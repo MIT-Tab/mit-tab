@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Data Entry{% endblock %}
+
+{% block banner %} {{title}} {% endblock %}
+
+{% block content %}
+<div class="float_container">
+    
+<div class="obj_info">
+    
+{% if team_obj %}
+<div class="team_record">
+    Team Stats:
+    <table>
+    <tr><th>Stat</th><th>Value</th></tr>
+    {% for stat,val in team_stats %}
+        <tr><td>{{stat}}</td><td>{{val}}</td></tr>
+    {% endfor %}
+    </table>
+    <a href='/team/card/{{ team_obj.id }}/'>View Tab Card</a>
+</div>
+{% endif %}
+
+
+    {% if debater_obj %}
+    <div class="team_record">
+
+        Debater Rounds:
+        <table>
+            <tr><th>Round #</th><th>Speaks</th><th>Ranks</th></tr>
+            {% for round in debater_rounds %}
+            <tr>
+                <td><a href='/round/{{ round.round.id }}/result/'>Round {{forloop.counter}}</a></td>
+                <td>{{round.speaks}}</td>
+                <td>{{round.ranks}}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
+
+    {% if form.errors %}
+        <p style="color: red;">
+            Please correct the error{{ form.errors|pluralize }} below.
+        </p>
+    {% endif %}
+    <script type="text/javascript" src="/admin/jsi18n/"></script> 
+    <link rel="stylesheet" type="text/css" href="/media/css/widgets.css" /> 
+    {{ form.media }}
+    <form action="{{ action }}" method="post" class="dataEntryForm">
+        <table>
+            {{ form }}
+            {{ other_data }}
+        </table>
+        {% if links %}
+        <div class="btn-group">
+            {% for link,text,confirm in links %}
+                <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
+            {% endfor %}
+        </div>
+        {%endif%}
+        <div class="btn-submit">
+            <input type="submit" value="Submit Changes">
+        <div>
+    </form>
+
+</div>
+</div>
+
+{% endblock %}

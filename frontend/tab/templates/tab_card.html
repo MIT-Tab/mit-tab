@@ -1,0 +1,65 @@
+<html lang="en">
+<head>
+
+<style type="text/css">
+table#pairing_list {
+    text-align: left;
+    border-collapse: collapse;
+    border: 1px solid #666666;   
+}
+
+table#pairing_list th{
+    border: 1px solid #666666;   
+    padding: .5em;
+    font-size: 16px;
+    font-style: bold;
+}
+table#pairing_list td{
+    border: 1px solid #666666;   
+    padding: .5em;
+    font-size: 14px;
+}
+</style>
+
+</head>
+<body>
+<table id="pairing_list">
+<tr>
+    <td colspan=5>Team: {{team_name}}</td>
+    <th rowspan=2>Speaker 1: {{debater_1}}</th>
+    <th rowspan=2>Speaker 2: {{debater_2}}</th>
+    <td></td>
+</tr>
+<tr>
+    <th>R</th>
+    <th>G/O</th>
+    <th>W/L</th>
+    <th>Opponent</th>
+    <th>Judge</th>
+    <th>Total</th>
+</tr>
+{% for round_stat in round_stats %}
+<tr>
+    <td>{{forloop.counter}}</td>
+    {% ifequal forloop.counter bye_round %}
+    <td>BYE</td>
+    {% else %}
+    <td>{{round_stat.0}}</td>
+    {% endifequal %}
+    <td>{{round_stat.1}}</td>
+    <td>{{round_stat.2}}</td>
+    <td>{{round_stat.3}}</td>
+    <td>{{round_stat.4}}</td>
+    <td>{{round_stat.5}}</td>
+    <td>{{round_stat.6}}</td>
+</tr>
+{% endfor %}
+<tr>
+    <td colspan=5>Tournament Totals:</td>
+    <td>({{d1st}},{{d1rt}})</td>
+    <td>({{d2st}},{{d2rt}})</td>
+    <td>({{ts}},{{tr}})</td>
+</tr>
+</table>
+</body>
+</html>

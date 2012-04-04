@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to MIT Tab{% endblock %}
+
+{% block content %}
+
+{% url tab.judge_views.view_judges as view_judges%}
+{% url tab.views.view_schools as view_schools %}
+{% url tab.team_views.view_teams as view_teams %}
+{% url tab.debater_views.view_debaters as view_debaters %}
+
+<div id="filter">
+Quick Search: <input type="text" id="filter_box"></input>
+</div>
+
+<p>{{number_schools}} Schools, {{number_judges}} Judges, {{ number_teams }} Teams </p>
+<div class="index_container">
+    <div class="index_list" id="school_list"> 
+        <a href="{{ view_schools }}">School List</a>
+        <ol id="schools">
+        {% for id,school in school_list %}
+        <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/school/{{id}}/"> {{school}}</a> </li>
+        {% endfor %}
+        </ol>
+    </div>
+
+    <div class="index_list" id="judge_list">
+        <a href="{{ view_judges }}">Judge List</a>
+        <ol id="judges">
+        {% for id,judge in judge_list %}
+        <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/judge/{{id}}/"> {{judge}}</a> </li>
+        {% endfor %}
+        </ol>
+    </div>
+
+    <div class="index_list" id="team_list">
+        <a href={{ view_teams }}>Team List</a>
+        <ol id="teams">
+        {% for id,team in team_list %}
+        <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/team/{{id}}/"> {{team}}</a> </li>
+        {% endfor %}
+        </ol>
+    </div>
+
+    <div class="index_list" id="debater_list">
+        <a href={{ view_debaters }}>Debater List</a>
+        <ol id="debaters">
+        {% for id,debater in debater_list %}
+        <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/debater/{{id}}/"> {{debater}}</a> </li>
+        {% endfor %}
+        </ol>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+    <link rel="stylesheet" type="text/css" href="/static/css/stylesheet.css" />
+    <link rel="stylesheet" type="text/css" href="/static/css/elements.css" />
+    <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css" />
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
+    <script type="text/javascript" src="/static/javascript/tab.js"></script>
+    <script type="text/javascript" src="/static/javascript/jsi18n.js"></script>
+
+    <title>{% block title %}{% endblock %}</title>
+</head>
+<body>
+    <div id="outer">
+        <div id="container">
+            <div id="dialog" class="invisible" title="Please Confirm">Are you sure?</div>
+            <div id="top_banner">
+                <!-- <img src="/static/images/title_banner.png" class="banner"> -->
+                <div class="welcome">Welcome to MIT-TAB</div>
+            </div>
+            {% include "navigation.html" %}
+            <br>
+                <div id="banner">
+                {% block banner %}{% endblock %}
+                </div>
+                {% block content %}{% endblock %}
+                {% block footer %}
+                <hr>
+                <p>MIT-TAB, published under the MIT License by Julia Boortz and Joey Lynch</p>
+                {% endblock %}
+        </div>
+    </div>
+</body>
+</html>

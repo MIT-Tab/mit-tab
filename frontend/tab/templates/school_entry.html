@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Judge Entry{% endblock %}
+
+{% block content %}
+    {% if form.errors %}
+        <p style="color: red;">
+            Please correct the error{{ form.errors|pluralize }} below.
+        </p>
+    {% endif %}
+    <form action="" method="post">
+        <table>
+            {{ form.as_table }}
+        </table>
+        <input type="submit" value="Submit">
+    </form>
+{% endblock %}

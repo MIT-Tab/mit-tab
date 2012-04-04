@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Round Status{% endblock %}
+
+{% block content %}
+<div id="round_info">
+	<h2>Round Status for Round: {{round_number}} </h2>
+	<h2 class="pairing_exists"> We have {% if valid_pairing %} a valid {% else %} an invalid {% endif %} Pairing: </h2>
+	{% if not valid_pairing %}
+         {{errors}}
+	{% endif %}
+    <div class="form_header">
+	<table class="pretty full_width">
+		<tr><th>Gov Team</th>
+            <th>Gov Wins/Speaks/Govs/Opps</th>
+            <th class="sep"></th>
+            <th>Opp Team</th>
+            <th>Opp Wins/Speaks/Govs/Opps</th>
+            <th class="sep"></th>
+            <th>Judge</th>
+            <th class="sep"></th>
+            <th>Room</th>
+            <th class="sep"></th>
+            <th>Results</th>
+		{% for pairing, gov_wins, gov_speaks, gov_govs, gov_opps, opp_wins, opp_speaks, opp_govs, opp_opps in round_info %}
+		<tr class="{% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}">
+            <td><a href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
+            <td><a href="/team/card/{{pairing.gov_team.id}}">{{gov_wins}} / {{gov_speaks|floatformat:2}} / {{gov_govs}} / {{gov_opps}}</a></td>
+            <td class="sep"></td>
+            <td><a href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
+            <td><a href="/team/card/{{pairing.opp_team.id}}">{{opp_wins}} / {{opp_speaks|floatformat:2}} / {{opp_govs}} / {{opp_opps}}</a></td>
+            <td class="sep"></td>
+            <td><a href="/judge/{{pairing.judge.id}}" >{{pairing.judge.name}}</a></td>
+            <td class="sep"></td>
+            <td><a href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
+            <td class="sep"></td>
+			<td>
+				{% if pairing.victor == 1 %}
+				<a href="/round/{{pairing.id}}/result/">GOV win</a></li>
+				{% else %}{% if pairing.victor == 2 %} 
+                    		<a href="/round/{{pairing.id}}/result/">OPP win</a></li>
+				{% else %}{% if pairing.victor == 3 %}
+				<a href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
+				{% else %}{% if pairing.victor == 4 %}
+				<a href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
+					{% else %}
+					<a href="/round/{{pairing.id}}/result/">[Enter Results]</a></li>
+					{%endif%}
+				{% endif %}{% endif %}{%endif%}
+			</td>
+		</tr>
+		{% endfor %}
+	</table>
+	</div>
+	
+	<br>
+	<div><h2>People Not Paired In</h2></div>
+    <div class="scroll">
+        <table class="pretty">
+            <tr><th>Checked in Teams</th><th>Checked in Judges</th><th>Non Checked in Judges</th></tr>
+            {% for team, cjudge, judge in excluded_people%}
+            <tr>
+                <td>
+                {% if team %} <a href="/team/{{team.id}}" >{{team.name}}</a> {% endif %}
+                </td>
+                <td>
+                {% if cjudge %} <a href="/judge/{{cjudge.id}}" >{{cjudge.name}}</a> {% endif %}
+                </td>
+                <td>
+                {% if judge %} <a style="color:{% if judge.rank > warning %}red{%else%}black{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+    
+        </table>
+    </div>
+    <br>
+    <div class="btn-group">
+        <a class="mid btn" href="/pairings/pairinglist/" title="A randomized view to display in GA">Announcement View</a>
+        <a class="mid btn confirmLink" href="/pairings/send_texts/" title="Text Round Information to Debaters and Judges">Send Texts</a>
+    </div>
+</div>
+
+{% endblock %}

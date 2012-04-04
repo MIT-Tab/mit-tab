@@ -1,0 +1,323 @@
+body {
+    background:#BFD9FF;
+    padding: auto;
+    font-size: 14px;
+}
+
+/*Navigation.html styling  */
+div#nab_bar {
+    width: 100%;    
+}
+
+ul#navlist {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    width: 100%;
+}
+
+ul#navlist li {
+  display: block;
+  position: relative;
+  float: left;
+}
+
+ul#navlist li {
+    width:12.5%;
+}
+
+ul#navlist li a {
+   border-radius:.2em;
+  display: block;
+  border-top: 1px solid #ffffff;
+  padding: .3em 1em .3em 1em;
+  background: #2E7BCA;
+  margin-left: 1px;
+  text-align: center;
+  text-decoration: none;
+  color: black;
+}
+
+ul#navlist li a.active {
+  background: #BFD9FF;
+  text-decoration: none;
+}
+
+ul#navlist li a:hover { background: #A4C0E4; }
+
+ul#sublist {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: none;
+    width: 100%;
+}
+
+ul#sublist li {
+    width:100%;
+    
+}
+
+ul#sublist li a.active {
+  background: #2C72C7;
+  text-decoration: none;
+}
+
+li:hover ul#sublist {
+  display: block;
+  position: absolute;
+}
+ul#sublist li:hover a { background: #A4C0E4; }
+ul#sublist li:hover li a:hover { background: #A4C0E4; }
+a:hover {
+    background: #AAAAAA;
+    border-radius: .2em;
+}
+/*finish navigation.html  */
+
+/* Index styling */
+div#outer {
+    text-align: center;
+}
+div#container {
+    width: 95%;
+    text-align: left;
+    margin: auto;
+    background: #FBFBF0;
+    padding-right: 1em;
+    padding-left: 1em;
+    padding-top: 1em;
+    border-radius: 1em;
+    overflow: auto;
+}
+div.float_container {
+    overflow:auto;
+    white-space: nowrap;
+}
+
+div.welcome {
+    line-height: 3em;
+    font-size: 25px;
+    color: white;
+    margin: auto;
+}
+
+div#top_banner {
+    background:#00438A;
+    height:6em;
+    width:100%;
+    margin: 0;
+    margin-bottom: .3em;
+    text-align: center;
+    position: relative;
+    border-radius: 1em;
+}
+
+img.banner{
+    float: left;
+    display:inline-block;
+    height: 6em;
+    margin:0 0 0 .8em;
+}
+
+#school_list {
+vertical-align: top;
+display:inline-block;
+padding:.5em;
+color:blue;
+}
+
+ul#schools{
+list-style: decimal;    
+}
+
+#judge_list{
+vertical-align: top;
+display:inline-block;
+padding:10px;
+color:blue;
+}
+
+ul#judges{
+list-style:decimal;    
+}
+/*  I really need to get rid of this copy paste code*/
+#team_list{
+vertical-align: top;
+display:inline-block;
+padding:10px;
+color:blue;
+}
+
+ul#teams{
+list-style:decimal;    
+}
+
+
+/*  Form Styling */
+.warning {
+    color: #CC0000;
+}
+
+.success {
+    color: #009900;
+}
+
+p.warning {
+    border: 1px solid #444444;
+    padding: .5em;
+}
+
+div#banner {
+    font-size: 25px;  
+    padding: .2em;
+}
+
+.form_header{
+    text-align:center;    
+}
+
+table#pairing_list {
+    text-align: left;
+    border-collapse: collapse;
+    border: 1px solid #666666;   
+}
+
+table#pairing_list th{
+    border: 1px solid #666666;   
+    padding: .5em;
+    font-size: 18px;
+    font-style: bold;
+}
+table#pairing_list td{
+    border: 1px solid #666666;   
+    padding: .5em;
+    font-size: 14px;
+}
+
+div#round_info{
+    font-size: 14px;   
+}
+
+table.check_status {
+    text-align: left;
+    border-collapse: collapse;
+    border-bottom: 1px solid #666666;
+}
+
+table.check_status th {
+    border: 1px solid #BBBBBB;
+}
+
+table.check_status td {
+    border-right: 1px solid #BBBBBB;
+    border-left: 1px solid #BBBBBB;
+}
+
+div.obj_info {
+    border: 1px solid #BBBBBB;
+    padding: .5em;
+    overflow: hidden; 
+}
+
+a.view_object {
+    text-decoration: none;
+    background: #CCCCCC;
+}
+
+
+a.view_object:hover {
+    background: #DDDDDD;
+}
+
+ul.errorlist {
+    list-style: none;
+    padding: .1em;
+    margin: 0;
+    color: #CC0000;
+}
+
+ul.errorlist li::before {
+    content: ", ";
+    white-space: pre;
+}
+ul.errorlist li:first-child::before {
+    content: "";
+}
+
+div.team_record {
+    float: right;
+    padding: 1em;
+    border: 1px solid #BBBBBB;
+    font-size: 18px;
+    z-index: 5;
+}
+
+div.team_record table {
+    border-collapse: collapse;
+}
+div.team_record table th{
+    border-right: 1px solid black;
+    border-bottom: 1px solid black;
+    margin: .1em;
+}
+div.team_record table td{
+    border-right: 1px solid black;
+    margin: .1em;
+}
+
+div.list_wrapper {
+    float: left;
+    width: 18em;
+}
+
+div.clear {
+    clear: both;
+}
+
+a.obj_item {
+    text-decoration: none;
+    color: black;
+}
+
+div.team_record td {
+    padding-right: .5em;    
+    padding-left: .5em;    
+}
+
+div.team_record th {
+    padding-right: .5em;    
+    padding-left: .5em;    
+}
+
+.mid {
+    font-size: 18px;
+}
+
+.right {
+    float: right;    
+}
+
+a.button {
+    text-decoration: none;
+    color: black;
+    background: #2E7BCA;
+    border-radius: .2em;
+    padding: .2em;
+    width: 5em;
+    display: inline-block;
+    text-align: center;
+}
+
+
+a.button:hover {
+    background: #A4C0E4;
+}
+
+li.odd {
+    background: #FBFBF0;
+}
+li.even {
+    background: #D9D9D0;
+    
+}

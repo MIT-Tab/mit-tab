@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block banner %} {{title}} {% endblock %}
+
+{% block content %}
+
+<div id="pairing_form">
+    <form action="." method="post">
+        <table class="check_status">
+            <tr><th>Sanity Check</th><th>Successful?</th></tr>
+            {% for check,status,alt in check_status%}
+                <tr>
+                    <td>{{check}}</td>
+                    {% if status == "No"%}
+                        <td class="warning" title="{{alt}}">
+                    {% else %}
+                        <td class="success" title="{{alt}}">
+                    {% endif %}
+                    {{status}}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>   
+        
+        <div>
+            <p class="warning">
+            This action is final, if you have chosen to ignore errors that is your own fault and will be 100% resonsible if things get messed up
+            </p>
+            <input type="submit" value="Pair This Round">
+        </div>
+    </form>
+</div>
+
+{% endblock %}

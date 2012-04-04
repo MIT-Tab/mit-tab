@@ -1,0 +1,189 @@
+#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+
+#Permission is hereby granted, free of charge, to any person obtaining a copy
+#of this software and associated documentation files (the "Software"), to deal
+#in the Software without restriction, including without limitation the rights
+#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#copies of the Software, and to permit persons to whom the Software is
+#furnished to do so, subject to the following conditions:
+
+#The above copyright notice and this permission notice shall be included in
+#all copies or substantial portions of the Software.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#THE SOFTWARE.
+
+from django.db import models
+from django.contrib.localflavor.us.models import PhoneNumberField 
+
+###NOTE All fields automatically have a id key created that act as primary keys
+
+class TabSettings(models.Model):
+   key = models.CharField(max_length=20)
+   value = models.IntegerField()
+   def __unicode__(self):
+       return "%s => %s" % (self.key,self.value)
+
+class School(models.Model):
+    name = models.CharField(max_length=50, unique = True)
+    def __unicode__(self):
+        return self.name
+    
+    def delete(self):
+        team_check = Team.objects.filter(school=self)
+        judge_check = Judge.objects.filter(school=self)
+        if len(team_check) == 0 and len(judge_check) == 0:
+            super(School, self).delete()
+        else:
+            raise Exception("School in use: [teams => %s,judges => %s]" % ([t.name for t in team_check], [j.name for j in judge_check]))
+            
+class Debater(models.Model):
+    name = models.CharField(max_length=30, unique = True)
+    #team_set is created by Team in the ManyToMany
+    #team = models.ForeignKey('Team')
+    #0 = Varsity, 1 = Novice
+    NOVICE_CHOICES = (
+        (0, u'Varsity'),
+        (1, u'Novice'),
+    )
+    phone = PhoneNumberField(blank=True) 
+    provider = models.CharField(max_length=40, blank=True)
+    novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    def __unicode__(self):
+        return self.name
+        
+    def delete(self):
+        teams = Team.objects.filter(debaters = self)
+        if len(teams) == 0:
+            super(Debater, self).delete()
+        else :
+            raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
+
+class Team(models.Model):
+    name = models.CharField(max_length=30, unique = True)
+    school = models.ForeignKey('School')
+    debaters = models.ManyToManyField(Debater)
+    # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
+    SEED_CHOICES= (
+        (0, u'Unseeded'),
+        (1, u'Free Seed'),
+        (2, u'Half Seed'),
+        (3, u'Full Seed'),
+    )
+    seed = models.IntegerField(choices=SEED_CHOICES)
+    checked_in = models.BooleanField(default=True)
+    
+    def __unicode__(self):
+        return self.name
+
+    def delete(self):
+        scratches = Scratch.objects.filter(team=self)
+        for s in scratches:
+            s.delete()
+        super(Team, self).delete()
+
+
+class Judge(models.Model):
+    name = models.CharField(max_length=30, unique = True)
+    rank = models.DecimalField(max_digits=4, decimal_places=2)
+    school = models.ForeignKey(School)
+    phone = PhoneNumberField(blank=True)
+    provider = models.CharField(max_length=40, blank=True)
+    def __unicode__(self):
+        return self.name
+
+    def delete(self):
+        checkins = CheckIn.objects.filter(judge=self)
+        for c in checkins:
+            c.delete()
+        super(Judge, self).delete()
+
+class Scratch(models.Model):
+    judge = models.ForeignKey(Judge)
+    team = models.ForeignKey(Team)
+    TYPE_CHOICES = (
+        (0, u'Team Scratch'),
+        (1, u'Tab Scratch'),
+    )
+    scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    def __unicode__(self):
+        return str(self.judge) + ", "+str(self.team)
+
+class Room(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+    rank = models.DecimalField(max_digits=4, decimal_places=2)
+    def __unicode__(self):
+        return self.name       
+    def delete(self):
+        rounds = Round.objects.filter(room=self)
+        if len(rounds) == 0:
+            super(Room, self).delete()
+        else :
+            raise Exception("Room is in round: %s" % ([r.name for r in rounds]))
+
+
+class Round(models.Model):
+    round_number = models.IntegerField()
+    gov_team = models.ForeignKey(Team, related_name="gov_team")
+    opp_team = models.ForeignKey(Team, related_name="opp_team")
+    judge = models.ForeignKey(Judge)
+    PULLUP_CHOICES = (
+        (0, u'NONE'),
+        (1, u'GOV'),
+        (2, u'OPP'),
+    )
+    pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
+    VICTOR_CHOICES = (
+        (0, u'UNKNOWN'),
+        (1, u'GOV'),
+        (2, u'OPP'),
+        (3, u'GOV via Forfeit'),
+        (4, u'OPP via Forfeit')
+    )
+    room = models.ForeignKey(Room)
+    victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+    def __unicode__(self):
+        return str(self.round_number) + " between " + str(self.gov_team) + " and " + str(self.opp_team)
+
+    def delete(self):
+        rounds = RoundStats.objects.filter(round=self)
+        for rs in rounds:
+            rs.delete()
+        super(Round, self).delete()
+
+class Bye(models.Model):
+   bye_team = models.ForeignKey(Team)
+   round_number = models.IntegerField()
+
+   def __unicode__(self):
+      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+      
+class NoShow(models.Model):
+   no_show_team = models.ForeignKey(Team)
+   round_number = models.IntegerField()
+
+   def __unicode__(self):
+      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
+
+                 
+class RoundStats(models.Model):
+    debater = models.ForeignKey(Debater)
+    round = models.ForeignKey(Round)
+    #fewer digits?
+    speaks = models.DecimalField(max_digits=6, decimal_places=4)
+    ranks = models.PositiveIntegerField()
+    debater_role = models.CharField(max_length=4, null=True)
+    
+    def __unicode__(self):
+        return "Results for %s in round %s" % (self.debater, self.round.round_number)
+
+class CheckIn(models.Model):
+    judge = models.ForeignKey(Judge)
+    round_number = models.IntegerField()
+    def __unicode__(self):
+        return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
