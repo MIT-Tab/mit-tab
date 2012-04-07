@@ -874,7 +874,7 @@ def double_adj_rank_deb(d):
     listOfRanks = []
     for i in range(num_rounds):
         listOfRanks += [[None]]
-    debStats = RoundStats.objects.filter(debater = d)
+    debStats = d.roundstats_set.all()
     for r in debStats:
         #print d
         #print listOfRanks
@@ -913,17 +913,11 @@ def double_adj_rank_deb(d):
     return double_adj_ranks
                       
 def deb_team(d):
-    for t in Team.objects.all():
-        if d in list(t.debaters.all()):
-            return t
+    return d.team_set.all()[0]
                           
 def rank_speakers():
     debs = list(Debater.objects.all())
-    random.shuffle(debs, random = random.random)
-    speakers = sorted(debs, key=lambda d: double_adj_rank_deb(d))
-    speakers = sorted(speakers, key=lambda d: double_adj_speak_deb(d), reverse = True)
-    speakers = sorted(speakers, key=lambda d: tot_ranks_deb(d))
-    speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
+    speakers = sorted(debs, key=lambda d: (-1 * tot_speaks_deb(d), tot_ranks_deb(d), -1 * double_adj_speak_deb(d), double_adj_rank_deb(d)))
     return speakers
 
 def rank_nov_teams():
