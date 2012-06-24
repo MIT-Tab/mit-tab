@@ -24,12 +24,15 @@
 #Always sort so that top team is at the beginning of the list - use reverse!
 
 from tab.models import *
+from django.db.models import *
+
 import random
 import pairingAlg
 import assignJudges
 import errors
 from decimal import *
 import send_texts
+from datetime import datetime
 
     
 #will return false if not ready to pair yet
@@ -344,16 +347,11 @@ def won_by_forfeit(r,t):
                
     
 #Calculate the total number of wins a team has
-def tot_wins(t):
-    tot_wins = 0
-    for r in list(Round.objects.filter(gov_team = t)):
-        if r.victor == 1 or r.victor == 3:
-            tot_wins +=1
-    for r in list(Round.objects.filter(opp_team = t)):
-        if r.victor == 2 or r.victor == 4:
-            tot_wins +=1
+def tot_wins(team):
+    tot_wins = Round.objects.filter(Q(gov_team=team, victor=Round.GOV)|
+                                    Q(opp_team=team, victor=Round.OPP)).count()
     #If a team had the bye, they won't have a round for that win so add one win
-    tot_wins += num_byes(t) 
+    tot_wins += num_byes(team) 
     return tot_wins
 
 #Calculate the team's average speaks
@@ -391,33 +389,29 @@ def avg_team_ranks(t):
         return float(tot_ranks)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
 
 #Calculate a team's total speaks
-def tot_speaks(t):
-    tot_speaks = 0
-    for d in list(t.debaters.all()):
-        debStats = list(RoundStats.objects.filter(debater = d))
-        for r in debStats:
-            tot_speaks += float(r.speaks)
-    #If a team had the bye or won by a forfeit, add in the average of speaks for those rounds
-    tot_speaks += avg_team_speaks(t) * (num_byes(t)+num_forfeit_wins(t))
+def tot_speaks(team):
+    tot_speaks = sum([tot_speaks_deb(deb)
+                      for deb in team.debaters.all()])
+    tot_speaks = float(tot_speaks) + avg_team_speaks(team) * (num_byes(team) + num_forfeit_wins(team))
     return tot_speaks
 
-def tot_ranks(t):
+
+def tot_ranks(team):
     tot_ranks = 0
-    for d in t.debaters.all():
-        debStats = list(RoundStats.objects.filter(debater = d))
-        for r in debStats:
-            if won_by_forfeit(r.round, t):
+    for debater in team.debaters.all():
+        for round_stat in debater.roundstats_set.all():
+            if won_by_forfeit(round_stat.round, team):
                 #The average ranks will be added later
                 pass
-            elif forfeited_round(r.round,t):
+            elif forfeited_round(round_stat.round, team):
                 tot_ranks += 3.5
             else:
-                tot_ranks += r.ranks
-    for n in list(NoShow.objects.filter(no_show_team = t)):
+                tot_ranks += round_stat.ranks
+    for n in list(NoShow.objects.filter(no_show_team = team)):
         tot_ranks +=7
 
     #If a team had the bye or won by a forfeit, add in the average of ranks for those rounds
-    tot_ranks += avg_team_ranks(t) * (num_byes(t)+num_forfeit_wins(t))
+    tot_ranks += avg_team_ranks(team) * (num_byes(team) + num_forfeit_wins(team))
         
     return tot_ranks
                           
@@ -598,7 +592,13 @@ def opp_strength(t):
         opp_record +=tot_wins(r.gov_team)
     return opp_record
     
+# Return a list of all teams who have no varsity members 
+def all_nov_teams():
+    return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
 
+# Return a list of all teams in the Database
+def all_teams():
+    return list(Team.objects.all())
 
 #return tuples with pairs for varsity break
 def tab_var_break():
@@ -619,37 +619,51 @@ def tab_nov_break():
         pairings += [(nov_break[i],nov_break[len(nov_break)-i-1])]
     return pairings
 
+
+# Returns a tuple b
+def team_score(team):
+    return (-tot_wins(team),
+            -tot_speaks(team),
+            tot_ranks(team),
+            -single_adjusted_speaks(team),
+            single_adjusted_ranks,
+            -double_adjusted_speaks(team),
+            double_adjusted_ranks,
+            -opp_strength(team))
+
+
+def team_score_except_record(team):
+    return team_score(team)[1:]
+
+
 def rank_teams():
-    teams = list(Team.objects.all())
-    random.shuffle(teams, random = random.random)
-    teams = sorted(teams, key=lambda team: opp_strength(team), reverse = True)
-    teams = sorted(teams, key=lambda team: double_adjusted_ranks(team))
-    teams = sorted(teams, key=lambda team: double_adjusted_speaks(team), reverse = True)
-    teams = sorted(teams, key=lambda team: single_adjusted_ranks(team))
-    teams = sorted(teams, key=lambda team: single_adjusted_speaks(team), reverse = True)
-    teams = sorted(teams, key=lambda team: tot_ranks(team))
-    teams = sorted(teams, key=lambda team: tot_speaks(team), reverse = True)
-    teams = sorted(teams, key=lambda team: tot_wins(team), reverse = True)
-    return teams
-    
+    return sorted(all_teams(), key=lambda team: team_score(team))
+
+
 def rank_teams_except_record(teams):
-    random.shuffle(teams, random = random.random)
-    teams = sorted(teams, key=lambda team: opp_strength(team), reverse = True)
-    teams = sorted(teams, key=lambda team: double_adjusted_ranks(team))
-    teams = sorted(teams, key=lambda team: double_adjusted_speaks(team), reverse = True)
-    teams = sorted(teams, key=lambda team: single_adjusted_ranks(team))
-    teams = sorted(teams, key=lambda team: single_adjusted_speaks(team), reverse = True)
-    teams = sorted(teams, key=lambda team: tot_ranks(team))
-    teams = sorted(teams, key=lambda team: tot_speaks(team), reverse = True)
-    return teams
+    return sorted(all_teams(), key=lambda team: team_score_except_record(team))
+
+
+def rank_nov_teams():
+    return sorted(all_nov_teams(), key=lambda team: team_score(team))
+
+
+def rank_nov_speakers():
+    debs = list(Debater.objects.filter(novice_status=1))
+    random.shuffle(debs, random = random.random)
+    speakers = sorted(debs, key=lambda d: double_adj_rank_deb(d))
+    speakers = sorted(speakers, key=lambda d: double_adj_speak_deb(d), reverse = True)
+    speakers = sorted(speakers, key=lambda d: tot_ranks_deb(d))
+    speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
+    return speakers
 
 def avg_deb_speaks(d):
     tot_speak = 0
     #This is all the rounds the debater debated in
-    myRounds = RoundStats.objects.filter(debater = d)
+    my_rounds = RoundStats.objects.filter(debater = d)
     for i in range(TabSettings.objects.get(key = "cur_round").value-1):
         tempSpeak = []
-        for r in myRounds:
+        for r in my_rounds:
             if r.round.round_number == i+1:
                 tempSpeak += [r.speaks]
         if len(tempSpeak) != 0:
@@ -660,25 +674,23 @@ def avg_deb_speaks(d):
         return 0
     else:
         return float(tot_speak)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
-
-
                     
 def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
-    myRounds = RoundStats.objects.filter(debater = d)
+    my_rounds = RoundStats.objects.filter(debater = d)
     for i in range(TabSettings.objects.get(key = "cur_round").value-1):
-        tempRank = []
-        for r in myRounds:
+        temp_rank = []
+        for r in my_rounds:
             if r.round.round_number == i+1:
                 if forfeited_round(r.round,t):
-                    tempRank += [3.5]
+                    temp_rank += [3.5]
                 elif won_by_forfeit(r.round,t):
                     pass
                 else:
-                    tempRank+=[r.ranks]
-        if len(tempRank) != 0:
-            tot_rank += float(sum(tempRank))/float(len(tempRank))
+                    temp_rank+=[r.ranks]
+        if len(temp_rank) != 0:
+            tot_rank += float(sum(temp_rank))/float(len(temp_rank))
 
                 
     for n in list(NoShow.objects.filter(no_show_team=t)):
@@ -694,41 +706,39 @@ def avg_deb_ranks(d):
 
     
 #calculate the total speaks for the debater (if iron-manned, average that round)
-def tot_speaks_deb(d):
+def tot_speaks_deb(debater):
     tot_speak = 0
     #This is all the rounds the debater debated in
-    myRounds = RoundStats.objects.filter(debater = d)
-    #
+    my_rounds = debater.roundstats_set.all()
     for i in range(TabSettings.objects.get(key = "cur_round").value-1):
-        tempSpeak = []
-        for r in myRounds:
+        temp_speak = []
+        for r in my_rounds:
             if r.round.round_number == i+1:
-                tempSpeak += [r.speaks]
-        if len(tempSpeak) != 0:
-            tot_speak += float(sum(tempSpeak))/float(len(tempSpeak))
-    t = deb_team(d)
+                temp_speak += [r.speaks]
+        if len(temp_speak) != 0:
+            tot_speak += float(sum(temp_speak))/float(len(temp_speak))
+    t = deb_team(debater)
     #If they had the bye or won by forfeit, need to add that round
-    tot_speak += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
-            
+    tot_speak += avg_deb_speaks(debater)*(num_byes(t)+num_forfeit_wins(t))
     return tot_speak
 
 #calculate the total ranks for the debater (if iron-manned, average that round)
 def tot_ranks_deb(d):
     tot_rank = 0
     t = deb_team(d)
-    myRounds = RoundStats.objects.filter(debater = d)
+    my_rounds = d.roundstats_set.all()
     for i in range(TabSettings.objects.get(key = "cur_round").value-1):
-        tempRank = []
-        for r in myRounds:
+        temp_rank = []
+        for r in my_rounds:
             if r.round.round_number == i+1:
                 if forfeited_round(r.round,t):
-                    tempRank += [3.5]
+                    temp_rank += [3.5]
                 elif won_by_forfeit(r.round,t):
                     pass
                 else:
-                    tempRank+=[r.ranks]
-        if len(tempRank) != 0:
-            tot_rank += float(sum(tempRank))/float(len(tempRank))
+                    temp_rank+=[r.ranks]
+        if len(temp_rank) != 0:
+            tot_rank += float(sum(temp_rank))/float(len(temp_rank))
             
     t=deb_team(d)
     for n in list(NoShow.objects.filter(no_show_team=t)):
@@ -914,48 +924,17 @@ def double_adj_rank_deb(d):
                       
 def deb_team(d):
     return d.team_set.all()[0]
-                          
+
+# Returns a tuple used for comparing two debaters 
+# in terms of their overall standing in the tournament
+def debater_score(debater):
+    return (-tot_speaks_deb(debater),
+            tot_ranks_deb(debater),
+            -sing_adj_speak_deb(debater),
+            sing_adj_speak_deb(debater),
+            -double_adj_speak_deb(debater),
+            double_adj_rank_deb(debater))
+
 def rank_speakers():
-    debs = list(Debater.objects.all())
-    speakers = sorted(debs, key=lambda d: (-1 * tot_speaks_deb(d), tot_ranks_deb(d), -1 * double_adj_speak_deb(d), double_adj_rank_deb(d)))
-    return speakers
-
-def rank_nov_teams():
-    teams = list(Team.objects.all())
-    var_break = tab_var_break()
-    novice_teams = []
-    for t in teams:
-        if t in var_break: #if the team broke varsity, they can't break novice
-            break
-        debs = list(t.debaters.all())
-        novice = True
-        for d in debs:
-            if d.novice_status == 0: #if have a varsity member then not a novice team
-                novice = False
-                break
-        if novice == True:
-            novice_teams += [t]
-
-    random.shuffle(novice_teams, random = random.random)
-    novice_teams = sorted(novice_teams, key=lambda team: opp_strength(team), reverse = True)
-    novice_teams = sorted(novice_teams, key=lambda team: double_adjusted_ranks(team))
-    novice_teams = sorted(novice_teams, key=lambda team: double_adjusted_speaks(team), reverse = True)
-    novice_teams = sorted(novice_teams, key=lambda team: single_adjusted_ranks(team))
-    novice_teams = sorted(novice_teams, key=lambda team: single_adjusted_speaks(team), reverse = True)
-    novice_teams = sorted(novice_teams, key=lambda team: tot_ranks(team))
-    novice_teams = sorted(novice_teams, key=lambda team: tot_speaks(team), reverse = True)
-    novice_teams = sorted(novice_teams, key=lambda team: tot_wins(team), reverse = True)
-
-    return novice_teams
-
-
-def rank_nov_speakers():
-    debs = list(Debater.objects.filter(novice_status=1))
-    random.shuffle(debs, random = random.random)
-    speakers = sorted(debs, key=lambda d: double_adj_rank_deb(d))
-    speakers = sorted(speakers, key=lambda d: double_adj_speak_deb(d), reverse = True)
-    speakers = sorted(speakers, key=lambda d: tot_ranks_deb(d))
-    speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
-    return speakers
-
+    return sorted(Debater.objects.all(), key=lambda deb: debater_score(deb))
 

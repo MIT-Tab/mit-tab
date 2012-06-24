@@ -47,9 +47,11 @@ class Debater(models.Model):
     #team_set is created by Team in the ManyToMany
     #team = models.ForeignKey('Team')
     #0 = Varsity, 1 = Novice
+    VARSITY = 0
+    NOVICE = 1
     NOVICE_CHOICES = (
-        (0, u'Varsity'),
-        (1, u'Novice'),
+        (VARSITY, u'Varsity'),
+        (NOVICE, u'Novice'),
     )
     phone = PhoneNumberField(blank=True) 
     provider = models.CharField(max_length=40, blank=True)
@@ -69,11 +71,15 @@ class Team(models.Model):
     school = models.ForeignKey('School')
     debaters = models.ManyToManyField(Debater)
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
+    UNSEEDED = 0
+    FREE_SEED = 1
+    HALF_SEED = 2
+    FULL_SEED = 3
     SEED_CHOICES= (
-        (0, u'Unseeded'),
-        (1, u'Free Seed'),
-        (2, u'Half Seed'),
-        (3, u'Full Seed'),
+        (UNSEEDED, u'Unseeded'),
+        (FREE_SEED, u'Free Seed'),
+        (HALF_SEED, u'Half Seed'),
+        (FULL_SEED, u'Full Seed'),
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
@@ -106,9 +112,11 @@ class Judge(models.Model):
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge)
     team = models.ForeignKey(Team)
+    TEAM_SCRATCH = 0
+    TAB_SCRATCH = 1
     TYPE_CHOICES = (
-        (0, u'Team Scratch'),
-        (1, u'Tab Scratch'),
+        (TEAM_SCRATCH, u'Team Scratch'),
+        (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
     def __unicode__(self):
@@ -132,18 +140,27 @@ class Round(models.Model):
     gov_team = models.ForeignKey(Team, related_name="gov_team")
     opp_team = models.ForeignKey(Team, related_name="opp_team")
     judge = models.ForeignKey(Judge)
+    NONE = 0
+    GOV = 1
+    OPP = 2
     PULLUP_CHOICES = (
-        (0, u'NONE'),
-        (1, u'GOV'),
-        (2, u'OPP'),
+        (NONE, u'NONE'),
+        (GOV, u'GOV'),
+        (OPP, u'OPP'),
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
+    UNKNOWN = 0
+    GOV = 1
+    OPP = 2
+    GOV_VIA_FORFEIT = 3
+    OPP_VIA_FORFEIT = 4
+    ALL_DROP = 5
     VICTOR_CHOICES = (
-        (0, u'UNKNOWN'),
-        (1, u'GOV'),
-        (2, u'OPP'),
-        (3, u'GOV via Forfeit'),
-        (4, u'OPP via Forfeit')
+        (UNKNOWN, u'UNKNOWN'),
+        (GOV, u'GOV'),
+        (OPP, u'OPP'),
+        (GOV_VIA_FORFEIT, u'GOV via Forfeit'),
+        (OPP_VIA_FORFEIT, u'OPP via Forfeit')
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)

@@ -12,15 +12,15 @@
                 <td colspan=5> Varsity Team Ranking </td>
             </tr>
             <tr>
-                <th>#</th><th>Team Name</th><th>Speaks</th><th>Ranks</th><th>Wins</th>
+                    <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th>
             </tr>    
-            {% for team,speaks,ranks,wins in varsity %}
+            {% for team,wins,speaks,ranks in varsity %}
             <tr>
                 <td> {{forloop.counter}} </td>
                 <td> <a href="/team/{{team.id}}">{{team.name}}</a></td>
+                <td> {{wins}}</td>
                 <td> {{speaks|floatformat:2}}</td>
                 <td> {{ranks|floatformat:2}}</td>
-                <td> {{wins}}</td>
             </tr>
             {% endfor %}
         </table>
@@ -31,15 +31,15 @@
                 <td colspan=5>Novice Team Ranking</td> 
             </tr>
             <tr>
-                <th>#</th><th>Team Name</th><th>Speaks</th><th>Ranks</th><th>Wins</th>
+                    <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th>
             </tr>    
-            {% for team,speaks,ranks,wins in novice %}
+            {% for team,wins,speaks,ranks in novice %}
             <tr>
                 <td> {{forloop.counter}} </td>
                 <td> <a href="/team/{{team.id}}">{{team.name}}</a></td>
+                <td> {{wins}}</td>
                 <td> {{speaks|floatformat:2}}</td>
                 <td> {{ranks|floatformat:2}}</td>
-                <td> {{wins}}</td>
             </tr>
             {% endfor %}
         </table>
