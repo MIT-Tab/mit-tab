@@ -49,7 +49,7 @@
     <script type="text/javascript" src="/admin/jsi18n/"></script> 
     <link rel="stylesheet" type="text/css" href="/media/css/widgets.css" /> 
     {{ form.media }}
-    <form action="{{ action }}" method="post" class="dataEntryForm">
+    <form action="{{ action }}" method="post" class="dataEntryForm">{% csrf_token %}
         <table>
             {{ form }}
             {{ other_data }}

@@ -3,7 +3,7 @@
 
 {% block title %}Multiple Data Entry{% endblock %}
 {% block content %}
-    <form method="post" action="">
+<form method="post" action=""> {% csrf_token %}
         <table>
             {% for form,delete in forms %}
             

@@ -7,7 +7,7 @@
 {% block content %}
 
 <div id="pairing_form">
-    <form action="." method="post">
+        <form action="." method="post"> {% csrf_token %}
         <table class="check_status">
             <tr><th>Sanity Check</th><th>Successful?</th></tr>
             {% for check,status,alt in check_status%}
