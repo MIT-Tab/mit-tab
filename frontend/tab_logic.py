@@ -461,38 +461,38 @@ def single_adjusted_ranks(t):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfRanks = []
+    list_of_ranks = []
     for i in range(num_rounds):
-        listOfRanks += [None]
+        list_of_ranks += [None]
 
     for d in list(t.debaters.all()):
         debStats = RoundStats.objects.filter(debater = d)
         for r in debStats:
-            if listOfRanks[r.round.round_number-1] == None:
+            if list_of_ranks[r.round.round_number-1] == None:
                 if won_by_forfeit(r.round, t):
                     pass
                 elif forfeited_round(r.round,t):
-                    listOfRanks[r.round.round_number-1] = 3.5
+                    list_of_ranks[r.round.round_number-1] = 3.5
                 else:
-                    listOfRanks[r.round.round_number-1] = r.ranks
+                    list_of_ranks[r.round.round_number-1] = r.ranks
             else:
                 if won_by_forfeit(r.round, t):
                     pass
                 elif forfeited_round(r.round,t):
-                    listOfRanks[r.round.round_number-1] += 3.5
+                    list_of_ranks[r.round.round_number-1] += 3.5
                 else:
-                    listOfRanks[r.round.round_number-1] += r.ranks
+                    list_of_ranks[r.round.round_number-1] += r.ranks
     for n in list(NoShow.objects.filter(no_show_team=t)):
-        listOfRanks[n.round_number-1] = 7
+        list_of_ranks[n.round_number-1] = 7
 
-    while None in listOfRanks:
-        listOfRanks.remove(None)
+    while None in list_of_ranks:
+        list_of_ranks.remove(None)
         
-    listOfRanks.sort()
+    list_of_ranks.sort()
 
-    listOfRanks=listOfRanks[1:-1]
+    list_of_ranks=list_of_ranks[1:-1]
     sing_adj_ranks = 0
-    for r in listOfRanks:
+    for r in list_of_ranks:
         sing_adj_ranks+=float(r)
     if had_bye(t) == True:
         sing_adj_ranks+= avg_team_ranks(t)*(num_byes(t)+num_forfeit_wins(t))
@@ -544,39 +544,39 @@ def double_adjusted_ranks(t):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfRanks = []
+    list_of_ranks = []
     for i in range(num_rounds):
-        listOfRanks += [None]
+        list_of_ranks += [None]
 
     for d in list(t.debaters.all()):
         debStats = RoundStats.objects.filter(debater = d)
         for r in debStats:
-            if listOfRanks[r.round.round_number-1] == None:
+            if list_of_ranks[r.round.round_number-1] == None:
                 if won_by_forfeit(r.round, t):
                     pass
                 elif forfeited_round(r.round,t):
-                    listOfRanks[r.round.round_number-1] = 3.5
+                    list_of_ranks[r.round.round_number-1] = 3.5
                 else:
-                    listOfRanks[r.round.round_number-1] = r.ranks
+                    list_of_ranks[r.round.round_number-1] = r.ranks
             else:
                 if won_by_forfeit(r.round, t):
                     pass
                 elif forfeited_round(r.round,t):
-                    listOfRanks[r.round.round_number-1] += 3.5
+                    list_of_ranks[r.round.round_number-1] += 3.5
                 else:
-                    listOfRanks[r.round.round_number-1] += r.ranks
+                    list_of_ranks[r.round.round_number-1] += r.ranks
 
     for n in list(NoShow.objects.filter(no_show_team=t)):
-        listOfRanks[n.round_number-1] = 7
+        list_of_ranks[n.round_number-1] = 7
             
-    listOfRanks.sort()
+    list_of_ranks.sort()
     
-    while None in listOfRanks:
-        listOfRanks.remove(None)
+    while None in list_of_ranks:
+        list_of_ranks.remove(None)
 
-    listOfRanks=listOfRanks[2:-2]
+    list_of_ranks=list_of_ranks[2:-2]
     double_adj_ranks = 0
-    for r in listOfRanks:
+    for r in list_of_ranks:
         double_adj_ranks+=float(r)
     if had_bye(t) == True:
         double_adj_ranks+= avg_team_ranks(t)*(num_byes(t)+num_forfeit_wins(t))
@@ -637,22 +637,22 @@ def team_score_except_record(team):
 
 
 def rank_teams():
-    return sorted(all_teams(), key=lambda team: team_score(team))
+    return sorted(all_teams(), key=team_score)
 
 
 def rank_teams_except_record(teams):
-    return sorted(all_teams(), key=lambda team: team_score_except_record(team))
+    return sorted(all_teams(), key=team_score_except_record)
 
 
 def rank_nov_teams():
-    return sorted(all_nov_teams(), key=lambda team: team_score(team))
+    return sorted(all_nov_teams(), key=team_score)
 
 
 def rank_nov_speakers():
     debs = list(Debater.objects.filter(novice_status=1))
     random.shuffle(debs, random = random.random)
-    speakers = sorted(debs, key=lambda d: double_adj_rank_deb(d))
-    speakers = sorted(speakers, key=lambda d: double_adj_speak_deb(d), reverse = True)
+    speakers = sorted(debs, key=lambda d: double_adjusted_ranks_deb(d))
+    speakers = sorted(speakers, key=lambda d: double_adjusted_speaks_deb(d), reverse = True)
     speakers = sorted(speakers, key=lambda d: tot_ranks_deb(d))
     speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
     return speakers
@@ -750,23 +750,24 @@ def tot_ranks_deb(d):
 
 
 
-def sing_adj_speak_deb(d):
-    t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 3:
-        return tot_speaks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
-        return avg_deb_speaks(d)*(TabSettings.objects.get(key = "cur_round").value-2)
+def single_adjusted_speaks_deb(debater):
+    team = deb_team(debater)
+    current_round = TabSettings.objects.get(key="cur_round").value
+    total_rounds = TabSettings.objects.get(key="tot_rounds").value
+    if current_round < 3:
+        return tot_speaks_deb(debater)
+    elif current_round - (num_byes(team) + num_forfeit_wins(team) + num_no_show(team)) < 3 :
+        return avg_deb_speaks(debater)*(current_round-2)
 
-    
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
-        num_rounds = TabSettings.objects.get(key = "tot_rounds").value
+    if current_round > total_rounds:
+        num_rounds = total_rounds
     else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
+        num_rounds = current_round
     listOfSpeaks = []
     for i in range(num_rounds):
         listOfSpeaks += [[None]]
-    debStats = RoundStats.objects.filter(debater = d)
-    for r in debStats:
+    deb_stats = debater.roundstats_set.all()
+    for r in deb_stats:
         if listOfSpeaks[r.round.round_number-1] == [None]:
             listOfSpeaks[r.round.round_number-1] = [r.speaks]
         else:
@@ -778,15 +779,12 @@ def sing_adj_speak_deb(d):
         
     listOfSpeaks.sort()
     listOfSpeaks=listOfSpeaks[1:-1]
-    sing_adj_speaks = 0
-    for s in listOfSpeaks:
-        sing_adj_speaks+=s
-    t = deb_team(d)
-    sing_adj_speaks += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
+    sing_adj_speaks = sum(listOfSpeaks)
+    sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
     return sing_adj_speaks
                             
 
-def sing_adj_rank_deb(d):
+def single_adjusted_ranks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 3:
         return tot_ranks_deb(d)
@@ -797,44 +795,44 @@ def sing_adj_rank_deb(d):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfRanks = []
+    list_of_ranks = []
     for i in range(num_rounds):
-        listOfRanks += [[None]]
+        list_of_ranks += [[None]]
         
     debStats = RoundStats.objects.filter(debater = d)
     for r in debStats:
-        if listOfRanks[r.round.round_number-1] == [None]:
+        if list_of_ranks[r.round.round_number-1] == [None]:
             if won_by_forfeit(r.round, t):
                 pass
             elif forfeited_round(r.round,t):
-                listOfRanks[r.round.round_number-1] = 3.5
+                list_of_ranks[r.round.round_number-1] = [3.5]
             else:
-                listOfRanks[r.round.round_number-1] = r.ranks
+                list_of_ranks[r.round.round_number-1] = [r.ranks]
         else:
             if won_by_forfeit(r.round, t):
                 pass
             elif forfeited_round(r.round,t):
-                listOfRanks[r.round.round_number-1] += [3.5]
+                list_of_ranks[r.round.round_number-1] += [3.5]
             else:
-                listOfRanks[r.round.round_number-1] +=[r.ranks]
-    while [None] in listOfRanks:
-        listOfRanks.remove([None])
-    for i in range(len(listOfRanks)):
-        listOfRanks[i] = float(sum(listOfRanks[i]))/float(len(listOfRanks[i]))
+                list_of_ranks[r.round.round_number-1] +=[r.ranks]
+    while [None] in list_of_ranks:
+        list_of_ranks.remove([None])
+    for i in range(len(list_of_ranks)):
+        list_of_ranks[i] = float(sum(list_of_ranks[i]))/float(len(list_of_ranks[i]))
         
     for n in list(NoShow.objects.filter(no_show_team=t)):
-        listOfRanks[n.round_number-1] = 3.5
+        list_of_ranks[n.round_number-1] = 3.5
         
-    listOfRanks.sort()
-    listOfRanks=listOfRanks[1:-1]
+    list_of_ranks.sort()
+    list_of_ranks=list_of_ranks[1:-1]
     sing_adj_ranks = 0
-    for s in listOfRanks:
+    for s in list_of_ranks:
         sing_adj_ranks+=s
     t = deb_team(d)
     avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
     return sing_adj_ranks
 
-def double_adj_speak_deb(d):
+def double_adjusted_speaks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 5:
         return tot_speaks_deb(d)
@@ -870,7 +868,7 @@ def double_adj_speak_deb(d):
     return double_adj_speaks
                             
 
-def double_adj_rank_deb(d):
+def double_adjusted_ranks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 5:
         return tot_ranks_deb(d)
@@ -881,42 +879,42 @@ def double_adj_rank_deb(d):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfRanks = []
+    list_of_ranks = []
     for i in range(num_rounds):
-        listOfRanks += [[None]]
+        list_of_ranks += [[None]]
     debStats = d.roundstats_set.all()
     for r in debStats:
         #print d
-        #print listOfRanks
-        #print listOfRanks[r.round.round_number-1]
-        if listOfRanks[r.round.round_number-1] == [None]:
+        #print list_of_ranks
+        #print list_of_ranks[r.round.round_number-1]
+        if list_of_ranks[r.round.round_number-1] == [None]:
             #print "in None"
             if won_by_forfeit(r.round, t):
                 pass
             elif forfeited_round(r.round,t):
-                listOfRanks[r.round.round_number-1] = [3.5]
+                list_of_ranks[r.round.round_number-1] = [3.5]
             else:
-                listOfRanks[r.round.round_number-1] = [r.ranks]
+                list_of_ranks[r.round.round_number-1] = [r.ranks]
         else:
-            #print "listOfRanks of " + str(d)
-            #print listOfRanks
+            #print "list_of_ranks of " + str(d)
+            #print list_of_ranks
             if won_by_forfeit(r.round, t):
                 pass
             elif forfeited_round(r.round,t):
-                listOfRanks[r.round.round_number-1] += [3.5]
+                list_of_ranks[r.round.round_number-1] += [3.5]
             else:
-                listOfRanks[r.round.round_number-1] += [r.ranks]
-    while [None] in listOfRanks:
-        listOfRanks.remove([None])
-    for i in range(len(listOfRanks)):
-        listOfRanks[i] = float(sum(listOfRanks[i]))/float(len(listOfRanks[i]))
+                list_of_ranks[r.round.round_number-1] += [r.ranks]
+    while [None] in list_of_ranks:
+        list_of_ranks.remove([None])
+    for i in range(len(list_of_ranks)):
+        list_of_ranks[i] = float(sum(list_of_ranks[i]))/float(len(list_of_ranks[i]))
 
     for n in list(NoShow.objects.filter(no_show_team=t)):
-        listOfRanks[n.round_number-1] = 3.5
-    listOfRanks.sort()
-    listOfRanks=listOfRanks[2:-2]
+        list_of_ranks[n.round_number-1] = 3.5
+    list_of_ranks.sort()
+    list_of_ranks=list_of_ranks[2:-2]
     double_adj_ranks = 0
-    for s in listOfRanks:
+    for s in list_of_ranks:
         double_adj_ranks+=s
     t = deb_team(d)
     double_adj_ranks += avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
@@ -930,11 +928,11 @@ def deb_team(d):
 def debater_score(debater):
     return (-tot_speaks_deb(debater),
             tot_ranks_deb(debater),
-            -sing_adj_speak_deb(debater),
-            sing_adj_speak_deb(debater),
-            -double_adj_speak_deb(debater),
-            double_adj_rank_deb(debater))
+            -single_adjusted_speaks_deb(debater),
+            single_adjusted_ranks_deb(debater),
+            -double_adjusted_speaks_deb(debater),
+            double_adjusted_ranks_deb(debater))
 
 def rank_speakers():
-    return sorted(Debater.objects.all(), key=lambda deb: debater_score(deb))
+    return sorted(Debater.objects.all(), key=debater_score)
 
