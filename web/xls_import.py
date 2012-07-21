@@ -13,23 +13,23 @@ def sep():
 
 if __name__ == "__main__":
     setup_environ(settings)
-    import importJudges
-    import importTeams
-    import importScratches
+    import import_judges
+    import import_teams
+    import import_scratches
     print "Importing Judges"
     sep()
     try:
-        importJudges.import_judges("../JudgeEntry.xls")
+        import_judges.import_judges("../JudgeEntry.xls")
     except:
         print "There was an error importing judges"
     sep()
     try:
-        importTeams.import_teams("../TeamEntry.xls")
+        import_teams.import_teams("../TeamEntry.xls")
     except:
         print "There was an error importing teams"
     sep()
     try:
-        importScratches.import_scratches("../ScratchEntry.xls")
+        import_scratches.import_scratches("../ScratchEntry.xls")
     except:
         print "There was an error importing scratches"
     sep() 

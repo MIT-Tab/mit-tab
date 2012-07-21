@@ -27,7 +27,7 @@ from tab.models import *
 from django.db.models import *
 
 import random
-import pairingAlg
+import pairing_alg
 import assignJudges
 import errors
 from decimal import *
@@ -178,9 +178,9 @@ def pair_round():
     i=0
     for bracket in range(TabSettings.objects.get(key="cur_round").value):
         if TabSettings.objects.get(key="cur_round").value == 1:
-            temp = pairingAlg.perfectPairing(list_of_teams)
+            temp = pairing_alg.perfectPairing(list_of_teams)
         else:
-            temp = pairingAlg.perfectPairing(list_of_teams[bracket])
+            temp = pairing_alg.perfectPairing(list_of_teams[bracket])
         for pair in temp:
             pairings[i] = [pair[0],pair[1],[None],[None]]
             i+=1
