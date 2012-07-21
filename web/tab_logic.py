@@ -28,7 +28,7 @@ from django.db.models import *
 
 import random
 import pairing_alg
-import assignJudges
+import assign_judges
 import errors
 from decimal import *
 import send_texts
@@ -205,7 +205,7 @@ def pair_round():
 
         
     #assign judges
-    pairings = assignJudges.addJudges(pairings)
+    pairings = assign_judges.addJudges(pairings)
     
     #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
