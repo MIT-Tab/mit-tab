@@ -150,8 +150,6 @@ class Round(models.Model):
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
     UNKNOWN = 0
-    GOV = 1
-    OPP = 2
     GOV_VIA_FORFEIT = 3
     OPP_VIA_FORFEIT = 4
     ALL_DROP = 5

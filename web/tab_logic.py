@@ -18,9 +18,6 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-#Julia's file
-
-
 #Always sort so that top team is at the beginning of the list - use reverse!
 
 from tab.models import *
@@ -37,19 +34,39 @@ import pprint
     
 #will return false if not ready to pair yet
 def pair_round():
+    """ 
+    Pair the next round of debate.
+    This function will do the following:
+        1) Check that we can pair the round
+        2) Check that we have scratches all judges from
+           teams of the same school, and if not add these 
+           scratches
+        3) Record no-show teams
+        4) Setup the list of teams by either seed or speaks
+        5) Calculate byes
+        6) Calculate pull ups based on byes
+        7) Pass in evened brackets to the perfect pairing algorithm
+        8) Assign judges to pairings
+        9) Assign rooms to pairings
+    
+    pairings are computed in the following format: [gov,opp,judge,room]
+    and then directly put into the database
+    FIXME: Allow for good rollback behavior
+    """
     #pairings = [gov,opp,judge,room]
+    current_round = TabSettings.objects.get(key="cur_round").value
     try:
-        ready_to_pair(TabSettings.objects.get(key="cur_round").value)
+        ready_to_pair(current_round)
     except errors.NotEnoughJudgesError:
         raise errors.NotEnoughJudgesError()
     except errors.NotEnoughRoomsError:
         raise errors.NotEnoughRoomsError()
+    # For testing purposes
     random.seed(0xBEEF)
     
-    #add scratches for teams/judges from the same school if they haven't already been added
+    # add scratches for teams/judges from the same school 
+    # NOTE that this only happens if they haven't already been added
     add_scratches_for_school_affil()
-
-    current_round = TabSettings.objects.get(key="cur_round").value
 
     list_of_teams = [None]*current_round
     pull_up = None
@@ -60,10 +77,7 @@ def pair_round():
         n = NoShow(no_show_team = t, round_number = current_round)
         n.save()
     
-
-    
-    
-    #if it is the first round, pair by seed
+    # If it is the first round, pair by *seed*
     if current_round == 1:
         list_of_teams = list(Team.objects.filter(checked_in=True))
         b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
@@ -71,19 +85,10 @@ def pair_round():
         list_of_teams.remove(b.bye_team)
         list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse = True)
 
-        #print list_of_teams
-            
-        
-        #should have sorted order of teams.  Now just need to do pairings.
-
-        #pairings are [gov,opp,judge,room]
         #pairings = [None]* Team.objects.count()/2
-
-    #Otherwise, pair by speaks
+    # Otherwise, pair by *speaks*
     else:
-        #print list_of_teams
         bye_teams = [bye.bye_team for bye in Bye.objects.all()]
-        
         for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
             print r.round_number
             print str(r.gov_team) + " won via forfeit"
@@ -96,30 +101,38 @@ def pair_round():
         random.shuffle(bye_teams, random= random.random)
         
         # Bucket all the teams into brackets
-        all_teams = Team.objects.filter(checked_in=True)
-        bracketed_teams = [(tot_wins(team), team)
-                           for team in all_teams
-                           if current_round - bye_teams.count(team) != 1]
+        # NOTE: We do not bucket teams that have only won by
+        #       forfeit/bye in every round because they have no speaks
+        all_checked_in_teams = Team.objects.filter(checked_in=True)
+        team_buckets = [(tot_wins(team), team)
+                        for team in all_checked_in_teams
+                        if current_round - bye_teams.count(team) != 1]
         list_of_teams = [rank_teams_except_record([team 
-                                                  for (w,team) in bracketed_teams 
+                                                  for (w,team) in team_buckets 
                                                   if w == i])
                          for i in range(current_round)]
 
+        # Take care of teams that only have forfeits/byes
         if len(bye_teams) != 0:
             for t in list(Team.objects.filter(checked_in=True)):
-                #if teams have won by forfeit/bye each round, pair into the middle
+                # pair into the middle
                 if current_round-bye_teams.count(t) == 1: 
                     print t
                     list_of_teams[current_round-1].insert(int(float(len(list_of_teams[tot_wins(t)]))/2.0),t)
         print "these are the teams before pullups"
         print pprint.pprint(list_of_teams)
         
-        #even out brackets with pull-up, etc. if necessary
+        # Correct for brackets with odd numbers of teams
+        #  1) If we are in the bottom bracket, give someone a bye
+        #  2) If we are in 1-up bracket and there are no all down
+        #     teams, give someone a bye
+        #  FIXME: Do we need to do special logic for smaller brackets?
+        #  3) Otherwise, find a pull up from the next bracket 
         for bracket in reversed(range(current_round)):
             if len(list_of_teams[bracket]) % 2 != 0:
                 #print "need pull-up"
-                #If there are no teams all down, give the bye to a one down team.
-                if bracket == 0: #in bottom bracket so give bye instead of pulling up
+                # If there are no teams all down, give the bye to a one down team.
+                if bracket == 0: 
                     byeint = len(list_of_teams[bracket])-1
                     b = Bye(bye_team = list_of_teams[bracket][byeint],
                             round_number = current_round)
@@ -137,12 +150,16 @@ def pair_round():
                             found_bye = True
                     if found_bye == False:
                         raise errors.NotEnoughTeamsError()
-                    
-                else: #need to pull a team up
+                else: 
                     pull_up = None
-                    i = len(list_of_teams[bracket-1])-1 # i is the last team in the bracket below
+                    # FIXME (jolynch): Try to use descriptive variable names 
+                    # instead of commenting
+
+                    # i is the last team in the bracket below
+                    i = len(list_of_teams[bracket-1])-1 
                     teams_been_pulled_up = Round.objects.exclude(pullup=None)   
-                    while pull_up == None: #find the lowest team in bracket below that can be pulled up
+                    #find the lowest team in bracket below that can be pulled up
+                    while pull_up == None: 
                         if list_of_teams[bracket-1][i] not in teams_been_pulled_up:
                             pull_up = list_of_teams[bracket-1][i]
                             list_of_teams[bracket].append(pull_up)
@@ -163,13 +180,13 @@ def pair_round():
                         else:
                             i-=1
     print "these are the teams after pullups"
-    print len(list_of_teams)
-    print [len(x) for x in list_of_teams] 
-        #should have sorted order of teams.  Now just need to do pairings.  Pass list to pairings algorithm
-
-    #if len(list_of_teams)%2 == 1:
-    #    raise errors.ByeAssignmentError()
-
+    print pprint.pprint(list_of_teams)
+    if current_round > 1:
+        for i in range(len(list_of_teams)):
+            print "Bracket %i has %i teams" % (i, len(list_of_teams[i]))
+    
+    # Pass in the prepared nodes to the perfect pairing logic
+    # to get a pairing for the round
     pairings = []
     for bracket in range(current_round):
         if current_round == 1:
@@ -180,11 +197,13 @@ def pair_round():
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
+    # FIXME: WHY DO WE RANDOMIZE THIS
     # should randomize first
     if current_round == 1:
         random.shuffle(pairings, random= random.random)
         pairings = sorted(pairings, key = lambda team: highest_seed(team[0],team[1]), reverse = True)
-    else: #sort with pairing with highest ranked team first
+    # sort with pairing with highest ranked team first
+    else: 
         sorted_teams = rank_teams()
         print sorted_teams
         print "pairings"
@@ -207,17 +226,24 @@ def pair_round():
 
     #enter into database
     for p in pairings:
-        r = Round(round_number = current_round, gov_team = p[0], opp_team = p[1], judge = p[2], room = p[3])
+        r = Round(round_number = current_round,
+                  gov_team = p[0],
+                  opp_team = p[1],
+                  judge = p[2],
+                  room = p[3])
         if p[0] == pull_up:
-            r.pullup = 1
+            r.pullup = Round.GOV
         elif p[1] == pull_up:
-            r.pullup = 2
+            r.pullup = Round.OPP
         r.save()
 
-
-#check if there are enough judges and rooms to pair and if all of the previous rounds have been entered  This still doesn't entirely work.
-#check if all results have been entered
 def ready_to_pair(round_to_check):
+    """
+    Check if we can pair a round using basic heuristics 
+    In particular:
+        1) We need enough N/2 judges that are *checked in*
+        2) We need all rounds to be entered from the previous round
+    """
     if CheckIn.objects.filter(round_number = round_to_check).count() < Team.objects.filter(checked_in=True).count()/2:
         raise errors.NotEnoughJudgesError()
     elif Room.objects.all().count() < Team.objects.filter(checked_in=True).count()/2:
@@ -232,13 +258,20 @@ def ready_to_pair(round_to_check):
     
     return True
 
-#add scratches for teams/judges from the same school if they haven't already been added
 def add_scratches_for_school_affil():
-    for j in Judge.objects.all():
-        for t in Team.objects.all():
-            if j.school == t.school:
-                if Scratch.objects.filter(judge = j, team = t).count() == 0:
-                    Scratch.objects.create(judge = j,team = t,scratch_type = 1)
+    """
+    Add scratches for teams/judges from the same school
+    Only do this if they haven't already been added
+    """
+    print datetime.now()
+    all_judges = Judge.objects.all()
+    all_teams = Team.objects.all()
+    for judge in all_judges:
+        for team in all_teams:
+            if judge.school == team.school:
+                if Scratch.objects.filter(judge = judge, team = team).count() == 0:
+                    Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
+    print datetime.now()
     
 def highest_seed(t1,t2):
     if t1.seed > t2.seed:
@@ -329,8 +362,6 @@ def won_by_forfeit(r,t):
             return True
     else:
         return False
-
-
                
     
 #Calculate the total number of wins a team has
