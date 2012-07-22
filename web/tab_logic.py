@@ -83,11 +83,11 @@ def pair_round():
         #print list_of_teams
         bye_teams = [bye.bye_team for bye in Bye.objects.all()]
         
-        for r in Round.objects.filter(victor = 3):
+        for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
             print r.round_number
             print str(r.gov_team) + " won via forfeit"
             bye_teams += [r.gov_team]
-        for r in Round.objects.filter(victor = 4):
+        for r in Round.objects.filter(victor = Round.OPP_VIA_FORFEIT):
             bye_teams += [r.opp_team]
             print r.round_number
             print str(r.opp_team) + " won via forfeit"
