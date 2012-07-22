@@ -33,7 +33,7 @@ import errors
 from decimal import *
 import send_texts
 from datetime import datetime
-
+import pprint
     
 #will return false if not ready to pair yet
 def pair_round():
@@ -49,23 +49,24 @@ def pair_round():
     #add scratches for teams/judges from the same school if they haven't already been added
     add_scratches_for_school_affil()
 
+    current_round = TabSettings.objects.get(key="cur_round").value
 
-    list_of_teams = [None]*TabSettings.objects.get(key="cur_round").value
+    list_of_teams = [None]*current_round
     pull_up = None
 
     #Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for t in forfeit_teams:
-        n = NoShow(no_show_team = t, round_number = TabSettings.objects.get(key="cur_round").value)
+        n = NoShow(no_show_team = t, round_number = current_round)
         n.save()
     
 
     
     
     #if it is the first round, pair by seed
-    if TabSettings.objects.get(key="cur_round").value == 1:
+    if current_round == 1:
         list_of_teams = list(Team.objects.filter(checked_in=True))
-        b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = TabSettings.objects.get(key="cur_round").value)
+        b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
         b.save()
         list_of_teams.remove(b.bye_team)
         list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse = True)
@@ -91,46 +92,46 @@ def pair_round():
             bye_teams += [r.opp_team]
             print r.round_number
             print str(r.opp_team) + " won via forfeit"
+        # FIXME (jolynch): Why is this random this here?
         random.shuffle(bye_teams, random= random.random)
-        print "Final bye team list: ", bye_teams 
-        for i in range(TabSettings.objects.get(key="cur_round").value): #sort the teams within each bracket
-            list_of_teams[i] = []  # set the list for the current bracket to nothing
-            #print "i is: " + str(i)
-            for t in list(Team.objects.filter(checked_in=True)):  #for each of the teams
-                bye = had_bye(t)  #check if this team has had the bye, is true if did
-                num_wins = tot_wins(t)  #check how many wins the team has had.  Round 1 should be zero.
-                print t.name, " => ", bye_teams.count(t)
-                if num_wins == i:  #assign to correct bracket based on number of wins.  Teams with zero wins in 0th array slot, teams with 1 win in 1st spot, etc.
-                    if TabSettings.objects.get(key="cur_round").value-bye_teams.count(t) != 1: 
-                        list_of_teams[i] += [t]
-
-            list_of_teams[i] = rank_teams_except_record(list_of_teams[i]) #sort the teams within each bracket such that highest team is first
+        
+        # Bucket all the teams into brackets
+        all_teams = Team.objects.filter(checked_in=True)
+        bracketed_teams = [(tot_wins(team), team)
+                           for team in all_teams
+                           if current_round - bye_teams.count(team) != 1]
+        list_of_teams = [rank_teams_except_record([team 
+                                                  for (w,team) in bracketed_teams 
+                                                  if w == i])
+                         for i in range(current_round)]
 
         if len(bye_teams) != 0:
             for t in list(Team.objects.filter(checked_in=True)):
-                if TabSettings.objects.get(key="cur_round").value-bye_teams.count(t) == 1: #if teams have won by forfeit/bye each round, pair into the middle
+                #if teams have won by forfeit/bye each round, pair into the middle
+                if current_round-bye_teams.count(t) == 1: 
                     print t
-                    list_of_teams[TabSettings.objects.get(key="cur_round").value-1].insert(int(float(len(list_of_teams[tot_wins(t)]))/2.0),t)
+                    list_of_teams[current_round-1].insert(int(float(len(list_of_teams[tot_wins(t)]))/2.0),t)
         print "these are the teams before pullups"
-        print "list_of_teams"
+        print pprint.pprint(list_of_teams)
+        
         #even out brackets with pull-up, etc. if necessary
-        print list_of_teams
-        for bracket in reversed(range(TabSettings.objects.get(key="cur_round").value)):
-            if len(list_of_teams[bracket])/2 != len(list_of_teams[bracket])/2.0:
+        for bracket in reversed(range(current_round)):
+            if len(list_of_teams[bracket]) % 2 != 0:
                 #print "need pull-up"
                 #If there are no teams all down, give the bye to a one down team.
                 if bracket == 0: #in bottom bracket so give bye instead of pulling up
-                    byeint = len(list_of_teams[0])-1
-                    b = Bye(bye_team = list_of_teams[0][byeint], round_number = TabSettings.objects.get(key="cur_round").value)
+                    byeint = len(list_of_teams[bracket])-1
+                    b = Bye(bye_team = list_of_teams[bracket][byeint],
+                            round_number = current_round)
                     b.save()
-                    list_of_teams[0].remove(list_of_teams[0][byeint])
+                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
                 elif bracket == 1 and len(list_of_teams[0]) == 0: #in 1 up and no all down teams
                     found_bye = False
                     for byeint in range(len(list_of_teams[1])-1, -1, -1):
                         if had_bye(list_of_teams[1][byeint]):
                             pass
                         elif found_bye == False:
-                            b = Bye(bye_team = list_of_teams[1][byeint], round_number = TabSettings.objects.get(key="cur_round").value)
+                            b = Bye(bye_team = list_of_teams[1][byeint], round_number = current_round)
                             b.save()
                             list_of_teams[1].remove(list_of_teams[1][byeint])
                             found_bye = True
@@ -151,7 +152,7 @@ def pair_round():
                             removed_teams = []
                             for t in list(Team.objects.filter(checked_in=True)):
                                 #They have all wins and they haven't forfeited so they need to get paired in
-                                if TabSettings.objects.get(key="cur_round").value-bye_teams.count(t) == 1 and tot_wins(t) == bracket:
+                                if current_round-bye_teams.count(t) == 1 and tot_wins(t) == bracket:
                                     removed_teams += [t]
                                     list_of_teams[bracket].remove(t)
                             list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
@@ -162,36 +163,25 @@ def pair_round():
                         else:
                             i-=1
     print "these are the teams after pullups"
-    print list_of_teams
-        
+    print len(list_of_teams)
+    print [len(x) for x in list_of_teams] 
         #should have sorted order of teams.  Now just need to do pairings.  Pass list to pairings algorithm
 
     #if len(list_of_teams)%2 == 1:
     #    raise errors.ByeAssignmentError()
 
-    #Count every team
-    #I don't understand why you guys use this idiom of [None]*N, then slotting
-    #pairings into each of the slots. Why not just use a blank array and append?
-    #Or, since you're going to shuffle them eventually, just use a set.
-    pairings = [None]*(Team.objects.filter(checked_in=True).count()/2)
-    #print len(pairings)
-    i=0
-    for bracket in range(TabSettings.objects.get(key="cur_round").value):
-        if TabSettings.objects.get(key="cur_round").value == 1:
-            temp = pairing_alg.perfectPairing(list_of_teams)
+    pairings = []
+    for bracket in range(current_round):
+        if current_round == 1:
+            temp = pairing_alg.perfect_pairing(list_of_teams)
         else:
-            temp = pairing_alg.perfectPairing(list_of_teams[bracket])
+            temp = pairing_alg.perfect_pairing(list_of_teams[bracket])
+            print "Pairing round %i of size %i" % (bracket,len(temp))
         for pair in temp:
-            pairings[i] = [pair[0],pair[1],[None],[None]]
-            i+=1
+            pairings.append([pair[0],pair[1],[None],[None]])
 
-    #print "pairings"
-    #print pairings
-        
-
-
-    #should randomize first
-    if TabSettings.objects.get(key="cur_round").value == 1:
+    # should randomize first
+    if current_round == 1:
         random.shuffle(pairings, random= random.random)
         pairings = sorted(pairings, key = lambda team: highest_seed(team[0],team[1]), reverse = True)
     else: #sort with pairing with highest ranked team first
@@ -201,11 +191,8 @@ def pair_round():
         print pairings
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
         
-                          
-
-        
-    #assign judges
-    pairings = assign_judges.addJudges(pairings)
+    # assign judges
+    pairings = assign_judges.add_judges(pairings)
     
     #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
@@ -220,7 +207,7 @@ def pair_round():
 
     #enter into database
     for p in pairings:
-        r = Round(round_number = TabSettings.objects.get(key="cur_round").value, gov_team = p[0], opp_team = p[1], judge = p[2], room = p[3])
+        r = Round(round_number = current_round, gov_team = p[0], opp_team = p[1], judge = p[2], room = p[3])
         if p[0] == pull_up:
             r.pullup = 1
         elif p[1] == pull_up:
@@ -641,7 +628,7 @@ def rank_teams():
 
 
 def rank_teams_except_record(teams):
-    return sorted(all_teams(), key=team_score_except_record)
+    return sorted(teams, key=team_score_except_record)
 
 
 def rank_nov_teams():

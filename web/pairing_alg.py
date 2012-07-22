@@ -61,7 +61,7 @@ def exhaustive_pairing(list_of_teams):
                 indexB = list_of_teams.index(pair[1])
                 pairA_opt = list_of_teams[len(list_of_teams)-indexA-1]
                 pairB_opt = list_of_teams[len(list_of_teams)-indexB-1]
-                weight += calcWeight(pair[0],pair[1],pairA_opt, pairB_opt)
+                weight += calc_weight(pair[0],pair[1],pairA_opt, pairB_opt)
             if min_weight == None:
                 min_weight = weight
                 opt_pairing = pairing
@@ -111,14 +111,16 @@ def pair_exhaustively(list_of_teams, cur_pairing, all_pairs):
                 pair_exhaustively(teams, cur_pairing+[[list_of_teams[0],list_of_teams[i]]], all_pairs)
     return determine_gov_opp(all_pairs)
 
-def perfectPairing(list_of_teams):
+def perfect_pairing(list_of_teams):
      #assign weights to edges:
     graph_edges = []
     for i in range(len(list_of_teams)):
         for j in range(len(list_of_teams)):
-        #may want to change actual penalties
-            if i > j: #a team should not have an edge back to itself nor do we need to calculate an edge from a to b and b to a
-                wt = calcWeight(list_of_teams[i], list_of_teams[j],i, j, list_of_teams[len(list_of_teams)-i-1], list_of_teams[len(list_of_teams)-j-1], len(list_of_teams)-i-1, len(list_of_teams)-j-1)
+        # may want to change actual penalties
+        # a team should not have an edge back to itself
+        # nor do we need to calculate an edge from a to b and b to a
+            if i > j: 
+                wt = calc_weight(list_of_teams[i], list_of_teams[j],i, j, list_of_teams[len(list_of_teams)-i-1], list_of_teams[len(list_of_teams)-j-1], len(list_of_teams)-i-1, len(list_of_teams)-j-1)
                 #now add edge to graph
                 graph_edges +=[(i,j,wt)]
     #print "graph_edges"
@@ -144,7 +146,7 @@ def perfectPairing(list_of_teams):
 #teamA_opt is the optimal team for teamA to be paired with
 #teamB_opt is the optimal team for teamB to be paired with
              
-def calcWeight(teamA, teamB, teamA_ind, teamB_ind, teamA_opt, teamB_opt,teamA_opt_ind, teamB_opt_ind):
+def calc_weight(teamA, teamB, teamA_ind, teamB_ind, teamA_opt, teamB_opt,teamA_opt_ind, teamB_opt_ind):
     #first penalize for being far away from ideal power pairings
     if TabSettings.objects.get(key="cur_round").value == 1:
         wt = -1* (abs(teamA_opt.seed - teamB.seed) + abs(teamB_opt.seed - teamA.seed))/2.0

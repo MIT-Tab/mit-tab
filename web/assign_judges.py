@@ -24,7 +24,7 @@ import mwmatching
 import random
 import errors
 
-def addJudges(pairings):
+def add_judges(pairings):
     #Get all checkedInJudges
     checkedInObject = CheckIn.objects.filter(round_number = TabSettings.objects.get(key="cur_round").value)
 
