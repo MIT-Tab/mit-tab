@@ -750,7 +750,8 @@ def tot_speaks_deb(debater):
     tot_speak = 0
     #This is all the rounds the debater debated in
     my_rounds = debater.roundstats_set.all()
-    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    for i in range(current_round - 1):
         temp_speak = []
         for r in my_rounds:
             if r.round.round_number == i+1:
@@ -767,7 +768,8 @@ def tot_ranks_deb(d):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = d.roundstats_set.all()
-    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    for i in range(current_round - 1):
         temp_rank = []
         for r in my_rounds:
             if r.round.round_number == i+1:
@@ -815,7 +817,7 @@ def single_adjusted_speaks_deb(debater):
     while [None] in list_of_speaks:
         list_of_speaks.remove([None])
     for i in range(len(list_of_speaks)):
-        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(listOfSpeaks[i]))
+        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(list_of_speaks[i]))
         
     list_of_speaks.sort()
     list_of_speaks=list_of_speaks[1:-1]
@@ -895,7 +897,7 @@ def double_adjusted_speaks_deb(d):
     while [None] in list_of_speaks:
         list_of_speaks.remove([None])
     for i in range(len(list_of_speaks)):
-        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(listOfSpeaks[i]))
+        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(list_of_speaks[i]))
 
 
     list_of_speaks.sort()
