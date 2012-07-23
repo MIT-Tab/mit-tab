@@ -153,12 +153,15 @@ class Round(models.Model):
     GOV_VIA_FORFEIT = 3
     OPP_VIA_FORFEIT = 4
     ALL_DROP = 5
+    ALL_WIN = 6
     VICTOR_CHOICES = (
         (UNKNOWN, u'UNKNOWN'),
         (GOV, u'GOV'),
         (OPP, u'OPP'),
         (GOV_VIA_FORFEIT, u'GOV via Forfeit'),
-        (OPP_VIA_FORFEIT, u'OPP via Forfeit')
+        (OPP_VIA_FORFEIT, u'OPP via Forfeit'),
+        (ALL_DROP, u'ALL DROP'),
+        (ALL_WIN, u'ALL WIN'),
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)

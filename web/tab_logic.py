@@ -89,15 +89,10 @@ def pair_round():
     # Otherwise, pair by *speaks*
     else:
         bye_teams = [bye.bye_team for bye in Bye.objects.all()]
-        for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
-            print r.round_number
-            print str(r.gov_team) + " won via forfeit"
-            bye_teams += [r.gov_team]
-        for r in Round.objects.filter(victor = Round.OPP_VIA_FORFEIT):
-            bye_teams += [r.opp_team]
-            print r.round_number
-            print str(r.opp_team) + " won via forfeit"
-        # FIXME (jolynch): Why is this random this here?
+        # For each time that a team has won by forfeit, add them
+        # to the list of bye_teams
+        bye_teams = bye_teams + team_wins_by_forfeit()
+        # FIXME (jolynch): Why is this random thing here?
         random.shuffle(bye_teams, random= random.random)
         
         # Bucket all the teams into brackets
@@ -327,14 +322,12 @@ def had_bye(t):
 def num_byes(t):
     return Bye.objects.filter(bye_team = t).count()
 
-def num_forfeit_wins(t):
-    forfeit_wins = 0
-    for r in list(Round.objects.filter(gov_team = t)):
-        if r.victor == 3:
-            forfeit_wins +=1
-    for r in list(Round.objects.filter(opp_team = t)):
-        if r.victor == 4:
-            forfeit_wins +=1
+def num_forfeit_wins(team):
+    forfeit_wins = Round.objects.filter(
+            Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)|
+            Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)|
+            Q(gov_team=team, victor=Round.ALL_WIN)|
+            Q(opp_team=team, victor=Round.ALL_WIN)).count()
     return forfeit_wins
 
 def num_no_show(t):
@@ -363,21 +356,50 @@ def won_by_forfeit(r,t):
     else:
         return False
                
-    
+def team_wins_by_forfeit():
+    """ 
+    Finds teams that have won by forfeit.
+
+    A team can win by forfeit either by having XXX_VIA_FORFEIT
+    or by having ALL_WIN situations.
+
+    Returns:
+        wins_by_forfeit - A list of *teams* for each time they 
+        have won by forfeit, there very well may be duplicates.
+    """
+    wins_by_forfeit = []
+    for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
+        print r.round_number
+        print str(r.gov_team) + " won via forfeit"
+        wins_by_forfeit.append(r.gov_team)
+    for r in Round.objects.filter(victor = Round.OPP_VIA_FORFEIT):
+        print r.round_number
+        print str(r.opp_team) + " won via forfeit"
+        wins_by_forfeit.append(r.opp_team)
+    for r in Round.objects.filter(victor = Round.ALL_WIN):
+        print r.round_numer
+        print str(r.gov_team)+ ", " + str(r.opp_team) + " won via forfeit"
+        wins_by_forfeit.append(r.gov_team)
+        wins_by_forfeit.append(r.opp_team)
+    return wins_by_forfeit
+
 #Calculate the total number of wins a team has
 def tot_wins(team):
-    tot_wins = Round.objects.filter(Q(gov_team=team, victor=Round.GOV)|
-                                    Q(opp_team=team, victor=Round.OPP)).count()
-    #If a team had the bye, they won't have a round for that win so add one win
+    tot_wins = Round.objects.filter(
+            Q(gov_team=team, victor=Round.GOV)|
+            Q(opp_team=team, victor=Round.OPP)).count()
+    # If a team had the bye, they won't have a round for that win so add one win
     tot_wins += num_byes(team) 
+    # If a team has won by forfeit, we didn't count that yet
+    tot_wins += num_forfeit_wins(team)
     return tot_wins
 
 #Calculate the team's average speaks
 def avg_team_speaks(t):
     tot_speaks = 0
     for d in list(t.debaters.all()):
-        debStats = list(RoundStats.objects.filter(debater = d))
-        for r in debStats:
+        deb_stats = list(RoundStats.objects.filter(debater = d))
+        for r in deb_stats:
             tot_speaks += r.speaks
             
     if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
@@ -390,8 +412,8 @@ def avg_team_speaks(t):
 def avg_team_ranks(t):
     tot_ranks = 0
     for d in t.debaters.all():
-        debStats = list(RoundStats.objects.filter(debater = d))
-        for r in debStats:
+        deb_stats = list(RoundStats.objects.filter(debater = d))
+        for r in deb_stats:
             if won_by_forfeit(r.round, t):
                 pass
             elif forfeited_round(r.round,t):
@@ -449,8 +471,8 @@ def single_adjusted_speaks(t):
         listOfSpeaks += [None]
         
     for d in list(t.debaters.all()):
-        debStats = RoundStats.objects.filter(debater = d)
-        for r in debStats:
+        deb_stats = RoundStats.objects.filter(debater = d)
+        for r in deb_stats:
             if listOfSpeaks[r.round.round_number-1] == None:
                 listOfSpeaks[r.round.round_number-1] = r.speaks
             else:
@@ -484,8 +506,8 @@ def single_adjusted_ranks(t):
         list_of_ranks += [None]
 
     for d in list(t.debaters.all()):
-        debStats = RoundStats.objects.filter(debater = d)
-        for r in debStats:
+        deb_stats = RoundStats.objects.filter(debater = d)
+        for r in deb_stats:
             if list_of_ranks[r.round.round_number-1] == None:
                 if won_by_forfeit(r.round, t):
                     pass
@@ -532,8 +554,8 @@ def double_adjusted_speaks(t):
         listOfSpeaks += [None]
 
     for d in list(t.debaters.all()):
-        debStats = RoundStats.objects.filter(debater = d)
-        for r in debStats:
+        deb_stats = RoundStats.objects.filter(debater = d)
+        for r in deb_stats:
             if listOfSpeaks[r.round.round_number-1] == None:
                 listOfSpeaks[r.round.round_number-1] = r.speaks
             else:
@@ -567,8 +589,8 @@ def double_adjusted_ranks(t):
         list_of_ranks += [None]
 
     for d in list(t.debaters.all()):
-        debStats = RoundStats.objects.filter(debater = d)
-        for r in debStats:
+        deb_stats = RoundStats.objects.filter(debater = d)
+        for r in deb_stats:
             if list_of_ranks[r.round.round_number-1] == None:
                 if won_by_forfeit(r.round, t):
                     pass
@@ -817,8 +839,8 @@ def single_adjusted_ranks_deb(d):
     for i in range(num_rounds):
         list_of_ranks += [[None]]
         
-    debStats = RoundStats.objects.filter(debater = d)
-    for r in debStats:
+    deb_stats = RoundStats.objects.filter(debater = d)
+    for r in deb_stats:
         if list_of_ranks[r.round.round_number-1] == [None]:
             if won_by_forfeit(r.round, t):
                 pass
@@ -864,8 +886,8 @@ def double_adjusted_speaks_deb(d):
     listOfSpeaks = []
     for i in range(num_rounds):
         listOfSpeaks += [[None]]
-    debStats = RoundStats.objects.filter(debater = d)
-    for r in debStats:
+    deb_stats = RoundStats.objects.filter(debater = d)
+    for r in deb_stats:
         if listOfSpeaks[r.round.round_number-1] == [None]:
             listOfSpeaks[r.round.round_number-1] = [r.speaks]
         else:
@@ -900,8 +922,8 @@ def double_adjusted_ranks_deb(d):
     list_of_ranks = []
     for i in range(num_rounds):
         list_of_ranks += [[None]]
-    debStats = d.roundstats_set.all()
-    for r in debStats:
+    deb_stats = d.roundstats_set.all()
+    for r in deb_stats:
         #print d
         #print list_of_ranks
         #print list_of_ranks[r.round.round_number-1]
