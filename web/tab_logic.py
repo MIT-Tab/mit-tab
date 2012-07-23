@@ -336,10 +336,10 @@ def num_no_show(t):
 #Return true if the team forfeited the round, otherwise, return false
 def forfeited_round(r,t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == 4:
+        if r.victor == Round.OPP_VIA_FORFEIT:
             return True
     elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == 3:
+        if r.victor == Round.GOV_VIA_FORFEIT:
             return True
     else:
         return False
@@ -348,10 +348,10 @@ def forfeited_round(r,t):
 ###Return true if the team won the round because the other team forfeited, otherwise return false
 def won_by_forfeit(r,t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == 3:
+        if r.victor == Round.GOV_VIA_FORFEIT:
             return True
     elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == 4:
+        if r.victor == Round.OPP_VIA_FORFEIT:
             return True
     else:
         return False
@@ -466,26 +466,26 @@ def single_adjusted_speaks(t):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfSpeaks = []
+    list_of_speaks = []
     for i in range(num_rounds):
-        listOfSpeaks += [None]
+        list_of_speaks += [None]
         
     for d in list(t.debaters.all()):
         deb_stats = RoundStats.objects.filter(debater = d)
         for r in deb_stats:
-            if listOfSpeaks[r.round.round_number-1] == None:
-                listOfSpeaks[r.round.round_number-1] = r.speaks
+            if list_of_speaks[r.round.round_number-1] == None:
+                list_of_speaks[r.round.round_number-1] = r.speaks
             else:
-                listOfSpeaks[r.round.round_number-1] += r.speaks
+                list_of_speaks[r.round.round_number-1] += r.speaks
             
-    while None in listOfSpeaks:
-        listOfSpeaks.remove(None)
+    while None in list_of_speaks:
+        list_of_speaks.remove(None)
         
-    listOfSpeaks.sort()
+    list_of_speaks.sort()
 
-    listOfSpeaks=listOfSpeaks[1:-1]
+    list_of_speaks=list_of_speaks[1:-1]
     sing_adj_speaks = 0
-    for s in listOfSpeaks:
+    for s in list_of_speaks:
         sing_adj_speaks+=float(s)
     if had_bye(t) == True:
         sing_adj_speaks+= avg_team_speaks(t)*(num_byes(t)+num_forfeit_wins(t))
@@ -549,26 +549,26 @@ def double_adjusted_speaks(t):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfSpeaks = []
+    list_of_speaks = []
     for i in range(num_rounds):
-        listOfSpeaks += [None]
+        list_of_speaks += [None]
 
     for d in list(t.debaters.all()):
         deb_stats = RoundStats.objects.filter(debater = d)
         for r in deb_stats:
-            if listOfSpeaks[r.round.round_number-1] == None:
-                listOfSpeaks[r.round.round_number-1] = r.speaks
+            if list_of_speaks[r.round.round_number-1] == None:
+                list_of_speaks[r.round.round_number-1] = r.speaks
             else:
-                listOfSpeaks[r.round.round_number-1] += r.speaks
+                list_of_speaks[r.round.round_number-1] += r.speaks
             
-    listOfSpeaks.sort()
+    list_of_speaks.sort()
 
-    while None in listOfSpeaks:
-        listOfSpeaks.remove(None)
+    while None in list_of_speaks:
+        list_of_speaks.remove(None)
 
-    listOfSpeaks=listOfSpeaks[2:-2]
+    list_of_speaks=list_of_speaks[2:-2]
     double_adj_speaks = 0
-    for s in listOfSpeaks:
+    for s in list_of_speaks:
         double_adj_speaks+=float(s)
     if had_bye(t) == True:
         double_adj_speaks+= avg_team_speaks(t)*(num_byes(t)+num_forfeit_wins(t))
@@ -803,23 +803,23 @@ def single_adjusted_speaks_deb(debater):
         num_rounds = total_rounds
     else:
         num_rounds = current_round
-    listOfSpeaks = []
+    list_of_speaks = []
     for i in range(num_rounds):
-        listOfSpeaks += [[None]]
+        list_of_speaks += [[None]]
     deb_stats = debater.roundstats_set.all()
     for r in deb_stats:
-        if listOfSpeaks[r.round.round_number-1] == [None]:
-            listOfSpeaks[r.round.round_number-1] = [r.speaks]
+        if list_of_speaks[r.round.round_number-1] == [None]:
+            list_of_speaks[r.round.round_number-1] = [r.speaks]
         else:
-            listOfSpeaks[r.round.round_number-1] += [r.speaks]
-    while [None] in listOfSpeaks:
-        listOfSpeaks.remove([None])
-    for i in range(len(listOfSpeaks)):
-        listOfSpeaks[i] = float(sum(listOfSpeaks[i]))/float(len(listOfSpeaks[i]))
+            list_of_speaks[r.round.round_number-1] += [r.speaks]
+    while [None] in list_of_speaks:
+        list_of_speaks.remove([None])
+    for i in range(len(list_of_speaks)):
+        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(listOfSpeaks[i]))
         
-    listOfSpeaks.sort()
-    listOfSpeaks=listOfSpeaks[1:-1]
-    sing_adj_speaks = sum(listOfSpeaks)
+    list_of_speaks.sort()
+    list_of_speaks=list_of_speaks[1:-1]
+    sing_adj_speaks = sum(list_of_speaks)
     sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
     return sing_adj_speaks
                             
@@ -883,25 +883,25 @@ def double_adjusted_speaks_deb(d):
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
         num_rounds = TabSettings.objects.get(key = "cur_round").value
-    listOfSpeaks = []
+    list_of_speaks = []
     for i in range(num_rounds):
-        listOfSpeaks += [[None]]
+        list_of_speaks += [[None]]
     deb_stats = RoundStats.objects.filter(debater = d)
     for r in deb_stats:
-        if listOfSpeaks[r.round.round_number-1] == [None]:
-            listOfSpeaks[r.round.round_number-1] = [r.speaks]
+        if list_of_speaks[r.round.round_number-1] == [None]:
+            list_of_speaks[r.round.round_number-1] = [r.speaks]
         else:
-            listOfSpeaks[r.round.round_number-1] += [r.speaks]
-    while [None] in listOfSpeaks:
-        listOfSpeaks.remove([None])
-    for i in range(len(listOfSpeaks)):
-        listOfSpeaks[i] = float(sum(listOfSpeaks[i]))/float(len(listOfSpeaks[i]))
+            list_of_speaks[r.round.round_number-1] += [r.speaks]
+    while [None] in list_of_speaks:
+        list_of_speaks.remove([None])
+    for i in range(len(list_of_speaks)):
+        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(listOfSpeaks[i]))
 
 
-    listOfSpeaks.sort()
-    listOfSpeaks=listOfSpeaks[2:-2]
+    list_of_speaks.sort()
+    list_of_speaks=list_of_speaks[2:-2]
     double_adj_speaks = 0
-    for s in listOfSpeaks:
+    for s in list_of_speaks:
         double_adj_speaks+=s
     t = deb_team(d)
     double_adj_speaks += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
