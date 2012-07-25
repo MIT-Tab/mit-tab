@@ -262,6 +262,11 @@ div.obj_info {
     overflow: hidden; 
 }
 
+.greyed_out {
+    background : white;
+    color: white;
+}
+
 a.view_object {
     text-decoration: none;
     background: #CCCCCC;
