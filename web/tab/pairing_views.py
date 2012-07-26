@@ -2,6 +2,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
+from django.utils import simplejson
 from errors import *
 from models import *
 from django.shortcuts import redirect
@@ -13,7 +14,25 @@ import traceback
 import send_texts as texting
 import backup
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")                               
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
+    try :
+        src_round = Round.objects.get(id=src_round)
+        src_judge = Judge.objects.get(id=src_judge)
+        dest_round = Round.objects.get(id=dest_round)
+        dest_judge = Judge.objects.get(id=dest_judge)
+        dest_round.judge = src_judge
+        src_round.judge = dest_judge
+        dest_round.save()
+        src_round.save()
+        data = {"success":True}
+    except Exception as e:
+        print "ARG ", e
+        data = {"success":False}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def pair_round(request):
     current_round = TabSettings.objects.get(key="cur_round")
     next_round = current_round.value 

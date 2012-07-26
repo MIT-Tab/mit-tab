@@ -22,15 +22,15 @@
             <th>Room</th>
             <th class="sep"></th>
             <th>Results</th>
-		{% for pairing, gov_wins, gov_speaks, gov_govs, gov_opps, opp_wins, opp_speaks, opp_govs, opp_opps in round_info %}
-		<tr class="{% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}">
-            <td><a href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
+            {% for pairing, gov_wins, gov_speaks, gov_govs, gov_opps, opp_wins, opp_speaks, opp_govs, opp_opps in round_info %}
+            <tr class="{% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}">
+            <td class="team swappable" team-id="{{pairing.gov_team.id}}"><a href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
             <td><a href="/team/card/{{pairing.gov_team.id}}">{{gov_wins}} / {{gov_speaks|floatformat:2}} / {{gov_govs}} / {{gov_opps}}</a></td>
             <td class="sep"></td>
-            <td><a href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
+            <td class="team swappable" team-id="{{pairing.opp_team.id}}"><a href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
             <td><a href="/team/card/{{pairing.opp_team.id}}">{{opp_wins}} / {{opp_speaks|floatformat:2}} / {{opp_govs}} / {{opp_opps}}</a></td>
             <td class="sep"></td>
-            <td class="judge sortable" judge-id="{{pairing.judge.id}}"><a href="/judge/{{pairing.judge.id}}" >{{pairing.judge.name}}</a></td>
+            <td class="judge swappable" round-id="{{pairing.id}}" judge-id="{{pairing.judge.id}}"><a href="/judge/{{pairing.judge.id}}" >{{pairing.judge.name}}</a></td>
             <td class="sep"></td>
             <td><a href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
             <td class="sep"></td>

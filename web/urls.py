@@ -77,4 +77,5 @@ urlpatterns = patterns('',
     (r'^pairing/start_tourny/$', pairing_views.start_new_tourny),
     (r'^pairing/backup/$', pairing_views.manual_backup),
     (r'^pairings/pairinglist/$', pairing_views.pretty_pair),
+    (r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
 )
