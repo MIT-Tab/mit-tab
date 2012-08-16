@@ -457,15 +457,17 @@ def tot_ranks(team):
                           
                           
 def single_adjusted_speaks(t):
-    if TabSettings.objects.get(key = "cur_round").value < 3:
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    total_rounds = TabSettings.objects.get(key = "tot_rounds").value
+    if current_round < 3:
         return tot_speaks(t)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
-        return avg_team_speaks(t)*(TabSettings.objects.get(key = "cur_round").value-2)
+    elif current_round-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
+        return avg_team_speaks(t)*(current_round-2)
     
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
-        num_rounds = TabSettings.objects.get(key = "tot_rounds").value
+    if current_round > total_rounds:
+        num_rounds = total_rounds
     else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
+        num_rounds = current_round
     list_of_speaks = []
     for i in range(num_rounds):
         list_of_speaks += [None]
@@ -719,7 +721,8 @@ def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = RoundStats.objects.filter(debater = d)
-    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
+    current_round = TabSettings.objects.geT(key = 'cur_round').value
+    for i in range(current_round - 1):
         temp_rank = []
         for r in my_rounds:
             if r.round.round_number == i+1:
@@ -736,13 +739,13 @@ def avg_deb_ranks(d):
     for n in list(NoShow.objects.filter(no_show_team=t)):
         tot_rank += 3.5
 
-    if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
+    if current_round-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
         return 0
     else:
         #print d
         #print "tot ranks = " + str(tot_rank)
         #print TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1
-        return float(tot_rank)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
+        return float(tot_rank)/float(current_round-(num_byes(t)+num_forfeit_wins(t))-1)
 
     
 #calculate the total speaks for the debater (if iron-manned, average that round)

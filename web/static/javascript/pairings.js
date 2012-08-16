@@ -1,18 +1,38 @@
+var swap_element = function(from, dest, element_type) {
+    var from_round_id = from.attr('round-id')
+    var from_judge_id = from.attr('judge-id')
+    var from_judge_name = from.attr('judge-name')
+    var dest_round_id = dest.attr('round-id')
+    var dest_judge_id = dest.attr('judge-id')
+    var dest_judge_name = dest.attr('judge-name')
+    new_from_html = 
+        "<a href=\"/judge/" + dest_judge_id + "/\">" + 
+        dest_judge_name + "</a>"
+    new_dest_html = 
+        "<a href=\"/judge/" + from_judge_id + "/\">" + 
+        from_judge_name + "</a>"
+
+    from.html(new_from_html)
+    from.attr('round-id', from_round_id)
+    from.attr('judge-id', dest_judge_id)
+    from.attr('judge-name', dest_judge_name)
+    
+    dest.html(new_dest_html)
+    dest.attr('round-id', dest_round_id)
+    dest.attr('judge-id', from_judge_id)
+    dest.attr('judge-name', from_judge_name)
+}
+
+
 $(document).ready(function(){
-//$("#swappable").sortable({items: 'td.sortable'});
-    saved = null;
-    saved_id = null;
-    saved_round = null;
     judge_drag_options = {
         revert: true,
         stack: "div",
         opacity: 0.8,
         start: function() {
-            saved = $(this).css('backgroundColor')
-            $(this).css('backgroundColor', '#AAAAAA')
+            // Insert logic to color bad things
         },
         stop: function() {
-            $(this).css('backgroundColor', saved);
         }
     };
 
@@ -20,20 +40,42 @@ $(document).ready(function(){
         accept: ".judge.swappable",
         hoverClass: "ui-state-hover",
         drop: function(event, ui) {
-            from_round = ui.draggable.attr('round-id')
-            from_judge = ui.draggable.attr('judge-id')
-            dest_round = $(this).attr('round-id')
-            dest_judge = $(this).attr('judge-id')
-            dest_obj = $(this)
-            $.ajax({url:"/pairings/swap/" +
-                        from_round + "/" + from_judge +
-                        "/with/" + dest_round + "/" + dest_judge + "/",
+            var from_round_id = ui.draggable.attr('round-id')
+            var from_judge_id = ui.draggable.attr('judge-id')
+            var from_judge_name = ui.draggable.attr('judge-name')
+            var dest_round_id = $(this).attr('round-id')
+            var dest_judge_id = $(this).attr('judge-id')
+            var dest_judge_name = $(this).attr('judge-name')
+            var dest_obj = $(this)
+            $.ajax({
+                url:"/pairings/swap/" +
+                    from_round_id + "/" + from_judge_id +
+                    "/with/" + dest_round_id + "/" + dest_judge_id + "/",
                 success: function(result) {
                     if(result.success) {
-                        new_text = dest_obj.text()
-                        dest_obj.text(ui.draggable.text())
-                        ui.draggable.text(new_text)
+                        new_from_html = 
+                            "<a href=\"/judge/" + dest_judge_id + "/\">" + 
+                            dest_judge_name + "</a>"
+                        new_dest_html = 
+                            "<a href=\"/judge/" + from_judge_id + "/\">" + 
+                            from_judge_name + "</a>"
+                        
+                        ui.draggable.html(new_from_html)
+                        ui.draggable.attr('round-id', from_round_id)
+                        ui.draggable.attr('judge-id', dest_judge_id)
+                        ui.draggable.attr('judge-name', dest_judge_name)
+                        
+                        dest_obj.html(new_dest_html)
+                        dest_obj.attr('round-id', dest_round_id)
+                        dest_obj.attr('judge-id', from_judge_id)
+                        dest_obj.attr('judge-name', from_judge_name)
                     }
+                    else {
+                        alert("unable to swap those two judges, use the admin interface");
+                    }
+                },
+                error: function(result) {
+                    alert("unable to swap those two judges, use the admin interface");
                 }
             });
         }
@@ -47,20 +89,54 @@ $(document).ready(function(){
         stack: "div",
         opacity: 0.9,
         start: function() {
-            saved = $(this).css('backgroundColor')
-            saved_id = $(this).attr('team-id')
-            $(this).css('backgroundColor', '#AAAAAA')
+            // insert bad drag drop logic
         },
         stop: function() {
-            $(this).css('backgroundColor', saved)
         }
     };
 
     team_drop_options = {
         hoverClass: "ui-state-hover",
         accept: ".team.swappable",
-        drop: function() {
-            alert("Tried to swap "+saved_id+" "+$(this).attr('team-id'));
+        drop: function(event, ui) {
+            var from_round_id = ui.draggable.attr('round-id')
+            var from_team_id = ui.draggable.attr('team-id')
+            var from_team_name = ui.draggable.attr('team-name')
+            var dest_round_id = $(this).attr('round-id')
+            var dest_team_id = $(this).attr('team-id')
+            var dest_team_name = $(this).attr('team-name')
+            var dest_obj = $(this)
+            $.ajax({
+                url:"/pairings/swap_team/" +
+                    from_round_id + "/" + from_team_id +
+                    "/with/" + dest_round_id + "/" + dest_team_id + "/",
+                success: function(result) {
+                    if(result.success) {
+                        new_from_html = 
+                            "<a href=\"/team/" + dest_team_id + "/\">" + 
+                            dest_team_name + "</a>"
+                        new_dest_html = 
+                            "<a href=\"/team/" + from_team_id + "/\">" + 
+                            from_team_name + "</a>"
+                        
+                        ui.draggable.html(new_from_html)
+                        ui.draggable.attr('round-id', from_round_id)
+                        ui.draggable.attr('team-id', dest_team_id)
+                        ui.draggable.attr('team-name', dest_team_name)
+                        
+                        dest_obj.html(new_dest_html)
+                        dest_obj.attr('round-id', dest_round_id)
+                        dest_obj.attr('team-id', from_team_id)
+                        dest_obj.attr('team-name', from_team_name)
+                    }
+                    else {
+                        alert("unable to swap those two teams, use the admin interface");
+                    }
+                },
+                error: function(result) {
+                    alert("unable to swap those two teams, use the admin interface");
+                }
+            });
         }
     }
 

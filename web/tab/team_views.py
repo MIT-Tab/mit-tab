@@ -2,6 +2,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
+from django.utils import simplejson
 from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
@@ -295,5 +296,19 @@ def rank_teams(request):
                               'title': "Team Rankings"},
                               context_instance=RequestContext(request))
 
+def team_stats(request, team_id):
+    team_id = int(team_id)
+    try:
+        team = Team.objects.get(pk=team_id)
+        stats = {}
+        stats["Wins"] = tab_logic.tot_wins(team)
+        stats["Total Speaks"] = tab_logic.tot_speaks(team)
+        stats["Govs"] = tab_logic.num_govs(team)
+        stats["Opps"] = tab_logic.num_opps(team)
+        data = {'success': True, 'result':stats}
+    except Team.DoesNotExist:
+        data = {'success': False}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
 
 
