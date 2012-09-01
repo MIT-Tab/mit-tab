@@ -28,13 +28,17 @@
                                        round-id="{{pairing.id}}"
                                        team-name="{{pairing.gov_team.name}}">
                 <a href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
-            <td><a href="/team/card/{{pairing.gov_team.id}}">{{gov_wins}} / {{gov_speaks|floatformat:2}} / {{gov_govs}} / {{gov_opps}}</a></td>
+            <td class="team tabcard" team-id="{{pairing.gov_team.id}}">
+                <a href="/team/card/{{pairing.gov_team.id}}">Loading Team Info...</a>
+            </td>
             <td class="sep"></td>
             <td class="team swappable" team-id="{{pairing.opp_team.id}}"
                                        round-id="{{pairing.id}}"
                                        team-name="{{pairing.opp_team.name}}">
                 <a href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
-            <td><a href="/team/card/{{pairing.opp_team.id}}">{{opp_wins}} / {{opp_speaks|floatformat:2}} / {{opp_govs}} / {{opp_opps}}</a></td>
+            <td class="team tabcard" team-id="{{pairing.opp_team.id}}">
+                <a href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
+            </td>
             <td class="sep"></td>
             <td class="judge swappable" round-id="{{pairing.id}}"
                                         judge-id="{{pairing.judge.id}}"

@@ -285,7 +285,7 @@ def rank_teams(request):
     print "started novice rankings: ", datetime.now()
     ranked_novice_teams = tab_logic.rank_nov_teams()
     nov_teams = [(team,
-                  tab_logic.tot_wins(team), 
+                  tab_logic.tot_wins(team),
                   tab_logic.tot_speaks(team),
                   tab_logic.tot_ranks(team))
                   for team in ranked_novice_teams]
@@ -301,10 +301,10 @@ def team_stats(request, team_id):
     try:
         team = Team.objects.get(pk=team_id)
         stats = {}
-        stats["Wins"] = tab_logic.tot_wins(team)
-        stats["Total Speaks"] = tab_logic.tot_speaks(team)
-        stats["Govs"] = tab_logic.num_govs(team)
-        stats["Opps"] = tab_logic.num_opps(team)
+        stats["wins"] = tab_logic.tot_wins(team)
+        stats["total_speaks"] = tab_logic.tot_speaks(team)
+        stats["govs"] = tab_logic.num_govs(team)
+        stats["opps"] = tab_logic.num_opps(team)
         data = {'success': True, 'result':stats}
     except Team.DoesNotExist:
         data = {'success': False}

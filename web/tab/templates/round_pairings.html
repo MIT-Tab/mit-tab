@@ -146,12 +146,11 @@
 
     <!-- Floating bottom header -->
     <div class="pairings_footer">
-      <span class="pairings_bye_label">
-        Giving the Bye to:
-      </span>
-      {% for team in byes %}
-          <span class="pairings_bye_entry">{{team.name}}</span>, 
-      {% endfor %}
+        <span class="pairings_bye_label">Giving the Bye to:</span>
+        {% for team in byes %}
+        <span class="pairings_bye_entry">{{team.name}}</span>
+        {% if not forloop.last %},{% endif%}
+        {% endfor %}
     </div>
 
 {% else %}

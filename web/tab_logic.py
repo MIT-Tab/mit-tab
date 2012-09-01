@@ -677,18 +677,14 @@ def team_score(team):
 def team_score_except_record(team):
     return team_score(team)[1:]
 
-
 def rank_teams():
     return sorted(all_teams(), key=team_score)
-
 
 def rank_teams_except_record(teams):
     return sorted(teams, key=team_score_except_record)
 
-
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
-
 
 def rank_nov_speakers():
     debs = list(Debater.objects.filter(novice_status=1))
@@ -703,25 +699,26 @@ def avg_deb_speaks(d):
     tot_speak = 0
     #This is all the rounds the debater debated in
     my_rounds = RoundStats.objects.filter(debater = d)
-    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
-        tempSpeak = []
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    for i in range(current_round - 1):
+        temp_speak = []
         for r in my_rounds:
             if r.round.round_number == i+1:
-                tempSpeak += [r.speaks]
-        if len(tempSpeak) != 0:
-            tot_speak += float(sum(tempSpeak))/float(len(tempSpeak))
+                temp_speak += [r.speaks]
+        if len(temp_speak) != 0:
+            tot_speak += float(sum(temp_speak))/float(len(temp_speak))
 
     t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
+    if current_round - (num_byes(t) + num_forfeit_wins(t)) - 1 == 0:
         return 0
     else:
-        return float(tot_speak)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
-                    
+        return float(tot_speak)/float(current_round - (num_byes(t) + num_forfeit_wins(t)) - 1)
+
 def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = RoundStats.objects.filter(debater = d)
-    current_round = TabSettings.objects.geT(key = 'cur_round').value
+    current_round = TabSettings.objects.get(key = 'cur_round').value
     for i in range(current_round - 1):
         temp_rank = []
         for r in my_rounds:
@@ -735,7 +732,6 @@ def avg_deb_ranks(d):
         if len(temp_rank) != 0:
             tot_rank += float(sum(temp_rank))/float(len(temp_rank))
 
-                
     for n in list(NoShow.objects.filter(no_show_team=t)):
         tot_rank += 3.5
 
@@ -751,7 +747,7 @@ def avg_deb_ranks(d):
 #calculate the total speaks for the debater (if iron-manned, average that round)
 def tot_speaks_deb(debater):
     tot_speak = 0
-    #This is all the rounds the debater debated in
+    # Get all the rounds the debater debated in
     my_rounds = debater.roundstats_set.all()
     current_round = TabSettings.objects.get(key = "cur_round").value
     for i in range(current_round - 1):
@@ -827,23 +823,23 @@ def single_adjusted_speaks_deb(debater):
     sing_adj_speaks = sum(list_of_speaks)
     sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
     return sing_adj_speaks
-                            
 
 def single_adjusted_ranks_deb(d):
     t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 3:
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    if current_round < 3:
         return tot_ranks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
-        return avg_deb_ranks(d)*(TabSettings.objects.get(key = "cur_round").value-2)
-    
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
+    elif current_round - (num_byes(t) + num_forfeit_wins(t) + num_no_show(t)) < 3:
+        return avg_deb_ranks(d)*(current_round-2)
+
+    if current_round > TabSettings.objects.get(key = "tot_rounds").value:
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
+        num_rounds = current_round
     list_of_ranks = []
     for i in range(num_rounds):
         list_of_ranks += [[None]]
-        
+
     deb_stats = RoundStats.objects.filter(debater = d)
     for r in deb_stats:
         if list_of_ranks[r.round.round_number-1] == [None]:
@@ -879,15 +875,16 @@ def single_adjusted_ranks_deb(d):
 
 def double_adjusted_speaks_deb(d):
     t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 5:
+    current_round = TabSettings.objects.get(key = "cur_round").value
+    if current_round < 5:
         return tot_speaks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
-        return avg_deb_speaks(d)*(TabSettings.objects.get(key = "cur_round").value-4)
+    elif current_round-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
+        return avg_deb_speaks(d)*(current_round-4)
     
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
+    if current_round > TabSettings.objects.get(key = "tot_rounds").value:
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
+        num_rounds = current_round
     list_of_speaks = []
     for i in range(num_rounds):
         list_of_speaks += [[None]]

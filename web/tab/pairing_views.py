@@ -35,32 +35,40 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     try :
-        src_round = Round.objects.get(id=src_round)
         src_team = Team.objects.get(id=src_team)
-        dest_round = Round.objects.get(id=dest_round)
         dest_team = Team.objects.get(id=dest_team)
-        if src_round.gov_team == src_team:
-            if dest_round.gov_team == dest_team:
-                # Swap the two gov teams
-                src_round.gov_team = dest_team
-                dest_round.gov_team = src_team
-            else:
-                # Swap src_rounds gov team with 
-                # dest_round's opp team
-                src_round.gov_team = dest_team
-                dest_round.opp_team = src_team
+        if src_round == dest_round:
+            same_round = Round.objects.get(id=src_round)
+            gov_team = same_round.gov_team
+            opp_team = same_round.opp_team
+            same_round.gov_team = opp_team
+            same_round.opp_team = gov_team
+            same_round.save()
         else:
-            if dest_round.gov_team == dest_team:
-                # Swap src_rounds opp team with
-                # dest_round's gov team
-                src_round.opp_team = dest_team
-                dest_round.gov_team = src_team
+            src_round = Round.objects.get(id=src_round)
+            dest_round = Round.objects.get(id=dest_round)
+            if src_round.gov_team == src_team:
+                if dest_round.gov_team == dest_team:
+                    # Swap the two gov teams
+                    src_round.gov_team = dest_team
+                    dest_round.gov_team = src_team
+                else:
+                    # Swap src_rounds gov team with 
+                    # dest_round's opp team
+                    src_round.gov_team = dest_team
+                    dest_round.opp_team = src_team
             else:
-                # Swap the two opp teams
-                src_round.opp_team = dest_team
-                dest_round.opp_team = src_team
-        dest_round.save()
-        src_round.save()
+                if dest_round.gov_team == dest_team:
+                    # Swap src_rounds opp team with
+                    # dest_round's gov team
+                    src_round.opp_team = dest_team
+                    dest_round.gov_team = src_team
+                else:
+                    # Swap the two opp teams
+                    src_round.opp_team = dest_team
+                    dest_round.opp_team = src_team
+            dest_round.save()
+            src_round.save()
         data = {'success':True}
     except Exception as e:
         print "Unable to swap teams: ", e
@@ -223,11 +231,8 @@ def pretty_pair(request):
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
     valid_pairing = len(round_pairing) >= n_over_two
-    for present_team in Team.objects.all():
-        if not (present_team in paired_teams):
-            errors.append("%s was not in the pairing" % (present_team))
-            byes.append(present_team) 
-    pairing_exists = len(round_pairing) > 0 
+    byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
+    pairing_exists = len(round_pairing) > 0
     return render_to_response('round_pairings.html',
                                locals(),
                                context_instance=RequestContext(request))
