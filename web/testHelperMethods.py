@@ -30,9 +30,10 @@ import tab_logic
 import errors
 import time
 import xlrd
-from gen_assertions_to_test import create_assertions
+#from gen_assertions_to_test import create_assertions
 
 
+#Create a new tournament and prepare for round 1
 def create_tourney(num_teams):
     clear_db()
     add_round_stats(1,5,4,2)
@@ -43,8 +44,19 @@ def create_tourney(num_teams):
     add_judges(num_teams/2)
     add_check_in(1)
 
+#Create a new tournament and prepare for round 1 with the judges from a school that no debater is from.
+#This prevents pairing from failing due to scratches.
+def create_tourney_judge_separate_school(num_teams):
+    clear_db()
+    add_round_stats(1,5,4,2)
+    add_debaters(num_teams*2)
+    add_schools(num_teams/5)
+    add_teams()
+    add_rooms(num_teams/2)
+    add_judges_separate_school(num_teams/2)
+    add_check_in(1)
 
-
+#Enter random results
 def enter_results(round_num):
     for r in Round.objects.filter(round_number = round_num):
         d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[1],0],[r.opp_team.debaters.all()[0],0],[r.opp_team.debaters.all()[1],0]]
@@ -93,6 +105,12 @@ def add_judges(num_gen):
     for i in range(num_gen):
         Judge.objects.create(name = str(random.random()), rank = random.randint(0,10), school = schools[random.randint(0,len(schools)-1)])
 
+def add_judges_separate_school(num_gen):
+    judgeSchool = School.objects.create(name = "JudgeSchool")
+    for i in range(num_gen):
+        Judge.objects.create(name = str(random.random()), rank = random.randint(0,10), school = judgeSchool)
+
+        
 def add_check_in(round_num):
     judges = Judge.objects.all()
     for i in range(len(judges)):
@@ -144,6 +162,37 @@ def clear_db():
     schools = School.objects.all()
     for i in range(len(schools)):
         School.delete(schools[i])
+
+
+def enter_results_iron(round_num):
+    entered_iron_man = 0
+    for r in Round.objects.filter(round_number = round_num):
+        if entered_iron_man == 0:
+            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[0],0],[r.opp_team.debaters.all()[0],0],[r.opp_team.debaters.all()[1],0]]
+            entered_iron_man +=1
+        elif entered_iron_man == 1:
+            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[1],0],[r.opp_team.debaters.all()[1],0],[r.opp_team.debaters.all()[1],0]]
+            entered_iron_man +=1
+        else:
+            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[1],0],[r.opp_team.debaters.all()[0],0],[r.opp_team.debaters.all()[1],0]]
+        i = 0
+        for deb in d:
+            s = random.randint(230,270)/10.0
+            d[i][1] = s
+            i+=1
+        a = sorted(d, key = lambda speak: speak[1])
+        for i in range(len(d)):
+            RoundStats.objects.create(debater = a[i][0], round = r, speaks = a[i][1], ranks = 4-i)
+        if d[0][1]+d[1][1] > d[2][1]+d[3][1]:
+            r.victor=1
+        elif d[0][1]+d[1][1] < d[2][1]+d[3][1]:
+            r.victor=2
+        else:
+            if a.index(d[0])+a.index(d[1]) < a.index(d[2]) + a.index(d[3]):
+                r.victor=1
+            else:
+                r.victor=2
+        r.save()
     
 #Here are a bunch of test cases. Should run master test to run all and ensure all functionality
 
@@ -169,7 +218,7 @@ def master():
     print "iron man"
     
 #Make sure an error gets thrown if there aren't enough judges in the round
-def test_not_enough_judges():
+def test_not_enough_judges_ETE():
     create_tourney(10)
     judges = Judge.objects.all()
     Judge.delete(judges[0])
@@ -180,7 +229,7 @@ def test_not_enough_judges():
         threwException = True
     finally:
         assert threwException == True
-
+        
 #Make sure an error gets thrown if there aren't enough judges checked in
 def test_not_enough_judges_checked_in():
     create_tourney(10)
@@ -614,79 +663,9 @@ def test_iron_man():
     
     
     
-def enter_results_iron(round_num):
-    entered_iron_man = 0
-    for r in Round.objects.filter(round_number = round_num):
-        if entered_iron_man == 0:
-            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[0],0],[r.opp_team.debaters.all()[0],0],[r.opp_team.debaters.all()[1],0]]
-            entered_iron_man +=1
-        elif entered_iron_man == 1:
-            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[1],0],[r.opp_team.debaters.all()[1],0],[r.opp_team.debaters.all()[1],0]]
-            entered_iron_man +=1
-        else:
-            d = [[r.gov_team.debaters.all()[0],0],[r.gov_team.debaters.all()[1],0],[r.opp_team.debaters.all()[0],0],[r.opp_team.debaters.all()[1],0]]
-        i = 0
-        for deb in d:
-            s = random.randint(230,270)/10.0
-            d[i][1] = s
-            i+=1
-        a = sorted(d, key = lambda speak: speak[1])
-        for i in range(len(d)):
-            RoundStats.objects.create(debater = a[i][0], round = r, speaks = a[i][1], ranks = 4-i)
-        if d[0][1]+d[1][1] > d[2][1]+d[3][1]:
-            r.victor=1
-        elif d[0][1]+d[1][1] < d[2][1]+d[3][1]:
-            r.victor=2
-        else:
-            if a.index(d[0])+a.index(d[1]) < a.index(d[2]) + a.index(d[3]):
-                r.victor=1
-            else:
-                r.victor=2
-        r.save()
 
-#Make sure varsity break works
-def var_break():
-    #Should include novice teams if good enough
-    #Make sure didn't try to break too many teams
-    #If team missed a round, but should be allowed to break, make sure that works here.
-    #Basically, give them a loss, but don't assign any roundstats because should get average of speaks/ranks for other rounds.
-
-    random.seed(1)
-    var_break = tab_logic.tab_var_break()
-    return var_break
     
-
-#Make sure novice break works
-def nov_break():
-    #Only novice teams
-    #If broke varsity not included
-    #Make sure didn't try to break too many novice teams
-
-    random.seed(1)
-    nov_break = tab_logic.tab_nov_break()
-    return nov_break
-
-#Make sure varsity speaks are calculated correctly
-def var_speaks():
-    #should include everyone
-    #should work even if iron man round
-
-    random.seed(1)
-    var_speakers = tab_logic.rank_speakers()
-    return var_speakers
-
-#Make sure novice speaks are calculated correctly
-def nov_speaks():
-    #Includes novices all novices even if got varsity speaker aware
-    #works with iron man round
-
-    random.seed(1)
-    nov_speakers = tab_logic.rank_nov_speakers()
-    return nov_speakers
-
-        
-
-    #We need a way to deal with giving both teams a bye or both teams a forfeit.  Maybe an extra option? Could happen if judge doesn't show up or if somehow both teams don't show
+#We need a way to deal with giving both teams a bye or both teams a forfeit.  Maybe an extra option? Could happen if judge doesn't show up or if somehow both teams don't show
 
         
         

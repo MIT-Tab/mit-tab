@@ -232,18 +232,20 @@ def pair_round():
             r.pullup = Round.OPP
         r.save()
 
+#This method is tested by tests.UnitTests.all_ready_to_pair_tests()
 def ready_to_pair(round_to_check):
     """
     Check if we can pair a round using basic heuristics 
     In particular:
         1) We need enough N/2 judges that are *checked in*
-        2) We need all rounds to be entered from the previous round
+        2) Do we have N/2 rooms
+        3) We need all rounds to be entered from the previous round
     """
     if CheckIn.objects.filter(round_number = round_to_check).count() < Team.objects.filter(checked_in=True).count()/2:
         raise errors.NotEnoughJudgesError()
     elif Room.objects.all().count() < Team.objects.filter(checked_in=True).count()/2:
         raise errors.NotEnoughRoomsError()
-    elif round_to_check != 1 and RoundStats.objects.all().count() < Round.objects.filter(round_number = round_to_check-1).count():
+    elif round_to_check != 1 and RoundStats.objects.all().count() < Round.objects.filter(round_number = round_to_check-1).count()*4:
         raise errors.PrevRoundNotEnteredError()
     else:
         prev_rounds = Round.objects.filter(round_number = round_to_check-1)
