@@ -138,15 +138,39 @@ ul#judges{
 list-style:decimal;    
 }
 /*  I really need to get rid of this copy paste code*/
-.index_list{
+div.index_list{
+    width: 22%;
     vertical-align: top;
     display:inline-block;
     padding:.5em;
-    
 }
+
+a.index_list {
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    font-size: 18px;
+    color: black;
+}
+
+.w100 {
+    width: 100%;
+}
+
+.w75 {
+    width: 75%;
+}
+
+.w60 {
+    width: 60%;
+}
+
+.w25 {
+    width: 25%;
+}
+
 div.index_list ol {
     padding-left: 2em;
-    
 }
 
 div.index_container {

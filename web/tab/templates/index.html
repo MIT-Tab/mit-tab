@@ -4,10 +4,17 @@
 
 {% block content %}
 
-{% url tab.judge_views.view_judges as view_judges%}
+{% url tab.judge_views.view_judges as view_judges %}
 {% url tab.views.view_schools as view_schools %}
 {% url tab.team_views.view_teams as view_teams %}
 {% url tab.debater_views.view_debaters as view_debaters %}
+
+{% url tab.judge_views.enter_judge as enter_judge %}
+{% url tab.views.enter_school as enter_school %}
+{% url tab.team_views.enter_team as enter_team %}
+{% url tab.debater_views.enter_debater as enter_debater %}
+
+
 
 <div id="filter">
 Quick Search: <input type="text" id="filter_box"></input>
@@ -16,7 +23,10 @@ Quick Search: <input type="text" id="filter_box"></input>
 <p>{{number_schools}} Schools, {{number_judges}} Judges, {{ number_teams }} Teams </p>
 <div class="index_container">
     <div class="index_list" id="school_list"> 
-        <a href="{{ view_schools }}">School List</a>
+        <div class="btn-group">
+            <a class="mid btn w60" href="{{ view_schools }}">School List</a>
+            <a class="mid btn" href="{{ enter_school }}">Add School</a>
+        </div>
         <ol id="schools">
         {% for id,school in school_list %}
         <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/school/{{id}}/"> {{school}}</a> </li>
@@ -25,7 +35,11 @@ Quick Search: <input type="text" id="filter_box"></input>
     </div>
 
     <div class="index_list" id="judge_list">
-        <a href="{{ view_judges }}">Judge List</a>
+        <div class="btn-group">
+            <a class="mid btn w60" href="{{ view_judges }}">Judge List</a>
+            <a class="mid btn" href="{{ enter_judge }}">Add Judge</a>
+        </div>
+
         <ol id="judges">
         {% for id,judge in judge_list %}
         <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/judge/{{id}}/"> {{judge}}</a> </li>
@@ -34,7 +48,11 @@ Quick Search: <input type="text" id="filter_box"></input>
     </div>
 
     <div class="index_list" id="team_list">
-        <a href={{ view_teams }}>Team List</a>
+        <div class="btn-group">
+            <a class="mid btn w60" href="{{ view_teams }}">Team List</a>
+            <a class="mid btn" href="{{ enter_team }}">Add Team</a>
+        </div>
+
         <ol id="teams">
         {% for id,team in team_list %}
         <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/team/{{id}}/"> {{team}}</a> </li>
@@ -43,7 +61,11 @@ Quick Search: <input type="text" id="filter_box"></input>
     </div>
 
     <div class="index_list" id="debater_list">
-        <a href={{ view_debaters }}>Debater List</a>
+        <div class="btn-group">
+            <a class="mid btn w60" href="{{ view_debaters }}">Debater List</a>
+            <a class="mid btn" href="{{ enter_debater }}">Add Debater</a>
+        </div>
+
         <ol id="debaters">
         {% for id,debater in debater_list %}
         <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/debater/{{id}}/"> {{debater}}</a> </li>
