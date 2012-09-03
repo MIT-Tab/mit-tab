@@ -31,15 +31,15 @@ ul#navlist li {
 }
 
 ul#navlist li a {
-   border-radius:.2em;
-  display: block;
-  border-top: 1px solid #ffffff;
-  padding: .3em 1em .3em 1em;
-  background: #2E7BCA;
-  margin-left: 1px;
-  text-align: center;
-  text-decoration: none;
-  color: black;
+    border-radius:.2em;
+    display: block;
+    border-top: 1px solid #ffffff;
+    padding: .5em 1em .5em 1em;
+    background: #2E7BCA;
+    margin-left: 1px;
+    text-align: center;
+    text-decoration: none;
+    color: black;
 }
 
 ul#navlist li a.active {
@@ -55,6 +55,7 @@ ul#sublist {
     list-style: none;
     display: none;
     width: 100%;
+    z-index: 5;
 }
 
 ul#sublist li {
@@ -110,7 +111,7 @@ div#top_banner {
     height:6em;
     width:100%;
     margin: 0;
-    margin-bottom: .3em;
+    margin-bottom: .8em;
     text-align: center;
     position: relative;
     border-radius: 1em;
@@ -139,17 +140,17 @@ list-style:decimal;
 }
 /*  I really need to get rid of this copy paste code*/
 div.index_list{
-    width: 22%;
+    width: 18%;
     vertical-align: top;
     display:inline-block;
     padding:.5em;
 }
 
-a.index_list {
+div.index_header {
     text-align: center;
     text-decoration: none;
     display: block;
-    font-size: 18px;
+    font-size: 20px;
     color: black;
 }
 
@@ -163,6 +164,10 @@ a.index_list {
 
 .w60 {
     width: 60%;
+}
+
+.w50 {
+    width: 50%;
 }
 
 .w25 {

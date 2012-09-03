@@ -98,7 +98,10 @@ def enter_debater(request):
                                       context_instance=RequestContext(request))
     else:
         form = DebaterForm()
-    return render_to_response('data_entry.html', {'form': form, 'title': "Create Debater:"}, context_instance=RequestContext(request))
+    return render_to_response('data_entry.html',
+                             {'form': form,
+                              'title': "Create Debater:"},
+                              context_instance=RequestContext(request))
 
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()

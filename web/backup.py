@@ -43,7 +43,6 @@ def backup_round(dst_filename = None, round_number = TabSettings.objects.get(key
             backup_round(dst_filename, round_number)
     else:
         print "Cannot backup to AWS, attempting to backup to backups directory"
-        return
         if dst_filename == None:
             dst_filename = "backups/site_%i.db" % int(time.time())
         else:

@@ -10,10 +10,15 @@ def index(request):
     number_teams = Team.objects.count()
     number_judges = Judge.objects.count()
     number_schools = School.objects.count()
+    number_debaters = Debater.objects.count()
+    number_rooms = Room.objects.count()
+
     school_list = [(school.pk,school.name) for school in School.objects.order_by('name')]
     judge_list = [(judge.pk,judge.name) for judge in Judge.objects.order_by('name')]
     team_list = [(team.pk,team.name) for team in Team.objects.order_by('name')]
     debater_list = [(debater.pk,debater.name) for debater in Debater.objects.order_by('name')]
+    room_list = [(room.pk, room.name) for room in Room.objects.order_by('name')]
+
     return render_to_response('index.html',locals(),context_instance=RequestContext(request))
 
 def render_403(request):

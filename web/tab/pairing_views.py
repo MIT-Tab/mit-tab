@@ -13,6 +13,7 @@ import sys
 import traceback
 import send_texts as texting
 import backup
+import time
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -136,11 +137,11 @@ def pair_round(request):
         return render_to_response('pair_round.html',
                                 locals(),
                                 context_instance=RequestContext(request))
-                                
-@permission_required('tab.tab_settings.can_change', login_url="/403/")                               
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
     try:
-        backup.backup_round("manual_backup_round_%i_.db" % (TabSettings.objects.get(key="cur_round").value))
+        backup.backup_round("manual_backup_round_%i_%i.db" % (TabSettings.objects.get(key="cur_round").value, time.time()))
     except:
         traceback.print_exc(file=sys.stdout)
         return render_to_response('error.html',

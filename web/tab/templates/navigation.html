@@ -30,45 +30,28 @@
 <div id="nab_bar">
     <ul id="navlist">
         <li><a class="{% active request home %}" href="{{ home }}">Home</a></li>
-        <li><a class="{% active request enter_school %}{% active request view_schools %}">Schools</a>
+        <li><a class="{% active request rank_teams %}{% active request rank_debaters %}">Rankings</a>
             <ul id="sublist">
-                <li><a class="{% active request enter_school %}" href="{{ enter_school }}">Enter School</a></li>
-                <li><a class="{% active request view_schools %}" href="{{ view_schools }}">View Schools</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request enter_room %}{% active request view_rooms %}">Rooms</a>
-            <ul id="sublist">
-                <li><a class="{% active request enter_room %}" href="{{ enter_room }}">Enter Room</a></li>
-                <li><a class="{% active request view_rooms %}" href="{{ view_rooms }}">View Rooms</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request enter_judge %}{% active request view_judges %}">Judges</a>
-            <ul id="sublist">
-                <li><a class="{% active request enter_judge %}" href="{{ enter_judge }}">Enter Judge</a></li>
-                <li><a class="{% active request view_judges %}" href="{{ view_judges }}">View Judges</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request enter_debater %}{% active request view_debaters %}">Debaters</a>
-                <ul id="sublist">
-                    <li><a class="{% active request enter_debater %}" href="{{ enter_debater }}">Enter Debater</a></li>
-                    <li><a class="{% active request view_debaters %}" href="{{ view_debaters }}">View Debaters</a></li>
-               
                 <li><a class="{% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a></li>
-                </ul>
+                <li><a class="{% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a></li>
+            </ul>
         </li>
-        <li><a class="{% active request enter_team %}{% active request view_teams %}">Teams</a>
+        </li>
             <ul id="sublist">
                 <li><a class="{% active request enter_team %}" href="{{ enter_team }}">Enter Team</a></li>
                 <li><a class="{% active request view_teams %}" href="{{ view_teams }}">View Teams</a></li>
-                <li><a class="{% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a></li>
-            
             </ul>
         </li>
-        <li><a class="{% active request view_status %}{% active request view_rounds %}{% active request pair_round %}{% active request confirm_start_new_tourny %}{% active request backup %}">Pairing</a>
+        <li><a class="{% active request view_status %}{% active request view_rounds %}">Past Pairings</a>
             <ul id = "sublist">
-                <li><a class="{%active request view_status %}" href="{{ view_status }}">Current Status</a></li>
+                <li><a class="{%active request view_status %}" href="{{ view_status }}">Current Round</a></li>
                 <li><a class="{%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a></li>
-                <li><a class="{%active request pair_round %}" href="{{ pair_round }}">Pair Round</a></li>
+            </ul>
+        </li>
+        <li><a class="{%active request pair_round %}" href="{{ pair_round }}">Prepare Next Pairing</a></li>
+        <li><a class="{% active request confirm_start_new_tourny %}{% active request backup %}">Admin</a>
+            <ul id = "sublist">
+                <li><a href="/admin">Admin Interface</a></li>
                 <li><a class="{%active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
                 <li><a class="{%active request backup %}" href="{{ backup }}">Backup Database</a></li>
             </ul>

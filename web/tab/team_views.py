@@ -80,7 +80,9 @@ def enter_team(request):
             return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
     else:
         form = TeamEntryForm()
-    return render_to_response('data_entry.html', {'form': form}, context_instance=RequestContext(request))
+    return render_to_response('data_entry.html',
+                             {'form': form, 'title': "Create Team"},
+                              context_instance=RequestContext(request))
     
 @permission_required('tab.team.can_delete', login_url="/403/")                               
 def delete_team(request, team_id):
