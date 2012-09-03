@@ -87,7 +87,6 @@ def pair_round():
         #If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
             b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
-            print "bye team = " + str(b)
             b.save()
             list_of_teams.remove(b.bye_team)
 
@@ -101,7 +100,9 @@ def pair_round():
         # For each time that a team has won by forfeit, add them
         # to the list of bye_teams
         bye_teams = bye_teams + team_wins_by_forfeit()
-        # FIXME (jolynch): Why is this random thing here?
+        # FIXME (jolynch): Why is this random thing here? - (julia) If there are multiple teams that have had the bye/won by forfeit,
+        #we want to order that they are inserted into the middle of the bracket to be random.  I need to change the code below so
+        #that this is actually true/used - See issue 3
         random.shuffle(bye_teams, random= random.random)
         
         # Bucket all the teams into brackets
@@ -117,6 +118,8 @@ def pair_round():
                          for i in range(current_round)]
 
         # Take care of teams that only have forfeits/byes
+        # FIXME (julia): This should just look at the bye teams. No need to look at all teams, plus looking only at bye teams will
+        #insert them in a random order. See issue 3
         if len(bye_teams) != 0:
             for t in list(Team.objects.filter(checked_in=True)):
                 # pair into the middle
@@ -130,7 +133,8 @@ def pair_round():
         #  1) If we are in the bottom bracket, give someone a bye
         #  2) If we are in 1-up bracket and there are no all down
         #     teams, give someone a bye
-        #  FIXME: Do we need to do special logic for smaller brackets?
+        #  FIXME: Do we need to do special logic for smaller brackets? - (julia) I need to make the logic more general to deal
+        # with if there are no teams in the all down or up one bracket. See Issue 4
         #  3) Otherwise, find a pull up from the next bracket 
         for bracket in reversed(range(current_round)):
             if len(list_of_teams[bracket]) % 2 != 0:
@@ -156,7 +160,7 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else: 
                     pull_up = None
-                    # FIXME (jolynch): Try to use descriptive variable names 
+                    # FIXME (jolynch): Try to use descriptive variable names. (julia) - I'll fix this.
                     # instead of commenting
 
                     # i is the last team in the bracket below
@@ -201,7 +205,9 @@ def pair_round():
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
-    # FIXME: WHY DO WE RANDOMIZE THIS
+    # FIXME: WHY DO WE RANDOMIZE THIS - we want the order of which fullseeded teams get the best judge to be random.
+    # We should possibly also sort on the weakest team first? I.e. a fullseed/halfseed should get a better judge than a
+    # fullseed/freeseed, etc. - Julia to fix. Issue 6.
     # should randomize first
     if current_round == 1:
         random.shuffle(pairings, random= random.random)
@@ -220,13 +226,10 @@ def pair_round():
     #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
-    #print rooms
 
     for i in range(len(pairings)):
         pairings[i][3] = rooms[i]
     
-    #print "pairings with rooms, etc"
-    #print pairings
 
     #enter into database
     for p in pairings:
