@@ -61,6 +61,9 @@ def pair_round():
         raise errors.NotEnoughJudgesError()
     except errors.NotEnoughRoomsError:
         raise errors.NotEnoughRoomsError()
+    except errors.PrevRoundNotEnteredError:
+        raise errors.PrevRoundNotEnteredError
+    
     # For testing purposes
     random.seed(0xBEEF)
     
@@ -80,9 +83,14 @@ def pair_round():
     # If it is the first round, pair by *seed*
     if current_round == 1:
         list_of_teams = list(Team.objects.filter(checked_in=True))
-        b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
-        b.save()
-        list_of_teams.remove(b.bye_team)
+
+        #If there are an odd number of teams, give a random team the bye
+        if len(list_of_teams) % 2 == 1:
+            b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
+            b.save()
+            list_of_teams.remove(b.bye_team)
+
+        #Sort the teams by seed.
         list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse = True)
 
         #pairings = [None]* Team.objects.count()/2
@@ -92,7 +100,9 @@ def pair_round():
         # For each time that a team has won by forfeit, add them
         # to the list of bye_teams
         bye_teams = bye_teams + team_wins_by_forfeit()
-        # FIXME (jolynch): Why is this random thing here?
+        # FIXME (jolynch): Why is this random thing here? - (julia) If there are multiple teams that have had the bye/won by forfeit,
+        #we want to order that they are inserted into the middle of the bracket to be random.  I need to change the code below so
+        #that this is actually true/used - See issue 3
         random.shuffle(bye_teams, random= random.random)
         
         # Bucket all the teams into brackets
@@ -108,6 +118,8 @@ def pair_round():
                          for i in range(current_round)]
 
         # Take care of teams that only have forfeits/byes
+        # FIXME (julia): This should just look at the bye teams. No need to look at all teams, plus looking only at bye teams will
+        #insert them in a random order. See issue 3
         if len(bye_teams) != 0:
             for t in list(Team.objects.filter(checked_in=True)):
                 # pair into the middle
@@ -121,7 +133,8 @@ def pair_round():
         #  1) If we are in the bottom bracket, give someone a bye
         #  2) If we are in 1-up bracket and there are no all down
         #     teams, give someone a bye
-        #  FIXME: Do we need to do special logic for smaller brackets?
+        #  FIXME: Do we need to do special logic for smaller brackets? - (julia) I need to make the logic more general to deal
+        # with if there are no teams in the all down or up one bracket. See Issue 4
         #  3) Otherwise, find a pull up from the next bracket 
         for bracket in reversed(range(current_round)):
             if len(list_of_teams[bracket]) % 2 != 0:
@@ -147,7 +160,7 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else: 
                     pull_up = None
-                    # FIXME (jolynch): Try to use descriptive variable names 
+                    # FIXME (jolynch): Try to use descriptive variable names. (julia) - I'll fix this.
                     # instead of commenting
 
                     # i is the last team in the bracket below
@@ -192,7 +205,9 @@ def pair_round():
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
-    # FIXME: WHY DO WE RANDOMIZE THIS
+    # FIXME: WHY DO WE RANDOMIZE THIS - we want the order of which fullseeded teams get the best judge to be random.
+    # We should possibly also sort on the weakest team first? I.e. a fullseed/halfseed should get a better judge than a
+    # fullseed/freeseed, etc. - Julia to fix. Issue 6.
     # should randomize first
     if current_round == 1:
         random.shuffle(pairings, random= random.random)
@@ -211,13 +226,10 @@ def pair_round():
     #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
-    #print rooms
 
     for i in range(len(pairings)):
         pairings[i][3] = rooms[i]
     
-    #print "pairings with rooms, etc"
-    #print pairings
 
     #enter into database
     for p in pairings:
@@ -679,14 +691,18 @@ def team_score(team):
 def team_score_except_record(team):
     return team_score(team)[1:]
 
+
 def rank_teams():
     return sorted(all_teams(), key=team_score)
+
 
 def rank_teams_except_record(teams):
     return sorted(teams, key=team_score_except_record)
 
+
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
+
 
 def rank_nov_speakers():
     debs = list(Debater.objects.filter(novice_status=1))
@@ -701,26 +717,25 @@ def avg_deb_speaks(d):
     tot_speak = 0
     #This is all the rounds the debater debated in
     my_rounds = RoundStats.objects.filter(debater = d)
-    current_round = TabSettings.objects.get(key = "cur_round").value
-    for i in range(current_round - 1):
-        temp_speak = []
+    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
+        tempSpeak = []
         for r in my_rounds:
             if r.round.round_number == i+1:
-                temp_speak += [r.speaks]
-        if len(temp_speak) != 0:
-            tot_speak += float(sum(temp_speak))/float(len(temp_speak))
+                tempSpeak += [r.speaks]
+        if len(tempSpeak) != 0:
+            tot_speak += float(sum(tempSpeak))/float(len(tempSpeak))
 
     t = deb_team(d)
-    if current_round - (num_byes(t) + num_forfeit_wins(t)) - 1 == 0:
+    if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
         return 0
     else:
-        return float(tot_speak)/float(current_round - (num_byes(t) + num_forfeit_wins(t)) - 1)
-
+        return float(tot_speak)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
+                    
 def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = RoundStats.objects.filter(debater = d)
-    current_round = TabSettings.objects.get(key = 'cur_round').value
+    current_round = TabSettings.objects.geT(key = 'cur_round').value
     for i in range(current_round - 1):
         temp_rank = []
         for r in my_rounds:
@@ -734,6 +749,7 @@ def avg_deb_ranks(d):
         if len(temp_rank) != 0:
             tot_rank += float(sum(temp_rank))/float(len(temp_rank))
 
+                
     for n in list(NoShow.objects.filter(no_show_team=t)):
         tot_rank += 3.5
 
@@ -749,7 +765,7 @@ def avg_deb_ranks(d):
 #calculate the total speaks for the debater (if iron-manned, average that round)
 def tot_speaks_deb(debater):
     tot_speak = 0
-    # Get all the rounds the debater debated in
+    #This is all the rounds the debater debated in
     my_rounds = debater.roundstats_set.all()
     current_round = TabSettings.objects.get(key = "cur_round").value
     for i in range(current_round - 1):
@@ -825,23 +841,23 @@ def single_adjusted_speaks_deb(debater):
     sing_adj_speaks = sum(list_of_speaks)
     sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
     return sing_adj_speaks
+                            
 
 def single_adjusted_ranks_deb(d):
     t = deb_team(d)
-    current_round = TabSettings.objects.get(key = "cur_round").value
-    if current_round < 3:
+    if TabSettings.objects.get(key = "cur_round").value < 3:
         return tot_ranks_deb(d)
-    elif current_round - (num_byes(t) + num_forfeit_wins(t) + num_no_show(t)) < 3:
-        return avg_deb_ranks(d)*(current_round-2)
-
-    if current_round > TabSettings.objects.get(key = "tot_rounds").value:
+    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
+        return avg_deb_ranks(d)*(TabSettings.objects.get(key = "cur_round").value-2)
+    
+    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
-        num_rounds = current_round
+        num_rounds = TabSettings.objects.get(key = "cur_round").value
     list_of_ranks = []
     for i in range(num_rounds):
         list_of_ranks += [[None]]
-
+        
     deb_stats = RoundStats.objects.filter(debater = d)
     for r in deb_stats:
         if list_of_ranks[r.round.round_number-1] == [None]:
@@ -877,16 +893,15 @@ def single_adjusted_ranks_deb(d):
 
 def double_adjusted_speaks_deb(d):
     t = deb_team(d)
-    current_round = TabSettings.objects.get(key = "cur_round").value
-    if current_round < 5:
+    if TabSettings.objects.get(key = "cur_round").value < 5:
         return tot_speaks_deb(d)
-    elif current_round-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
-        return avg_deb_speaks(d)*(current_round-4)
+    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
+        return avg_deb_speaks(d)*(TabSettings.objects.get(key = "cur_round").value-4)
     
-    if current_round > TabSettings.objects.get(key = "tot_rounds").value:
+    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
-        num_rounds = current_round
+        num_rounds = TabSettings.objects.get(key = "cur_round").value
     list_of_speaks = []
     for i in range(num_rounds):
         list_of_speaks += [[None]]
