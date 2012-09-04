@@ -244,7 +244,7 @@ def pair_round():
             r.pullup = Round.OPP
         r.save()
 
-#This method is tested by tests.UnitTests.all_ready_to_pair_tests()
+#This method is tested by testsUnitTests.all_ready_to_pair_tests()
 def ready_to_pair(round_to_check):
     """
     Check if we can pair a round using basic heuristics 
@@ -267,6 +267,7 @@ def ready_to_pair(round_to_check):
     
     return True
 
+#This method is tested by testsUnitTests.all_add_scratches_for_school_affil_tests()
 def add_scratches_for_school_affil():
     """
     Add scratches for teams/judges from the same school
@@ -281,12 +282,13 @@ def add_scratches_for_school_affil():
                 if Scratch.objects.filter(judge = judge, team = team).count() == 0:
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
     print datetime.now()
-    
-def highest_seed(t1,t2):
-    if t1.seed > t2.seed:
-        return t1.seed
+
+#This method is tested by testsUnitTests.all_highest_seed()
+def highest_seed(team1,team2):
+    if team1.seed > team2.seed:
+        return team1.seed
     else:
-        return t2.seed
+        return team2.seed
     
 def highest_speak(t1,t2):
     if tot_speaks(t1) > tot_speaks(t2):
