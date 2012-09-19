@@ -223,17 +223,28 @@ def send_texts(request):
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""
 def pretty_pair(request):
+
+    errors, byes = [], []
+
     round_number = TabSettings.objects.get(key="cur_round").value-1
-    valid_pairing, errors, byes = True, [], []
     round_pairing = list(Round.objects.filter(round_number = round_number))
+
     #We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
     random.shuffle(round_pairing)
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
-    n_over_two = Team.objects.filter(checked_in=True).count() / 2
-    valid_pairing = len(round_pairing) >= n_over_two
+
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
+
+    print "getting errors"
+    for present_team in Team.objects.filter(checked_in=True):
+        if not (present_team in paired_teams):
+            if present_team not in byes:
+                print "got error for", present_team
+                errors.append(present_team) 
+
     pairing_exists = len(round_pairing) > 0
+
     return render_to_response('round_pairings.html',
                                locals(),
                                context_instance=RequestContext(request))
