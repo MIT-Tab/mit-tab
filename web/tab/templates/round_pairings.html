@@ -108,7 +108,7 @@
 
 <body>
 
-{% if valid_pairing %}
+{% if pairing_exists %}
     <div id="scrollPage" class="hidden"></div>
     <!-- Floating top header -->
     <div class="pairings_header">
@@ -146,11 +146,20 @@
 
     <!-- Floating bottom header -->
     <div class="pairings_footer">
-        <span class="pairings_bye_label">Giving the Bye to:</span>
-        {% for team in byes %}
-          <span class="pairings_bye_entry">{{team.name}}</span>
-          {% if not forloop.last %},{% endif%}
-        {% endfor %}
+        {% if byes %}
+            <span class="pairings_bye_label">Giving the Bye to:</span>
+            {% for team in byes %}
+              <span class="pairings_bye_entry">{{team.name}}</span>
+              {% if not forloop.last %},{% endif%}
+            {% endfor %}
+        {% endif %}
+        {% if errors %}
+            <span class="pairings_bye_label">Teams not Paired in:</span>
+            {% for team in errors %}
+              <span class="pairings_bye_entry">{{team.name}}</span>
+              {% if not forloop.last %},{% endif%}
+            {% endfor %}
+        {% endif %}
     </div>
 
 {% else %}
