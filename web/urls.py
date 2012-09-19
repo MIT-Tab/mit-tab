@@ -57,6 +57,7 @@ urlpatterns = patterns('',
     (r'^team/(\d+)/stats/', team_views.team_stats),
     (r'^view_teams/$', team_views.view_teams),
     (r'^enter_team/$', team_views.enter_team),
+    (r'^all_tab_cards/$', team_views.all_tab_cards),
     (r'^team/card/(\d+)/$', team_views.tab_card),
     (r'^team/ranking/$', team_views.rank_teams),
     

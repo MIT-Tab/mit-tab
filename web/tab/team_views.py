@@ -175,6 +175,12 @@ def view_scratches(request, team_id):
                               'title':"Viewing Scratch Information for %s"%(team.name)}, 
                               context_instance=RequestContext(request))
 
+def all_tab_cards(request):
+    all_teams = Team.objects.all()
+    return render_to_response('all_tab_cards.html',
+                              locals(),
+                              context_instance=RequestContext(request))
+
 def tab_card(request, team_id):
     try:
         team_id = int(team_id)

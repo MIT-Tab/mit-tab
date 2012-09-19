@@ -70,7 +70,25 @@ $(document).ready(function(){
         var pos = $(window).scrollTop() + 1*dir;
         $(window).scrollTop(pos);
     }
-    
+
+    $('#progressbar').progressbar({
+        value: 0
+    });
+    $('.tab_card_item').each(function(index, value) {
+        $.ajax({
+            url:"/team/card/" + $(value).data('team-id') + '/',
+            success: function(result) {
+                var pb = $('#progressbar')
+                $(value).html(result);
+                pb.data('count', pb.data('count') + 1);
+                pb.progressbar("value", 100*(pb.data('count') / pb.data('max')));
+                if(pb.progressbar("value") == 100) {
+                    pb.remove()
+                }
+            }
+        });
+    });
+
 //  Taken from stackoverflow
     $("#dialog").dialog({
         autoOpen: false,

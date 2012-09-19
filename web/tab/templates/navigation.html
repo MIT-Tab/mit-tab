@@ -14,6 +14,7 @@
 {% url tab.team_views.enter_team as enter_team %}
 {% url tab.team_views.view_teams as view_teams%}
 {% url tab.team_views.rank_teams as rank_teams %}
+{% url tab.team_views.all_tab_cards as tab_cards %}
 
 {% url django.contrib.auth.views.logout as logout %}
 
@@ -49,14 +50,18 @@
             </ul>
         </li>
         <li><a class="{%active request pair_round %}" href="{{ pair_round }}">Prepare Next Pairing</a></li>
-        <li><a class="{% active request confirm_start_new_tourny %}{% active request backup %}">Admin</a>
+        <li><a class="{% active request confirm_start_new_tourny %}">Admin</a>
             <ul id = "sublist">
                 <li><a href="/admin">Admin Interface</a></li>
                 <li><a class="{%active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
-                <li><a class="{%active request backup %}" href="{{ backup }}">Backup Database</a></li>
             </ul>
         </li>
-
+        <li><a class="{% active request tab_cards %}{% active request backup %}">Security</a>
+            <ul id = "sublist">
+                <li><a class="{%active request backup %}" href="{{ backup }}">Backup Database</a></li>
+                <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
+            </ul>
+        </li>
 	<li><a class="{% active request logout %}" href="{{ logout }}">Logout</a></li>
     </ul>
 <br>
