@@ -175,6 +175,7 @@ def view_scratches(request, team_id):
                               'title':"Viewing Scratch Information for %s"%(team.name)}, 
                               context_instance=RequestContext(request))
 
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
     return render_to_response('all_tab_cards.html',
