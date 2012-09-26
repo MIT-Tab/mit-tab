@@ -128,15 +128,17 @@ class ResultEntryForm(forms.Form):
     winner = forms.ChoiceField(label="Which team won the round?", choices=[(0,"---"),
                                                                            (1,"GOV"),
                                                                            (2,"OPP"),
-                                                                           (3, "GOV via Forfeit"), 
-                                                                           (4, "OPP via Forfeit")])
+                                                                           (3, "GOV via Forfeit"),
+                                                                           (4, "OPP via Forfeit"),
+                                                                           (5, "All Drop"),
+                                                                           (6, "All Win")])
     def __init__(self, *args, **kwargs):
         round_object = kwargs.pop('round_instance')
-        super(ResultEntryForm, self).__init__(*args, **kwargs)  
-        #If we already have information, fill that into the form
+        super(ResultEntryForm, self).__init__(*args, **kwargs) 
+        # If we already have information, fill that into the form
         if round_object.victor != 0:
             self.fields["winner"].initial = round_object.victor
-           
+
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
@@ -158,7 +160,7 @@ class ResultEntryForm(forms.Form):
                     self.fields["%s_debater"%(d)].initial = stats.debater.id
                     self.fields["%s_speaks"%(d)].initial = stats.speaks
                     self.fields["%s_ranks"%(d)].initial = stats.ranks
-                except: 
+                except:
                     pass
 
     def clean(self):
@@ -169,7 +171,7 @@ class ResultEntryForm(forms.Form):
         try:
             speak_ranks = [ (cleaned_data["%s_speaks" % (d)] ,cleaned_data["%s_ranks" % (d)], d) for d in debaters]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
-            
+
             #Check to make sure everyone has different ranks
             if set([r[0] for r in self.RANKS]) != set([int(x[1]) for x in sorted_by_ranks]):
                 for debater in debaters:
@@ -198,7 +200,7 @@ class ResultEntryForm(forms.Form):
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
         return cleaned_data
-        
+
     def save(self):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
@@ -209,7 +211,6 @@ class ResultEntryForm(forms.Form):
             old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
             if len(old_stats) > 0:
                 old_stats.delete()
-                
 
             debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
             debater_role_obj = debater
@@ -222,7 +223,3 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
-        #round_obj.save()
-        #print round_obj
-        
-                                                           

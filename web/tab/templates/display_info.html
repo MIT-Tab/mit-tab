@@ -57,9 +57,13 @@
                 <a href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
                 {% else %}{% if pairing.victor == 4 %}
                 <a href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
-                    {% else %}
-                    <a href="/round/{{pairing.id}}/result/">[Enter Results]</a></li>
-                    {%endif%}
+                {% else %}{% if pairing.victor == 5 %}
+                <a href="/round/{{pairing.id}}/result/">All Drop</a></li>
+                {% else %}{% if pairing.victor == 6 %}
+                <a href="/round/{{pairing.id}}/result/">All Win</a></li>
+                {% else %}
+                <a href="/round/{{pairing.id}}/result/">[Enter Results]</a></li>
+                {%endif%}{%endif%}{%endif%}
                 {% endif %}{% endif %}{%endif%}
             </td>
         </tr>

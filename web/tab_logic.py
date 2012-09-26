@@ -352,10 +352,10 @@ def num_no_show(t):
 #Return true if the team forfeited the round, otherwise, return false
 def forfeited_round(r,t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.OPP_VIA_FORFEIT:
+        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
             return True
     elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.GOV_VIA_FORFEIT:
+        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
             return True
     else:
         return False
@@ -364,10 +364,10 @@ def forfeited_round(r,t):
 ###Return true if the team won the round because the other team forfeited, otherwise return false
 def won_by_forfeit(r,t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.GOV_VIA_FORFEIT:
+        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
             return True
     elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.OPP_VIA_FORFEIT:
+        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
             return True
     else:
         return False
@@ -774,6 +774,7 @@ def tot_speaks_deb(debater):
         temp_speak = []
         for r in my_rounds:
             if r.round.round_number == i+1:
+                # This is why forfeit wins really need to be 0
                 temp_speak += [r.speaks]
         if len(temp_speak) != 0:
             tot_speak += float(sum(temp_speak))/float(len(temp_speak))

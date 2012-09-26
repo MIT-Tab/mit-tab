@@ -230,7 +230,11 @@ def tab_card(request, team_id):
             elif r.victor == 3:
                 round_stats[index][1] = "WF"
             elif r.victor == 4 :
-                round_stats[index][1] = "LF"    
+                round_stats[index][1] = "LF"
+            elif r.victor == 5 :
+                round_stats[index][1] = "AD"
+            elif r.victor == 6:
+                round_stats[index][1] = "AW"
         elif r.opp_team == team:
             round_stats[index][2] = r.gov_team
             round_stats[index][0] = "O"
@@ -242,6 +246,10 @@ def tab_card(request, team_id):
                 round_stats[index][1] = "LF"
             elif r.victor == 4 :
                 round_stats[index][1] = "WF"
+            elif r.victor == 5 :
+                round_stats[index][1] = "AD"
+            elif r.victor == 6:
+                round_stats[index][1] = "AW"
 
     for i in range(cur_round-1):
         if round_stats[i][6] == blank:
