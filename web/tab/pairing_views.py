@@ -141,7 +141,8 @@ def pair_round(request):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
     try:
-        backup.backup_round("manual_backup_round_%i_%i.db" % (TabSettings.objects.get(key="cur_round").value, time.time()))
+        cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(time.time())
+        backup.backup_round("manual_backup_round_%i_%i.db" % (cur_round, btime))
     except:
         traceback.print_exc(file=sys.stdout)
         return render_to_response('error.html',
@@ -149,9 +150,13 @@ def manual_backup(request):
                                   'error_info': "Could not backup database. Something is wrong with your AWS setup."},
                                   context_instance=RequestContext(request))
     return render_to_response('thanks.html',
-                             {'data_type': "Backing up",
-                              'data_name': " database backup to aws "},
+                             {'data_type': "Backing up database",
+                              'data_name': " for round {} as version number {}".format(cur_round, btime)},
                                context_instance=RequestContext(request))
+
+#def view_backups(request):
+    #try:
+        #available_backups = 
                                 
 def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value-1

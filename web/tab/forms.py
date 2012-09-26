@@ -55,8 +55,7 @@ class JudgeForm(forms.ModelForm):
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
                                               widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
-   
+                                              is_stacked=False))   
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):

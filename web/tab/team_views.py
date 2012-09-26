@@ -282,6 +282,11 @@ def tab_card(request, team_id):
                               'bye_round': bye_round},
                               context_instance=RequestContext(request))
 
+def rank_teams_ajax(request):
+    return render_to_response('rank_teams.html',
+                             {'title': "Team Rankings"},
+                              context_instance=RequestContext(request))
+
 def rank_teams(request):
     print "starting rankings: ", datetime.now()
     ranked_teams = tab_logic.rank_teams()
@@ -299,7 +304,7 @@ def rank_teams(request):
                   tab_logic.tot_ranks(team))
                   for team in ranked_novice_teams]
 
-    return render_to_response('rank_teams.html',
+    return render_to_response('rank_teams_component.html',
                              {'varsity': teams,
                               'novice': nov_teams,
                               'title': "Team Rankings"},

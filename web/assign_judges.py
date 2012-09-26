@@ -58,7 +58,7 @@ def add_judges(pairings):
         for j in range(len(list(judges))):
             for p in range(len(pairings)):
                 if judge_conflict(judges[j],pairings[p][0], pairings[p][1]) == False:
-                    wt = calcWeight(p, j)
+                    wt = calc_weight(p, j)
                     graph_edges +=[(p,j+len(pairings),wt)]
         
         judges_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
@@ -75,7 +75,7 @@ def add_judges(pairings):
 
 
 #take in a sorted list of judges and teams with the best judges and teams first
-def calcWeight(judges, pair):
+def calc_weight(judges, pair):
     wt = -1*(abs(judges-pair)**2)
     return wt
 

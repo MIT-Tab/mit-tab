@@ -103,6 +103,11 @@ def enter_debater(request):
                               'title': "Create Debater:"},
                               context_instance=RequestContext(request))
 
+def rank_debaters_ajax(request):
+    return render_to_response('rank_debaters.html',
+                             {'title': "Debater Rankings"},
+                              context_instance=RequestContext(request))
+                              
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
@@ -116,7 +121,7 @@ def rank_debaters(request):
                      tab_logic.tot_ranks_deb(s),
                      tab_logic.deb_team(s)) for s in nov_speakers]
 
-    return render_to_response('rank_debaters.html', 
+    return render_to_response('rank_debaters_component.html', 
                              {'debaters': debaters, 
                               'nov_debaters' : nov_debaters,
                               'title': "Speaker Rankings"}, 

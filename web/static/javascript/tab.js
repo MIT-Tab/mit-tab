@@ -89,6 +89,10 @@ $(document).ready(function(){
         });
     });
 
+    $('#id_debaters').closest('tr').append(
+    "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
+    )
+    
 //  Taken from stackoverflow
     $("#dialog").dialog({
         autoOpen: false,

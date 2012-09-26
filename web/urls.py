@@ -59,14 +59,16 @@ urlpatterns = patterns('',
     (r'^enter_team/$', team_views.enter_team),
     (r'^all_tab_cards/$', team_views.all_tab_cards),
     (r'^team/card/(\d+)/$', team_views.tab_card),
-    (r'^team/ranking/$', team_views.rank_teams),
+    (r'^team/ranking/$', team_views.rank_teams_ajax),
+    (r'^team/rank/$', team_views.rank_teams),
     
     #All debater related pages
     (r'^debater/(\d+)/$', debater_views.view_debater),
     (r'^debater/(\d+)/delete/$', debater_views.delete_debater),
     (r'^view_debaters/$', debater_views.view_debaters),
     (r'^enter_debater/$', debater_views.enter_debater),
-    (r'^debater/ranking/$', debater_views.rank_debaters),
+    (r'^debater/ranking/$', debater_views.rank_debaters_ajax),
+    (r'^debater/rank/$', debater_views.rank_debaters),
     
     #All pairing related pages
     (r'^pairings/status/$', pairing_views.view_status),

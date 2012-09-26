@@ -431,3 +431,10 @@ ul.list_item {
 .invisible {
     display: none;
 }
+
+.loading{
+    background:url('/static/images/ajax-loader.gif') no-repeat center;
+    width: 100%;
+    height: 200px;
+}
+

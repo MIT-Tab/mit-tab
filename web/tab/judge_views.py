@@ -81,7 +81,9 @@ def enter_judge(request):
                                       context_instance=RequestContext(request))
     else:
         form = JudgeForm(first_entry=True)
-    return render_to_response('data_entry.html', {'form': form},context_instance=RequestContext(request))
+    return render_to_response('data_entry.html',
+                              {'form': form, 'title': "Create Judge"},
+                              context_instance=RequestContext(request))
 
 @permission_required('tab.judge.can_delete', login_url="/403/")    
 def delete_judge(request, judge_id):

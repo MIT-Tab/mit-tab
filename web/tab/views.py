@@ -90,7 +90,9 @@ def enter_school(request):
                                       context_instance=RequestContext(request))
     else:
         form = SchoolForm()
-    return render_to_response('data_entry.html', {'form': form}, context_instance=RequestContext(request))
+    return render_to_response('data_entry.html', 
+                              {'form': form, 'title': "Create School"}, 
+                              context_instance=RequestContext(request))
 
 @permission_required('tab.school.can_delete', login_url="/403/")    
 def delete_school(request, school_id):
@@ -179,7 +181,9 @@ def enter_room(request):
                                       context_instance=RequestContext(request))
     else:
         form = RoomForm()
-    return render_to_response('data_entry.html', {'form': form}, context_instance=RequestContext(request))    
+    return render_to_response('data_entry.html',
+                             {'form': form, 'title': 'Create Room'},
+                             context_instance=RequestContext(request))    
     
 @permission_required('tab.room.can_delete', login_url="/403/")    
 def delete_room(request, room_id):

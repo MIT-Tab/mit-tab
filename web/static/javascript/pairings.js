@@ -157,6 +157,21 @@ var populate_tab_card = function(tab_card_element) {
     })
 }
 
+var lazy_load = function(element, url) {
+    element.addClass("loading");
+    $.ajax({
+        url:url,
+        success: function(result) {
+            element.html(result);
+            element.removeClass("loading");
+        },
+        failure: function(result) {
+            element.html("Error received from server");
+            element.removeClass("loading");
+        }
+    })
+}
+
 var bind_handlers = function() {
     $('.judge.swappable').draggable(judge_drag_options)
     $('.judge.swappable').droppable(judge_drop_options)
@@ -166,6 +181,12 @@ var bind_handlers = function() {
 
     $('.team.tabcard').each(function(index, element) {
         populate_tab_card($(element))
+    })
+    $('#team_ranking').each(function(index, element) {
+        lazy_load($(element), "/team/rank/");
+    })
+    $('#debater_ranking').each(function(index, element) {
+        lazy_load($(element), "/debater/rank/");
     })
 
 }
