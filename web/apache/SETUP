@@ -1,0 +1,19 @@
+To use mit-tab with Apache, do the following:
+1) Copy the mit-tab directory into /var/www/tab/. Make sure that
+the http user (depends on your apache deployment) has read and write
+permissions to this directory.
+    # All as root
+    cd /var/www
+    git clone https://github.com/jolynch/mit-tab.git tab
+    chown -R root:www-data tab
+    cd tab
+    chmod 770 web
+2) Copy the provided "tab" configuration to the sites-available directory
+in your apache configuration directory. E.G. /etc/apache2
+3) Modify the tab configuration to suit your system.  In general this
+consists of changing the django paths to point to the right place.
+
+Occasionally you have to:
+    cd /usr/local/lib/python2.7/dist-packages/django/contrib/admin/static
+    ln -s admin/* .
+

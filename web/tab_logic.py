@@ -737,7 +737,7 @@ def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = RoundStats.objects.filter(debater = d)
-    current_round = TabSettings.objects.geT(key = 'cur_round').value
+    current_round = TabSettings.objects.get(key = 'cur_round').value
     for i in range(current_round - 1):
         temp_rank = []
         for r in my_rounds:
@@ -882,7 +882,7 @@ def single_adjusted_ranks_deb(d):
         list_of_ranks[i] = float(sum(list_of_ranks[i]))/float(len(list_of_ranks[i]))
         
     for n in list(NoShow.objects.filter(no_show_team=t)):
-        list_of_ranks[n.round_number-1] = 3.5
+        list_of_ranks.append(3.5)
         
     list_of_ranks.sort()
     list_of_ranks=list_of_ranks[1:-1]
