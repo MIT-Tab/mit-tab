@@ -393,7 +393,7 @@ def team_wins_by_forfeit():
         print str(r.opp_team) + " won via forfeit"
         wins_by_forfeit.append(r.opp_team)
     for r in Round.objects.filter(victor = Round.ALL_WIN):
-        print r.round_numer
+        print r.round_number
         print str(r.gov_team)+ ", " + str(r.opp_team) + " won via forfeit"
         wins_by_forfeit.append(r.gov_team)
         wins_by_forfeit.append(r.opp_team)
