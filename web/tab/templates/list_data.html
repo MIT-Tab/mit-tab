@@ -4,7 +4,7 @@
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<p>List of all {{item_type}}s (click to edit):</p>
+<p>List of all {{item_type}}s (click to {{item_manip|default:"edit"}}):</p>
 <div id="filter">
 Quick Search: <input type="text" id="filter_box"></input>
 </div>

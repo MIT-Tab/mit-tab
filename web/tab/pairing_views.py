@@ -14,6 +14,7 @@ import traceback
 import send_texts as texting
 import backup
 import time
+import datetime
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -142,7 +143,8 @@ def pair_round(request):
 def manual_backup(request):
     try:
         cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(time.time())
-        backup.backup_round("manual_backup_round_%i_%i.db" % (cur_round, btime))
+        now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
+        backup.backup_round("manual_backup_round_{}_{}_{}.db".format(cur_round, btime, now))
     except:
         traceback.print_exc(file=sys.stdout)
         return render_to_response('error.html',
@@ -154,10 +156,25 @@ def manual_backup(request):
                               'data_name': " for round {} as version number {}".format(cur_round, btime)},
                                context_instance=RequestContext(request))
 
-#def view_backups(request):
-    #try:
-        #available_backups = 
-                                
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def view_backups(request):
+    backups = backup.list_backups()
+    item_list = [(i,i) for i in sorted(backups)]
+    item_type='backup'
+    title = "Viewing All Backups"
+    item_manip = "restore from that backup"
+    return render_to_response('list_data.html', locals(), context_instance=RequestContext(request))
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def restore_backup(request, filename):
+    print "Trying to restore %s" % filename
+    backup.restore_from_backup(filename)
+    return render_to_response('thanks.html',
+                             {'data_type': "Restored from backup",
+                              'data_name': "{}".format(filename)},
+                               context_instance=RequestContext(request))
+    
+    
 def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value-1
     return view_round(request, current_round_number)

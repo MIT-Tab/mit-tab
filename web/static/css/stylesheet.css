@@ -344,7 +344,6 @@ div.team_record table td{
 
 div.list_wrapper {
     float: left;
-    width: 18em;
 }
 
 div.clear {
@@ -419,6 +418,7 @@ div.scroll{
 
 li.data_list a{
     display: block;
+    padding: .1em;
     width: 100%;    
 }
 
