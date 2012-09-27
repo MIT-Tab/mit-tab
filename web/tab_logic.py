@@ -31,6 +31,8 @@ from decimal import *
 import send_texts
 from datetime import datetime
 import pprint
+
+from cache_logic import cache
     
 #will return false if not ready to pair yet
 def pair_round():
@@ -445,13 +447,14 @@ def avg_team_ranks(t):
         return float(tot_ranks)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
 
 #Calculate a team's total speaks
+@cache()
 def tot_speaks(team):
     tot_speaks = sum([tot_speaks_deb(deb)
                       for deb in team.debaters.all()])
     tot_speaks = float(tot_speaks) + avg_team_speaks(team) * (num_byes(team) + num_forfeit_wins(team))
     return tot_speaks
 
-
+@cache()
 def tot_ranks(team):
     tot_ranks = 0
     for debater in team.debaters.all():
@@ -468,10 +471,10 @@ def tot_ranks(team):
 
     #If a team had the bye or won by a forfeit, add in the average of ranks for those rounds
     tot_ranks += avg_team_ranks(team) * (num_byes(team) + num_forfeit_wins(team))
-        
+    
     return tot_ranks
                           
-                          
+@cache()                         
 def single_adjusted_speaks(t):
     current_round = TabSettings.objects.get(key = "cur_round").value
     total_rounds = TabSettings.objects.get(key = "tot_rounds").value
@@ -509,6 +512,7 @@ def single_adjusted_speaks(t):
         sing_adj_speaks+= avg_team_speaks(t)*(num_byes(t)+num_forfeit_wins(t))
     return sing_adj_speaks
 
+@cache()
 def single_adjusted_ranks(t):
     if TabSettings.objects.get(key = "cur_round").value < 3:
         return tot_ranks(t)
@@ -556,7 +560,7 @@ def single_adjusted_ranks(t):
         sing_adj_ranks+= avg_team_ranks(t)*(num_byes(t)+num_forfeit_wins(t))
     return sing_adj_ranks
 
-
+@cache()
 def double_adjusted_speaks(t):
     if TabSettings.objects.get(key = "cur_round").value < 5:
         return tot_speaks(t)
@@ -592,6 +596,7 @@ def double_adjusted_speaks(t):
         double_adj_speaks+= avg_team_speaks(t)*(num_byes(t)+num_forfeit_wins(t))
     return double_adj_speaks
 
+@cache()
 def double_adjusted_ranks(t):
     if TabSettings.objects.get(key = "cur_round").value < 5:
         return tot_ranks(t)
@@ -651,10 +656,12 @@ def opp_strength(t):
     return opp_record
     
 # Return a list of all teams who have no varsity members 
+@cache()
 def all_nov_teams():
     return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
 
 # Return a list of all teams in the Database
+@cache()
 def all_teams():
     return list(Team.objects.all())
 
@@ -677,8 +684,8 @@ def tab_nov_break():
         pairings += [(nov_break[i],nov_break[len(nov_break)-i-1])]
     return pairings
 
-
 # Returns a tuple b
+@cache()
 def team_score(team):
     return (-tot_wins(team),
             -tot_speaks(team),
@@ -693,19 +700,16 @@ def team_score(team):
 def team_score_except_record(team):
     return team_score(team)[1:]
 
-
 def rank_teams():
     return sorted(all_teams(), key=team_score)
-
 
 def rank_teams_except_record(teams):
     return sorted(teams, key=team_score_except_record)
 
-
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
 
-
+@cache()
 def rank_nov_speakers():
     debs = list(Debater.objects.filter(novice_status=1))
     random.shuffle(debs, random = random.random)
@@ -715,6 +719,7 @@ def rank_nov_speakers():
     speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
     return speakers
 
+@cache()
 def avg_deb_speaks(d):
     tot_speak = 0
     #This is all the rounds the debater debated in
@@ -732,7 +737,8 @@ def avg_deb_speaks(d):
         return 0
     else:
         return float(tot_speak)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
-                    
+        
+@cache()
 def avg_deb_ranks(d):
     tot_rank = 0
     t = deb_team(d)
@@ -764,7 +770,8 @@ def avg_deb_ranks(d):
         return float(tot_rank)/float(current_round-(num_byes(t)+num_forfeit_wins(t))-1)
 
     
-#calculate the total speaks for the debater (if iron-manned, average that round)
+# Calculate the total speaks for the debater (if iron-manned, average that round)
+@cache()
 def tot_speaks_deb(debater):
     tot_speak = 0
     #This is all the rounds the debater debated in
@@ -783,7 +790,8 @@ def tot_speaks_deb(debater):
     tot_speak += avg_deb_speaks(debater)*(num_byes(t)+num_forfeit_wins(t))
     return tot_speak
 
-#calculate the total ranks for the debater (if iron-manned, average that round)
+# Calculate the total ranks for the debater (if iron-manned, average that round)
+@cache()
 def tot_ranks_deb(d):
     tot_rank = 0
     t = deb_team(d)
@@ -810,8 +818,7 @@ def tot_ranks_deb(d):
         
     return tot_rank
 
-
-
+@cache()
 def single_adjusted_speaks_deb(debater):
     team = deb_team(debater)
     current_round = TabSettings.objects.get(key="cur_round").value
@@ -845,7 +852,7 @@ def single_adjusted_speaks_deb(debater):
     sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
     return sing_adj_speaks
                             
-
+@cache()
 def single_adjusted_ranks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 3:
@@ -894,6 +901,7 @@ def single_adjusted_ranks_deb(d):
     avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
     return sing_adj_ranks
 
+@cache()
 def double_adjusted_speaks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 5:
@@ -929,7 +937,7 @@ def double_adjusted_speaks_deb(d):
     double_adj_speaks += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
     return double_adj_speaks
                             
-
+@cache()
 def double_adjusted_ranks_deb(d):
     t = deb_team(d)
     if TabSettings.objects.get(key = "cur_round").value < 5:
@@ -987,6 +995,7 @@ def deb_team(d):
 
 # Returns a tuple used for comparing two debaters 
 # in terms of their overall standing in the tournament
+@cache()
 def debater_score(debater):
     return (-tot_speaks_deb(debater),
             tot_ranks_deb(debater),

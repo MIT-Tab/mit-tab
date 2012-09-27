@@ -7,6 +7,7 @@ from errors import *
 from models import *
 from django.shortcuts import redirect
 from forms import ResultEntryForm
+import cache_logic
 import tab_logic
 import random
 import sys
@@ -81,6 +82,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def pair_round(request):
+    cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
     next_round = current_round.value 
     if request.method == 'POST':
@@ -181,10 +183,12 @@ def view_status(request):
 
 def view_round(request, round_number):
     valid_pairing, errors, byes = True, [], []
+    print "1: ",time.time()
     round_pairing = list(Round.objects.filter(round_number = round_number))
     round_pairing.sort(key=lambda x: (max(tab_logic.tot_wins(x.gov_team), tab_logic.tot_wins(x.opp_team)),
                                       max(tab_logic.tot_speaks(x.gov_team), tab_logic.tot_speaks(x.opp_team))))
     round_pairing.reverse()
+    print "2: ",time.time()
     #For the template since we can't pass in something nicer like a hash
     round_info = [[pair]+[None]*8 for pair in round_pairing]
     for pair in round_info:
@@ -195,7 +199,9 @@ def view_round(request, round_number):
         pair[5] = tab_logic.tot_wins(pair[0].opp_team)
         pair[6] = tab_logic.tot_speaks(pair[0].opp_team)
         pair[7] = tab_logic.num_govs(pair[0].opp_team)    
-        pair[8] = tab_logic.num_opps(pair[0].opp_team)    
+        pair[8] = tab_logic.num_opps(pair[0].opp_team)
+    print "3: ",time.time()
+
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
     valid_pairing = len(round_pairing) >= n_over_two
@@ -209,7 +215,8 @@ def view_round(request, round_number):
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
-    
+    print "4: ",time.time()
+
     # A seemingly complex one liner to do a fairly simple thing
     # basically this generates the table that the HTML will display such that the output looks like:
     # [ Byes ][Judges not in round but checked in][Judges not in round but not checked in]
