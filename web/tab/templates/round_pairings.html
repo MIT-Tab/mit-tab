@@ -89,6 +89,17 @@
             background:             #BDF;
             border:                 .15em solid #000;
         }
+        .pairings_footer_printable
+        {
+            white-space: nowrap;
+            height:                 1.5em;
+            width:                  100%;
+            padding:                .5em;
+            margin:                 0em;
+
+            background:             #BDF;
+            border:                 .15em solid #000;
+        }
 
         .pairings_footer_spacer
         {
@@ -103,65 +114,111 @@
         .pairings_bye_entry
         {
         }
+        .printable 
+        {
+            width: 7in;    
+            white-space: nowrap;
+        }
     </style>
 </head>
 
 <body>
 
 {% if pairing_exists %}
-    <div id="scrollPage" class="hidden"></div>
-    <!-- Floating top header -->
-    <div class="pairings_header">
-      <h1>Pairings for Round {{round_number}}</h1>
-      <table class="pairings_table">
+    {% if printable %}
+        <!-- Center pairings table -->
+        <table class="pairings_table printable">
         <tr>
-          <th>
-            Government
-          </th> <th>
-            Opposition
-          </th> <th>
-            Judge
-          </th> <th>
-            Room
-          </th>
+            <th>
+                Government
+            </th> <th>
+                Opposition
+            </th> <th>
+                Judge
+            </th> <th>
+                Room
+            </th>
         </tr>
-      </table>
-    </div>
+        {% for pairing in round_pairing %}
+        <tr>
+            <td>{{pairing.gov_team.name}}</td>
+            <td>{{pairing.opp_team.name}}</td>
+            <td>{{pairing.judge.name}}</td>
+            <td>{{pairing.room.name}}</td>
+        </tr>
+        {% endfor %}
+        </table>
+        <div class="pairings_footer_printable">
+            {% if byes %}
+                <span class="pairings_bye_label">Giving the Bye to:</span>
+                {% for team in byes %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
+                {% endfor %}
+            {% endif %}
+            {% if errors %}
+                <span class="pairings_bye_label">Teams not Paired in:</span>
+                {% for team in errors %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+    {% else %}
+        <div id="scrollPage" class="hidden"></div>
+        <!-- Floating top header -->
+        <div class="pairings_header">
+        <h1>Pairings for Round {{round_number}}</h1>
+        <table class="pairings_table">
+            <tr>
+            <th>
+                Government
+            </th> <th>
+                Opposition
+            </th> <th>
+                Judge
+            </th> <th>
+                Room
+            </th>
+            </tr>
+        </table>
+        </div>
 
-    <div class="pairings_header_spacer"></div>
+        <div class="pairings_header_spacer"></div>
 
-    <!-- Center pairings table -->
-    <table class="pairings_table">
-      {% for pairing in round_pairing %}
-      <tr>
-        <td>{{pairing.gov_team.name}}</td>
-        <td>{{pairing.opp_team.name}}</td>
-        <td>{{pairing.judge.name}}</td>
-        <td>{{pairing.room.name}}</td>
-      </tr>
-      {% endfor %}
-    </table>
+        <!-- Center pairings table -->
+        <table class="pairings_table">
+        {% for pairing in round_pairing %}
+        <tr>
+            <td>{{pairing.gov_team.name}}</td>
+            <td>{{pairing.opp_team.name}}</td>
+            <td>{{pairing.judge.name}}</td>
+            <td>{{pairing.room.name}}</td>
+        </tr>
+        {% endfor %}
+        </table>
 
-    <div class="pairings_footer_spacer"></div>
+        <div class="pairings_footer_spacer"></div>
 
-    <!-- Floating bottom header -->
-    <div class="pairings_footer">
-        {% if byes %}
-            <span class="pairings_bye_label">Giving the Bye to:</span>
-            {% for team in byes %}
-              <span class="pairings_bye_entry">{{team.name}}</span>
-              {% if not forloop.last %},{% endif%}
-            {% endfor %}
-        {% endif %}
-        {% if errors %}
-            <span class="pairings_bye_label">Teams not Paired in:</span>
-            {% for team in errors %}
-              <span class="pairings_bye_entry">{{team.name}}</span>
-              {% if not forloop.last %},{% endif%}
-            {% endfor %}
-        {% endif %}
-    </div>
-
+        <!-- Floating bottom header -->
+        <div class="pairings_footer">
+            {% if byes %}
+                <span class="pairings_bye_label">Giving the Bye to:</span>
+                {% for team in byes %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
+                {% endfor %}
+            {% endif %}
+            {% if errors %}
+                <span class="pairings_bye_label">Teams not Paired in:</span>
+                {% for team in errors %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
+                {% endfor %}
+            {% endif %}
+        </div>
+    {% endif %}
 {% else %}
 
     Round {{round_number}} does not yet have a valid pairing. Please wait until

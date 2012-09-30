@@ -251,7 +251,7 @@ def send_texts(request):
 
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""
-def pretty_pair(request):
+def pretty_pair(request, printable=False):
 
     errors, byes = [], []
 
@@ -273,10 +273,13 @@ def pretty_pair(request):
                 errors.append(present_team) 
 
     pairing_exists = len(round_pairing) > 0
-
+    printable = printable
     return render_to_response('round_pairings.html',
                                locals(),
                                context_instance=RequestContext(request))
+
+def pretty_pair_print(request):
+    return pretty_pair(request, True)
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
