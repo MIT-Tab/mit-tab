@@ -656,12 +656,10 @@ def opp_strength(t):
     return opp_record
     
 # Return a list of all teams who have no varsity members 
-@cache()
 def all_nov_teams():
     return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
 
 # Return a list of all teams in the Database
-@cache()
 def all_teams():
     return list(Team.objects.all())
 
@@ -685,7 +683,6 @@ def tab_nov_break():
     return pairings
 
 # Returns a tuple b
-@cache()
 def team_score(team):
     return (-tot_wins(team),
             -tot_speaks(team),
@@ -709,7 +706,6 @@ def rank_teams_except_record(teams):
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
 
-@cache()
 def rank_nov_speakers():
     debs = list(Debater.objects.filter(novice_status=1))
     random.shuffle(debs, random = random.random)
@@ -995,7 +991,6 @@ def deb_team(d):
 
 # Returns a tuple used for comparing two debaters 
 # in terms of their overall standing in the tournament
-@cache()
 def debater_score(debater):
     return (-tot_speaks_deb(debater),
             tot_ranks_deb(debater),
