@@ -19,7 +19,9 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     (r'^admin/', include(admin.site.urls)),
-    
+    (r'^dynamic-media/jsi18n/$', 'django.views.i18n.javascript_catalog'), 
+   
+ 
     (r'^static/(?P<path>.*)$', 'django.views.static.serve',
         {'document_root': settings.MEDIA_ROOT}),
     (r'^$', views.index),
