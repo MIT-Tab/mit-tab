@@ -22,12 +22,15 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
     """    
     def do_cache(f):
         def x(*args, **kwargs):
-                key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
-                result = _djcache.get(key)
-                if result is None:
-                    result = f(*args, **kwargs)
-                    _djcache.set(key, result, random.randint(seconds, seconds+stampede))
-                return result
+            key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
+            result = _djcache.get(key)
+            if result is None:
+                #print "busting cache"
+                result = f(*args, **kwargs)
+                _djcache.set(key, result, random.randint(seconds, seconds+stampede))
+            else:
+                #print "hitting cache"
+            return result
         return x
     return do_cache
 
