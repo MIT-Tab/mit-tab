@@ -28,8 +28,6 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
                 #print "busting cache"
                 result = f(*args, **kwargs)
                 _djcache.set(key, result, random.randint(seconds, seconds+stampede))
-            else:
-                #print "hitting cache"
             return result
         return x
     return do_cache
