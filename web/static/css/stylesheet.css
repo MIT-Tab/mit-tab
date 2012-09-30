@@ -326,6 +326,7 @@ div.team_record {
     border: 1px solid #BBBBBB;
     font-size: 18px;
     z-index: 5;
+    background-color: #FBFBF0
 }
 
 div.team_record table {
@@ -436,4 +437,5 @@ ul.list_item {
     width: 100%;
     height: 200px;
 }
+
 

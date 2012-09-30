@@ -295,6 +295,7 @@ button.btn.small, input[type="submit"].btn.small {
   *margin-left: .3em;
   margin-top: .3em;
   margin-bottom: .3em;
+  overflow: auto;
 }
 .btn-group:before, .btn-group:after {
   display: table;
