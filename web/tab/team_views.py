@@ -10,11 +10,18 @@ import tab_logic
 from datetime import datetime
 
 def view_teams(request):
-    c_teams = [(t.pk,t.name) for t in Team.objects.all().order_by("name")]
+    def symbols(team):
+        result = ""
+        if not t.checked_in:
+            result += "*"
+        return result
+    c_teams = [(t.pk,t.name,symbols(t)) for t in Team.objects.all().order_by("name")]
+    symbol_text = [("*","Team not checked into the tournament")]
     return render_to_response('list_data.html', 
                              {'item_type':'team',
                               'title': "Viewing All Teams",
-                              'item_list':c_teams}, 
+                              'item_list': c_teams,
+                              'symbol_text': symbol_text}, 
                               context_instance=RequestContext(request))
 
 def view_team(request, team_id):

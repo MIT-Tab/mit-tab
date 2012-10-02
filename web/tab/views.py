@@ -121,12 +121,21 @@ def delete_school(request, school_id):
 
 #### BEGIN ROOM ###
 def view_rooms(request):
-    #Get a list of (id,school_name) tuples
-    all_rooms = [(room.pk,room.name) for room in Room.objects.all().order_by("name")]
+    def symbols(room):
+        result = ""
+        if room.rank == 0:
+            result += "*"
+        return result
+    symbol_text = [("*","Room has rank of 0 (won't be paired in)")]
+    all_rooms = [(room.pk, room.name, symbols(room)) 
+                  for room in Room.objects.all().order_by("name")]
+   
     return render_to_response('list_data.html', 
                              {'item_type':'room',
                               'title': "Viewing All Rooms",
-                              'item_list':all_rooms}, context_instance=RequestContext(request))
+                              'item_list':all_rooms,
+                              'symbol_text':symbol_text},
+                              context_instance=RequestContext(request))
 
 def view_room(request, room_id):
     room_id = int(room_id)

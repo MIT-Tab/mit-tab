@@ -173,6 +173,10 @@ div.index_header {
     width: 25%;
 }
 
+.center_text {
+    text-align: center;    
+}
+
 div.index_list ol {
     padding-left: 2em;
 }
@@ -387,6 +391,10 @@ div.team_record th {
     width: 48%;
 }
 
+.no_decoration {
+    text-decoration: none;    
+}
+
 a.button {
     text-decoration: none;
     color: black;
@@ -426,6 +434,12 @@ ul.list_item {
     list-style: none;
     padding-left: 1em;
     padding-right: 1em;
+}
+
+span.list_item {
+    float: right;
+    margin-left: .5em;
+    
 }
 
 .invisible {

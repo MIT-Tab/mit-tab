@@ -11,11 +11,25 @@ from errors import *
 
 def view_judges(request):
     #Get a list of (id,school_name) tuples
-    c_judge = [(judge.pk,judge.name) for judge in Judge.objects.order_by("name")]
+    current_round = TabSettings.objects.get(key="cur_round").value
+    checkins = CheckIn.objects.filter(round_number = current_round)
+    checked_in_judges = set([c.judge for c in checkins])
+    
+    def symbols(judge):
+        result = ""
+        if judge not in checked_in_judges:
+            result += "*"
+        if judge.rank > 5.0:
+            result += "#"
+        return result
+    
+    symbol_text = [("*","Judge not checked in for this round"),("#","Judge has rank > 5")]
+    c_judge = [(judge.pk,judge.name, symbols(judge)) for judge in Judge.objects.order_by("name")]
     return render_to_response('list_data.html', 
                              {'item_type':'judge',
                               'title': "Viewing All Judges",
-                              'item_list':c_judge}, context_instance=RequestContext(request))
+                              'item_list':c_judge,
+                              'symbol_text': symbol_text}, context_instance=RequestContext(request))
     
 def view_judge(request, judge_id):
     judge_id = int(judge_id)
