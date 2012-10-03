@@ -1,0 +1,10 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {% trans 'MIT-TAB site admin' %}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">{% trans 'MIT-TAB site administration' %}</h1>
+{% endblock %}
+
+{% block nav-global %}<div style="padding: 0 10px 10px;font-size: 18px;"><a  href="/">Go Back to Main Homepage</a></div>{% endblock %}

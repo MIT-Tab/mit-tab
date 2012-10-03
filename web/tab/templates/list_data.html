@@ -38,4 +38,14 @@ Quick Search: <input type="text" id="filter_box"></input>
     </table>
 {% endif %}
 <div class="clear"></div>
+
+{% if links %}
+<div class="btn-group">
+    {% for link,text,confirm in links %}
+        <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
+    {% endfor %}
+</div>
+{%endif%}
+
+<div class="clear"></div>
 {% endblock %}

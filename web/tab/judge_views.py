@@ -23,7 +23,7 @@ def view_judges(request):
             result += "#"
         return result
     
-    symbol_text = [("*","Judge not checked in for this round"),("#","Judge has rank > 5")]
+    symbol_text = [("*","Judge not checked in for the current round"),("#","Judge has rank > 5")]
     c_judge = [(judge.pk,judge.name, symbols(judge)) for judge in Judge.objects.order_by("name")]
     return render_to_response('list_data.html', 
                              {'item_type':'judge',

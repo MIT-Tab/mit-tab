@@ -6,7 +6,7 @@ from django.utils import simplejson
 from errors import *
 from models import *
 from django.shortcuts import redirect
-from forms import ResultEntryForm
+from forms import ResultEntryForm, UploadFileForm
 import cache_logic
 import tab_logic
 import random
@@ -16,14 +16,17 @@ import send_texts as texting
 import backup
 import time
 import datetime
+import os
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     try :
-        src_round = Round.objects.get(id=src_round)
-        src_judge = Judge.objects.get(id=src_judge)
-        dest_round = Round.objects.get(id=dest_round)
-        dest_judge = Judge.objects.get(id=dest_judge)
+        src_judge = Judge.objects.get(id=int(src_judge))
+        dest_judge = Judge.objects.get(id=int(dest_judge))
+        
+        src_round = Round.objects.get(id=int(src_round))
+        dest_round = Round.objects.get(id=int(dest_round))
+        
         dest_round.judge = src_judge
         src_round.judge = dest_judge
         dest_round.save()
@@ -38,18 +41,18 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     try :
-        src_team = Team.objects.get(id=src_team)
-        dest_team = Team.objects.get(id=dest_team)
-        if src_round == dest_round:
-            same_round = Round.objects.get(id=src_round)
+        src_team = Team.objects.get(id=int(src_team))
+        dest_team = Team.objects.get(id=int(dest_team))
+        if int(src_round) == int(dest_round):
+            same_round = Round.objects.get(id=int(src_round))
             gov_team = same_round.gov_team
             opp_team = same_round.opp_team
             same_round.gov_team = opp_team
             same_round.opp_team = gov_team
             same_round.save()
         else:
-            src_round = Round.objects.get(id=src_round)
-            dest_round = Round.objects.get(id=dest_round)
+            src_round = Round.objects.get(id=int(src_round))
+            dest_round = Round.objects.get(id=int(dest_round))
             if src_round.gov_team == src_team:
                 if dest_round.gov_team == dest_team:
                     # Swap the two gov teams
@@ -129,17 +132,55 @@ def pair_round(request):
         else:
             check_status.append((msg, "Yes", "Have judges"))
         ready_to_pair = "Yes"
-        ready_to_pair_alt = "Backend ready to pair!"
+        ready_to_pair_alt = "Checks passed!"
         try:
             tab_logic.ready_to_pair(current_round)
         except Exception as e:
             ready_to_pair = "No"
             ready_to_pair_alt = str(e) 
-        check_status.append(("Backend Ready to Pair?", ready_to_pair, ready_to_pair_alt))
+        check_status.append(("Additional Minor Checks", ready_to_pair, ready_to_pair_alt))
         
         return render_to_response('pair_round.html',
                                 locals(),
                                 context_instance=RequestContext(request))
+
+@permission_required('tab.tab_settings.can_change', login_url='/403/')
+def view_backup(request, filename):
+    backups = backup.list_backups()
+    item_list = []
+    item_type='backup'
+    title = "Viewing Backup: {}".format(filename)
+    item_manip = "restore from that backup"
+    links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
+             ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
+    return render_to_response('list_data.html', locals(), context_instance=RequestContext(request))
+
+@permission_required('tab.tab_settings.can_change', login_url='/403/')
+def download_backup(request, filename):
+    print "Trying to download {}".format(filename)
+    wrapper, size = backup.get_wrapped_file(filename)
+    response = HttpResponse(wrapper, content_type='text/plain')
+    response['Content-Length'] = size
+    response['Content-Disposition'] = "attachment; filename=%s" % filename
+    return response
+
+@permission_required('tab.tab_settings.can_change', login_url='/403/')
+def upload_backup(request):
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            backup.handle_backup(request.FILES['file'])
+            return render_to_response('thanks.html', 
+                                     {'data_type': "Backup",
+                                      'data_name': request.FILES['file'].name,
+                                      'data_modification': "CREATE"}, 
+                                      context_instance=RequestContext(request))
+    else:
+        form = UploadFileForm()
+    return render_to_response('data_entry.html', 
+                              {'form': form,
+                               'title': 'Upload a Backup'}, 
+                               context_instance=RequestContext(request))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
@@ -165,6 +206,7 @@ def view_backups(request):
     item_type='backup'
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
+    links = [('/upload_backup/', "Upload Backup", False)]
     return render_to_response('list_data.html', locals(), context_instance=RequestContext(request))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")

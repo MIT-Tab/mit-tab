@@ -4,6 +4,9 @@ from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from models import *
 
+class UploadFileForm(forms.Form):
+    file  = forms.FileField(label="Your Backup File")
+
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School

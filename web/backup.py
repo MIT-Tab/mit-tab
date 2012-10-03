@@ -1,5 +1,7 @@
 from tab.models import *
 from django.conf import settings
+from django.core.servers.basehttp import FileWrapper
+
 import shutil
 import time
 import os
@@ -61,6 +63,18 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
         except:
             print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
 
+def handle_backup(f):
+    prefix = os.path.dirname(os.path.realpath(__file__))
+    dst_filename = prefix+"/backups/{}".format(f.name)
+    print "Tried to write {}".format(dst_filename)
+    try:
+        with open(dst_filename, 'wb+') as destination:
+            for chunk in f.chunks():
+                destination.write(chunk)
+    except Exception as e:
+        print "Could not write {}".format(dst_filename)
+        print "ERROR: {}".format(str(e))
+
 def list_backups():
     if AWSBackup.use_aws:
         raise Exception("Not Implemented")
@@ -95,5 +109,10 @@ def restore_from_file(filename):
     except:
         print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
 
+
+def get_wrapped_file(src_filename):
+    prefix = os.path.dirname(os.path.realpath(__file__))
+    src_filename = prefix + "/backups/%s" % src_filename
+    return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 
 
