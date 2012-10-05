@@ -451,7 +451,6 @@ def avg_team_ranks(t):
 def tot_speaks(team):
     tot_speaks = sum([tot_speaks_deb(deb)
                       for deb in team.debaters.all()])
-    tot_speaks = float(tot_speaks) + avg_team_speaks(team) * (num_byes(team) + num_forfeit_wins(team))
     return tot_speaks
 
 @cache()
@@ -714,8 +713,9 @@ def rank_nov_teams():
 def avg_deb_speaks(d):
     tot_speak = 0
     #This is all the rounds the debater debated in
+    current_round = TabSettings.objects.get(key = "cur_round").value
     my_rounds = RoundStats.objects.filter(debater = d)
-    for i in range(TabSettings.objects.get(key = "cur_round").value-1):
+    for i in range(current_round-1):
         tempSpeak = []
         for r in my_rounds:
             if r.round.round_number == i+1:
@@ -727,7 +727,7 @@ def avg_deb_speaks(d):
     if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
         return 0
     else:
-        return float(tot_speak)/float(TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1)
+        return float(tot_speak)/float(current_round-(num_byes(t)+num_forfeit_wins(t))-1)
         
 @cache()
 def avg_deb_ranks(d):
@@ -999,6 +999,7 @@ def debater_score(debater):
                   double_adjusted_ranks_deb(debater))
     except Exception as e:
         print "Could not calculate debater score for {}".format(debater)
+    print "finished scoring {}".format(debater)
     return score
 
 def rank_speakers():
