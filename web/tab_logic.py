@@ -684,15 +684,19 @@ def tab_nov_break():
 
 # Returns a tuple b
 def team_score(team):
-    return (-tot_wins(team),
-            -tot_speaks(team),
-            tot_ranks(team),
-            -single_adjusted_speaks(team),
-            single_adjusted_ranks,
-            -double_adjusted_speaks(team),
-            double_adjusted_ranks,
-            -opp_strength(team))
-
+    score = (0,0,0,0,0,0,0,0)
+    try:
+        score = (-tot_wins(team),
+                 -tot_speaks(team),
+                  tot_ranks(team),
+                 -single_adjusted_speaks(team),
+                  single_adjusted_ranks,
+                 -double_adjusted_speaks(team),
+                  double_adjusted_ranks,
+                 -opp_strength(team))
+    except Exception as e:
+        print "Could not calculate team score for {}".format(team)
+    return score
 
 def team_score_except_record(team):
     return team_score(team)[1:]
@@ -705,15 +709,6 @@ def rank_teams_except_record(teams):
 
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
-
-def rank_nov_speakers():
-    debs = list(Debater.objects.filter(novice_status=1))
-    random.shuffle(debs, random = random.random)
-    speakers = sorted(debs, key=lambda d: double_adjusted_ranks_deb(d))
-    speakers = sorted(speakers, key=lambda d: double_adjusted_speaks_deb(d), reverse = True)
-    speakers = sorted(speakers, key=lambda d: tot_ranks_deb(d))
-    speakers = sorted(speakers, key=lambda d: tot_speaks_deb(d), reverse = True)
-    return speakers
 
 @cache()
 def avg_deb_speaks(d):
@@ -987,18 +982,28 @@ def double_adjusted_ranks_deb(d):
     return double_adj_ranks
                       
 def deb_team(d):
-    return d.team_set.all()[0]
-
+    try:
+        return d.team_set.all()[0]
+    except:
+        return None
 # Returns a tuple used for comparing two debaters 
 # in terms of their overall standing in the tournament
 def debater_score(debater):
-    return (-tot_speaks_deb(debater),
-            tot_ranks_deb(debater),
-            -single_adjusted_speaks_deb(debater),
-            single_adjusted_ranks_deb(debater),
-            -double_adjusted_speaks_deb(debater),
-            double_adjusted_ranks_deb(debater))
+    score = (0,0,0,0,0,0)
+    try:
+        score = (-tot_speaks_deb(debater),
+                  tot_ranks_deb(debater),
+                 -single_adjusted_speaks_deb(debater),
+                  single_adjusted_ranks_deb(debater),
+                 -double_adjusted_speaks_deb(debater),
+                  double_adjusted_ranks_deb(debater))
+    except Exception as e:
+        print "Could not calculate debater score for {}".format(debater)
+    return score
 
 def rank_speakers():
     return sorted(Debater.objects.all(), key=debater_score)
+
+def rank_nov_speakers():
+    return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
 
