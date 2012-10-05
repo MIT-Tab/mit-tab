@@ -28,6 +28,7 @@
 {% url tab.pairing_views.confirm_start_new_tourny as confirm_start_new_tourny %}
 {% url tab.pairing_views.manual_backup as backup %}
 {% url tab.pairing_views.view_backups as view_backups %}
+{% url tab.views.view_scratches as view_scratches %}
 
 <div id="nab_bar">
     <ul id="navlist">
@@ -64,6 +65,8 @@
                 <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
             </ul>
         </li>
+    <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a></li>
+
 	<li><a class="{% active request logout %}" href="{{ logout }}">Logout</a></li>
     </ul>
 <br>

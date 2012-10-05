@@ -120,7 +120,8 @@ class Scratch(models.Model):
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
     def __unicode__(self):
-        return str(self.judge) + ", "+str(self.team)
+        s_type = ("Team","Tab")[self.scratch_type]
+        return str(self.team) + " <="+str(s_type)+"=> " + str(self.judge)
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)

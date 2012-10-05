@@ -229,4 +229,12 @@ def delete_scratch(request, item_id, scratch_id):
                               'data_name': "["+str(scratch_id)+"]",
                               'data_modification': 'DELETED'}, 
                               context_instance=RequestContext(request))
+
+def view_scratches(request):
+    #Get a list of (id,school_name) tuples
+    c_scratches = [(s.team.pk, str(s)) for s in Scratch.objects.all()]
+    return render_to_response('list_data.html', 
+                             {'item_type':'team',
+                              'title': "Viewing All Scratches for Teams",
+                              'item_list':c_scratches}, context_instance=RequestContext(request))
     

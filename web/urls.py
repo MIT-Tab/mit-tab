@@ -50,6 +50,7 @@ urlpatterns = patterns('',
     #Scratch deletion
     (r'^judge/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
     (r'^team/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
+    (r'^scratches/', views.view_scratches),
 
     
     #All team related pages
