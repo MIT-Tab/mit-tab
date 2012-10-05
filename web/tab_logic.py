@@ -449,28 +449,14 @@ def avg_team_ranks(t):
 #Calculate a team's total speaks
 @cache()
 def tot_speaks(team):
-    tot_speaks = sum([tot_speaks_deb(deb)
+    tot_speaks = sum([tot_speaks_deb(deb, False)
                       for deb in team.debaters.all()])
     return tot_speaks
 
 @cache()
 def tot_ranks(team):
-    tot_ranks = 0
-    for debater in team.debaters.all():
-        for round_stat in debater.roundstats_set.all():
-            if won_by_forfeit(round_stat.round, team):
-                #The average ranks will be added later
-                pass
-            elif forfeited_round(round_stat.round, team):
-                tot_ranks += 3.5
-            else:
-                tot_ranks += round_stat.ranks
-    for n in list(NoShow.objects.filter(no_show_team = team)):
-        tot_ranks +=7
-
-    #If a team had the bye or won by a forfeit, add in the average of ranks for those rounds
-    tot_ranks += avg_team_ranks(team) * (num_byes(team) + num_forfeit_wins(team))
-    
+    tot_ranks = sum([tot_ranks_deb(deb, False)
+                     for deb in team.debaters.all()])    
     return tot_ranks
                           
 @cache()                         
@@ -724,10 +710,15 @@ def avg_deb_speaks(d):
             tot_speak += float(sum(tempSpeak))/float(len(tempSpeak))
 
     t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
+    
+    offset = 1
+    if my_rounds.filter(round__round_number=(current_round-1)).count() == 0:
+        offset = 2
+    
+    if current_round - (num_byes(t)+num_forfeit_wins(t)) - offset <= 0:
         return 0
     else:
-        return float(tot_speak)/float(current_round-(num_byes(t)+num_forfeit_wins(t))-1)
+        return float(tot_speak)/float(current_round-(num_byes(t)+num_forfeit_wins(t)) - offset)
         
 @cache()
 def avg_deb_ranks(d):
@@ -752,18 +743,19 @@ def avg_deb_ranks(d):
     for n in list(NoShow.objects.filter(no_show_team=t)):
         tot_rank += 3.5
 
-    if current_round-(num_byes(t)+num_forfeit_wins(t))-1 == 0:
+    offset = 1
+    if my_rounds.filter(round__round_number=(current_round-1)).count() == 0:
+        offset = 2
+
+    if current_round-(num_byes(t)+num_forfeit_wins(t)) - offset <= 0:
         return 0
     else:
-        #print d
-        #print "tot ranks = " + str(tot_rank)
-        #print TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t))-1
-        return float(tot_rank)/float(current_round-(num_byes(t)+num_forfeit_wins(t))-1)
+        return float(tot_rank)/float(current_round-(num_byes(t)+num_forfeit_wins(t)) - offset)
 
     
 # Calculate the total speaks for the debater (if iron-manned, average that round)
 @cache()
-def tot_speaks_deb(debater):
+def tot_speaks_deb(debater, average=True):
     tot_speak = 0
     #This is all the rounds the debater debated in
     my_rounds = debater.roundstats_set.all()
@@ -775,7 +767,10 @@ def tot_speaks_deb(debater):
                 # This is why forfeit wins really need to be 0
                 temp_speak += [r.speaks]
         if len(temp_speak) != 0:
-            tot_speak += float(sum(temp_speak))/float(len(temp_speak))
+            if average:
+                tot_speak += float(sum(temp_speak))/float(len(temp_speak))
+            else:
+                tot_speak += float(sum(temp_speak))
     t = deb_team(debater)
     #If they had the bye or won by forfeit, need to add that round
     tot_speak += avg_deb_speaks(debater)*(num_byes(t)+num_forfeit_wins(t))
@@ -783,7 +778,7 @@ def tot_speaks_deb(debater):
 
 # Calculate the total ranks for the debater (if iron-manned, average that round)
 @cache()
-def tot_ranks_deb(d):
+def tot_ranks_deb(d, average=True):
     tot_rank = 0
     t = deb_team(d)
     my_rounds = d.roundstats_set.all()
@@ -799,7 +794,10 @@ def tot_ranks_deb(d):
                 else:
                     temp_rank+=[r.ranks]
         if len(temp_rank) != 0:
-            tot_rank += float(sum(temp_rank))/float(len(temp_rank))
+            if average:
+                tot_rank += float(sum(temp_rank))/float(len(temp_rank))
+            else:
+                tot_rank += float(sum(temp_rank))
             
     t=deb_team(d)
     for n in list(NoShow.objects.filter(no_show_team=t)):
