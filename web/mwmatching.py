@@ -1,4 +1,11 @@
-"""Weighted maximum matching in general graphs.
+"""
+Taken from http://jorisvr.nl/maximummatching.html
+
+Author: Joris van Rantwijk
+"""
+
+"""
+Weighted maximum matching in general graphs.
 
 The algorithm is taken from "Efficient Algorithms for Finding Maximum
 Matching in Graphs" by Zvi Galil, ACM Computing Surveys, 1986.
