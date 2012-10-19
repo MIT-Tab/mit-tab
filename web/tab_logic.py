@@ -275,15 +275,15 @@ def add_scratches_for_school_affil():
     Add scratches for teams/judges from the same school
     Only do this if they haven't already been added
     """
-    print datetime.now()
+    print "Creating judge-affiliation scratches ",datetime.now()
     all_judges = Judge.objects.all()
     all_teams = Team.objects.all()
     for judge in all_judges:
         for team in all_teams:
-            if judge.school == team.school:
+            if team.school in judge.schools.all():
                 if Scratch.objects.filter(judge = judge, team = team).count() == 0:
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
-    print datetime.now()
+    print "Done creating judge-affiliation scratches ", datetime.now()
 
 #This method is tested by testsUnitTests.all_highest_seed()
 def highest_seed(team1,team2):
@@ -316,10 +316,10 @@ def hit_before(t1, t2):
 #This should calculate whether or not team t has hit the pull-up before.
 def hit_pull_up(t):
     for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == 2:
+        if a.pullup == Round.OPP:
             return True
     for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == 1:
+        if a.pullup == Round.GOV:
             return True
     return False
 
@@ -328,7 +328,6 @@ def num_opps(t):
 
 def num_govs(t):
     return Round.objects.filter(gov_team = t).count()
-
 
 #Return True if the team has already had the bye
 def had_bye(t):

@@ -146,37 +146,68 @@ def perfect_pairing(list_of_teams):
 #teamA_opt is the optimal team for teamA to be paired with
 #teamB_opt is the optimal team for teamB to be paired with
              
-def calc_weight(teamA, teamB, teamA_ind, teamB_ind, teamA_opt, teamB_opt,teamA_opt_ind, teamB_opt_ind):
-    #first penalize for being far away from ideal power pairings
-    if TabSettings.objects.get(key="cur_round").value == 1:
-        wt = -1* (abs(teamA_opt.seed - teamB.seed) + abs(teamB_opt.seed - teamA.seed))/2.0
+def calc_weight(team_a,
+                team_b,
+                team_a_ind,
+                team_b_ind,
+                team_a_opt,
+                team_b_opt,
+                team_a_opt_ind,
+                team_b_opt_ind):
+    """ 
+    Calculate the penalty for a given pairing
+    
+    Args:
+        team_a - the first team in the pairing
+        team_b - the second team in the pairing
+        team_a_ind - the position in the pairing of team_a
+        team_b_ind - the position in the pairing of team_b
+        team_a_opt - the optimal power paired team for team_a to be paired with
+        team_b_opt - the optimal power paired team for team_b to be paired with
+        team_a_opt_ind - the position in the pairing of team_a_opt
+        team_b_opt_ind - the position in the pairing of team_b_opt
+    """
+    
+    # Get configuration values
+    def try_get(key, default= None):
+        try:
+            return TabSettings.objects.get(key=key).value
+        except:
+            return default
+    current_round = try_get("cur_round", 1)
+    power_pairing_multiple = try_get("power_pairing_multiple", -1)
+    high_opp_penalty = try_get("high_opp_penalty", -10)
+    high_gov_penalty = try_get("high_gov_penalty", -100)
+    same_school_penalty = try_get("same_school_penalty", -1000)
+    hit_pull_up_before = try_get("hit_pull_up_before", -10000)
+    hit_team_before = try_get("hit_team_before", -100000)
+    
+    # Penalize for being far away from ideal power pairings
+    if current_round == 1:
+        wt = power_pairing_multiple * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))/2.0
     else:
-        wt = -1* (abs(teamA_opt_ind - teamB_ind) + abs(teamB_opt_ind - teamA_ind))/2
-    #penalize for one team having too many opps
-    if tab_logic.num_opps(teamA) >= 4 and tab_logic.num_opps(teamB) >= 4:
-        wt +=-10
-    #penalize for one team having too many govs
-    if tab_logic.num_govs(teamA) >= 3 and tab_logic.num_govs(teamB) >= 3:
-        wt += -100
-    #penalize for teams being from the same school
-    if teamA.school == teamB.school:
-            wt+=-1000
-    #penalize for team hitting pull-up more than once
-    if (tab_logic.hit_pull_up(teamA) and tab_logic.tot_wins(teamB)<tab_logic.tot_wins(teamA)) or (tab_logic.hit_pull_up(teamB) and tab_logic.tot_wins(teamA) < tab_logic.tot_wins(teamB)):
-        wt+=-10000
-    #then penalize for teams having hit before
-##    if teamA.name == "BU NI" or teamB.name == "BU NI":
-##        print "Debugging double hit"
-##        print teamA
-##        print teamB
-##        print tab_logic.hit_before(teamA, teamB)
-##        print tab_logic.hit_before(teamB, teamA)
+        wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
+    
+    # Penalize for one team having too many opps
+    if tab_logic.num_opps(team_a) >= 4 and tab_logic.num_opps(team_b) >= 4:
+        wt += high_opp_penalty
+    
+    # Penalize for one team having too many govs
+    if tab_logic.num_govs(team_a) >= 3 and tab_logic.num_govs(team_b) >= 3:
+        wt += high_gov_penalty
         
-    if tab_logic.hit_before(teamA, teamB):
-##        print "Print teams"
-##        print teamA
-##        print teamB
-        wt+=-100000
+    # Penalize for teams being from the same school
+    if team_a.school == team_b.school:
+        wt += same_school_penalty
+        
+    # Penalize for team hitting pull-up more than once
+    if (tab_logic.hit_pull_up(team_a) and tab_logic.tot_wins(team_b) < tab_logic.tot_wins(team_a)) or (tab_logic.hit_pull_up(team_b) and tab_logic.tot_wins(team_a) < tab_logic.tot_wins(team_b)):
+        wt += hit_pull_up_before
+
+    # Penalize for teams hitting each other before 
+    if tab_logic.hit_before(team_a, team_b):
+        wt += hit_team_before
+        
     return wt
 
 
