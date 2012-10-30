@@ -36,7 +36,7 @@ class School(models.Model):
     
     def delete(self):
         team_check = Team.objects.filter(school=self)
-        judge_check = Judge.objects.filter(school=self)
+        judge_check = Judge.objects.filter(schools=self)
         if len(team_check) == 0 and len(judge_check) == 0:
             super(School, self).delete()
         else:
