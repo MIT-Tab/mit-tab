@@ -714,7 +714,8 @@ def avg_deb_speaks(d):
     
     offset = 1
     if my_rounds.filter(round__round_number=(current_round-1)).count() == 0:
-        offset = 2
+        if Bye.objects.filter(round_number = (current_round - 1), bye_team = t).count() == 0:
+            offset = 2
     
     if current_round - (num_byes(t)+num_forfeit_wins(t)) - offset <= 0:
         return 0
