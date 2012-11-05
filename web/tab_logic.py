@@ -167,7 +167,7 @@ def pair_round():
 
                     # i is the last team in the bracket below
                     i = len(list_of_teams[bracket-1])-1 
-                    pullup_rounds = Round.objects.exclude(pullup=None)
+                    pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [r.gov_team for r in pullup_rounds if r.pullup == Round.GOV]
                     teams_been_pulled_up.extend([r.opp_team for r in pullup_rounds if r.pullup == Round.OPP])
                     #find the lowest team in bracket below that can be pulled up
