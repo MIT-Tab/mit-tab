@@ -169,15 +169,17 @@ def calc_weight(team_a,
     """
     
     # Get configuration values
+    all_settings = dict([(ts.key, ts.value) for ts in TabSettings.objects.all()])
     def try_get(key, default= None):
         try:
-            return TabSettings.objects.get(key=key).value
+            return int(all_settings[key])
         except:
             return default
     current_round = try_get("cur_round", 1)
     power_pairing_multiple = try_get("power_pairing_multiple", -1)
-    high_opp_penalty = try_get("high_opp_penalty", -10)
-    high_gov_penalty = try_get("high_gov_penalty", -100)
+    high_opp_penalty = try_get("4th_opp_penalty", 0)
+    high_gov_penalty = try_get("4th_gov_penalty", -100)
+    high_high_opp_penalty = try_get("5th_opp_penalty", -10)
     same_school_penalty = try_get("same_school_penalty", -1000)
     hit_pull_up_before = try_get("hit_pull_up_before", -10000)
     hit_team_before = try_get("hit_team_before", -100000)
@@ -188,11 +190,18 @@ def calc_weight(team_a,
     else:
         wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
     
-    # Penalize for one team having too many opps
-    if tab_logic.num_opps(team_a) >= 4 and tab_logic.num_opps(team_b) >= 4:
+    # Penalize for both teams having three opps, meaning we'll have to give
+    # a fifth opp to one of the teams
+    if tab_logic.num_opps(team_a) >= 3 and tab_logic.num_opps(team_b) >= 3:
         wt += high_opp_penalty
+
+    # Penalize for both teams having four opps, meaning we'll have to give
+    # a fourth opp to one of the teams
+    if tab_logic.num_opps(team_a) >= 4 and tab_logic.num_opps(team_b) >= 4:
+        wt += high_high_opp_penalty
     
-    # Penalize for one team having too many govs
+    # Penalize for both teams having three govs, meaning we'll have to give
+    # a fourth gov to one of the teams
     if tab_logic.num_govs(team_a) >= 3 and tab_logic.num_govs(team_b) >= 3:
         wt += high_gov_penalty
         
