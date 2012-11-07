@@ -676,9 +676,9 @@ def team_score(team):
                  -tot_speaks(team),
                   tot_ranks(team),
                  -single_adjusted_speaks(team),
-                  single_adjusted_ranks,
+                  single_adjusted_ranks(team),
                  -double_adjusted_speaks(team),
-                  double_adjusted_ranks,
+                  double_adjusted_ranks(team),
                  -opp_strength(team))
     except Exception as e:
         print "Could not calculate team score for {}".format(team)
