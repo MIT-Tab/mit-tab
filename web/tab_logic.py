@@ -33,7 +33,8 @@ from datetime import datetime
 import pprint
 
 from cache_logic import cache
-    
+from functools import cmp_to_key
+
 #will return false if not ready to pair yet
 def pair_round():
     """ 
@@ -86,13 +87,15 @@ def pair_round():
     if current_round == 1:
         list_of_teams = list(Team.objects.filter(checked_in=True))
 
-        #If there are an odd number of teams, give a random team the bye
+        # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
             b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
             b.save()
             list_of_teams.remove(b.bye_team)
 
-        #Sort the teams by seed.
+        # Sort the teams by seed. We must randomize beforehand so that similarly
+        # seeded teams are paired randomly.
+        random.shuffle(list_of_teams)
         list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse = True)
 
         #pairings = [None]* Team.objects.count()/2
@@ -1001,6 +1004,9 @@ def debater_score(debater):
         print "Could not calculate debater score for {}".format(debater)
     print "finished scoring {}".format(debater)
     return score
+
+def break_tie(team_1, team_2):
+	return team1;
 
 def rank_speakers():
     return sorted(Debater.objects.all(), key=debater_score)
