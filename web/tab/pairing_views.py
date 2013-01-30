@@ -303,6 +303,7 @@ def pretty_pair(request, printable=False):
     #We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
     random.shuffle(round_pairing)
+    round_pairing.sort(key=lambda r: r.gov_team.name)
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
 
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
@@ -352,8 +353,11 @@ def enter_result(request, round_id):
     else:
         is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
         form = ResultEntryForm(round_instance=round_obj)
-    return render_to_response('data_entry.html', 
-                              {'form': form}, 
+    return render_to_response('round_entry.html', 
+                              {'form': form,
+                               'title': "Entering Ballot for {}".format(str(round_obj)),
+                               'gov_team': round_obj.gov_team,
+                               'opp_team': round_obj.opp_team}, 
                                context_instance=RequestContext(request))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")

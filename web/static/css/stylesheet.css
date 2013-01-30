@@ -177,8 +177,9 @@ div.index_header {
     text-align: center;    
 }
 
-div.index_list ol {
+.div.index_list ol {
     padding-left: 2em;
+    margin: 0;
 }
 
 div.index_container {
@@ -204,6 +205,11 @@ list-style:decimal;
 p.warning {
     border: 1px solid #444444;
     padding: .5em;
+}
+
+th.header{
+    font-size: 16px;
+    text-align: center;
 }
 
 div#banner {
@@ -291,6 +297,7 @@ table.check_status td {
 div.obj_info {
     border: 1px solid #BBBBBB;
     padding: .5em;
+    margin-botton: 1em;
     overflow: hidden; 
 }
 
@@ -304,6 +311,9 @@ a.view_object {
     background: #CCCCCC;
 }
 
+div#view_items {
+    padding: 1em 0 1em 0;
+}
 
 a.view_object:hover {
     background: #DDDDDD;
@@ -345,6 +355,19 @@ div.team_record table td{
     border-right: 1px solid black;
     margin: .1em;
 }
+
+table.ballot_entry tr.top{
+    border-top: 1px solid black;
+}
+
+table.ballot_entry tr.bottom{
+    border-bottom: 1px solid black;
+}
+
+table.ballot_entry td.right_line{
+    border-right: 1px solid black;
+}
+
 
 div.list_wrapper {
     float: left;
@@ -434,6 +457,7 @@ ul.list_item {
     list-style: none;
     padding-left: 1em;
     padding-right: 1em;
+    margin: 0;
 }
 
 span.list_item {
@@ -452,4 +476,16 @@ span.list_item {
     height: 200px;
 }
 
+/*Fixing all the bootstraps */
 
+span.inline {
+    padding-left: 5px;
+    padding-top: 5px;
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+
+
+.table th, .table td { 
+     border-top: none; 
+}

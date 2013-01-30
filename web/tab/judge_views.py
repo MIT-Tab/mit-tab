@@ -7,6 +7,7 @@ from forms import JudgeForm, ScratchForm
 from models import *
 from django.db import models
 from errors import *
+from tab_logic import TabFlags
 
 
 def view_judges(request):
@@ -15,20 +16,33 @@ def view_judges(request):
     checkins = CheckIn.objects.filter(round_number = current_round)
     checked_in_judges = set([c.judge for c in checkins])
     
-    def symbols(judge):
-        result = ""
-        if judge not in checked_in_judges:
-            result += "*"
-        if judge.rank > 5.0:
-            result += "#"
+    def flags(judge):
+        result = 0
+        if judge in checked_in_judges:
+            result |= TabFlags.JUDGE_CHECKED_IN
+        else:
+            result |= TabFlags.JUDGE_NOT_CHECKED_IN
+        if judge.rank < 3.0:
+            result |= TabFlags.LOW_RANKED_JUDGE
+        if judge.rank >= 3.0 and judge.rank < 5.0:
+            result |= TabFlags.MID_RANKED_JUDGE
+        if judge.rank >= 5.0:
+            result |= TabFlags.HIGH_RANKED_JUDGE
         return result
     
-    symbol_text = [("*","Judge not checked in for the current round"),("#","Judge has rank > 5")]
-    c_judge = [(judge.pk,judge.name, symbols(judge)) for judge in Judge.objects.order_by("name")]
+    
+    c_judge = [(judge.pk,judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
+               for judge in Judge.objects.order_by("name")]
+
+    all_flags = [[TabFlags.JUDGE_CHECKED_IN, TabFlags.JUDGE_NOT_CHECKED_IN], 
+                 [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
+    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
+    print filters
     return render_to_response('list_data.html', 
                              {'item_type':'judge',
                               'title': "Viewing All Judges",
                               'item_list':c_judge,
+                              'filters': filters,
                               'symbol_text': symbol_text}, context_instance=RequestContext(request))
     
 def view_judge(request, judge_id):

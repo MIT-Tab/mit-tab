@@ -7,20 +7,27 @@ from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
 import tab_logic
+from tab_logic import TabFlags
 from datetime import datetime
 
 def view_teams(request):
-    def symbols(team):
-        result = ""
-        if not t.checked_in:
-            result += "*"
+    def flags(team):
+        result = 0
+        if t.checked_in:
+            result |= TabFlags.TEAM_CHECKED_IN
+        else:
+            result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
-    c_teams = [(t.pk,t.name,symbols(t)) for t in Team.objects.all().order_by("name")]
-    symbol_text = [("*","Team not checked into the tournament")]
+    
+    c_teams = [(t.pk, t.name, flags(t), TabFlags.flags_to_symbols(flags(t)))
+               for t in Team.objects.all().order_by("name")]
+    all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
+    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render_to_response('list_data.html', 
                              {'item_type':'team',
                               'title': "Viewing All Teams",
                               'item_list': c_teams,
+                              'filters': filters,
                               'symbol_text': symbol_text}, 
                               context_instance=RequestContext(request))
 

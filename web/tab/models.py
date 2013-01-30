@@ -167,7 +167,7 @@ class Round(models.Model):
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
     def __unicode__(self):
-        return str(self.round_number) + " between " + str(self.gov_team) + " and " + str(self.opp_team)
+        return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(self.opp_team) + " (OPP)"
 
     def delete(self):
         rounds = RoundStats.objects.filter(round=self)

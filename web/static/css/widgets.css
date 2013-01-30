@@ -23,6 +23,8 @@
 
 .selector-available h2, .selector-chosen h2 {
     border: 1px solid #ccc;
+    font-size: 24px;
+    line-height: 26px;
 }
 
 .selector .selector-available h2 {

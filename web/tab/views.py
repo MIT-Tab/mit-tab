@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import permission_required
 from forms import SchoolForm, RoomForm
 from django.db import models
 from models import *
+from tab_logic import TabFlags
 
 def index(request):
     number_teams = Team.objects.count()
@@ -121,20 +122,26 @@ def delete_school(request, school_id):
 
 #### BEGIN ROOM ###
 def view_rooms(request):
-    def symbols(room):
-        result = ""
+    def flags(room):
+        result = 0
         if room.rank == 0:
-            result += "*"
+            result |= TabFlags.ROOM_ZERO_RANK
+        else:
+            result |= TabFlags.ROOM_NON_ZERO_RANK
         return result
-    symbol_text = [("*","Room has rank of 0 (won't be paired in)")]
-    all_rooms = [(room.pk, room.name, symbols(room)) 
+    
+
+    all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
+    all_rooms = [(room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room))) 
                   for room in Room.objects.all().order_by("name")]
-   
+    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
+  
     return render_to_response('list_data.html', 
                              {'item_type':'room',
                               'title': "Viewing All Rooms",
                               'item_list':all_rooms,
-                              'symbol_text':symbol_text},
+                              'symbol_text':symbol_text,
+                              "filters": filters},
                               context_instance=RequestContext(request))
 
 def view_room(request, room_id):
