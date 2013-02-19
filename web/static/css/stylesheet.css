@@ -4,6 +4,10 @@ body {
     font-size: 14px;
 }
 
+a {
+    text-decoration: none;
+}
+
 .full_width {
     width:100%;
 }
@@ -74,21 +78,19 @@ li:hover ul#sublist {
 }
 ul#sublist li:hover a { background: #A4C0E4; }
 ul#sublist li:hover li a:hover { background: #A4C0E4; }
-a:hover {
-    background: #AAAAAA;
-    border-radius: .2em;
-}
 /*finish navigation.html  */
 
 /* Index styling */
 div#outer {
     text-align: center;
 }
+
 div#container {
     width: 95%;
     text-align: left;
     margin: auto;
-    background: #FBFBF0;
+    color: #333333;
+    background-color: #ffffff;
     padding-right: 1em;
     padding-left: 1em;
     padding-top: 1em;
@@ -173,7 +175,7 @@ div.index_header {
     width: 25%;
 }
 
-.center_text {
+.center-text {
     text-align: center;    
 }
 
@@ -232,49 +234,6 @@ table.pretty th{
     font-size: 18px;
     font-style: bold;
 }
-
-table.pretty td{
-    border: 1px solid #666666;   
-    font-size: 14px;
-}
-
-table.pretty td a{
-    text-decoration: none;
-    padding: .3em;
-    color: black;
-    display: block;
-}
-
-table.pretty td.sep{
-    padding: .1em;
-    background: #DDDDDD;
-    border: none;
-}
-
-table.pretty th.sep{
-    padding: .1em;
-    background: #DDDDDD;
-    border: none;
-}
-
-table#pairing_list {
-    text-align: left;
-    border-collapse: collapse;
-    border: 1px solid #666666;   
-}
-
-table#pairing_list th{
-    border: 1px solid #666666;   
-    padding: .5em;
-    font-size: 18px;
-    font-style: bold;
-}
-table#pairing_list td{
-    border: 1px solid #666666;   
-    padding: .5em;
-    font-size: 14px;
-}
-
 div#round_info{
     font-size: 14px;   
 }
@@ -313,10 +272,6 @@ a.view_object {
 
 div#view_items {
     padding: 1em 0 1em 0;
-}
-
-a.view_object:hover {
-    background: #DDDDDD;
 }
 
 ul.errorlist {
@@ -429,18 +384,6 @@ a.button {
 }
 
 
-a.button:hover {
-    background: #A4C0E4;
-}
-
-.odd {
-    background: #FBFBF0;
-}
-.even {
-    background: #D9D9D0;
-    
-}
-
 div.scroll{
     border: 1px solid #444444;
     height: 20em;
@@ -492,4 +435,8 @@ span.inline {
 
 .nowrap {
     white-space:nowrap;
+}
+
+.bold-font {
+    font-weight: bold;
 }

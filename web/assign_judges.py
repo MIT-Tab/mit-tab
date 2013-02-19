@@ -98,6 +98,11 @@ def had_judge(j, t):
         return True
     else:
         return False
-    
-    
-    
+
+def can_judge_teams(list_of_judges, team1, team2):
+    result = []
+    for judge in list_of_judges:
+        if not judge_conflict(judge, team1, team2):
+            result.append(judge)
+    return result
+

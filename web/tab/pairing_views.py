@@ -9,6 +9,7 @@ from django.shortcuts import redirect
 from forms import ResultEntryForm, UploadFileForm
 import cache_logic
 import tab_logic
+import assign_judges
 import random
 import sys
 import traceback
@@ -17,6 +18,7 @@ import backup
 import time
 import datetime
 import os
+import pprint
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -267,10 +269,50 @@ def view_round(request, round_number):
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
     excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins)])) 
+
     return render_to_response('display_info.html',
                                locals(),
                                context_instance=RequestContext(request))
-                               
+
+def alternative_judges(request, round_id):
+    round_obj = Round.objects.get(id=int(round_id))
+    round_number = round_obj.round_number
+    round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
+    judge_name = round_obj.judge.name
+    judge_rank = round_obj.judge.rank
+    judge_id = round_obj.judge.id
+    excluded_judges = Judge.objects.exclude(round__round_number = round_number) \
+                                   .filter(checkin__round_number = round_number)
+    included_judges = Judge.objects.filter(round__round_number = round_number) \
+                                   .filter(checkin__round_number = round_number)
+    excluded_judges = [(j.name, j.id, float(j.rank))
+                       for j in
+                       assign_judges.can_judge_teams(excluded_judges, round_gov, round_opp)]
+    included_judges = [(j.name, j.id, float(j.rank))
+                       for j in
+                       assign_judges.can_judge_teams(included_judges, round_gov, round_opp)]
+    included_judges = sorted(included_judges, key=lambda x: -x[2])
+    excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+
+    return render_to_response('judge_dropdown.html',
+                              locals(),
+                              context_instance=RequestContext(request))
+
+def assign_judge(request, round_id, judge_id):
+    try :
+        round_obj = Round.objects.get(id=int(round_id))
+        judge_obj = Judge.objects.get(id=int(judge_id))
+
+        round_obj.judge = judge_obj
+        round_obj.save()
+        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name}
+    except Exception as e:
+        print "Failed to assign judge: ", e
+        data = {"success":False}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
+
+
 @permission_required('tab.tab_settings.can_change', login_url="/403/")                               
 def send_texts(request):
     try:

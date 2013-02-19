@@ -36,6 +36,7 @@ $(document).ready(function(){
         }
     };
 
+
     judge_drop_options = {
         accept: ".judge.swappable",
         hoverClass: "ui-state-hover",
@@ -152,10 +153,41 @@ var populate_tab_card = function(tab_card_element) {
         success: function(result) {
             result = result.result
             var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps].join(" / ")
-            tab_card_element.html("<a href=\"/team/card/"+team_id+"\">"+text+"</a>")
+            tab_card_element.html("<a class=\"btn btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
         },
     })
 }
+
+
+var populate_alternative_judges = function() {
+    var round_id = $(this).attr('round-id');
+    $.ajax({
+        url:"/round/" + round_id + "/alternative_judges/",
+        success: function(result) {
+            var judge_list = $("ul[round-id="+round_id+"]");
+            $(judge_list).html(result);
+            bind_handlers()
+        },
+    })
+}
+
+var assign_judge = function() {
+    var round_id = $(this).attr('round-id');
+    var judge_id = $(this).attr('judge-id');
+    $.ajax({
+        url:"/round/" + round_id + "/assign_judge/" + judge_id + "/",
+        success: function(result) {
+            var judge_button = $("span[round-id="+result.round_id+"]");
+            var html = "<a class=\"btn dropdown-toggle\" data-toggle=\"dropdown\"" +
+                       "round-id=" + result.round_id + " href=\"#\">"+ result.judge_name +
+                       "  <span class=\"caret\"></span></a><ul class=\"dropdown-menu\" round-id="+
+                        result.round_id+"></ul>"
+            $(judge_button).html(html)
+            bind_handlers();
+        },
+    });
+}
+
 
 var lazy_load = function(element, url) {
     element.addClass("loading");
@@ -170,6 +202,10 @@ var lazy_load = function(element, url) {
             element.removeClass("loading");
         }
     })
+}
+
+var alert_link = function(e) {
+    alert("Note that you have assigned a judge from within the pairing. You need to go and fix that round now.");
 }
 
 var bind_handlers = function() {
@@ -189,6 +225,9 @@ var bind_handlers = function() {
         lazy_load($(element), "/debater/rank/");
     })
 
+    $('.dropdown-toggle').click(populate_alternative_judges);
+    $('.judge-assign').click(assign_judge);
+    $('.alert-link').click(alert_link);
 }
 
 

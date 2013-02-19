@@ -5,25 +5,20 @@
 {% block content %}
 <div id="round_info">
     <h2>Round Status for Round: {{round_number}} </h2>
-    <h2 class="pairing_exists"> We have {% if valid_pairing %} a valid {% else %} an invalid {% endif %} Pairing: </h2>
+    <h3 class="pairing_exists"> We have {% if valid_pairing %} a valid {% else %} an invalid {% endif %} Pairing: </h2>
     {% if not valid_pairing %}
          {{errors}}
     {% endif %}
     <div class="form_header">
-    <table class="pretty full_width">
+    <table class="table table-condensed table-striped table-bordered ">
         <tr><th>Gov Team</th>
             <th>Gov Wins/Speaks/Govs/Opps</th>
-            <th class="sep"></th>
             <th>Opp Team</th>
             <th>Opp Wins/Speaks/Govs/Opps</th>
-            <th class="sep"></th>
             <th>Judge</th>
-            <th class="sep"></th>
             <th>Room</th>
-            <th class="sep"></th>
             <th>Results</th>
             {% if perms.tab.change_tab_settings %}
-                <th class="sep"></th>
                 <th>Admin</th>
             {% endif %}
             {% for pairing, gov_wins, gov_speaks, gov_govs, gov_opps, opp_wins, opp_speaks, opp_govs, opp_opps in round_info %}
@@ -31,49 +26,48 @@
             <td class="team swappable" team-id="{{pairing.gov_team.id}}"
                                        round-id="{{pairing.id}}"
                                        team-name="{{pairing.gov_team.name}}">
-                <a href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
+                <a class="btn btn-link" href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
             <td class="team tabcard" team-id="{{pairing.gov_team.id}}">
-                <a href="/team/card/{{pairing.gov_team.id}}">Loading Team Info...</a>
+                <a class="btn btn-link" href="/team/card/{{pairing.gov_team.id}}">Loading Team Info...</a>
             </td>
-            <td class="sep"></td>
             <td class="team swappable" team-id="{{pairing.opp_team.id}}"
                                        round-id="{{pairing.id}}"
                                        team-name="{{pairing.opp_team.name}}">
-                <a href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
+                <a class="btn btn-link" href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
             <td class="team tabcard" team-id="{{pairing.opp_team.id}}">
-                <a href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
+                <a class="btn btn-link" href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
             </td>
-            <td class="sep"></td>
-            <td class="judge swappable" round-id="{{pairing.id}}"
-                                        judge-id="{{pairing.judge.id}}"
-                                        judge-name="{{pairing.judge.name}}">
-                <a href="/judge/{{pairing.judge.id}}" >{{pairing.judge.name}}</a>
+            <td class="judge">
+                <span class="btn-group full_width" round-id="{{pairing.id}}">
+                    <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
+                                                   round-id="{{pairing.id}}" href="#">
+                        {{pairing.judge.name}}  <span class="caret"></span>
+                    </a>
+                    <ul class="dropdown-menu" round-id={{pairing.id}}></ul>
+                </span>
             </td>
-            <td class="sep"></td>
-            <td><a href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
-            <td class="sep"></td>
+            <td><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
             <td>
                 {% if pairing.victor == 1 %}
-                <a href="/round/{{pairing.id}}/result/">GOV win</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">GOV win</a></li>
                 {% else %}{% if pairing.victor == 2 %} 
-                            <a href="/round/{{pairing.id}}/result/">OPP win</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">OPP win</a></li>
                 {% else %}{% if pairing.victor == 3 %}
-                <a href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
                 {% else %}{% if pairing.victor == 4 %}
-                <a href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
                 {% else %}{% if pairing.victor == 5 %}
-                <a href="/round/{{pairing.id}}/result/">All Drop</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">All Drop</a></li>
                 {% else %}{% if pairing.victor == 6 %}
-                <a href="/round/{{pairing.id}}/result/">All Win</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">All Win</a></li>
                 {% else %}
-                <a href="/round/{{pairing.id}}/result/">[Enter Results]</a></li>
+                <a class="btn btn-link" href="/round/{{pairing.id}}/result/">Enter Ballot</a></li>
                 {%endif%}{%endif%}{%endif%}
                 {% endif %}{% endif %}{%endif%}
             </td>
             {% if perms.tab.change_tab_settings %}
-                <td class="sep"></td>
                 <td>
-                    <a href="/admin/tab/round/{{pairing.id}}/"> Modify in Admin </a>
+                    <a class="btn btn-link" href="/admin/tab/round/{{pairing.id}}/"> Modify in Admin </a>
                 </td>
             {% endif %}
         </tr>
@@ -84,7 +78,7 @@
     <br>
     <div><h2>People Not Paired In</h2></div>
     <div class="scroll">
-        <table class="pretty">
+        <table class="table table-striped table-condensed">
             <tr><th>Checked in Teams</th><th>Checked in Judges</th><th>Non Checked in Judges</th></tr>
             {% for team, cjudge, judge in excluded_people%}
             <tr>

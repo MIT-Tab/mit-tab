@@ -24,7 +24,7 @@ $(document).ready(function(){
     function show_all(type) {
         $(type).show();
     };
-    
+
     $('#filter_box').keyup(function() {
         if ($(this).val()) {
             filter($(this).val());
