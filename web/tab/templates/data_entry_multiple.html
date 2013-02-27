@@ -22,7 +22,7 @@
                 {% for field in form %}
                 <tr>
                 {{ field.errors }}
-                <th><label class="form_label">{{ field.label_tag }}:</label></th>
+                <th><label class="form_label">{{ field.label }} :</label></th>
                 <td>{{ field }}</td>
                 {% endfor %}
                 </tr>

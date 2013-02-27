@@ -489,3 +489,7 @@ span.inline {
 .table th, .table td { 
      border-top: none; 
 }
+
+.nowrap {
+    white-space:nowrap;
+}
