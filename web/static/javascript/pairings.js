@@ -208,6 +208,12 @@ var alert_link = function(e) {
     alert("Note that you have assigned a judge from within the pairing. You need to go and fix that round now.");
 }
 
+var select_info = function(element) {
+    var div = $("div[data-option="+$(this).val()+"]");
+    $(".winner").each(function(i,e){$(e).addClass("hidden")});
+    $(div).removeClass("hidden")
+}
+
 var bind_handlers = function() {
     $('.judge.swappable').draggable(judge_drag_options)
     $('.judge.swappable').droppable(judge_drop_options)
@@ -228,6 +234,7 @@ var bind_handlers = function() {
     $('.dropdown-toggle').click(populate_alternative_judges);
     $('.judge-assign').click(assign_judge);
     $('.alert-link').click(alert_link);
+    $('select[name=winner]').change(select_info);
 }
 
 

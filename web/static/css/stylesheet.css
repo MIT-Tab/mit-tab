@@ -440,3 +440,14 @@ span.inline {
 .bold-font {
     font-weight: bold;
 }
+
+.hidden {
+    display: none;
+}
+
+.winner {
+    font-size: 16px;
+    border: 1px solid #dddddd;
+    padding: 1em;
+
+}

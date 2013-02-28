@@ -27,10 +27,50 @@
         <table class="table ballot_entry">
         {# Include the common fields to Gov and Opp #}
         
-        <tr class="common_fields" colspan=8>
+        <tr class="common_fields">
             {{ form.winner.errors }}
-            <td><label for="id_winner">{{form.winner.label_tag}}</label></td>
-            <td>{{ form.winner }}<td>
+            <td>{{form.winner.label_tag}}</td>
+            <td>{{ form.winner }}</td>
+            <td colspan=2></td>
+            <td colspan=4>
+                <div class="hidden winner" data-option=0>Please select a winner</div>
+                <div class="hidden winner" data-option=1>
+                    The Government team has won.  Enter speaks and ranks
+                    normally.
+                </div>
+                <div class="hidden winner" data-option=2>
+                    The Opposition team has won. Enter speaks and ranks
+                    normally
+                </div>
+                <div class="hidden winner" data-option=3>
+                    The Government team has won via forfeit. Enter speaks of
+                    zero and arbitrary ranks for all debaters. The winning team
+                    will receive average speaks and ranks for this round. 
+                    The losing team will receive speaks of zero and ranks of 7,
+                    although you can give them non zero speaks if you wish.
+                    Do <b>not</b> give speaks to the winning team.
+                </div>
+                <div class="hidden winner" data-option=4>
+                    The Opposition team has won via forfeit. Enter speaks of
+                    zero and arbitrary ranks for all debaters. The winning team
+                    will receive average speaks and ranks for this round. 
+                    The losing team will receive speaks of zero and ranks of 7,
+                    although you can give them non zero speaks if you wish.
+                    Do <b>not</b> give speaks to the winning team.
+                </div>
+                <div class="hidden winner" data-option=5>
+                    Everyone lost this round (didn't show up?). Enter speaks of
+                    zero and arbitrary ranks. Both teams will receive speaks of
+                    zero and ranks of 7, although you can give them non zero
+                    speaks if you wish.  No averaging will occur, however.
+                </div>
+                <div class="hidden winner" data-option=6>
+                    Everyone won this round (judge didn't show up). Enter speaks
+                    of zero and arbitrary ranks. Both teams will receive average
+                    speaks and ranks for this round. Do <b>not</b> give speaks
+                    greater than zero to either team.
+                </div>
+            </td>
         </tr>
         <tr>
             <th colspan=4 class="header">Government: {{gov_team.name}}</th>
