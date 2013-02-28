@@ -140,7 +140,7 @@ def pair_round(request):
         except Exception as e:
             ready_to_pair = "No"
             ready_to_pair_alt = str(e) 
-        check_status.append(("Additional Minor Checks", ready_to_pair, ready_to_pair_alt))
+        check_status.append(("Additional Minor Checks (Enough Rooms)", ready_to_pair, ready_to_pair_alt))
         
         return render_to_response('pair_round.html',
                                 locals(),

@@ -76,7 +76,7 @@ def pair_round():
     add_scratches_for_school_affil()
 
     list_of_teams = [None]*current_round
-    pull_up = None
+    all_pull_ups = []
 
     #Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
@@ -164,7 +164,7 @@ def pair_round():
                             found_bye = True
                     if found_bye == False:
                         raise errors.NotEnoughTeamsError()
-                else: 
+                else:
                     pull_up = None
                     # FIXME (jolynch): Try to use descriptive variable names. (julia) - I'll fix this.
                     # instead of commenting
@@ -178,6 +178,7 @@ def pair_round():
                     while pull_up == None: 
                         if list_of_teams[bracket-1][i] not in teams_been_pulled_up:
                             pull_up = list_of_teams[bracket-1][i]
+                            all_pull_ups.append(pull_up)
                             list_of_teams[bracket].append(pull_up)
                             list_of_teams[bracket-1].remove(pull_up)
                             #after adding pull-up to new bracket and deleting from old, sort again by speaks making sure to leave any first
@@ -246,9 +247,9 @@ def pair_round():
                   opp_team = p[1],
                   judge = p[2],
                   room = p[3])
-        if p[0] == pull_up:
+        if p[0] in all_pull_ups:
             r.pullup = Round.GOV
-        elif p[1] == pull_up:
+        elif p[1] in all_pull_ups:
             r.pullup = Round.OPP
         r.save()
 
@@ -328,6 +329,31 @@ def hit_pull_up(t):
         if a.pullup == Round.GOV:
             return True
     return False
+
+# This should count the number of pullup rounds the team has faced (should be 1)
+# at most
+def hit_pull_up_count(t):
+    pullups = 0
+    for a in list(Round.objects.filter(gov_team = t)):
+        if a.pullup == Round.OPP:
+            pullups += 1
+    for a in list(Round.objects.filter(opp_team = t)):
+        if a.pullup == Round.GOV:
+            pullups += 1
+    return pullups
+
+
+# This should count the number of pullup rounds the team has had (should be 1)
+# at most
+def pull_up_count(t):
+    pullups = 0
+    for a in list(Round.objects.filter(gov_team = t)):
+        if a.pullup == Round.GOV:
+            pullups += 1
+    for a in list(Round.objects.filter(opp_team = t)):
+        if a.pullup == Round.OPP:
+            pullups += 1
+    return pullups
 
 def num_opps(t):
     return Round.objects.filter(opp_team = t).count()
