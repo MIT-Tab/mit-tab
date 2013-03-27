@@ -1,9 +1,11 @@
 <link rel="stylesheet" type="text/css" href="/static/css/tab_cards.css" />
 <table id="pairing_list">
 <tr>
-    <td colspan=5>Team: {{team_name}}</td>
-    <th rowspan=2>Speaker 1: {{debater_1}}</th>
-    <th rowspan=2>Speaker 2: {{debater_2}}</th>
+    <td colspan=5>Team: {{team_name}} ({{team_school}})</td>
+    <th class="center" rowspan=2>
+        <p>{{debater_1}} ({{debater_1_status|slice:":1" }})</p></th>
+    <th class="center" rowspan=2>
+        <p>{{debater_2}} ({{debater_2_status|slice:":1" }})</p></th>
     <td></td>
 </tr>
 <tr>

@@ -7,7 +7,7 @@ from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
 import tab_logic
-from tab_logic import TabFlags
+from tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 from datetime import datetime
 
 def view_teams(request):
@@ -294,15 +294,18 @@ def tab_card(request, team_id):
         
     return render_to_response('tab_card.html', 
                              {'team_name': team.name,
+                              'team_school': team.school,
                               'debater_1': d1.name,
+                              'debater_1_status': Debater.NOVICE_CHOICES[d1.novice_status][1],
                               'debater_2': d2.name,
+                              'debater_2_status': Debater.NOVICE_CHOICES[d2.novice_status][1],
                               'round_stats': round_stats,
-                              'd1st': totals[0][0],
-                              'd1rt': totals[0][1],
-                              'd2st': totals[1][0],
-                              'd2rt': totals[1][1],
-                              'ts': totals[2][0],
-                              'tr': totals[2][1], 
+                              'd1st': tot_speaks_deb(d1),
+                              'd1rt': tot_ranks_deb(d1),
+                              'd2st': tot_speaks_deb(d2),
+                              'd2rt': tot_ranks_deb(d2),
+                              'ts': tot_speaks(team),
+                              'tr': tot_ranks(team),
                               'bye_round': bye_round},
                               context_instance=RequestContext(request))
 
