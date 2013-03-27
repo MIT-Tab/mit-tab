@@ -93,7 +93,7 @@ def pair_round(request):
     if request.method == 'POST':
         try:
             backup.backup_round("round_%i_before_pairing.db" % (next_round))
-            tab_logic.pair_round()
+            tab_logic.pair_round(assign_judges_with_pairing=True)
             backup.backup_round("round_%i_after_pairing.db" % (next_round))
         except Exception, e:
             traceback.print_exc(file=sys.stdout)

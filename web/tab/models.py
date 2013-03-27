@@ -140,7 +140,7 @@ class Round(models.Model):
     round_number = models.IntegerField()
     gov_team = models.ForeignKey(Team, related_name="gov_team")
     opp_team = models.ForeignKey(Team, related_name="opp_team")
-    judge = models.ForeignKey(Judge)
+    judge = models.ForeignKey(Judge, null=True, blank=True)
     NONE = 0
     GOV = 1
     OPP = 2
