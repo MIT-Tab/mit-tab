@@ -77,7 +77,7 @@ class TeamForm(forms.ModelForm):
         model = Team
 
 class TeamEntryForm(forms.ModelForm):
-    number_scratches = forms.IntegerField(label="How many scratches?", initial=1)
+    number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
                                               widget=FilteredSelectMultiple("Debaters", 
                                               is_stacked=False))

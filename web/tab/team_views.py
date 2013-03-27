@@ -93,7 +93,15 @@ def enter_team(request):
                                           'error_info':"Team name cannot be validated, most likely a duplicate school"}, 
                                           context_instance=RequestContext(request))
             num_forms = form.cleaned_data['number_scratches']
-            return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
+            if num_forms > 0:
+                return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
+            else:
+                return render_to_response('thanks.html', 
+                                         {'data_type': "Team",
+                                          'data_name': "["+str(team.name)+"]",
+                                          'data_modification': 'CREATED'}, 
+                                          context_instance=RequestContext(request))
+
     else:
         form = TeamEntryForm()
     return render_to_response('data_entry.html',
