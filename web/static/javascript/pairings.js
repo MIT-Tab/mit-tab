@@ -152,7 +152,7 @@ var populate_tab_card = function(tab_card_element) {
         url:"/team/" + team_id + "/stats/",
         success: function(result) {
             result = result.result
-            var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps].join(" / ")
+            var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
             tab_card_element.html("<a class=\"btn btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
         },
     })
@@ -161,10 +161,21 @@ var populate_tab_card = function(tab_card_element) {
 
 var populate_alternative_judges = function() {
     var round_id = $(this).attr('round-id');
+    var judge_id = $(this).attr('judge-id');
+    var judge_position = $(this).attr('judge-pos');
+    var populate_url = "/round/" + round_id + "/alternative_judges/";
+    var judge_list;
+    if (judge_id) {
+        populate_url +=  judge_id + "/";
+    }
     $.ajax({
-        url:"/round/" + round_id + "/alternative_judges/",
+        url: populate_url,
         success: function(result) {
-            var judge_list = $("ul[round-id="+round_id+"]");
+            if (judge_id) {
+                judge_list = $("ul[round-id="+round_id+"][judge-id="+judge_id+"]");
+            } else {
+                judge_list = $("ul[round-id="+round_id+"][judge-pos="+judge_position+"]");
+            }
             $(judge_list).html(result);
             bind_handlers()
         },
@@ -174,15 +185,28 @@ var populate_alternative_judges = function() {
 var assign_judge = function() {
     var round_id = $(this).attr('round-id');
     var judge_id = $(this).attr('judge-id');
+    var current_judge_id = $(this).attr('current-judge-id');
+    var assign_url = "/round/" + round_id + "/assign_judge/" + judge_id + "/";
+    if (current_judge_id) {
+        assign_url += current_judge_id + "/";
+    }
+
+    var judge_button;
     $.ajax({
-        url:"/round/" + round_id + "/assign_judge/" + judge_id + "/",
+        url: assign_url,
         success: function(result) {
-            var judge_button = $("span[round-id="+result.round_id+"]");
-            var html = "<a class=\"btn dropdown-toggle\" data-toggle=\"dropdown\"" +
-                       "round-id=" + result.round_id + " href=\"#\">"+ result.judge_name +
+            if (current_judge_id) {
+                judge_button = $("span[round-id="+result.round_id+"][judge-id="+current_judge_id+"]");
+            } else {
+                judge_button = $("span[round-id="+result.round_id+"].unassigned").first()
+            }
+            var html = "<a class=\"btn btn-link dropdown-toggle\" data-toggle=\"dropdown\"" +
+                       "round-id=" + result.round_id + " judge-id=" + result.judge_id + " href=\"#\">"+ result.judge_name +
                        "  <span class=\"caret\"></span></a><ul class=\"dropdown-menu\" round-id="+
-                        result.round_id+"></ul>"
-            $(judge_button).html(html)
+                        result.round_id+" judge-id=" + result.judge_id + "></ul>";
+            $(judge_button).html(html);
+            $(judge_button).attr('judge-id', result.judge_id);
+            $(judge_button).removeClass('unassigned');
             bind_handlers();
         },
     });

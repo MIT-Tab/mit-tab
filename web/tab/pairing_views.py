@@ -93,7 +93,7 @@ def pair_round(request):
     if request.method == 'POST':
         try:
             backup.backup_round("round_%i_before_pairing.db" % (next_round))
-            tab_logic.pair_round(assign_judges_with_pairing=True)
+            tab_logic.pair_round(assign_judges_with_pairing=False)
             backup.backup_round("round_%i_after_pairing.db" % (next_round))
         except Exception, e:
             traceback.print_exc(file=sys.stdout)
@@ -145,6 +145,38 @@ def pair_round(request):
         return render_to_response('pair_round.html',
                                 locals(),
                                 context_instance=RequestContext(request))
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def assign_judges_to_pairing(request):
+    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    if request.method == 'POST':
+        try:
+            print "Assigning judges"
+            print request.POST
+            panel_points, errors = [], []
+            if 'panel_point' in request.POST:
+                for point in request.POST['panel_point']:
+                    try:
+                        point = int(point)
+                        num = float(request.POST["panel_{0}".format(point)])
+                        if num > 0.0:
+                            panel_points.append((Round.objects.get(id=point), num))
+                    except Exception as e:
+                        errors.append(e)
+                        pass
+
+            rounds = Round.objects.filter(round_number=current_round_number)
+            judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
+            assign_judges.add_judges(rounds, judges, panel_points)
+            return view_round(request, current_round_number)
+        except Exception as e:
+            return render_to_response('error.html',
+                                     {'error_type': "Judge", 'error_name': " Assignment",
+                                      'error_info': "Could not assign judges. {0}".format(e)},
+                                      context_instance=RequestContext(request))
+    else:
+        return view_round(request, current_round_number)
+
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def view_backup(request, filename):
@@ -225,13 +257,22 @@ def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value-1
     return view_round(request, current_round_number)
 
-def view_round(request, round_number):
-    valid_pairing, errors, byes = True, [], []
+def view_round(request, round_number, errors = None):
+    if errors is None:
+        errors = []
+    valid_pairing, byes = True, []
     print "1: ",time.time()
     round_pairing = list(Round.objects.filter(round_number = round_number))
-    round_pairing.sort(key=lambda x: (max(tab_logic.tot_wins(x.gov_team), tab_logic.tot_wins(x.opp_team)),
-                                      max(tab_logic.tot_speaks(x.gov_team), tab_logic.tot_speaks(x.opp_team))))
-    round_pairing.reverse()
+    def team_comp(pairing):
+        gov, opp = pairing.gov_team, pairing.opp_team
+        if round_number == 1:
+            return (max(gov.seed, opp.seed),
+                    min(gov.seed, opp.seed))
+        else:
+            return (max(tab_logic.tot_wins(gov), tab_logic.tot_wins(opp)),
+                    max(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)))
+
+    round_pairing.sort(key = team_comp, reverse = True)
     print "2: ",time.time()
     #For the template since we can't pass in something nicer like a hash
     round_info = [[pair]+[None]*8 for pair in round_pairing]
@@ -259,6 +300,7 @@ def view_round(request, round_number):
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
+    judge_slots = [1,2,3]
     print "4: ",time.time()
 
     # A seemingly complex one liner to do a fairly simple thing
@@ -274,13 +316,19 @@ def view_round(request, round_number):
                                locals(),
                                context_instance=RequestContext(request))
 
-def alternative_judges(request, round_id):
+def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
     round_number = round_obj.round_number
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
-    judge_name = round_obj.judge.name
-    judge_rank = round_obj.judge.rank
-    judge_id = round_obj.judge.id
+    # All of these variables are for the convenience of the template
+    try:
+        current_judge_id = int(judge_id)
+        current_judge_obj = Judge.objects.get(id=current_judge_id)
+        current_judge_name = current_judge_obj.name
+        current_judge_rank = current_judge_obj.rank
+    except TypeError:
+        current_judge_id, current_judge_obj, current_judge_rank = "","",""
+        current_judge_name = "No judge"
     excluded_judges = Judge.objects.exclude(round__round_number = round_number) \
                                    .filter(checkin__round_number = round_number)
     included_judges = Judge.objects.filter(round__round_number = round_number) \
@@ -298,14 +346,33 @@ def alternative_judges(request, round_id):
                               locals(),
                               context_instance=RequestContext(request))
 
-def assign_judge(request, round_id, judge_id):
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def assign_judge(request, round_id, judge_id, remove_id=None):
+    try :
+        round_obj = Round.objects.get(id=int(round_id))
+        judge_obj = Judge.objects.get(id=int(judge_id))
+        if remove_id is not None:
+            remove_obj = Judge.objects.get(id=int(remove_id))
+            round_obj.judges.remove(remove_obj)
+
+        round_obj.judges.add(judge_obj)
+        round_obj.save()
+        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name, "judge_id": judge_obj.id}
+    except Exception as e:
+        print "Failed to assign judge: ", e
+        data = {"success":False}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def remove_judge(request, round_id, judge_id):
     try :
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
 
-        round_obj.judge = judge_obj
+        round_obj.judges.remove(judge_obj)
         round_obj.save()
-        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name}
+        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name, "judge_id": judge_obj.id}
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
@@ -313,7 +380,7 @@ def assign_judge(request, round_id, judge_id):
     return HttpResponse(data, mimetype='application/json')
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")                               
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def send_texts(request):
     try:
         print "#"*80

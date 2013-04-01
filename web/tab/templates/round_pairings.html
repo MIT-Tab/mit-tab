@@ -153,7 +153,7 @@
         <tr>
             <td>{{pairing.gov_team.name}}</td>
             <td>{{pairing.opp_team.name}}</td>
-            <td>{{pairing.judge.name}}</td>
+            <td>{{pairing.judges.all|join:" - "}}</td>
             <td>{{pairing.room.name}}</td>
         </tr>
         {% endfor %}
@@ -204,7 +204,7 @@
         <tr>
             <td>{{pairing.gov_team.name}}</td>
             <td>{{pairing.opp_team.name}}</td>
-            <td>{{pairing.judge.name}}</td>
+            <td>{{pairing.judges.all|join:" - "}}</td>
             <td>{{pairing.room.name}}</td>
         </tr>
         {% endfor %}

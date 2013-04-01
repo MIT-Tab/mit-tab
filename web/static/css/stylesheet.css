@@ -179,6 +179,9 @@ div.index_header {
     text-align: center;    
 }
 
+td.center {
+    text-align: center;    
+}
 .div.index_list ol {
     padding-left: 2em;
     margin: 0;
@@ -450,4 +453,8 @@ span.inline {
     border: 1px solid #dddddd;
     padding: 1em;
 
+}
+
+div.spacer {
+    margin: 1em;
 }

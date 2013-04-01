@@ -239,7 +239,7 @@ def tab_card(request, team_id):
         else: 
             dstat1,dstat2 = dstat1[0], dstat2[0]
         index = r.round_number-1
-        round_stats[index][3] = r.judge
+        round_stats[index][3] = " - ".join([j.name for j in r.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks),dstat1.ranks)
         round_stats[index][5] = (float(dstat2.speaks),dstat2.ranks)
         round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks), dstat1.ranks + dstat2.ranks)
@@ -350,6 +350,7 @@ def team_stats(request, team_id):
     try:
         team = Team.objects.get(pk=team_id)
         stats = {}
+        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
         stats["wins"] = tab_logic.tot_wins(team)
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)
