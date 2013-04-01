@@ -23,8 +23,7 @@
                     <th>Opp Team</th>
                     <th>Opp Ws/Ss/Gs/Os</th>
                     <th colspan=3>Judges</th>
-                    <th title="Points that you would like to start paneling at" >PanelP</th>
-                    <th title="Maximum gap in ranks between panel judge and panelists" >Gap</th>
+                    <th title="Maximum gap in ranks between panel judge and panelists" >Panel Gap</th>
                     <th>Room</th>
                     <th>Results</th>
                     {% if perms.tab.change_tab_settings %}
@@ -72,11 +71,8 @@
                         </td>
                         {% endif %}
                         {% endfor %}
-                        <td class="center">
-                            <input type="checkbox" name="panel_point" value="{{pairing.id}}" class="inline checkbox">
-                        </td>
                         <td>
-                            <input type="text" name="panel_{{pairing.id}}" maxlength=3 class="input-super-mini">
+                            <input type="text" name="panel_{{pairing.id}}" maxlength=4 class="input-super-mini">
                         </td>
                         <td><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
                         <td>

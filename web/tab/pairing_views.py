@@ -154,17 +154,17 @@ def assign_judges_to_pairing(request):
             print "Assigning judges"
             print request.POST
             panel_points, errors = [], []
-            if 'panel_point' in request.POST:
-                for point in request.POST['panel_point']:
-                    try:
-                        point = int(point)
-                        num = float(request.POST["panel_{0}".format(point)])
-                        if num > 0.0:
-                            panel_points.append((Round.objects.get(id=point), num))
-                    except Exception as e:
-                        errors.append(e)
-                        pass
-
+            potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
+            for point in potential_panel_points:
+               try:
+                   point = int(point.split("_")[1])
+                   num = float(request.POST["panel_{0}".format(point)])
+                   if num > 0.0:
+                       panel_points.append((Round.objects.get(id=point), num))
+               except Exception as e:
+                   errors.append(e)
+                   pass
+ 
             rounds = Round.objects.filter(round_number=current_round_number)
             judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
             assign_judges.add_judges(rounds, judges, panel_points)

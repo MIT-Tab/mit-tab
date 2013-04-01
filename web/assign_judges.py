@@ -121,11 +121,11 @@ def add_judges(pairings, judges, panel_points):
                 for (judge_i, judge) in enumerate(potential_panelists):
                     for (pairing_i, pairing) in enumerate(rounds_to_panel):
                         if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
-                            judges = panel_assignments[pairing_i]
-                            if len(judges) < 3:
-                                graph_edges.append((pairing_i,
-                                                    judge_i + num_to_panel,
-                                                    calc_weight_panel(judges)))
+                            judges = panel_assignments[pairing_i] + [judge]
+                            graph_edges.append((pairing_i,
+                                                judge_i + num_to_panel,
+                                                calc_weight_panel(judges)))
+                pprint.pprint(graph_edges)
                 judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
                 print judge_assignments
                 if ((-1 in judge_assignments[:num_to_panel]) or
@@ -140,6 +140,7 @@ def add_judges(pairings, judges, panel_points):
                     judges_used.append(judge)
                 # Remove any used judges from the potential panelist pool
                 for judge in judges_used:
+                    print "Removing {0}".format(judge)
                     potential_panelists.remove(judge)
 
             print "panels: ", panel_assignments
@@ -175,7 +176,6 @@ def calc_weight(judge_i, pairing_i):
 def calc_weight_panel(judges):
     judge_ranks = [float(j.rank) for j in judges]
     # Use the geometric mean so that we tend towards having less outliers
-    return sum(judge_ranks)
     return reduce(lambda x, y: x * y, judge_ranks, 1)
 
 #return true if the judge is scratched from either team, false otherwise
