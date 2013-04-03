@@ -31,7 +31,7 @@ DEBUG = None
 CHECK_DELTA = False
 
 # Check optimality of solution before returning; only works on integer weights.
-CHECK_OPTIMUM = True
+CHECK_OPTIMUM = False
 
 
 def maxWeightMatching(edges, maxcardinality=False):

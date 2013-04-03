@@ -93,7 +93,7 @@ def pair_round(request):
     if request.method == 'POST':
         try:
             backup.backup_round("round_%i_before_pairing.db" % (next_round))
-            tab_logic.pair_round(assign_judges_with_pairing=False)
+            tab_logic.pair_round()
             backup.backup_round("round_%i_after_pairing.db" % (next_round))
         except Exception, e:
             traceback.print_exc(file=sys.stdout)
@@ -150,30 +150,25 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == 'POST':
-        try:
-            print "Assigning judges"
-            print request.POST
-            panel_points, errors = [], []
-            potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
-            for point in potential_panel_points:
-               try:
-                   point = int(point.split("_")[1])
-                   num = float(request.POST["panel_{0}".format(point)])
-                   if num > 0.0:
-                       panel_points.append((Round.objects.get(id=point), num))
-               except Exception as e:
-                   errors.append(e)
-                   pass
- 
-            rounds = Round.objects.filter(round_number=current_round_number)
-            judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
-            assign_judges.add_judges(rounds, judges, panel_points)
-            return view_round(request, current_round_number)
-        except Exception as e:
-            return render_to_response('error.html',
-                                     {'error_type': "Judge", 'error_name': " Assignment",
-                                      'error_info': "Could not assign judges. {0}".format(e)},
-                                      context_instance=RequestContext(request))
+        print "Assigning judges"
+        print request.POST
+        panel_points, errors = [], []
+        potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
+        for point in potential_panel_points:
+           try:
+               point = int(point.split("_")[1])
+               num = float(request.POST["panel_{0}".format(point)])
+               if num > 0.0:
+                   panel_points.append((Round.objects.get(id=point), num))
+           except Exception as e:
+               errors.append(e)
+               pass
+
+        panel_points.reverse()
+        rounds = Round.objects.filter(round_number=current_round_number)
+        judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
+        assign_judges.add_judges(rounds, judges, panel_points)
+        return view_round(request, current_round_number)
     else:
         return view_round(request, current_round_number)
 
@@ -295,8 +290,8 @@ def view_round(request, round_number, errors = None):
             errors.append("%s was not in the pairing" % (present_team))
             byes.append(present_team) 
     pairing_exists = len(round_pairing) > 0 
-    excluded_judges = Judge.objects.exclude(round__round_number = round_number).filter(checkin__round_number = round_number)
-    non_checkins = Judge.objects.exclude(round__round_number = round_number).exclude(checkin__round_number = round_number)
+    excluded_judges = Judge.objects.exclude(judges__round_number = round_number).filter(checkin__round_number = round_number)
+    non_checkins = Judge.objects.exclude(judges__round_number = round_number).exclude(checkin__round_number = round_number)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
@@ -329,9 +324,9 @@ def alternative_judges(request, round_id, judge_id=None):
     except TypeError:
         current_judge_id, current_judge_obj, current_judge_rank = "","",""
         current_judge_name = "No judge"
-    excluded_judges = Judge.objects.exclude(round__round_number = round_number) \
+    excluded_judges = Judge.objects.exclude(judges__round_number = round_number) \
                                    .filter(checkin__round_number = round_number)
-    included_judges = Judge.objects.filter(round__round_number = round_number) \
+    included_judges = Judge.objects.filter(judges__round_number = round_number) \
                                    .filter(checkin__round_number = round_number)
     excluded_judges = [(j.name, j.id, float(j.rank))
                        for j in
@@ -357,7 +352,11 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
         round_obj.judges.add(judge_obj)
         round_obj.save()
-        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name, "judge_id": judge_obj.id}
+        data = {"success":True,
+                "round_id": round_obj.id,
+                "judge_name": judge_obj.name,
+                "judge_rank": float(judge_obj.rank),
+                "judge_id": judge_obj.id}
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
@@ -372,7 +371,11 @@ def remove_judge(request, round_id, judge_id):
 
         round_obj.judges.remove(judge_obj)
         round_obj.save()
-        data = {"success":True, "round_id": round_obj.id, "judge_name": judge_obj.name, "judge_id": judge_obj.id}
+        data = {"success":True,
+                "round_id": round_obj.id,
+                "judge_name": judge_obj.name,
+                "judge_rank": float(judge_obj.rank),
+                "judge_id": judge_obj.id}
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}

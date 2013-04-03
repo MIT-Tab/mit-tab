@@ -201,7 +201,7 @@ var assign_judge = function() {
                 judge_button = $("span[round-id="+result.round_id+"].unassigned").first()
             }
             var html = "<a class=\"btn btn-link dropdown-toggle\" data-toggle=\"dropdown\"" +
-                       "round-id=" + result.round_id + " judge-id=" + result.judge_id + " href=\"#\">"+ result.judge_name +
+                       "round-id=" + result.round_id + " judge-id=" + result.judge_id + " href=\"#\">"+ result.judge_name + " (" + result.judge_rank +")" +
                        "  <span class=\"caret\"></span></a><ul class=\"dropdown-menu\" round-id="+
                         result.round_id+" judge-id=" + result.judge_id + "></ul>";
             $(judge_button).html(html);

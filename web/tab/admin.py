@@ -1,7 +1,15 @@
 from django.contrib import admin
+from django import forms
 from tab.models import *
 
+class RoundAdminForm(forms.ModelForm):
+    chair = forms.ModelChoiceField(queryset=Judge.objects.order_by('name'))
+
+    class Meta:
+        model = Round
+
 class RoundAdmin(admin.ModelAdmin):
+    form = RoundAdminForm
     filter_horizontal = ('judges',)
 
 class TeamAdmin(admin.ModelAdmin):

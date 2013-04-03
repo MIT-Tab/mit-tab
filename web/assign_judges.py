@@ -35,15 +35,15 @@ def add_judges(pairings, judges, panel_points):
     def team_comp(pairing):
         gov, opp = pairing.gov_team, pairing.opp_team
         if current_round_number == 1:
-            print "Sorting teams based on seeds"
             return (max(gov.seed, opp.seed),
                     min(gov.seed, opp.seed))
         else:
-            print "Sorting teams based on speaks"
-            return (max(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)),
+            return (max(tab_logic.tot_wins(gov), tab_logic.tot_wins(opp)),
+                    max(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)),
                     min(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)))
 
-    # Order the judges and pairings by power ranking (high speaking judges get high ranked judges)
+
+    # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
     judges = sorted(judges, key=lambda j: j.rank, reverse = True)
     pairings = sorted(pairings, key=team_comp, reverse = True)
 
@@ -56,6 +56,8 @@ def add_judges(pairings, judges, panel_points):
             panel_gaps[current_group] = panel_points[current_group][1]
             current_group += 1
 
+    pprint.pprint(panel_points)
+
     for (group_i, group) in enumerate(pairing_groups):
         num_rounds = len(group)
         # Assign chairs (single judges) to each round using perfect pairing
@@ -67,6 +69,7 @@ def add_judges(pairings, judges, panel_points):
                                         judge_i + len(group),
                                         calc_weight(judge_i, pairing_i)))
         judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+        print "wat"
         # If there is no possible assignment of chairs, raise an error
         if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and len(graph_edges) == 0):
             if len(graph_edges) == 0:
@@ -81,6 +84,7 @@ def add_judges(pairings, judges, panel_points):
         # Save the judges to the pairings
         for i in range(num_rounds):
             group[i].judges.add(judges[judge_assignments[i] - num_rounds])
+            group[i].chair = judges[judge_assignments[i] - num_rounds]
             group[i].save()
 
         # Remove any assigned judges from the judging pool
@@ -98,7 +102,7 @@ def add_judges(pairings, judges, panel_points):
                 return {}
 
             rounds = sorted(potential_pairings,
-                            key=lambda r: argmin(r.judges.all(), lambda j: j.rank).rank)
+                            key=lambda r: (argmin(r.judges.all(), lambda j: j.rank).rank,) + team_comp(r))
             base_judge = argmax(rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
             print "Found maximally ranked judge {0}".format(base_judge)
             potential_panelists = [j for j in all_judges if
@@ -149,7 +153,7 @@ def add_judges(pairings, judges, panel_points):
                 result[rounds_to_panel[panel_i]] = panel
             return result
 
-        # Use te try_paneling function for any rounds that have been marked as panel
+        # Use the try_paneling function for any rounds that have been marked as panel
         # points, note that we start with trying to panel the entire bracket and
         # rely on try_paneling's retries to fix it
         if group_i in panel_gaps and panel_gaps[group_i]:
@@ -175,8 +179,10 @@ def calc_weight(judge_i, pairing_i):
 
 def calc_weight_panel(judges):
     judge_ranks = [float(j.rank) for j in judges]
-    # Use the geometric mean so that we tend towards having less outliers
-    return reduce(lambda x, y: x * y, judge_ranks, 1)
+    avg = round(float(sum(judge_ranks)) / len(judge_ranks))
+    sum_squares = sum([((r - avg) ** 2) for r in judge_ranks])
+    # Use the sum_squares so we get highest panelists with lowest judges 
+    return 1000000 * sum(judge_ranks) + sum_squares
 
 #return true if the judge is scratched from either team, false otherwise
 def judge_conflict(j, team1, team2):

@@ -9,7 +9,9 @@
     {% if not valid_pairing %}
     {{errors}}
     {% endif %}
-    <form action="/pairing/assign_judges/" method="post"> {% csrf_token %}
+    <form action="/pairing/assign_judges/"
+          method="post"
+          onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
         <div class="btn-group">
             <button type="submit" class="mid btn" href="/pairing/assign_judges/" title="Assign judges to your pairing">Assign Judges</button>
             <a class="mid btn" href="/pairings/pairinglist/" title="A randomized view to display in GA">Announcement View</a>

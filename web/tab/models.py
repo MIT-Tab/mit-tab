@@ -19,7 +19,8 @@
 #THE SOFTWARE.
 
 from django.db import models
-from django.contrib.localflavor.us.models import PhoneNumberField 
+from django.contrib.localflavor.us.models import PhoneNumberField
+from django.core.exceptions import ValidationError
 
 ###NOTE All fields automatically have a id key created that act as primary keys
 
@@ -140,7 +141,11 @@ class Round(models.Model):
     round_number = models.IntegerField()
     gov_team = models.ForeignKey(Team, related_name="gov_team")
     opp_team = models.ForeignKey(Team, related_name="opp_team")
-    judges = models.ManyToManyField(Judge, null=True, blank=True)
+    chair = models.ForeignKey(Judge, null=True, blank=True, related_name="chair")
+    judges = models.ManyToManyField(Judge,
+                                    null=True,
+                                    blank=True,
+                                    related_name="judges")
     NONE = 0
     GOV = 1
     OPP = 2
@@ -166,6 +171,11 @@ class Round(models.Model):
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+
+    def clean(self):
+        if self.chair not in self.judges.all():
+            raise ValidationError("Chair must be a judge in the round")
+
     def __unicode__(self):
         return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(self.opp_team) + " (OPP)"
 

@@ -37,7 +37,7 @@ from cache_logic import cache
 from functools import cmp_to_key    
 
 #will return false if not ready to pair yet
-def pair_round(assign_judges_with_pairing=True):
+def pair_round():
     """ 
     Pair the next round of debate.
     This function will do the following:
@@ -229,19 +229,14 @@ def pair_round(assign_judges_with_pairing=True):
         print pairings
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
         
-    # assign judges
-    if assign_judges_with_pairing:
-        pairings = assign_judges.add_judges(pairings)
-    
-    #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
+    # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
 
     for i in range(len(pairings)):
         pairings[i][3] = rooms[i]
-    
 
-    #enter into database
+    # Enter into database
     for p in pairings:
         if isinstance(p[2], Judge):
             r = Round(round_number = current_round,

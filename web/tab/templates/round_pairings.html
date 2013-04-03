@@ -153,7 +153,15 @@
         <tr>
             <td>{{pairing.gov_team.name}}</td>
             <td>{{pairing.opp_team.name}}</td>
-            <td>{{pairing.judges.all|join:" - "}}</td>
+            <td>
+                {% for judge in pairing.judges.all %}
+                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                    <b>{{judge.name}}</b><br>
+                    {% else %}
+                    {{judge.name}}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
             <td>{{pairing.room.name}}</td>
         </tr>
         {% endfor %}
@@ -204,7 +212,15 @@
         <tr>
             <td>{{pairing.gov_team.name}}</td>
             <td>{{pairing.opp_team.name}}</td>
-            <td>{{pairing.judges.all|join:" - "}}</td>
+            <td>
+                {% for judge in pairing.judges.all %}
+                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                    <b>{{judge.name}}</b><br>
+                    {% else %}
+                    {{judge.name}}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
             <td>{{pairing.room.name}}</td>
         </tr>
         {% endfor %}
