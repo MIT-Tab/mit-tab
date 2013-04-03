@@ -29,3 +29,6 @@ table#pairing_list td{
     margin-bottom: 2em;
 }
 
+.center {
+    text-align: center;
+}

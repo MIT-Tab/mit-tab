@@ -7,7 +7,7 @@ from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
 import tab_logic
-from tab_logic import TabFlags
+from tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 from datetime import datetime
 
 def view_teams(request):
@@ -93,7 +93,15 @@ def enter_team(request):
                                           'error_info':"Team name cannot be validated, most likely a duplicate school"}, 
                                           context_instance=RequestContext(request))
             num_forms = form.cleaned_data['number_scratches']
-            return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
+            if num_forms > 0:
+                return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
+            else:
+                return render_to_response('thanks.html', 
+                                         {'data_type': "Team",
+                                          'data_name': "["+str(team.name)+"]",
+                                          'data_modification': 'CREATED'}, 
+                                          context_instance=RequestContext(request))
+
     else:
         form = TeamEntryForm()
     return render_to_response('data_entry.html',
@@ -231,7 +239,7 @@ def tab_card(request, team_id):
         else: 
             dstat1,dstat2 = dstat1[0], dstat2[0]
         index = r.round_number-1
-        round_stats[index][3] = r.judge
+        round_stats[index][3] = " - ".join([j.name for j in r.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks),dstat1.ranks)
         round_stats[index][5] = (float(dstat2.speaks),dstat2.ranks)
         round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks), dstat1.ranks + dstat2.ranks)
@@ -294,15 +302,18 @@ def tab_card(request, team_id):
         
     return render_to_response('tab_card.html', 
                              {'team_name': team.name,
+                              'team_school': team.school,
                               'debater_1': d1.name,
+                              'debater_1_status': Debater.NOVICE_CHOICES[d1.novice_status][1],
                               'debater_2': d2.name,
+                              'debater_2_status': Debater.NOVICE_CHOICES[d2.novice_status][1],
                               'round_stats': round_stats,
-                              'd1st': totals[0][0],
-                              'd1rt': totals[0][1],
-                              'd2st': totals[1][0],
-                              'd2rt': totals[1][1],
-                              'ts': totals[2][0],
-                              'tr': totals[2][1], 
+                              'd1st': tot_speaks_deb(d1),
+                              'd1rt': tot_ranks_deb(d1),
+                              'd2st': tot_speaks_deb(d2),
+                              'd2rt': tot_ranks_deb(d2),
+                              'ts': tot_speaks(team),
+                              'tr': tot_ranks(team),
                               'bye_round': bye_round},
                               context_instance=RequestContext(request))
 
@@ -339,6 +350,7 @@ def team_stats(request, team_id):
     try:
         team = Team.objects.get(pk=team_id)
         stats = {}
+        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
         stats["wins"] = tab_logic.tot_wins(team)
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)

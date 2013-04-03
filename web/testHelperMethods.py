@@ -103,7 +103,8 @@ def add_rooms(num_gen):
 def add_judges(num_gen):
     schools = School.objects.all()
     for i in range(num_gen):
-        Judge.objects.create(name = str(random.random()), rank = random.randint(0,10), school = schools[random.randint(0,len(schools)-1)])
+        j = Judge.objects.create(name = str(random.random()), rank = random.randint(0,10))
+        j.schools.add(schools[random.randint(0,len(schools)-1)])
 
 def add_judges_separate_school(num_gen):
     judgeSchool = School.objects.create(name = "JudgeSchool")

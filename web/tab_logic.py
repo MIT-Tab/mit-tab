@@ -229,24 +229,26 @@ def pair_round():
         print pairings
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
         
-    # assign judges
-    pairings = assign_judges.add_judges(pairings)
-    
-    #assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
+    # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
 
     for i in range(len(pairings)):
         pairings[i][3] = rooms[i]
-    
 
-    #enter into database
+    # Enter into database
     for p in pairings:
-        r = Round(round_number = current_round,
-                  gov_team = p[0],
-                  opp_team = p[1],
-                  judge = p[2],
-                  room = p[3])
+        if isinstance(p[2], Judge):
+            r = Round(round_number = current_round,
+                      gov_team = p[0],
+                      opp_team = p[1],
+                      judge = p[2],
+                      room = p[3])
+        else:
+            r = Round(round_number = current_round,
+                      gov_team = p[0],
+                      opp_team = p[1],
+                      room = p[3])
         if p[0] in all_pull_ups:
             r.pullup = Round.GOV
         elif p[1] in all_pull_ups:

@@ -109,6 +109,16 @@ class ToManyScratchesError(Error):
     def __str__(self):
         return repr(self.msg)
 
+class JudgeAssignmentError(Error):
+    def __init__(self, reason=None):
+        if reason is not None:
+            self.msg = reason
+        else:
+            self.msg = "Could not assign judges"
+
+    def __str__(self):
+        return repr(self.msg)
+
 class PrevRoundNotEnteredError(Error):
     def __init__(self):
         self.msg = "You have not entered all the results from the previous round."
