@@ -124,8 +124,8 @@ def pair_round(request):
         # end
         checkins = CheckIn.objects.filter(round_number = current_round)
         checked_in_judges = set([c.judge for c in checkins])
-        n_over_two = Team.objects.count() / 2
-        msg = "N/2 Judges checked in for Round %s?" % (current_round)
+        n_over_two = Team.objects.filter(checked_in=True).count() / 2
+        msg = "N/2 Judges checked in for Round %s? Need %d, have %d." % (current_round, n_over_two, len(checked_in_judges))
         if len(checked_in_judges) < n_over_two:
             check_status.append((msg, 
                                  "No", 

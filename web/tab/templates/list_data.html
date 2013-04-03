@@ -34,15 +34,15 @@ Quick Search: <input type="text" id="filter_box"></input>
                 <div class="list_wrapper">
                 <ul class="list_item">
             {% endif %}
-            <li class="data_list {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{% if perms.tab.change_tab_settings %}{{flags}}{%endif%}">
-                <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {% if perms.tab.change_tab_settings %}{{symbols}}{%endif%}</a>
+            <li class="data_list {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+                <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
             </li>
         {% endfor %}
     </ul>
     </div>
 </div>
 
-{% if symbol_text and perms.tab.change_tab_settings%}
+{% if symbol_text%}
     <div class="clear"></div>
     <table class="pretty">
         <tr>
