@@ -30,22 +30,21 @@ def add_judges(pairings, judges, panel_points):
     for pairing in pairings:
         pairing.judges.clear()
 
-    current_round_number = TabSettings.objects.get(key="cur_round").value
+    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
 
-    def team_comp(pairing):
-        gov, opp = pairing.gov_team, pairing.opp_team
-        if current_round_number == 1:
-            return (max(gov.seed, opp.seed),
-                    min(gov.seed, opp.seed))
-        else:
-            return (max(tab_logic.tot_wins(gov), tab_logic.tot_wins(opp)),
-                    max(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)),
-                    min(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)))
+    # Try to have consistent ordering with the round display
+    random.seed(1337)
+    random.shuffle(pairings)
+    random.seed(1337)
+    random.shuffle(judges)
 
 
     # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
     judges = sorted(judges, key=lambda j: j.rank, reverse = True)
-    pairings = sorted(pairings, key=team_comp, reverse = True)
+    pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
+                  reverse = True)
+
+    pprint.pprint(pairings)
 
     pairing_groups = [list() for panel_point in panel_points] + [list()]
     panel_gaps = {}
@@ -102,7 +101,9 @@ def add_judges(pairings, judges, panel_points):
                 return {}
 
             rounds = sorted(potential_pairings,
-                            key=lambda r: (argmin(r.judges.all(), lambda j: j.rank).rank,) + team_comp(r))
+                            key=lambda r: (argmin(r.judges.all(),
+                                           lambda j: j.rank).rank,) + \
+                                           tab_logic.team_comp(r, current_round_number))
             base_judge = argmax(rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
             print "Found maximally ranked judge {0}".format(base_judge)
             potential_panelists = [j for j in all_judges if

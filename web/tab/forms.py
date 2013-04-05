@@ -3,6 +3,9 @@ from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from models import *
+from decimal import Decimal
+import itertools
+import pprint
 
 class UploadFileForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -130,18 +133,19 @@ class ResultEntryForm(forms.Form):
         (4, 4),
     )
     
-    winner = forms.ChoiceField(label="Which team won the round?", choices=[(0,"---"),
-                                                                           (1,"GOV"),
-                                                                           (2,"OPP"),
-                                                                           (3, "GOV via Forfeit"),
-                                                                           (4, "OPP via Forfeit"),
-                                                                           (5, "All Drop"),
-                                                                           (6, "All Win")])
+    winner = forms.ChoiceField(label="Which team won the round?",
+                               choices=Round.VICTOR_CHOICES)
+
     def __init__(self, *args, **kwargs):
+        # Have to pop these off before sending to the super constructor
         round_object = kwargs.pop('round_instance')
+        no_fill = False
+        if 'no_fill' in kwargs:
+            kwargs.pop('no_fill')
+            no_fill = True
         super(ResultEntryForm, self).__init__(*args, **kwargs) 
         # If we already have information, fill that into the form
-        if round_object.victor != 0:
+        if round_object.victor != 0 and not no_fill:
             self.fields["winner"].initial = round_object.victor
 
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
@@ -158,13 +162,13 @@ class ResultEntryForm(forms.Form):
             self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=opp_debaters)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
-        if round_object.victor != 0:
+        if round_object.victor != 0 and not no_fill:
             for d in self.GOV + self.OPP:
                 try:
                     stats = RoundStats.objects.get(round=round_object, debater_role = d)
                     self.fields["%s_debater"%(d)].initial = stats.debater.id
                     self.fields["%s_speaks"%(d)].initial = stats.speaks
-                    self.fields["%s_ranks"%(d)].initial = stats.ranks
+                    self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
                 except:
                     pass
 
@@ -228,3 +232,77 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
+
+def validate_panel(result):
+    all_good = True
+    all_results = list(itertools.chain(*result.values()))
+    debater_roles = zip(*all_results)
+
+    # Check everyone is in the same position
+    for debater in debater_roles:
+        ds = [(d,rl) for (d,rl,s,r) in debater]
+        if not all(x == ds[0] for x in ds):
+            all_good = False
+            break
+
+    # Check the winner makes sense
+    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    debater_roles = zip(*result[final_winner])
+    for debater in debater_roles:
+        ds = [(d,rl) for (d,rl,s,r) in debater]
+        if ((len(ds) != len(result[final_winner])) or
+            (len(ds) < 2)):
+            all_good = False
+            break
+
+    return all_good, "Inconsistent Panel results, please check yourself"
+
+def score_panel(result, discard_minority):
+    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    debater_roles = zip(*result[final_winner])
+
+    # Take all speaks and ranks even if they are a minority judge
+    if not discard_minority:
+        all_results = list(itertools.chain(*result.values()))
+        debater_roles = zip(*all_results)
+
+    final_scores = []
+    for debater in debater_roles:
+        ds = [(d,rl) for (d,rl,s,r) in debater]
+        d, rl = ds[0]
+        speaks = [s for (d,rl,s,r) in debater]
+        avg_speaks = sum(speaks) / float(len(speaks))
+        ranks = [r for (d,rl,s,r) in debater]
+        avg_ranks = sum(ranks) / float(len(ranks))
+        final_scores.append((d, rl, avg_speaks, avg_ranks))
+
+    # Rank by resulting average speaks
+    ranked = sorted([score for score in final_scores],
+                    key = lambda x: x[2])
+    ranked = [(d, rl, s, r+1)
+              for (r, (d, rl, s, _)) in enumerate(ranked)]
+
+    # Break any ties by taking the average of the tied ranks
+    ties = {}
+    for (score_i, score) in enumerate(ranked):
+        # For floating point roundoff errors
+        d_score = Decimal(score[2]).quantize(Decimal('1.00'))
+        if d_score in ties:
+            ties[d_score].append((score_i, score[3]))
+        else:
+            ties[d_score] = [(score_i, score[3])]
+
+    # Average over the tied ranks
+    for k, v in ties.iteritems():
+        if len(v) > 1:
+            tied_ranks = [x[1] for x in v]
+            avg = sum(tied_ranks) / float(len(tied_ranks))
+            for i, _ in v:
+                fs = final_scores[i]
+                final_scores[i] = (fs[0], fs[1], fs[2], avg)
+    pprint.pprint(final_scores)
+
+    return final_scores, final_winner
+
+
+

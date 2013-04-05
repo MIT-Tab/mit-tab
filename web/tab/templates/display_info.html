@@ -24,7 +24,7 @@
                     <th>Gov Ws/Ss/Gs/Os</th>
                     <th>Opp Team</th>
                     <th>Opp Ws/Ss/Gs/Os</th>
-                    <th colspan=3>Judges</th>
+                    <th>Judges</th>
                     <th title="Maximum gap in ranks between panel judge and panelists" >Panel Gap</th>
                     <th>Room</th>
                     <th>Results</th>
@@ -47,9 +47,9 @@
                         <td class="team tabcard" team-id="{{pairing.opp_team.id}}">
                             <a class="btn btn-link" href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
                         </td>
-                        {% for judge in pairing.judges.all %} 
                         <td class="judge">
-                            <span class="btn-group full_width"
+                        {% for judge in pairing.judges.all %} 
+                            <span class="full_width btn-group block-tight"
                                 round-id="{{pairing.id}}"
                                 judge-id="{{judge.id}}">
                                 <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
@@ -58,26 +58,25 @@
                                 </a>
                                 <ul class="dropdown-menu" round-id={{pairing.id}} judge-id={{judge.id}}></ul>
                             </span>
-                        </td>
                         {% endfor %}
                         {% for slot in judge_slots %}
                         {% if pairing.judges.all|length < slot %}
-                        <td class="judge">
-                            <span class="btn-group full_width unassigned"
+                            <span class="full_width unassigned btn-group block-tight"
                                 round-id="{{pairing.id}}"> 
                                 <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
                                     round-id="{{pairing.id}}" judge-pos="{{slot}}" href="#">NA
                                 </a>
                                 <ul class="dropdown-menu" round-id={{pairing.id}} judge-pos={{slot}}></ul>
                             </span>
-                        </td>
                         {% endif %}
                         {% endfor %}
+                        </td>
                         <td>
                             <input type="text" name="panel_{{pairing.id}}" maxlength=4 class="input-super-mini">
                         </td>
                         <td><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
                         <td>
+
                             {% if pairing.victor == 1 %}
                             <a class="btn btn-link" href="/round/{{pairing.id}}/result/">GOV win</a></li>
                             {% else %}{% if pairing.victor == 2 %} 
@@ -94,6 +93,12 @@
                             <a class="btn btn-link" href="/round/{{pairing.id}}/result/">Enter Ballot</a></li>
                             {%endif%}{%endif%}{%endif%}
                             {% endif %}{% endif %}{%endif%}
+
+                            {% if pairing.judges.all|length > 1 %}
+                            <br>
+                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a></li>
+                            {% endif %}
+
                         </td>
                         {% if perms.tab.change_tab_settings %}
                         <td>

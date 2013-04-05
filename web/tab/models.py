@@ -205,7 +205,7 @@ class RoundStats(models.Model):
     round = models.ForeignKey(Round)
     #fewer digits?
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
-    ranks = models.PositiveIntegerField()
+    ranks = models.DecimalField(max_digits=6, decimal_places=4)
     debater_role = models.CharField(max_length=4, null=True)
     
     def __unicode__(self):

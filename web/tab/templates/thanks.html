@@ -8,7 +8,9 @@
 <div class="btn-group">
     {# TODO: Use reverse urls ... some reason it's not working for me #} 
     <a href="/" class="btn">Go Home</a>
+    {% if enter_again %}
     <a href="/enter_{{data_type|lower}}/" class="btn"> Enter another {{data_type}}</a>
+    {% endif %}
     <a href="/pairings/status/" class="btn">Go To Ballot Entry</a>
 </div>
 

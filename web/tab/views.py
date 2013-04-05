@@ -71,8 +71,7 @@ def view_school(request, school_id):
                                   'links': links,
                                   'title': "Viewing School: %s" %(school.name)},
                                   context_instance=RequestContext(request))
-    #return  render_to_response('display_info.html', {'id':school_id} ,context_instance=RequestContext(request))
-                                
+
 def enter_school(request):
     if request.method == 'POST':
         form = SchoolForm(request.POST)
@@ -84,10 +83,11 @@ def enter_school(request):
                                          {'error_type': "School",'error_name': "["+form.cleaned_data['name']+"]",
                                           'error_info':"School name cannot be validated, most likely a duplicate school"}, 
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
+            return render_to_response('thanks.html',
                                      {'data_type': "School",
                                       'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED" }, 
+                                      'data_modification': "CREATED",
+                                      'enter_again': True},
                                       context_instance=RequestContext(request))
     else:
         form = SchoolForm()
@@ -193,7 +193,8 @@ def enter_room(request):
             return render_to_response('thanks.html', 
                                      {'data_type': "Room",
                                       'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED" }, 
+                                      'data_modification': "CREATED",
+                                      'enter_again': True}, 
                                       context_instance=RequestContext(request))
     else:
         form = RoomForm()

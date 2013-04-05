@@ -700,6 +700,20 @@ def tab_nov_break():
         pairings += [(nov_break[i],nov_break[len(nov_break)-i-1])]
     return pairings
 
+def team_comp(pairing, round_number):
+    print round_number
+    gov, opp = pairing.gov_team, pairing.opp_team
+    if round_number == 1:
+        print "Using seeds"
+        return (max(gov.seed, opp.seed),
+                min(gov.seed, opp.seed))
+    else:
+        print "Using speaks"
+        return (max(tot_wins(gov), tot_wins(opp)),
+                max(tot_speaks(gov), tot_speaks(opp)),
+                min(tot_speaks(gov), tot_speaks(opp)))
+
+
 # Returns a tuple b
 def team_score(team):
     score = (0,0,0,0,0,0,0,0)

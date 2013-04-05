@@ -99,7 +99,8 @@ def enter_team(request):
                 return render_to_response('thanks.html', 
                                          {'data_type': "Team",
                                           'data_name': "["+str(team.name)+"]",
-                                          'data_modification': 'CREATED'}, 
+                                          'data_modification': 'CREATED',
+                                          'enter_again': True},
                                           context_instance=RequestContext(request))
 
     else:

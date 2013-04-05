@@ -6,7 +6,7 @@ from django.utils import simplejson
 from errors import *
 from models import *
 from django.shortcuts import redirect
-from forms import ResultEntryForm, UploadFileForm
+from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel
 import cache_logic
 import tab_logic
 import assign_judges
@@ -143,8 +143,8 @@ def pair_round(request):
         check_status.append(("Additional Minor Checks (Enough Rooms)", ready_to_pair, ready_to_pair_alt))
         
         return render_to_response('pair_round.html',
-                                locals(),
-                                context_instance=RequestContext(request))
+                                  locals(),
+                                  context_instance=RequestContext(request))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
@@ -165,9 +165,16 @@ def assign_judges_to_pairing(request):
                pass
 
         panel_points.reverse()
-        rounds = Round.objects.filter(round_number=current_round_number)
+        rounds = list(Round.objects.filter(round_number=current_round_number))
         judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
-        assign_judges.add_judges(rounds, judges, panel_points)
+        try:
+            assign_judges.add_judges(rounds, judges, panel_points)
+        except Exception as e:
+            return render_to_response('error.html',
+                                     {'error_type': "Judge Assignment",
+                                      'error_name': "",
+                                      'error_info': str(e)},
+                                      context_instance=RequestContext(request))
         return view_round(request, current_round_number)
     else:
         return view_round(request, current_round_number)
@@ -258,16 +265,12 @@ def view_round(request, round_number, errors = None):
     valid_pairing, byes = True, []
     print "1: ",time.time()
     round_pairing = list(Round.objects.filter(round_number = round_number))
-    def team_comp(pairing):
-        gov, opp = pairing.gov_team, pairing.opp_team
-        if round_number == 1:
-            return (max(gov.seed, opp.seed),
-                    min(gov.seed, opp.seed))
-        else:
-            return (max(tab_logic.tot_wins(gov), tab_logic.tot_wins(opp)),
-                    max(tab_logic.tot_speaks(gov), tab_logic.tot_speaks(opp)))
 
-    round_pairing.sort(key = team_comp, reverse = True)
+    random.seed(1337)
+    random.shuffle(round_pairing)
+    round_pairing.sort(key = lambda x: tab_logic.team_comp(x, round_number),
+                       reverse = True)
+
     print "2: ",time.time()
     #For the template since we can't pass in something nicer like a hash
     round_info = [[pair]+[None]*8 for pair in round_pairing]
@@ -468,6 +471,70 @@ def enter_result(request, round_id):
     return render_to_response('round_entry.html', 
                               {'form': form,
                                'title': "Entering Ballot for {}".format(str(round_obj)),
+                               'gov_team': round_obj.gov_team,
+                               'opp_team': round_obj.opp_team}, 
+                               context_instance=RequestContext(request))
+
+
+def enter_multiple_results(request, round_id, num_entered):
+    round_obj = Round.objects.get(id=round_id)
+    num_entered = max(int(num_entered), 1)
+    if request.method == 'POST':
+        forms = [ResultEntryForm(request.POST,
+                                 prefix=str(i),
+                                 round_instance=round_obj,
+                                 no_fill = True)
+                 for i in range(1, num_entered +1)]
+        all_good = True
+        for form in forms:
+            all_good = all_good and form.is_valid()
+        if all_good:
+            # result is of the format:
+            # winner_1 => [(debater, role, speaks, rank), (debater, role, speaks, rank) ...]
+            # winner_2 => [(debater, role, sp ...]
+            result = {}
+            debaters = ResultEntryForm.GOV + ResultEntryForm.OPP
+            for form in forms:
+                cleaned_data = form.cleaned_data
+                winner = cleaned_data["winner"]
+                if winner not in result:
+                    result[winner] = []
+
+                result[winner].append([])
+                for debater in debaters:
+                    old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
+                    if len(old_stats) > 0:
+                        old_stats.delete()
+                    debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
+                    debater_role_obj = debater
+                    speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)])
+                    result[winner][-1].append((debater_obj, debater_role_obj, speaks_obj, ranks_obj))
+            # Validate the extracted data and return it
+            all_good, error_msg = validate_panel(result)
+            if all_good:
+                final_scores, final_winner = score_panel(result, "discard_minority" in request.POST)
+                print final_scores
+                for (debater, role, speaks, ranks) in final_scores:
+                    RoundStats.objects.create(debater = debater,
+                                              round = round_obj,
+                                              speaks = speaks,
+                                              ranks = ranks,
+                                              debater_role = role)
+                round_obj.victor = final_winner
+                round_obj.save()
+                return render_to_response('thanks.html', 
+                                         {'data_type': "Round Result",
+                                          'data_name': "["+str(round_obj)+"]"}, 
+                                          context_instance=RequestContext(request))
+            else:
+                forms[0]._errors["winner"] = forms[0].error_class([error_msg])
+    else:
+        forms = [ResultEntryForm(prefix = str(i),
+                                 round_instance=round_obj,
+                                 no_fill = True) for i in range(1, num_entered + 1)]
+    return render_to_response('round_entry_multiple.html',
+                              {'forms': forms,
+                               'title': "Entering Ballots for {}".format(str(round_obj)),
                                'gov_team': round_obj.gov_team,
                                'opp_team': round_obj.opp_team}, 
                                context_instance=RequestContext(request))

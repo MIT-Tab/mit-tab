@@ -314,6 +314,10 @@ div.team_record table td{
     margin: .1em;
 }
 
+table.ballot_entry td {
+    padding: 1em;
+}
+
 table.ballot_entry tr.top{
     border-top: 1px solid black;
 }
@@ -458,3 +462,9 @@ span.inline {
 div.spacer {
     margin: 1em;
 }
+
+.block-tight {
+    display: block;
+    margin: 0px;
+}
+

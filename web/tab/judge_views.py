@@ -97,15 +97,16 @@ def enter_judge(request):
             try:
                 form.save()
             except ValueError:
-                return render_to_response('error.html', 
+                return render_to_response('error.html',
                                          {'error_type': "Judge",
                                           'error_name': "["+cd['name']+"]",
-                                          'error_info':"Judge Cannot Validate!"}, 
+                                          'error_info': "Judge Cannot Validate!"},
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
+            return render_to_response('thanks.html',
                                      {'data_type': "Judge",
                                       'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED" }, 
+                                      'data_modification': "CREATED",
+                                      'enter_again': True},
                                       context_instance=RequestContext(request))
     else:
         form = JudgeForm(first_entry=True)

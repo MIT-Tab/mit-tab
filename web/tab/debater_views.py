@@ -94,7 +94,8 @@ def enter_debater(request):
             return render_to_response('thanks.html', 
                                      {'data_type': "Debater",
                                       'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED" }, 
+                                      'data_modification': "CREATED",
+                                      'enter_again': True}, 
                                       context_instance=RequestContext(request))
     else:
         form = DebaterForm()
