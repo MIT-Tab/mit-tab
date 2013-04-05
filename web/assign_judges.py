@@ -100,10 +100,11 @@ def add_judges(pairings, judges, panel_points):
                 print "Failed to panel"
                 return {}
 
+
             rounds = sorted(potential_pairings,
                             key=lambda r: (argmin(r.judges.all(),
                                            lambda j: j.rank).rank,) + \
-                                           tab_logic.team_comp(r, current_round_number))
+                                           tuple([-1 * i for i in tab_logic.team_comp(r, current_round_number)]))
             base_judge = argmax(rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
             print "Found maximally ranked judge {0}".format(base_judge)
             potential_panelists = [j for j in all_judges if
