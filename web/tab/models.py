@@ -173,7 +173,7 @@ class Round(models.Model):
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
-        if self.chair not in self.judges.all():
+        if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
     def __unicode__(self):
