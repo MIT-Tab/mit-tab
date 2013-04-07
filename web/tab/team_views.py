@@ -241,9 +241,9 @@ def tab_card(request, team_id):
             dstat1,dstat2 = dstat1[0], dstat2[0]
         index = r.round_number-1
         round_stats[index][3] = " - ".join([j.name for j in r.judges.all()])
-        round_stats[index][4] = (float(dstat1.speaks),dstat1.ranks)
-        round_stats[index][5] = (float(dstat2.speaks),dstat2.ranks)
-        round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks), dstat1.ranks + dstat2.ranks)
+        round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
+        round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))
+        round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks), float(dstat1.ranks + dstat2.ranks))
 
         if r.gov_team == team:
             round_stats[index][2] = r.opp_team
