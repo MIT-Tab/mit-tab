@@ -278,9 +278,12 @@ def score_panel(result, discard_minority):
 
     # Rank by resulting average speaks
     ranked = sorted([score for score in final_scores],
-                    key = lambda x: x[2])
+                    key = lambda x: x[2], reverse=True)
     ranked = [(d, rl, s, r+1)
               for (r, (d, rl, s, _)) in enumerate(ranked)]
+
+    print "Ranked Debaters"
+    pprint.pprint(ranked)
 
     # Break any ties by taking the average of the tied ranks
     ties = {}
@@ -292,17 +295,21 @@ def score_panel(result, discard_minority):
         else:
             ties[d_score] = [(score_i, score[3])]
 
+    print "Ties"
+    pprint.pprint(ties)
+
     # Average over the tied ranks
     for k, v in ties.iteritems():
         if len(v) > 1:
             tied_ranks = [x[1] for x in v]
             avg = sum(tied_ranks) / float(len(tied_ranks))
             for i, _ in v:
-                fs = final_scores[i]
-                final_scores[i] = (fs[0], fs[1], fs[2], avg)
-    pprint.pprint(final_scores)
+                fs = ranked[i]
+                ranked[i] = (fs[0], fs[1], fs[2], avg)
+    print "Final scores"
+    pprint.pprint(ranked)
 
-    return final_scores, final_winner
+    return ranked, final_winner
 
 
 
