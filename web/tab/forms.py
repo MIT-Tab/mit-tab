@@ -278,7 +278,10 @@ def score_panel(result, discard_minority):
 
     # Rank by resulting average speaks
     ranked = sorted([score for score in final_scores],
-                    key = lambda x: x[2], reverse=True)
+                    key = lambda x: Decimal(x[3]).quantize(Decimal('1.00')))
+    ranked = sorted([score for score in ranked],
+                    key = lambda x: Decimal(x[2]).quantize(Decimal('1.00')), reverse=True)
+
     ranked = [(d, rl, s, r+1)
               for (r, (d, rl, s, _)) in enumerate(ranked)]
 
@@ -290,10 +293,12 @@ def score_panel(result, discard_minority):
     for (score_i, score) in enumerate(ranked):
         # For floating point roundoff errors
         d_score = Decimal(score[2]).quantize(Decimal('1.00'))
-        if d_score in ties:
-            ties[d_score].append((score_i, score[3]))
+        d_rank = Decimal(score[3]).quantize(Decimal('1.00'))
+        tie_key = (d_score, d_rank)
+        if tie_key in ties:
+            ties[tie_key].append((score_i, score[3]))
         else:
-            ties[d_score] = [(score_i, score[3])]
+            ties[tie_key] = [(score_i, score[3])]
 
     print "Ties"
     pprint.pprint(ties)
