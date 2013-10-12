@@ -784,6 +784,7 @@ def avg_deb_ranks(d):
                     pass
                 else:
                     temp_rank+=[r.ranks]
+            temp_rank = [float(i) for i in temp_rank]
         if len(temp_rank) != 0:
             tot_rank += float(sum(temp_rank))/float(len(temp_rank))
 
@@ -840,7 +841,8 @@ def tot_ranks_deb(d, average=True):
                 elif won_by_forfeit(r.round,t):
                     pass
                 else:
-                    temp_rank+=[r.ranks]
+                    temp_rank += [r.ranks]
+        temp_rank = [float(i) for i in temp_rank]
         if len(temp_rank) != 0:
             if average:
                 tot_rank += float(sum(temp_rank))/float(len(temp_rank))

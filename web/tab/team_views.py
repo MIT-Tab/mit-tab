@@ -327,6 +327,7 @@ def rank_teams_ajax(request):
 def rank_teams(request):
     print "starting rankings: ", datetime.now()
     ranked_teams = tab_logic.rank_teams()
+    print "Got ranked teams"
     teams = [(team,
               tab_logic.tot_wins(team),
               tab_logic.tot_speaks(team),
@@ -341,6 +342,7 @@ def rank_teams(request):
                   tab_logic.tot_ranks(team))
                   for team in ranked_novice_teams]
 
+    print "Got ranked novice teams"
     return render_to_response('rank_teams_component.html',
                              {'varsity': teams,
                               'novice': nov_teams,
