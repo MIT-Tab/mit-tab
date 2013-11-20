@@ -7,7 +7,7 @@ permissions to this directory.
     git clone https://github.com/jolynch/mit-tab.git tab
     chown -R root:www-data tab
     cd tab
-    chmod 770 web
+    chmod 770 mittab
 2) Copy the provided "tab" configuration to the sites-available directory
 in your apache configuration directory. E.G. /etc/apache2
 3) Modify the tab configuration to suit your system.  In general this
