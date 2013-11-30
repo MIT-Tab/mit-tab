@@ -2,6 +2,7 @@ MIT-TAB
 =======
 A web application that allows APDA american debate tournaments to correctly tab
 and manage their tournaments. You add the following information:
+
 1. Schools
 2. Debaters
 3. Teams
@@ -10,6 +11,7 @@ and manage their tournaments. You add the following information:
 
 Then you can use this program to actually run your tournament, which means for
 each round you:
+
 1. Pair the round
 2. Assign judges to the round
 3. Let the debaters debate
