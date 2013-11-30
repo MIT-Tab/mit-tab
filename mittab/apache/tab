@@ -2,9 +2,9 @@
 	ServerName <SERVER NAME>
 	ServerAdmin <ADMIN NAME>
 	
-	DocumentRoot /var/www/tab/web
+	DocumentRoot /var/www/tab/mittab
 	Alias /static/admin/ /usr/local/lib/python2.7/dist-packages/django/contrib/admin/static/
-	Alias /static/ /var/www/tab/web/static/
+	Alias /static/ /var/www/tab/mittab/static/
 	<Directory /usr/local/lib/python2.7/dist-packages/django/contrib/admin/media>
 		AllowOverride None
 		Options None
@@ -12,16 +12,16 @@
 		Allow from all
 	</Directory>
 
-	<Directory /var/www/tab/web>
+	<Directory /var/www/tab/mittab>
 		Order allow,deny
 		allow from all
 	</Directory>
 
-	WSGIScriptAlias / /var/www/tab/web/apache/django.wsgi
-	<Directory /var/www/tab/web/apache>
+	WSGIScriptAlias / /var/www/tab/mittab/apache/django.wsgi
+	<Directory /var/www/tab/mittab/apache>
 		Order deny,allow
 		Allow from all
-	</Directory>	
+	</Directory>
 
 	ErrorLog ${APACHE_LOG_DIR}/error.log
 
