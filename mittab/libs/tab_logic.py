@@ -20,7 +20,7 @@
 
 #Always sort so that top team is at the beginning of the list - use reverse!
 
-from tab.models import *
+from mittab.apps.tab.models import *
 from django.db.models import *
 
 import random
@@ -28,7 +28,6 @@ import pairing_alg
 import assign_judges
 import errors
 from decimal import *
-import send_texts
 from datetime import datetime
 import pprint
 import itertools

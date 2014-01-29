@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import permission_required
 from forms import SchoolForm, RoomForm
 from django.db import models
 from models import *
-from tab_logic import TabFlags
+from mittab.libs.tab_logic import TabFlags
 
 def index(request):
     number_teams = Team.objects.count()

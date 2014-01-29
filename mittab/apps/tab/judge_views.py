@@ -7,7 +7,7 @@ from forms import JudgeForm, ScratchForm
 from models import *
 from django.db import models
 from errors import *
-from tab_logic import TabFlags
+from mittab.libs.tab_logic import TabFlags
 
 
 def view_judges(request):

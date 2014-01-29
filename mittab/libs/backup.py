@@ -1,4 +1,4 @@
-from tab.models import *
+from mittab.apps.tab.models import *
 from django.conf import settings
 from django.core.servers.basehttp import FileWrapper
 

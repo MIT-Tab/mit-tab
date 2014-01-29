@@ -7,7 +7,7 @@ from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
 import tab_logic
-from tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.apps.tab.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 from datetime import datetime
 
 def view_teams(request):

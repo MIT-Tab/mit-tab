@@ -1,5 +1,7 @@
 .PHONY: all production web cmd test tests clean
 
+export DJANGO_SETTINGS_MODULE := mittab.settings
+
 all: production
 
 production:

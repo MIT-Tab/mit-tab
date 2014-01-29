@@ -19,7 +19,7 @@
 #THE SOFTWARE.
 
 from django.db import models
-from django.contrib.localflavor.us.models import PhoneNumberField
+from localflavor.us.models import PhoneNumberField
 from django.core.exceptions import ValidationError
 
 ###NOTE All fields automatically have a id key created that act as primary keys
@@ -34,7 +34,7 @@ class School(models.Model):
     name = models.CharField(max_length=50, unique = True)
     def __unicode__(self):
         return self.name
-    
+
     def delete(self):
         team_check = Team.objects.filter(school=self)
         judge_check = Judge.objects.filter(schools=self)
@@ -42,7 +42,7 @@ class School(models.Model):
             super(School, self).delete()
         else:
             raise Exception("School in use: [teams => %s,judges => %s]" % ([t.name for t in team_check], [j.name for j in judge_check]))
-            
+
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique = True)
     #team_set is created by Team in the ManyToMany

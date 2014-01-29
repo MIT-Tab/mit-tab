@@ -19,7 +19,7 @@
 #THE SOFTWARE.
 
 import tab_logic
-from tab.models import *
+from mittab.apps.tab.models import *
 import mwmatching
 import random
 import errors

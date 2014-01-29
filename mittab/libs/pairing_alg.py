@@ -19,97 +19,9 @@
 #THE SOFTWARE.
 
 import tab_logic
-from tab.models import *
+from mittab.apps.tab.models import *
 import mwmatching
 import random
-                
-#take in list of teams
-#return pairing as list of [gov_team, opp_team]
-
-
-#DOES NOT WORK
-def approx_pairing(list_of_teams):
-    
-    #print list_of_teams[bracket]
-    team_ideal = []
-    for i in range(len(list_of_teams[bracket])/2):
-                #print "i = " + str(i)
-                #print list_of_teams[bracket][len(list_of_teams[bracket])-1-i].seed
-                #print list_of_teams[bracket][i].seed
-
-                #teamIdeal is (rank, team, speak/seed of ideal team to hit)
-
-        team_ideal +=[(i, list_of_teams[bracket][i], tot_speaks(list_of_teams[bracket][len(list_of_teams[bracket])-1-i]))]
-        team_ideal +=[(len(list_of_teams[bracket])-1-i, list_of_teams[bracket][len(list_of_teams[bracket])-1-i], tot_speaks(list_of_teams[bracket][i]))]
-            #now_rounds[bracket] = list_of_teams[bracket]
-        now_rounds[bracket] = team_ideal
-
-#Works for up to about ten teams
-def exhaustive_pairing(list_of_teams):
-    #list of all possible pairings
-    all_pairs = pair_exhaustively(list_of_teams, [], [])
-    #print all_pairs
-    #now check weight and choose best
-    min_weight = None
-    opt_pairing = None
-    for pairing in all_pairs:
-        #print pairing
-        if len(pairing) == 2:
-            weight = 0
-            for pair in pairing:
-                indexA = list_of_teams.index(pair[0])
-                indexB = list_of_teams.index(pair[1])
-                pairA_opt = list_of_teams[len(list_of_teams)-indexA-1]
-                pairB_opt = list_of_teams[len(list_of_teams)-indexB-1]
-                weight += calc_weight(pair[0],pair[1],pairA_opt, pairB_opt)
-            if min_weight == None:
-                min_weight = weight
-                opt_pairing = pairing
-            else:
-                if weight < min_weight:
-                    min_weight = weight
-                    opt_pairing = pairing
-        else:
-            weight=0 #right now, don't calculate by in weight. Should change)
-    #print opt_pairing
-    return opt_pairing
-        
-
-   
-
-
-#will return all possible pairings    
-def pair_exhaustively(list_of_teams, cur_pairing, all_pairs):
-    #print 
-    #print "list_of_teams" + str(list_of_teams)
-    #print "cur_pairing" + str(cur_pairing)
-    if len(list_of_teams) == 0: #no more teams left to pair
-        all_pairs +=[cur_pairing]
-        cur_pairing = []
-     #   print "all_pairs" + str(all_pairs)
-    else:
-        if len(list_of_teams)/2 != len(list_of_teams)/2.0 and cur_pairing == []:
-            for t in list_of_teams:
-                bye = t
-                temp_teams = []
-                for tmp in list_of_teams:
-                    if tmp != bye:
-                        temp_teams+=[tmp]
-                pair_exhaustively(temp_teams,cur_pairing+[[bye]],all_pairs)
-        for i in range(len(list_of_teams)):
-       #     print i
-            if i!=0:
-       #         print "cur_pairing" + str(cur_pairing)
-                teams = []
-                for t in list_of_teams:
-                    teams +=[t]
-                teams.remove(list_of_teams[i])
-                teams.remove(list_of_teams[0])
-         #       print "teams" + str(teams)
-          #      print "cur_pair" + str(cur_pairing)
-           #     print "all_pairs" + str(all_pairs)
-                pair_exhaustively(teams, cur_pairing+[[list_of_teams[0],list_of_teams[i]]], all_pairs)
-    return determine_gov_opp(all_pairs)
 
 def perfect_pairing(list_of_teams):
      #assign weights to edges:
@@ -123,9 +35,6 @@ def perfect_pairing(list_of_teams):
                 wt = calc_weight(list_of_teams[i], list_of_teams[j],i, j, list_of_teams[len(list_of_teams)-i-1], list_of_teams[len(list_of_teams)-j-1], len(list_of_teams)-i-1, len(list_of_teams)-j-1)
                 #now add edge to graph
                 graph_edges +=[(i,j,wt)]
-    #print "graph_edges"
-    #print graph_edges
-             
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
     #print "Pairing numbers"
     #print pairings_num
@@ -139,13 +48,9 @@ def perfect_pairing(list_of_teams):
     #print all_pairs
     return determine_gov_opp(all_pairs)
 
-
-
-
 #Determine the weight of the pairing between teamA and teamB, i.e. how bad it is
 #teamA_opt is the optimal team for teamA to be paired with
 #teamB_opt is the optimal team for teamB to be paired with
-             
 def calc_weight(team_a,
                 team_b,
                 team_a_ind,
