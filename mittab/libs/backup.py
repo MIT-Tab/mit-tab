@@ -6,26 +6,6 @@ import shutil
 import time
 import os
 
-#AWS related stuff, mostly just a namespace so we don't allow unintential access to this
-class AWSBackup:
-    awskeyfile = settings.AWS_KEYFILE
-    key,secret = None,None
-    try:
-        from boto.s3.connection import S3Connection       
-        from boto.s3.key import Key as Key
-        with open(awskeyfile) as f:
-            key = f.readline().strip()
-            secret = f.readline().strip()
-        conn = S3Connection(key,secret)
-    except Exception as e:
-        print "Caught exception while setting up AWS: ", e
-        print "[ERROR] Could not set up AWS connection.  Perhaps boto is not installed or you do not have the AWS_KEYFILE setting."
-        key, secret = None, None
-    if key and secret:
-        use_aws = True
-    else:
-        use_aws = False
-
 def backup_round(dst_filename = None, round_number = None, btime = None):
     if round_number is None:
         round_number = TabSettings.objects.get(key="cur_round").value

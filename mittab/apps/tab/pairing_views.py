@@ -7,14 +7,13 @@ from errors import *
 from models import *
 from django.shortcuts import redirect
 from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel
-import cache_logic
-import tab_logic
-import assign_judges
+import mittab.libs.cache_logic
+import mittab.libs.tab_logic
+import mittab.libs.assign_judges
 import random
 import sys
 import traceback
-import send_texts as texting
-import backup
+import mittab.libs.backup
 import time
 import datetime
 import os
@@ -385,26 +384,6 @@ def remove_judge(request, round_id, judge_id):
     data = simplejson.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
-
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
-def send_texts(request):
-    try:
-        print "#"*80
-        print "Sending Texts"   
-        print "#"*80
-        texting.text()
-        print "done sending "
-        print "#"*80
-    except:
-        traceback.print_exc(file=sys.stdout)
-        return render_to_response('error.html',
-                                 {'error_type': "Texting",'error_name': "Texts",
-                                  'error_info': "Could not send texts. Sorry."},
-                                  context_instance=RequestContext(request))
-    return render_to_response('thanks.html',
-                             {'data_type': "Texting",
-                              'data_name': "Texts"},
-                               context_instance=RequestContext(request))
 
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""

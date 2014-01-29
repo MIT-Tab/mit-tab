@@ -74,7 +74,6 @@ urlpatterns = patterns('',
     #All pairing related pages
     url(r'^pairings/status/$', pairing_views.view_status),
     url(r'^pairings/view_rounds/$', pairing_views.view_rounds),
-    url(r'^pairings/send_texts/$', pairing_views.send_texts),
     url(r'^round/(\d+)/$', pairing_views.view_round),
     url(r'^round/(\d+)/result/$', pairing_views.enter_result),
     url(r'^round/(\d+)/result/(\d+)/$', pairing_views.enter_multiple_results),
