@@ -7,13 +7,13 @@ from errors import *
 from models import *
 from django.shortcuts import redirect
 from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel
-import mittab.libs.cache_logic
-import mittab.libs.tab_logic
-import mittab.libs.assign_judges
+import mittab.libs.cache_logic as cache_logic
+import mittab.libs.tab_logic as tab_logic
+import mittab.libs.assign_judges as assign_judges
 import random
 import sys
 import traceback
-import mittab.libs.backup
+import mittab.libs.backup as backup
 import time
 import datetime
 import os

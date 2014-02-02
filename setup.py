@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='mittab',
-    version='0.1.0',
+    version='0.2.0',
     description='A web application to tabulate and run APDA tournaments',
     author='Joseph Lynch',
     author_email='jolynch@mit.edu',

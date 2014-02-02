@@ -33,7 +33,6 @@ import pprint
 import itertools
 
 from cache_logic import cache
-from functools import cmp_to_key    
 
 #will return false if not ready to pair yet
 def pair_round():
@@ -725,7 +724,7 @@ def team_score(team):
                  -double_adjusted_speaks(team),
                   double_adjusted_ranks(team),
                  -opp_strength(team))
-    except Exception as e:
+    except Exception:
         print "Could not calculate team score for {}".format(team)
     return score
 
@@ -974,7 +973,7 @@ def double_adjusted_speaks_deb(d):
     t = deb_team(d)
     double_adj_speaks += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
     return double_adj_speaks
-                            
+
 @cache()
 def double_adjusted_ranks_deb(d):
     t = deb_team(d)
@@ -982,7 +981,6 @@ def double_adjusted_ranks_deb(d):
         return tot_ranks_deb(d)
     elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
         return avg_deb_ranks(d)*(TabSettings.objects.get(key = "cur_round").value-4)
-    
     if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
         num_rounds = TabSettings.objects.get(key = "tot_rounds").value
     else:
@@ -1027,7 +1025,7 @@ def double_adjusted_ranks_deb(d):
     t = deb_team(d)
     double_adj_ranks += avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
     return double_adj_ranks
-                      
+
 def deb_team(d):
     try:
         return d.team_set.all()[0]
@@ -1044,7 +1042,7 @@ def debater_score(debater):
                   single_adjusted_ranks_deb(debater),
                  -double_adjusted_speaks_deb(debater),
                   double_adjusted_ranks_deb(debater))
-    except Exception as e:
+    except Exception:
         print "Could not calculate debater score for {}".format(debater)
     print "finished scoring {}".format(debater)
     return score

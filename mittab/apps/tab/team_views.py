@@ -2,11 +2,11 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from django.utils import simplejson
+import json
 from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
-import mittab.libs.tab_logic
+import mittab.libs.tab_logic as tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 from datetime import datetime
 
@@ -362,7 +362,7 @@ def team_stats(request, team_id):
         data = {'success': True, 'result':stats}
     except Team.DoesNotExist:
         data = {'success': False}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 
