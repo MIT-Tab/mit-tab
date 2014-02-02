@@ -1,28 +1,8 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
-
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
-
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
-
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
-#Always sort so that top team is at the beginning of the list - use reverse!
-
+import traceback
 from mittab.apps.tab.models import *
 from django.db.models import *
 
+from collections import defaultdict
 import random
 import pairing_alg
 import assign_judges
@@ -855,182 +835,160 @@ def tot_ranks_deb(d, average=True):
         
     return tot_rank
 
+""" Debater Speaks Calculations """
+
+def debater_forfeit_speaks(debater):
+    """ Calculate a debater's speaks for a forfeit round
+
+    Note that right now we just return 0, but we may want to add support
+    for returning average speaks or some such
+    """
+    return 0.0
+
 @cache()
-def single_adjusted_speaks_deb(debater):
+def speaks_for_debater(debater):
+    """Returns a list of speaks for the provided debater
+
+    In most normal rounds the speaks of the debater are the speaks the judge
+    gave them, but there are some special circumstances.
+
+    Forfeits:
+    If a debater won by forfeit, they get their average speaks
+    If a debater lost by forfeit, they get speaks of 0
+    If a debater was Noshow for a round, they get speaks of 0
+
+    Iron Mans:
+    If a debater is an iron man for a round, they get the average of their
+    speaks for that round
+    """
     team = deb_team(debater)
-    current_round = TabSettings.objects.get(key="cur_round").value
-    total_rounds = TabSettings.objects.get(key="tot_rounds").value
-    if current_round < 3:
-        return tot_speaks_deb(debater)
-    elif current_round - (num_byes(team) + num_forfeit_wins(team) + num_no_show(team)) < 3 :
-        return avg_deb_speaks(debater)*(current_round-2)
+    # We start counting at 1, so when cur_round says 6 that means that we are
+    # in round 5 and should have 5 speaks
+    num_speaks = TabSettings.objects.get(key="cur_round").value - 1
 
-    if current_round > total_rounds:
-        num_rounds = total_rounds
-    else:
-        num_rounds = current_round
-    list_of_speaks = []
-    for i in range(num_rounds):
-        list_of_speaks += [[None]]
-    deb_stats = debater.roundstats_set.all()
-    for r in deb_stats:
-        if list_of_speaks[r.round.round_number-1] == [None]:
-            list_of_speaks[r.round.round_number-1] = [r.speaks]
+    debater_roundstats = debater.roundstats_set.all()
+    debater_speaks = []
+
+    speaks_per_round = defaultdict(list)
+    # We might have multiple roundstats per round if we have iron men, so first
+    # group by round number
+    for roundstat in debater_roundstats:
+        speaks_per_round[roundstat.round.round_number].append(roundstat)
+
+    for _, roundstats in speaks_per_round.iteritems():
+        speaks = sum(float(rs.speaks) for rs in roundstats)
+        speaks = speaks / float(len(roundstats))
+        roundstat = roundstats[0]
+        if won_by_forfeit(roundstat.round, team):
+            debater_speaks.append(avg_deb_speaks(debater))
+        elif forfeited_round(roundstat.round, team):
+            debater_speaks.append(debater_forfeit_speaks(debater))
         else:
-            list_of_speaks[r.round.round_number-1] += [r.speaks]
-    while [None] in list_of_speaks:
-        list_of_speaks.remove([None])
-    for i in range(len(list_of_speaks)):
-        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(list_of_speaks[i]))
-        
-    list_of_speaks.sort()
-    list_of_speaks=list_of_speaks[1:-1]
-    sing_adj_speaks = sum(list_of_speaks)
-    sing_adj_speaks += avg_deb_speaks(debater)*(num_byes(team)+num_forfeit_wins(team))
-    return sing_adj_speaks
-                            
-@cache()
-def single_adjusted_ranks_deb(d):
-    t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 3:
-        return tot_ranks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 3 :
-        return avg_deb_ranks(d)*(TabSettings.objects.get(key = "cur_round").value-2)
-    
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
-        num_rounds = TabSettings.objects.get(key = "tot_rounds").value
-    else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
-    list_of_ranks = []
-    for i in range(num_rounds):
-        list_of_ranks += [[None]]
-        
-    deb_stats = RoundStats.objects.filter(debater = d)
-    for r in deb_stats:
-        if list_of_ranks[r.round.round_number-1] == [None]:
-            if won_by_forfeit(r.round, t):
-                pass
-            elif forfeited_round(r.round,t):
-                list_of_ranks[r.round.round_number-1] = [3.5]
-            else:
-                list_of_ranks[r.round.round_number-1] = [r.ranks]
-        else:
-            if won_by_forfeit(r.round, t):
-                pass
-            elif forfeited_round(r.round,t):
-                list_of_ranks[r.round.round_number-1] += [3.5]
-            else:
-                list_of_ranks[r.round.round_number-1] +=[r.ranks]
-    while [None] in list_of_ranks:
-        list_of_ranks.remove([None])
-    for i in range(len(list_of_ranks)):
-        list_of_ranks[i] = float(sum(list_of_ranks[i]))/float(len(list_of_ranks[i]))
-        
-    for n in list(NoShow.objects.filter(no_show_team=t)):
-        list_of_ranks.append(3.5)
-        
-    list_of_ranks.sort()
-    list_of_ranks=list_of_ranks[1:-1]
-    sing_adj_ranks = 0
-    for s in list_of_ranks:
-        sing_adj_ranks+=s
-    t = deb_team(d)
-    avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
-    return sing_adj_ranks
+            debater_speaks.append(speaks)
+
+    # Add in NoShow rounds as forfeit loss speaks
+    noshow_speaks = [debater_forfeit_speaks(debater)] * num_no_show(team)
+    debater_speaks.extend(noshow_speaks)
+
+    # Ensure we have num_speaks speaks, cutting off NoShows if we need to, which
+    # can happen because people repair rounds
+    # TODO(jolynch): Turn this into an assert once we have fixed the logic in
+    # repairing
+    debater_speaks = debater_speaks[:num_speaks]
+    debater_speaks = map(float, debater_speaks)
+
+    return debater_speaks
+
+def single_adjusted_speaks_deb(debater):
+    debater_speaks = speaks_for_debater(debater)
+    debater_speaks.sort()
+    return sum(debater_speaks[1:-1])
+
+def double_adjusted_speaks_deb(debater):
+    debater_speaks = speaks_for_debater(debater)
+    debater_speaks.sort()
+    return sum(debater_speaks[2:-2])
+
+
+""" Deabter Rank Calculations """
+def debater_forfeit_ranks(debater):
+    """ Calculate a debater's ranks for a forfeit round
+
+    Note that right now we just return 3.5 (average of 3 and 4), but we may
+    want to support returning average ranks or some such
+    """
+    return 3.5
 
 @cache()
-def double_adjusted_speaks_deb(d):
-    t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 5:
-        return tot_speaks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
-        return avg_deb_speaks(d)*(TabSettings.objects.get(key = "cur_round").value-4)
-    
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
-        num_rounds = TabSettings.objects.get(key = "tot_rounds").value
-    else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
-    list_of_speaks = []
-    for i in range(num_rounds):
-        list_of_speaks += [[None]]
-    deb_stats = RoundStats.objects.filter(debater = d)
-    for r in deb_stats:
-        if list_of_speaks[r.round.round_number-1] == [None]:
-            list_of_speaks[r.round.round_number-1] = [r.speaks]
+def ranks_for_debater(debater):
+    """Returns a list of ranks for the provided debater
+
+    In most normal rounds the ranks of the debater are the ranks the judge gave
+    them, but there are some special circumstances.
+
+    Forfeits:
+    If a debater won by forfeit, they get their average ranks
+    If a debater lost by forfeit, they get ranks of 3.5
+    If a debater was Noshow for a round, they get ranks of 3.5
+
+    Iron Mans:
+    If a debater is an iron man for a round, they get the average of their
+    ranks for that round
+    """
+    team = deb_team(debater)
+    # We start counting at 1, so when cur_round says 6 that means that we are
+    # in round 5 and should have 5 ranks
+    num_ranks = TabSettings.objects.get(key="cur_round").value - 1
+
+    debater_roundstats = debater.roundstats_set.all()
+    debater_ranks = []
+
+    ranks_per_round = defaultdict(list)
+    # We might have multiple roundstats per round if we have iron men, so first
+    # group by round number
+    for roundstat in debater_roundstats:
+        ranks_per_round[roundstat.round.round_number].append(roundstat)
+
+    for _, roundstats in ranks_per_round.iteritems():
+        ranks = sum(float(rs.ranks) for rs in roundstats)
+        ranks = ranks / float(len(roundstats))
+        roundstat = roundstats[0]
+        if won_by_forfeit(roundstat.round, team):
+            debater_ranks.append(avg_deb_ranks(debater))
+        elif forfeited_round(roundstat.round, team):
+            debater_ranks.append(debater_forfeit_ranks(debater))
         else:
-            list_of_speaks[r.round.round_number-1] += [r.speaks]
-    while [None] in list_of_speaks:
-        list_of_speaks.remove([None])
-    for i in range(len(list_of_speaks)):
-        list_of_speaks[i] = float(sum(list_of_speaks[i]))/float(len(list_of_speaks[i]))
+            debater_ranks.append(ranks)
 
+    # Add in NoShow rounds as forfeit loss ranks
+    noshow_ranks = [debater_forfeit_ranks(debater)] * num_no_show(team)
+    debater_ranks.extend(noshow_ranks)
 
-    list_of_speaks.sort()
-    list_of_speaks=list_of_speaks[2:-2]
-    double_adj_speaks = 0
-    for s in list_of_speaks:
-        double_adj_speaks+=s
-    t = deb_team(d)
-    double_adj_speaks += avg_deb_speaks(d)*(num_byes(t)+num_forfeit_wins(t))
-    return double_adj_speaks
+    # Ensure we have num_ranks ranks, cutting off NoShows if we need to, which
+    # can happen because people repair rounds
+    # TODO(jolynch): Turn this into an assert once we have fixed the logic in
+    # repairing
+    debater_ranks = debater_ranks[:num_ranks]
+    debater_ranks = map(float, debater_ranks)
 
-@cache()
-def double_adjusted_ranks_deb(d):
-    t = deb_team(d)
-    if TabSettings.objects.get(key = "cur_round").value < 5:
-        return tot_ranks_deb(d)
-    elif TabSettings.objects.get(key = "cur_round").value-(num_byes(t)+num_forfeit_wins(t)+num_no_show(t)) < 5:
-        return avg_deb_ranks(d)*(TabSettings.objects.get(key = "cur_round").value-4)
-    if TabSettings.objects.get(key = "cur_round").value > TabSettings.objects.get(key = "tot_rounds").value:
-        num_rounds = TabSettings.objects.get(key = "tot_rounds").value
-    else:
-        num_rounds = TabSettings.objects.get(key = "cur_round").value
-    list_of_ranks = []
-    for i in range(num_rounds):
-        list_of_ranks += [[None]]
-    deb_stats = d.roundstats_set.all()
-    for r in deb_stats:
-        #print d
-        #print list_of_ranks
-        #print list_of_ranks[r.round.round_number-1]
-        if list_of_ranks[r.round.round_number-1] == [None]:
-            #print "in None"
-            if won_by_forfeit(r.round, t):
-                pass
-            elif forfeited_round(r.round,t):
-                list_of_ranks[r.round.round_number-1] = [3.5]
-            else:
-                list_of_ranks[r.round.round_number-1] = [r.ranks]
-        else:
-            #print "list_of_ranks of " + str(d)
-            #print list_of_ranks
-            if won_by_forfeit(r.round, t):
-                pass
-            elif forfeited_round(r.round,t):
-                list_of_ranks[r.round.round_number-1] += [3.5]
-            else:
-                list_of_ranks[r.round.round_number-1] += [r.ranks]
-    while [None] in list_of_ranks:
-        list_of_ranks.remove([None])
-    for i in range(len(list_of_ranks)):
-        list_of_ranks[i] = float(sum(list_of_ranks[i]))/float(len(list_of_ranks[i]))
+    return debater_ranks
 
-    for n in list(NoShow.objects.filter(no_show_team=t)):
-        list_of_ranks[n.round_number-1] = 3.5
-    list_of_ranks.sort()
-    list_of_ranks=list_of_ranks[2:-2]
-    double_adj_ranks = 0
-    for s in list_of_ranks:
-        double_adj_ranks+=s
-    t = deb_team(d)
-    double_adj_ranks += avg_deb_ranks(d)*(num_byes(t)+num_forfeit_wins(t))
-    return double_adj_ranks
+def single_adjusted_ranks_deb(debater):
+    debater_ranks = ranks_for_debater(debater)
+    debater_ranks.sort()
+    return sum(debater_ranks[1:-1])
+
+def double_adjusted_ranks_deb(debater):
+    debater_ranks = ranks_for_debater(debater)
+    debater_ranks.sort()
+    return sum(debater_ranks[2:-2])
 
 def deb_team(d):
     try:
         return d.team_set.all()[0]
     except:
         return None
+
 # Returns a tuple used for comparing two debaters 
 # in terms of their overall standing in the tournament
 def debater_score(debater):
@@ -1042,7 +1000,9 @@ def debater_score(debater):
                   single_adjusted_ranks_deb(debater),
                  -double_adjusted_speaks_deb(debater),
                   double_adjusted_ranks_deb(debater))
-    except Exception:
+    except Exception as e:
+        print "Wtf"
+        traceback.print_exc()
         print "Could not calculate debater score for {}".format(debater)
     print "finished scoring {}".format(debater)
     return score
