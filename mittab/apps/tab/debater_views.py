@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import permission_required
 from forms import DebaterForm
 from errors import *
 from models import *
-import mittab.libs.tab_logic
+import mittab.libs.tab_logic as tab_logic
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples

@@ -8,12 +8,15 @@ production:
 	@true
 
 web:
-	python mittab/manage.py runserver
+	python manage.py runserver
 
 tests: test
 
 test:
-	python -m pytest tests
+	python -m pytest mittab
+
+shell:
+	python manage.py shell
 
 clean:
 	find . -name '*.pyc' -delete
