@@ -31,7 +31,7 @@
             <tr><th>Round #</th><th>Speaks</th><th>Ranks</th></tr>
             {% for round in debater_rounds %}
             <tr>
-                <td><a href='/round/{{ round.round.id }}/result/'>Round {{forloop.counter}}</a></td>
+              <td><a href='/round/{{ round.round.id }}/result/'>Round {{ round.round.round_number }}</a></td>
                 <td>{{round.speaks}}</td>
                 <td>{{round.ranks}}</td>
             </tr>

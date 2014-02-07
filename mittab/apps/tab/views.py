@@ -200,27 +200,27 @@ def enter_room(request):
         form = RoomForm()
     return render_to_response('data_entry.html',
                              {'form': form, 'title': 'Create Room'},
-                             context_instance=RequestContext(request))    
-    
-@permission_required('tab.room.can_delete', login_url="/403/")    
+                             context_instance=RequestContext(request))
+
+@permission_required('tab.room.can_delete', login_url="/403/")
 def delete_room(request, room_id):
     school_id = int(room_id)
     try :
         r = Room.objects.get(pk=room_id)
         r.delete()
     except Room.DoesNotExist:
-        return render_to_response('error.html', 
+        return render_to_response('error.html',
                                  {'error_type': "Delete Room",
                                   'error_name': str(room_id),
                                   'error_info':"This room does not exist, please try again with a valid id. "}, 
                                   context_instance=RequestContext(request))
-    return render_to_response('thanks.html', 
+    return render_to_response('thanks.html',
                              {'data_type': "Room",
                               'data_name': "["+str(room_id)+"]",
-                              'data_modification': 'DELETED'}, 
+                              'data_modification': 'DELETED'},
                               context_instance=RequestContext(request))
 
-@permission_required('tab.scratch.can_delete', login_url="/403/")                                  
+@permission_required('tab.scratch.can_delete', login_url="/403/")
 def delete_scratch(request, item_id, scratch_id):
     try:
         scratch_id = int(scratch_id)
@@ -239,7 +239,7 @@ def delete_scratch(request, item_id, scratch_id):
                               context_instance=RequestContext(request))
 
 def view_scratches(request):
-    #Get a list of (id,school_name) tuples
+    # Get a list of (id,school_name) tuples
     c_scratches = [(s.team.pk, str(s)) for s in Scratch.objects.all()]
     return render_to_response('list_data.html', 
                              {'item_type':'team',

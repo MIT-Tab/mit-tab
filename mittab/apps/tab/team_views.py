@@ -217,7 +217,8 @@ def tab_card(request, team_id):
                                   'error_info':"I require INTEGERS!"}, 
                                   context_instance=RequestContext(request))
     team = Team.objects.get(pk=team_id)
-    rounds = [r for r in Round.objects.filter(gov_team=team)] + [r for r in Round.objects.filter(opp_team=team)]
+    rounds = ([r for r in Round.objects.filter(gov_team=team)] +
+              [r for r in Round.objects.filter(opp_team=team)])
     rounds.sort(key =lambda x: x.round_number)
     roundstats = [RoundStats.objects.filter(round=r) for r in rounds]
     debaters = [d for d in team.debaters.all()]
@@ -232,15 +233,19 @@ def tab_card(request, team_id):
     for r in rounds:
         dstat1 = [k for k in RoundStats.objects.filter(debater=d1).filter(round=r).all()]
         dstat2 = [k for k in RoundStats.objects.filter(debater=d2).filter(round=r).all()]
+        blank_rs = RoundStats(debater=d1, round=r, speaks=0, ranks=0)
+        while len(dstat1) + len(dstat2) < 2:
+            # Something is wrong with our data, but we don't want to crash
+            dstat1.append(blank_rs)
         if not dstat2 and not dstat1:
             break
         if not dstat2:
             dstat1,dstat2 = dstat1[0], dstat1[1]
         elif not dstat1:
             dstat1,dstat2 = dstat2[0], dstat2[1]
-        else: 
+        else:
             dstat1,dstat2 = dstat1[0], dstat2[0]
-        index = r.round_number-1
+        index = r.round_number - 1
         round_stats[index][3] = " - ".join([j.name for j in r.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
         round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))

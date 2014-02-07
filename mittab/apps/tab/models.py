@@ -191,7 +191,7 @@ class Bye(models.Model):
 
    def __unicode__(self):
       return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
-      
+
 class NoShow(models.Model):
    no_show_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
@@ -199,15 +199,14 @@ class NoShow(models.Model):
    def __unicode__(self):
       return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
 
-                 
 class RoundStats(models.Model):
     debater = models.ForeignKey(Debater)
     round = models.ForeignKey(Round)
-    #fewer digits?
+    # fewer digits?
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
     ranks = models.DecimalField(max_digits=6, decimal_places=4)
     debater_role = models.CharField(max_length=4, null=True)
-    
+
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
 

@@ -24,10 +24,10 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     try :
         src_judge = Judge.objects.get(id=int(src_judge))
         dest_judge = Judge.objects.get(id=int(dest_judge))
-        
+
         src_round = Round.objects.get(id=int(src_round))
         dest_round = Round.objects.get(id=int(dest_round))
-        
+
         dest_round.judge = src_judge
         src_round.judge = dest_judge
         dest_round.save()

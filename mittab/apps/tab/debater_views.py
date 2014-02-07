@@ -42,6 +42,7 @@ def view_debater(request, debater_id):
                                       context_instance=RequestContext(request))
     else:
         rounds = RoundStats.objects.filter(debater=debater)
+        rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
         form = DebaterForm(instance=debater)
         # Really only should be one, TODO: change to get when we have tests
         teams = Team.objects.filter(debaters = debater)
