@@ -208,13 +208,26 @@ def all_tab_cards(request):
                               locals(),
                               context_instance=RequestContext(request))
 
+def pretty_tab_card(request, team_id):
+    try:
+        team_id = int(team_id)
+    except:
+        return render_to_response('error.html',
+                                 {'error_type': "Tab Card",'error_name': "View",
+                                  'error_info': "Team id must be an integer!"},
+                                  context_instance=RequestContext(request))
+    team = Team.objects.get(pk=team_id)
+    return render_to_response('pretty_tab_card.html',
+                             {'team':team},
+                              context_instance=RequestContext(request))
+
 def tab_card(request, team_id):
     try:
         team_id = int(team_id)
     except ValueError:
-        return render_to_response('error.html', 
-                                 {'error_type': "Scratch",'error_name': "Delete",
-                                  'error_info':"I require INTEGERS!"}, 
+        return render_to_response('error.html',
+                                 {'error_type': "Tab Card",'error_name': "View",
+                                  'error_info': "Team id must be an integer!"},
                                   context_instance=RequestContext(request))
     team = Team.objects.get(pk=team_id)
     rounds = ([r for r in Round.objects.filter(gov_team=team)] +

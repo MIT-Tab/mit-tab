@@ -60,6 +60,7 @@ urlpatterns = patterns('',
     url(r'^enter_team/$', team_views.enter_team),
     url(r'^all_tab_cards/$', team_views.all_tab_cards),
     url(r'^team/card/(\d+)/$', team_views.tab_card),
+    url(r'^team/card/(\d+)/pretty/$', team_views.pretty_tab_card),
     url(r'^team/ranking/$', team_views.rank_teams_ajax),
     url(r'^team/rank/$', team_views.rank_teams),
 

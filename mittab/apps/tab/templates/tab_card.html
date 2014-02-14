@@ -34,8 +34,8 @@
 {% endfor %}
 <tr>
     <td colspan=5>Tournament Totals:</td>
-    <td>({{d1st}},{{d1rt}})</td>
-    <td>({{d2st}},{{d2rt}})</td>
-    <td>({{ts}},{{tr}})</td>
+    <td>({{ d1st|floatformat:2 }},{{ d1rt|floatformat:2 }})</td>
+    <td>({{ d2st|floatformat:2 }},{{ d2rt|floatformat:2 }})</td>
+    <td>({{ ts|floatformat:2 }},{{ tr|floatformat:2 }})</td>
 </tr>
 </table>

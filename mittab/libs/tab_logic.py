@@ -16,12 +16,12 @@ from cache_logic import cache
 
 #will return false if not ready to pair yet
 def pair_round():
-    """ 
+    """
     Pair the next round of debate.
     This function will do the following:
         1) Check that we can pair the round
         2) Check that we have scratches all judges from
-           teams of the same school, and if not add these 
+           teams of the same school, and if not add these
            scratches
         3) Record no-show teams
         4) Setup the list of teams by either seed or speaks
@@ -48,14 +48,14 @@ def pair_round():
     # For testing purposes
     random.seed(0xBEEF)
 
-    # add scratches for teams/judges from the same school 
+    # add scratches for teams/judges from the same school
     # NOTE that this only happens if they haven't already been added
     add_scratches_for_school_affil()
 
     list_of_teams = [None]*current_round
     all_pull_ups = []
 
-    #Record no-shows
+    # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for t in forfeit_teams:
         n = NoShow(no_show_team = t, round_number = current_round)
@@ -538,6 +538,10 @@ def rank_teams_except_record(teams):
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
 
+###################################
+""" Debater Speaks Calculations """
+###################################
+
 @cache()
 def avg_deb_speaks(debater):
     """ Computes the average debater speaks for the supplied debater
@@ -545,11 +549,12 @@ def avg_deb_speaks(debater):
     Generally this consistes of finding all the speaks we have, averaging iron
     men speaks, and then dividing by the length.
 
-    The only tricky part is making sure we handle forfeits correctly, namely
-    we want to count forfeit losses but not forfeit wins
+    This does not count forfeit losses or noshow's as 0 because lacking those
+    speaker points in the first place is penalty enough, and some tab policies
+    may want forfeits to count as average speaks.
     """
     real_speaks = []
-    current_round = TabSettings.objects.get(key = 'cur_round').value
+    num_speaks = TabSettings.objects.get(key = 'cur_round').value - 1
     debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
@@ -559,7 +564,7 @@ def avg_deb_speaks(debater):
     for roundstat in debater_roundstats:
         speaks_per_round[roundstat.round.round_number].append(roundstat)
 
-    for round_number in range(1, current_round + 1):
+    for round_number in range(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
             speaks = [float(rs.speaks) for rs in roundstats]
@@ -568,86 +573,13 @@ def avg_deb_speaks(debater):
             if (won_by_forfeit(roundstat.round, team) or
                 forfeited_round(roundstat.round, team)):
                 continue
-            else:
-                real_speaks.append(avg_speaks)
+            real_speaks.append(avg_speaks)
 
     if len(real_speaks) == 0:
         return 0
     else:
         return float(sum(real_speaks)) / float(len(real_speaks))
 
-@cache()
-def avg_deb_ranks(debater):
-    """ Computes the average debater ranks for the supplied debater
-
-    Generally this consistes of finding all the ranks we have, averaging iron
-    men ranks, and then dividing by the length.
-
-    The only tricky part is making sure we handle forfeits correctly, namely
-    we want to count forfeit losses but not forfeit wins
-    """
-    real_ranks = []
-    current_round = TabSettings.objects.get(key = 'cur_round').value
-    debater_roundstats = debater.roundstats_set.all()
-    team = deb_team(debater)
-
-    ranks_per_round = defaultdict(list)
-    # We might have multiple roundstats per round if we have iron men, so first
-    # group by round number
-    for roundstat in debater_roundstats:
-        ranks_per_round[roundstat.round.round_number].append(roundstat)
-
-    for round_number in range(1, current_round + 1):
-        roundstats = ranks_per_round[round_number]
-        if roundstats:
-            ranks = [float(rs.ranks) for rs in roundstats]
-            avg_ranks = sum(ranks) / float(len(roundstats))
-            roundstat = roundstats[0]
-            if (won_by_forfeit(roundstat.round, team) or
-                forfeited_round(roundstat.round, team)):
-                continue
-            else:
-                real_ranks.append(avg_ranks)
-
-    if len(real_ranks) == 0:
-        return 0
-    else:
-        return float(sum(real_ranks)) / float(len(real_ranks))
-
-@cache()
-def avg_deb_ranks(d):
-    tot_rank = 0
-    t = deb_team(d)
-    my_rounds = RoundStats.objects.filter(debater = d)
-    current_round = TabSettings.objects.get(key = 'cur_round').value
-    for i in range(current_round - 1):
-        temp_rank = []
-        for r in my_rounds:
-            if r.round.round_number == i+1:
-                if forfeited_round(r.round,t):
-                    temp_rank += [3.5]
-                elif won_by_forfeit(r.round,t):
-                    pass
-                else:
-                    temp_rank+=[r.ranks]
-            temp_rank = [float(i) for i in temp_rank]
-        if len(temp_rank) != 0:
-            tot_rank += float(sum(temp_rank))/float(len(temp_rank))
-
-                
-    for n in list(NoShow.objects.filter(no_show_team=t)):
-        tot_rank += 3.5
-
-    offset = 1
-    if my_rounds.filter(round__round_number=(current_round-1)).count() == 0:
-        offset = 2
-
-    if current_round-(num_byes(t)+num_forfeit_wins(t)) - offset <= 0:
-        return 0
-    else:
-        return float(tot_rank)/float(current_round-(num_byes(t)+num_forfeit_wins(t)) - offset)
-
-""" Debater Speaks Calculations """
 
 def debater_forfeit_speaks(debater):
     """ Calculate a debater's speaks for a forfeit round
@@ -693,9 +625,16 @@ def speaks_for_debater(debater, average_ironmen=True):
     for round_number in range(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
+            # This is so if in the odd chance we get a debater paired in
+            # twice we take the speaks they actually got
+            roundstats.sort(key=lambda rs: rs.speaks, reverse=True)
+            roundstat = roundstats[0]
+            if not len(set(rs.round for rs in roundstats)) == 1:
+                roundstats = roundstats[:1]
+
             speaks = [float(rs.speaks) for rs in roundstats]
             avg_speaks = sum(speaks) / float(len(roundstats))
-            roundstat = roundstats[0]
+            print roundstat.speaks
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
             elif forfeited_round(roundstat.round, team):
@@ -735,8 +674,47 @@ def tot_speaks_deb(debater, average_ironmen=True):
     debater_speaks = speaks_for_debater(debater, average_ironmen)
     return sum(debater_speaks)
 
-
+#################################
 """ Debater Rank Calculations """
+#################################
+
+@cache()
+def avg_deb_ranks(debater):
+    """ Computes the average debater ranks for the supplied debater
+
+    Generally this consistes of finding all the ranks we have, averaging iron
+    men ranks, and then dividing by the length.
+
+    This does not count forfeit losses or noshow's as 7 because having ranks of
+    3.5 in the first place is penalty enough, and some tab polices may want
+    forfeits to count as average ranks.
+    """
+    real_ranks = []
+    num_ranks = TabSettings.objects.get(key = 'cur_round').value - 1
+    debater_roundstats = debater.roundstats_set.all()
+    team = deb_team(debater)
+
+    ranks_per_round = defaultdict(list)
+    # We might have multiple roundstats per round if we have iron men, so first
+    # group by round number
+    for roundstat in debater_roundstats:
+        ranks_per_round[roundstat.round.round_number].append(roundstat)
+
+    for round_number in range(1, num_ranks + 1):
+        roundstats = ranks_per_round[round_number]
+        if roundstats:
+            ranks = [float(rs.ranks) for rs in roundstats]
+            avg_ranks = sum(ranks) / float(len(roundstats))
+            roundstat = roundstats[0]
+            if (won_by_forfeit(roundstat.round, team) or
+                forfeited_round(roundstat.round, team)):
+                continue
+            real_ranks.append(avg_ranks)
+
+    if len(real_ranks) == 0:
+        return 0
+    else:
+        return float(sum(real_ranks)) / float(len(real_ranks))
 
 def debater_forfeit_ranks(debater):
     """ Calculate a debater's ranks for a forfeit round
@@ -891,7 +869,7 @@ class TabFlags:
             TabFlags.ROOM_ZERO_RANK:        ("Room has rank of 0", "*"),
             TabFlags.ROOM_NON_ZERO_RANK:    ("Room has rank > 0", "")
         }.get(flag, ("Flag Not Found", "U"))[short]
-       
+
     @staticmethod
     def flags_to_symbols(flags):
         return "".join([TabFlags.translate_flag(flag, True)

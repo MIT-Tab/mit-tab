@@ -8,6 +8,6 @@
 
 {% for team in all_teams %}
 <div class="printable tab_card_item {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}" data-team-id={{team.id}}></div>
-    
+
 {% endfor %}
 
