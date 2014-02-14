@@ -521,8 +521,7 @@ def team_score(team):
                  -double_adjusted_speaks(team),
                   double_adjusted_ranks(team),
                  -opp_strength(team))
-    except Exception as e:
-        print traceback.format_exc()
+    except Exception:
         print "Could not calculate team score for {}".format(team)
     return score
 
@@ -819,7 +818,7 @@ def debater_score(debater):
                   single_adjusted_ranks_deb(debater),
                  -double_adjusted_speaks_deb(debater),
                   double_adjusted_ranks_deb(debater))
-    except Exception as e:
+    except Exception:
         print "Could not calculate debater score for {}".format(debater)
     print "finished scoring {}".format(debater)
     return score
