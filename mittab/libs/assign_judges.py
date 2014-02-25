@@ -174,9 +174,18 @@ def argmax(seq, fn):
     return max([(fn(i), i) for i in seq])[1]
 
 
-#take in a sorted list of judges and teams with the best judges and teams first
 def calc_weight(judge_i, pairing_i):
-    return -1 * (judge_i - pairing_i)**2
+    """ Calculate the relative badness of this judge assignment
+
+    We want small negative numbers to be preferred to large negative numbers
+
+    """
+    if judge_i < pairing_i:
+        # if the judge is highly ranked, we can have them judge a lower round
+        # if we absolutely have to
+        return judge_i - pairing_i
+    else:
+        return -1 * (judge_i - pairing_i)**2
 
 
 def calc_weight_panel(judges):

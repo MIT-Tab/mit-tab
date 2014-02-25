@@ -12,7 +12,7 @@ from mittab.libs.tab_logic import TabFlags
 
 def view_judges(request):
     #Get a list of (id,school_name) tuples
-    current_round = TabSettings.objects.get(key="cur_round").value
+    current_round = TabSettings.objects.get(key="cur_round").value - 1
     checkins = CheckIn.objects.filter(round_number = current_round)
     checked_in_judges = set([c.judge for c in checkins])
     

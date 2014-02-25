@@ -275,7 +275,7 @@ def highest_seed(team1,team2):
         return team1.seed
     else:
         return team2.seed
-    
+
 def highest_speak(t1,t2):
     if tot_speaks(t1) > tot_speaks(t2):
         return tot_speaks(t1)
@@ -288,7 +288,7 @@ def most_wins(t1,t2):
     else:
         return tot_wins(t2)
 
-#Check if two teams have hit before                          
+# Check if two teams have hit before
 def hit_before(t1, t2):
     if Round.objects.filter(gov_team = t1, opp_team = t2).count() > 0:
         return True
@@ -296,7 +296,7 @@ def hit_before(t1, t2):
         return True
     else:
         return False
-    
+
 #This should calculate whether or not team t has hit the pull-up before.
 def hit_pull_up(t):
     for a in list(Round.objects.filter(gov_team = t)):
@@ -478,11 +478,11 @@ def all_teams():
 #return tuples with pairs for varsity break
 def tab_var_break():
     teams = rank_teams()
-    the_break = teams[0:TabSettings.objects.get(key = "var_teams_to_break").value]               
+    the_break = teams[0:TabSettings.objects.get(key = "var_teams_to_break").value]
     pairings = []
     for i in range(len(the_break)):
         pairings += [(the_break[i],the_break[len(the_break)-i-1])]
-    return pairings                      
+    return pairings
 
 
 #return tuples with pairs for novice break
@@ -631,7 +631,6 @@ def speaks_for_debater(debater, average_ironmen=True):
 
             speaks = [float(rs.speaks) for rs in roundstats]
             avg_speaks = sum(speaks) / float(len(roundstats))
-            print roundstat.speaks
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
             elif forfeited_round(roundstat.round, team):
