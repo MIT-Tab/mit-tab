@@ -34,7 +34,10 @@ sudo pip install -r requirements.txt
 python manage.py runserver
 ```
 
-Hopefully this will be a proper package soon and available in that format.
+The code here is considered experimental and I have a production setup on EC2
+that doesn't have a lot of the new refactoring and is considered more stable.
+
+I am working on getting the django 1.6 version completely backwards compatible.
 
 Why Should I Use This?
 ----------------------
