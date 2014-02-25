@@ -1,10 +1,17 @@
 from mittab.apps.tab.models import *
 from django.conf import settings
 from django.core.servers.basehttp import FileWrapper
+from mittab.settings import BASE_DIR
 
 import shutil
 import time
 import os
+
+def get_backup_prefix():
+    return os.path.join(BASE_DIR, "mittab")
+
+def get_backup_path():
+    return os.path.join(get_backup_prefix(), "backups")
 
 def backup_round(dst_filename = None, round_number = None, btime = None):
     if round_number is None:
@@ -12,7 +19,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
     if btime is None:
         btime = int(time.time())
     print "Attempting to backup to backups directory"
-    prefix = os.path.dirname(os.path.realpath(__file__))
+    prefix = get_backup_prefix()
     if dst_filename == None:
         dst_filename = prefix+"/backups/site_round_%i_%i.db" % (round_number, btime)
     else:
@@ -25,7 +32,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
         print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
 
 def handle_backup(f):
-    prefix = os.path.dirname(os.path.realpath(__file__))
+    prefix = get_backup_prefix()
     dst_filename = prefix+"/backups/{}".format(f.name)
     print "Tried to write {}".format(dst_filename)
     try:
@@ -38,12 +45,12 @@ def handle_backup(f):
 
 def list_backups():
     print "Checking backups directory"
-    prefix = os.path.dirname(os.path.realpath(__file__))
+    prefix = get_backup_prefix()
     return os.listdir(prefix+"/backups/")
 
 def restore_from_backup(src_filename):
     print "Restoring from backups directory"
-    prefix = os.path.dirname(os.path.realpath(__file__))
+    prefix = get_backup_prefix()
     src_filename = prefix + "/backups/%s" % src_filename
     dst_filename = settings.DATABASES['default']['NAME']
     try:
@@ -66,7 +73,7 @@ def restore_from_file(filename):
 
 
 def get_wrapped_file(src_filename):
-    prefix = os.path.dirname(os.path.realpath(__file__))
+    prefix = get_backup_prefix()
     src_filename = prefix + "/backups/%s" % src_filename
     return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 

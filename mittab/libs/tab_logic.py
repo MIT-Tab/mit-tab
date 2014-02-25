@@ -245,14 +245,12 @@ def ready_to_pair(round_to_check):
         raise errors.NotEnoughJudgesError()
     elif Room.objects.all().count() < Team.objects.filter(checked_in=True).count()/2:
         raise errors.NotEnoughRoomsError()
-    elif round_to_check != 1 and RoundStats.objects.all().count() < Round.objects.filter(round_number = round_to_check-1).count()*4:
-        raise errors.PrevRoundNotEnteredError()
-    else:
+    elif round_to_check != 1:
         prev_rounds = Round.objects.filter(round_number = round_to_check-1)
         for r in prev_rounds:
-            if r.victor == 0:
+            if r.victor == Round.NONE:
                 raise errors.PrevRoundNotEnteredError()
-    
+
     return True
 
 #This method is tested by testsUnitTests.all_add_scratches_for_school_affil_tests()
