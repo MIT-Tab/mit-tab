@@ -115,24 +115,24 @@ class ResultEntryForm(forms.Form):
         "lo" : "Leader of the Opposition",
         "mo" : "Member of the Opposition"
     }
-    
+
     GOV = [
         "pm",
         "mg"
     ]
-    
+
     OPP = [
         "lo",
         "mo"
     ]
-    
+
     RANKS = (
         (1, 1),
         (2, 2),
         (3, 3),
         (4, 4),
     )
-    
+
     winner = forms.ChoiceField(label="Which team won the round?",
                                choices=Round.VICTOR_CHOICES)
 
@@ -153,7 +153,8 @@ class ResultEntryForm(forms.Form):
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
         gov_debaters = [(-1,'---')]+[(d.id, d.name) for d in gov_team.debaters.all()]
         opp_debaters = [(-1,'---')]+[(d.id, d.name) for d in opp_team.debaters.all()]
-        #TODO: Combine these loops?
+
+        # TODO: Combine these loops?
         for d in self.GOV:
             self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=gov_debaters)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
@@ -181,30 +182,44 @@ class ResultEntryForm(forms.Form):
             speak_ranks = [ (cleaned_data["%s_speaks" % (d)] ,cleaned_data["%s_ranks" % (d)], d) for d in debaters]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
 
-            #Check to make sure everyone has different ranks
+            # Check to make sure everyone has different ranks
             if set([r[0] for r in self.RANKS]) != set([int(x[1]) for x in sorted_by_ranks]):
                 for debater in debaters:
                     self._errors["%s_speaks"%(debater)] = self.error_class(["Ranks must be different"])
-            #Check to make sure that the lowest ranks have the highest scores
+
+            # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
             for (speaks,rank,debater) in sorted_by_ranks:
                 if speaks > high_score:
                     self._errors["%s_speaks"%debater] = self.error_class(["These speaks are too high for the rank"])
                 high_score = speaks
-            #Check to make sure that the team with most points wins
+
+            # Check to make sure that the team with most speaks and the least
+            # ranks win the round
             gov_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in gov])
             opp_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in opp])
+            gov_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in gov])
+            opp_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in opp])
+            gov_points = (gov_speaks, -gov_ranks)
+            opp_points = (opp_speaks, -opp_ranks)
             cleaned_data["winner"] = int(cleaned_data["winner"])
-            if cleaned_data["winner"] == 0:
-                self._errors["winner"] = self.error_class(["Someone has to win!"]) 
-            if cleaned_data["winner"] == 1 and opp_speaks > gov_speaks:
+
+            # No winner, this is bad
+            if cleaned_data["winner"] == Round.NONE:
+                self._errors["winner"] = self.error_class(["Someone has to win!"])
+            # Gov won but opp has higher points
+            if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
                 self._errors["winner"] = self.error_class(["Low Point Win!!"])
-            if cleaned_data["winner"] == 2 and gov_speaks > opp_speaks:
+            # Opp won but gov has higher points
+            if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self._errors["winner"] = self.error_class(["Low Point Win!!"])
-            for deb in gov+opp:
-                #TODO: Take out this strange cast to int, perhaps have real error valus?
+
+            for deb in gov + opp:
+                # TODO: Take out this strange cast to int, perhaps have real
+                # error values?
                 if int(cleaned_data["%s_debater"%deb]) == -1:
                     self._errors["%s_debater"%deb] = self.error_class(["You need to pick a debater"])
+
         except Exception, e:
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])

@@ -88,7 +88,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
-    next_round = current_round.value 
+    next_round = current_round.value
     if request.method == 'POST':
         try:
             backup.backup_round("round_%i_before_pairing.db" % (next_round))
@@ -96,13 +96,13 @@ def pair_round(request):
             backup.backup_round("round_%i_after_pairing.db" % (next_round))
         except Exception, e:
             traceback.print_exc(file=sys.stdout)
-            return render_to_response('error.html', 
+            return render_to_response('error.html',
                                  {'error_type': "Pair Next Round",
                                   'error_name': "Pairing Round %s" % (current_round.value + 1),
                                   'error_info':"Could not pair next round because of: [%s]" %(e)}, 
                                   context_instance=RequestContext(request))           
         current_round.value = current_round.value + 1
-        current_round.save() 
+        current_round.save()
         return view_status(request)
     else:
         #We must check a few things:
