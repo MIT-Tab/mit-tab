@@ -43,7 +43,8 @@ def pair_round():
     except errors.NotEnoughRoomsError:
         raise errors.NotEnoughRoomsError()
     except errors.PrevRoundNotEnteredError:
-        raise errors.PrevRoundNotEnteredError
+        # We don't actually want to kill pairing for this
+        pass
 
     # For testing purposes
     random.seed(0xBEEF)
