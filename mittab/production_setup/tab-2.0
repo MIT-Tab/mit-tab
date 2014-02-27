@@ -1,0 +1,36 @@
+
+<VirtualHost *:80>
+    ServerName <SERVER NAME>
+    ServerAdmin <ADMIN EMAIL>
+
+    DocumentRoot /var/www/tab/mittab
+    Alias /static/admin/ /usr/local/lib/python2.7/dist-packages/django/contrib/admin/static/
+    Alias /static/ /var/www/tab/mittab/static/
+    <Directory /usr/local/lib/python2.7/dist-packages/django/contrib/admin/media>
+        AllowOverride None
+        Options None
+        Order allow,deny
+        Allow from all
+    </Directory>
+
+    <Directory /var/www/tab/mittab>
+        <Files wsgi.py>
+        Order allow,deny
+        allow from all
+        </Files>
+    </Directory>
+
+    WSGIDaemonProcess mit-tab.com processes=2 threads=15
+    WSGIProcessGroup mit-tab.com
+
+    WSGIScriptAlias / /var/www/tab/mittab/wsgi.py
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+
+    # Possible values include: debug, info, notice, warn, error, crit,
+    # alert, emerg.
+    LogLevel warn
+
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+</VirtualHost>
