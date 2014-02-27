@@ -13,15 +13,20 @@ class TabLogicTestCase(TestCase):
         team1, team2 = teams[:2]
 
     def test_debater_score(self):
+        """ Comprehensive test of ranking calculations, done on real world
+        data that has real world problems (e.g. teams not paired in, ironmen,
+        etc ...)
+        """
         debaters = Debater.objects.all()
-        expected_scores = [
-            (-126.25, 10.0, -76.25, 5.0, -25.5, 1.0),
-            (-125.75, 14.0, -75.25, 8.0, -25.0, 3.0),
-            (-102.5, 10.5, -76.5, 6.0, -25.5, 2.0),
-            (-101.0, 14.5, -74.5, 9.5, -25.0, 3.0),
-            (-98.5, 17.5, -73.5, 11.5, -24.5, 4.0)
-        ]
         scores = [(debater, tab_logic.debater_score(debater)) for debater in debaters]
+
+    def test_team_score(self):
+        """ Comprehensive test of team scoring calculations, done on real
+        world data that has real world inaccuracies """
+        teams = Team.objects.all()
+        team_scores = [(team, tab_logic.team_score(team)) for team in teams]
+
+
 
 
 

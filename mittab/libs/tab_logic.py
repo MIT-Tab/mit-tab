@@ -14,13 +14,12 @@ import itertools
 
 from cache_logic import cache
 
-#will return false if not ready to pair yet
 def pair_round():
     """
     Pair the next round of debate.
     This function will do the following:
         1) Check that we can pair the round
-        2) Check that we have scratches all judges from
+        2) Check that we have scratched all judges from
            teams of the same school, and if not add these
            scratches
         3) Record no-show teams
@@ -28,11 +27,13 @@ def pair_round():
         5) Calculate byes
         6) Calculate pull ups based on byes
         7) Pass in evened brackets to the perfect pairing algorithm
-        8) Assign judges to pairings
-        9) Assign rooms to pairings
+        8) Assign rooms to pairings
+
+    Judges are added later.
 
     pairings are computed in the following format: [gov,opp,judge,room]
-    and then directly put into the database
+    and then saved immediately into the database
+
     FIXME: Allow for good rollback behavior
     """
     current_round = TabSettings.objects.get(key="cur_round").value
@@ -476,7 +477,6 @@ def all_nov_teams():
 def all_teams():
     return list(Team.objects.all())
 
-#return tuples with pairs for varsity break
 def tab_var_break():
     teams = rank_teams()
     the_break = teams[0:TabSettings.objects.get(key = "var_teams_to_break").value]
@@ -486,7 +486,6 @@ def tab_var_break():
     return pairings
 
 
-#return tuples with pairs for novice break
 def tab_nov_break():
     novice_teams = rank_nov_teams()
     nov_break = novice_teams[0:TabSettings.objects.get(key = "nov_teams_to_break").value]
@@ -822,7 +821,7 @@ def debater_score(debater):
     return score
 
 def break_tie(team_1, team_2):
-	return team1;
+    return team1;
 
 def rank_speakers():
     return sorted(Debater.objects.all(), key=debater_score)

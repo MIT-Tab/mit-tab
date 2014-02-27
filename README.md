@@ -34,10 +34,14 @@ sudo pip install -r requirements.txt
 python manage.py runserver
 ```
 
-The code here is considered experimental and I have a production setup on EC2
-that doesn't have a lot of the new refactoring and is considered more stable.
+You can either run v1.0 (Django 1.4, battle hardened) or v2.0 (Django 1.6)
 
-I am working on getting the django 1.6 version completely backwards compatible.
+Production Setup
+----------------
+Do not attempt to run the django server in a production environment, you will
+be very sad. Instead checkout:
+
+[The production instructions](mittab/production_setup)
 
 Why Should I Use This?
 ----------------------
