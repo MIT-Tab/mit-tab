@@ -7,8 +7,9 @@ from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tests.assertion import assert_nearly_equal
 
 
-class TabLogicTestCase(TestCase):
-    """Tests that the Tab Logic instance returns sane results"""
+class TestRankingLogic(TestCase):
+    """Tests that the methods related to debater and team scoring work as
+    expected"""
     fixtures = ['testing_finished_db']
 
     def test_debater_score(self):
@@ -27,7 +28,6 @@ class TabLogicTestCase(TestCase):
             left, right = dict_scores[k], dict_expected_scores[k]
             [assert_nearly_equal(*pair) for pair in zip(set(left), set(right))]
 
-
     def test_team_score(self):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
@@ -41,8 +41,11 @@ class TabLogicTestCase(TestCase):
             left, right = dict_scores[k], dict_expected_scores[k]
             [assert_nearly_equal(*pair) for pair in zip(set(left), set(right))]
 
+class TestPairingLogic(TestCase):
+    """Tests that the the generate pairings are correct"""
+    fixtures = ['testing_db']
 
-
-
-
+    def test_pair_round_one(self):
+        """ Tests that the first pairing results in a reasonable result """
+        tab_logic.pair_round()
 

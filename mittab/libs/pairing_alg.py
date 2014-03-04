@@ -24,17 +24,22 @@ import mwmatching
 import random
 
 def perfect_pairing(list_of_teams):
-     #assign weights to edges:
+    """ Uses the mwmatching library to assign teams in a pairing """
     graph_edges = []
     for i in range(len(list_of_teams)):
         for j in range(len(list_of_teams)):
         # may want to change actual penalties
         # a team should not have an edge back to itself
         # nor do we need to calculate an edge from a to b and b to a
-            if i > j: 
-                wt = calc_weight(list_of_teams[i], list_of_teams[j],i, j, list_of_teams[len(list_of_teams)-i-1], list_of_teams[len(list_of_teams)-j-1], len(list_of_teams)-i-1, len(list_of_teams)-j-1)
-                #now add edge to graph
-                graph_edges +=[(i,j,wt)]
+            if i > j:
+                wt = calc_weight(list_of_teams[i],
+                                 list_of_teams[j], i, j,
+                                 list_of_teams[len(list_of_teams) - i - 1],
+                                 list_of_teams[len(list_of_teams) - j - 1],
+                                 len(list_of_teams) - i - 1,
+                                 len(list_of_teams) - j - 1)
+                # Add the edge to the graph
+                graph_edges += [(i,j,wt)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
     #print "Pairing numbers"
     #print pairings_num
