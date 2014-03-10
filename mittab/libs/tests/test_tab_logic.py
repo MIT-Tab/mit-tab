@@ -28,13 +28,17 @@ class TestRankingLogic(TestCase):
         debaters = Debater.objects.all()
         scores = [(debater.name, tab_logic.debater_score(debater))
                   for debater in debaters]
+        import pprint
+        pprint.pprint( scores)
         expected_scores = load_debater_rankings()
         dict_scores, dict_expected_scores = map(dict,
                                                 (scores, expected_scores))
         assert len(dict_scores) == len(dict_expected_scores)
         for k in dict_scores:
             left, right = dict_scores[k], dict_expected_scores[k]
-            [assert_nearly_equal(*pair) for pair in zip(set(left), set(right))]
+            msg = "{} - {}, {}".format(k, left, right)
+            [assert_nearly_equal(*pair, message=msg) for pair
+             in zip(set(left), set(right))]
 
     def test_team_score(self):
         """ Comprehensive test of team scoring calculations, done on real
@@ -47,10 +51,14 @@ class TestRankingLogic(TestCase):
         assert len(dict_scores) == len(dict_expected_scores)
         for k in dict_scores:
             left, right = dict_scores[k], dict_expected_scores[k]
-            [assert_nearly_equal(*pair) for pair in zip(set(left), set(right))]
+            msg = "{} - {}, {}".format(k, left, right)
+            [assert_nearly_equal(*pair, message=msg) for pair
+             in zip(set(left), set(right))]
 
 class TestPairingLogic(TestCase):
-    """Tests that the the generate pairings are correct"""
+    """
+    Tests that the the generated pairings are correct starting from round 1
+    """
     fixtures = ['testing_db']
 
     def pair_round(self):
@@ -71,7 +79,7 @@ class TestPairingLogic(TestCase):
         random.shuffle(available)
         if checkin_count < desired_judges:
             num_to_checkin = desired_judges - checkin_count
-            judges_to_checkin = available[:num_to_checkin] 
+            judges_to_checkin = available[:num_to_checkin]
             checkins = [CheckIn(judge=judge, round_number=cur_round) for
                         judge in judges_to_checkin]
             for checkin in checkins:
@@ -85,6 +93,7 @@ class TestPairingLogic(TestCase):
         self.generate_checkins()
         judges = [ci.judge for ci in
                   CheckIn.objects.filter(round_number=cur_round)]
+        print len(rounds), len(judges)
         assign_judges.add_judges(rounds, judges, panel_points)
 
     def round_number(self):
