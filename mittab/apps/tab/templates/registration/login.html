@@ -6,15 +6,36 @@
     <p class="error">Sorry, that's not a valid username or password</p>
   {% endif %}
 
-  <form action="" method="post">{% csrf_token %}
-    <label for="username">User name:</label>
-    <input type="text" name="username" value="" id="username">
-    <label for="password">Password:</label>
-    <input type="password" name="password" value="" id="password">
+  <div class="well">
+    Welcome to MIT-TAB. If you are a member of the tournament staff you can
+    login below to the right. If you are a participant you can view pairings
+    below to the right.
+  </div>
 
-    <input type="submit" value="login" />
-    <input type="hidden" name="next" value="{{ next|escape }}" />
-  </form>
+  <div class="row-fluid">
+    <div class="span6">
+      <h3> Tab Staff Login </h3>
+      <form action="" method="post" class="form-horizontal">{% csrf_token %}
+        <div class="control-group">
+          <label for="username">User name:</label>
+          <input type="text" name="username" value="" id="username" placeholder="Username">
+          <label for="password">Password:</label>
+          <input type="password" name="password" value="" id="password" placeholder="Password">
+        </div>
+        <button type="submit" class="btn inline">Sign in</button>
+        <input type="hidden" name="next" value="{{ next|escape }}" />
+      </form>
+    </div>
+    <div class="span6">
+      <h3> Participant Access </h3>
+      <div class="control-group">
+        <a class="btn btn-large btn-info" href="/pairings/pairinglist/">
+          View released pairings
+        </a>
+      </div>
+    </div>
+  </div>
+
 
 {% endblock %}
 
