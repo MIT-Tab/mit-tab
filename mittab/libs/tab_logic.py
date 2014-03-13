@@ -819,9 +819,6 @@ def debater_score(debater):
     print "finished scoring {}".format(debater)
     return score
 
-def break_tie(team_1, team_2):
-    return team1;
-
 def rank_speakers():
     return sorted(Debater.objects.all(), key=debater_score)
 
