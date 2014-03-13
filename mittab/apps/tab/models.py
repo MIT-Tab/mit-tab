@@ -3,10 +3,29 @@ from localflavor.us.models import PhoneNumberField
 from django.core.exceptions import ValidationError
 
 class TabSettings(models.Model):
-   key = models.CharField(max_length=20)
-   value = models.IntegerField()
-   def __unicode__(self):
-       return "%s => %s" % (self.key,self.value)
+    key = models.CharField(max_length=20)
+    value = models.IntegerField()
+    def __unicode__(self):
+        return "%s => %s" % (self.key,self.value)
+
+    @classmethod
+    def get(cls, key, default=None):
+        try:
+            return cls.objects.get(key=key).value
+        except Exception as e:
+            if default is None:
+                raise e
+            return default
+
+    @classmethod
+    def set(cls, key, value):
+        try:
+            obj = cls.objects.get(key=key)
+            obj.value = value
+            obj.save()
+        except Exception as e:
+            obj = cls.objects.create(key=key, value=value)
+
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique = True)
@@ -21,6 +40,7 @@ class School(models.Model):
         else:
             raise Exception("School in use: [teams => %s,judges => %s]" % ([t.name for t in team_check], [j.name for j in judge_check]))
 
+
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique = True)
     #team_set is created by Team in the ManyToMany
@@ -32,12 +52,12 @@ class Debater(models.Model):
         (VARSITY, u'Varsity'),
         (NOVICE, u'Novice'),
     )
-    phone = PhoneNumberField(blank=True) 
+    phone = PhoneNumberField(blank=True)
     provider = models.CharField(max_length=40, blank=True)
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     def __unicode__(self):
         return self.name
-        
+
     def delete(self):
         teams = Team.objects.filter(debaters = self)
         if len(teams) == 0:
@@ -62,7 +82,7 @@ class Team(models.Model):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
-    
+
     def __unicode__(self):
         return self.name
 
