@@ -45,12 +45,12 @@ urlpatterns = patterns('',
     url(r'^view_rooms/$', views.view_rooms),
     url(r'^enter_room/$', views.enter_room),
 
-    #Scratch deletion
+    # Scratch deletion
     url(r'^judge/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
     url(r'^team/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
     url(r'^scratches/', views.view_scratches),
 
-    #All team related pages
+    # All team related pages
     url(r'^team/(\d+)/$', team_views.view_team),
     url(r'^team/(\d+)/delete/$', team_views.delete_team),
     url(r'^team/(\d+)/scratches/add/(\d+)/', team_views.add_scratches),
@@ -64,7 +64,7 @@ urlpatterns = patterns('',
     url(r'^team/ranking/$', team_views.rank_teams_ajax),
     url(r'^team/rank/$', team_views.rank_teams),
 
-    #All debater related pages
+    # All debater related pages
     url(r'^debater/(\d+)/$', debater_views.view_debater),
     url(r'^debater/(\d+)/delete/$', debater_views.delete_debater),
     url(r'^view_debaters/$', debater_views.view_debaters),
@@ -72,7 +72,7 @@ urlpatterns = patterns('',
     url(r'^debater/ranking/$', debater_views.rank_debaters_ajax),
     url(r'^debater/rank/$', debater_views.rank_debaters),
 
-    #All pairing related pages
+    # All pairing related pages
     url(r'^pairings/status/$', pairing_views.view_status),
     url(r'^pairings/view_rounds/$', pairing_views.view_rounds),
     url(r'^round/(\d+)/$', pairing_views.view_round),
@@ -89,12 +89,16 @@ urlpatterns = patterns('',
     url(r'^pairings/pairinglist/$', pairing_views.pretty_pair),
     url(r'^pairings/pairinglist/printable/$', pairing_views.pretty_pair_print),
     url(r'^pairing/backup/$', pairing_views.manual_backup),
+    url(r'^pairing/released/$', pairing_views.get_pairing_released),
+    url(r'^pairing/release/$', pairing_views.toggle_pairing_released),
     url(r'^pairing/view_backups/$', pairing_views.view_backups),
+    url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
+    url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
+
+
+    # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup),
     url(r'^backup/download/(.+)/$', pairing_views.download_backup),
     url(r'^backup/(.+)/$', pairing_views.view_backup),
     url(r'^upload_backup/$', pairing_views.upload_backup),
-
-    url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
-    url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
 )

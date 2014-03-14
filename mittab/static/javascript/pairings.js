@@ -238,6 +238,24 @@ var select_info = function(element) {
     $(div).removeClass("hidden")
 }
 
+var toggle_pairing_release = function(element) {
+    var button = $(this);
+    $.ajax({
+        url:"/pairing/release",
+        success: function(result) {
+            if (result.pairing_released) {
+                button.text("Close Pairings");
+                button.removeClass("btn-warning");
+                button.addClass("btn-success");
+            } else {
+                button.text("Release Pairings");
+                button.removeClass("btn-success");
+                button.addClass("btn-warning");
+            }
+        },
+    });
+}
+
 var bind_handlers = function() {
     $('.judge.swappable').draggable(judge_drag_options)
     $('.judge.swappable').droppable(judge_drop_options)
@@ -259,6 +277,7 @@ var bind_handlers = function() {
     $('.judge-assign').click(assign_judge);
     $('.alert-link').click(alert_link);
     $('select[name=winner]').change(select_info);
+    $('.btn.release').click(toggle_pairing_release);
 }
 
 

@@ -825,6 +825,7 @@ def rank_speakers():
 def rank_nov_speakers():
     return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
 
+
 class TabFlags:
     TEAM_CHECKED_IN =       1 << 0
     TEAM_NOT_CHECKED_IN =   1 << 1

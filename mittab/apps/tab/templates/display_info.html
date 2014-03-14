@@ -12,11 +12,33 @@
     <form action="/pairing/assign_judges/"
           method="post"
           onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
-        <div class="btn-group">
-            <button type="submit" class="mid btn" href="/pairing/assign_judges/" title="Assign judges to your pairing">Assign Judges</button>
-            <a class="mid btn" href="/pairings/pairinglist/" title="A randomized view to display in GA">Announcement View</a>
-            <a class="mid btn" href="/pairings/pairinglist/printable" title="A randomized view to print for GA">Printable View</a>
+          <div class="row-fluid">
+              <div class="span3">
+                  <h4>Pairing Controls</h4>
+                  <div class="btn-group">
+                      {% if judges_assigned %}
+                      <button type="submit" class="mid btn btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">Assign Judges Again</button>
+                      {% else %}
+                      <button type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">Assign Judges</button>
+                      {% endif %}
+                      {% if pairing_released %}
+                      <a class="mid btn btn-success release"
+                         href="#" title="Release the pairings to the participants">Close Pairings</a>
+                      {% else %}
+                      <a class="mid btn btn-warning release"
+                         href="#" title="Release the pairings to the participants">Release Pairing</a>
+                      {% endif %}
+                  </div>
+              </div>
+              <div class="span4">
+                  <h4>Display Options</h4>
+                  <div class="btn-group"> Display Options
+                      <a class="mid btn" href="/pairings/pairinglist/" title="A randomized view to display in GA">Announcement View</a>
+                      <a class="mid btn" href="/pairings/pairinglist/printable" title="A randomized view to print for GA">Printable View</a>
+                  </div>
+              </div>
         </div>
+
         <div class="spacer"></div>
         <div class="form_header">
             <table class="table table-condensed table-striped table-bordered ">
@@ -31,7 +53,7 @@
                     {% if perms.tab.change_tab_settings %}
                     <th>Admin</th>
                     {% endif %}
-                    {% for pairing, gov_wins, gov_speaks, gov_govs, gov_opps, opp_wins, opp_speaks, opp_govs, opp_opps in round_info %}
+                    {% for pairing in round_info %}
                     <tr class="{% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}">
                         <td class="team swappable" team-id="{{pairing.gov_team.id}}"
                             round-id="{{pairing.id}}"

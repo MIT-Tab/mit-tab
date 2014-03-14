@@ -262,27 +262,15 @@ def view_round(request, round_number, errors = None):
     if errors is None:
         errors = []
     valid_pairing, byes = True, []
-    print "1: ",time.time()
-    round_pairing = list(Round.objects.filter(round_number = round_number))
+    round_pairing = list(Round.objects.filter(round_number=round_number))
 
     random.seed(1337)
     random.shuffle(round_pairing)
     round_pairing.sort(key = lambda x: tab_logic.team_comp(x, round_number),
                        reverse = True)
 
-    print "2: ",time.time()
     #For the template since we can't pass in something nicer like a hash
-    round_info = [[pair]+[None]*8 for pair in round_pairing]
-    for pair in round_info:
-        pair[1] = tab_logic.tot_wins(pair[0].gov_team)
-        pair[2] = tab_logic.tot_speaks(pair[0].gov_team)
-        pair[3] = tab_logic.num_govs(pair[0].gov_team)    
-        pair[4] = tab_logic.num_opps(pair[0].gov_team)    
-        pair[5] = tab_logic.tot_wins(pair[0].opp_team)
-        pair[6] = tab_logic.tot_speaks(pair[0].opp_team)
-        pair[7] = tab_logic.num_govs(pair[0].opp_team)    
-        pair[8] = tab_logic.num_opps(pair[0].opp_team)
-    print "3: ",time.time()
+    round_info = [pair for pair in round_pairing]
 
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
@@ -290,9 +278,11 @@ def view_round(request, round_number, errors = None):
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             errors.append("%s was not in the pairing" % (present_team))
-            byes.append(present_team) 
-    pairing_exists = len(round_pairing) > 0 
-    excluded_judges = Judge.objects.exclude(judges__round_number = round_number).filter(checkin__round_number = round_number)
+            byes.append(present_team)
+    pairing_exists = len(round_pairing) > 0
+    pairing_released = TabSettings.get("pairing_released", 0) == 1
+    judges_assigned = all((r.judges.count() > 0 for r in round_info))
+    excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
     non_checkins = Judge.objects.exclude(judges__round_number = round_number).exclude(checkin__round_number = round_number)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
@@ -384,6 +374,20 @@ def remove_judge(request, round_id, judge_id):
     data = simplejson.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
+def get_pairing_released(request):
+    released = TabSettings.get("pairing_released", 0)
+    data = {"success": True,
+            "pairing_released": released == 1}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
+
+def toggle_pairing_released(request):
+    old = TabSettings.get("pairing_released", 0)
+    TabSettings.set("pairing_released", int(not old))
+    data = {"success": True,
+            "pairing_released": int(not old) == 1}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
 
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""
@@ -391,7 +395,7 @@ def pretty_pair(request, printable=False):
 
     errors, byes = [], []
 
-    round_number = TabSettings.objects.get(key="cur_round").value-1
+    round_number = TabSettings.get("cur_round") - 1
     round_pairing = list(Round.objects.filter(round_number = round_number))
 
     #We want a random looking, but constant ordering of the rounds
@@ -407,9 +411,9 @@ def pretty_pair(request, printable=False):
         if not (present_team in paired_teams):
             if present_team not in byes:
                 print "got error for", present_team
-                errors.append(present_team) 
+                errors.append(present_team)
 
-    pairing_exists = len(round_pairing) > 0
+    pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
     return render_to_response('round_pairings.html',
                                locals(),
@@ -515,17 +519,17 @@ def enter_multiple_results(request, round_id, num_entered):
                               {'forms': forms,
                                'title': "Entering Ballots for {}".format(str(round_obj)),
                                'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team}, 
+                               'opp_team': round_obj.opp_team},
                                context_instance=RequestContext(request))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def confirm_start_new_tourny(request):
-    return render_to_response('confirm.html', 
+    return render_to_response('confirm.html',
                               {'link': "/pairing/start_tourny/",
-                               'confirm_text': "Create New Tournament"}, 
+                               'confirm_text': "Create New Tournament"},
                                context_instance=RequestContext(request))
-                               
-@permission_required('tab.tab_settings.can_change', login_url="/403/")                               
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def start_new_tourny(request):
     try:
         clear_db()
@@ -534,18 +538,18 @@ def start_new_tourny(request):
         TabSettings.objects.create(key = "var_teams_to_break", value = 8)
         TabSettings.objects.create(key = "nov_teams_to_break", value = 4)
 
-    
+
     except Exception as e:
-        return render_to_response('error.html', 
+        return render_to_response('error.html',
                             {'error_type': "Could not Start Tournament",
                             'error_name': "",
-                            'error_info':"Invalid Tournament State. Time to hand tab. [%s]"%(e)}, 
+                            'error_info':"Invalid Tournament State. Time to hand tab. [%s]"%(e)},
                             context_instance=RequestContext(request))
-    return render_to_response('thanks.html', 
+    return render_to_response('thanks.html',
                             {'data_type': "Started New Tournament",
-                            'data_name': ""}, 
+                            'data_name': ""},
                             context_instance=RequestContext(request))
-        
+
 def clear_db():
     check_ins = CheckIn.objects.all()
     for i in range(len(check_ins)):
