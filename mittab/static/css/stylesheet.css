@@ -2,6 +2,7 @@ body {
     background:#BFD9FF;
     padding: auto;
     font-size: 14px;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif
 }
 
 a {
@@ -102,8 +103,9 @@ div.float_container {
 }
 
 div.welcome {
-    line-height: 3em;
-    font-size: 25px;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    line-height: 2.5em;
+    font-size: 35px;
     color: white;
     margin: auto;
 }
@@ -126,19 +128,12 @@ img.banner{
     margin:0 0 0 .8em;
 }
 
-#school_list {
-vertical-align: top;
-display:inline-block;
-padding:.5em;
-color:blue;
-}
-
 ul#schools{
-list-style: decimal;    
+list-style: decimal;
 }
 
 ul#judges{
-list-style:decimal;    
+list-style:decimal;
 }
 /*  I really need to get rid of this copy paste code*/
 div.index_list{

@@ -2,6 +2,7 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.views import login
 from forms import SchoolForm, RoomForm
 from django.db import models
 from models import *
@@ -22,11 +23,14 @@ def index(request):
 
     return render_to_response('index.html',locals(),context_instance=RequestContext(request))
 
+def tab_login(request):
+    return login(request, extra_context={'no_navigation': True})
+
 def render_403(request):
     t = loader.get_template('403.html')
     c = RequestContext(request, {})
     return HttpResponseForbidden(t.render(c))
-    
+
 #### BEGIN SCHOOL ###
 #Three views for entering, viewing, and editing schools
 def view_schools(request):

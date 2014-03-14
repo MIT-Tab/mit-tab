@@ -1,5 +1,5 @@
 from django.conf.urls import patterns, include, url
-from django.contrib.auth.views import login, logout
+from django.contrib.auth.views import logout
 from django.conf import settings
 import apps.tab.views as views
 import apps.tab.judge_views as judge_views
@@ -23,7 +23,7 @@ urlpatterns = patterns('',
     url(r'^$', views.index),
     url(r'^403/', views.render_403),
     #All account related info
-    url(r'^accounts/login/$',  login),
+    url(r'^accounts/login/$',  views.tab_login),
     url(r'^accounts/logout/$', logout),
     #All judge related pages
     url(r'^judge/(\d+)/$', judge_views.view_judge),
