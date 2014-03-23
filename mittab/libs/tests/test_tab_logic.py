@@ -28,8 +28,6 @@ class TestRankingLogic(TestCase):
         debaters = Debater.objects.all()
         scores = [(debater.name, tab_logic.debater_score(debater))
                   for debater in debaters]
-        import pprint
-        pprint.pprint( scores)
         expected_scores = load_debater_rankings()
         dict_scores, dict_expected_scores = map(dict,
                                                 (scores, expected_scores))

@@ -22,10 +22,12 @@ urlpatterns = patterns('',
 
     url(r'^$', views.index),
     url(r'^403/', views.render_403),
-    #All account related info
+
+    # Account related
     url(r'^accounts/login/$',  views.tab_login),
     url(r'^accounts/logout/$', logout),
-    #All judge related pages
+
+    # Judge related
     url(r'^judge/(\d+)/$', judge_views.view_judge),
     url(r'^judge/(\d+)/delete/$', judge_views.delete_judge),
     url(r'^judge/(\d+)/scratches/add/(\d+)/', judge_views.add_scratches),
@@ -33,13 +35,13 @@ urlpatterns = patterns('',
     url(r'^view_judges/$', judge_views.view_judges),
     url(r'^enter_judge/$', judge_views.enter_judge),
 
-    #All school related pages
+    # School related
     url(r'^school/(\d+)/$', views.view_school),
     url(r'^school/(\d+)/delete/$', views.delete_school),
     url(r'^view_schools/$', views.view_schools),
     url(r'^enter_school/$', views.enter_school),
 
-    #All room related pages
+    # Room related
     url(r'^room/(\d+)/$', views.view_room),
     url(r'^room/(\d+)/delete/$', views.delete_room),
     url(r'^view_rooms/$', views.view_rooms),
@@ -50,7 +52,7 @@ urlpatterns = patterns('',
     url(r'^team/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
     url(r'^scratches/', views.view_scratches),
 
-    # All team related pages
+    # Team related
     url(r'^team/(\d+)/$', team_views.view_team),
     url(r'^team/(\d+)/delete/$', team_views.delete_team),
     url(r'^team/(\d+)/scratches/add/(\d+)/', team_views.add_scratches),
@@ -64,7 +66,7 @@ urlpatterns = patterns('',
     url(r'^team/ranking/$', team_views.rank_teams_ajax),
     url(r'^team/rank/$', team_views.rank_teams),
 
-    # All debater related pages
+    # Debater related
     url(r'^debater/(\d+)/$', debater_views.view_debater),
     url(r'^debater/(\d+)/delete/$', debater_views.delete_debater),
     url(r'^view_debaters/$', debater_views.view_debaters),
@@ -72,7 +74,7 @@ urlpatterns = patterns('',
     url(r'^debater/ranking/$', debater_views.rank_debaters_ajax),
     url(r'^debater/rank/$', debater_views.rank_debaters),
 
-    # All pairing related pages
+    # Pairing related
     url(r'^pairings/status/$', pairing_views.view_status),
     url(r'^pairings/view_rounds/$', pairing_views.view_rounds),
     url(r'^round/(\d+)/$', pairing_views.view_round),

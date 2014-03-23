@@ -36,7 +36,7 @@ def pair_round():
 
     FIXME: Allow for good rollback behavior
     """
-    current_round = TabSettings.objects.get(key="cur_round").value
+    current_round = TabSettings.get('cur_round')
     try:
         ready_to_pair(current_round)
     except errors.NotEnoughJudgesError:
@@ -47,7 +47,10 @@ def pair_round():
         # We don't actually want to kill pairing for this
         pass
 
-    # For testing purposes
+    # Set released to false so we don't show pairings
+    TabSettings.set('pairing_released', 0)
+
+    # Need a reproduceable random pairing order
     random.seed(0xBEEF)
 
     # add scratches for teams/judges from the same school
