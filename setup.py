@@ -14,10 +14,13 @@ setup(
     include_package_data=True,
     setup_requires=['setuptools'],
     install_requires=[
-        'Django=1.4.5',
+        'Django==1.6.1',
         'South',
-        'mock'
-        'pytest'
+        'mock',
+        'pytest',
     ],
+    extras_require = {
+        'Statistical Analysis': ['numpy'],
+    },
     license='MIT License'
 )
