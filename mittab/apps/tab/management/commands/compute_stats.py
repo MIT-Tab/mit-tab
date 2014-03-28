@@ -1,7 +1,7 @@
 from optparse import make_option
 
 from django.core.management.base import BaseCommand
-from mittab.apps.tab.models import NoShow, RoundStats, TabSettings, Team
+from mittab.apps.tab.models import NoShow, RoundStats, TabSettings, Team, Debater
 import mittab.libs.tab_logic as tab_logic
 
 import numpy as np
@@ -25,20 +25,25 @@ class Command(BaseCommand):
         return num_valid_teams, num_teams
 
     def speaks_stats(self, speaks, header):
-        if len(speaks) == 0:
-            return [], 0, 0
-        percentiles = np.percentile(speaks, [0, 25, 50, 75, 100])
-        mean, std = round(np.mean(speaks), 2), round(np.std(speaks), 2)
-        print header
-        print "|  min  |  25%  |  50%  |  75%  |  max  |"
-        print (("| %05.2f "*5) + "|") % tuple(percentiles)
-
-        print "Mean, Standard Deviation: {0:.2f}, {1:.2f}".format(mean, std)
+        if len(speaks) > 0:
+            percentiles = np.percentile(speaks, [0, 25, 50, 75, 100])
+            mean, std = round(np.mean(speaks), 2), round(np.std(speaks), 2)
+        else:
+            percentiles = [0]*5
+            mean, std = 0, 0
+        print "{0} ".format(header),
+        print (("| %05.2f "*5) + "|") % tuple(percentiles),"|",
+        print (("|  %05.2f  "*2) + "|") % (mean, std)
         return percentiles, mean, std
 
     def valid_speaks_for_round(self, round_number):
         return RoundStats.objects.filter(round__round_number=round_number)\
                                  .filter(speaks__gte=20).all()
+
+    def deb_speaks_for_round(self, round_number, debater_status):
+        return RoundStats.objects.filter(round__round_number=round_number)\
+                                 .filter(speaks__gte=20)\
+                                 .filter(debater__novice_status=debater_status)
 
     def bucket_speaks_by_wl(self, speaks):
         def bracket(round_obj):
@@ -52,35 +57,84 @@ class Command(BaseCommand):
         results = [list() for i in range(5)]
         for speak in speaks:
             sbracket = bracket(speak.round)
-            results[sbracket].append(speak)
+            results[sbracket].append(float(speak.speaks))
         return results
 
     def bracket_stats(self, speaks):
         bracket_results = {}
         bucketed_speaks = self.bucket_speaks_by_wl(speaks)
-        for index, speaks in enumerate(bucketed_speaks):
-            speak_values = [float(s.speaks) for s in speaks]
-            bracket_results[str(index) + 'up'] = \
+        for index, speak_values in enumerate(bucketed_speaks):
+            bracket_results["{0} up ({1:3d})".format(index, int(len(speak_values)))] = \
             self.speaks_stats(
                     speak_values,
-                    "Speaks for {0} up bracket, size {1}:".format(index,
-                        int(len(speaks)/4.0)))
+                    "{0} up ({1:3d})".format(index,
+                        int(len(speak_values))))
         return bracket_results
+
+    def print_header(self, header):
+        print header
+        print "            |  min  |  25%  |  50%  |  75%  |  max  | | |   mean  | stddev |" 
 
     def handle(self, *args, **options):
         stats = {}
         valid_speaks = RoundStats.objects.filter(speaks__gte=20)
+        novice_speaks = []
+        varsity_speaks = []
+        for speak in valid_speaks:
+            if speak.debater.novice_status == Debater.VARSITY:
+                varsity_speaks.append(float(speak.speaks))
+            else:
+                novice_speaks.append(float(speak.speaks))
+
         speaks = [float(rs.speaks) for rs in valid_speaks]
         print "#" * 80
         print "Tournament Statistics:"
         print "1) Number of teams: {0} competed out of {1} regged".format(*self.count_valid_teams())
         print "#" * 80
         print "Speaking Statistics:"
-        stats["all"] = self.speaks_stats(speaks, "Combined Speaks for all Rounds")
-        stats["round_5"] = self.bracket_stats(self.valid_speaks_for_round(5))
+        self.print_header("Speaking statistics for the entire tournament")
+        stats["overall"] = {}
+        stats["overall"]["Combined"] = self.speaks_stats(speaks,        "Combined  ")
+        stats["overall"]["Varsity"] = self.speaks_stats(varsity_speaks, "Varsity   ")
+        stats["overall"]["Novice"] = self.speaks_stats(novice_speaks,   "Novice    ")
 
-        import pprint
-        pprint.pprint(stats)
+        stats["round_5"] = {}
+        self.print_header("Combined Speaking Statistics in Round 5")
+        stats["round_5"]["Combined"] = self.bracket_stats(self.valid_speaks_for_round(5))
+        self.print_header("Varsity Speaking Statistics in Round 5")
+        stats["round_5"]["Varsity"] = self.bracket_stats(self.deb_speaks_for_round(5, Debater.VARSITY))
+        self.print_header("Novice Speaking Statistics in Round 5")
+        stats["round_5"]["Novice"] = self.bracket_stats(self.deb_speaks_for_round(5, Debater.NOVICE))
+
+        def make_csv(speak_stats):
+            data = list(speak_stats[0])
+            data.extend(speak_stats[1:])
+            return ','.join(["%05.2f" % d for d in data])
+
+        output = "Teams,{0} competed,{1} registered\n".format(*self.count_valid_teams())
+        output += "Overall Statistics,min,25%,50%,75%,max,mean,stddev\n"
+        for key in sorted(stats["overall"]):
+            value = stats["overall"][key]
+            output += key + "," + make_csv(value) + "\n"
+
+        for key in sorted(stats["round_5"]):
+            value = stats["round_5"][key]
+            output += key + " Speaking Statistics in Round 5,min,25%,50%,75%,max,mean,stddev\n"
+            rounds = []
+            for round_number, vvalue in value.iteritems():
+                rounds.append((round_number, vvalue))
+            rounds.sort()
+            for round_number, vvalue in rounds:
+                output += round_number + "," + make_csv(vvalue) + "\n"
+
+        print args
+        if len(args) == 1:
+            with open(args[0], 'w') as f:
+                f.write(output)
+
+
+
+
 
 
 
