@@ -118,20 +118,23 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
         return str(self.team) + " <="+str(s_type)+"=> " + str(self.judge)
 
+
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+
     def __unicode__(self):
-        return self.name       
+        return self.name
     def delete(self):
         rounds = Round.objects.filter(room=self)
         if len(rounds) == 0:
             super(Room, self).delete()
-        else :
+        else:
             raise Exception("Room is in round: %s" % ([r.name for r in rounds]))
 
 

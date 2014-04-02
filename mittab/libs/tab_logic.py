@@ -18,7 +18,7 @@ def pair_round():
     """
     Pair the next round of debate.
     This function will do the following:
-        1) Check that we can pair the round
+        1) Verify we can pair the next round
         2) Check that we have scratched all judges from
            teams of the same school, and if not add these
            scratches
@@ -37,15 +37,7 @@ def pair_round():
     FIXME: Allow for good rollback behavior
     """
     current_round = TabSettings.get('cur_round')
-    try:
-        ready_to_pair(current_round)
-    except errors.NotEnoughJudgesError:
-        raise errors.NotEnoughJudgesError()
-    except errors.NotEnoughRoomsError:
-        raise errors.NotEnoughRoomsError()
-    except errors.PrevRoundNotEnteredError:
-        # We don't actually want to kill pairing for this
-        pass
+    validate_round_data(current_round)
 
     # Set released to false so we don't show pairings
     TabSettings.set('pairing_released', 0)
@@ -237,27 +229,67 @@ def pair_round():
             r.pullup = Round.OPP
         r.save()
 
-def ready_to_pair(round_to_check):
+def have_enough_judges(round_to_check):
+    last_round = round_to_check - 1
+    future_rounds = Team.objects.filter(checked_in=True).count() / 2
+    num_judges = CheckIn.objects.filter(round_number=round_to_check).count()
+    if num_judges < future_rounds:
+        return False, (num_judges, future_rounds)
+    return True, (num_judges, future_rounds)
+
+def have_enough_rooms(round_to_check):
+    future_rounds = Team.objects.filter(checked_in=True).count() / 2
+    num_rooms = Room.objects.filter(rank__gt=0).count()
+    if num_rooms < future_rounds:
+        return False, (num_judges, future_rounds)
+    return True, (num_rooms, future_rounds)
+
+def have_properly_entered_data(round_to_check):
+    last_round = round_to_check - 1
+    prev_rounds = Round.objects.filter(round_number=last_round)
+    for prev_round in prev_rounds:
+        # There should be a result
+        if prev_round.victor == Round.NONE:
+            raise errors.PrevRoundNotEnteredError()
+        # Both teams should not have byes or noshows
+        gov_team, opp_team = prev_round.gov_team, prev_round.opp_team
+        for team in gov_team, opp_team:
+            had_bye = Bye.objects.filter(bye_team=team,
+                                         round_number=last_round)
+            had_noshow = NoShow.objects.filter(no_show_team=team,
+                                               round_number=last_round)
+            if had_bye:
+                raise errors.ByeAssignmentError(
+                    "{0} both had a bye and debated last round".format(team))
+            if had_noshow:
+                raise errors.NoShowAssignmentError(
+                    "{0} both debated and had a no show".format(team))
+
+def validate_round_data(round_to_check):
     """
-    Check if we can pair a round using basic heuristics 
-    In particular:
-        1) We need enough N/2 judges that are *checked in*
-        2) Do we have N/2 rooms
-        3) We need all rounds to be entered from the previous round
+    Validate that the current round has all the data we expect before
+    pairing the next round
+    In particular we require:
+        1) N/2 judges that are *checked in*
+        2) N/2 rooms available
+        3) All rounds must be entered from the previous round
+        4) Check that no teams both have a round result and a NoShow or Bye
+
+    If any of these fail we raise a specific error as to the type of error
     """
-    if CheckIn.objects.filter(round_number = round_to_check).count() < Team.objects.filter(checked_in=True).count()/2:
+
+    # Check that there are enough judges
+    if not have_enough_judges(round_to_check)[0]:
         raise errors.NotEnoughJudgesError()
-    elif Room.objects.all().count() < Team.objects.filter(checked_in=True).count()/2:
+
+    # Check there are enough rooms
+    if not have_enough_rooms(round_to_check)[0]:
         raise errors.NotEnoughRoomsError()
-    elif round_to_check != 1:
-        prev_rounds = Round.objects.filter(round_number = round_to_check-1)
-        for r in prev_rounds:
-            if r.victor == Round.NONE:
-                raise errors.PrevRoundNotEnteredError()
 
-    return True
+    # If we have results, they should be entered and there should be no
+    # byes or noshows for teams that debated
+    have_properly_entered_data(round_to_check)
 
-#This method is tested by testsUnitTests.all_add_scratches_for_school_affil_tests()
 def add_scratches_for_school_affil():
     """
     Add scratches for teams/judges from the same school

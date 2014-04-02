@@ -3,7 +3,9 @@ from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.utils import simplejson
+from django.db import transaction
 from errors import *
+from mittab.libs.errors import *
 from models import *
 from django.shortcuts import redirect
 from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel
@@ -88,59 +90,66 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
-    next_round = current_round.value
+    current_round_number = current_round.value
     if request.method == 'POST':
+        # We should pair the round
         try:
-            backup.backup_round("round_%i_before_pairing.db" % (next_round))
-            tab_logic.pair_round()
-            backup.backup_round("round_%i_after_pairing.db" % (next_round))
-        except Exception, e:
+            TabSettings.set('pairing_released', 0)
+            backup.backup_round("round_%i_before_pairing.db" % (current_round_number))
+            with transaction.atomic():
+                tab_logic.pair_round()
+                current_round.value = current_round.value + 1
+                current_round.save()
+            backup.backup_round("round_%i_after_pairing.db" % (current_round_number))
+        except Exception as exp:
             traceback.print_exc(file=sys.stdout)
             return render_to_response('error.html',
-                                 {'error_type': "Pair Next Round",
-                                  'error_name': "Pairing Round %s" % (current_round.value + 1),
-                                  'error_info':"Could not pair next round because of: [%s]" %(e)}, 
-                                  context_instance=RequestContext(request))           
-        current_round.value = current_round.value + 1
-        current_round.save()
+                                      {'error_type': "Pair Next Round",
+                                       'error_name': "Pairing Round %s" % (current_round.value + 1),
+                                       'error_info': "Could not pair next round because of: [{0}]".format(exp)},
+                                        context_instance=RequestContext(request))
         return view_status(request)
     else:
-        #We must check a few things:
-        # 1) Have all round results been entered
-        # 2) Do the round results make sense
-        # 3) Are all Judges Checked In
+        # See if we can pair the round
+        title = "Pairing Round %s" % (current_round_number)
         check_status = []
-        current_round = current_round.value
-        title = "Pairing Round %s" % (current_round)
-        num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        rounds = Round.objects.filter(round_number = current_round-1)
-        msg = "All Rounds Entered for Overall Round %s" % (current_round-1)
-        if not all(map(lambda r: r.victor != 0, rounds)):
-            check_status.append((msg, "No", "Missing rounds from the previous round."))
-        else :
-            check_status.append((msg, "Yes", "Results for previous round have all been entered."))
-        #Put sanity checks here
-        # end
-        checkins = CheckIn.objects.filter(round_number = current_round)
-        checked_in_judges = set([c.judge for c in checkins])
-        n_over_two = Team.objects.filter(checked_in=True).count() / 2
-        msg = "N/2 Judges checked in for Round %s? Need %d, have %d." % (current_round, n_over_two, len(checked_in_judges))
-        if len(checked_in_judges) < n_over_two:
-            check_status.append((msg, 
-                                 "No", 
-                                 "Not enough judges checked in. Need %i and only have %i"%(n_over_two,len(checked_in_judges))
-                                 ))
+
+        judges = tab_logic.have_enough_judges(current_round_number)
+        rooms = tab_logic.have_enough_rooms(current_round_number)
+
+        msg = "N/2 Judges checked in for Round {0}? Need {1}, have {2}".format(
+              current_round_number, judges[1][1], judges[1][0])
+        if judges[0]:
+            check_status.append((msg, "Yes", "Judges are checked in"))
         else:
-            check_status.append((msg, "Yes", "Have judges"))
+            check_status.append((msg, "No", "Not enough judges"))
+
+        msg = "N/2 Rooms available Round {0}? Need {1}, have {2}".format(
+              current_round_number, rooms[1][1], rooms[1][0])
+        if rooms[0]:
+            check_status.append((msg, "Yes", "Rooms are checked in"))
+        else:
+            check_status.append((msg, "No", "Not enough rooms"))
+
+        msg = "All Rounds properly entered for Round %s" % (current_round_number - 1)
         ready_to_pair = "Yes"
         ready_to_pair_alt = "Checks passed!"
         try:
-            tab_logic.ready_to_pair(current_round)
-        except Exception as e:
+            tab_logic.have_properly_entered_data(current_round_number)
+            check_status.append((msg, "Yes", "All rounds look good"))
+        except PrevRoundNotEnteredError as e:
+            ready_to_pair = "No"
+            ready_to_pair_alt = str(e)
+            check_status.append((msg, "No", "Not all rounds are entered. %s" % str(e)))
+        except ByeAssignmentError as e:
+            ready_to_pair = "No"
+            ready_to_pair_alt = str(e)
+            check_status.append((msg, "No", "You have a bye and results. %s" % str(e)))
+        except NoShowAssignmentError as e:
             ready_to_pair = "No"
             ready_to_pair_alt = str(e) 
-        check_status.append(("Additional Minor Checks (Enough Rooms)", ready_to_pair, ready_to_pair_alt))
-        
+            check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
+
         return render_to_response('pair_round.html',
                                   locals(),
                                   context_instance=RequestContext(request))

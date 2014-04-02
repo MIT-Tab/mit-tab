@@ -104,7 +104,7 @@ class TestPairingLogic(TestCase):
         self.assign_judges()
         generate_results(round_number + 1, 0.05, 0.05)
         if round_number + 2 != last:
-            assert tab_logic.ready_to_pair(round_number + 2)
+            tab_logic.validate_round_data(round_number + 2)
 
     def test_pairing_tournament(self):
         """
