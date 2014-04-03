@@ -41,11 +41,10 @@
 
         <div class="spacer"></div>
         <div class="form_header">
-            <table class="table table-condensed table-striped table-bordered ">
-                <tr><th>Gov Team</th>
-                    <th>Gov Ws/Ss/Gs/Os</th>
-                    <th>Opp Team</th>
-                    <th>Opp Ws/Ss/Gs/Os</th>
+            <table class="table table-condensed table-second-striped table-bordered ">
+                <tr><th>Team</th>
+                    <th>Role</th>
+                    <th>Ws/Ss/Gs/Os</th>
                     <th>Judges</th>
                     <th title="Maximum gap in ranks between panel judge and panelists" >Panel Gap</th>
                     <th>Room</th>
@@ -54,22 +53,16 @@
                     <th>Admin</th>
                     {% endif %}
                     {% for pairing in round_info %}
-                    <tr class="{% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}">
+                    <tr>
                         <td class="team swappable" team-id="{{pairing.gov_team.id}}"
                             round-id="{{pairing.id}}"
                             team-name="{{pairing.gov_team.name}}">
                             <a class="btn btn-link" href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
+                        <td>GOV</td>
                         <td class="team tabcard" team-id="{{pairing.gov_team.id}}">
                             <a class="btn btn-link" href="/team/card/{{pairing.gov_team.id}}">Loading Team Info...</a>
                         </td>
-                        <td class="team swappable" team-id="{{pairing.opp_team.id}}"
-                            round-id="{{pairing.id}}"
-                            team-name="{{pairing.opp_team.name}}">
-                            <a class="btn btn-link" href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
-                        <td class="team tabcard" team-id="{{pairing.opp_team.id}}">
-                            <a class="btn btn-link" href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
-                        </td>
-                        <td class="judge">
+                        <td class="judge" rowspan=2>
                         {% for judge in pairing.judges.all %} 
                             <span class="full_width btn-group block-tight"
                                 round-id="{{pairing.id}}"
@@ -93,40 +86,52 @@
                         {% endif %}
                         {% endfor %}
                         </td>
-                        <td>
+                        <td rowspan=2>
                             <input type="text" name="panel_{{pairing.id}}" maxlength=4 class="input-super-mini">
                         </td>
-                        <td><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
-                        <td>
+                        <td rowspan=2><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
+                        <td rowspan=2>
 
                             {% if pairing.victor == 1 %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">GOV win</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">GOV win</a></li>
                             {% else %}{% if pairing.victor == 2 %} 
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">OPP win</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">OPP win</a></li>
                             {% else %}{% if pairing.victor == 3 %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a></li>
                             {% else %}{% if pairing.victor == 4 %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a></li>
                             {% else %}{% if pairing.victor == 5 %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">All Drop</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">All Drop</a></li>
                             {% else %}{% if pairing.victor == 6 %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">All Win</a></li>
+                            <a class="btn btn-success" href="/round/{{pairing.id}}/result/">All Win</a></li>
                             {% else %}
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/">Enter Ballot</a></li>
+                            <a class="btn btn-warning" href="/round/{{pairing.id}}/result/">Enter Ballot</a></li>
                             {%endif%}{%endif%}{%endif%}
                             {% endif %}{% endif %}{%endif%}
 
                             {% if pairing.judges.all|length > 1 %}
                             <br>
-                            <a class="btn btn-link" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a></li>
+                            <br>
+                            <a class="btn btn-warning" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a></li>
                             {% endif %}
 
                         </td>
                         {% if perms.tab.change_tab_settings %}
-                        <td>
+                        <td rowspan=2>
                             <a class="btn btn-link" href="/admin/tab/round/{{pairing.id}}/"> Modify in Admin </a>
                         </td>
                         {% endif %}
+
+                    </tr>
+                    <tr>
+                        <td class="team swappable" team-id="{{pairing.opp_team.id}}"
+                            round-id="{{pairing.id}}"
+                            team-name="{{pairing.opp_team.name}}">
+                            <a class="btn btn-link" href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
+                        <td>OPP</td>
+                        <td class="team tabcard" team-id="{{pairing.opp_team.id}}">
+                            <a class="btn btn-link" href="/team/card/{{pairing.opp_team.id}}">Loading Team Info...</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </table>

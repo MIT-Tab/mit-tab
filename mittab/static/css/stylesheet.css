@@ -463,3 +463,17 @@ div.spacer {
     margin: 0px;
 }
 
+.table-second-striped > tbody > tr:nth-child(4n) > td {
+      background-color: #EEEEEE;
+}
+
+.table-second-striped > tbody > tr:nth-child(4n+1) > td {
+      background-color: #EEEEEE;
+}
+
+.input-super-mini {
+  width: 40px;
+}
+
+
+
