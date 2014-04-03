@@ -241,7 +241,7 @@ def have_enough_rooms(round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() / 2
     num_rooms = Room.objects.filter(rank__gt=0).count()
     if num_rooms < future_rounds:
-        return False, (num_judges, future_rounds)
+        return False, (num_rooms, future_rounds)
     return True, (num_rooms, future_rounds)
 
 def have_properly_entered_data(round_to_check):
