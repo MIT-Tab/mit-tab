@@ -57,7 +57,6 @@ def view_debater(request, debater_id):
                                   'debater_rounds': rounds,
                                   'title':"Viewing Debater: %s"%(debater.name)}, 
                                   context_instance=RequestContext(request))
-    #return  render_to_response('display_info.html', {'id':debater_id} ,context_instance=RequestContext(request))
 
 @permission_required('tab.debater.can_delete', login_url="/403/")    
 def delete_debater(request, debater_id):

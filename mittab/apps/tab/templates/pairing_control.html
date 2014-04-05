@@ -13,7 +13,7 @@
           method="post"
           onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
           <div class="row-fluid">
-              <div class="span3">
+              <div class="span4">
                   <h4>Pairing Controls</h4>
                   <div class="btn-group">
                       {% if judges_assigned %}
@@ -28,6 +28,10 @@
                       <a class="mid btn btn-warning release"
                          href="#" title="Release the pairings to the participants">Release Pairing</a>
                       {% endif %}
+                      {% url 'mittab.apps.tab.pairing_views.pair_round' as pair_round_url %}
+                      <a class="mid btn btn-info"
+                         href="{{ pair_round_url }}"
+                         title="Pair the next round of debate">Prepare Next Round</a>
                   </div>
               </div>
               <div class="span4">

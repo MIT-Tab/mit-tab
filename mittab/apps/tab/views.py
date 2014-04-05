@@ -181,7 +181,6 @@ def view_room(request, room_id):
                                   'links': links,
                                   'title': "Viewing Room: %s"%(room.name)}, 
                                  context_instance=RequestContext(request))
-    #return  render_to_response('display_info.html', {'id':school_id} ,context_instance=RequestContext(request))
 
 def enter_room(request):
     if request.method == 'POST':

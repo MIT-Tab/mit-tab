@@ -308,7 +308,7 @@ def view_round(request, round_number, errors = None):
     # [      ][                                  ][                 Judge4               ]
     excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins)])) 
 
-    return render_to_response('display_info.html',
+    return render_to_response('pairing_control.html',
                                locals(),
                                context_instance=RequestContext(request))
 
