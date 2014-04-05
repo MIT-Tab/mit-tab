@@ -5,18 +5,18 @@ var swap_element = function(from, dest, element_type) {
     var dest_round_id = dest.attr('round-id')
     var dest_judge_id = dest.attr('judge-id')
     var dest_judge_name = dest.attr('judge-name')
-    new_from_html = 
-        "<a href=\"/judge/" + dest_judge_id + "/\">" + 
+    new_from_html =
+        "<a href=\"/judge/" + dest_judge_id + "/\">" +
         dest_judge_name + "</a>"
-    new_dest_html = 
-        "<a href=\"/judge/" + from_judge_id + "/\">" + 
+    new_dest_html =
+        "<a href=\"/judge/" + from_judge_id + "/\">" +
         from_judge_name + "</a>"
 
     from.html(new_from_html)
     from.attr('round-id', from_round_id)
     from.attr('judge-id', dest_judge_id)
     from.attr('judge-name', dest_judge_name)
-    
+
     dest.html(new_dest_html)
     dest.attr('round-id', dest_round_id)
     dest.attr('judge-id', from_judge_id)
@@ -25,63 +25,6 @@ var swap_element = function(from, dest, element_type) {
 
 
 $(document).ready(function(){
-    judge_drag_options = {
-        revert: true,
-        stack: "div",
-        opacity: 0.8,
-        start: function() {
-            // Insert logic to color bad things
-        },
-        stop: function() {
-        }
-    };
-
-
-    judge_drop_options = {
-        accept: ".judge.swappable",
-        hoverClass: "ui-state-hover",
-        drop: function(event, ui) {
-            var from_round_id = ui.draggable.attr('round-id')
-            var from_judge_id = ui.draggable.attr('judge-id')
-            var from_judge_name = ui.draggable.attr('judge-name')
-            var dest_round_id = $(this).attr('round-id')
-            var dest_judge_id = $(this).attr('judge-id')
-            var dest_judge_name = $(this).attr('judge-name')
-            var dest_obj = $(this)
-            $.ajax({
-                url:"/pairings/swap/" +
-                    from_round_id + "/" + from_judge_id +
-                    "/with/" + dest_round_id + "/" + dest_judge_id + "/",
-                success: function(result) {
-                    if(result.success) {
-                        new_from_html = 
-                            "<a href=\"/judge/" + dest_judge_id + "/\">" + 
-                            dest_judge_name + "</a>"
-                        new_dest_html = 
-                            "<a href=\"/judge/" + from_judge_id + "/\">" + 
-                            from_judge_name + "</a>"
-                        
-                        ui.draggable.html(new_from_html)
-                        ui.draggable.attr('round-id', from_round_id)
-                        ui.draggable.attr('judge-id', dest_judge_id)
-                        ui.draggable.attr('judge-name', dest_judge_name)
-                        
-                        dest_obj.html(new_dest_html)
-                        dest_obj.attr('round-id', dest_round_id)
-                        dest_obj.attr('judge-id', from_judge_id)
-                        dest_obj.attr('judge-name', from_judge_name)
-                    }
-                    else {
-                        alert("unable to swap those two judges, use the admin interface");
-                    }
-                },
-                error: function(result) {
-                    alert("unable to swap those two judges, use the admin interface");
-                }
-            });
-        }
-    }
- 
     team_drag_options = {
         revert: true,
         stack: "div",
@@ -118,7 +61,7 @@ $(document).ready(function(){
                         new_dest_html = 
                             "<a href=\"/team/" + from_team_id + "/\">" + 
                             from_team_name + "</a>"
-                        
+
                         ui.draggable.html(new_from_html)
                         ui.draggable.attr('round-id', from_round_id)
                         ui.draggable.attr('team-id', dest_team_id)
@@ -177,7 +120,7 @@ var populate_alternative_judges = function() {
                 judge_list = $("ul[round-id="+round_id+"][judge-pos="+judge_position+"]");
             }
             $(judge_list).html(result);
-            bind_handlers()
+            bind_handlers();
         },
     })
 }
@@ -257,9 +200,6 @@ var toggle_pairing_release = function(element) {
 }
 
 var bind_handlers = function() {
-    $('.judge.swappable').draggable(judge_drag_options)
-    $('.judge.swappable').droppable(judge_drop_options)
-
     $('.team.swappable').draggable(team_drag_options)
     $('.team.swappable').droppable(team_drop_options)
 
