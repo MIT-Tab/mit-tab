@@ -261,10 +261,9 @@ def restore_backup(request, filename):
                              {'data_type': "Restored from backup",
                               'data_name': "{}".format(filename)},
                                context_instance=RequestContext(request))
-    
-    
+
 def view_status(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value-1
+    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     return view_round(request, current_round_number)
 
 def view_round(request, round_number, errors = None):
@@ -283,7 +282,7 @@ def view_round(request, round_number, errors = None):
 
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
-    valid_pairing = len(round_pairing) >= n_over_two
+    valid_pairing = len(round_pairing) >= n_over_two or round_number == 0
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             errors.append("%s was not in the pairing" % (present_team))
