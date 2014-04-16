@@ -862,40 +862,46 @@ def rank_nov_speakers():
 
 
 class TabFlags:
-    TEAM_CHECKED_IN =       1 << 0
-    TEAM_NOT_CHECKED_IN =   1 << 1
-    JUDGE_CHECKED_IN =      1 << 2
-    JUDGE_NOT_CHECKED_IN =  1 << 3
-    LOW_RANKED_JUDGE =      1 << 4
-    MID_RANKED_JUDGE =      1 << 5
-    HIGH_RANKED_JUDGE =     1 << 6
-    ROOM_ZERO_RANK =        1 << 7
-    ROOM_NON_ZERO_RANK =    1 << 8
+    TEAM_CHECKED_IN =           1 << 0
+    TEAM_NOT_CHECKED_IN =       1 << 1
+    JUDGE_CHECKED_IN_CUR =      1 << 2
+    JUDGE_NOT_CHECKED_IN_CUR =  1 << 3
+    LOW_RANKED_JUDGE =          1 << 4
+    MID_RANKED_JUDGE =          1 << 5
+    HIGH_RANKED_JUDGE =         1 << 6
+    ROOM_ZERO_RANK =            1 << 7
+    ROOM_NON_ZERO_RANK =        1 << 8
+    JUDGE_CHECKED_IN_NEXT =     1 << 9
+    JUDGE_NOT_CHECKED_IN_NEXT = 1 << 10
 
     ALL_FLAGS = [
         TEAM_CHECKED_IN,
         TEAM_NOT_CHECKED_IN,
-        JUDGE_CHECKED_IN,
-        JUDGE_NOT_CHECKED_IN,
+        JUDGE_CHECKED_IN_CUR,
+        JUDGE_NOT_CHECKED_IN_CUR,
         LOW_RANKED_JUDGE,
         MID_RANKED_JUDGE,
         HIGH_RANKED_JUDGE,
         ROOM_ZERO_RANK,
-        ROOM_NON_ZERO_RANK
+        ROOM_NON_ZERO_RANK,
+        JUDGE_CHECKED_IN_NEXT,
+        JUDGE_NOT_CHECKED_IN_NEXT
     ]
 
     @staticmethod
     def translate_flag(flag, short=False):
         return {
-            TabFlags.TEAM_NOT_CHECKED_IN:   ("Team NOT Checked In", "*"),
-            TabFlags.TEAM_CHECKED_IN:       ("Team Checked In", ""),
-            TabFlags.JUDGE_CHECKED_IN:      ("Judge Checked In", ""),
-            TabFlags.JUDGE_NOT_CHECKED_IN:  ("Judge NOT Checked In", "*"),
-            TabFlags.LOW_RANKED_JUDGE:      ("Low Ranked Judge", "L"),
-            TabFlags.MID_RANKED_JUDGE:      ("Mid Ranked Judge", "M"),
-            TabFlags.HIGH_RANKED_JUDGE:     ("High Ranked Judge", "H"),
-            TabFlags.ROOM_ZERO_RANK:        ("Room has rank of 0", "*"),
-            TabFlags.ROOM_NON_ZERO_RANK:    ("Room has rank > 0", "")
+            TabFlags.TEAM_NOT_CHECKED_IN:       ("Team NOT Checked In", "*"),
+            TabFlags.TEAM_CHECKED_IN:           ("Team Checked In", ""),
+            TabFlags.JUDGE_CHECKED_IN_CUR:      ("Judge Checked In, Current Round", ""),
+            TabFlags.JUDGE_NOT_CHECKED_IN_CUR:  ("Judge NOT Checked In, Current Round", "*"),
+            TabFlags.JUDGE_CHECKED_IN_NEXT:     ("Judge Checked In, Next Round", ""),
+            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT: ("Judge NOT Checked In, Next Round", "!"),
+            TabFlags.LOW_RANKED_JUDGE:          ("Low Ranked Judge", "L"),
+            TabFlags.MID_RANKED_JUDGE:          ("Mid Ranked Judge", "M"),
+            TabFlags.HIGH_RANKED_JUDGE:         ("High Ranked Judge", "H"),
+            TabFlags.ROOM_ZERO_RANK:            ("Room has rank of 0", "*"),
+            TabFlags.ROOM_NON_ZERO_RANK:        ("Room has rank > 0", "")
         }.get(flag, ("Flag Not Found", "U"))[short]
 
     @staticmethod

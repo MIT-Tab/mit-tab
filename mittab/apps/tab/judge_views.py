@@ -13,15 +13,22 @@ from mittab.libs.tab_logic import TabFlags
 def view_judges(request):
     #Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
-    checkins = CheckIn.objects.filter(round_number = current_round)
+    checkins = CheckIn.objects.filter(round_number=current_round)
+    checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
     checked_in_judges = set([c.judge for c in checkins])
-    
+    checked_in_judges_next = set([c.judge for c in checkins_next])
+
     def flags(judge):
         result = 0
         if judge in checked_in_judges:
-            result |= TabFlags.JUDGE_CHECKED_IN
+            result |= TabFlags.JUDGE_CHECKED_IN_CUR
         else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN
+            result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
+        if judge in checked_in_judges_next:
+            result |= TabFlags.JUDGE_CHECKED_IN_NEXT
+        else:
+            result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
+
         if judge.rank < 3.0:
             result |= TabFlags.LOW_RANKED_JUDGE
         if judge.rank >= 3.0 and judge.rank < 5.0:
@@ -29,12 +36,11 @@ def view_judges(request):
         if judge.rank >= 5.0:
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
-    
-    
+
     c_judge = [(judge.pk,judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
                for judge in Judge.objects.order_by("name")]
 
-    all_flags = [[TabFlags.JUDGE_CHECKED_IN, TabFlags.JUDGE_NOT_CHECKED_IN], 
+    all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     print filters
@@ -44,7 +50,7 @@ def view_judges(request):
                               'item_list':c_judge,
                               'filters': filters,
                               'symbol_text': symbol_text}, context_instance=RequestContext(request))
-    
+
 def view_judge(request, judge_id):
     judge_id = int(judge_id)
     try:
