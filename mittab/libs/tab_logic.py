@@ -64,7 +64,14 @@ def pair_round():
 
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
-            b = Bye(bye_team = list_of_teams[random.randint(0,len(list_of_teams)-1)], round_number = current_round)
+            if TabSettings.get('fair_bye', 1) == 0:
+                print "Bye: using only unseeded teams"
+                possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
+            else:
+                print "Bye: using all teams"
+                possible_teams = list_of_teams
+            bye_team = random.choice(possible_teams)
+            b = Bye(bye_team=bye_team, round_number=current_round)
             b.save()
             list_of_teams.remove(b.bye_team)
 
