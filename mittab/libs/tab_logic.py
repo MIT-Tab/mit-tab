@@ -129,6 +129,30 @@ def pair_round():
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
                     byeint = len(list_of_teams[bracket])-1
+                    #Don't give the bye to a team who only has lenient NoShows
+                    if (TabSettings.get('lenient_late') + 1 >= current_round):
+                        print "Lenient Late Bye Check"
+                        #If Team was not a lenient NoShow in every previous round, they're valid. 
+                        #Otherwise check next team
+                        checking_lenient = True
+                        while (checking_lenient == True):
+                            for r in range(1, current_round):
+                                print "Checking" + str(list_of_teams[bracket][byeint]) + "for Round " + str(r)
+                                if not (NoShow.objects.filter(no_show_team=list_of_teams[bracket][byeint],
+                                                        round_number=r)):
+                                    print ("Wasn't NoShow, it's valid")
+                                    checking_lenient = False
+                                    break
+                            if not checking_lenient:
+                                break
+                            #If there are no more teams, just use the original
+                            if (byeint > 0):
+                                print("Team was invalid, checking next")
+                                byeint -= 1
+                            else:
+                                print("Checked all teams")
+                                byeint = len(list_of_teams[bracket]) - 1
+                                checking_lenient = False
                     b = Bye(bye_team = list_of_teams[bracket][byeint],
                             round_number = current_round)
                     b.save()
@@ -645,6 +669,7 @@ def speaks_for_debater(debater, average_ironmen=True):
 
     Byes:
     If a debater wins in a bye, they get their average speaks
+    If a debater was late to a lenient round, they get average speaks
     """
     team = deb_team(debater)
     # We start counting at 1, so when cur_round says 6 that means that we are
@@ -757,7 +782,7 @@ def debater_forfeit_ranks(debater, round_number):
     #Calculate a debater's ranks for a forfeit round
 
     if (TabSettings.get('lenient_late') >= round_number):
-        reutrn avg_deb_ranks(debater)
+        return avg_deb_ranks(debater)
     else:
         return 3.5
 
@@ -780,6 +805,7 @@ def ranks_for_debater(debater, average_ironmen=True):
 
     Byes:
     If a debater wins in a bye, they get their average ranks
+    If a debater was late to a lenient round, they get average ranks
     """
     team = deb_team(debater)
     # We start counting at 1, so when cur_round says 6 that means that we are

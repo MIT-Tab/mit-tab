@@ -301,19 +301,6 @@ def tab_card(request, team_id):
     for i in range(1,cur_round-1):
         round_stats[i][6] = (round_stats[i][6][0] + round_stats[i-1][6][0],
                              round_stats[i][6][1] + round_stats[i-1][6][1])
-
-    totals = [[0,0],[0,0],[0,0]]
-    for r in rounds:
-        index = r.round_number-1
-        if round_stats[index][4]==blank or round_stats[index][5]==blank:
-            continue
-        totals[0][0] += round_stats[index][4][0]
-        totals[0][1] += round_stats[index][4][1]
-        totals[1][0] += round_stats[index][5][0]
-        totals[1][1] += round_stats[index][5][1]
-        totals[2][0] += round_stats[index][4][0] + round_stats[index][5][0]
-        totals[2][1] += round_stats[index][4][1] + round_stats[index][5][1]
-    
     #Error out if we don't have a bye
     try:
         bye_round = Bye.objects.get(bye_team = team).round_number
