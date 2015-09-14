@@ -131,26 +131,21 @@ def pair_round():
                     byeint = len(list_of_teams[bracket])-1
                     #Don't give the bye to a team who only has lenient NoShows
                     if (TabSettings.get('lenient_late') + 1 >= current_round):
-                        print "Lenient Late Bye Check"
                         #If Team was not a lenient NoShow in every previous round, they're valid. 
                         #Otherwise check next team
                         checking_lenient = True
                         while (checking_lenient == True):
                             for r in range(1, current_round):
-                                print "Checking" + str(list_of_teams[bracket][byeint]) + "for Round " + str(r)
                                 if not (NoShow.objects.filter(no_show_team=list_of_teams[bracket][byeint],
                                                         round_number=r)):
-                                    print ("Wasn't NoShow, it's valid")
                                     checking_lenient = False
                                     break
                             if not checking_lenient:
                                 break
                             #If there are no more teams, just use the original
                             if (byeint > 0):
-                                print("Team was invalid, checking next")
                                 byeint -= 1
                             else:
-                                print("Checked all teams")
                                 byeint = len(list_of_teams[bracket]) - 1
                                 checking_lenient = False
                     b = Bye(bye_team = list_of_teams[bracket][byeint],
