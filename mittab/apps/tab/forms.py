@@ -13,7 +13,6 @@ class UploadBackupForm(forms.Form):
 class UploadDataForm(forms.Form):
     teamFile = forms.FileField(label="Teams Data File", required=False)
     judgeFile = forms.FileField(label="Judge Data File", required=False)
-    scratchFile = forms.FileField(label="Scratches Data File", required=False)
 
 
 class SchoolForm(forms.ModelForm):

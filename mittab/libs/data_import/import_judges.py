@@ -26,7 +26,10 @@ import xlrd
 from xlwt import Workbook
 
 def import_judges(fileToImport):
-    sh = xlrd.open_workbook(filename=None, file_contents=fileToImport.read()).sheet_by_index(0)
+    try:
+        sh = xlrd.open_workbook(filename=None, file_contents=fileToImport.read()).sheet_by_index(0)
+    except:
+        return ["ERROR: Please upload an .xlsx file. This filetype is not compatible"]
     num_judges = 0
     found_end = False
     judge_errors = []
@@ -42,6 +45,7 @@ def import_judges(fileToImport):
         try:
             theName = Judge.objects.get(name=judge_name)
             judge_errors.append(judge_name + ": Duplicate Judge Name")
+            continue
         except:
             pass
 

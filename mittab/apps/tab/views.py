@@ -264,21 +264,14 @@ def upload_data(request):
           if len(judgeErrors) > 0:
             results += 'Judge Import Errors (Please Check These Manually):\n'
             for e in judgeErrors:
-              results += '    ' + e + '\n'
+              results += '            ' + e + '\n'
         if 'teamFile' in request.FILES:
           teamErrors = import_teams.import_teams(request.FILES['teamFile'])
           importName += request.FILES['teamFile'].name + ' '
           if len(teamErrors) > 0:
             results += 'Team Import Errors (Please Check These Manually):\n'
             for e in teamErrors:
-              results += '    ' + e + '\n'
-        if 'scratchFile' in request.FILES:
-          scratchErrors = import_scratches.import_scratches(request.FILES['scratchFile'])
-          importName += request.FILES['scratchFile'].name + ' '
-          if len(scratchErrors) > 0:
-            results += 'Scratch Import Errors (Please Check These Manually):\n'
-            for e in scratchErrors:
-              results += '    ' + e + '\n'
+              results += '            ' + e + '\n'
         return render_to_response('thanks.html', 
                                  {'data_type': "Database data",
                                   'data_name': importName,
