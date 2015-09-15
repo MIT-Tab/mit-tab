@@ -8,7 +8,7 @@ from errors import *
 from mittab.libs.errors import *
 from models import *
 from django.shortcuts import redirect
-from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel
+from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
@@ -211,7 +211,7 @@ def download_backup(request, filename):
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def upload_backup(request):
     if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
+        form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
             backup.handle_backup(request.FILES['file'])
             return render_to_response('thanks.html', 
@@ -220,7 +220,7 @@ def upload_backup(request):
                                       'data_modification': "CREATE"}, 
                                       context_instance=RequestContext(request))
     else:
-        form = UploadFileForm()
+        form = UploadBackupForm()
     return render_to_response('data_entry.html', 
                               {'form': form,
                                'title': 'Upload a Backup'}, 

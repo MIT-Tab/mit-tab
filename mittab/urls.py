@@ -103,4 +103,7 @@ urlpatterns = patterns('',
     url(r'^backup/download/(.+)/$', pairing_views.download_backup),
     url(r'^backup/(.+)/$', pairing_views.view_backup),
     url(r'^upload_backup/$', pairing_views.upload_backup),
+
+    # Data Upload
+    url(r'^import_data/$', views.upload_data)
 )

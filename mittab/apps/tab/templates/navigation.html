@@ -24,6 +24,7 @@
 {% url "mittab.apps.tab.pairing_views.view_rounds" as view_rounds %}
 {% url "mittab.apps.tab.pairing_views.pair_round" as pair_round %}
 {% url "mittab.apps.tab.pairing_views.confirm_start_new_tourny" as confirm_start_new_tourny %}
+{% url "mittab.apps.tab.views.upload_data" as upload_data %}
 {% url "mittab.apps.tab.pairing_views.manual_backup" as backup %}
 {% url "mittab.apps.tab.pairing_views.view_backups" as view_backups %}
 {% url "mittab.apps.tab.views.view_scratches" as view_scratches %}
@@ -47,7 +48,8 @@
         <li><a class="{% active request confirm_start_new_tourny %}">Admin</a>
             <ul id = "sublist">
                 <li><a href="/admin">Admin Interface</a></li>
-                <li><a class="{%active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
+                <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
+                <li><a class="{% active request upload_data %}" href="{{ upload_data }}">File Data Upload</a></li>
             </ul>
         </li>
         <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}">Backups</a>

@@ -3,10 +3,11 @@ from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from forms import SchoolForm, RoomForm
+from forms import SchoolForm, RoomForm, UploadDataForm
 from django.db import models
 from models import *
 from mittab.libs.tab_logic import TabFlags
+from mittab.libs.data_import import import_judges, import_scratches, import_teams
 
 def index(request):
     number_teams = Team.objects.count()
@@ -248,4 +249,47 @@ def view_scratches(request):
                              {'item_type':'team',
                               'title': "Viewing All Scratches for Teams",
                               'item_list':c_scratches}, context_instance=RequestContext(request))
+
+def upload_data(request):
+    if request.method == 'POST':
+      form = UploadDataForm(request.POST, request.FILES)
+      if form.is_valid():
+        judgeErrors = scratchErrors = teamErrors = []
+        importName = ''
+        results = ''
+        #TODO: Could probably turn these checks into a loop
+        if 'judgeFile' in request.FILES:
+          judgeErrors = import_judges.import_judges(request.FILES['judgeFile'])
+          importName += request.FILES['judgeFile'].name + ' '
+          if len(judgeErrors) > 0:
+            results += 'Judge Import Errors (Please Check These Manually):\n'
+            for e in judgeErrors:
+              results += '    ' + e + '\n'
+        if 'teamFile' in request.FILES:
+          teamErrors = import_teams.import_teams(request.FILES['teamFile'])
+          importName += request.FILES['teamFile'].name + ' '
+          if len(teamErrors) > 0:
+            results += 'Team Import Errors (Please Check These Manually):\n'
+            for e in teamErrors:
+              results += '    ' + e + '\n'
+        if 'scratchFile' in request.FILES:
+          scratchErrors = import_scratches.import_scratches(request.FILES['scratchFile'])
+          importName += request.FILES['scratchFile'].name + ' '
+          if len(scratchErrors) > 0:
+            results += 'Scratch Import Errors (Please Check These Manually):\n'
+            for e in scratchErrors:
+              results += '    ' + e + '\n'
+        return render_to_response('thanks.html', 
+                                 {'data_type': "Database data",
+                                  'data_name': importName,
+                                  'data_modification': "INPUT",
+                                  'results': True,
+                                  'data_results': results}, 
+                                  context_instance=RequestContext(request))
+    else:
+      form = UploadDataForm()
+    return render_to_response('data_entry.html', 
+                              {'form': form,
+                               'title': 'Upload Input Files'}, 
+                               context_instance=RequestContext(request))
     

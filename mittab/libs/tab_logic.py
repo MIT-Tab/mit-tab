@@ -134,7 +134,7 @@ def pair_round():
                         #If Team was not a lenient NoShow in every previous round, they're valid. 
                         #Otherwise check next team
                         checking_lenient = True
-                        while (checking_lenient == True):
+                        while (checking_lenient):
                             for r in range(1, current_round):
                                 if not (NoShow.objects.filter(no_show_team=list_of_teams[bracket][byeint],
                                                         round_number=r)):
