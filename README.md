@@ -89,6 +89,6 @@ Rooms:
 1. Room Name
 2. Room Rank (Decimal Value from 0-100)
 
-*Note that schools and scratches must still be put in manually. If schools have not
+* Note that schools and scratches must still be put in manually. If schools have not
 been added, imports will fail
-*The first row is assumed to be a header row - it will not be read
+* The first row is assumed to be a header row - it will not be read
