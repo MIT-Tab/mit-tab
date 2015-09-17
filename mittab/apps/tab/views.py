@@ -7,7 +7,7 @@ from forms import SchoolForm, RoomForm, UploadDataForm
 from django.db import models
 from models import *
 from mittab.libs.tab_logic import TabFlags
-from mittab.libs.data_import import import_judges, import_scratches, import_teams
+from mittab.libs.data_import import import_judges, import_rooms, import_teams
 
 def index(request):
     number_teams = Team.objects.count()
@@ -258,6 +258,13 @@ def upload_data(request):
         importName = ''
         results = ''
         #TODO: Could probably turn these checks into a loop
+        if 'teamFile' in request.FILES:
+          teamErrors = import_teams.import_teams(request.FILES['teamFile'])
+          importName += request.FILES['teamFile'].name + ' '
+          if len(teamErrors) > 0:
+            results += 'Team Import Errors (Please Check These Manually):\n'
+            for e in teamErrors:
+              results += '            ' + e + '\n'
         if 'judgeFile' in request.FILES:
           judgeErrors = import_judges.import_judges(request.FILES['judgeFile'])
           importName += request.FILES['judgeFile'].name + ' '
@@ -265,12 +272,12 @@ def upload_data(request):
             results += 'Judge Import Errors (Please Check These Manually):\n'
             for e in judgeErrors:
               results += '            ' + e + '\n'
-        if 'teamFile' in request.FILES:
-          teamErrors = import_teams.import_teams(request.FILES['teamFile'])
-          importName += request.FILES['teamFile'].name + ' '
-          if len(teamErrors) > 0:
-            results += 'Team Import Errors (Please Check These Manually):\n'
-            for e in teamErrors:
+        if 'roomFile' in request.FILES:
+          roomErrors = import_rooms.import_rooms(request.FILES['roomFile'])
+          importName += request.FILES['roomFile'].name + ' '
+          if len(roomErrors) > 0:
+            results += 'Room Import Errors (Please Check These Manually):\n'
+            for e in roomErrors:
               results += '            ' + e + '\n'
         return render_to_response('thanks.html', 
                                  {'data_type': "Database data",
