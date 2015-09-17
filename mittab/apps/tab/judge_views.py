@@ -170,7 +170,7 @@ def add_scratches(request, judge_id, number_scratches):
             for form in forms:
                 form.save()
             return render_to_response('thanks.html', 
-                                     {'data_type': "Scratches for Jude",
+                                     {'data_type': "Scratches for Judge",
                                       'data_name': "["+str(judge_id)+"]",
                                       'data_modification': "CREATED"},
                                       context_instance=RequestContext(request))            

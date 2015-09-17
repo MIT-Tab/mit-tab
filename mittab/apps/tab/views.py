@@ -3,7 +3,7 @@ from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from forms import SchoolForm, RoomForm, UploadDataForm
+from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
 from models import *
 from mittab.libs.tab_logic import TabFlags
@@ -31,6 +31,29 @@ def render_403(request):
     t = loader.get_template('403.html')
     c = RequestContext(request, {})
     return HttpResponseForbidden(t.render(c))
+
+#View for manually adding scratches
+#TODO: Update logic here (and all other scratch methods) to prevent duplicate scratches
+def add_scratch(request):
+    if request.method == 'POST':
+        form = ScratchForm(request.POST)
+        if (form.is_valid()):
+          form.save()
+        judge = form.cleaned_data['judge'].name
+        team = form.cleaned_data['team'].name
+        return render_to_response('thanks.html', 
+                                  {'data_type': "Scratch",
+                                  'data_name': " from " + str(team) + " on " + str(judge),
+                                  'data_modification': "CREATED",
+                                  'enter_again': True},
+                                  context_instance=RequestContext(request))            
+    else:
+        form = ScratchForm(initial={'scratch_type':0})
+    return render_to_response('data_entry.html', 
+                              {'title':"Adding Scratch",
+                              'form': form}, 
+                              context_instance=RequestContext(request))
+
 
 #### BEGIN SCHOOL ###
 #Three views for entering, viewing, and editing schools

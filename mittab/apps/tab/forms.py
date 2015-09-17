@@ -100,6 +100,9 @@ class TeamEntryForm(forms.ModelForm):
         model = Team
         
 class ScratchForm(forms.ModelForm):
+    team = forms.ModelChoiceField(queryset=Team.objects.all())
+    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
         

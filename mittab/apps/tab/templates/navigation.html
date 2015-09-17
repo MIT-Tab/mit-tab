@@ -28,6 +28,7 @@
 {% url "mittab.apps.tab.pairing_views.manual_backup" as backup %}
 {% url "mittab.apps.tab.pairing_views.view_backups" as view_backups %}
 {% url "mittab.apps.tab.views.view_scratches" as view_scratches %}
+{% url "mittab.apps.tab.views.add_scratch" as add_scratch %}
 
 <div id="nab_bar">
     <ul id="navlist">
@@ -59,8 +60,11 @@
                 <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
             </ul>
         </li>
-    <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">Scratches</a></li>
-
+        <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">Scratches</a>
+            <ul id = "sublist">
+                <li><a class="{%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a></li>
+            </ul>
+        </li>
     </ul>
 <br>
 </div>

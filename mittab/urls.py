@@ -47,10 +47,11 @@ urlpatterns = patterns('',
     url(r'^view_rooms/$', views.view_rooms),
     url(r'^enter_room/$', views.enter_room),
 
-    # Scratch deletion
+    # Scratch related
     url(r'^judge/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
     url(r'^team/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
-    url(r'^scratches/', views.view_scratches),
+    url(r'^scratches/view/', views.view_scratches),
+    url(r'^enter_scratch/', views.add_scratch),
 
     # Team related
     url(r'^team/(\d+)/$', team_views.view_team),
