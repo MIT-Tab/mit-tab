@@ -62,6 +62,7 @@ Batch Data Import
 For file import, structure seperate .xlsx spreadsheets with columns as follows:
 
 Teams:
+
 1. Team's Name
 2. Team's School. If the team is a hybrid, use the school they're protected from
 3. Team Seed - "Full", "Half", "Free", or leave blank for Unseeded
@@ -76,6 +77,7 @@ Otherwise they will be marked as varsity
 11. Debater 2 Provider
 
 Judges:
+
 1. Judge's Name
 2. Judge's Rank (Decimial Value from 0-100)
 3. Judge's Phone Number (can be blank)
@@ -83,6 +85,7 @@ Judges:
 5. Affiliated schools, one per column, using as many additional columns as needed
 
 Rooms:
+
 1. Room Name
 2. Room Rank (Decimal Value from 0-100)
 
