@@ -50,6 +50,6 @@ def import_scratches(fileToImport):
                 s.save()
             except:
                 scratch_errors.append[[j,t]]
-        except:
-            print "Epic fail"
+        except Exception as e:
+            print e
     return scratch_errors

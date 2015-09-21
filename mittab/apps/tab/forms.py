@@ -11,9 +11,9 @@ class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
 
 class UploadDataForm(forms.Form):
-    teamFile = forms.FileField(label="Teams Data File", required=False)
-    judgeFile = forms.FileField(label="Judge Data File", required=False)
-    roomFile = forms.FileField(label="Room Data File", required=False)
+    team_file = forms.FileField(label="Teams Data File", required=False)
+    judge_file = forms.FileField(label="Judge Data File", required=False)
+    room_file = forms.FileField(label="Room Data File", required=False)
 
 
 class SchoolForm(forms.ModelForm):

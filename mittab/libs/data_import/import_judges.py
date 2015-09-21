@@ -35,8 +35,8 @@ def import_judges(fileToImport):
     judge_errors = []
     while found_end == False:
         try:
-            sh.cell(num_judges,0).value
-            num_judges +=1
+            sh.cell(num_judges, 0).value
+            num_judges += 1
         except IndexError:
             found_end = True
 
@@ -48,7 +48,7 @@ def import_judges(fileToImport):
             return team_errors
     for i in range(1, num_judges):
         #Load and validate Judge's Name
-        judge_name = sh.cell(i,0).value
+        judge_name = sh.cell(i, 0).value
         try:
             Judge.objects.get(name=judge_name)
             judge_errors.append(judge_name + ": Duplicate Judge Name")
@@ -57,7 +57,7 @@ def import_judges(fileToImport):
             pass
 
         #Load and validate judge_rank
-        judge_rank = sh.cell(i,1).value
+        judge_rank = sh.cell(i, 1).value
         try:
             judge_rank = Decimal(judge_rank)
         except:
@@ -69,44 +69,46 @@ def import_judges(fileToImport):
 
         #Because this data is not required, be prepared for IndexErrors
         try:
-            judge_phone = sh.cell(i,2).value
+            judge_phone = sh.cell(i, 2).value
         except IndexError:
             judge_phone = ''
         try: 
-            judge_provider = sh.cell(i,3).value
+            judge_provider = sh.cell(i, 3).value
         except IndexError:
             judge_provider = ''
 
         #iterate through schools until none are left
-        curCol = 4
-        moreSchools = True
-        bad_judge = False
+        cur_col = 4
         schools = []
         while(True):
             try:
-                judge_school = sh.cell(i,curCol).value
+                judge_school = sh.cell(i, cur_col).value
                 #If other judges have more schools but this judge doesn't, we get an empty string
                 #If blank, keep iterating in case user has a random blank column for some reason
                 if (judge_school != ''):
                     try:
                         #Get id from the name because JudgeForm requires we use id
-                        s = School.objects.get(name=judge_school).id 
+                        s = School.objects.get(name__iexact=judge_school).id 
                         schools.append(s)
-                    except:
-                        bad_judge = True
+                    except IndexError:
                         break
+                    except:
+                        try:
+                            s = School(name=judge_school)
+                            s.save()
+                            schools.append(s.id)
+                        except:
+                            judge_errors.append(judge_name + ': Invalid School')
+                            continue
             except IndexError:
                 break
-            curCol += 1
-        if (not bad_judge):
-            form = JudgeForm(data = {'name': judge_name, 'rank': judge_rank, 'phone': judge_phone,
-                                    'provider': judge_provider, 'schools': schools})
-            if (form.is_valid()):
-                form.save()
-            else:
-                judge_errors.append(judge_name + ": Unknown Error")
+            cur_col += 1
+        form = JudgeForm(data={'name': judge_name, 'rank': judge_rank, 'phone': judge_phone,
+                                'provider': judge_provider, 'schools': schools})
+        if (form.is_valid()):
+            form.save()
         else:
-            judge_errors.append(judge_name + ": Invalid School")
+            judge_errors.append(judge_name + ": Unknown Error")
                 
     return judge_errors
         

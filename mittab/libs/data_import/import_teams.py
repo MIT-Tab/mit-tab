@@ -19,6 +19,7 @@
 #THE SOFTWARE.
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab.forms import SchoolForm
 
 import xlrd
 from xlwt import Workbook
@@ -33,7 +34,7 @@ def import_teams(fileToImport):
     team_errors = []
     while found_end == False:
         try:
-            sh.cell(num_teams,0).value
+            sh.cell(num_teams, 0).value
             num_teams +=1
         except IndexError:
             found_end = True
@@ -47,27 +48,33 @@ def import_teams(fileToImport):
 
     for i in range(1, num_teams):
 
-        team_name = sh.cell(i,0).value
+        team_name = sh.cell(i, 0).value
         if team_name == '':
             team_errors.append('Row ' + str(i) + ': Empty Team Name')
             continue
         try:
-            theName = Team.objects.get(name=team_name)
+            Team.objects.get(name=team_name)
             team_errors.append(team_name + ': Duplicate Team Name')
             continue
         except:
             pass
 
-        team_school = sh.cell(i,1).value
+        school_name = sh.cell(i, 1).value.strip()
         try:
-            team_school = School.objects.get(name=team_school)
+            team_school = School.objects.get(name__iexact=school_name)
         except:
-            team_errors.append(team_name + ': Invalid School')
-            continue
-        
+            #Create school through SchoolForm because for some reason they don't save otherwise
+            form = SchoolForm(data={'name': school_name})
+            if form.is_valid():
+                form.save()
+            else:
+                team_errors.append(team_name + ": Invalid School")
+                continue
+            team_school = School.objects.get(name__iexact=school_name)
+
 
         #TODO: Verify there are not multiple free seeds from the same school
-        team_seed = sh.cell(i,2).value.lower()
+        team_seed = sh.cell(i,2).value.strip().lower()
         if team_seed == 'full seed' or team_seed == 'full':
             team_seed = 3
         elif team_seed == 'half seed' or team_seed == 'half':
@@ -85,7 +92,7 @@ def import_teams(fileToImport):
             team_errors.append(team_name + ': Empty Debater-1 Name')
             continue
         try:
-            theName = Debater.objects.get(name=deb1_name)
+            Debater.objects.get(name=deb1_name)
             team_errors.append(team_name + ': Duplicate Debater-1 Name')
             continue
         except:
@@ -99,11 +106,11 @@ def import_teams(fileToImport):
         deb1_provider = sh.cell(i,6).value
 
 
-        ironMan = False
+        iron_man = False
         deb2_name = sh.cell(i,7).value
         if deb2_name == '':
-            ironMan = True
-        if (not ironMan):
+            iron_man = True
+        if (not iron_man):
             try:
                 Debater.objects.get(name=deb2_name)
                 team_errors.append(team_name + ': Duplicate Debater-2 Name')
@@ -134,7 +141,7 @@ def import_teams(fileToImport):
         except:
             team_errors.append(team_name + ': Unkown Error Saving Debater 1')
             continue
-        if (not ironMan):
+        if (not iron_man):
             try:
                 deb2 = Debater(name = deb2_name, novice_status = deb2_status, phone = deb2_phone, provider = deb2_provider)
                 deb2.save()
@@ -144,11 +151,11 @@ def import_teams(fileToImport):
                                     'Please Check this Manually')
                 continue
         
-        team = Team(name = team_name, school = team_school, seed = team_seed)
+        team = Team(name=team_name, school=team_school, seed=team_seed)
         try:
             team.save()
             team.debaters.add(deb1)
-            if (not ironMan):
+            if (not iron_man):
                 team.debaters.add(deb2)
             else:
                 team_errors.append(team_name + ": Detected to be Iron Man - Still added successfully")

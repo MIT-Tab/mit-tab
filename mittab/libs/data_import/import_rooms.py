@@ -35,7 +35,7 @@ def import_rooms(fileToImport):
     room_errors = []
     while found_end == False:
         try:
-            sh.cell(num_rooms,0).value
+            sh.cell(num_rooms, 0).value
             num_rooms +=1
         except IndexError:
             found_end = True
@@ -48,7 +48,7 @@ def import_rooms(fileToImport):
             return room_errors
 
     for i in range(1, num_rooms):
-        room_name = sh.cell(i,0).value
+        room_name = sh.cell(i, 0).value
         if room_name == '':
             room_errors.append("Row " + str(i) + ": Empty Room Name")
             continue
@@ -60,7 +60,7 @@ def import_rooms(fileToImport):
             pass
 
         #Load and validate room_rank
-        room_rank = sh.cell(i,1).value
+        room_rank = sh.cell(i, 1).value
         try:
             room_rank = Decimal(room_rank)
         except:

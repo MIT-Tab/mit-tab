@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/jolynch/mit-tab.svg?branch=master)](https://travis-ci.org/jolynch/mit-tab)
+
 MIT-TAB
 =======
 A web application that allows APDA american debate tournaments to correctly tab
@@ -89,6 +91,5 @@ Rooms:
 1. Room Name
 2. Room Rank (Decimal Value from 0-100)
 
-* Note that schools and scratches must still be put in manually. If schools have not
-been added, imports will fail
+
 * The first row is assumed to be a header row - it will not be read

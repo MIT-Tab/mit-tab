@@ -43,7 +43,7 @@ def add_scratch(request):
         team = form.cleaned_data['team'].name
         return render_to_response('thanks.html', 
                                   {'data_type': "Scratch",
-                                  'data_name': " from " + str(team) + " on " + str(judge),
+                                  'data_name': " from {0} on {1}".format(team,judge),
                                   'data_modification': "CREATED",
                                   'enter_again': True},
                                   context_instance=RequestContext(request))            
@@ -101,6 +101,7 @@ def view_school(request, school_id):
                                   context_instance=RequestContext(request))
 
 def enter_school(request):
+
     if request.method == 'POST':
         form = SchoolForm(request.POST)
         if form.is_valid():
@@ -277,30 +278,30 @@ def upload_data(request):
     if request.method == 'POST':
       form = UploadDataForm(request.POST, request.FILES)
       if form.is_valid():
-        judgeErrors = scratchErrors = teamErrors = []
+        judge_errors = room_errors = team_errors = []
         importName = ''
         results = ''
         #TODO: Could probably turn these checks into a loop
-        if 'teamFile' in request.FILES:
-          teamErrors = import_teams.import_teams(request.FILES['teamFile'])
-          importName += request.FILES['teamFile'].name + ' '
-          if len(teamErrors) > 0:
+        if 'team_file' in request.FILES:
+          team_errors = import_teams.import_teams(request.FILES['team_file'])
+          importName += request.FILES['team_file'].name + ' '
+          if len(team_errors) > 0:
             results += 'Team Import Errors (Please Check These Manually):\n'
-            for e in teamErrors:
+            for e in team_errors:
               results += '            ' + e + '\n'
-        if 'judgeFile' in request.FILES:
-          judgeErrors = import_judges.import_judges(request.FILES['judgeFile'])
-          importName += request.FILES['judgeFile'].name + ' '
-          if len(judgeErrors) > 0:
+        if 'judge_file' in request.FILES:
+          judge_errors = import_judges.import_judges(request.FILES['judge_file'])
+          importName += request.FILES['judge_file'].name + ' '
+          if len(judge_errors) > 0:
             results += 'Judge Import Errors (Please Check These Manually):\n'
-            for e in judgeErrors:
+            for e in judge_errors:
               results += '            ' + e + '\n'
-        if 'roomFile' in request.FILES:
-          roomErrors = import_rooms.import_rooms(request.FILES['roomFile'])
-          importName += request.FILES['roomFile'].name + ' '
-          if len(roomErrors) > 0:
+        if 'room_file' in request.FILES:
+          room_errors = import_rooms.import_rooms(request.FILES['room_file'])
+          importName += request.FILES['room_file'].name + ' '
+          if len(room_errors) > 0:
             results += 'Room Import Errors (Please Check These Manually):\n'
-            for e in roomErrors:
+            for e in room_errors:
               results += '            ' + e + '\n'
         return render_to_response('thanks.html', 
                                  {'data_type': "Database data",
