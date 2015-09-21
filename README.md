@@ -1,3 +1,5 @@
+https://travis-ci.org/jolynch/mit-tab.svg?branch=master
+
 MIT-TAB
 =======
 A web application that allows APDA american debate tournaments to correctly tab
