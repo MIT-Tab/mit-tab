@@ -1,4 +1,4 @@
-https://travis-ci.org/jolynch/mit-tab.svg?branch=master
+[![Build Status](https://travis-ci.org/jolynch/mit-tab.svg?branch=master)](https://travis-ci.org/jolynch/mit-tab)
 
 MIT-TAB
 =======
