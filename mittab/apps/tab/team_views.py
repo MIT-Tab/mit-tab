@@ -235,7 +235,12 @@ def tab_card(request, team_id):
     rounds.sort(key =lambda x: x.round_number)
     roundstats = [RoundStats.objects.filter(round=r) for r in rounds]
     debaters = [d for d in team.debaters.all()]
-    d1,d2 = debaters[0], debaters[1]
+    iron_man = False
+    if (len(debaters) == 1):
+      iron_man = True
+    d1 = debaters[0]
+    if (not iron_man):
+      d2 = debaters[1]
     round_stats = []
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
     cur_round = TabSettings.objects.get(key="cur_round").value
@@ -245,7 +250,9 @@ def tab_card(request, team_id):
 
     for r in rounds:
         dstat1 = [k for k in RoundStats.objects.filter(debater=d1).filter(round=r).all()]
-        dstat2 = [k for k in RoundStats.objects.filter(debater=d2).filter(round=r).all()]
+        dstat2 = []
+        if (not iron_man):
+          dstat2 = [k for k in RoundStats.objects.filter(debater=d2).filter(round=r).all()]
         blank_rs = RoundStats(debater=d1, round=r, speaks=0, ranks=0)
         while len(dstat1) + len(dstat2) < 2:
             # Something is wrong with our data, but we don't want to crash
@@ -306,7 +313,10 @@ def tab_card(request, team_id):
         bye_round = Bye.objects.get(bye_team = team).round_number
     except:
         bye_round = None
-        
+
+    #Duplicates Debater 1 for display if Ironman team    
+    if (iron_man):
+      d2 = d1
     return render_to_response('tab_card.html', 
                              {'team_name': team.name,
                               'team_school': team.school,
