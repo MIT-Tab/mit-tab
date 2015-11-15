@@ -128,26 +128,7 @@ def pair_round():
                 #print "need pull-up"
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
-                    byeint = len(list_of_teams[bracket])-1
-                    #Don't give the bye to a team who only has lenient NoShows
-                    if (TabSettings.get('lenient_late') + 1 >= current_round):
-                        #If Team was not a lenient NoShow in every previous round, they're valid. 
-                        #Otherwise check next team
-                        checking_lenient = True
-                        while (checking_lenient):
-                            for r in range(1, current_round):
-                                if not (NoShow.objects.filter(no_show_team=list_of_teams[bracket][byeint],
-                                                        round_number=r)):
-                                    checking_lenient = False
-                                    break
-                            if not checking_lenient:
-                                break
-                            #If there are no more teams, just use the original
-                            if (byeint > 0):
-                                byeint -= 1
-                            else:
-                                byeint = len(list_of_teams[bracket]) - 1
-                                checking_lenient = False
+                    byeint = len(list_of_teams[bracket]) - 1
                     b = Bye(bye_team = list_of_teams[bracket][byeint],
                             round_number = current_round)
                     b.save()
@@ -774,7 +755,7 @@ def avg_deb_ranks(debater):
         return float(sum(real_ranks)) / float(len(real_ranks))
 
 def debater_forfeit_ranks(debater, round_number):
-    #Calculate a debater's ranks for a forfeit round
+    # Calculate a debater's ranks for a forfeit round
 
     if (TabSettings.get('lenient_late') >= round_number):
         return avg_deb_ranks(debater)
