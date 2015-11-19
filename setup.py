@@ -18,6 +18,8 @@ setup(
         'South',
         'mock',
         'pytest',
+        'xlrd',
+        'xlwt'
     ],
     extras_require = {
         'Statistical Analysis': ['numpy'],

@@ -59,5 +59,37 @@ which means that your tab will be much more fair and as optimal as possible.
 a program like TRPC, MIT-TAB forces you to use standard tabbing practices so that
 tournament experiences are more uniform.
 
+Batch Data Import
+-----------------
+For file import, structure seperate .xlsx spreadsheets with columns as follows:
+
+Teams:
+
+1. Team's Name
+2. Team's School. If the team is a hybrid, use the school they're protected from
+3. Team Seed - "Full", "Half", "Free", or leave blank for Unseeded
+4. Debater 1 Name - If the team is an ironman, place the debater's info here
+5. Debater 1 Varsity/Novice - "Novice", "Nov", or "N", to mark debater as novice.
+Otherwise they will be marked as varsity
+6. Debater 1 Phone Number - can be blank
+7. Debater 1 Provider - can be blank
+8. Debater 2 Name - if ironman, leave blank
+9. Debater 2 Varsity/Novice
+10. Debater 2 Phone
+11. Debater 2 Provider
+
+Judges:
+
+1. Judge's Name
+2. Judge's Rank (Decimial Value from 0-100)
+3. Judge's Phone Number (can be blank)
+4. Judge's Provider (can be blank)
+5. Affiliated schools, one per column, using as many additional columns as needed
+
+Rooms:
+
+1. Room Name
+2. Room Rank (Decimal Value from 0-100)
 
 
+* The first row is assumed to be a header row - it will not be read

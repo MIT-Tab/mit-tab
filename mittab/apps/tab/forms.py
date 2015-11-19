@@ -7,8 +7,14 @@ from decimal import Decimal
 import itertools
 import pprint
 
-class UploadFileForm(forms.Form):
+class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
+
+class UploadDataForm(forms.Form):
+    team_file = forms.FileField(label="Teams Data File", required=False)
+    judge_file = forms.FileField(label="Judge Data File", required=False)
+    room_file = forms.FileField(label="Room Data File", required=False)
+
 
 class SchoolForm(forms.ModelForm):
     class Meta:
@@ -94,6 +100,9 @@ class TeamEntryForm(forms.ModelForm):
         model = Team
         
 class ScratchForm(forms.ModelForm):
+    team = forms.ModelChoiceField(queryset=Team.objects.all())
+    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
         

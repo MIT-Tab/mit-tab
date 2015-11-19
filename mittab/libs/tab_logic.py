@@ -128,7 +128,7 @@ def pair_round():
                 #print "need pull-up"
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
-                    byeint = len(list_of_teams[bracket])-1
+                    byeint = len(list_of_teams[bracket]) - 1
                     b = Bye(bye_team = list_of_teams[bracket][byeint],
                             round_number = current_round)
                     b.save()
@@ -619,13 +619,13 @@ def avg_deb_speaks(debater):
         return float(sum(real_speaks)) / float(len(real_speaks))
 
 
-def debater_forfeit_speaks(debater):
-    """ Calculate a debater's speaks for a forfeit round
+def debater_forfeit_speaks(debater, round_number):
+    #Calculate a debater's speaks for a forfeit round
 
-    Note that right now we just return 0, but we may want to add support
-    for returning average speaks or some such
-    """
-    return 0.0
+    if (TabSettings.get('lenient_late') >= round_number):
+        return avg_deb_speaks(debater)
+    else:
+        return 0.0
 
 @cache()
 def speaks_for_debater(debater, average_ironmen=True):
@@ -645,6 +645,7 @@ def speaks_for_debater(debater, average_ironmen=True):
 
     Byes:
     If a debater wins in a bye, they get their average speaks
+    If a debater was late to a lenient round, they get average speaks
     """
     team = deb_team(debater)
     # We start counting at 1, so when cur_round says 6 that means that we are
@@ -675,7 +676,7 @@ def speaks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_speaks.append(debater_forfeit_speaks(debater))
+                debater_speaks.append(debater_forfeit_speaks(debater, round_number))
             else:
                 if average_ironmen:
                     debater_speaks.append(avg_speaks)
@@ -690,7 +691,7 @@ def speaks_for_debater(debater, average_ironmen=True):
             if had_bye:
                 debater_speaks.append(avg_deb_speaks(debater))
             elif had_noshow:
-                debater_speaks.append(debater_forfeit_speaks(debater))
+                debater_speaks.append(debater_forfeit_speaks(debater, round_number))
 
     debater_speaks = map(float, debater_speaks)
     return debater_speaks
@@ -753,13 +754,13 @@ def avg_deb_ranks(debater):
     else:
         return float(sum(real_ranks)) / float(len(real_ranks))
 
-def debater_forfeit_ranks(debater):
-    """ Calculate a debater's ranks for a forfeit round
+def debater_forfeit_ranks(debater, round_number):
+    # Calculate a debater's ranks for a forfeit round
 
-    Note that right now we just return 3.5 (average of 3 and 4), but we may
-    want to support returning average ranks or some such
-    """
-    return 3.5
+    if (TabSettings.get('lenient_late') >= round_number):
+        return avg_deb_ranks(debater)
+    else:
+        return 3.5
 
 
 @cache()
@@ -780,6 +781,7 @@ def ranks_for_debater(debater, average_ironmen=True):
 
     Byes:
     If a debater wins in a bye, they get their average ranks
+    If a debater was late to a lenient round, they get average ranks
     """
     team = deb_team(debater)
     # We start counting at 1, so when cur_round says 6 that means that we are
@@ -804,7 +806,7 @@ def ranks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_ranks.append(debater_forfeit_ranks(debater))
+                debater_ranks.append(debater_forfeit_ranks(debater, round_number))
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
@@ -819,7 +821,7 @@ def ranks_for_debater(debater, average_ironmen=True):
             if had_bye:
                 debater_ranks.append(avg_deb_ranks(debater))
             elif had_noshow:
-                debater_ranks.append(debater_forfeit_ranks(debater))
+                debater_ranks.append(debater_forfeit_ranks(debater, round_number))
 
     debater_ranks = map(float, debater_ranks)
     return debater_ranks

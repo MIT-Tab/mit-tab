@@ -18,72 +18,154 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from tab.models import *
+from mittab.apps.tab.models import *
+from mittab.apps.tab.forms import SchoolForm
+
 import xlrd
-import csv
 from xlwt import Workbook
 
 def import_teams(fileToImport):
-    wb = xlrd.open_workbook(fileToImport)
-    sh = wb.sheet_by_index(0)
+    try:
+        sh = xlrd.open_workbook(filename=None, file_contents=fileToImport.read()).sheet_by_index(0)
+    except:
+        return ['ERROR: Please upload an .xlsx file. This filetype is not compatible']
     num_teams = 0
     found_end = False
+    team_errors = []
     while found_end == False:
         try:
-            sh.cell(num_teams,0).value
+            sh.cell(num_teams, 0).value
             num_teams +=1
         except IndexError:
             found_end = True
-    for i in range(num_teams):
-        if i != 0:
-            team_school = sh.cell(i,1).value
+
+        #Verify sheet has required number of columns
+        try:
+            sh.cell(0, 8).value
+        except:
+            team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
+            return team_errors
+
+    for i in range(1, num_teams):
+
+        team_name = sh.cell(i, 0).value
+        if team_name == '':
+            team_errors.append('Row ' + str(i) + ': Empty Team Name')
+            continue
+        try:
+            Team.objects.get(name=team_name)
+            team_errors.append(team_name + ': Duplicate Team Name')
+            continue
+        except:
+            pass
+
+        school_name = sh.cell(i, 1).value.strip()
+        try:
+            team_school = School.objects.get(name__iexact=school_name)
+        except:
+            #Create school through SchoolForm because for some reason they don't save otherwise
+            form = SchoolForm(data={'name': school_name})
+            if form.is_valid():
+                form.save()
+            else:
+                team_errors.append(team_name + ": Invalid School")
+                continue
+            team_school = School.objects.get(name__iexact=school_name)
+
+
+        #TODO: Verify there are not multiple free seeds from the same school
+        team_seed = sh.cell(i,2).value.strip().lower()
+        if team_seed == 'full seed' or team_seed == 'full':
+            team_seed = 3
+        elif team_seed == 'half seed' or team_seed == 'half':
+            team_seed = 2
+        elif team_seed == 'free seed' or team_seed == 'free':
+            team_seed = 1
+        elif team_seed == 'unseeded' or team_seed == 'un' or team_seed == 'none' or team_seed == '':
+            team_seed = 0
+        else:
+            team_errors.append(team_name + ': Invalid Seed Value')
+            continue
+
+        deb1_name = sh.cell(i,3).value
+        if deb1_name == '':
+            team_errors.append(team_name + ': Empty Debater-1 Name')
+            continue
+        try:
+            Debater.objects.get(name=deb1_name)
+            team_errors.append(team_name + ': Duplicate Debater-1 Name')
+            continue
+        except:
+            pass
+        deb1_status = sh.cell(i,4).value.lower()
+        if deb1_status == 'novice' or deb1_status == 'nov' or deb1_status == 'n':
+            deb1_status = 1
+        else:
+            deb1_status = 0
+        deb1_phone = sh.cell(i,5).value
+        deb1_provider = sh.cell(i,6).value
+
+
+        iron_man = False
+        deb2_name = sh.cell(i,7).value
+        if deb2_name == '':
+            iron_man = True
+        if (not iron_man):
             try:
-                s = School(name = team_school)
-                s.save()
+                Debater.objects.get(name=deb2_name)
+                team_errors.append(team_name + ': Duplicate Debater-2 Name')
+                continue
             except:
-                s = School.objects.get(name = team_school)
-            finally:
-                deb1_name = sh.cell(i,3).value
-                deb1_status = sh.cell(i,4).value
-                if deb1_status == "Novice":
-                    deb1_status = 1
-                else:
-                    deb1_status = 0
-                deb1_phone = sh.cell(i,5).value
-                deb1_provider = sh.cell(i,6).value
-                deb2_name = sh.cell(i,7).value
-                deb2_status = sh.cell(i,8).value
-                if deb2_status == "Novice":
-                    deb2_status = 1
-                else:
-                    deb2_status = 0
+                pass
+            deb2_status = sh.cell(i,8).value.lower()
+            if deb2_status == 'novice' or deb2_status == 'nov' or deb2_status == 'n':
+                deb2_status = 1
+            else:
+                deb2_status = 0
+
+            #Since this is not required data and at the end of the sheet, be ready for index errors
+            try: 
                 deb2_phone = sh.cell(i,9).value
+            except IndexError:
+                deb2_phone = ''
+            try:
                 deb2_provider = sh.cell(i,10).value
-                deb1 = Debater(name = deb1_name, novice_status = deb1_status, phone = deb1_phone, provider = deb1_provider)
-                deb1.save()
+            except IndexError:
+                deb2_provider = ''
+
+
+        #Save Everything
+        try:
+            deb1 = Debater(name = deb1_name, novice_status = deb1_status, phone = deb1_phone, provider = deb1_provider)
+            deb1.save()
+        except:
+            team_errors.append(team_name + ': Unkown Error Saving Debater 1')
+            continue
+        if (not iron_man):
+            try:
                 deb2 = Debater(name = deb2_name, novice_status = deb2_status, phone = deb2_phone, provider = deb2_provider)
                 deb2.save()
-                team_name = sh.cell(i,0).value
-                team_seed = sh.cell(i,2).value
-                if team_seed == "Full seed":
-                    team_seed = 3
-                elif team_seed == "Half seed":
-                    team_seed = 2
-                elif team_seed == "Free seed":
-                    team_seed = 1
-                elif team_seed == "Unseeded":
-                    team_seed = 0
-                team = Team(name = team_name, school = s, seed = team_seed)
-                try:
-                    team.save()
-                    team.debaters.add(deb1)
-                    team.debaters.add(deb2)
-                    team.save()
-                    print "Added team: %s" % team_name
-                except:
-                    print "Failed to add team: %s" % team_name
+            except:
+                team_errors.append(team_name + ': Unkown Error Saving Debater 2')
+                team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
+                                    'Please Check this Manually')
+                continue
+        
+        team = Team(name=team_name, school=team_school, seed=team_seed)
+        try:
+            team.save()
+            team.debaters.add(deb1)
+            if (not iron_man):
+                team.debaters.add(deb2)
+            else:
+                team_errors.append(team_name + ": Detected to be Iron Man - Still added successfully")
+            team.save()
+        except:
+            team_errors.append(team_name + ': Unknown Error Saving Team')
+            team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
+                                'Please Check this Manually')
 
-    print "teams entered"
+    return team_errors
 
     
 

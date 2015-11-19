@@ -3,10 +3,11 @@ from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from forms import SchoolForm, RoomForm
+from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
 from models import *
 from mittab.libs.tab_logic import TabFlags
+from mittab.libs.data_import import import_judges, import_rooms, import_teams
 
 def index(request):
     number_teams = Team.objects.count()
@@ -30,6 +31,29 @@ def render_403(request):
     t = loader.get_template('403.html')
     c = RequestContext(request, {})
     return HttpResponseForbidden(t.render(c))
+
+#View for manually adding scratches
+#TODO: Update logic here (and all other scratch methods) to prevent duplicate scratches
+def add_scratch(request):
+    if request.method == 'POST':
+        form = ScratchForm(request.POST)
+        if (form.is_valid()):
+          form.save()
+        judge = form.cleaned_data['judge'].name
+        team = form.cleaned_data['team'].name
+        return render_to_response('thanks.html', 
+                                  {'data_type': "Scratch",
+                                  'data_name': " from {0} on {1}".format(team,judge),
+                                  'data_modification': "CREATED",
+                                  'enter_again': True},
+                                  context_instance=RequestContext(request))            
+    else:
+        form = ScratchForm(initial={'scratch_type':0})
+    return render_to_response('data_entry.html', 
+                              {'title':"Adding Scratch",
+                              'form': form}, 
+                              context_instance=RequestContext(request))
+
 
 #### BEGIN SCHOOL ###
 #Three views for entering, viewing, and editing schools
@@ -77,6 +101,7 @@ def view_school(request, school_id):
                                   context_instance=RequestContext(request))
 
 def enter_school(request):
+
     if request.method == 'POST':
         form = SchoolForm(request.POST)
         if form.is_valid():
@@ -248,4 +273,47 @@ def view_scratches(request):
                              {'item_type':'team',
                               'title': "Viewing All Scratches for Teams",
                               'item_list':c_scratches}, context_instance=RequestContext(request))
+
+def upload_data(request):
+    if request.method == 'POST':
+      form = UploadDataForm(request.POST, request.FILES)
+      if form.is_valid():
+        judge_errors = room_errors = team_errors = []
+        importName = ''
+        results = ''
+        #TODO: Could probably turn these checks into a loop
+        if 'team_file' in request.FILES:
+          team_errors = import_teams.import_teams(request.FILES['team_file'])
+          importName += request.FILES['team_file'].name + ' '
+          if len(team_errors) > 0:
+            results += 'Team Import Errors (Please Check These Manually):\n'
+            for e in team_errors:
+              results += '            ' + e + '\n'
+        if 'judge_file' in request.FILES:
+          judge_errors = import_judges.import_judges(request.FILES['judge_file'])
+          importName += request.FILES['judge_file'].name + ' '
+          if len(judge_errors) > 0:
+            results += 'Judge Import Errors (Please Check These Manually):\n'
+            for e in judge_errors:
+              results += '            ' + e + '\n'
+        if 'room_file' in request.FILES:
+          room_errors = import_rooms.import_rooms(request.FILES['room_file'])
+          importName += request.FILES['room_file'].name + ' '
+          if len(room_errors) > 0:
+            results += 'Room Import Errors (Please Check These Manually):\n'
+            for e in room_errors:
+              results += '            ' + e + '\n'
+        return render_to_response('thanks.html', 
+                                 {'data_type': "Database data",
+                                  'data_name': importName,
+                                  'data_modification': "INPUT",
+                                  'results': True,
+                                  'data_results': results}, 
+                                  context_instance=RequestContext(request))
+    else:
+      form = UploadDataForm()
+    return render_to_response('data_entry.html', 
+                              {'form': form,
+                               'title': 'Upload Input Files'}, 
+                               context_instance=RequestContext(request))
     

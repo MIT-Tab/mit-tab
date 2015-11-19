@@ -4,7 +4,9 @@
 
 {% block content %}
 <p style="color: blue;"> {{ data_type }} {{ data_name }} has been successfully modified!({{ data_modification }})</p>
-
+{% if results %}
+<p style="white-space: pre-wrap">{{ data_results }}</p>
+{% endif %}
 <div class="btn-group">
     {# TODO: Use reverse urls ... some reason it's not working for me #} 
     <a href="/" class="btn">Go Home</a>

@@ -40,6 +40,9 @@ class Command(BaseCommand):
         if not os.path.exists(tournament_dir):
             os.makedirs(tournament_dir)
 
+        if not os.path.exists(path + "/backups"):
+            os.makedirs(path + "/backups")
+
         self.stdout.write("Copying current tournament state to backup tournament directory: %s" % tournament_dir)
         try:
             shutil.copy(path + "/pairing_db.sqlite3", tournament_dir)
