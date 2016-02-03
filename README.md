@@ -32,7 +32,9 @@ requirements and then manually running the server. So:
 ```
 git clone <mit-tab repo> mit-tab
 cd mit-tab
-sudo pip install -r requirements.txt
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python manage.py runserver
 ```
 
