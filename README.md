@@ -35,10 +35,12 @@ cd mit-tab
 virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
+python manage.py changepassword tab
+# Type in the password you want to use while developing
 python manage.py runserver
 ```
 
-You can either run v1.0 (Django 1.4, battle hardened) or v2.0 (Django 1.6)
+At this time it is recommended to run v2.0 (Django 1.6)
 
 Production Setup
 ----------------
