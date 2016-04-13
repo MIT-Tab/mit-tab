@@ -55,7 +55,8 @@ def pair_round():
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for t in forfeit_teams:
-        n = NoShow(no_show_team = t, round_number = current_round)
+        lenient_late = TabSettings.get('lenient_late') >= current_round
+        n = NoShow(no_show_team = t, round_number = current_round, lenient_late = lenient_late)
         n.save()
 
     # If it is the first round, pair by *seed*
@@ -619,13 +620,14 @@ def avg_deb_speaks(debater):
         return float(sum(real_speaks)) / float(len(real_speaks))
 
 
-def debater_forfeit_speaks(debater, round_number):
-    #Calculate a debater's speaks for a forfeit round
+def debater_forfeit_speaks(debater):
+    """ Calculate a debater's speaks for a forfeit round
 
-    if (TabSettings.get('lenient_late') >= round_number):
-        return avg_deb_speaks(debater)
-    else:
-        return 0.0
+    Note that right now we just return 0, but we may want to add support
+    for returning average speaks or some such
+    """
+
+    return 0.0
 
 @cache()
 def speaks_for_debater(debater, average_ironmen=True):
@@ -676,7 +678,7 @@ def speaks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_speaks.append(debater_forfeit_speaks(debater, round_number))
+                debater_speaks.append(debater_forfeit_speaks(debater))
             else:
                 if average_ironmen:
                     debater_speaks.append(avg_speaks)
@@ -691,7 +693,10 @@ def speaks_for_debater(debater, average_ironmen=True):
             if had_bye:
                 debater_speaks.append(avg_deb_speaks(debater))
             elif had_noshow:
-                debater_speaks.append(debater_forfeit_speaks(debater, round_number))
+                if had_noshow.first().lenient_late:
+                    debater_speaks.append(avg_deb_speaks(debater))
+                else:
+                    debater_speaks.append(debater_forfeit_speaks(debater))
 
     debater_speaks = map(float, debater_speaks)
     return debater_speaks
@@ -754,13 +759,13 @@ def avg_deb_ranks(debater):
     else:
         return float(sum(real_ranks)) / float(len(real_ranks))
 
-def debater_forfeit_ranks(debater, round_number):
-    # Calculate a debater's ranks for a forfeit round
+def debater_forfeit_ranks(debater):
+    """ Calculate a debater's speaks for a forfeit round
 
-    if (TabSettings.get('lenient_late') >= round_number):
-        return avg_deb_ranks(debater)
-    else:
-        return 3.5
+    Note that right now we just return 3.5 (average of 3 and 4), but we may want to add support
+    for returning average ranks or some such
+    """
+    return 3.5
 
 
 @cache()
@@ -806,7 +811,7 @@ def ranks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_ranks.append(debater_forfeit_ranks(debater, round_number))
+                debater_ranks.append(debater_forfeit_ranks(debater))
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
@@ -821,7 +826,10 @@ def ranks_for_debater(debater, average_ironmen=True):
             if had_bye:
                 debater_ranks.append(avg_deb_ranks(debater))
             elif had_noshow:
-                debater_ranks.append(debater_forfeit_ranks(debater, round_number))
+                if had_noshow.first().lenient_late:
+                    debater_ranks.append(avg_deb_ranks(debater))
+                else:
+                    debater_ranks.append(debater_forfeit_ranks(debater))
 
     debater_ranks = map(float, debater_ranks)
     return debater_ranks
