@@ -61,13 +61,17 @@ def import_rooms(fileToImport):
 
         #Load and validate room_rank
         room_rank = sh.cell(i, 1).value
+        room_string = str(room_rank)
         try:
             room_rank = Decimal(room_rank)
         except:
             room_errors.append(room_name + ": Rank not number")
             continue
-        if room_rank > 100 or room_rank < 0:
-            room_errors.append(room_name + ": Rank should be between 0-100")
+        if len(room_string) > 5 or (room_rank < 10 and len(room_string) > 4):
+            room_errors.append(room_name + ": Rank should have no more than two decimal places")
+            continue
+        if room_rank >= 100 or room_rank < 0:
+            room_errors.append(room_name + ": Rank should be between 0-99.99")
             continue
 
         #Create the room
