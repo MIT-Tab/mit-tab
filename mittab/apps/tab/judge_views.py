@@ -37,7 +37,7 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    c_judge = [(judge.pk,judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
+    c_judge = [(judge.pk, judge.name+' ('+judge.ballot_code+') ', flags(judge), TabFlags.flags_to_symbols(flags(judge)))
                for judge in Judge.objects.order_by("name")]
 
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
@@ -120,7 +120,7 @@ def enter_judge(request):
                               {'form': form, 'title': "Create Judge"},
                               context_instance=RequestContext(request))
 
-@permission_required('tab.judge.can_delete', login_url="/403/")    
+@permission_required('tab.judge.can_delete', login_url="/403/")
 def delete_judge(request, judge_id):
     error_msg = None
     try :
@@ -131,7 +131,7 @@ def delete_judge(request, judge_id):
         error_msg = "Judge does not exist"
     except Exception as e:
         error_msg = "Error deleting judge: %s" % (e)
-    
+
     if error_msg:
         return render_to_response('error.html', 
                                  {'error_type': "Judge",
@@ -160,7 +160,7 @@ def add_scratches(request, judge_id, number_scratches):
                                   'error_name': str(judge_id),
                                   'error_info':"No such Judge"}, 
                                   context_instance=RequestContext(request))
-        
+
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) for i in range(1,number_scratches+1)]
         all_good = True
@@ -208,7 +208,7 @@ def view_scratches(request, judge_id):
                                       context_instance=RequestContext(request))  
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
-    
+
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
