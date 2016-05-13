@@ -81,7 +81,7 @@ class TeamForm(forms.ModelForm):
         if not( 1 <= len(data) <= 2) :
             raise forms.ValidationError("You must select 1 or 2 debaters!") 
         return data
-    
+
     class Meta:
         model = Team
 
@@ -98,26 +98,26 @@ class TeamEntryForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
-        
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        
-        
+
+
 def validate_speaks(value):
     if not (21.0 <= value <= 29.0 or value == 0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
-    
+
 #TODO: Rewrite this, it is ugly as hell
 class ResultEntryForm(forms.Form):
-    
+
     NAMES = {
         "pm" : "Prime Minister",
         "mg" : "Member of Government",
@@ -159,17 +159,14 @@ class ResultEntryForm(forms.Form):
 
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
+
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
         gov_debaters = [(-1,'---')]+[(d.id, d.name) for d in gov_team.debaters.all()]
         opp_debaters = [(-1,'---')]+[(d.id, d.name) for d in opp_team.debaters.all()]
 
-        # TODO: Combine these loops?
-        for d in self.GOV:
+        for d in self.GOV + self.OPP:
+            debater_choices = gov_debaters if d in self.GOV else opp_debaters
             self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=gov_debaters)
-            self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
-            self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
-        for d in self.OPP:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=opp_debaters)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
         if round_object.victor != 0 and not no_fill:
@@ -181,6 +178,7 @@ class ResultEntryForm(forms.Form):
                     self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
                 except:
                     pass
+
 
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -256,6 +254,37 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
+
+class EBallotForm(ResultEntryForm):
+
+    def __init__(self, *args, **kwargs):
+        super(EBallotForm, self).__init__(*args, **kwargs)
+        self.fields['ballot_code'] = forms.CharField(max_length=6, min_length=6)
+
+    def clean_data(self):
+        cleaned_data = self.clean_data
+        ballot_code = cleaned_data["ballot_code"]
+        if not Judges.objects.filter(ballot_code=ballot_code).first():
+            # If there is no judge with that ballot code
+            msg = "Could not find any judges with that ballot code."
+        else:
+            rounds = Round.objects.filter(judges__ballot_code=ballot_code)
+            current_round = TabSettings.objects.get(key="cur_round") - 1
+            rounds = rounds.objects.filter(round_number=current_round)
+            first = rounds.first()
+            if not first:
+                # If the judge is not paired into the round this ballot is for
+                message = "You are not juding this round."
+            elif ballot_code != first.chair.ballot_code:
+                # If the judge is not the chair of this round
+                message = "Only the chair of a panel can submit ballot."
+            elif RoundStats.filter(round=first).count() == 4:
+                # If there was already a ballot submitted for the round
+                message =  "A ballot has already been completed for this round."
+                message += "Go to tab if you need to change the results"
+                message += "for this round."
+        self._errors["ballot_code"] = self.error_class(msg)
+        super(EBallotForm, self).clean_data()
 
 def validate_panel(result):
     all_good = True
@@ -339,6 +368,4 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
-
-
 
