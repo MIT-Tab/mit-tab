@@ -510,7 +510,7 @@ def opp_strength(t):
     for r in myOppRounds:
         opp_record +=tot_wins(r.gov_team)
     return opp_record
-    
+
 # Return a list of all teams who have no varsity members 
 def all_nov_teams():
     return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))

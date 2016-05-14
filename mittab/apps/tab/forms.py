@@ -261,30 +261,39 @@ class EBallotForm(ResultEntryForm):
         super(EBallotForm, self).__init__(*args, **kwargs)
         self.fields['ballot_code'] = forms.CharField(max_length=6, min_length=6)
 
-    def clean_data(self):
-        cleaned_data = self.clean_data
+    def clean(self):
+        cleaned_data = self.cleaned_data
         ballot_code = cleaned_data["ballot_code"]
-        if not Judges.objects.filter(ballot_code=ballot_code).first():
+        if not Judge.objects.filter(ballot_code=ballot_code).first():
             # If there is no judge with that ballot code
-            msg = "Could not find any judges with that ballot code."
+            msg = "Incorrect ballot code. Enter again."
+            self._errors["ballot_code"] = self.error_class([msg])
         else:
             rounds = Round.objects.filter(judges__ballot_code=ballot_code)
-            current_round = TabSettings.objects.get(key="cur_round") - 1
-            rounds = rounds.objects.filter(round_number=current_round)
+            current_round = int(TabSettings.get(key="cur_round")) - 1
+            rounds = rounds.filter(round_number=current_round)
             first = rounds.first()
             if not first:
                 # If the judge is not paired into the round this ballot is for
-                message = "You are not juding this round."
+                msg = "You are not juding this round."
+                self._errors["ballot_code"] = self.error_class([msg])
             elif ballot_code != first.chair.ballot_code:
                 # If the judge is not the chair of this round
-                message = "Only the chair of a panel can submit ballot."
-            elif RoundStats.filter(round=first).count() == 4:
+                msg = "Only the chair of a panel can submit ballot."
+                self._errors["ballot_code"] = self.error_class([msg])
+            elif RoundStats.objects.filter(round=first).first():
                 # If there was already a ballot submitted for the round
-                message =  "A ballot has already been completed for this round."
-                message += "Go to tab if you need to change the results"
-                message += "for this round."
-        self._errors["ballot_code"] = self.error_class(msg)
-        super(EBallotForm, self).clean_data()
+                msg =  "A ballot has already been completed for this round."
+                msg += "Go to tab if you need to change the results "
+                msg += "for this round."
+                self._errors["ballot_code"] = self.error_class([msg])
+
+        for d in (self.GOV + self.OPP):
+            speaks = cleaned_data["%s_speaks" % d]
+            if speaks >= 26.75 or speaks <= 23.25:
+                self._errors["%s_speaks" % d] = self.error_class(["Speaks must be justified to tab."])
+
+        super(EBallotForm, self).clean()
 
 def validate_panel(result):
     all_good = True

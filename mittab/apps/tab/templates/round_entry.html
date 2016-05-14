@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="float_container">
-    
+
 <div class="obj_info">
     {% if form.errors %}
         <p style="color: red;">
@@ -18,15 +18,15 @@
     {{ form.media }}
     <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
         {{ form.non_field_errors }}
-        
+
         {# Include the hidden fields #}
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
         {% endfor %}
-        
+
         <table class="table ballot_entry">
         {# Include the common fields to Gov and Opp #}
-        
+
         <tr class="common_fields">
             {{ form.winner.errors }}
             <td>{{form.winner.label_tag}}</td>
@@ -81,7 +81,7 @@
                 {{ form.pm_debater.errors }}
                 <label for="id_pm_debater">Prime Minister:</label>
             </td>
-            
+
             <td colspan=3 class="right_line"> {{ form.pm_debater }} </td>
             <td class="opp lo">
                 {{ form.lo_debater.errors }}
@@ -95,7 +95,7 @@
                 <label for="id_pm_speaks">Speaks:</label>
             </td>
             <td> {{ form.pm_speaks }} </td>
-            
+
             <td class="gov pm ranks">
                 {{ form.pm_ranks.errors }}
                 <label for="id_pm_ranks">Ranks:</label>
@@ -106,21 +106,21 @@
                 <label for="id_lo_speaks">Speaks:</label>
             </td>
             <td> {{ form.lo_speaks }} </td>
-            
+
             <td class="opp lo ranks">
                 {{ form.lo_ranks.errors }}
                 <label for="id_lo_ranks">Ranks:</label>
             </td>
             <td> {{ form.lo_ranks }} </td>
         </tr>
-        
+
        <tr class="members top">
             <td class="gov mg">
                 {{ form.mg_debater.errors }}
                 <label for="id_mg_debater">Member of Government:</label>
             </td>
             <td colspan=3 class="right_line"> {{ form.mg_debater }} </td>
-            
+
             <td class="opp mo">
                 {{ form.mo_debater.errors }}
                 <label for="id_mo_debater">Member of Opposition</label>
@@ -133,7 +133,7 @@
                 <label for="id_mg_speaks">Speaks:</label>
             </td>
             <td> {{ form.mg_speaks }} </td>
-            
+
             <td class="gov mg ranks">
                 {{ form.mg_ranks.errors }}
                 <label for="id_mg_ranks">Ranks:</label>
@@ -144,14 +144,24 @@
                 <label for="id_mo_speaks">Speaks:</label>
             </td>
             <td> {{ form.mo_speaks }} </td>
-            
+
             <td class="opp mo ranks">
                 {{ form.mo_ranks.errors }}
                 <label for="id_mo_ranks">Ranks:</label>
             </td>
             <td> {{ form.mo_ranks }} </td>
         </tr>
-            
+
+        {% if form.ballot_code %}
+        <tr>
+          <td>
+            {{ form.ballot_code.errors }}
+            <label for="id_ballot_code">Ballot Code:</label>
+          </td>
+          <td> {{ form.ballot_code }}</td>
+        </tr>
+        {% endif %}
+
         </table>
         {% if links %}
         <div class="btn-group">
@@ -160,6 +170,7 @@
             {% endfor %}
         </div>
         {%endif%}
+
         <div class="btn-submit">
             <input type="submit" value="Submit Changes">
         <div>

@@ -109,6 +109,6 @@ def import_judges(fileToImport):
             form.save()
         else:
             judge_errors.append(judge_name + ": Unknown Error")
-                
+
     return judge_errors
-        
+
