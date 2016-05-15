@@ -263,35 +263,49 @@ class EBallotForm(ResultEntryForm):
 
     def clean(self):
         cleaned_data = self.cleaned_data
-        ballot_code = cleaned_data["ballot_code"]
-        if not Judge.objects.filter(ballot_code=ballot_code).first():
-            # If there is no judge with that ballot code
-            msg = "Incorrect ballot code. Enter again."
-            self._errors["ballot_code"] = self.error_class([msg])
-        else:
-            rounds = Round.objects.filter(judges__ballot_code=ballot_code)
-            current_round = int(TabSettings.get(key="cur_round")) - 1
-            rounds = rounds.filter(round_number=current_round)
-            first = rounds.first()
-            if not first:
-                # If the judge is not paired into the round this ballot is for
-                msg = "You are not juding this round."
+        try:
+            ballot_code = cleaned_data.get("ballot_code")
+            if not Judge.objects.filter(ballot_code=ballot_code).first():
+                # If there is no judge with that ballot code
+                msg = "Incorrect ballot code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
-            elif ballot_code != first.chair.ballot_code:
-                # If the judge is not the chair of this round
-                msg = "Only the chair of a panel can submit ballot."
-                self._errors["ballot_code"] = self.error_class([msg])
-            elif RoundStats.objects.filter(round=first).first():
-                # If there was already a ballot submitted for the round
-                msg =  "A ballot has already been completed for this round."
-                msg += "Go to tab if you need to change the results "
-                msg += "for this round."
-                self._errors["ballot_code"] = self.error_class([msg])
+            else:
+                rounds = Round.objects.filter(judges__ballot_code=ballot_code)
+                current_round = int(TabSettings.get(key="cur_round")) - 1
+                rounds = rounds.filter(round_number=current_round)
+                first = rounds.first()
+                if not first:
+                    # If the judge is not paired into the round this ballot is for
+                    msg = "You are not juding this round."
+                    self._errors["ballot_code"] = self.error_class([msg])
+                elif ballot_code != first.chair.ballot_code:
+                    # If the judge is not the chair of this round
+                    msg = "Only the chair of a panel can submit ballot."
+                    self._errors["ballot_code"] = self.error_class([msg])
+                elif RoundStats.objects.filter(round=first).first():
+                    # If there was already a ballot submitted for the round
+                    msg =  "A ballot has already been completed for this round."
+                    msg += "Go to tab if you need to change the results "
+                    msg += "for this round."
+                    self._errors["ballot_code"] = self.error_class([msg])
 
-        for d in (self.GOV + self.OPP):
-            speaks = cleaned_data["%s_speaks" % d]
-            if speaks >= 26.75 or speaks <= 23.25:
-                self._errors["%s_speaks" % d] = self.error_class(["Speaks must be justified to tab."])
+            if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
+                message = "Go to tab to submit a result other than a win or loss."
+                self._errors["winner"] = self.error_class([message])
+
+            for d in (self.GOV + self.OPP):
+                speaks = cleaned_data.get("%s_speaks" % d)
+                split = str(speaks).split(".")
+                if len(split) == 2 and int(split[-1]) not in [0, 25, 5, 50, 75]:
+                    # speaks do not end in quarter points
+                    msg = "Speaks must be given in quarter points."
+                    self._errors["%s_speaks" % d] = self.error_class([msg])
+                elif speaks >= 26.75 or speaks <= 23.25:
+                    msg = "Speaks must be justified to tab."
+                    self._errors["%s_speaks" % d] = self.error_class([msg])
+        except Exception, e:
+            print "Caught error %s" %(e)
+            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
 
         super(EBallotForm, self).clean()
 
