@@ -37,3 +37,8 @@ nosetests.xml
 
 # Vim
 *.swp
+
+# VENV files
+venv/.Python
+venv/include/*
+venv/pip-selfcheck.json
