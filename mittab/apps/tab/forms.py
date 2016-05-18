@@ -307,7 +307,7 @@ class EBallotForm(ResultEntryForm):
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
 
-        super(EBallotForm, self).clean()
+        return super(EBallotForm, self).clean()
 
 def validate_panel(result):
     all_good = True
