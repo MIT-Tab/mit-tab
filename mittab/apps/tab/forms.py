@@ -33,6 +33,7 @@ class JudgeForm(forms.ModelForm):
         if entry:
             kwargs.pop('first_entry')
         super(JudgeForm, self).__init__(*args, **kwargs)
+        self.fields['ballot_code'].widget = forms.HiddenInput()
         if not entry:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
