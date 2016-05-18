@@ -7,7 +7,7 @@ from django.db import transaction
 from errors import *
 from mittab.libs.errors import *
 from models import *
-from forms import ResultEntryForm, UploadFileForm, score_panel, validate_panel, EBallotForm
+from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
