@@ -220,5 +220,18 @@ var bind_handlers = function() {
     $('.btn.release').click(toggle_pairing_release);
 }
 
+var confirm_results = function() {
+  debaters = ['pm', 'mg', 'lo', 'mo']
 
+  get_selected_element = function(e) {
+    return e.options[e.selectedIndex].text;
+  }
+
+  get_attribute_for = function(debater, attr) {
+    return document.getElementById("id_" + debater + "_" + attr).value
+  }
+
+  msg = "Please confirm the results:\n"
+  msg += "Winner: "
+}
 
