@@ -42,3 +42,4 @@ nosetests.xml
 venv/.Python
 venv/include/*
 venv/pip-selfcheck.json
+venv/src/*
