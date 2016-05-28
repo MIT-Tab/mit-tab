@@ -232,6 +232,6 @@ var confirm_results = function() {
   }
 
   msg = "Please confirm the results:\n"
-  msg += "Winner: "
+  msg += "Winner: " + get_selected_element
 }
 
