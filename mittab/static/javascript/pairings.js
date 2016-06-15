@@ -220,7 +220,7 @@ var bind_handlers = function() {
     $('.btn.release').click(toggle_pairing_release);
 }
 
-var confirm_results = function() {
+var get_formatted_result = function() {
   debaters = ['pm', 'mg', 'lo', 'mo']
 
   get_selected_element = function(e) {
@@ -232,6 +232,12 @@ var confirm_results = function() {
   }
 
   msg = "Please confirm the results:\n"
-  msg += "Winner: " + get_selected_element
+  msg += "Winner: " + get_selected_element($("#id_winner"))
+  return msg
 }
 
+$(document).ready(function() {
+  if ($(".ballot_entry").length && $("#id_ballot_code").length) {
+    $("input[type='submit']").click(confirm(get_formatted_result()))
+  }
+});
