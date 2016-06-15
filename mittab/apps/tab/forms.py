@@ -279,10 +279,9 @@ class EBallotForm(ResultEntryForm):
                     # If the judge is not paired into the round this ballot is for
                     msg = "You are not juding this round."
                     self._errors["ballot_code"] = self.error_class([msg])
-                elif ballot_code != first.chair.ballot_code:
-                    # If the judge is not the chair of this round
-                    msg = "Only the chair of a panel can submit ballot."
-                    self._errors["ballot_code"] = self.error_class([msg])
+                    # TODO ensure judge is the chair of the panel
+                    # (this requires fixing a bug when judges a manually changed
+                    # but the chair of the panel isn't)
                 elif RoundStats.objects.filter(round=first).first():
                     # If there was already a ballot submitted for the round
                     msg =  "A ballot has already been completed for this round."
