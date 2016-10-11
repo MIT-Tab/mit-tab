@@ -322,8 +322,8 @@ class EBallotForm(ResultEntryForm):
             subj = "Error sending back-up"
             msg = "Error: %s" % e
             msg += "\n"
-            msg += "Raw data: %s" % self.cleaned_data
-        send_mail(subj, msg, "e-ballots@nu-tab.me", settings.EBALLOT_BACKUP_EMAIL)
+            msg += "Raw data: %s" % str(self.cleaned_data)
+        send_mail(subj, msg, "e-ballots@nu-tab.me", [settings.EBALLOT_BACKUP_EMAIL])
         super(EBallotForm, self).save()
 
 def validate_panel(result):
