@@ -1,8 +1,9 @@
+import boto3
+
 from django.db import models
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from mittab import settings
 from models import *
 from decimal import Decimal
@@ -312,19 +313,15 @@ class EBallotForm(ResultEntryForm):
         return super(EBallotForm, self).clean()
 
     def save(self):
-        cleaned_data = self.cleaned_data
-        cur_round = int(TabSettings.get(key="cur_round")) - 1
         try:
-            judge = Judge.objects.filter(ballot_code=ballot_code).first()
-            subj = "E-Ballot submission (Round: %s, Judge: %s)" % (cur_round, judge.name)
-            msg = str(self.cleaned_data)
+            client = boto3.client('s3')
+            key = "%s/%s/%s" % (str(int(TabSettings.get(key="cur_round")) - 1),
+                    str(self.cleaned_data.get('ballot_code')), str(self.cleaned_data))
+            client.put_object(Bucket='proams-backups', Key=key)
         except Exception, e:
-            subj = "Error sending back-up"
-            msg = "Error: %s" % e
-            msg += "\n"
-            msg += "Raw data: %s" % str(self.cleaned_data)
-        send_mail(subj, msg, "e-ballots@nu-tab.me", [settings.EBALLOT_BACKUP_EMAIL])
-        super(EBallotForm, self).save()
+            print "Error uploading result to S3"
+
+        return super(EBallotForm, self).save()
 
 def validate_panel(result):
     all_good = True

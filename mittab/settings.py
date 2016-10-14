@@ -25,10 +25,10 @@ DEBUG = True
 TEMPLATE_DEBUG = True
 
 TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
+    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
 )
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["benmusch.pythonanywhere.com"]
 
 
 # Application definition
@@ -89,6 +89,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = '/home/benmusch/mittab/static/'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = '/home/benmusch/mittab/media/'
 
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'mittab', 'static'),
@@ -103,11 +107,3 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.messages.context_processors.messages",
     "django.core.context_processors.request",
 )
-
-# Sendgrid configuration
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_HOST_USER = 'benmusch'
-EMAIL_HOST_PASSWORD = os.environ['SENDGRID_PASSWORD']
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EBALLOT_BACKUP_EMAIL = 'northeasterntab2016@gmail.com'

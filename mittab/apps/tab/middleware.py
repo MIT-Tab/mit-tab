@@ -3,6 +3,7 @@ import re
 from django.contrib.auth.views import login
 from django.http import HttpResponseRedirect
 from django.core.cache import cache
+from models import TabSettings
 
 login_white_list = ('/accounts/login/', '/static/css/stylesheet.css',
         '/static/images/title_banner.png', '/pairings/pairinglist/', '/stat')
@@ -24,5 +25,5 @@ class Login:
     def _is_eballot_url(self, path):
         if not TabSettings.get('allow_eballots', 0) == 1:
             return False
-        return (path == '/e_ballots/') or e_ballot_regex.match(request.path)
+        return (path == '/e_ballots/') or e_ballot_regex.match(path)
 
