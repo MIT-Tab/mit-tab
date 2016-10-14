@@ -1,3 +1,6 @@
+import time
+import json
+
 import boto3
 
 from django.db import models
@@ -238,6 +241,7 @@ class ResultEntryForm(forms.Form):
 
     def save(self):
         cleaned_data = self.cleaned_data
+        self._backup(cleaned_data)
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
         debaters = self.GOV + self.OPP
@@ -258,6 +262,9 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
+
+    def _backup(self, data):
+        pass
 
 class EBallotForm(ResultEntryForm):
 
@@ -312,16 +319,55 @@ class EBallotForm(ResultEntryForm):
 
         return super(EBallotForm, self).clean()
 
-    def save(self):
+    def _backup(self, data):
+        self._save_json_dump(data)
         try:
-            client = boto3.client('s3')
-            key = "%s/%s/%s" % (str(int(TabSettings.get(key="cur_round")) - 1),
-                    str(self.cleaned_data.get('ballot_code')), str(self.cleaned_data))
-            client.put_object(Bucket='proams-backups', Key=key)
-        except Exception, e:
-            print "Error uploading result to S3"
+            self._save_to_s3(data)
+        except:
+            print "Error uploading to S3"
 
-        return super(EBallotForm, self).save()
+
+        try:
+            self._save_readable_text(data)
+        except:
+            print "Error saving readable text"
+
+    def _save_to_s3(self, data):
+        client = boto3.client('s3')
+        key = "%s/%s/%s/%s" % (int(TabSettings.get(key="cur_round")) - 1,
+                self.cleaned_data.get('ballot_code'),
+                int(time.time()),
+                data)
+        client.put_object(Bucket='proams-backups', Key=key)
+
+    # TODO why does this not work?
+    def _save_json_dump(self, data):
+        cur_round = int(TabSettings.get(key="cur_round")) - 1
+        filepath = "/home/benmusch/mittab_backups/json/%s/%s_%s.json" % (cur_round,
+                data.get('ballot_code'),
+                int(time.time()))
+        j = json.dumps(data)
+        f = open(filepath, 'w')
+        f.write(j)
+        f.close()
+
+    def _save_readable_text(self, data):
+        cur_round = int(TabSettings.get(key="cur_round")) - 1
+        filepath = "/home/benmusch/mittab_backups/readable/%s/%s_%s.txt" % (cur_round,
+                data.get('ballot_code'),
+                int(time.time()))
+        f = open(filepath, 'w')
+        judge = Judge.objects.get(ballot_code=data['ballot_code'])
+        f.write("Round number: %s\n" % cur_round)
+        f.write("Judge: %s\n" % judge.name)
+        f.write("Winner: %s\n" % data["winner"])
+
+        for position in (self.GOV + self.OPP):
+            debater = Debater.objects.get(pk=int(data[position + "_debater"]))           
+            f.write("%s: %s (%s, %s)\n" % (position, debater.name,
+                data[position+"_speaks"], data[position+"_ranks"]))
+        f.close()
+
 
 def validate_panel(result):
     all_good = True
