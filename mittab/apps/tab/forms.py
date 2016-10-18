@@ -7,6 +7,7 @@ from django.db import models
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
 from mittab import settings
 from models import *
 from decimal import Decimal
@@ -320,12 +321,15 @@ class EBallotForm(ResultEntryForm):
         return super(EBallotForm, self).clean()
 
     def _backup(self, data):
-        self._save_json_dump(data)
+        try:
+            self._save_json_dump(data)
+        except:
+            print "Error saving json"
+
         try:
             self._save_to_s3(data)
         except:
-            print "Error uploading to S3"
-
+            print "Error saving to s3"
 
         try:
             self._save_readable_text(data)
@@ -340,16 +344,16 @@ class EBallotForm(ResultEntryForm):
                 data)
         client.put_object(Bucket='proams-backups', Key=key)
 
-    # TODO why does this not work?
     def _save_json_dump(self, data):
         cur_round = int(TabSettings.get(key="cur_round")) - 1
         filepath = "/home/benmusch/mittab_backups/json/%s/%s_%s.json" % (cur_round,
                 data.get('ballot_code'),
                 int(time.time()))
-        j = json.dumps(data)
+        j = json.dumps(data, cls=DjangoJSONEncoder)
         f = open(filepath, 'w')
         f.write(j)
         f.close()
+        pass
 
     def _save_readable_text(self, data):
         cur_round = int(TabSettings.get(key="cur_round")) - 1
