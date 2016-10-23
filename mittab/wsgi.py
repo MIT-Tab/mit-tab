@@ -7,8 +7,10 @@ For more information on this file, see
 https://docs.djangoproject.com/en/1.6/howto/deployment/wsgi/
 """
 
-import os, sys
-sys.path.append('/home/benmusch/mittab/')
+import os
+import sys
+
+sys.path.append('/var/www/tab')
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mittab.settings")
 
 from django.core.wsgi import get_wsgi_application

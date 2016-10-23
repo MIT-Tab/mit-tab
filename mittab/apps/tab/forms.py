@@ -1,18 +1,12 @@
-import time
-import json
-
-import boto3
-
-from django.db import models
-from django import forms
-from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.core.exceptions import ValidationError
-from django.core.serializers.json import DjangoJSONEncoder
-from mittab import settings
-from models import *
-from decimal import Decimal
 import itertools
 import pprint
+from decimal import Decimal
+
+from django import forms
+from django.contrib.admin.widgets import FilteredSelectMultiple
+
+from models import *
+
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -52,7 +46,7 @@ class JudgeForm(forms.ModelForm):
                                                                        required = False)
             except:
                 pass
-
+            
     def save(self, force_insert=False, force_update=False, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -67,12 +61,12 @@ class JudgeForm(forms.ModelForm):
                     checked_in.save()
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
-
+                    
         return judge
-
+                
     class Meta:
         model = Judge
-
+        
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
@@ -242,7 +236,6 @@ class ResultEntryForm(forms.Form):
 
     def save(self):
         cleaned_data = self.cleaned_data
-        self._backup(cleaned_data)
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
         debaters = self.GOV + self.OPP
@@ -263,9 +256,6 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
-
-    def _backup(self, data):
-        pass
 
 class EBallotForm(ResultEntryForm):
 
@@ -319,59 +309,6 @@ class EBallotForm(ResultEntryForm):
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
 
         return super(EBallotForm, self).clean()
-
-    def _backup(self, data):
-        try:
-            self._save_json_dump(data)
-        except:
-            print "Error saving json"
-
-        try:
-            self._save_to_s3(data)
-        except:
-            print "Error saving to s3"
-
-        try:
-            self._save_readable_text(data)
-        except:
-            print "Error saving readable text"
-
-    def _save_to_s3(self, data):
-        client = boto3.client('s3')
-        key = "%s/%s/%s/%s" % (int(TabSettings.get(key="cur_round")) - 1,
-                self.cleaned_data.get('ballot_code'),
-                int(time.time()),
-                data)
-        client.put_object(Bucket='proams-backups', Key=key)
-
-    def _save_json_dump(self, data):
-        cur_round = int(TabSettings.get(key="cur_round")) - 1
-        filepath = "/home/benmusch/mittab_backups/json/%s/%s_%s.json" % (cur_round,
-                data.get('ballot_code'),
-                int(time.time()))
-        j = json.dumps(data, cls=DjangoJSONEncoder)
-        f = open(filepath, 'w')
-        f.write(j)
-        f.close()
-        pass
-
-    def _save_readable_text(self, data):
-        cur_round = int(TabSettings.get(key="cur_round")) - 1
-        filepath = "/home/benmusch/mittab_backups/readable/%s/%s_%s.txt" % (cur_round,
-                data.get('ballot_code'),
-                int(time.time()))
-        f = open(filepath, 'w')
-        judge = Judge.objects.get(ballot_code=data['ballot_code'])
-        f.write("Round number: %s\n" % cur_round)
-        f.write("Judge: %s\n" % judge.name)
-        f.write("Winner: %s\n" % data["winner"])
-
-        for position in (self.GOV + self.OPP):
-            debater = Debater.objects.get(pk=int(data[position + "_debater"]))           
-            f.write("%s: %s (%s, %s)\n" % (position, debater.name,
-                data[position+"_speaks"], data[position+"_ranks"]))
-        f.close()
-
 
 def validate_panel(result):
     all_good = True
