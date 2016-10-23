@@ -131,10 +131,3 @@ class Command(BaseCommand):
         if len(args) == 1:
             with open(args[0], 'w') as f:
                 f.write(output)
-
-
-
-
-
-
-

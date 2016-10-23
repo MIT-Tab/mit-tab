@@ -47,3 +47,8 @@ venv/src/*
 # pycharm files
 .idea/*
 .idea
+
+# pairings database
+mittab/pairing_db.sqlite3
+mittab/pairing_db_clean.sqlite3
+mittab/backups/*

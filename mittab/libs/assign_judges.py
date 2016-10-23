@@ -39,7 +39,6 @@ def add_judges(pairings, judges, panel_points):
     random.seed(1337)
     random.shuffle(judges)
 
-
     # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
     judges = sorted(judges, key=lambda j: j.rank, reverse = True)
     pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
