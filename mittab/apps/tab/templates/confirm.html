@@ -2,19 +2,19 @@
 
 {% block title %}Confirm Action{% endblock %}
 
-{% block banner %} {{ title }} {% endblock %}
+{% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-    <div>
-        <p class="warning">
-            This action is final. This will nuke everything, please backup if you are not sure.
-        </p>
-        <div class="btn-group">
-            <a class="mid btn confirmLink" href='{{ link }}'>{{ confirm_text }}</a>
-        </div>
-
-
+<div>
+    <p class="warning">
+    This action is final.  This will nuke everything, please backup if you are not sure.
+    </p>
+    <div class="btn-group">
+      <a class="mid btn confirmLink" href='{{link}}'>{{confirm_text}}</a>
     </div>
+
+
+</div>
 
 
 {% endblock %}

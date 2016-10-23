@@ -1,31 +1,29 @@
 <li class="center-text bold-font">Current Judge</li>
-<li><a href="/judge/{{ current_judge_id }}">{{ current_judge_name }} - {{ current_judge_rank }}</a></li>
+<li><a href="/judge/{{current_judge_id}}">{{current_judge_name}} - {{current_judge_rank}}</a></li> 
 <li class="divider"></li>
 <li class="center-text bold-font">Viable Judges</li>
 <li class="center-text bold-font">Not Currently Paired In</li>
-{% for judge_name, judge_id, judge_rank in excluded_judges %}
-    <li>
-        <a class="judge-assign" judge-id="{{ judge_id }}" round-id="{{ round_obj.id }}"
-           current-judge-id="{{ current_judge_id }}">
-            {{ judge_name }} - {{ judge_rank }}
-        </a>
-    </li>
+{% for judge_name, judge_id, judge_rank in excluded_judges%}
+<li>
+    <a class="judge-assign" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
+    {{judge_name}} - {{judge_rank}}
+    </a>
+</li>
 {% empty %}
-    <li> No viable judges</li>
+    <li> No viable judges </li>
 {% endfor %}
 
 <li class="divider"></li>
 <li class="center-text bold-font">Viable Judges</li>
 <li class="center-text bold-font">Within Pairing</li>
 {% for judge_name, judge_id, judge_rank in included_judges %}
-    <li>
-        <a class="judge-assign alert-link" judge-id="{{ judge_id }}" round-id="{{ round_obj.id }}"
-           current-judge-id="{{ current_judge_id }}">
-            {{ judge_name }} - {{ judge_rank }}
-        </a>
-    </li>
+<li>
+    <a class="judge-assign alert-link" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
+    {{judge_name}} - {{judge_rank}}
+    </a>
+</li>
 {% empty %}
-    <li> No viable judges</li>
+    <li> No viable judges </li>
 {% endfor %}
 
 

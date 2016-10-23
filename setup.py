@@ -21,7 +21,7 @@ setup(
         'xlrd',
         'xlwt'
     ],
-    extras_require={
+    extras_require = {
         'Statistical Analysis': ['numpy'],
     },
     license='MIT License'

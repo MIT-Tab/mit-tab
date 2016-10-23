@@ -10,15 +10,12 @@ class RoundAdminForm(forms.ModelForm):
     class Meta:
         model = Round
 
-
 class RoundAdmin(admin.ModelAdmin):
     form = RoundAdminForm
     filter_horizontal = ('judges',)
 
-
 class TeamAdmin(admin.ModelAdmin):
     filter_horizontal = ('debaters',)
-
 
 admin.site.register(Debater)
 admin.site.register(Team, TeamAdmin)

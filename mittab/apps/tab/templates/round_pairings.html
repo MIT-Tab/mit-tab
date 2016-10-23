@@ -2,120 +2,131 @@
 
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="/static/css/bootstrap.css"/>
-    <link rel="stylesheet" type="text/css"
-          href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css"/>
+    <link rel="stylesheet" type="text/css" href="/static/css/bootstrap.css" />
+    <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css" />
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
     <script type="text/javascript" src="/static/javascript/tab.js"></script>
 
-    <title>Pairings for Round {{ round_number }}</title>
+    <title>Pairings for Round {{round_number}}</title>
 
     <style type="text/css">
-        body {
-            font-family: Helvetica, sans-serif;
-            font-size: 20px;
-            margin: 0em;
-            height: 100%;
-            width: 100%;
+        body
+        {
+            font-family:            Helvetica, sans-serif;
+            font-size:              20px;
+            margin:                 0em;
+            height:                 100%;
+            width:                  100%;
         }
 
-        .pairings_header {
-            position: fixed;
-            top: 0em;
-            left: 0em;
-            right: 0em;
+        .pairings_header
+        {
+            position:               fixed;
+            top:                    0em;
+            left:                   0em;
+            right:                  0em;
 
-            height: 4.5em;
-            width: 100%;
-            padding: .5em;
-            margin: 0em;
+            height:                 4.5em;
+            width:                  100%;
+            padding:                .5em;
+            margin:                 0em;
 
-            background: #9CF;
-            border-bottom: .1em solid #000;
+            background:             #9CF;
+            border-bottom:          .1em solid #000;
         }
 
-        .pairings_header h1 {
-            margin: 0em;
-            padding: .25em;
+        .pairings_header h1
+        {
+            margin:                 0em;
+            padding:                .25em;
         }
 
-        .pairings_header_spacer {
-            height: 5.5em;
+        .pairings_header_spacer
+        {
+            height:                 5.5em;
         }
 
-        .pairings_table {
-            width: 100%;
-            min-width: 100%;
+        .pairings_table
+        {
+            width:                  100%;
+            min-width:              100%;
 
-            border-collapse: collapse;
+            border-collapse:        collapse;
         }
 
-        .pairings_table tr:nth-child(even) {
-            background: #DEF;
+        .pairings_table tr:nth-child(even)
+        {
+            background:             #DEF;
         }
 
-        .pairings_table th {
-            width: 25%;
-            min-width: 25%;
-            text-align: left;
+        .pairings_table th
+        {
+            width:                  25%;
+            min-width:              25%;
+            text-align:             left;
         }
 
-        .pairings_table td {
-            width: 25%;
-            min-width: 25%;
-            text-overflow: ellipsis;
-            border: 1px solid #DDD;
-            padding: .5em;
+        .pairings_table td
+        {
+            width:                  25%;
+            min-width:              25%;
+            text-overflow:          ellipsis;
+            border:                 1px solid #DDD;
+            padding:                .5em;
         }
 
-        .pairings_footer {
-            position: fixed;
-            bottom: 0em;
-            left: 0em;
-            right: 0em;
+        .pairings_footer
+        {
+            position:               fixed;
+            bottom:                 0em;
+            left:                   0em;
+            right:                  0em;
 
-            height: 1.5em;
-            width: 100%;
-            padding: .5em;
-            margin: 0em;
+            height:                 1.5em;
+            width:                  100%;
+            padding:                .5em;
+            margin:                 0em;
 
-            background: #BDF;
-            border: .15em solid #000;
+            background:             #BDF;
+            border:                 .15em solid #000;
         }
-
-        .pairings_footer_printable {
+        .pairings_footer_printable
+        {
             white-space: nowrap;
-            height: 1.5em;
-            width: 100%;
-            padding: .5em;
-            margin: 0em;
+            height:                 1.5em;
+            width:                  100%;
+            padding:                .5em;
+            margin:                 0em;
 
-            background: #BDF;
-            border: .15em solid #000;
+            background:             #BDF;
+            border:                 .15em solid #000;
         }
 
-        .pairings_footer_spacer {
-            height: 2.5em;
+        .pairings_footer_spacer
+        {
+            height:                 2.5em;
         }
 
-        .pairings_bye_label {
-            font-weight: bold;
+        .pairings_bye_label
+        {
+            font-weight:            bold;
         }
 
-        .pairings_bye_entry {
+        .pairings_bye_entry
+        {
         }
-
-        .printable {
-            width: 7in;
+        .printable 
+        {
+            width: 7in;    
             white-space: nowrap;
         }
-
-        .right-margin {
+        .right-margin 
+        {
             margin-right: 1em;
         }
-
-        .right {
+        .right
+        {
             float: right;
         }
     </style>
@@ -127,98 +138,92 @@
     {% if printable %}
         <!-- Center pairings table -->
         <table class="pairings_table printable">
-            <tr>
-                <th>
-                    Government
-                </th>
-                <th>
-                    Opposition
-                </th>
-                <th>
-                    Judge
-                </th>
-                <th>
-                    Room
-                </th>
-            </tr>
-            {% for pairing in round_pairing %}
-                <tr>
-                    <td>{{ pairing.gov_team.name }}</td>
-                    <td>{{ pairing.opp_team.name }}</td>
-                    <td>
-                        {% for judge in pairing.judges.all %}
-                            {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-                                <b>{{ judge.name }}</b><br>
-                            {% else %}
-                                {{ judge.name }}<br>
-                            {% endif %}
-                        {% endfor %}
-                    </td>
-                    <td>{{ pairing.room.name }}</td>
-                </tr>
-            {% endfor %}
+        <tr>
+            <th>
+                Government
+            </th> <th>
+                Opposition
+            </th> <th>
+                Judge
+            </th> <th>
+                Room
+            </th>
+        </tr>
+        {% for pairing in round_pairing %}
+        <tr>
+            <td>{{pairing.gov_team.name}}</td>
+            <td>{{pairing.opp_team.name}}</td>
+            <td>
+                {% for judge in pairing.judges.all %}
+                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                    <b>{{judge.name}}</b><br>
+                    {% else %}
+                    {{judge.name}}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
+            <td>{{pairing.room.name}}</td>
+        </tr>
+        {% endfor %}
         </table>
         <div class="pairings_footer_printable">
             {% if byes %}
                 <span class="pairings_bye_label">Giving the Bye to:</span>
                 {% for team in byes %}
-                    <span class="pairings_bye_entry">{{ team.name }}</span>
-                    {% if not forloop.last %},{% endif %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
                 {% endfor %}
             {% endif %}
             {% if errors %}
                 <span class="pairings_bye_label">Teams not Paired in:</span>
                 {% for team in errors %}
-                    <span class="pairings_bye_entry">{{ team.name }}</span>
-                    {% if not forloop.last %},{% endif %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
                 {% endfor %}
             {% endif %}
         </div>
-
+        
     {% else %}
         <div id="scrollPage" class="hidden"></div>
         <!-- Floating top header -->
         <div class="pairings_header">
-            <h1>Pairings for Round {{ round_number }}</h1>
+        <h1>Pairings for Round {{round_number}}</h1>
 
-            <table class="pairings_table">
-                <tr>
-                    <th>
-                        Government
-                    </th>
-                    <th>
-                        Opposition
-                    </th>
-                    <th>
-                        Judge
-                    </th>
-                    <th>
-                        Room
-                    </th>
-                </tr>
-            </table>
+        <table class="pairings_table">
+            <tr>
+            <th>
+                Government
+            </th> <th>
+                Opposition
+            </th> <th>
+                Judge
+            </th> <th>
+                Room
+            </th>
+            </tr>
+        </table>
         </div>
 
         <div class="pairings_header_spacer"></div>
 
         <!-- Center pairings table -->
         <table class="pairings_table">
-            {% for pairing in round_pairing %}
-                <tr>
-                    <td>{{ pairing.gov_team.name }}</td>
-                    <td>{{ pairing.opp_team.name }}</td>
-                    <td>
-                        {% for judge in pairing.judges.all %}
-                            {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-                                <b>{{ judge.name }}</b><br>
-                            {% else %}
-                                {{ judge.name }}<br>
-                            {% endif %}
-                        {% endfor %}
-                    </td>
-                    <td>{{ pairing.room.name }}</td>
-                </tr>
-            {% endfor %}
+        {% for pairing in round_pairing %}
+        <tr>
+            <td>{{pairing.gov_team.name}}</td>
+            <td>{{pairing.opp_team.name}}</td>
+            <td>
+                {% for judge in pairing.judges.all %}
+                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                    <b>{{judge.name}}</b><br>
+                    {% else %}
+                    {{judge.name}}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
+            <td>{{pairing.room.name}}</td>
+        </tr>
+        {% endfor %}
         </table>
 
         <div class="pairings_footer_spacer"></div>
@@ -228,20 +233,19 @@
             {% if byes %}
                 <span class="pairings_bye_label">Giving the Bye to:</span>
                 {% for team in byes %}
-                    <span class="pairings_bye_entry">{{ team.name }}</span>
-                    {% if not forloop.last %},{% endif %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
                 {% endfor %}
             {% endif %}
             {% if errors %}
                 <span class="pairings_bye_label">Teams not Paired in:</span>
                 {% for team in errors %}
-                    <span class="pairings_bye_entry">{{ team.name }}</span>
-                    {% if not forloop.last %},{% endif %}
+                <span class="pairings_bye_entry">{{team.name}}</span>
+                {% if not forloop.last %},{% endif%}
                 {% endfor %}
             {% endif %}
             <span>
-            <button type="button" class="btn right pairings_toggle right-margin"
-                    data-toggle="0">Toggle Autoscroll</button>
+            <button type="button" class="btn right pairings_toggle right-margin" data-toggle="0">Toggle Autoscroll</button>
             <div id="progressbar" class="right right-margin" data-count="0"></div>
 
             </span>
@@ -249,7 +253,7 @@
     {% endif %}
 {% else %}
 
-    Round {{ round_number }} does not yet have a valid pairing. Please wait until
+    Round {{round_number}} does not yet have a valid pairing. Please wait until
     your tournament directors release a valid pairing before viewing this page.
 
 {% endif %}

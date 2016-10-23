@@ -10,8 +10,8 @@ https://docs.djangoproject.com/en/1.6/ref/settings/
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
@@ -29,6 +29,7 @@ TEMPLATE_DIRS = (
 )
 
 ALLOWED_HOSTS = ["benmusch.pythonanywhere.com"]
+
 
 # Application definition
 
@@ -51,12 +52,13 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mittab.apps.tab.middleware.Login',
-    'django.middleware.transaction.TransactionMiddleware',  # Be careful about ordering
+    'django.middleware.transaction.TransactionMiddleware', #Be careful about ordering
 )
 
 ROOT_URLCONF = 'mittab.urls'
 
 WSGI_APPLICATION = 'mittab.wsgi.application'
+
 
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
@@ -82,6 +84,7 @@ USE_L10N = True
 
 USE_TZ = True
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
@@ -94,6 +97,7 @@ MEDIA_ROOT = '/home/benmusch/mittab/media/'
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'mittab', 'static'),
 )
+
 
 TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.auth.context_processors.auth",
