@@ -1,11 +1,10 @@
-import string
 import random
+import string
 
-from django.db import models
-from django.db.models.signals import post_init
-from django.dispatch import receiver
-from localflavor.us.models import PhoneNumberField
 from django.core.exceptions import ValidationError
+from django.db import models
+from localflavor.us.models import PhoneNumberField
+
 
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)

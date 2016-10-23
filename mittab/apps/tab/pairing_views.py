@@ -1,24 +1,25 @@
-from django.shortcuts import render_to_response, render, redirect
-from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
-from django.contrib.auth.decorators import permission_required
-from django.utils import simplejson
-from django.db import transaction
-from errors import *
-from mittab.libs.errors import *
-from models import *
-from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel, EBallotForm
-import mittab.libs.cache_logic as cache_logic
-import mittab.libs.tab_logic as tab_logic
-import mittab.libs.assign_judges as assign_judges
+import datetime
 import random
 import sys
-import traceback
-import mittab.libs.backup as backup
 import time
-import datetime
-import os
-import pprint
+import traceback
+
+from django.contrib.auth.decorators import permission_required
+from django.db import transaction
+from django.http import HttpResponse
+from django.shortcuts import render_to_response, render, redirect
+from django.template import RequestContext
+from django.utils import simplejson
+
+import mittab.libs.assign_judges as assign_judges
+import mittab.libs.backup as backup
+import mittab.libs.cache_logic as cache_logic
+import mittab.libs.tab_logic as tab_logic
+from errors import *
+from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel, EBallotForm
+from mittab.libs.errors import *
+from models import *
+
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -582,6 +583,7 @@ def start_new_tourny(request):
         TabSettings.objects.create(key = "tot_rounds", value = 5)
         TabSettings.objects.create(key = "var_teams_to_break", value = 8)
         TabSettings.objects.create(key = "nov_teams_to_break", value = 4)
+        TabSettings.objects.create(key="lenient_late", value=0)
 
 
     except Exception as e:
