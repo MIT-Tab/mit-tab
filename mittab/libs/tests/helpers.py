@@ -7,6 +7,7 @@ from mittab.apps.tab.models import Round, RoundStats
 # Speaks every quarter point
 speak_range = [23 + .25 * i for i in range(17)]
 
+
 def generate_speaks_for_debater(debater, is_forfeit=False):
     """
     Generates a fake speak for a debater chosen from a normal distribution
@@ -30,6 +31,7 @@ def generate_speaks_for_debater(debater, is_forfeit=False):
     # Limit to 0 -> len(speak_range) - 1
     sampled_speak = max(min(sampled_speak, len(speak_range) - 1), 0)
     return speak_range[sampled_speak]
+
 
 def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
     """
@@ -126,4 +128,3 @@ def generate_results(round_number, prob_forfeit=0.0,
                                             prob_ironman=prob_ironman)
         for result in results:
             result.save()
-

@@ -29,21 +29,21 @@ class Command(BaseCommand):
             percentiles = np.percentile(speaks, [0, 25, 50, 75, 100])
             mean, std = round(np.mean(speaks), 2), round(np.std(speaks), 2)
         else:
-            percentiles = [0]*5
+            percentiles = [0] * 5
             mean, std = 0, 0
         print "{0} ".format(header),
-        print (("| %05.2f "*5) + "|") % tuple(percentiles),"|",
-        print (("|  %05.2f  "*2) + "|") % (mean, std)
+        print (("| %05.2f " * 5) + "|") % tuple(percentiles), "|",
+        print (("|  %05.2f  " * 2) + "|") % (mean, std)
         return percentiles, mean, std
 
     def valid_speaks_for_round(self, round_number):
-        return RoundStats.objects.filter(round__round_number=round_number)\
-                                 .filter(speaks__gte=20).all()
+        return RoundStats.objects.filter(round__round_number=round_number) \
+            .filter(speaks__gte=20).all()
 
     def deb_speaks_for_round(self, round_number, debater_status):
-        return RoundStats.objects.filter(round__round_number=round_number)\
-                                 .filter(speaks__gte=20)\
-                                 .filter(debater__novice_status=debater_status)
+        return RoundStats.objects.filter(round__round_number=round_number) \
+            .filter(speaks__gte=20) \
+            .filter(debater__novice_status=debater_status)
 
     def bucket_speaks_by_wl(self, speaks):
         def bracket(round_obj):
@@ -65,15 +65,15 @@ class Command(BaseCommand):
         bucketed_speaks = self.bucket_speaks_by_wl(speaks)
         for index, speak_values in enumerate(bucketed_speaks):
             bracket_results["{0} up ({1:3d})".format(index, int(len(speak_values)))] = \
-            self.speaks_stats(
+                self.speaks_stats(
                     speak_values,
                     "{0} up ({1:3d})".format(index,
-                        int(len(speak_values))))
+                                             int(len(speak_values))))
         return bracket_results
 
     def print_header(self, header):
         print header
-        print "            |  min  |  25%  |  50%  |  75%  |  max  | | |   mean  | stddev |" 
+        print "            |  min  |  25%  |  50%  |  75%  |  max  | | |   mean  | stddev |"
 
     def handle(self, *args, **options):
         stats = {}
@@ -94,9 +94,9 @@ class Command(BaseCommand):
         print "Speaking Statistics:"
         self.print_header("Speaking statistics for the entire tournament")
         stats["overall"] = {}
-        stats["overall"]["Combined"] = self.speaks_stats(speaks,        "Combined  ")
+        stats["overall"]["Combined"] = self.speaks_stats(speaks, "Combined  ")
         stats["overall"]["Varsity"] = self.speaks_stats(varsity_speaks, "Varsity   ")
-        stats["overall"]["Novice"] = self.speaks_stats(novice_speaks,   "Novice    ")
+        stats["overall"]["Novice"] = self.speaks_stats(novice_speaks, "Novice    ")
 
         stats["round_5"] = {}
         self.print_header("Combined Speaking Statistics in Round 5")
@@ -131,10 +131,3 @@ class Command(BaseCommand):
         if len(args) == 1:
             with open(args[0], 'w') as f:
                 f.write(output)
-
-
-
-
-
-
-

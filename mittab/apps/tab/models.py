@@ -9,8 +9,9 @@ from localflavor.us.models import PhoneNumberField
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
+
     def __unicode__(self):
-        return "%s => %s" % (self.key,self.value)
+        return "%s => %s" % (self.key, self.value)
 
     @classmethod
     def get(cls, key, default=None):
@@ -32,7 +33,8 @@ class TabSettings(models.Model):
 
 
 class School(models.Model):
-    name = models.CharField(max_length=50, unique = True)
+    name = models.CharField(max_length=50, unique=True)
+
     def __unicode__(self):
         return self.name
 
@@ -42,14 +44,15 @@ class School(models.Model):
         if len(team_check) == 0 and len(judge_check) == 0:
             super(School, self).delete()
         else:
-            raise Exception("School in use: [teams => %s,judges => %s]" % ([t.name for t in team_check], [j.name for j in judge_check]))
+            raise Exception("School in use: [teams => %s,judges => %s]" % (
+            [t.name for t in team_check], [j.name for j in judge_check]))
 
 
 class Debater(models.Model):
-    name = models.CharField(max_length=30, unique = True)
-    #team_set is created by Team in the ManyToMany
-    #team = models.ForeignKey('Team')
-    #0 = Varsity, 1 = Novice
+    name = models.CharField(max_length=30, unique=True)
+    # team_set is created by Team in the ManyToMany
+    # team = models.ForeignKey('Team')
+    # 0 = Varsity, 1 = Novice
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -59,18 +62,20 @@ class Debater(models.Model):
     phone = PhoneNumberField(blank=True)
     provider = models.CharField(max_length=40, blank=True)
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+
     def __unicode__(self):
         return self.name
 
     def delete(self):
-        teams = Team.objects.filter(debaters = self)
+        teams = Team.objects.filter(debaters=self)
         if len(teams) == 0:
             super(Debater, self).delete()
-        else :
+        else:
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
 
+
 class Team(models.Model):
-    name = models.CharField(max_length=30, unique = True)
+    name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey('School')
     debaters = models.ManyToManyField(Debater)
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
@@ -78,7 +83,7 @@ class Team(models.Model):
     FREE_SEED = 1
     HALF_SEED = 2
     FULL_SEED = 3
-    SEED_CHOICES= (
+    SEED_CHOICES = (
         (UNSEEDED, u'Unseeded'),
         (FREE_SEED, u'Free Seed'),
         (HALF_SEED, u'Half Seed'),
@@ -98,7 +103,7 @@ class Team(models.Model):
 
 
 class Judge(models.Model):
-    name = models.CharField(max_length=30, unique = True)
+    name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
     phone = PhoneNumberField(blank=True)
@@ -123,6 +128,7 @@ class Judge(models.Model):
             c.delete()
         super(Judge, self).delete()
 
+
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge)
     team = models.ForeignKey(Team)
@@ -135,8 +141,8 @@ class Scratch(models.Model):
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
 
     def __unicode__(self):
-        s_type = ("Team","Tab")[self.scratch_type]
-        return str(self.team) + " <="+str(s_type)+"=> " + str(self.judge)
+        s_type = ("Team", "Tab")[self.scratch_type]
+        return str(self.team) + " <=" + str(s_type) + "=> " + str(self.judge)
 
 
 class Room(models.Model):
@@ -145,6 +151,7 @@ class Room(models.Model):
 
     def __unicode__(self):
         return self.name
+
     def delete(self):
         rounds = Round.objects.filter(room=self)
         if len(rounds) == 0:
@@ -196,7 +203,8 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __unicode__(self):
-        return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(self.opp_team) + " (OPP)"
+        return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(
+            self.opp_team) + " (OPP)"
 
     def delete(self):
         rounds = RoundStats.objects.filter(round=self)
@@ -204,20 +212,23 @@ class Round(models.Model):
             rs.delete()
         super(Round, self).delete()
 
-class Bye(models.Model):
-   bye_team = models.ForeignKey(Team)
-   round_number = models.IntegerField()
 
-   def __unicode__(self):
-      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+class Bye(models.Model):
+    bye_team = models.ForeignKey(Team)
+    round_number = models.IntegerField()
+
+    def __unicode__(self):
+        return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+
 
 class NoShow(models.Model):
-   no_show_team = models.ForeignKey(Team)
-   round_number = models.IntegerField()
-   lenient_late = models.BooleanField()
+    no_show_team = models.ForeignKey(Team)
+    round_number = models.IntegerField()
+    lenient_late = models.BooleanField()
 
-   def __unicode__(self):
-      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
+    def __unicode__(self):
+        return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
+
 
 class RoundStats(models.Model):
     debater = models.ForeignKey(Debater)
@@ -230,11 +241,15 @@ class RoundStats(models.Model):
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
 
+
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
     round_number = models.IntegerField()
+
     def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
 
+
 from south.modelsinspector import add_introspection_rules
+
 add_introspection_rules([], ["^localflavor\.us\.models\.PhoneNumberField"])

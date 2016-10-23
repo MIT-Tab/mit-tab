@@ -1,7 +1,8 @@
 var timeParsePatterns = [
     // 9
-    {   re: /^\d{1,2}$/i,
-        handler: function(bits) {
+    {
+        re: /^\d{1,2}$/i,
+        handler: function (bits) {
             if (bits[0].length == 1) {
                 return '0' + bits[0] + ':00';
             } else {
@@ -10,20 +11,23 @@ var timeParsePatterns = [
         }
     },
     // 13:00
-    {   re: /^\d{2}[:.]\d{2}$/i,
-        handler: function(bits) {
+    {
+        re: /^\d{2}[:.]\d{2}$/i,
+        handler: function (bits) {
             return bits[0].replace('.', ':');
         }
     },
     // 9:00
-    {   re: /^\d[:.]\d{2}$/i,
-        handler: function(bits) {
+    {
+        re: /^\d[:.]\d{2}$/i,
+        handler: function (bits) {
             return '0' + bits[0].replace('.', ':');
         }
     },
     // 3 am / 3 a.m. / 3am
-    {   re: /^(\d+)\s*([ap])(?:.?m.?)?$/i,
-        handler: function(bits) {
+    {
+        re: /^(\d+)\s*([ap])(?:.?m.?)?$/i,
+        handler: function (bits) {
             var hour = parseInt(bits[1]);
             if (hour == 12) {
                 hour = 0;
@@ -43,8 +47,9 @@ var timeParsePatterns = [
         }
     },
     // 3.30 am / 3:15 a.m. / 3.00am
-    {   re: /^(\d+)[.:](\d{2})\s*([ap]).?m.?$/i,
-        handler: function(bits) {
+    {
+        re: /^(\d+)[.:](\d{2})\s*([ap]).?m.?$/i,
+        handler: function (bits) {
             var hour = parseInt(bits[1]);
             var mins = parseInt(bits[2]);
             if (mins < 10) {
@@ -68,14 +73,16 @@ var timeParsePatterns = [
         }
     },
     // noon
-    {   re: /^no/i,
-        handler: function(bits) {
+    {
+        re: /^no/i,
+        handler: function (bits) {
             return '12:00';
         }
     },
     // midnight
-    {   re: /^mid/i,
-        handler: function(bits) {
+    {
+        re: /^mid/i,
+        handler: function (bits) {
             return '00:00';
         }
     }

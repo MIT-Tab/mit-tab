@@ -1,5 +1,6 @@
-<link rel="stylesheet" type="text/css" href="/static/css/tab_cards.css" />
-<link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css" />
+<link rel="stylesheet" type="text/css" href="/static/css/tab_cards.css"/>
+<link rel="stylesheet" type="text/css"
+      href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css"/>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
 <script type="text/javascript" src="/static/javascript/tab.js"></script>
@@ -7,7 +8,8 @@
 <div id="progressbar" class="printable" data-count="0" data-max="{{ all_teams|length }}"></div>
 
 {% for team in all_teams %}
-<div class="printable tab_card_item {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}" data-team-id={{team.id}}></div>
+    <div class="printable tab_card_item {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}"
+         data-team-id={{ team.id }}></div>
 
 {% endfor %}
 

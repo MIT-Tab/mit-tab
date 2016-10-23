@@ -1,8 +1,8 @@
 body {
-    background:#BFD9FF;
+    background: #BFD9FF;
     padding: auto;
     font-size: 14px;
-    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif
 }
 
 a {
@@ -10,12 +10,12 @@ a {
 }
 
 .full_width {
-    width:100%;
+    width: 100%;
 }
 
 /*Navigation.html styling  */
 div#nab_bar {
-    width: 100%;    
+    width: 100%;
 }
 
 ul#navlist {
@@ -26,9 +26,9 @@ ul#navlist {
 }
 
 ul#navlist li {
-  display: block;
-  position: relative;
-  float: left;
+    display: block;
+    position: relative;
+    float: left;
 }
 
 ul#navlist li {
@@ -36,7 +36,7 @@ ul#navlist li {
 }
 
 ul#navlist li a {
-    border-radius:.2em;
+    border-radius: .2em;
     display: block;
     border-top: 1px solid #ffffff;
     padding: .5em 1em .5em 1em;
@@ -48,11 +48,13 @@ ul#navlist li a {
 }
 
 ul#navlist li a.active {
-  background: #BFD9FF;
-  text-decoration: none;
+    background: #BFD9FF;
+    text-decoration: none;
 }
 
-ul#navlist li a:hover { background: #A4C0E4; }
+ul#navlist li a:hover {
+    background: #A4C0E4;
+}
 
 ul#sublist {
     margin: 0;
@@ -64,21 +66,28 @@ ul#sublist {
 }
 
 ul#sublist li {
-    width:100%;
-    
+    width: 100%;
+
 }
 
 ul#sublist li a.active {
-  background: #2C72C7;
-  text-decoration: none;
+    background: #2C72C7;
+    text-decoration: none;
 }
 
 li:hover ul#sublist {
-  display: block;
-  position: absolute;
+    display: block;
+    position: absolute;
 }
-ul#sublist li:hover a { background: #A4C0E4; }
-ul#sublist li:hover li a:hover { background: #A4C0E4; }
+
+ul#sublist li:hover a {
+    background: #A4C0E4;
+}
+
+ul#sublist li:hover li a:hover {
+    background: #A4C0E4;
+}
+
 /*finish navigation.html  */
 
 /* Index styling */
@@ -98,12 +107,13 @@ div#container {
     border-radius: 1em;
     overflow: auto;
 }
+
 div.float_container {
-    overflow:hidden;
+    overflow: hidden;
 }
 
 div.welcome {
-    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     line-height: 2.5em;
     font-size: 35px;
     color: white;
@@ -111,9 +121,9 @@ div.welcome {
 }
 
 div#top_banner {
-    background:#00438A;
-    height:6em;
-    width:100%;
+    background: #00438A;
+    height: 6em;
+    width: 100%;
     margin: 0;
     margin-bottom: .8em;
     text-align: center;
@@ -121,26 +131,27 @@ div#top_banner {
     border-radius: 1em;
 }
 
-img.banner{
+img.banner {
     float: left;
-    display:inline-block;
+    display: inline-block;
     height: 6em;
-    margin:0 0 0 .8em;
+    margin: 0 0 0 .8em;
 }
 
-ul#schools{
-list-style: decimal;
+ul#schools {
+    list-style: decimal;
 }
 
-ul#judges{
-list-style:decimal;
+ul#judges {
+    list-style: decimal;
 }
+
 /*  I really need to get rid of this copy paste code*/
-div.index_list{
+div.index_list {
     width: 18%;
     vertical-align: top;
-    display:inline-block;
-    padding:.5em;
+    display: inline-block;
+    padding: .5em;
 }
 
 div.index_header {
@@ -171,27 +182,27 @@ div.index_header {
 }
 
 .center-text {
-    text-align: center;    
+    text-align: center;
 }
 
 td.center {
-    text-align: center;    
+    text-align: center;
 }
+
 .div.index_list ol {
     padding-left: 2em;
     margin: 0;
 }
 
 div.index_container {
-    overflow-x:hidden;
-    overflow-y:scroll;
+    overflow-x: hidden;
+    overflow-y: scroll;
     height: 40em;
 }
 
-ul#teams{
-list-style:decimal;    
+ul#teams {
+    list-style: decimal;
 }
-
 
 /*  Form Styling */
 .warning {
@@ -207,33 +218,35 @@ p.warning {
     padding: .5em;
 }
 
-th.header{
+th.header {
     font-size: 16px;
     text-align: center;
 }
 
 div#banner {
-    font-size: 25px;  
+    font-size: 25px;
     padding: .2em;
 }
 
-.form_header{
-    text-align:center;    
+.form_header {
+    text-align: center;
 }
 
 table.pretty {
     text-align: left;
     border-collapse: collapse;
-    border: 1px solid #666666;  
+    border: 1px solid #666666;
 }
-table.pretty th{
-    border: 1px solid #666666;   
+
+table.pretty th {
+    border: 1px solid #666666;
     padding: .25em;
     font-size: 18px;
     font-style: bold;
 }
-div#round_info{
-    font-size: 14px;   
+
+div#round_info {
+    font-size: 14px;
 }
 
 table.check_status {
@@ -255,11 +268,11 @@ div.obj_info {
     border: 1px solid #BBBBBB;
     padding: .5em;
     margin-botton: 1em;
-    overflow: hidden; 
+    overflow: hidden;
 }
 
 .greyed_out {
-    background : white;
+    background: white;
     color: white;
 }
 
@@ -283,6 +296,7 @@ ul.errorlist li::before {
     content: ", ";
     white-space: pre;
 }
+
 ul.errorlist li:first-child::before {
     content: "";
 }
@@ -299,12 +313,14 @@ div.team_record {
 div.team_record table {
     border-collapse: collapse;
 }
-div.team_record table th{
+
+div.team_record table th {
     border-right: 1px solid black;
     border-bottom: 1px solid black;
     margin: .1em;
 }
-div.team_record table td{
+
+div.team_record table td {
     border-right: 1px solid black;
     margin: .1em;
 }
@@ -313,18 +329,17 @@ table.ballot_entry td {
     padding: 1em;
 }
 
-table.ballot_entry tr.top{
+table.ballot_entry tr.top {
     border-top: 1px solid black;
 }
 
-table.ballot_entry tr.bottom{
+table.ballot_entry tr.bottom {
     border-bottom: 1px solid black;
 }
 
-table.ballot_entry td.right_line{
+table.ballot_entry td.right_line {
     border-right: 1px solid black;
 }
-
 
 div.list_wrapper {
     float: left;
@@ -340,13 +355,13 @@ a.obj_item {
 }
 
 div.team_record td {
-    padding-right: .5em;    
-    padding-left: .5em;    
+    padding-right: .5em;
+    padding-left: .5em;
 }
 
 div.team_record th {
-    padding-right: .5em;    
-    padding-left: .5em;    
+    padding-right: .5em;
+    padding-left: .5em;
 }
 
 .mid {
@@ -354,7 +369,7 @@ div.team_record th {
 }
 
 .right {
-    float: right;    
+    float: right;
 }
 
 .left {
@@ -372,7 +387,7 @@ div.team_record th {
 }
 
 .no_decoration {
-    text-decoration: none;    
+    text-decoration: none;
 }
 
 a.button {
@@ -385,17 +400,16 @@ a.button {
     text-align: center;
 }
 
-
-div.scroll{
+div.scroll {
     border: 1px solid #444444;
     height: 20em;
     overflow: auto
 }
 
-li.data_list a{
+li.data_list a {
     display: block;
     padding: .1em;
-    width: 100%;    
+    width: 100%;
 }
 
 ul.list_item {
@@ -408,15 +422,15 @@ ul.list_item {
 span.list_item {
     float: right;
     margin-left: .5em;
-    
+
 }
 
 .invisible {
     display: none;
 }
 
-.loading{
-    background:url('/static/images/ajax-loader.gif') no-repeat center;
+.loading {
+    background: url('/static/images/ajax-loader.gif') no-repeat center;
     width: 100%;
     height: 200px;
 }
@@ -430,13 +444,12 @@ span.inline {
     vertical-align: middle;
 }
 
-
-.table th, .table td { 
-     border-top: none; 
+.table th, .table td {
+    border-top: none;
 }
 
 .nowrap {
-    white-space:nowrap;
+    white-space: nowrap;
 }
 
 .bold-font {
@@ -464,15 +477,15 @@ div.spacer {
 }
 
 .table-second-striped > tbody > tr:nth-child(4n) > td {
-      background-color: #EEEEEE;
+    background-color: #EEEEEE;
 }
 
 .table-second-striped > tbody > tr:nth-child(4n+1) > td {
-      background-color: #EEEEEE;
+    background-color: #EEEEEE;
 }
 
 .input-super-mini {
-  width: 40px;
+    width: 40px;
 }
 
 

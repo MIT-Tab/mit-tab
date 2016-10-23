@@ -54,6 +54,7 @@ class TestRankingLogic(TestCase):
             [assert_nearly_equal(*pair, message=msg) for pair
              in zip(set(left), set(right))]
 
+
 class TestPairingLogic(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
@@ -83,7 +84,6 @@ class TestPairingLogic(TestCase):
                         judge in judges_to_checkin]
             for checkin in checkins:
                 checkin.save()
-
 
     def assign_judges(self):
         cur_round = self.round_number()
@@ -119,5 +119,3 @@ class TestPairingLogic(TestCase):
         last_round = 6
         for _ in range(1, last_round):
             self.check_pairing(self.round_number(), last_round)
-
-

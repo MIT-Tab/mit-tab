@@ -1,19 +1,23 @@
 <div class="left50">
     <table class="table table-striped table-condensed table-bordered">
         <tr>
-            <th colspan=5> Varsity Ranking </th>
+            <th colspan=5> Varsity Ranking</th>
         </tr>
         <tr>
-            <th>#</th><th>Debater Name</th><th>Speaks</th><th>Ranks</th><th>Team</th>
-        </tr>    
+            <th>#</th>
+            <th>Debater Name</th>
+            <th>Speaks</th>
+            <th>Ranks</th>
+            <th>Team</th>
+        </tr>
         {% for debater,speaks,ranks,team in debaters %}
-        <tr>
-            <td> {{forloop.counter}} </td>
-            <td> <a href="/debater/{{debater.id}}">{{debater.name}}</a></td>
-            <td> {{speaks|floatformat:2}}</td>
-            <td> {{ranks|floatformat:2}}</td>
-            <td> <a href="/team/{{team.id}}/">{{team.name}}</a></td>
-        </tr>
+            <tr>
+                <td> {{ forloop.counter }} </td>
+                <td><a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
+                <td> {{ speaks|floatformat:2 }}</td>
+                <td> {{ ranks|floatformat:2 }}</td>
+                <td><a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
+            </tr>
         {% endfor %}
     </table>
 </div>
@@ -23,16 +27,20 @@
             <th colspan=5>Novice Ranking</th>
         </tr>
         <tr>
-            <th>#</th><th>Debater Name</th><th>Speaks</th><th>Ranks</th><th>Name</th>
-        </tr>    
-        {% for debater,speaks,ranks,team in nov_debaters %}
-        <tr>
-            <td> {{forloop.counter}} </td>
-            <td> <a href="/debater/{{debater.id}}">{{debater.name}}</a></td>
-            <td> {{speaks|floatformat:2}}</td>
-            <td> {{ranks|floatformat:2}}</td>
-            <td> <a href="/team/{{team.id}}/">{{team.name}}</a></td>
+            <th>#</th>
+            <th>Debater Name</th>
+            <th>Speaks</th>
+            <th>Ranks</th>
+            <th>Name</th>
         </tr>
+        {% for debater,speaks,ranks,team in nov_debaters %}
+            <tr>
+                <td> {{ forloop.counter }} </td>
+                <td><a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
+                <td> {{ speaks|floatformat:2 }}</td>
+                <td> {{ ranks|floatformat:2 }}</td>
+                <td><a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
+            </tr>
         {% endfor %}
     </table>
 </div>

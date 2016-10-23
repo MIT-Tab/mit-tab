@@ -1,49 +1,53 @@
 {% extends "base.html" %}
-{% block banner %} {{title}} {% endblock %}
+{% block banner %} {{ title }} {% endblock %}
 
 {% block title %}Multiple Data Entry{% endblock %}
 {% block content %}
-<form method="post" action=""> {% csrf_token %}
+    <form method="post" action=""> {% csrf_token %}
         <table>
             {% for form,delete in forms %}
-            
-            {% if form.errors %}
-            <p style="color: red;">
-                Please correct the error{{ form.errors|pluralize }} below.
-            </p>
-            {% endif %}
-            <tr><td colspan="2" class="form_header">
-            <label>{{data_type}} #{{ form.prefix }}
-            {% if delete%}
-            <a class="btn confirmLink" href="{{delete}}">Delete</a>
-            {% endif %}
-            
-            </label></td></tr>
-                {% for field in form %}
+
+                {% if form.errors %}
+                    <p style="color: red;">
+                        Please correct the error{{ form.errors|pluralize }} below.
+                    </p>
+                {% endif %}
                 <tr>
-                {{ field.errors }}
-                <th><label class="form_label">{{ field.label }} :</label></th>
-                <td>{{ field }}</td>
-                {% endfor %}
+                    <td colspan="2" class="form_header">
+                        <label>{{ data_type }} #{{ form.prefix }}
+                            {% if delete %}
+                                <a class="btn confirmLink" href="{{ delete }}">Delete</a>
+                            {% endif %}
+
+                        </label></td>
                 </tr>
-                <tr><td>&nbsp</td></tr>
+                {% for field in form %}
+                    <tr>
+                    {{ field.errors }}
+                    <th><label class="form_label">{{ field.label }} :</label></th>
+                    <td>{{ field }}</td>
+                {% endfor %}
+            </tr>
+                <tr>
+                    <td>&nbsp</td>
+                </tr>
             {% endfor %}
         </table>
         {% if links %}
             <div class="btn-group">
-            {% for link,text in links %}
-                <a class="btn" href='{{link}}'>{{text}}</a>
-            {% endfor %}
+                {% for link,text in links %}
+                    <a class="btn" href='{{ link }}'>{{ text }}</a>
+                {% endfor %}
             </div>
         {% endif %}
         {% if forms %}
-        <div class="btn-submit">
+            <div class="btn-submit">
             <input type="submit" value="Submit">
-        <div>
+            <div>
         {% else %}
-        <p class="mid"> No scratches </p>
+            <p class="mid"> No scratches </p>
         {% endif %}
- 
-   </form>
+
+    </form>
 
 {% endblock %}

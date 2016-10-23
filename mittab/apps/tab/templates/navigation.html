@@ -1,6 +1,6 @@
 {% load tags %}
 
-{% url "mittab.apps.tab.views.index" as home%}
+{% url "mittab.apps.tab.views.index" as home %}
 
 {% url "mittab.apps.tab.views.enter_school" as enter_school %}
 {% url "mittab.apps.tab.views.view_schools" as view_schools %}
@@ -9,10 +9,10 @@
 {% url "mittab.apps.tab.views.view_rooms" as view_rooms %}
 
 {% url "mittab.apps.tab.judge_views.enter_judge" as enter_judge %}
-{% url "mittab.apps.tab.judge_views.view_judges" as view_judges%}
+{% url "mittab.apps.tab.judge_views.view_judges" as view_judges %}
 
 {% url "mittab.apps.tab.team_views.enter_team" as enter_team %}
-{% url "mittab.apps.tab.team_views.view_teams" as view_teams%}
+{% url "mittab.apps.tab.team_views.view_teams" as view_teams %}
 {% url "mittab.apps.tab.team_views.rank_teams_ajax" as rank_teams %}
 {% url "mittab.apps.tab.team_views.all_tab_cards" as tab_cards %}
 
@@ -33,10 +33,10 @@
 <div id="nab_bar">
     <ul id="navlist">
         <li><a class="{% active request home %}" href="{{ home }}">Home</a></li>
-        <li><a class="{%active request pair_round %}{% active request view_status %}{% active request view_rounds %}">Pairings</a>
-            <ul id = "sublist">
-                <li><a class="{%active request view_status %}" href="{{ view_status }}">Current Round</a></li>
-                <li><a class="{%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a></li>
+        <li><a class="{% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">Pairings</a>
+            <ul id="sublist">
+                <li><a class="{% active request view_status %}" href="{{ view_status }}">Current Round</a></li>
+                <li><a class="{% active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a></li>
             </ul>
         </li>
 
@@ -47,24 +47,25 @@
             </ul>
         </li>
         <li><a class="{% active request confirm_start_new_tourny %}">Admin</a>
-            <ul id = "sublist">
+            <ul id="sublist">
                 <li><a href="/admin">Admin Interface</a></li>
-                <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
+                <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New
+                    Tournament</a></li>
                 <li><a class="{% active request upload_data %}" href="{{ upload_data }}">File Data Upload</a></li>
             </ul>
         </li>
         <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}">Backups</a>
-            <ul id = "sublist">
-                <li><a class="{%active request view_backups %}" href="{{ view_backups }}">View Backups</a></li>
-                <li><a class="{%active request backup %}" href="{{ backup }}">Backup Current</a></li>
-                <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
+            <ul id="sublist">
+                <li><a class="{% active request view_backups %}" href="{{ view_backups }}">View Backups</a></li>
+                <li><a class="{% active request backup %}" href="{{ backup }}">Backup Current</a></li>
+                <li><a class="{% active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
             </ul>
         </li>
         <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">Scratches</a>
-            <ul id = "sublist">
-                <li><a class="{%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a></li>
+            <ul id="sublist">
+                <li><a class="{% active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a></li>
             </ul>
         </li>
     </ul>
-<br>
+    <br>
 </div>

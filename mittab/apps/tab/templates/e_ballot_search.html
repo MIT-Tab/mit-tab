@@ -2,24 +2,24 @@
 
 {% block title %}E-Ballot Search{% endblock %}
 
-{% block banner %} {{title}} {% endblock %}
+{% block banner %} {{ title }} {% endblock %}
 
 {% block content %}
 
-<center>
-  <h2>E-Ballot Search</h2>
-  <br>
-  <form action="/e_ballots/" method="post" class="eBallotSearchForm" enctyp="multipate/form-data">
-    {% csrf_token %}
+    <center>
+        <h2>E-Ballot Search</h2>
+        <br>
+        <form action="/e_ballots/" method="post" class="eBallotSearchForm" enctyp="multipate/form-data">
+            {% csrf_token %}
 
-    <label for="e_ballot_search">Ballot code:</label>
-    <input id="e_ballot_search" name="ballot_code" type="text" placeholder="Your 6-character code">
+            <label for="e_ballot_search">Ballot code:</label>
+            <input id="e_ballot_search" name="ballot_code" type="text" placeholder="Your 6-character code">
 
-    <div class="btn-submit">
-      <input type="submit" value="Get Ballot">
-    </div>
+            <div class="btn-submit">
+                <input type="submit" value="Get Ballot">
+            </div>
 
-  </form>
-</center>
+        </form>
+    </center>
 
 {% endblock %}
