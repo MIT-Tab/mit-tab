@@ -165,17 +165,20 @@ class Round(models.Model):
     NONE = 0
     GOV = 1
     OPP = 2
+
     PULLUP_CHOICES = (
         (NONE, u'NONE'),
         (GOV, u'GOV'),
         (OPP, u'OPP'),
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
+
     UNKNOWN = 0
     GOV_VIA_FORFEIT = 3
     OPP_VIA_FORFEIT = 4
     ALL_DROP = 5
     ALL_WIN = 6
+
     VICTOR_CHOICES = (
         (UNKNOWN, u'UNKNOWN'),
         (GOV, u'GOV'),

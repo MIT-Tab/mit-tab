@@ -18,12 +18,13 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+import pprint
+
+import errors
+import mwmatching
 import tab_logic
 from mittab.apps.tab.models import *
-import mwmatching
-import random
-import errors
-import pprint
+
 
 def add_judges(pairings, judges, panel_points):
     # First clear any existing judge assignments

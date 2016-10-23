@@ -18,10 +18,10 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
+import mwmatching
 import tab_logic
 from mittab.apps.tab.models import *
-import mwmatching
-import random
+
 
 def perfect_pairing(list_of_teams):
     """ Uses the mwmatching library to assign teams in a pairing """

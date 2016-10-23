@@ -1,11 +1,12 @@
-from django.db import models
-from django import forms
-from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.core.exceptions import ValidationError
-from models import *
-from decimal import Decimal
 import itertools
 import pprint
+from decimal import Decimal
+
+from django import forms
+from django.contrib.admin.widgets import FilteredSelectMultiple
+
+from models import *
+
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")

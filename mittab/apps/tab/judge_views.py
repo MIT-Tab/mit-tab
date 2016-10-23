@@ -1,13 +1,10 @@
+from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
-from django.contrib.auth.decorators import permission_required
+
 from forms import JudgeForm, ScratchForm
-#New Models based approach
-from models import *
-from django.db import models
-from errors import *
 from mittab.libs.tab_logic import TabFlags
+from models import *
 
 
 def view_judges(request):
@@ -61,6 +58,7 @@ def view_judge(request, judge_id):
                                   'error_name': str(judge_id),
                                   'error_info':"No such judge"}, 
                                   context_instance=RequestContext(request))
+
     if request.method == 'POST':
         form = JudgeForm(request.POST,instance=judge)
         if form.is_valid():

@@ -1,11 +1,13 @@
-from mittab.apps.tab.models import *
-from django.conf import settings
-from django.core.servers.basehttp import FileWrapper
-from mittab.settings import BASE_DIR
-
+import os
 import shutil
 import time
-import os
+
+from django.conf import settings
+from django.core.servers.basehttp import FileWrapper
+
+from mittab.apps.tab.models import *
+from mittab.settings import BASE_DIR
+
 
 def get_backup_prefix():
     return os.path.join(BASE_DIR, "mittab")

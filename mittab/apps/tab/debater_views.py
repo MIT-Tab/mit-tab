@@ -1,11 +1,11 @@
+from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
-from django.contrib.auth.decorators import permission_required
-from forms import DebaterForm
-from errors import *
-from models import *
+
 import mittab.libs.tab_logic as tab_logic
+from forms import DebaterForm
+from models import *
+
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples

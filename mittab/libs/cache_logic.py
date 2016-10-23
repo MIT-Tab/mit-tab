@@ -1,7 +1,8 @@
 # Caching decorator taken from http://djangosnippets.org/snippets/564/
-from hashlib import sha1
-from django.core.cache import cache as _djcache
 import random
+from hashlib import sha1
+
+from django.core.cache import cache as _djcache
 
 CACHE_TIMEOUT = 20
 

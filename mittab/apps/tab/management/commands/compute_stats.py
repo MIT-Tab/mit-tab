@@ -1,10 +1,10 @@
 from optparse import make_option
 
-from django.core.management.base import BaseCommand
-from mittab.apps.tab.models import NoShow, RoundStats, TabSettings, Team, Debater
-import mittab.libs.tab_logic as tab_logic
-
 import numpy as np
+from django.core.management.base import BaseCommand
+
+import mittab.libs.tab_logic as tab_logic
+from mittab.apps.tab.models import NoShow, RoundStats, TabSettings, Team, Debater
 
 
 class Command(BaseCommand):
