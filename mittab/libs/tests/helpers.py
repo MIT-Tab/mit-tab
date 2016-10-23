@@ -1,7 +1,8 @@
 """Collection of useful methods for manipulating pairing data"""
 
-from mittab.apps.tab.models import Round, RoundStats
 import random
+
+from mittab.apps.tab.models import Round, RoundStats
 
 # Speaks every quarter point
 speak_range = [23 + .25 * i for i in range(17)]

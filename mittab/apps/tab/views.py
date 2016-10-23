@@ -1,13 +1,14 @@
-from django.shortcuts import render_to_response
-from django.template import RequestContext, loader
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
+from django.http import HttpResponseForbidden
+from django.shortcuts import render_to_response
+from django.template import RequestContext, loader
+
 from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
-from django.db import models
-from models import *
-from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams
+from mittab.libs.tab_logic import TabFlags
+from models import *
+
 
 def index(request):
     number_teams = Team.objects.count()

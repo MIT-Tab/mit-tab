@@ -1,18 +1,19 @@
+import random
+
 from django.test import TestCase
+
+import mittab.libs.assign_judges as assign_judges
+import mittab.libs.tab_logic as tab_logic
 from mittab.apps.tab.models import CheckIn
 from mittab.apps.tab.models import Debater
 from mittab.apps.tab.models import Judge
-from mittab.apps.tab.models import Team
-from mittab.apps.tab.models import TabSettings
 from mittab.apps.tab.models import Round
-import mittab.libs.assign_judges as assign_judges
-import mittab.libs.tab_logic as tab_logic
+from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import Team
 from mittab.libs.tests.assertion import assert_nearly_equal
 from mittab.libs.tests.data.load_data import load_debater_rankings
 from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tests.helpers import generate_results
-
-import random
 
 
 class TestRankingLogic(TestCase):
