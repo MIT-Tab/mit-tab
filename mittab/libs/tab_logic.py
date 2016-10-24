@@ -9,6 +9,9 @@ import pairing_alg
 from cache_logic import cache
 from mittab.apps.tab.models import *
 
+"""
+Pairing methods
+"""
 
 def pair_round():
     """
@@ -481,53 +484,63 @@ def tot_wins(team):
     return tot_wins
 
 
-""" Speaks """
+# End pairing methods
+"""
+Team speaks methods
+"""
 
 
-@cache()
+# @cache()
 def tot_speaks(team):
-    tot_speaks = sum([tot_speaks_deb(deb, False)
-                      for deb in team.debaters.all()])
-    return tot_speaks
+    total_speaks = sum([tot_speaks_deb(deb, False)
+                        for deb in team.debaters.all()])
+    return total_speaks
 
 
-@cache()
+# @cache()
 def single_adjusted_speaks(team):
     speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[1:-1])
 
 
-@cache()
+# @cache()
 def double_adjusted_speaks(team):
     speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[2:-2])
 
 
-""" Ranks """
+"""
+Team Ranks Methods
+"""
 
 
-@cache()
+# @cache()
 def tot_ranks(team):
     tot_ranks = sum([tot_ranks_deb(deb, False)
                      for deb in team.debaters.all()])
     return tot_ranks
 
 
-@cache()
+# @cache()
 def single_adjusted_ranks(team):
     ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[1:-1])
 
 
-@cache()
+# @cache()
 def double_adjusted_ranks(team):
     ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
+"""
+Miscallaneous team methods:
+    Stuff like Opp-strength, listings for teams, default methods for varsity and novice breaks (based entire on speaks)
+    so if you don't use that tab-policy, do not use those functions.
+"""
 
 def opp_strength(t):
     opp_record = 0
@@ -613,14 +626,15 @@ def rank_teams_except_record(teams):
 def rank_nov_teams():
     return sorted(all_nov_teams(), key=team_score)
 
+"""
+Debater speaks calculation methods
+"""
 
-###################################
-""" Debater Speaks Calculations """
-###################################
 
-@cache()
+# @cache()
 def avg_deb_speaks(debater):
-    """ Computes the average debater speaks for the supplied debater
+    """
+    Computes the average debater speaks for the supplied debater
 
     Generally this consistes of finding all the speaks we have, averaging iron
     men speaks, and then dividing by the length.
@@ -658,36 +672,36 @@ def avg_deb_speaks(debater):
 
 
 def debater_forfeit_speaks(debater):
-    """ Calculate a debater's speaks for a forfeit round
-
-    Note that right now we just return 0, but we may want to add support
-    for returning average speaks or some such
     """
-
+    Calculates a debater's speaks for a forfeit round. Note that right now we just return 0, but we may want to add
+    support for returning average speaks or some such
+    """
     return 0.0
 
 
-@cache()
+# @cache()
 def speaks_for_debater(debater, average_ironmen=True):
-    """Returns a list of speaks for the provided debater
+    """
+    Returns a list of speaks for the provided debater
 
-    In most normal rounds the speaks of the debater are the speaks the judge
-    gave them, but there are some special circumstances.
+    In most normal rounds the speaks of the debater are the speaks the judge gave them, but there are some special
+    circumstances (forfeits, ironmans, and byes).
 
     Forfeits:
-    If a debater won by forfeit, they get their average speaks
-    If a debater lost by forfeit, they get speaks of 0
-    If a debater was Noshow for a round, they get speaks of 0
+        If a debater won by forfeit, they get their average speaks
+        If a debater lost by forfeit, they get speaks of 0
+        If a debater was Noshow for a round, they get speaks of 0
 
     Iron Mans:
-    If a debater is an iron man for a round, they get the average of their
-    speaks for that round
+        If a debater is an iron man for a round, they get the average of their speaks for that round
 
     Byes:
-    If a debater wins in a bye, they get their average speaks
-    If a debater was late to a lenient round, they get average speaks
+        If a debater wins in a bye, they get their average speaks
+        If a debater was late to a lenient round (note that leniency is defined in TabSettings under the lenient_late
+            setting), they get average speaks
     """
     team = deb_team(debater)
+
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
     num_speaks = TabSettings.objects.get(key="cur_round").value - 1
@@ -747,32 +761,40 @@ def single_adjusted_speaks_deb(debater):
 
 
 def double_adjusted_speaks_deb(debater):
+    """
+    Double-adjusted speaks are the speaking score of a debater, removing the top two and the bottom two. In tournaments
+    where there are five in-rounds, this is the speaker's median score. The algorithm used is to get all the debater's
+    speaks, sort them from top to bottom, and then return the ones in the middle (which is generalised, as needed, since
+    Nats uses 6 in-rounds).
+    :return: the double-adjusted speaks for the provided debater
+    """
     debater_speaks = speaks_for_debater(debater)
     debater_speaks.sort()
     return sum(debater_speaks[2:-2])
 
 
-@cache()
+# @cache()
 def tot_speaks_deb(debater, average_ironmen=True):
-    """Return the total of all speaks for a debater"""
+    """
+    Return the total of all speaks for a debater
+    """
     debater_speaks = speaks_for_debater(debater, average_ironmen)
     return sum(debater_speaks)
 
 
-#################################
-""" Debater Rank Calculations """
-#################################
+"""
+Debater rank calculation methods
+"""
 
-@cache()
+
+# @cache()
 def avg_deb_ranks(debater):
-    """ Computes the average debater ranks for the supplied debater
+    """
+    Computes the average debater ranks for the supplied debater. Generally thisconsistss of finding all the ranks we
+    have, averaging iron men ranks, and then dividing by the length.
 
-    Generally this consistes of finding all the ranks we have, averaging iron
-    men ranks, and then dividing by the length.
-
-    This does not count forfeit losses or noshow's as 7 because having ranks of
-    3.5 in the first place is penalty enough, and some tab polices may want
-    forfeits to count as average ranks.
+    This does not count forfeit losses or noshow's as 7 because having ranks of 3.5 in the first place is penalty
+    enough, and some tab polices may want forfeits to count as average ranks.
     """
     real_ranks = []
     num_ranks = TabSettings.objects.get(key='cur_round').value - 1
@@ -803,7 +825,8 @@ def avg_deb_ranks(debater):
 
 
 def debater_forfeit_ranks(debater):
-    """ Calculate a debater's speaks for a forfeit round
+    """
+    Calculate a debater's speaks for a forfeit round
 
     Note that right now we just return 3.5 (average of 3 and 4), but we may want to add support
     for returning average ranks or some such
@@ -811,7 +834,7 @@ def debater_forfeit_ranks(debater):
     return 3.5
 
 
-@cache()
+# @cache()
 def ranks_for_debater(debater, average_ironmen=True):
     """Returns a list of ranks for the provided debater
 
@@ -885,27 +908,45 @@ def single_adjusted_ranks_deb(debater):
 
 
 def double_adjusted_ranks_deb(debater):
+    """
+    Double-adjusted ranks are a debater's ranks, removing the top two and the bottom two. In tournaments where there are
+    five in-rounds, this is the speaker's median rank. The algorithm used is to get all the debater's ranks, sort them
+    from top to bottom, and then return the ones in the middle (which is generalised, as needed, since Nats uses 6
+    in-rounds).
+    :return: the double-adjusted ranks for the provided debater
+    """
     debater_ranks = ranks_for_debater(debater)
     debater_ranks.sort()
     return sum(debater_ranks[2:-2])
 
 
-@cache()
+# @cache()
 def tot_ranks_deb(debater, average_ironmen=True):
+    """
+    :param debater: debater object
+    :param average_ironmen: boolean flag on whether or not to average for ironmen or use 25
+    :return: the total ranks got by that debater
+    """
     debater_ranks = ranks_for_debater(debater, average_ironmen=average_ironmen)
     return sum(debater_ranks)
 
 
 def deb_team(d):
+    """
+    Returns the debaters which make up the debate team.
+    """
+    # TODO check whether this interpretation is correct
     try:
         return d.team_set.all()[0]
     except:
         return None
 
 
-# Returns a tuple used for comparing two debaters
-# in terms of their overall standing in the tournament
 def debater_score(debater):
+    """
+    Returns a tuple used for comparing two debaters in terms of their overall standing in the tournament. Note that all
+    debater scores are scored on the fly.
+    """
     score = (0, 0, 0, 0, 0, 0)
     try:
         score = (-tot_speaks_deb(debater),
@@ -921,10 +962,22 @@ def debater_score(debater):
 
 
 def rank_speakers():
+    """
+    Ranks all speakers based on their debater_score. This takes a long time, because the debater_score associated with
+    each debater is calculated by the debater score method, which also takes forever, because everything is calculated
+    on the fly and not stored in a database.
+    :return: a sorted list containing debaters, all ranked
+    """
     return sorted(Debater.objects.all(), key=debater_score)
 
 
 def rank_nov_speakers():
+    """
+    Ranks novice speakers based on their debater_score. This takes a long time, because the debater_score associated with
+    each debater is calculated by the debater score method, which also takes forever, because everything is calculated
+    on the fly and not stored in a database.
+    :return: a sorted list containing novice debaters, all ranked
+    """
     return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
 
 

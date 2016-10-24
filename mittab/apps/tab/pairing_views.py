@@ -100,7 +100,7 @@ def pair_round(request):
                 tab_logic.pair_round()
                 current_round.value = current_round.value + 1
                 current_round.save()
-            backup.backup_round("round_%i_after_pairing.db" % (current_round_number))
+            backup.backup_round("round_%i_after_pairing.db" % current_round_number)
         except Exception as exp:
             traceback.print_exc(file=sys.stdout)
             return render_to_response('error.html',
@@ -294,7 +294,7 @@ def view_round(request, round_number, errors=None):
     valid_pairing = len(round_pairing) >= n_over_two or round_number == 0
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
-            errors.append("%s was not in the pairing" % (present_team))
+            errors.append("%s was not in the pairing" % present_team)
             byes.append(present_team)
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
@@ -451,7 +451,7 @@ def pretty_pair_print(request):
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
-    rounds = [(i, "Round %i" % i) for i in range(1, number_of_rounds + 1)]
+    rounds = [(i, "Round %i" % i) for i in xrange(1, number_of_rounds + 1)]
     return render_to_response('list_data.html',
                               {'item_type': 'round',
                                'item_list': rounds,
@@ -499,6 +499,7 @@ def enter_e_ballot(request, ballot_code):
 
 def enter_result(request, round_id, e_ballot=False):
     round_obj = Round.objects.get(id=round_id)
+
     if request.method == 'POST':
         if e_ballot:
             form = EBallotForm(request.POST, round_instance=round_obj)
@@ -506,7 +507,8 @@ def enter_result(request, round_id, e_ballot=False):
             form = ResultEntryForm(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
-                result = form.save()
+                print form.cleaned_data
+                form.save()
             except ValueError:
                 return render_to_response('error.html',
                                           {'error_type': "Round Result",
@@ -517,12 +519,15 @@ def enter_result(request, round_id, e_ballot=False):
                                       {'data_type': "Round Result",
                                        'data_name': "[" + str(round_obj) + "]"},
                                       context_instance=RequestContext(request))
+
     else:
-        is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
+        # TODO implement some way to verify that the submitted e-ballot is the correct one for that round
+        # is_current = (round_obj.round_number == TabSettings.objects.get(key="cur_round"))
         if e_ballot:
             form = EBallotForm(round_instance=round_obj)
         else:
             form = ResultEntryForm(round_instance=round_obj)
+
     return render_to_response('round_entry.html',
                               {'form': form,
                                'title': "Entering Ballot for {}".format(str(round_obj)),
@@ -539,7 +544,7 @@ def enter_multiple_results(request, round_id, num_entered):
                                  prefix=str(i),
                                  round_instance=round_obj,
                                  no_fill=True)
-                 for i in range(1, num_entered + 1)]
+                 for i in xrange(1, num_entered + 1)]
         all_good = True
         for form in forms:
             all_good = all_good and form.is_valid()
@@ -587,7 +592,7 @@ def enter_multiple_results(request, round_id, num_entered):
     else:
         forms = [ResultEntryForm(prefix=str(i),
                                  round_instance=round_obj,
-                                 no_fill=True) for i in range(1, num_entered + 1)]
+                                 no_fill=True) for i in xrange(1, num_entered + 1)]
     return render_to_response('round_entry_multiple.html',
                               {'forms': forms,
                                'title': "Entering Ballots for {}".format(str(round_obj)),
@@ -644,51 +649,51 @@ def clear_db():
     in models.py.
     """
     check_ins = CheckIn.objects.all()
-    for i in range(len(check_ins)):
+    for i in xrange(len(check_ins)):
         CheckIn.delete(check_ins[i])
     print "Cleared Checkins"
 
     round_stats = RoundStats.objects.all()
-    for i in range(len(round_stats)):
+    for i in xrange(len(round_stats)):
         RoundStats.delete(round_stats[i])
     print "Cleared RoundStats"
 
     rounds = Round.objects.all()
-    for i in range(len(rounds)):
+    for i in xrange(len(rounds)):
         Round.delete(rounds[i])
     print "Cleared Rounds"
 
     judges = Judge.objects.all()
-    for i in range(len(judges)):
+    for i in xrange(len(judges)):
         Judge.delete(judges[i])
     print "Cleared Judges"
 
     rooms = Room.objects.all()
-    for i in range(len(rooms)):
+    for i in xrange(len(rooms)):
         Room.delete(rooms[i])
     print "Cleared Rooms"
 
     scratches = Scratch.objects.all()
-    for i in range(len(scratches)):
+    for i in xrange(len(scratches)):
         Scratch.delete(scratches[i])
     print "Cleared Scratches"
 
     tab_set = TabSettings.objects.all()
-    for i in range(len(tab_set)):
+    for i in xrange(len(tab_set)):
         TabSettings.delete(tab_set[i])
     print "Cleared TabSettings"
 
     teams = Team.objects.all()
-    for i in range(len(teams)):
+    for i in xrange(len(teams)):
         Team.delete(teams[i])
     print "Cleared Teams"
 
     debaters = Debater.objects.all()
-    for i in range(len(debaters)):
+    for i in xrange(len(debaters)):
         Debater.delete(debaters[i])
     print "Cleared Debaters"
 
     schools = School.objects.all()
-    for i in range(len(schools)):
+    for i in xrange(len(schools)):
         School.delete(schools[i])
     print "Cleared Schools"

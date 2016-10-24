@@ -145,8 +145,7 @@ class ResultEntryForm(forms.Form):
         (4, 4),
     )
 
-    winner = forms.ChoiceField(label="Which team won the round?",
-                               choices=Round.VICTOR_CHOICES)
+    winner = forms.ChoiceField(label="Which team won the round?", choices=Round.VICTOR_CHOICES)
 
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
@@ -158,7 +157,7 @@ class ResultEntryForm(forms.Form):
         super(ResultEntryForm, self).__init__(*args, **kwargs) 
         # If we already have information, fill that into the form
         if round_object.victor != 0 and not no_fill:
-            self.fields["winner"].initial = round_object.victor
+            self.fields['winner'].initial = round_object.victor
 
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
@@ -172,6 +171,7 @@ class ResultEntryForm(forms.Form):
             self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=debater_choices)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
+
         if round_object.victor != 0 and not no_fill:
             for d in self.GOV + self.OPP:
                 try:

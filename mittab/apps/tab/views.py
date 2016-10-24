@@ -12,7 +12,7 @@ from models import *
 
 def index(request):
     """
-    Handles the display of the index page for MITTAB, i.e. that page with all the schools, judges, teams, debaters,
+    Handles the display of the index page for MIT-TAB, i.e. that page with all the schools, judges, teams, debaters,
     rooms, etc when you log into the program.
     """
     number_teams = Team.objects.count()
@@ -47,10 +47,10 @@ def render_403(request):
     return HttpResponseForbidden(t.render(c))
 
 
-'''
+"""
 School view section.
 Includes views for viewing schools, viewing one school, entering a school, and deleting a school.
-'''
+"""
 
 
 def view_schools(request):
@@ -155,7 +155,6 @@ def delete_school(request, school_id):
         school name. You can view the school_id by clicking on the school and checking the URL. It is _not_ the same as
         the number accompanying the school on the index page.
     """
-
     error_msg = None
     try:
         school_id = int(school_id)
@@ -181,7 +180,6 @@ def delete_school(request, school_id):
 
 
 # End of School views
-
 '''
 Room views.
 Includes views for viewing rooms, viewing a room, entering a room, and deleting a room. Deletion thereof requires
@@ -319,10 +317,10 @@ def delete_room(request, room_id):
                               context_instance=RequestContext(request))
 
 
-'''
+"""
 Scratch views.
 Includes three views for adding, deleting, and viewing scratches.
-'''
+"""
 
 
 # View for manually adding scratches

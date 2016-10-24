@@ -2,6 +2,7 @@ import random
 import string
 
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from localflavor.us.models import PhoneNumberField
 
@@ -61,10 +62,8 @@ class Debater(models.Model):
     """
     Contains information with regard to the debaters at the tournament.
     """
-    """
-    TODO it's honestly probably better to make a super-class containing the provider, phone, and name information. Then,
-    make the Judge and the Debater classes extend that class.
-    """
+    # TODO it's honestly probably better to make a super-class containing the provider, phone, and name information.
+    # Then, make the Judge and the Debater classes extend that class.
     name = models.CharField(max_length=30, unique=True)
     """ name is the name of the Debater """
 
@@ -103,7 +102,8 @@ class Team(models.Model):
     Contains information with regard to the team itself. Contains the team name, the team school, the debaters in that
     team, the team seed, and the information on whetehr that team is checked in or not.
     """
-    name = models.CharField(max_length=30, unique=True)
+    alphanumeric = RegexValidator(r'^[0-9a-zA-Z ]*$', 'Only alphanumeric characters are allowed.')
+    name = models.CharField(max_length=30, unique=True, validators=[alphanumeric])
     school = models.ForeignKey('School')
     debaters = models.ManyToManyField(Debater)
 
@@ -124,7 +124,7 @@ class Team(models.Model):
     def __unicode__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, **kwargs):
         scratches = Scratch.objects.filter(team=self)
         for s in scratches:
             s.delete()
@@ -151,12 +151,11 @@ class Judge(models.Model):
     """ ballot code for the judge for the e-ballots """
 
     def save(self, *args, **kwargs):
-
         if not self.ballot_code:
             choices = string.ascii_lowercase + string.digits
             code = ''.join(random.choice(choices) for _ in range(6))
             while Judge.objects.filter(ballot_code=code).first():
-                # keep regerating codes if it is something already selected
+                # keep regenerating codes if it is something already selected
                 code = ''.join(random.choice(choices) for _ in range(6))
             self.ballot_code = code
 

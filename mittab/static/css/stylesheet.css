@@ -232,6 +232,10 @@ div.mittab-content {
     padding: 0.2em;
 }
 
+div#tab-cards {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
 .form_header {
     text-align: center;
 }

@@ -1,22 +1,22 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+# Copyright (C) 2011 by Julia Boortz and Joseph Lynch
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import pprint
 
@@ -40,9 +40,9 @@ def add_judges(pairings, judges, panel_points):
     random.shuffle(judges)
 
     # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
-    judges = sorted(judges, key=lambda j: j.rank, reverse = True)
+    judges = sorted(judges, key=lambda j: j.rank, reverse=True)
     pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
-                  reverse = True)
+                  reverse=True)
 
     pprint.pprint(pairings)
 
@@ -59,7 +59,7 @@ def add_judges(pairings, judges, panel_points):
 
     for (group_i, group) in enumerate(pairing_groups):
         num_rounds = len(group)
-        # Assign chairs (single judges) to each round using perfect pairing
+        # Assign chairs (equivalent to single judges) to each round using perfect pairing
         graph_edges = []
         for (judge_i, judge) in enumerate(judges):
             for (pairing_i, pairing) in enumerate(group):
@@ -68,11 +68,13 @@ def add_judges(pairings, judges, panel_points):
                                         judge_i + len(group),
                                         calc_weight(judge_i, pairing_i)))
         judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-        print "wat"
+
         # If there is no possible assignment of chairs, raise an error
         if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and len(graph_edges) == 0):
             if len(graph_edges) == 0:
-                raise errors.JudgeAssignmentError("Impossible to assign judges, consider reducing your gaps if you are making panels, otherwise find some more judges.")
+                raise errors.JudgeAssignmentError(
+                    "Impossible to assign judges, consider reducing your gaps if you are making panels, otherwise " +
+                    "find some more judges.")
             elif -1 in judge_assignments[:num_rounds]:
                 pairing_list = judge_assignments[:len(pairings)]
                 bad_pairing = pairings[pairing_list.index(-1)]
@@ -91,6 +93,8 @@ def add_judges(pairings, judges, panel_points):
             for judge in pairing.judges.all():
                 judges.remove(judge)
 
+        # TODO probably make a better algorithm to assign panels automatically, also
+        # TODO probably make a function to turn panel judges into one judge for pairing purposes
         # Function that tries to panel num_to_panel rounds of the potential_pairings
         # Has built in logic to retry with lower number of panels if we fail due
         # to either scratches or wanting to many rounds
@@ -100,11 +104,10 @@ def add_judges(pairings, judges, panel_points):
                 print "Failed to panel"
                 return {}
 
-
             rounds = sorted(potential_pairings,
                             key=lambda r: (argmin(r.judges.all(),
-                                           lambda j: j.rank).rank,) + \
-                                           tuple([-1 * i for i in tab_logic.team_comp(r, current_round_number)]))
+                                                  lambda j: j.rank).rank,) + \
+                                          tuple([-1 * i for i in tab_logic.team_comp(r, current_round_number)]))
             base_judge = argmax(rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
             print "Found maximally ranked judge {0}".format(base_judge)
             potential_panelists = [j for j in all_judges if
@@ -122,7 +125,7 @@ def add_judges(pairings, judges, panel_points):
                 panel_assignments.append([j for j in pairing.judges.all()])
 
             # Do it twice so we get panels of 3
-            for i in (0,1):
+            for i in (0, 1):
                 graph_edges = []
                 for (judge_i, judge) in enumerate(potential_panelists):
                     for (pairing_i, pairing) in enumerate(rounds_to_panel):
@@ -135,7 +138,7 @@ def add_judges(pairings, judges, panel_points):
                 judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
                 print judge_assignments
                 if ((-1 in judge_assignments[:num_to_panel]) or
-                    (num_to_panel > 0 and len(graph_edges) == 0)):
+                        (num_to_panel > 0 and len(graph_edges) == 0)):
                     print "Scratches are causing a retry"
                     return try_paneling(potential_pairings, all_judges, num_to_panel - 1, gap)
                 # Save the judges to the potential panel assignments
@@ -167,25 +170,26 @@ def add_judges(pairings, judges, panel_points):
                         judges.remove(panelist)
                 pairing.save()
 
+
 def argmin(seq, fn):
     return min([(fn(i), i) for i in seq])[1]
+
 
 def argmax(seq, fn):
     return max([(fn(i), i) for i in seq])[1]
 
 
 def calc_weight(judge_i, pairing_i):
-    """ Calculate the relative badness of this judge assignment
-
-    We want small negative numbers to be preferred to large negative numbers
-
+    """
+    Calculate the relative badness of this judge assignment. We want small negative numbers to be preferred to large
+    negative numbers
     """
     if judge_i < pairing_i:
         # if the judge is highly ranked, we can have them judge a lower round
         # if we absolutely have to
         return judge_i - pairing_i
     else:
-        return -1 * (judge_i - pairing_i)**2
+        return -1 * (judge_i - pairing_i) ** 2
 
 
 def calc_weight_panel(judges):
@@ -195,30 +199,45 @@ def calc_weight_panel(judges):
     # Use the sum_squares so we get highest panelists with lowest judges 
     return 1000000 * sum(judge_ranks) + sum_squares
 
-#return true if the judge is scratched from either team, false otherwise
+
 def judge_conflict(j, team1, team2):
-    if len(Scratch.objects.filter(judge = j).filter(team = team1)) != 0 or had_judge(j,team1) == True:
-        #judge scratched from team one
+    """
+    Determines whether the judge has been scratched and therefore, a conflict exists
+    :param j: judge
+    :return: boolean on whether the judge is scratched from either team
+    """
+    if len(Scratch.objects.filter(judge=j).filter(team=team1)) != 0 or had_judge(j, team1) == True:
+        # judge scratched from team one
         return True
-    elif len(Scratch.objects.filter(judge = j).filter(team = team2)) != 0 or had_judge(j, team2) == True:
-            #judge scratched from team two
-            return True
+    elif len(Scratch.objects.filter(judge=j).filter(team=team2)) != 0 or had_judge(j, team2) == True:
+        # judge scratched from team two
+        return True
     else:
         return False
 
-#returns true if team has had judge before, otherwise false
+
 def had_judge(j, t):
-    if Round.objects.filter(gov_team = t, judges = j).count() != 0:
+    """
+    Determines whether that team has had that judge before
+    :param j: judge
+    :param t: team
+    :return: boolean on whether the judge has judged that team before
+    """
+    if Round.objects.filter(gov_team=t, judges=j).count() != 0:
         return True
-    elif Round.objects.filter(opp_team = t, judges = j).count() != 0:
+    elif Round.objects.filter(opp_team=t, judges=j).count() != 0:
         return True
     else:
         return False
+
 
 def can_judge_teams(list_of_judges, team1, team2):
+    """
+    :param list_of_judges: list of judges
+    :return: Returns the number of judges who can judge both 'team1' and 'team2'
+    """
     result = []
     for judge in list_of_judges:
         if not judge_conflict(judge, team1, team2):
             result.append(judge)
     return result
-
