@@ -233,7 +233,8 @@ def upload_backup(request):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
     try:
-        cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(time.time())
+        cur_round = TabSettings.objects.get(key="cur_round").value
+        btime = int(time.time())
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
         backup.backup_round("manual_backup_round_{}_{}_{}.db".format(cur_round, btime, now))
     except:
@@ -439,7 +440,6 @@ def pretty_pair(request, printable=False):
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
     return render_to_response('round_pairings.html',
                               locals(),
                               context_instance=RequestContext(request))
@@ -471,24 +471,28 @@ def enter_e_ballot(request, ballot_code):
     current_round = TabSettings.get(key="cur_round") - 1
     rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
     rounds = rounds.filter(round_number=current_round)
+
     if not Judge.objects.filter(ballot_code=ballot_code).first():
         message = 'No judges with the ballot code "%s."' % ballot_code
-        message += " Try submitting again, or go to tab to resolve the issue."
+        message += " Try submitting again or go to Tab to resolve the issue."
         return render(request,
                       'error.html',
                       {'error_type': "Ballot retrieval",
                        'error_info': message})
+
     elif rounds.count() != 1:
         if rounds.count() > 1:
             message = "Found more than one ballot for you this round. "
-            message += "Go to tab to resolve error."
+            message += "This should only happen if the same code is assigned to multiple judges. "
+            message += "Go to Tab to resolve this issue."
         else:
-            message = "Could not find a ballot for you this round. Go to tab "
-            message += " to resolve the issue if you believe you were paired in."
+            message = "Could not find a ballot for you this round. Go to Tab "
+            message += "to resolve the issue if you believe you were paired in. "
         return render(request,
                       'error.html',
                       {'error_type': "Retrieval",
                        'error_info': message})
+
     else:
         return enter_result(request, rounds.first().id, True)
 
@@ -594,6 +598,9 @@ def enter_multiple_results(request, round_id, num_entered):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def confirm_start_new_tourny(request):
+    """
+    Should be self-evident in the name 'confirm_start_new_tourny'.
+    """
     return render_to_response('confirm.html',
                               {'link': "/pairing/start_tourny/",
                                'confirm_text': "Create New Tournament"},
@@ -602,20 +609,28 @@ def confirm_start_new_tourny(request):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def start_new_tourny(request):
+    """
+    Starts a new tournament. First, it calls 'clear_db()', which wipes the database. Then, it sets a number of
+    TabSettings (look in models). This should be kept up to date with the number of tab settings which is required to
+    actually run MIT-TAB.
+    """
     try:
         clear_db()
         TabSettings.objects.create(key="cur_round", value=1)
         TabSettings.objects.create(key="tot_rounds", value=5)
         TabSettings.objects.create(key="var_teams_to_break", value=8)
         TabSettings.objects.create(key="nov_teams_to_break", value=4)
-        TabSettings.objects.create(key="lenient_late", value=0)
+        TabSettings.objects.create(key="lenient_late", value=0)  # why didn't someone add this earlier?
 
     except Exception as e:
         return render_to_response('error.html',
                                   {'error_type': "Could not Start Tournament",
                                    'error_name': "",
-                                   'error_info': "Invalid Tournament State. Time to hand tab. [%s]" % (e)},
+                                   'error_info': "Invalid Tournament State. "
+                                                 "Time to hand tab. You have my condolences. [%s]" % (
+                                                     e)},
                                   context_instance=RequestContext(request))
+
     return render_to_response('thanks.html',
                               {'data_type': "Started New Tournament",
                                'data_name': ""},
@@ -623,6 +638,11 @@ def start_new_tourny(request):
 
 
 def clear_db():
+    """
+    Clears the database. Clears the check-ins, the round statistics, the rounds, the judges, rooms, scratches, the
+    tab settings, the teams, debaters, and schools. This method should be updated as needed if new models are included
+    in models.py.
+    """
     check_ins = CheckIn.objects.all()
     for i in range(len(check_ins)):
         CheckIn.delete(check_ins[i])

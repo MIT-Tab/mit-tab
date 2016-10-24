@@ -7,6 +7,11 @@ from localflavor.us.models import PhoneNumberField
 
 
 class TabSettings(models.Model):
+    """
+    TabSettings is used to control the settings in the tabulation program. This is the object which is looked at. Look
+    at pairing_views.start_new_tourney() to find the place where most of the TabSettings are initalised when a new
+    tournament is started.
+    """
     key = models.CharField(max_length=20)
     value = models.IntegerField()
 
@@ -33,7 +38,11 @@ class TabSettings(models.Model):
 
 
 class School(models.Model):
+    """
+    Contains information with regard to a school.
+    """
     name = models.CharField(max_length=50, unique=True)
+    """ name is the name of the school. """
 
     def __unicode__(self):
         return self.name
@@ -45,11 +54,20 @@ class School(models.Model):
             super(School, self).delete()
         else:
             raise Exception("School in use: [teams => %s,judges => %s]" % (
-            [t.name for t in team_check], [j.name for j in judge_check]))
+                [t.name for t in team_check], [j.name for j in judge_check]))
 
 
 class Debater(models.Model):
+    """
+    Contains information with regard to the debaters at the tournament.
+    """
+    """
+    TODO it's honestly probably better to make a super-class containing the provider, phone, and name information. Then,
+    make the Judge and the Debater classes extend that class.
+    """
     name = models.CharField(max_length=30, unique=True)
+    """ name is the name of the Debater """
+
     # team_set is created by Team in the ManyToMany
     # team = models.ForeignKey('Team')
     # 0 = Varsity, 1 = Novice
@@ -59,9 +77,15 @@ class Debater(models.Model):
         (VARSITY, u'Varsity'),
         (NOVICE, u'Novice'),
     )
+
     phone = PhoneNumberField(blank=True)
+    """ field for the debater's phone number """
+
     provider = models.CharField(max_length=40, blank=True)
+    """ field for the provider of the debater"""
+
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    """ field for whether the debater is a novice or not """
 
     def __unicode__(self):
         return self.name
@@ -75,9 +99,14 @@ class Debater(models.Model):
 
 
 class Team(models.Model):
+    """
+    Contains information with regard to the team itself. Contains the team name, the team school, the debaters in that
+    team, the team seed, and the information on whetehr that team is checked in or not.
+    """
     name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey('School')
     debaters = models.ManyToManyField(Debater)
+
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
     UNSEEDED = 0
     FREE_SEED = 1
@@ -104,19 +133,33 @@ class Team(models.Model):
 
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
+    """ name of the judge. cannot be more than 30 characters """
+
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    """ rank of the judge, must have less than 4 digits and less than 2 decimal places """
+
     schools = models.ManyToManyField(School)
+    """judge schools (takes many, because some dinos (ahem.) have like 4 or 5 affiliations for some reason...) """
+
     phone = PhoneNumberField(blank=True)
+    """ judge phone number """
+
     provider = models.CharField(max_length=40, blank=True)
+    """ provider for the judge """
+
     ballot_code = models.CharField(max_length=6, blank=True, null=True)
+    """ ballot code for the judge for the e-ballots """
 
     def save(self, *args, **kwargs):
+
         if not self.ballot_code:
             choices = string.ascii_lowercase + string.digits
             code = ''.join(random.choice(choices) for _ in range(6))
             while Judge.objects.filter(ballot_code=code).first():
+                # keep regerating codes if it is something already selected
                 code = ''.join(random.choice(choices) for _ in range(6))
             self.ballot_code = code
+
         super(Judge, self).save(*args, **kwargs)
 
     def __unicode__(self):
@@ -130,8 +173,15 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
+    """
+    Keeps the data for scratches. Remember that scratches are private.
+    """
     judge = models.ForeignKey(Judge)
+    """ judge scratched """
+
     team = models.ForeignKey(Team)
+    """ teams scratching """
+
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
@@ -139,15 +189,26 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    """ type of the scratch, i.e. tab or team """
 
     def __unicode__(self):
+        """
+        Returns string representation of this. This is the method which is called when MIT-TAB shows the people
+        :return: Returns a string representation of the scratch.
+        """
         s_type = ("Team", "Tab")[self.scratch_type]
         return str(self.team) + " <=" + str(s_type) + "=> " + str(self.judge)
 
 
 class Room(models.Model):
+    """
+    Room object. Contains the name and the rank.
+    """
     name = models.CharField(max_length=30, unique=True)
+    """ name of the room to be displayed """
+
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    """ rank of the room, from 99.99 to 0, limited to two decimal places. """
 
     def __unicode__(self):
         return self.name

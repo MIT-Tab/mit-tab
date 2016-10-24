@@ -287,8 +287,7 @@ class EBallotForm(ResultEntryForm):
                 elif RoundStats.objects.filter(round=first).first():
                     # If there was already a ballot submitted for the round
                     msg =  "A ballot has already been completed for this round."
-                    msg += "Go to tab if you need to change the results "
-                    msg += "for this round."
+                    msg += "Go to tab if you need to change the results for this round."
                     self._errors["ballot_code"] = self.error_class([msg])
 
             if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
@@ -305,6 +304,7 @@ class EBallotForm(ResultEntryForm):
                 elif speaks >= 26.75 or speaks <= 23.25:
                     msg = "Speaks must be justified to tab."
                     self._errors["%s_speaks" % d] = self.error_class([msg])
+
         except Exception, e:
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
