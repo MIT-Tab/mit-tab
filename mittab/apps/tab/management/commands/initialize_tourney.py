@@ -1,12 +1,13 @@
+import os
+import shutil
+import sys
 from optparse import make_option
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
+
 from mittab.libs.backup import get_backup_prefix
 
-import os
-import shutil
-import sys
 
 class Command(BaseCommand):
     args = '<tournament_name> <backup_directory>'

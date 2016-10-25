@@ -18,23 +18,16 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from mittab.apps.tab.models import *
 import xlrd
-import csv
-from xlwt import Workbook
+
+from mittab.apps.tab.models import *
+
 
 def import_scratches(fileToImport):
     sh = xlrd.open_workbook(fileToImport).sheet_by_index(0)
-    num_scratches = 0
-    found_end = False
     scratch_errors = []
-    while found_end == False:
-        try:
-            sh.cell(num_scratches,0).value
-            num_scratches +=1
-        except IndexError:
-            found_end = True
-    for i in range(1, num_scratches):
+
+    for i in range(1, sh.nrows):
         try:
             team_name = sh.cell(i,0).value
             t = Team.objects.get(name = team_name)

@@ -1,11 +1,12 @@
-from django.db import models
-from django import forms
-from django.contrib.admin.widgets import FilteredSelectMultiple
-from django.core.exceptions import ValidationError
-from models import *
-from decimal import Decimal
 import itertools
 import pprint
+from decimal import Decimal
+
+from django import forms
+from django.contrib.admin.widgets import FilteredSelectMultiple
+
+from models import *
+
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -70,7 +71,8 @@ class JudgeForm(forms.ModelForm):
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
                                               widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
+                                              is_stacked=False))
+
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):
@@ -143,8 +145,7 @@ class ResultEntryForm(forms.Form):
         (4, 4),
     )
 
-    winner = forms.ChoiceField(label="Which team won the round?",
-                               choices=Round.VICTOR_CHOICES)
+    winner = forms.ChoiceField(label="Which team won the round?", choices=Round.VICTOR_CHOICES)
 
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
@@ -156,7 +157,7 @@ class ResultEntryForm(forms.Form):
         super(ResultEntryForm, self).__init__(*args, **kwargs) 
         # If we already have information, fill that into the form
         if round_object.victor != 0 and not no_fill:
-            self.fields["winner"].initial = round_object.victor
+            self.fields['winner'].initial = round_object.victor
 
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
@@ -170,6 +171,7 @@ class ResultEntryForm(forms.Form):
             self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=debater_choices)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
+
         if round_object.victor != 0 and not no_fill:
             for d in self.GOV + self.OPP:
                 try:
@@ -285,8 +287,7 @@ class EBallotForm(ResultEntryForm):
                 elif RoundStats.objects.filter(round=first).first():
                     # If there was already a ballot submitted for the round
                     msg =  "A ballot has already been completed for this round."
-                    msg += "Go to tab if you need to change the results "
-                    msg += "for this round."
+                    msg += "Go to tab if you need to change the results for this round."
                     self._errors["ballot_code"] = self.error_class([msg])
 
             if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
@@ -303,6 +304,7 @@ class EBallotForm(ResultEntryForm):
                 elif speaks >= 26.75 or speaks <= 23.25:
                     msg = "Speaks must be justified to tab."
                     self._errors["%s_speaks" % d] = self.error_class([msg])
+
         except Exception, e:
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])

@@ -1,13 +1,13 @@
 from django.conf.urls import patterns, include, url
-from django.contrib.auth.views import logout
-from django.conf import settings
-import apps.tab.views as views
-import apps.tab.judge_views as judge_views
-import apps.tab.team_views as team_views
-import apps.tab.debater_views as debater_views
-import apps.tab.pairing_views as pairing_views
-
 from django.contrib import admin
+from django.contrib.auth.views import logout
+
+import apps.tab.debater_views as debater_views
+import apps.tab.judge_views as judge_views
+import apps.tab.pairing_views as pairing_views
+import apps.tab.team_views as team_views
+import apps.tab.views as views
+
 admin.autodiscover()
 
 urlpatterns = patterns('',
