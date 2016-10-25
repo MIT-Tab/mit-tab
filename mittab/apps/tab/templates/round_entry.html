@@ -5,9 +5,9 @@
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="float_container">
-    
 <div class="obj_info">
+
+<div class="container-fluid">
     {% if form.errors %}
         <p style="color: red;">
             Please correct the error{{ form.errors|pluralize }} below.
@@ -18,140 +18,187 @@
     {{ form.media }}
     <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
         {{ form.non_field_errors }}
-        
+
         {# Include the hidden fields #}
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
         {% endfor %}
-        
-        <table class="table ballot_entry">
+
+        <div class="table ballot_entry">
         {# Include the common fields to Gov and Opp #}
-        
-        <tr class="common_fields">
-            {{ form.winner.errors }}
-            <td>{{form.winner.label_tag}}</td>
-            <td>{{ form.winner }}</td>
-            <td colspan=2></td>
-            <td colspan=4>
-                <div class="hidden winner" data-option=0>Please select a winner</div>
-                <div class="hidden winner" data-option=1>
-                    The Government team has won.  Enter speaks and ranks
-                    normally.
+
+
+        <div class="row">
+          <div class="common_fields col-md-12">
+              {{ form.winner.errors }}
+              <div>{{form.winner.label_tag}}</div>
+              <div>{{ form.winner }}</div>
+              <div ""></div>
+              <div class="col-md-4">
+                  <div class="hidden winner" data-option=0>Please select a winner</div>
+                  <div class="hidden winner" data-option=1>
+                      The Government team has won.  Enter speaks and ranks
+                      normally.
+                  </div>
+                  <div class="hidden winner" data-option=2>
+                      The Opposition team has won. Enter speaks and ranks
+                      normally
+                  </div>
+                  <div class="hidden winner" data-option=3>
+                      The Government team has won via forfeit. Enter speaks of
+                      zero and arbitrary ranks for all debaters. The winning team
+                      will receive average speaks and ranks for this round. 
+                      The losing team will receive speaks of zero and ranks of 7,
+                      although you can give them non zero speaks if you wish.
+                      Do <b>not</b> give speaks to the winning team.
+                  </div>
+                  <div class="hidden winner" data-option=4>
+                      The Opposition team has won via forfeit. Enter speaks of
+                      zero and arbitrary ranks for all debaters. The winning team
+                      will receive average speaks and ranks for this round. 
+                      The losing team will receive speaks of zero and ranks of 7,
+                      although you can give them non zero speaks if you wish.
+                      Do <b>not</b> give speaks to the winning team.
+                  </div>
+                  <div class="hidden winner" data-option=5>
+                      Everyone lost this round (didn't show up?). Enter speaks of
+                      zero and arbitrary ranks. Both teams will receive speaks of
+                      zero and ranks of 7, although you can give them non zero
+                      speaks if you wish.  No averaging will occur, however.
+                  </div>
+                  <div class="hidden winner" data-option=6>
+                      Everyone won this round (judge didn't show up). Enter speaks
+                      of zero and arbitrary ranks. Both teams will receive average
+                      speaks and ranks for this round. Do <b>not</b> give speaks
+                      greater than zero to either team.
+                  </div>
+              </div>
+          </div>
+        </div>
+        <div class="row container-fluid">
+          <div class="col-md-6 team_container" id="id_gov_container">
+            <center>
+              <h4 class="header" id="id_gov_header">Government: {{gov_team.name}}</th>
+            </center>
+
+            <div class="gov">
+
+              <div class="pm row">
+
+                <div class="col-md-12">
+                  {{ form.pm_debater.errors }}
+                  <label for="id_pm_debater">Prime Minister:</label>
+                  <div>{{ form.pm_debater }}</div>
+
+                  <div class="speaks">
+                      {{ form.pm_speaks.errors }}
+                      <label for="id_pm_speaks">Speaks:</label>
+                      <div> {{ form.pm_speaks }} </div>
+                  </div>
+
+                  <div class="ranks">
+                      {{ form.pm_ranks.errors }}
+                      <label for="id_pm_ranks">Ranks:</label>
+                      <div> {{ form.pm_ranks }} </div>
+                  </div>
                 </div>
-                <div class="hidden winner" data-option=2>
-                    The Opposition team has won. Enter speaks and ranks
-                    normally
+
+              </div>
+
+              <hr>
+
+              <div class="mg row">
+
+                <div class="col-md-12">
+                  {{ form.mg_debater.errors }}
+                  <label for="id_mg_debater">Member of Government:</label>
+                  <div>{{ form.mg_debater }}</div>
+
+                  <div class="speaks">
+                      {{ form.mg_speaks.errors }}
+                      <label for="id_mg_speaks">Speaks:</label>
+                      <div> {{ form.mg_speaks }} </div>
+                  </div>
+
+                  <div class="ranks">
+                      {{ form.mg_ranks.errors }}
+                      <label for="id_mg_ranks">Ranks:</label>
+                      <div> {{ form.mg_ranks }} </div>
+                  </div>
                 </div>
-                <div class="hidden winner" data-option=3>
-                    The Government team has won via forfeit. Enter speaks of
-                    zero and arbitrary ranks for all debaters. The winning team
-                    will receive average speaks and ranks for this round. 
-                    The losing team will receive speaks of zero and ranks of 7,
-                    although you can give them non zero speaks if you wish.
-                    Do <b>not</b> give speaks to the winning team.
+
+              </div>
+            </div>
+
+          </div>
+
+          <div class="col-md-6 team_container" id="id_opp_container">
+            <center>
+              <h4 class="header" id="id_opp_header">Opposition: {{opp_team.name}}</th>
+            </center>
+
+            <div class="opp">
+
+              <div class="lo row">
+
+                <div class="col-md-12">
+                  {{ form.lo_debater.errors }}
+                  <label for="id_lo_debater">Leader of Opposition:</label>
+                  <div>{{ form.lo_debater }}</div>
+
+                  <div class="speaks">
+                      {{ form.lo_speaks.errors }}
+                      <label for="id_pm_speaks">Speaks:</label>
+                      <div> {{ form.lo_speaks }} </div>
+                  </div>
+
+                  <div class="ranks">
+                      {{ form.lo_ranks.errors }}
+                      <label for="id_lo_ranks">Ranks:</label>
+                      <div> {{ form.lo_ranks }} </div>
+                  </div>
                 </div>
-                <div class="hidden winner" data-option=4>
-                    The Opposition team has won via forfeit. Enter speaks of
-                    zero and arbitrary ranks for all debaters. The winning team
-                    will receive average speaks and ranks for this round. 
-                    The losing team will receive speaks of zero and ranks of 7,
-                    although you can give them non zero speaks if you wish.
-                    Do <b>not</b> give speaks to the winning team.
+
+              </div>
+
+              <hr>
+
+              <div class="mo row">
+
+                <div class="col-md-12">
+                  {{ form.mo_debater.errors }}
+                  <label for="id_mo_debater">Member of Opposition:</label>
+                  <div>{{ form.mo_debater }}</div>
+
+                  <div class="speaks">
+                      {{ form.mo_speaks.errors }}
+                      <label for="id_mo_speaks">Speaks:</label>
+                      <div> {{ form.mo_speaks }} </div>
+                  </div>
+
+                  <div class="ranks">
+                      {{ form.mo_ranks.errors }}
+                      <label for="id_mo_ranks">Ranks:</label>
+                      <div> {{ form.mo_ranks }} </div>
+                  </div>
                 </div>
-                <div class="hidden winner" data-option=5>
-                    Everyone lost this round (didn't show up?). Enter speaks of
-                    zero and arbitrary ranks. Both teams will receive speaks of
-                    zero and ranks of 7, although you can give them non zero
-                    speaks if you wish.  No averaging will occur, however.
-                </div>
-                <div class="hidden winner" data-option=6>
-                    Everyone won this round (judge didn't show up). Enter speaks
-                    of zero and arbitrary ranks. Both teams will receive average
-                    speaks and ranks for this round. Do <b>not</b> give speaks
-                    greater than zero to either team.
-                </div>
-            </td>
-        </tr>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        {% if form.ballot_code %}
         <tr>
-            <th colspan=4 class="header">Government: {{gov_team.name}}</th>
-            <th colspan=4 class="header">Opposition: {{opp_team.name}}</th>
+          <td>
+            {{ form.ballot_code.errors }}
+            <label for="id_ballot_code">Ballot Code:</label>
+          </td>
+          <td> {{ form.ballot_code }}</td>
         </tr>
-        <tr class="leaders top">
-            <td class="gov pm">
-                {{ form.pm_debater.errors }}
-                <label for="id_pm_debater">Prime Minister:</label>
-            </td>
-            
-            <td colspan=3 class="right_line"> {{ form.pm_debater }} </td>
-            <td class="opp lo">
-                {{ form.lo_debater.errors }}
-                <label for="id_lo_debater">Leader of Opposition</label>
-            </td>
-            <td colspan=3> {{ form.lo_debater }} </td>
-        </tr>
-        <tr class="leaders stats">
-            <td class="gov pm speaks">
-                {{ form.pm_speaks.errors }}
-                <label for="id_pm_speaks">Speaks:</label>
-            </td>
-            <td> {{ form.pm_speaks }} </td>
-            
-            <td class="gov pm ranks">
-                {{ form.pm_ranks.errors }}
-                <label for="id_pm_ranks">Ranks:</label>
-            </td>
-            <td class="right_line"> {{ form.pm_ranks }} </td>
-            <td class="opp lo speaks">
-                {{ form.lo_speaks.errors }}
-                <label for="id_lo_speaks">Speaks:</label>
-            </td>
-            <td> {{ form.lo_speaks }} </td>
-            
-            <td class="opp lo ranks">
-                {{ form.lo_ranks.errors }}
-                <label for="id_lo_ranks">Ranks:</label>
-            </td>
-            <td> {{ form.lo_ranks }} </td>
-        </tr>
-        
-       <tr class="members top">
-            <td class="gov mg">
-                {{ form.mg_debater.errors }}
-                <label for="id_mg_debater">Member of Government:</label>
-            </td>
-            <td colspan=3 class="right_line"> {{ form.mg_debater }} </td>
-            
-            <td class="opp mo">
-                {{ form.mo_debater.errors }}
-                <label for="id_mo_debater">Member of Opposition</label>
-            </td>
-            <td colspan=3> {{ form.mo_debater }} </td>
-        </tr>
-        <tr class="members stats bottom">
-            <td class="gov mg speaks">
-                {{ form.mg_speaks.errors }}
-                <label for="id_mg_speaks">Speaks:</label>
-            </td>
-            <td> {{ form.mg_speaks }} </td>
-            
-            <td class="gov mg ranks">
-                {{ form.mg_ranks.errors }}
-                <label for="id_mg_ranks">Ranks:</label>
-            </td>
-            <td class="right_line"> {{ form.mg_ranks }} </td>
-            <td class="opp mo speaks">
-                {{ form.mo_speaks.errors }}
-                <label for="id_mo_speaks">Speaks:</label>
-            </td>
-            <td> {{ form.mo_speaks }} </td>
-            
-            <td class="opp mo ranks">
-                {{ form.mo_ranks.errors }}
-                <label for="id_mo_ranks">Ranks:</label>
-            </td>
-            <td> {{ form.mo_ranks }} </td>
-        </tr>
-            
+        {% endif %}
+
         </table>
         {% if links %}
         <div class="btn-group">
@@ -160,6 +207,7 @@
             {% endfor %}
         </div>
         {%endif%}
+
         <div class="btn-submit">
             <input type="submit" value="Submit Changes">
         <div>

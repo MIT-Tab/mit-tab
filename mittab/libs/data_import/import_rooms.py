@@ -1,29 +1,29 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+# Copyright (C) 2011 by Julia Boortz and Joseph Lynch
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import RoomForm
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 from decimal import *
+
 import xlrd
-from xlwt import Workbook
+
+from mittab.apps.tab.models import *
+
 
 def import_rooms(fileToImport):
     try:
@@ -33,14 +33,16 @@ def import_rooms(fileToImport):
     num_rooms = 0
     found_end = False
     room_errors = []
+
+    # TODO: Why is this even here? Why not just use the sh.nrows and sh.ncols -- Kevin
     while found_end == False:
         try:
             sh.cell(num_rooms, 0).value
-            num_rooms +=1
+            num_rooms += 1
         except IndexError:
             found_end = True
 
-        #Verify sheet has required number of columns
+        # Verify sheet has required number of columns
         try:
             sh.cell(0, 1).value
         except:
@@ -59,22 +61,24 @@ def import_rooms(fileToImport):
         except:
             pass
 
-        #Load and validate room_rank
+        # Load and validate room_rank
         room_rank = sh.cell(i, 1).value
-        room_string = str(room_rank)
         try:
-            room_rank = Decimal(room_rank)
+            # auto-round to two floating point digits
+            room_rank = round(Decimal(room_rank), 2)
         except:
             room_errors.append(room_name + ": Rank not number")
             continue
-        if len(room_string) > 5 or (room_rank < 10 and len(room_string) > 4):
-            room_errors.append(room_name + ": Rank should have no more than two decimal places")
-            continue
-        if room_rank >= 100 or room_rank < 0:
-            room_errors.append(room_name + ": Rank should be between 0-99.99")
-            continue
 
-        #Create the room
+        # cap room rank at 100
+        if room_rank >= 100:
+            room_rank = 99.99
+
+        # floor room rank at 0
+        if room_rank < 0:
+            room_rank = 0
+
+        # Create the room
         room = Room(name=room_name, rank=room_rank);
         try:
             room.save()

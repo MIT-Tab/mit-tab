@@ -1,13 +1,13 @@
 from django.conf.urls import patterns, include, url
-from django.contrib.auth.views import logout
-from django.conf import settings
-import apps.tab.views as views
-import apps.tab.judge_views as judge_views
-import apps.tab.team_views as team_views
-import apps.tab.debater_views as debater_views
-import apps.tab.pairing_views as pairing_views
-
 from django.contrib import admin
+from django.contrib.auth.views import logout
+
+import apps.tab.debater_views as debater_views
+import apps.tab.judge_views as judge_views
+import apps.tab.pairing_views as pairing_views
+import apps.tab.team_views as team_views
+import apps.tab.views as views
+
 admin.autodiscover()
 
 urlpatterns = patterns('',
@@ -97,6 +97,8 @@ urlpatterns = patterns('',
     url(r'^pairing/view_backups/$', pairing_views.view_backups),
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
     url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
+    url(r'^e_ballots/$', pairing_views.e_ballots),
+    url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot),
 
 
     # Backups

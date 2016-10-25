@@ -1,28 +1,28 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+# Copyright (C) 2011 by Julia Boortz and Joseph Lynch
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import SchoolForm
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import xlrd
-from xlwt import Workbook
+
+from mittab.apps.tab.forms import SchoolForm
+from mittab.apps.tab.models import *
+
 
 def import_teams(fileToImport):
     try:
@@ -35,17 +35,18 @@ def import_teams(fileToImport):
     while found_end == False:
         try:
             sh.cell(num_teams, 0).value
-            num_teams +=1
+            num_teams += 1
         except IndexError:
             found_end = True
 
-        #Verify sheet has required number of columns
+        # Verify sheet has required number of columns
         try:
             sh.cell(0, 8).value
         except:
             team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
 
+    school_map = {}
     for i in range(1, num_teams):
 
         team_name = sh.cell(i, 0).value
@@ -63,7 +64,7 @@ def import_teams(fileToImport):
         try:
             team_school = School.objects.get(name__iexact=school_name)
         except:
-            #Create school through SchoolForm because for some reason they don't save otherwise
+            # Create school through SchoolForm because for some reason they don't save otherwise
             form = SchoolForm(data={'name': school_name})
             if form.is_valid():
                 form.save()
@@ -72,9 +73,8 @@ def import_teams(fileToImport):
                 continue
             team_school = School.objects.get(name__iexact=school_name)
 
-
-        #TODO: Verify there are not multiple free seeds from the same school
-        team_seed = sh.cell(i,2).value.strip().lower()
+        # TODO: Verify there are not multiple free seeds from the same school
+        team_seed = sh.cell(i, 2).value.strip().lower()
         if team_seed == 'full seed' or team_seed == 'full':
             team_seed = 3
         elif team_seed == 'half seed' or team_seed == 'half':
@@ -87,7 +87,7 @@ def import_teams(fileToImport):
             team_errors.append(team_name + ': Invalid Seed Value')
             continue
 
-        deb1_name = sh.cell(i,3).value
+        deb1_name = sh.cell(i, 3).value
         if deb1_name == '':
             team_errors.append(team_name + ': Empty Debater-1 Name')
             continue
@@ -97,17 +97,16 @@ def import_teams(fileToImport):
             continue
         except:
             pass
-        deb1_status = sh.cell(i,4).value.lower()
+        deb1_status = sh.cell(i, 4).value.lower()
         if deb1_status == 'novice' or deb1_status == 'nov' or deb1_status == 'n':
             deb1_status = 1
         else:
             deb1_status = 0
-        deb1_phone = sh.cell(i,5).value
-        deb1_provider = sh.cell(i,6).value
-
+        deb1_phone = sh.cell(i, 5).value
+        deb1_provider = sh.cell(i, 6).value
 
         iron_man = False
-        deb2_name = sh.cell(i,7).value
+        deb2_name = sh.cell(i, 7).value
         if deb2_name == '':
             iron_man = True
         if (not iron_man):
@@ -117,40 +116,39 @@ def import_teams(fileToImport):
                 continue
             except:
                 pass
-            deb2_status = sh.cell(i,8).value.lower()
+            deb2_status = sh.cell(i, 8).value.lower()
             if deb2_status == 'novice' or deb2_status == 'nov' or deb2_status == 'n':
                 deb2_status = 1
             else:
                 deb2_status = 0
 
-            #Since this is not required data and at the end of the sheet, be ready for index errors
-            try: 
-                deb2_phone = sh.cell(i,9).value
+            # Since this is not required data and at the end of the sheet, be ready for index errors
+            try:
+                deb2_phone = sh.cell(i, 9).value
             except IndexError:
                 deb2_phone = ''
             try:
-                deb2_provider = sh.cell(i,10).value
+                deb2_provider = sh.cell(i, 10).value
             except IndexError:
                 deb2_provider = ''
 
-
-        #Save Everything
+        # Save Everything
         try:
-            deb1 = Debater(name = deb1_name, novice_status = deb1_status, phone = deb1_phone, provider = deb1_provider)
+            deb1 = Debater(name=deb1_name, novice_status=deb1_status, phone=deb1_phone, provider=deb1_provider)
             deb1.save()
         except:
             team_errors.append(team_name + ': Unkown Error Saving Debater 1')
             continue
         if (not iron_man):
             try:
-                deb2 = Debater(name = deb2_name, novice_status = deb2_status, phone = deb2_phone, provider = deb2_provider)
+                deb2 = Debater(name=deb2_name, novice_status=deb2_status, phone=deb2_phone, provider=deb2_provider)
                 deb2.save()
             except:
                 team_errors.append(team_name + ': Unkown Error Saving Debater 2')
                 team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                    'Please Check this Manually')
+                                   'Please Check this Manually')
                 continue
-        
+
         team = Team(name=team_name, school=team_school, seed=team_seed)
         try:
             team.save()
@@ -163,9 +161,6 @@ def import_teams(fileToImport):
         except:
             team_errors.append(team_name + ': Unknown Error Saving Team')
             team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                'Please Check this Manually')
+                               'Please Check this Manually')
 
     return team_errors
-
-    
-

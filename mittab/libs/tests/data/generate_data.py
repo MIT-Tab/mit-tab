@@ -1,7 +1,6 @@
-import mittab.libs.tab_logic as tab_logic
-from mittab.apps.tab.models import Debater
-
 import json
+
+from mittab.apps.tab.models import Debater
 
 def generate_debater_rankings():
     scores = [(debater.name, debatertab_logic.debater_score(debater))

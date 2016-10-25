@@ -18,12 +18,13 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import JudgeForm
-
 from decimal import *
+
 import xlrd
-from xlwt import Workbook
+
+from mittab.apps.tab.forms import JudgeForm
+from mittab.apps.tab.models import *
+
 
 def import_judges(fileToImport):
     try:
@@ -44,8 +45,8 @@ def import_judges(fileToImport):
         try:
             sh.cell(0, 1).value
         except:
-            team_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
-            return team_errors
+            judge_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
+            return judge_errors
     for i in range(1, num_judges):
         #Load and validate Judge's Name
         judge_name = sh.cell(i, 0).value
@@ -109,6 +110,6 @@ def import_judges(fileToImport):
             form.save()
         else:
             judge_errors.append(judge_name + ": Unknown Error")
-                
+
     return judge_errors
-        
+

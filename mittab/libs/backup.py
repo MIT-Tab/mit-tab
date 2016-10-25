@@ -1,19 +1,23 @@
-from mittab.apps.tab.models import *
-from django.conf import settings
-from django.core.servers.basehttp import FileWrapper
-from mittab.settings import BASE_DIR
-
+import os
 import shutil
 import time
-import os
+
+from django.conf import settings
+from django.core.servers.basehttp import FileWrapper
+
+from mittab.apps.tab.models import *
+from mittab.settings import BASE_DIR
+
 
 def get_backup_prefix():
     return os.path.join(BASE_DIR, "mittab")
 
+
 def get_backup_path():
     return os.path.join(get_backup_prefix(), "backups")
 
-def backup_round(dst_filename = None, round_number = None, btime = None):
+
+def backup_round(dst_filename=None, round_number=None, btime=None):
     if round_number is None:
         round_number = TabSettings.objects.get(key="cur_round").value
     if btime is None:
@@ -21,19 +25,20 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
     print "Attempting to backup to backups directory"
     prefix = get_backup_prefix()
     if dst_filename == None:
-        dst_filename = prefix+"/backups/site_round_%i_%i.db" % (round_number, btime)
+        dst_filename = prefix + "/backups/site_round_%i_%i.db" % (round_number, btime)
     else:
-        dst_filename = prefix+"/backups/%s"%dst_filename
+        dst_filename = prefix + "/backups/%s" % dst_filename
     src_filename = settings.DATABASES['default']['NAME']
     try:
         shutil.copy(src_filename, dst_filename)
         print "Copied %s to %s" % (src_filename, dst_filename)
     except:
-        print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
+        print "Could not copy %s to %s; most likely non-existant file" % (src_filename, dst_filename)
+
 
 def handle_backup(f):
     prefix = get_backup_prefix()
-    dst_filename = prefix+"/backups/{}".format(f.name)
+    dst_filename = prefix + "/backups/{}".format(f.name)
     print "Tried to write {}".format(dst_filename)
     try:
         with open(dst_filename, 'wb+') as destination:
@@ -43,10 +48,12 @@ def handle_backup(f):
         print "Could not write {}".format(dst_filename)
         print "ERROR: {}".format(str(e))
 
+
 def list_backups():
     print "Checking backups directory"
     prefix = get_backup_prefix()
-    return os.listdir(prefix+"/backups/")
+    return os.listdir(prefix + "/backups/")
+
 
 def restore_from_backup(src_filename):
     print "Restoring from backups directory"
@@ -57,10 +64,11 @@ def restore_from_backup(src_filename):
         shutil.copy(src_filename, dst_filename)
         print "Copied %s to %s" % (src_filename, dst_filename)
     except:
-        print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
+        print "Could not copy %s to %s; most likely non-existant file" % (src_filename, dst_filename)
 
-#This does not work at all since the switch to AWS_KEYFILE
-#TODO Clean this up
+
+# This does not work at all since the switch to AWS_KEYFILE
+# TODO Clean this up
 def restore_from_file(filename):
     print "Copying backup: %s => site.db" % filename
     src_filename = filename
@@ -69,12 +77,10 @@ def restore_from_file(filename):
         shutil.copy(filename, dst_filename)
         print "Copied %s to %s" % (src_filename, dst_filename)
     except:
-        print "Could not copy %s to %s; most likely non-existant file"%(src_filename, dst_filename)
+        print "Could not copy %s to %s; most likely non-existant file" % (src_filename, dst_filename)
 
 
 def get_wrapped_file(src_filename):
     prefix = get_backup_prefix()
     src_filename = prefix + "/backups/%s" % src_filename
     return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
-
-
