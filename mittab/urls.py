@@ -1,16 +1,20 @@
 from django.conf.urls import patterns, include, url
-from django.contrib.auth.views import logout
-from django.conf import settings
-import apps.tab.views as views
-import apps.tab.judge_views as judge_views
-import apps.tab.team_views as team_views
-import apps.tab.debater_views as debater_views
-import apps.tab.pairing_views as pairing_views
-
 from django.contrib import admin
+from django.contrib.auth.views import logout
+from django.views.generic import TemplateView
+
+import apps.tab.debater_views as debater_views
+import apps.tab.judge_views as judge_views
+import apps.tab.pairing_views as pairing_views
+import apps.tab.team_views as team_views
+import apps.tab.views as views
+from mittab.apps.tab import template_views
+from mittab.libs.data_import import export_xls_files
+
 admin.autodiscover()
 
 urlpatterns = patterns('',
+
     # Example:
     # url(r'^tab/', include('tab.foo.urls')),
 
@@ -24,7 +28,7 @@ urlpatterns = patterns('',
     url(r'^403/', views.render_403),
 
     # Account related
-    url(r'^accounts/login/$',  views.tab_login),
+    url(r'^accounts/login/$', views.tab_login),
     url(r'^accounts/logout/$', logout),
 
     # Judge related
@@ -67,7 +71,7 @@ urlpatterns = patterns('',
     url(r'^team/ranking/$', team_views.rank_teams_ajax),
     url(r'^team/rank/$', team_views.rank_teams),
 
-    # Debater related
+                       # Debater related
     url(r'^debater/(\d+)/$', debater_views.view_debater),
     url(r'^debater/(\d+)/delete/$', debater_views.delete_debater),
     url(r'^view_debaters/$', debater_views.view_debaters),
@@ -75,7 +79,7 @@ urlpatterns = patterns('',
     url(r'^debater/ranking/$', debater_views.rank_debaters_ajax),
     url(r'^debater/rank/$', debater_views.rank_debaters),
 
-    # Pairing related
+                       # Pairing related
     url(r'^pairings/status/$', pairing_views.view_status),
     url(r'^pairings/view_rounds/$', pairing_views.view_rounds),
     url(r'^round/(\d+)/$', pairing_views.view_round),
@@ -98,13 +102,21 @@ urlpatterns = patterns('',
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
     url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
 
-
-    # Backups
+                       # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup),
     url(r'^backup/download/(.+)/$', pairing_views.download_backup),
     url(r'^backup/(.+)/$', pairing_views.view_backup),
     url(r'^upload_backup/$', pairing_views.upload_backup),
 
-    # Data Upload
-    url(r'^import_data/$', views.upload_data)
+                       # Data Upload
+    url(r'^import_data/$', views.upload_data),
+
+                       # Data export
+    url(r'^export/$', template_views.ExportXlsView.as_view()),
+    url(r'^export/teams', export_xls_files.export_teams),
+    url(r'^export/judges', export_xls_files.export_judges),
+    url(r'^export/rooms', export_xls_files.export_rooms),
+    url(r'^export/team-stats', export_xls_files.export_team_stats),
+    url(r'^export/speaker-stats', export_xls_files.export_debater_stats),
+
 )

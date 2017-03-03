@@ -6,17 +6,18 @@ div.printable {
 table#pairing_list {
     text-align: left;
     border-collapse: collapse;
-    border: 1px solid #666666;   
+    border: 1px solid #666666;
 }
 
-table#pairing_list th{
-    border: 1px solid #666666;   
+table#pairing_list th {
+    border: 1px solid #666666;
     padding: .5em;
     font-size: 18px;
     font-style: bold;
 }
-table#pairing_list td{
-    border: 1px solid #666666;   
+
+table#pairing_list td {
+    border: 1px solid #666666;
     padding: .5em;
     font-size: 14px;
 }

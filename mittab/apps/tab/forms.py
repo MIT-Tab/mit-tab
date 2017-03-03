@@ -2,6 +2,8 @@ from django.db import models
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
+from django.utils.safestring import mark_safe
+
 from models import *
 from decimal import Decimal
 import itertools
@@ -11,9 +13,17 @@ class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
 
 class UploadDataForm(forms.Form):
-    team_file = forms.FileField(label="Teams Data File", required=False)
-    judge_file = forms.FileField(label="Judge Data File", required=False)
-    room_file = forms.FileField(label="Room Data File", required=False)
+    """Creates the form for uploading files, found at """
+    team_file = forms.FileField(label=mark_safe('Teams Data File <br /><small>(Name, School, Seed [full, half, free, '
+                                                'none], D1 name, D1 status [varsity, novice, nov, n], D1 phone, '
+                                                'D1 prov, <br />D2 name, D2 [varsity, novice, nov, n], D2 phone, '
+                                                'D2 prov) <b>Note: Overwrites data for duplicate teams</b></small>'),
+                                required=False)
+    judge_file = forms.FileField(label=mark_safe('Judge Data File <br /><small>(name, rank, phone #, provider, '
+                                                 'school) <b>Note: Overwrites data for duplicate judges</b></small>'),
+                                 required=False)
+    room_file = forms.FileField(label=mark_safe('Room Data File <br /><small>(name, rank) <b>Note: Overwrites data for '
+                                                'duplicate rooms</b></small>'), required=False)
 
 
 class SchoolForm(forms.ModelForm):

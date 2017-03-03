@@ -150,7 +150,7 @@ def add_scratches(request, judge_id, number_scratches):
     except ValueError:
         return render_to_response('error.html', 
                                  {'error_type': "Scratch",'error_name': "Data Entry",
-                                  'error_info':"I require INTEGERS!"}, 
+                                  'error_info':"Value must be an integer!"},
                                   context_instance=RequestContext(request))
     try:
         judge = Judge.objects.get(pk=judge_id)
@@ -188,7 +188,7 @@ def view_scratches(request, judge_id):
     except ValueError:
         return render_to_response('error.html', 
                                  {'error_type': "Scratch",'error_name': "Delete",
-                                  'error_info':"I require INTEGERS!"}, 
+                                  'error_info':"Value must be an integer!"},
                                   context_instance=RequestContext(request))
     scratches = Scratch.objects.filter(judge=judge_id)
     judge = Judge.objects.get(pk=judge_id)

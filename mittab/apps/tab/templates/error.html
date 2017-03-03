@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}ERROR!{% endblock %}
+{% block title %}MIT-TAB Error{% endblock %}
 
 {% block content %}
-<p style="color:red;"> {{ error_type }} {{ error_name }} ecountered an error!</p>
-
-<p style="color:red;"> Reason for Error: {{error_info}} </p>
+    <p style="color:red"><span style="font-size: 150%">{{ error_type }}:</span> {{ error_name }} encountered an error!
+    </p>
+    <blocktext style="font-family: 'Monaco', 'Courier New', monospaced;">
+        <pre>{{ error_info }}</pre>
+    </blocktext>
 {% endblock %}
