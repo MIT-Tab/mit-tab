@@ -7,8 +7,10 @@ from decimal import Decimal
 import itertools
 import pprint
 
+
 class UploadBackupForm(forms.Form):
-    file  = forms.FileField(label="Your Backup File")
+    file = forms.FileField(label="Your Backup File")
+
 
 class UploadDataForm(forms.Form):
     team_file = forms.FileField(label="Teams Data File", required=False)
@@ -20,14 +22,17 @@ class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
 
+
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
 
+
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(), 
-                                             widget=FilteredSelectMultiple("Affiliated Schools", 
-                                             is_stacked=False))
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
+                                             widget=FilteredSelectMultiple("Affiliated Schools",
+                                                                           is_stacked=False))
+
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -39,90 +44,104 @@ class JudgeForm(forms.ModelForm):
                 judge = kwargs['instance']
                 checkins = map(lambda c: c.round_number, CheckIn.objects.filter(judge=judge))
                 for i in range(num_rounds):
-                    self.fields['checkin_%s' % i] = forms.BooleanField(label ="Checked in for round %s?"%(i+1),
-                                                                       initial = i+1 in checkins,
-                                                                       required = False)
+                    self.fields['checkin_%s' % i] = forms.BooleanField(label="Checked in for round %s?" % (i + 1),
+                                                                       initial=i + 1 in checkins,
+                                                                       required=False)
             except:
                 pass
-            
+
     def save(self, force_insert=False, force_update=False, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(num_rounds):
-            if "checkin_%s"%(i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data['checkin_%s'%(i)]
-                checked_in = CheckIn.objects.filter(judge=judge, round_number=i+1)
+            if "checkin_%s" % (i) in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data['checkin_%s' % (i)]
+                checked_in = CheckIn.objects.filter(judge=judge, round_number=i + 1)
                 # Two cases, either the judge is not checked in and the user says he is,
                 # or the judge is checked in and the user says he is not
                 if not checked_in and should_be_checked_in:
-                    checked_in = CheckIn(judge=judge, round_number=i+1)
+                    checked_in = CheckIn(judge=judge, round_number=i + 1)
                     checked_in.save()
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
-                    
+
         return judge
-                
+
     class Meta:
         model = Judge
-        
+
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
-#    def __init__(self, *args, **kwargs):
-#        super(TeamForm, self).__init__(*args, **kwargs)
-#        if kwargs.has_key('instance'):
-#            instance = kwargs['instance']
-#            self.fields['debaters'].initial = [d.pk for d in instance.debaters.all()]
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
+                                              widget=FilteredSelectMultiple("Debaters",
+                                                                            is_stacked=False))
+
+    #    def __init__(self, *args, **kwargs):
+    #        super(TeamForm, self).__init__(*args, **kwargs)
+    #        if kwargs.has_key('instance'):
+    #            instance = kwargs['instance']
+    #            self.fields['debaters'].initial = [d.pk for d in instance.debaters.all()]
 
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
-        if not( 1 <= len(data) <= 2) :
-            raise forms.ValidationError("You must select 1 or 2 debaters!") 
+        if not (1 <= len(data) <= 2):
+            raise forms.ValidationError("You must select 1 or 2 debaters!")
         return data
-    
+
     class Meta:
         model = Team
+
 
 class TeamEntryForm(forms.ModelForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True),
+                                              widget=FilteredSelectMultiple("Debaters",
+                                                                            is_stacked=False))
+
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
-        if not( 1 <= len(data) <= 2) :
-            raise forms.ValidationError("You must select 1 or 2 debaters!") 
+        if not (1 <= len(data) <= 2):
+            raise forms.ValidationError("You must select 1 or 2 debaters!")
         return data
 
     class Meta:
         model = Team
-        
+
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
     class Meta:
         model = Scratch
-        
+
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        
-        
+
+
 def validate_speaks(value):
-    if not (21.0 <= value <= 29.0 or value == 0):
-        raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
-    
-#TODO: Rewrite this, it is ugly as hell
+    lower_bound = 5   # defaults
+    upper_bound = 45
+    try:
+        lower_bound = int(TabSettings.objects.get(key="lower_speaks").value)
+        upper_bound = int(TabSettings.objects.get(key="upper_speaks").value)
+    except Exception as e:
+        print str(e.message)
+
+    if not (lower_bound <= value <= upper_bound or value == 0):
+        raise ValidationError('{0} is outside [{1}, {2}]'.format(value, lower_bound, upper_bound))
+
+
+# TODO: Rewrite this, it is ugly as hell
 class ResultEntryForm(forms.Form):
-    
     NAMES = {
-        "pm" : "Prime Minister",
-        "mg" : "Member of Government",
-        "lo" : "Leader of the Opposition",
-        "mo" : "Member of the Opposition"
+        "pm": "Prime Minister",
+        "mg": "Member of Government",
+        "lo": "Leader of the Opposition",
+        "mo": "Member of the Opposition"
     }
 
     GOV = [
@@ -152,7 +171,7 @@ class ResultEntryForm(forms.Form):
         if 'no_fill' in kwargs:
             kwargs.pop('no_fill')
             no_fill = True
-        super(ResultEntryForm, self).__init__(*args, **kwargs) 
+        super(ResultEntryForm, self).__init__(*args, **kwargs)
         # If we already have information, fill that into the form
         if round_object.victor != 0 and not no_fill:
             self.fields["winner"].initial = round_object.victor
@@ -160,53 +179,57 @@ class ResultEntryForm(forms.Form):
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
-        gov_debaters = [(-1,'---')]+[(d.id, d.name) for d in gov_team.debaters.all()]
-        opp_debaters = [(-1,'---')]+[(d.id, d.name) for d in opp_team.debaters.all()]
+        gov_debaters = [(-1, '---')] + [(d.id, d.name) for d in gov_team.debaters.all()]
+        opp_debaters = [(-1, '---')] + [(d.id, d.name) for d in opp_team.debaters.all()]
 
         # TODO: Combine these loops?
         for d in self.GOV:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=gov_debaters)
-            self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
-            self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
+            self.fields["%s_debater" % (d)] = forms.ChoiceField(label="Who was %s?" % (self.NAMES[d]),
+                                                                choices=gov_debaters)
+            self.fields["%s_speaks" % (d)] = forms.DecimalField(label="%s Speaks" % (self.NAMES[d]),
+                                                                validators=[validate_speaks])
+            self.fields["%s_ranks" % (d)] = forms.ChoiceField(label="%s Rank" % (self.NAMES[d]), choices=self.RANKS)
         for d in self.OPP:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=opp_debaters)
-            self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
-            self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
+            self.fields["%s_debater" % (d)] = forms.ChoiceField(label="Who was %s?" % (self.NAMES[d]),
+                                                                choices=opp_debaters)
+            self.fields["%s_speaks" % (d)] = forms.DecimalField(label="%s Speaks" % (self.NAMES[d]),
+                                                                validators=[validate_speaks])
+            self.fields["%s_ranks" % (d)] = forms.ChoiceField(label="%s Rank" % (self.NAMES[d]), choices=self.RANKS)
         if round_object.victor != 0 and not no_fill:
             for d in self.GOV + self.OPP:
                 try:
-                    stats = RoundStats.objects.get(round=round_object, debater_role = d)
-                    self.fields["%s_debater"%(d)].initial = stats.debater.id
-                    self.fields["%s_speaks"%(d)].initial = stats.speaks
-                    self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
+                    stats = RoundStats.objects.get(round=round_object, debater_role=d)
+                    self.fields["%s_debater" % (d)].initial = stats.debater.id
+                    self.fields["%s_speaks" % (d)].initial = stats.speaks
+                    self.fields["%s_ranks" % (d)].initial = int(round(stats.ranks))
                 except:
                     pass
 
     def clean(self):
         cleaned_data = self.cleaned_data
-        #This is where we validate that the person entering data didn't mess up significantly
+        # This is where we validate that the person entering data didn't mess up significantly
         gov, opp = self.GOV, self.OPP
         debaters = gov + opp
         try:
-            speak_ranks = [ (cleaned_data["%s_speaks" % (d)] ,cleaned_data["%s_ranks" % (d)], d) for d in debaters]
+            speak_ranks = [(cleaned_data["%s_speaks" % (d)], cleaned_data["%s_ranks" % (d)], d) for d in debaters]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
 
             # Check to make sure everyone has different ranks
             if set([r[0] for r in self.RANKS]) != set([int(x[1]) for x in sorted_by_ranks]):
                 for debater in debaters:
-                    self._errors["%s_speaks"%(debater)] = self.error_class(["Ranks must be different"])
+                    self._errors["%s_speaks" % (debater)] = self.error_class(["Ranks must be different"])
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
-            for (speaks,rank,debater) in sorted_by_ranks:
+            for (speaks, rank, debater) in sorted_by_ranks:
                 if speaks > high_score:
-                    self._errors["%s_speaks"%debater] = self.error_class(["These speaks are too high for the rank"])
+                    self._errors["%s_speaks" % debater] = self.error_class(["These speaks are too high for the rank"])
                 high_score = speaks
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
-            gov_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in gov])
-            opp_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in opp])
+            gov_speaks = sum([cleaned_data["%s_speaks" % (d)] for d in gov])
+            opp_speaks = sum([cleaned_data["%s_speaks" % (d)] for d in opp])
             gov_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in gov])
             opp_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in opp])
             gov_points = (gov_speaks, -gov_ranks)
@@ -226,11 +249,11 @@ class ResultEntryForm(forms.Form):
             for deb in gov + opp:
                 # TODO: Take out this strange cast to int, perhaps have real
                 # error values?
-                if int(cleaned_data["%s_debater"%deb]) == -1:
-                    self._errors["%s_debater"%deb] = self.error_class(["You need to pick a debater"])
+                if int(cleaned_data["%s_debater" % deb]) == -1:
+                    self._errors["%s_debater" % deb] = self.error_class(["You need to pick a debater"])
 
         except Exception, e:
-            print "Caught error %s" %(e)
+            print "Caught error %s" % (e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
         return cleaned_data
 
@@ -239,23 +262,25 @@ class ResultEntryForm(forms.Form):
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
         debaters = self.GOV + self.OPP
-        #How do we handle iron men? Do I enter both speaks?
+        # How do we handle iron men? Do I enter both speaks?
         for debater in debaters:
-            old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
+            old_stats = RoundStats.objects.filter(round=round_obj, debater_role=debater)
             if len(old_stats) > 0:
                 old_stats.delete()
 
-            debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
+            debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater" % (debater)])
             debater_role_obj = debater
-            speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
-            stats = RoundStats(debater = debater_obj, 
-                               round = round_obj, 
-                               speaks = speaks_obj, 
-                               ranks = ranks_obj, 
-                               debater_role = debater_role_obj)
+            speaks_obj, ranks_obj = float(cleaned_data["%s_speaks" % (debater)]), int(
+                cleaned_data["%s_ranks" % (debater)])
+            stats = RoundStats(debater=debater_obj,
+                               round=round_obj,
+                               speaks=speaks_obj,
+                               ranks=ranks_obj,
+                               debater_role=debater_role_obj)
             stats.save()
         round_obj.save()
         return round_obj
+
 
 def validate_panel(result):
     all_good = True
@@ -264,25 +289,26 @@ def validate_panel(result):
 
     # Check everyone is in the same position
     for debater in debater_roles:
-        ds = [(d,rl) for (d,rl,s,r) in debater]
+        ds = [(d, rl) for (d, rl, s, r) in debater]
         if not all(x == ds[0] for x in ds):
             all_good = False
             break
 
     # Check the winner makes sense
-    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    final_winner = max([(len(v), k) for k, v in result.iteritems()])[1]
     debater_roles = zip(*result[final_winner])
     for debater in debater_roles:
-        ds = [(d,rl) for (d,rl,s,r) in debater]
+        ds = [(d, rl) for (d, rl, s, r) in debater]
         if ((len(ds) != len(result[final_winner])) or
-            (len(ds) < 2)):
+                (len(ds) < 2)):
             all_good = False
             break
 
     return all_good, "Inconsistent Panel results, please check yourself"
 
+
 def score_panel(result, discard_minority):
-    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    final_winner = max([(len(v), k) for k, v in result.iteritems()])[1]
     debater_roles = zip(*result[final_winner])
 
     # Take all speaks and ranks even if they are a minority judge
@@ -292,21 +318,21 @@ def score_panel(result, discard_minority):
 
     final_scores = []
     for debater in debater_roles:
-        ds = [(d,rl) for (d,rl,s,r) in debater]
+        ds = [(d, rl) for (d, rl, s, r) in debater]
         d, rl = ds[0]
-        speaks = [s for (d,rl,s,r) in debater]
+        speaks = [s for (d, rl, s, r) in debater]
         avg_speaks = sum(speaks) / float(len(speaks))
-        ranks = [r for (d,rl,s,r) in debater]
+        ranks = [r for (d, rl, s, r) in debater]
         avg_ranks = sum(ranks) / float(len(ranks))
         final_scores.append((d, rl, avg_speaks, avg_ranks))
 
     # Rank by resulting average speaks
     ranked = sorted([score for score in final_scores],
-                    key = lambda x: Decimal(x[3]).quantize(Decimal('1.00')))
+                    key=lambda x: Decimal(x[3]).quantize(Decimal('1.00')))
     ranked = sorted([score for score in ranked],
-                    key = lambda x: Decimal(x[2]).quantize(Decimal('1.00')), reverse=True)
+                    key=lambda x: Decimal(x[2]).quantize(Decimal('1.00')), reverse=True)
 
-    ranked = [(d, rl, s, r+1)
+    ranked = [(d, rl, s, r + 1)
               for (r, (d, rl, s, _)) in enumerate(ranked)]
 
     print "Ranked Debaters"
@@ -339,6 +365,3 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
-
-
-
