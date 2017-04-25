@@ -267,23 +267,17 @@ class EBallotForm(ResultEntryForm):
         cleaned_data = self.cleaned_data
         try:
             ballot_code = cleaned_data.get("ballot_code")
-            if not Judge.objects.filter(ballot_code=ballot_code).first():
+            judge = Judge.objects.filter(ballot_code=ballot_code).first()
+            if not judge:
                 # If there is no judge with that ballot code
                 msg = "Incorrect ballot code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
             else:
-                rounds = Round.objects.filter(judges__ballot_code=ballot_code)
-                current_round = int(TabSettings.get(key="cur_round")) - 1
-                rounds = rounds.filter(round_number=current_round)
-                first = rounds.first()
-                if not first:
-                    # If the judge is not paired into the round this ballot is for
-                    msg = "You are not juding this round."
+                round_obj = Round.objects.filter(pk=cleaned_data["round_instance"])
+                if round_obj.chair.ballot_code != judge.ballot_code:
+                    msg = "You are not judging the round, or you are not the chair"
                     self._errors["ballot_code"] = self.error_class([msg])
-                    # TODO ensure judge is the chair of the panel
-                    # (this requires fixing a bug when judges a manually changed
-                    # but the chair of the panel isn't)
-                elif RoundStats.objects.filter(round=first).first():
+                elif RoundStats.objects.filter(round=round_obj).first():
                     # If there was already a ballot submitted for the round
                     msg =  "A ballot has already been completed for this round."
                     msg += "Go to tab if you need to change the results "
