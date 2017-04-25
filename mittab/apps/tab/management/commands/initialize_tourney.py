@@ -10,6 +10,10 @@ import sys
 
 
 class Command(BaseCommand):
+    """
+    Usage example, in testing,
+        `python manage.py initialize_tourney test-tourney-1 . --tab_password=PASSWORD`
+    """
 
     args = '<tournament_name> <backup_directory>'
     help = 'Setup a new tournament and backup the last one'

@@ -286,6 +286,7 @@ def validate_round_data(round_to_check):
     If any of these fail we raise a specific error as to the type of error
     """
 
+    # TODO (Kevin) remove this? Can just assign judges later.
     # Check that there are enough judges
     if not have_enough_judges(round_to_check)[0]:
         raise errors.NotEnoughJudgesError()
