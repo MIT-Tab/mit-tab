@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
@@ -235,25 +235,26 @@ class ResultEntryForm(forms.Form):
 
     def save(self):
         cleaned_data = self.cleaned_data
-        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
-        round_obj.victor = cleaned_data["winner"]
-        debaters = self.GOV + self.OPP
-        #How do we handle iron men? Do I enter both speaks?
-        for debater in debaters:
-            old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
-            if len(old_stats) > 0:
-                old_stats.delete()
+        with transaction.atomic():
+            round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+            round_obj.victor = cleaned_data["winner"]
+            debaters = self.GOV + self.OPP
+            #How do we handle iron men? Do I enter both speaks?
+            for debater in debaters:
+                old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
+                if len(old_stats) > 0:
+                    old_stats.delete()
 
-            debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
-            debater_role_obj = debater
-            speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
-            stats = RoundStats(debater = debater_obj, 
-                               round = round_obj, 
-                               speaks = speaks_obj, 
-                               ranks = ranks_obj, 
-                               debater_role = debater_role_obj)
-            stats.save()
-        round_obj.save()
+                debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
+                debater_role_obj = debater
+                speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
+                stats = RoundStats(debater = debater_obj, 
+                                round = round_obj, 
+                                speaks = speaks_obj, 
+                                ranks = ranks_obj, 
+                                debater_role = debater_role_obj)
+                stats.save()
+            round_obj.save()
         return round_obj
 
 class EBallotForm(ResultEntryForm):
