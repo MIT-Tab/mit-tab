@@ -9,7 +9,7 @@ import simplejson as json
 
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from errors import *
@@ -41,7 +41,7 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
         print "ARG ", e
         data = {"success":False}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
@@ -85,7 +85,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
         print "Unable to swap teams: ", e
         data = {'success':False}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -363,7 +363,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         print "Failed to assign judge: ", e
         data = {"success":False}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def remove_judge(request, round_id, judge_id):
@@ -382,14 +382,14 @@ def remove_judge(request, round_id, judge_id):
         print "Failed to assign judge: ", e
         data = {"success":False}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 def get_pairing_released(request):
     released = TabSettings.get("pairing_released", 0)
     data = {"success": True,
             "pairing_released": released == 1}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
@@ -397,7 +397,7 @@ def toggle_pairing_released(request):
     data = {"success": True,
             "pairing_released": int(not old) == 1}
     data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""
