@@ -7,6 +7,7 @@ from decimal import Decimal
 import itertools
 import pprint
 
+#TODO clean up form fields
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
 
@@ -19,10 +20,12 @@ class UploadDataForm(forms.Form):
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
+        fields = '__all__'
 
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
+        fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(), 
@@ -44,7 +47,7 @@ class JudgeForm(forms.ModelForm):
                                                                        required = False)
             except:
                 pass
-            
+
     def save(self, force_insert=False, force_update=False, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -59,12 +62,13 @@ class JudgeForm(forms.ModelForm):
                     checked_in.save()
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
-                    
+
         return judge
-                
+
     class Meta:
         model = Judge
-        
+        fields = '__all__'
+
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
@@ -81,9 +85,10 @@ class TeamForm(forms.ModelForm):
         if not( 1 <= len(data) <= 2) :
             raise forms.ValidationError("You must select 1 or 2 debaters!") 
         return data
-    
+
     class Meta:
         model = Team
+        fields = '__all__'
 
 class TeamEntryForm(forms.ModelForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
@@ -98,6 +103,7 @@ class TeamEntryForm(forms.ModelForm):
 
     class Meta:
         model = Team
+        fields = '__all__'
         
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
@@ -105,10 +111,12 @@ class ScratchForm(forms.ModelForm):
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
+        fields = '__all__'
         
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
+        fields = '__all__'
         
         
 def validate_speaks(value):
