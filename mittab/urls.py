@@ -1,4 +1,4 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
 import apps.tab.views as views
@@ -10,7 +10,7 @@ import apps.tab.pairing_views as pairing_views
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('',
+urlpatterns = [
     # Example:
     # url(r'^tab/', include('tab.foo.urls')),
 
@@ -107,4 +107,4 @@ urlpatterns = patterns('',
 
     # Data Upload
     url(r'^import_data/$', views.upload_data)
-)
+]
