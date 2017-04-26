@@ -1,25 +1,27 @@
+import random
+import sys
+import traceback
+import time
+import datetime
+import os
+import pprint
+import simplejson as json
+
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from django.utils import simplejson
 from django.db import transaction
 from errors import *
 from mittab.libs.errors import *
 from models import *
 from django.shortcuts import redirect
+
 from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
-import random
-import sys
-import traceback
 import mittab.libs.backup as backup
-import time
-import datetime
-import os
-import pprint
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -38,7 +40,7 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     except Exception as e:
         print "ARG ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -82,7 +84,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     except Exception as e:
         print "Unable to swap teams: ", e
         data = {'success':False}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 
@@ -360,7 +362,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -379,14 +381,14 @@ def remove_judge(request, round_id, judge_id):
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 def get_pairing_released(request):
     released = TabSettings.get("pairing_released", 0)
     data = {"success": True,
             "pairing_released": released == 1}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 def toggle_pairing_released(request):
@@ -394,7 +396,7 @@ def toggle_pairing_released(request):
     TabSettings.set("pairing_released", int(not old))
     data = {"success": True,
             "pairing_released": int(not old) == 1}
-    data = simplejson.dumps(data)
+    data = json.dumps(data)
     return HttpResponse(data, mimetype='application/json')
 
 """dxiao: added a html page for showing tab for the current round.

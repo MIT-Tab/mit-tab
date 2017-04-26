@@ -1,9 +1,12 @@
--e .
+appdirs==1.4.3
 Django==1.6.1
-wsgiref==0.1.2
-South==0.8.4
-mock==1.0.1
-pytest==2.4.2
 django-localflavor==1.0
-xlrd==0.9.4
-xlwt==1.0.0
+-e git+git@github.com:BenMusch/mit-tab.git@ae5eb8156202ff6cce2e707bc2f5305bd91c94da#egg=mittab
+mock==1.0.1
+packaging==16.8
+py==1.4.33
+pyparsing==2.2.0
+pytest==2.4.2
+simplejson==3.10.0
+six==1.10.0
+South==0.8.4
