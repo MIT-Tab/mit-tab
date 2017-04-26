@@ -25,7 +25,7 @@ DEBUG = True
 TEMPLATE_DEBUG = True
 
 TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
+    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
 )
 
 ALLOWED_HOSTS = []
@@ -40,7 +40,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'south',
     'mittab.apps.tab',
 )
 
