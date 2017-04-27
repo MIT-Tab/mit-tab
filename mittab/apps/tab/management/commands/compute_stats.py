@@ -1,5 +1,3 @@
-from optparse import make_option
-
 from django.core.management.base import BaseCommand
 from mittab.apps.tab.models import NoShow, RoundStats, TabSettings, Team, Debater
 import mittab.libs.tab_logic as tab_logic
@@ -8,11 +6,11 @@ import numpy as np
 
 
 class Command(BaseCommand):
-    option_list = BaseCommand.option_list + (
-        make_option("--output-file", dest="output_file",
-                    help="file to output data to as csv"),)
-
     help = 'Calculate statistics relevant to the tabulation'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--output-file', dest='output_file',
+                help='file to output data to as csv')
 
     def count_valid_teams(self):
         num_teams, num_valid_teams = 0, 0

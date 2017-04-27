@@ -1,5 +1,3 @@
-from optparse import make_option
-
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from mittab.libs.backup import get_backup_prefix
@@ -9,13 +7,17 @@ import shutil
 import sys
 
 class Command(BaseCommand):
-    args = '<tournament_name> <backup_directory>'
     help = 'Setup a new tounament and backup the last one'
-    option_list = BaseCommand.option_list + (
-            make_option("--tab-password", dest="tab_password",
-                help="Password for the tab user"),
-            make_option("--entry-password", dest="entry_password",
-                help="Password for the entry user"))
+
+    def add_arguments(self, parser):
+        parser.add_argument('tournament_name', type=str, nargs=1)
+        parser.add_argument('backuo_directory', type=str, nargs=1)
+
+        parser.add_argument('--tab-password', dest='tab_password',
+                help='Password for the tab user')
+
+        parser.add_argument('--entry-password', dest='entry_password',
+                help='Password for the tab user')
 
     def handle(self, *args, **options):
         if len(args) != 2:
