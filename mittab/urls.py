@@ -18,7 +18,7 @@ urlpatterns = [
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^dynamic-media/jsi18n/$', 'django.views.i18n.javascript_catalog'),
+    url(r'^dynamic-media/jsi18n/$', django.views.i18n.javascript_catalog),
 
     url(r'^$', views.index),
     url(r'^403/', views.render_403),

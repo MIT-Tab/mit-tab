@@ -18,7 +18,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if len(args) != 2:
-            print len(args)
             self.print_help('./manage.py', 'initialize_tourney')
             raise CommandError('Please supply valid arguments')
 

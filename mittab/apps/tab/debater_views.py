@@ -13,7 +13,7 @@ def view_debaters(request):
     return render_to_response('list_data.html', 
                              {'item_type':'debater',
                               'title': "Viewing All Debaters",
-                              'item_list':c_debaters}, context_instance=RequestContext(request))
+                              'item_list':c_debaters}, request=request)
 
 def view_debater(request, debater_id):
     debater_id = int(debater_id)
@@ -24,7 +24,7 @@ def view_debater(request, debater_id):
                                  {'error_type': "View Debater",
                                   'error_name': str(debater_id),
                                   'error_info':"No such debater"}, 
-                                  context_instance=RequestContext(request))
+                                  request=request)
     if request.method == 'POST':
         form = DebaterForm(request.POST,instance=debater)
         if form.is_valid():
@@ -35,11 +35,11 @@ def view_debater(request, debater_id):
                                          {'error_type': "Debater",
                                           'error_name': "["+form.cleaned_data['name']+"]",
                                           'error_info':"Debater name cannot be validated, most likely a non-existent debater"}, 
-                                          context_instance=RequestContext(request))
+                                          request=request)
             return render_to_response('thanks.html', 
                                      {'data_type': "Debater",
                                       'data_name': "["+form.cleaned_data['name']+"]"}, 
-                                      context_instance=RequestContext(request))
+                                      request=request)
     else:
         rounds = RoundStats.objects.filter(debater=debater)
         rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
@@ -56,7 +56,7 @@ def view_debater(request, debater_id):
                                   'links': links,
                                   'debater_rounds': rounds,
                                   'title':"Viewing Debater: %s"%(debater.name)}, 
-                                  context_instance=RequestContext(request))
+                                  request=request)
 
 @permission_required('tab.debater.can_delete', login_url="/403/")    
 def delete_debater(request, debater_id):
@@ -74,12 +74,12 @@ def delete_debater(request, debater_id):
                                  {'error_type': "Debater",
                                  'error_name': "Error Deleting Debater",
                                  'error_info':error_msg}, 
-                                 context_instance=RequestContext(request))
+                                 request=request)
     return render_to_response('thanks.html', 
                              {'data_type': "Debater",
                               'data_name': "["+str(debater_id)+"]",
                               'data_modification': 'DELETED'}, 
-                              context_instance=RequestContext(request))
+                              request=request)
 def enter_debater(request):
     if request.method == 'POST':
         form = DebaterForm(request.POST)
@@ -90,25 +90,25 @@ def enter_debater(request):
                 return render_to_response('error.html', 
                                          {'error_type': "Debater",'error_name': "["+form.cleaned_data['name']+"]",
                                           'error_info':"Debater name cannot be validated, most likely a duplicate debater"}, 
-                                          context_instance=RequestContext(request))
+                                          request=request)
             return render_to_response('thanks.html', 
                                      {'data_type': "Debater",
                                       'data_name': "["+form.cleaned_data['name']+"]",
                                       'data_modification': "CREATED",
                                       'enter_again': True}, 
-                                      context_instance=RequestContext(request))
+                                      request=request)
     else:
         form = DebaterForm()
     return render_to_response('data_entry.html',
                              {'form': form,
                               'title': "Create Debater:"},
-                              context_instance=RequestContext(request))
+                              request=request)
 
 def rank_debaters_ajax(request):
     return render_to_response('rank_debaters.html',
                              {'title': "Debater Rankings"},
-                              context_instance=RequestContext(request))
-                              
+                              request=request)
+
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
@@ -126,22 +126,5 @@ def rank_debaters(request):
                              {'debaters': debaters, 
                               'nov_debaters' : nov_debaters,
                               'title': "Speaker Rankings"}, 
-                             context_instance=RequestContext(request))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                             request=request)
 

@@ -144,7 +144,6 @@ class Round(models.Model):
     opp_team = models.ForeignKey(Team, related_name="opp_team")
     chair = models.ForeignKey(Judge, null=True, blank=True, related_name="chair")
     judges = models.ManyToManyField(Judge,
-                                    null=True,
                                     blank=True,
                                     related_name="judges")
     NONE = 0
