@@ -102,11 +102,6 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.request'
             ],
-        },
-        'DEBUG': True,
-        'LOADERS': [
-            'django.template.loaders.filesystem.Loader',
-            'django.template.loaders.app_directories.Loader'
-        ]
+        }
     }
 ]

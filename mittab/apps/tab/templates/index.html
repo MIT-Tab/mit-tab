@@ -4,17 +4,17 @@
 
 {% block content %}
 
-{% url "mittab.apps.tab.judge_views.view_judges" as view_judges %}
-{% url "mittab.apps.tab.views.view_schools" as view_schools %}
-{% url "mittab.apps.tab.team_views.view_teams" as view_teams %}
-{% url "mittab.apps.tab.debater_views.view_debaters" as view_debaters %}
-{% url "mittab.apps.tab.views.view_rooms" as view_rooms %}
+{% url "judges" as view_judges %}
+{% url "schools" as view_schools %}
+{% url "teams" as view_teams %}
+{% url "debaters" as view_debaters %}
+{% url "rooms" as view_rooms %}
 
-{% url "mittab.apps.tab.judge_views.enter_judge" as enter_judge %}
-{% url "mittab.apps.tab.views.enter_school" as enter_school %}
-{% url "mittab.apps.tab.team_views.enter_team" as enter_team %}
-{% url "mittab.apps.tab.debater_views.enter_debater" as enter_debater %}
-{% url "mittab.apps.tab.views.enter_room" as enter_room %}
+{% url "new-judge" as enter_judge %}
+{% url "new-school" as enter_school %}
+{% url "new-team" as enter_team %}
+{% url "new-debater" as enter_debater %}
+{% url "new-room" as enter_room %}
 
 
 <div id="filter">

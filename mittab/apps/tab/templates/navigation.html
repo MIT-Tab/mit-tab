@@ -1,34 +1,34 @@
 {% load tags %}
 
-{% url "mittab.apps.tab.views.index" as home%}
+{% url "index" as home%}
 
-{% url "mittab.apps.tab.views.enter_school" as enter_school %}
-{% url "mittab.apps.tab.views.view_schools" as view_schools %}
+{% url "new-school" as enter_school %}
+{% url "schools" as view_schools %}
 
-{% url "mittab.apps.tab.views.enter_room" as enter_room %}
-{% url "mittab.apps.tab.views.view_rooms" as view_rooms %}
+{% url "new-room" as enter_room %}
+{% url "rooms" as view_rooms %}
 
-{% url "mittab.apps.tab.judge_views.enter_judge" as enter_judge %}
-{% url "mittab.apps.tab.judge_views.view_judges" as view_judges%}
+{% url "new-judge" as enter_judge %}
+{% url "judges" as view_judges%}
 
-{% url "mittab.apps.tab.team_views.enter_team" as enter_team %}
-{% url "mittab.apps.tab.team_views.view_teams" as view_teams%}
-{% url "mittab.apps.tab.team_views.rank_teams_ajax" as rank_teams %}
-{% url "mittab.apps.tab.team_views.all_tab_cards" as tab_cards %}
+{% url "new-team" as enter_team %}
+{% url "teams" as view_teams%}
+{% url "team-rank-ajax" as rank_teams %}
+{% url "tab-cards" as tab_cards %}
 
-{% url "mittab.apps.tab.debater_views.enter_debater" as enter_debater %}
-{% url "mittab.apps.tab.debater_views.view_debaters" as view_debaters %}
-{% url "mittab.apps.tab.debater_views.rank_debaters_ajax" as rank_debaters %}
+{% url "new-debater" as enter_debater %}
+{% url "debaters" as view_debaters %}
+{% url "debater-rank-ajax" as rank_debaters %}
 
-{% url "mittab.apps.tab.pairing_views.view_status" as view_status %}
-{% url "mittab.apps.tab.pairing_views.view_rounds" as view_rounds %}
-{% url "mittab.apps.tab.pairing_views.pair_round" as pair_round %}
-{% url "mittab.apps.tab.pairing_views.confirm_start_new_tourny" as confirm_start_new_tourny %}
-{% url "mittab.apps.tab.views.upload_data" as upload_data %}
-{% url "mittab.apps.tab.pairing_views.manual_backup" as backup %}
-{% url "mittab.apps.tab.pairing_views.view_backups" as view_backups %}
-{% url "mittab.apps.tab.views.view_scratches" as view_scratches %}
-{% url "mittab.apps.tab.views.add_scratch" as add_scratch %}
+{% url "pairings-status" as view_status %}
+{% url "rounds" as view_rounds %}
+{% url "pair-round" as pair_round %}
+{% url "confirm-new-tournament" as confirm_start_new_tourny %}
+{% url "upload-data" as upload_data %}
+{% url "backup-pairing" as backup %}
+{% url "backups" as view_backups %}
+{% url "scratches" as view_scratches %}
+{% url "new-scratch" as add_scratch %}
 
 <div id="nab_bar">
     <ul id="navlist">
