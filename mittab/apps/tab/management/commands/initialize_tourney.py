@@ -7,20 +7,18 @@ import shutil
 import sys
 
 class Command(BaseCommand):
+    args = '<tournament_name> <backup_directory>'
     help = 'Setup a new tounament and backup the last one'
 
     def add_arguments(self, parser):
-        parser.add_argument('tournament_name', type=str, nargs=1)
-        parser.add_argument('backuo_directory', type=str, nargs=1)
-
         parser.add_argument('--tab-password', dest='tab_password',
                 help='Password for the tab user')
-
         parser.add_argument('--entry-password', dest='entry_password',
                 help='Password for the tab user')
 
     def handle(self, *args, **options):
         if len(args) != 2:
+            print len(args)
             self.print_help('./manage.py', 'initialize_tourney')
             raise CommandError('Please supply valid arguments')
 
