@@ -1,13 +1,14 @@
 appdirs==1.4.3
-Django==1.10
+Django==1.11
 django-localflavor==1.0
--e git+git@github.com:BenMusch/mit-tab.git@0c009238c95f1e0fe69ddac6f1de7901905b55bf#egg=mittab
+-e git+git@github.com:BenMusch/mit-tab.git@22524142b741dc92990237122e8ed84ac7cd52d0#egg=mittab
 mock==1.0.1
 numpy==1.12.1
 packaging==16.8
 py==1.4.33
 pyparsing==2.2.0
 pytest==2.4.2
+pytz==2017.2
 simplejson==3.10.0
 six==1.10.0
 xlrd==0.9.4
