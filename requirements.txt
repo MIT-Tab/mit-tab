@@ -9,6 +9,7 @@ py==1.4.33
 pyparsing==2.2.0
 pytest==2.4.2
 pytz==2017.2
+selenium==3.4.1
 simplejson==3.10.0
 six==1.10.0
 xlrd==0.9.4

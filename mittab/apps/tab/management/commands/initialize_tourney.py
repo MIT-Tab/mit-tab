@@ -10,20 +10,20 @@ class Command(BaseCommand):
     help = 'Setup a new tounament and backup the last one'
 
     def add_arguments(self, parser):
-        parser.add_argument('tournament_name', nargs=1, type=str)
-        parser.add_argument('backup_directory', nargs=1, type=str)
+        parser.add_argument('tournament_name', nargs='+', type=str)
+        parser.add_argument('backup_directory', nargs='+', type=str)
         parser.add_argument('--tab-password', dest='tab_password',
                 help='Password for the tab user')
         parser.add_argument('--entry-password', dest='entry_password',
                 help='Password for the tab user')
 
     def handle(self, *args, **options):
-        if not options.get('tournament_name') and options.get('backup_directory')):
+        if not (options.get('tournament_name') and options.get('backup_directory')):
             self.print_help('./manage.py', 'initialize_tourney')
             raise CommandError('Please supply valid arguments')
 
-        tournament_name = options['tournament_name']
-        backup_directory = options['backup_directory']
+        tournament_name = options['tournament_name'][0]
+        backup_dir = options['backup_directory'][0]
         path = get_backup_prefix()
 
         if options['tab_password'] is None:
