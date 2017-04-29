@@ -188,3 +188,416 @@ JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeE
 1493474657987	Marionette	INFO	New connections will no longer be accepted
 [Child 36113] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
 [Child 36113] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493483847596	geckodriver	INFO	Listening on 127.0.0.1:50146
+1493483848580	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.2YdHiUDvuscE
+1493483848582	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493483848586	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50155
+1493483849293	Marionette	INFO	Listening on port 50155
+1493483849562	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:37:30.866 plugin-container[38567:9596931] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:37:30.870 plugin-container[38567:9596931] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493483851693	Marionette	INFO	New connections will no longer be accepted
+[Child 38567] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38567] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493483871107	geckodriver	INFO	Listening on 127.0.0.1:50208
+1493483872098	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.HxmoZEUIYq8j
+1493483872099	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493483872103	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50217
+1493483872756	Marionette	INFO	Listening on port 50217
+1493483873018	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:37:54.361 plugin-container[38588:9597685] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9333, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:37:54.367 plugin-container[38588:9597685] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493483875024	Marionette	INFO	New connections will no longer be accepted
+[Child 38588] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38588] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484012730	geckodriver	INFO	Listening on 127.0.0.1:50274
+1493484013720	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.XmHFv2acf2M4
+1493484013721	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484013724	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50283
+1493484014399	Marionette	INFO	Listening on port 50283
+1493484014657	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:40:15.947 plugin-container[38657:9599033] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:40:15.951 plugin-container[38657:9599033] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+1493484061058	geckodriver	INFO	Listening on 127.0.0.1:50326
+1493484062038	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.Y9ueh3F9PxaD
+1493484062039	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484062042	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50335
+1493484062734	Marionette	INFO	Listening on port 50335
+1493484062997	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:41:04.366 plugin-container[38689:9599615] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9333, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:41:04.370 plugin-container[38689:9599615] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484065050	Marionette	INFO	New connections will no longer be accepted
+[Child 38689] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38689] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484086762	geckodriver	INFO	Listening on 127.0.0.1:50394
+1493484087745	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.yzevLHET31Oz
+1493484087747	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484087751	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50403
+1493484088400	Marionette	INFO	Listening on port 50403
+1493484088654	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:41:29.961 plugin-container[38710:9600357] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:41:29.966 plugin-container[38710:9600357] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484143645	Marionette	INFO	New connections will no longer be accepted
+[Child 38710] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38710] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484145944	geckodriver	INFO	Listening on 127.0.0.1:50465
+1493484146933	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.xT0xW2082H8q
+1493484146934	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484146937	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50474
+1493484147609	Marionette	INFO	Listening on port 50474
+1493484147873	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:42:29.173 plugin-container[38745:9601374] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:42:29.177 plugin-container[38745:9601374] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484225729	Marionette	INFO	New connections will no longer be accepted
+[Child 38745] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38745] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484228401	geckodriver	INFO	Listening on 127.0.0.1:50543
+1493484229387	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.3GDUSkM3ASvW
+1493484229388	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484229392	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50552
+1493484230062	Marionette	INFO	Listening on port 50552
+1493484230329	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:43:51.649 plugin-container[38797:9602626] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x952f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:43:51.653 plugin-container[38797:9602626] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484309436	Marionette	INFO	New connections will no longer be accepted
+[Child 38797] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38797] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484312822	geckodriver	INFO	Listening on 127.0.0.1:50614
+1493484313805	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.hAttwtNttiA3
+1493484313806	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484313809	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50623
+1493484314476	Marionette	INFO	Listening on port 50623
+1493484314741	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:45:16.063 plugin-container[38842:9603767] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x932f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:45:16.067 plugin-container[38842:9603767] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484426725	Marionette	INFO	New connections will no longer be accepted
+1493484436830	geckodriver	INFO	Listening on 127.0.0.1:50712
+1493484437820	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.5s07nzYNTa6J
+1493484437822	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484437825	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50721
+1493484438538	Marionette	INFO	Listening on port 50721
+1493484438808	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:47:20.182 plugin-container[38911:9605230] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x953b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:47:20.186 plugin-container[38911:9605230] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484495442	Marionette	INFO	New connections will no longer be accepted
+1493484504646	geckodriver	INFO	Listening on 127.0.0.1:50794
+1493484505617	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.J8SVkWqhI7ke
+1493484505618	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484505622	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50803
+1493484506522	Marionette	INFO	Listening on port 50803
+1493484506834	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:48:28.129 plugin-container[38960:9606071] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9337, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:48:28.133 plugin-container[38960:9606071] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484508799	Marionette	INFO	New connections will no longer be accepted
+[Child 38960] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38960] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484531941	geckodriver	INFO	Listening on 127.0.0.1:50859
+1493484532893	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.djLKI9HXPgNp
+1493484532895	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484532897	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50868
+1493484533567	Marionette	INFO	Listening on port 50868
+1493484533823	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:48:55.106 plugin-container[38989:9606921] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x932f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:48:55.110 plugin-container[38989:9606921] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484554438	Marionette	INFO	New connections will no longer be accepted
+[Child 38989] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 38989] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484556803	geckodriver	INFO	Listening on 127.0.0.1:50924
+1493484557787	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.Hkc3ivK8oK5i
+1493484557788	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484557792	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50933
+1493484558466	Marionette	INFO	Listening on port 50933
+1493484558724	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:49:19.981 plugin-container[39010:9607741] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:49:19.982 plugin-container[39010:9607741] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484560591	Marionette	INFO	New connections will no longer be accepted
+[Child 39010] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39010] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484589871	geckodriver	INFO	Listening on 127.0.0.1:50987
+1493484590857	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.4vP3JZQD6Hkh
+1493484590858	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484590862	geckodriver::marionette	INFO	Connecting to Marionette on localhost:50996
+1493484591527	Marionette	INFO	Listening on port 50996
+1493484591811	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:49:53.413 plugin-container[39034:9608531] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9527, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:49:53.420 plugin-container[39034:9608531] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484626381	Marionette	INFO	New connections will no longer be accepted
+[Child 39034] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39034] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484634068	geckodriver	INFO	Listening on 127.0.0.1:51054
+1493484635054	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.GjunD0fqP2JQ
+1493484635056	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484635060	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51063
+1493484635735	Marionette	INFO	Listening on port 51063
+1493484635998	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:50:37.278 plugin-container[39064:9609390] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x932f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:50:37.282 plugin-container[39064:9609390] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9607, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484637926	Marionette	INFO	New connections will no longer be accepted
+[Child 39064] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39064] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484649517	geckodriver	INFO	Listening on 127.0.0.1:51114
+1493484650503	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.0f3Q0iOOndb7
+1493484650505	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484650509	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51123
+1493484651184	Marionette	INFO	Listening on port 51123
+1493484651449	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:50:52.719 plugin-container[39083:9610064] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:50:52.720 plugin-container[39083:9610064] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484653328	Marionette	INFO	New connections will no longer be accepted
+[Child 39083] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39083] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484745629	geckodriver	INFO	Listening on 127.0.0.1:51517
+1493484746613	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.r3oUzOzDtvFl
+1493484746615	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484746620	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51530
+1493484747294	Marionette	INFO	Listening on port 51530
+1493484747556	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:52:28.820 plugin-container[39145:9611589] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9537, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:52:28.824 plugin-container[39145:9611589] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484749750	Marionette	INFO	New connections will no longer be accepted
+[Child 39145] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39145] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484790249	geckodriver	INFO	Listening on 127.0.0.1:51772
+1493484791235	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.AytLxDMBwxLK
+1493484791237	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484791240	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51785
+1493484791904	Marionette	INFO	Listening on port 51785
+1493484792165	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:53:13.471 plugin-container[39175:9612501] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x932f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:53:13.475 plugin-container[39175:9612501] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484794088	Marionette	INFO	New connections will no longer be accepted
+[Child 39175] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39175] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484808413	geckodriver	INFO	Listening on 127.0.0.1:51907
+1493484809398	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.mlq4flFiUUXv
+1493484809400	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484809403	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51920
+1493484810070	Marionette	INFO	Listening on port 51920
+1493484810329	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:53:31.596 plugin-container[39195:9613220] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:53:31.601 plugin-container[39195:9613220] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484812255	Marionette	INFO	New connections will no longer be accepted
+[Child 39195] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39195] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484859151	geckodriver	INFO	Listening on 127.0.0.1:52178
+1493484860131	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.SmwmIEVp8t8F
+1493484860133	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484860137	geckodriver::marionette	INFO	Connecting to Marionette on localhost:52191
+1493484860818	Marionette	INFO	Listening on port 52191
+1493484861089	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:54:22.406 plugin-container[39229:9614248] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:54:22.410 plugin-container[39229:9614248] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484894837	Marionette	INFO	New connections will no longer be accepted
+[Child 39229] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39229] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484917357	geckodriver	INFO	Listening on 127.0.0.1:52482
+1493484918344	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.tu1Kg3kPadkx
+1493484918345	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484918348	geckodriver::marionette	INFO	Connecting to Marionette on localhost:52495
+1493484919010	Marionette	INFO	Listening on port 52495
+1493484919269	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:55:20.532 plugin-container[39259:9615225] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x953b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:55:20.536 plugin-container[39259:9615225] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484921183	Marionette	INFO	New connections will no longer be accepted
+[Child 39259] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39259] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484939883	geckodriver	INFO	Listening on 127.0.0.1:52635
+1493484940863	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.zZtrHgkpQVnY
+1493484940864	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484940868	geckodriver::marionette	INFO	Connecting to Marionette on localhost:52648
+1493484941529	Marionette	INFO	Listening on port 52648
+1493484941804	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:55:43.086 plugin-container[39279:9615990] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x953b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:55:43.092 plugin-container[39279:9615990] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484943790	Marionette	INFO	New connections will no longer be accepted
+[Child 39279] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39279] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484971478	geckodriver	INFO	Listening on 127.0.0.1:52829
+1493484972459	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.eKbubvrfxODS
+1493484972461	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484972464	geckodriver::marionette	INFO	Connecting to Marionette on localhost:52844
+1493484973134	Marionette	INFO	Listening on port 52844
+1493484973407	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:56:14.692 plugin-container[39306:9616839] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:56:14.693 plugin-container[39306:9616839] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484976017	Marionette	INFO	New connections will no longer be accepted
+[Child 39306] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39306] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493484994610	geckodriver	INFO	Listening on 127.0.0.1:53000
+1493484995592	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.vsAjNNqQtyWK
+1493484995593	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493484995597	geckodriver::marionette	INFO	Connecting to Marionette on localhost:53013
+1493484996262	Marionette	INFO	Listening on port 53013
+1493484996527	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:56:37.808 plugin-container[39327:9617586] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:56:37.813 plugin-container[39327:9617586] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493484998777	Marionette	INFO	New connections will no longer be accepted
+[Child 39327] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39327] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493485040360	geckodriver	INFO	Listening on 127.0.0.1:53263
+1493485041349	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.qZxWW3NI1Xaz
+1493485041351	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493485041355	geckodriver::marionette	INFO	Connecting to Marionette on localhost:53277
+1493485042031	Marionette	INFO	Listening on port 53277
+1493485042290	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:57:23.582 plugin-container[39356:9618503] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x952f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:57:23.586 plugin-container[39356:9618503] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493485044326	Marionette	INFO	New connections will no longer be accepted
+[Child 39356] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39356] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493485064199	geckodriver	INFO	Listening on 127.0.0.1:53422
+1493485065182	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.Nyl8Hz7hBTqU
+1493485065184	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493485065188	geckodriver::marionette	INFO	Connecting to Marionette on localhost:53435
+1493485065853	Marionette	INFO	Listening on port 53435
+1493485066114	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:57:47.391 plugin-container[39377:9619251] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9337, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:57:47.395 plugin-container[39377:9619251] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493485190917	Marionette	INFO	New connections will no longer be accepted
+[Child 39377] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39377] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493485192735	geckodriver	INFO	Listening on 127.0.0.1:53649
+1493485193719	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.XwGrck2CRxsq
+1493485193721	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493485193724	geckodriver::marionette	INFO	Connecting to Marionette on localhost:53658
+1493485194413	Marionette	INFO	Listening on port 53658
+1493485194672	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-04-29 16:59:55.949 plugin-container[39433:9620728] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9327, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-04-29 16:59:55.953 plugin-container[39433:9620728] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493485201644	Marionette	INFO	New connections will no longer be accepted
+[Child 39433] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 39433] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
