@@ -601,3 +601,225 @@ JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeE
 1493485201644	Marionette	INFO	New connections will no longer be accepted
 [Child 39433] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
 [Child 39433] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493942322108	geckodriver	INFO	Listening on 127.0.0.1:51600
+1493942323092	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.bWJUmOcip1lq
+1493942323094	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493942323106	geckodriver::marionette	INFO	Connecting to Marionette on localhost:51609
+1493942323872	Marionette	INFO	Listening on port 51609
+1493942324130	Marionette	WARN	TLS certificate errors will be ignored for this session
+1493942325407	Marionette	INFO	New connections will no longer be accepted
+2017-05-04 23:58:45.416 plugin-container[22979:17180207] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-04 23:58:45.422 plugin-container[22979:17180207] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+[Child 22979] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 22979] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943255316	geckodriver	INFO	Listening on 127.0.0.1:54241
+1493943256299	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.VceoO1wAcLNb
+1493943256300	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943256303	geckodriver::marionette	INFO	Connecting to Marionette on localhost:54254
+1493943256980	Marionette	INFO	Listening on port 54254
+1493943257245	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:14:18.498 plugin-container[23445:17187758] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9337, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:14:18.501 plugin-container[23445:17187758] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943260462	Marionette	INFO	New connections will no longer be accepted
+[Child 23445] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23445] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943279890	geckodriver	INFO	Listening on 127.0.0.1:54418
+1493943280873	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.iHqGcdkofLUe
+1493943280875	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943280880	geckodriver::marionette	INFO	Connecting to Marionette on localhost:54431
+1493943281564	Marionette	INFO	Listening on port 54431
+1493943281820	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:14:43.082 plugin-container[23469:17188566] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x953b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:14:43.087 plugin-container[23469:17188566] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943287911	Marionette	INFO	New connections will no longer be accepted
+[Child 23469] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23469] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943315208	geckodriver	INFO	Listening on 127.0.0.1:54784
+1493943316194	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.czkfZiWgOe3C
+1493943316196	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943316199	geckodriver::marionette	INFO	Connecting to Marionette on localhost:54797
+1493943316980	Marionette	INFO	Listening on port 54797
+1493943317361	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:15:18.732 plugin-container[23492:17189474] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x953b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:15:18.737 plugin-container[23492:17189474] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9803, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943323620	Marionette	INFO	New connections will no longer be accepted
+[Child 23492] WARNING: pipe error: Broken pipe: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/chromium/src/chrome/common/ipc_channel_posix.cc, line 685
+[Child 23492] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23492] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943370490	geckodriver	INFO	Listening on 127.0.0.1:55107
+1493943371475	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.DqDB2z5P9DSJ
+1493943371476	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943371480	geckodriver::marionette	INFO	Connecting to Marionette on localhost:55120
+1493943372211	Marionette	INFO	Listening on port 55120
+1493943372476	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:16:13.900 plugin-container[23529:17190518] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:16:13.904 plugin-container[23529:17190518] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943378829	Marionette	INFO	New connections will no longer be accepted
+[Child 23529] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23529] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943390561	geckodriver	INFO	Listening on 127.0.0.1:55277
+1493943391543	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.IZVBOS3mWXze
+1493943391545	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943391549	geckodriver::marionette	INFO	Connecting to Marionette on localhost:55286
+1493943392203	Marionette	INFO	Listening on port 55286
+1493943392461	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:16:34.132 plugin-container[23549:17191274] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x932f, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:16:34.135 plugin-container[23549:17191274] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943401050	Marionette	INFO	New connections will no longer be accepted
+[GFX1-]: Receive IPC close with reason=AbnormalShutdown
+[Child 23549] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23549] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493943581783	geckodriver	INFO	Listening on 127.0.0.1:55471
+1493943582765	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.9xZOniJCeWbx
+1493943582766	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493943582770	geckodriver::marionette	INFO	Connecting to Marionette on localhost:55480
+1493943583429	Marionette	INFO	Listening on port 55480
+1493943583687	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:19:44.945 plugin-container[23632:17193705] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9333, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:19:44.950 plugin-container[23632:17193705] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493943591794	Marionette	INFO	New connections will no longer be accepted
+[Child 23632] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23632] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+1493944169675	geckodriver	INFO	Listening on 127.0.0.1:55670
+1493944170664	mozprofile::profile	INFO	Using profile path /var/folders/fg/fmvmphr13sq1vclrftmplj100000gp/T/rust_mozprofile.T9zLeDYtgvpz
+1493944170666	geckodriver::marionette	INFO	Starting browser /Applications/Firefox.app/Contents/MacOS/firefox-bin with args []
+1493944170669	geckodriver::marionette	INFO	Connecting to Marionette on localhost:55679
+1493944171336	Marionette	INFO	Listening on port 55679
+1493944171592	Marionette	WARN	TLS certificate errors will be ignored for this session
+2017-05-05 00:29:32.834 plugin-container[23889:17198081] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x933b, name = 'com.apple.tsm.portname'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+2017-05-05 00:29:32.838 plugin-container[23889:17198081] *** CFMessagePort: bootstrap_register(): failed 1100 (0x44c) 'Permission denied', port = 0x9603, name = 'com.apple.CFPasteboardClient'
+See /usr/include/servers/bootstrap_defs.h for the error codes.
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+JavaScript warning: http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js, line 1: Using //@ to indicate sourceMappingURL pragmas is deprecated. Use //# instead
+JavaScript error: http://127.0.0.1:8000/static/javascript/tab.js, line 28: TypeError: $ is not a function
+1493944200767	Marionette	INFO	New connections will no longer be accepted
+[Child 23889] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
+[Child 23889] ###!!! ABORT: Aborting on channel error.: file /builds/slave/m-rel-m64-00000000000000000000/build/src/ipc/glue/MessageChannel.cpp, line 2143
