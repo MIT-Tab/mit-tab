@@ -1,8 +1,7 @@
 import time
 from django.test import LiveServerTestCase
 from django.contrib.auth.models import User
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
+from splinter import Browser
 
 class RunningATournamentTestCase(LiveServerTestCase):
     """
@@ -13,7 +12,7 @@ class RunningATournamentTestCase(LiveServerTestCase):
     fixtures = ['testing_db']
 
     def setUp(self):
-        self.selenium = webdriver.Firefox()
+        self.selenium = Browser('phantomjs', wait_time=10)
         super(RunningATournamentTestCase, self).setUp()
 
     def tearDown(self):
@@ -27,19 +26,23 @@ class RunningATournamentTestCase(LiveServerTestCase):
         self._login()
         self._add_rooms()
         self._add_schools()
+        self._add_judges()
 
     def _login(self):
         """
         Test that logging in with the tab password takes you home
         """
-        self.selenium.get(self.live_server_url)
-        self.selenium.find_element_by_id('username').send_keys(self.username)
-        self.selenium.find_element_by_id('password').send_keys(self.password)
-        self.selenium.find_element_by_class_name('form-horizontal').submit()
+        self.selenium.visit(self.live_server_url)
+        self.selenium.fill('username', self.username)
+        self.selenium.fill('password', self.password)
+        self.selenium.find_by_text('Sign in').first.click()
 
-        self._sleep()
-        is_logged_in = 'Sign in' not in self.selenium.page_source
-        assert is_logged_in
+        assert self.selenium.is_text_present('Home')
+        assert not self.selenium.is_text_present('Sign in')
+
+    def _add_judges(self):
+        for i in range(5):
+            self._add_judge("Judge %s" % i, i, ["School %s" % i])
 
     def _add_rooms(self):
         """
@@ -47,7 +50,6 @@ class RunningATournamentTestCase(LiveServerTestCase):
         """
         for i in range(5):
             self._add_room("Room %s" % i, i)
-            self._sleep(2)
 
     def _add_schools(self):
         """
@@ -55,6 +57,19 @@ class RunningATournamentTestCase(LiveServerTestCase):
         """
         for i in range(5):
             self._add_school("School %s" % i)
+
+    def _add_judge(self, name, rank, schools):
+        """
+        Test submitting a judge
+         - The schools param is an array of school names the judge is affiliated
+           with
+        """
+        def click_schools():
+            for school in schools:
+                el = self.selenium.find_option_by_text(school).first
+                el.click()
+
+        self._add_entity('Judge', click_schools, name=name, rank=rank)
 
     def _add_school(self, name):
         """
@@ -68,30 +83,31 @@ class RunningATournamentTestCase(LiveServerTestCase):
         """
         self._add_entity('Room', name=name, rank=rank)
 
-    def _add_entity(self, entity_name, **data):
+    def _add_entity(self, entity_name, custom_form_logic=None, **data):
         """
         Test adding an entity (i.e. School, Room, etc.) via the dashboard and verify
         that it was successfully added
 
          - The model must have a name attribute used to determine links
          - The name cannot be shared with any other entity
-         - Does not work with more complex form submission
+         - Only submits data for plain text/number fields. Pass in a lambda for
+           the custom_form_logic parameter to fill in any additional fields
         """
         self._go_home()
 
-        self.selenium.find_element_by_link_text("Add %s" % entity_name).click()
-        self._sleep()
+        self.selenium.click_link_by_text("Add %s" % entity_name)
+        if custom_form_logic:
+            custom_form_logic()
         self._submit_form(**data)
 
         msg = "%s [%s] has been successfully modified!(CREATED)" % (entity_name, data['name'])
-        assert msg in self.selenium.page_source
+        assert self.selenium.is_text_present(msg)
 
         self._go_home()
-        self.selenium.find_element_by_link_text(data['name']).click()
-        self._sleep()
+        self.selenium.click_link_by_partial_text(data['name'])
 
         for key in data:
-            assert str(data[key]) in self.selenium.page_source
+            assert self.selenium.is_text_present(str(data[key]))
 
 
     def _submit_form(self, **data):
@@ -101,16 +117,12 @@ class RunningATournamentTestCase(LiveServerTestCase):
         this method.
         """
         for key in data:
-            self.selenium.find_element_by_id("id_%s" % key).send_keys(data[key])
-        self.selenium.find_element_by_class_name('dataEntryForm').submit()
-        self._sleep(10)
+            self.selenium.fill(key, data[key])
+        self.selenium.find_by_value('Submit Changes').first.click()
 
-    def _go_home(self, sleep=0):
+    def _go_home(self):
         """
         Navigate to the dashboard using the navigation bar
         """
-        self.selenium.find_element_by_link_text('Home').click()
-        self._sleep(sleep)
+        self.selenium.click_link_by_text('Home')
 
-    def _sleep(self, additional=0):
-        time.sleep(2 + additional)

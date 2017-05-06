@@ -1,7 +1,7 @@
 appdirs==1.4.3
 Django==1.11
 django-localflavor==1.0
--e .
+-e git+git@github.com:BenMusch/mit-tab.git@45bb4bf25238867af3b707dd3266f99d41456361#egg=mittab
 mock==1.0.1
 numpy==1.12.1
 packaging==16.8
@@ -12,5 +12,6 @@ pytz==2017.2
 selenium==3.4.1
 simplejson==3.10.0
 six==1.10.0
+splinter==0.7.5
 xlrd==0.9.4
 xlwt==1.0.0
