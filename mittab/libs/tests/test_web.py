@@ -28,6 +28,7 @@ class RunningATournamentTestCase(LiveServerTestCase):
         self._add_rooms()
         self._add_schools()
         self._add_judges()
+        self._add_debaters()
 
     def _login(self):
         """
@@ -40,6 +41,11 @@ class RunningATournamentTestCase(LiveServerTestCase):
 
         assert self.selenium.is_text_present('Home')
         assert not self.selenium.is_text_present('Sign in')
+
+    def _add_debaters(self):
+        for i in range(4):
+            self._add_debater("Debater %s" % (i * 2), False)
+            self._add_debater("Debater %s" % (i * 2 + 1), True)
 
     def _add_judges(self):
         for i in range(5):
@@ -71,6 +77,14 @@ class RunningATournamentTestCase(LiveServerTestCase):
                 el.click()
 
         self._add_entity('Judge', click_schools, name=name, rank=rank)
+
+
+    def _add_debater(self, name, varsity):
+        def select_varsity_status():
+            val = '0' if varsity else '1'
+            self.selenium.select('novice_status', val)
+
+        self._add_entity('Debater', select_varsity_status, name=name)
 
     def _add_school(self, name):
         """
