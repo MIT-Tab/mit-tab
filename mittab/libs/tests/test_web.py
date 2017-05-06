@@ -1,15 +1,16 @@
 import time
+from splinter import Browser
 from django.test import LiveServerTestCase
 from django.contrib.auth.models import User
-from splinter import Browser
+from django.core.management import call_command
 
 class RunningATournamentTestCase(LiveServerTestCase):
     """
     Tests the 'happy path' of running a tournament via the web interface
     """
+    fixtures = ['testing_empty']
     username = 'tab'
     password = 'tab'
-    fixtures = ['testing_db']
 
     def setUp(self):
         self.selenium = Browser('phantomjs', wait_time=10)

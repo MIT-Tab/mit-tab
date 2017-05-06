@@ -1,7 +1,7 @@
 appdirs==1.4.3
 Django==1.11
 django-localflavor==1.0
--e git+git@github.com:BenMusch/mit-tab.git@45bb4bf25238867af3b707dd3266f99d41456361#egg=mittab
+-e .
 mock==1.0.1
 numpy==1.12.1
 packaging==16.8
