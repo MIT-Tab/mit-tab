@@ -98,7 +98,7 @@ class TeamEntryForm(forms.ModelForm):
     class Meta:
         model = Team
         fields = '__all__'
-        
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
@@ -106,13 +106,13 @@ class ScratchForm(forms.ModelForm):
     class Meta:
         model = Scratch
         fields = '__all__'
-        
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
         fields = '__all__'
-        
-        
+
+
 def validate_speaks(value):
     if not (21.0 <= value <= 29.0 or value == 0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
