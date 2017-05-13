@@ -29,6 +29,7 @@ class RunningATournamentTestCase(LiveServerTestCase):
         self._add_schools()
         self._add_judges()
         self._add_debaters()
+        self._add_teams()
 
     def _login(self):
         """
@@ -42,12 +43,26 @@ class RunningATournamentTestCase(LiveServerTestCase):
         assert self.selenium.is_text_present('Home')
         assert not self.selenium.is_text_present('Sign in')
 
+    def _add_teams(self):
+        """
+        Test adding teams
+        """
+        for i in range(4):
+            debaters = ["Debater %s" % (i * 2), "Debater %s" % (i * 2 + 1)]
+            self._add_team("Team %s" % i, debaters, "School %s" % i)
+
     def _add_debaters(self):
+        """
+        Test adding debaters
+        """
         for i in range(4):
             self._add_debater("Debater %s" % (i * 2), False)
             self._add_debater("Debater %s" % (i * 2 + 1), True)
 
     def _add_judges(self):
+        """
+        Test adding judges
+        """
         for i in range(5):
             self._add_judge("Judge %s" % i, i, ["School %s" % i])
 
@@ -64,6 +79,24 @@ class RunningATournamentTestCase(LiveServerTestCase):
         """
         for i in range(5):
             self._add_school("School %s" % i)
+
+    def _add_team(self, name, debaters, school):
+        """
+        Test adding a team with debaters with the passed names and school with
+        the passed name
+        """
+        def select_team_options():
+            for debater in debaters:
+                debater_option = self.selenium.find_option_by_text(debater).first
+                debater_option.click()
+
+            school_option = self.selenium.find_option_by_text(school).first
+            school_option.click()
+
+            seed_option = self.selenium.find_option_by_text('Unseeded').first
+            seed_option.click()
+
+        self._add_entity('Team', select_team_options, name=name)
 
     def _add_judge(self, name, rank, schools):
         """
@@ -116,7 +149,10 @@ class RunningATournamentTestCase(LiveServerTestCase):
         self._submit_form(**data)
 
         msg = "%s [%s] has been successfully modified!(CREATED)" % (entity_name, data['name'])
-        assert self.selenium.is_text_present(msg)
+        try:
+            assert self.selenium.is_text_present(msg)
+        except:
+            import pdb; pdb.set_trace()
 
         self._go_home()
         self.selenium.click_link_by_partial_text(data['name'])

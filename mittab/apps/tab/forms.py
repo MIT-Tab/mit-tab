@@ -28,9 +28,7 @@ class RoomForm(forms.ModelForm):
         fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(), 
-                                             widget=FilteredSelectMultiple("Affiliated Schools", 
-                                             is_stacked=False))
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all())
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
