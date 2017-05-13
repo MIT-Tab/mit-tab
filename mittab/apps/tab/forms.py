@@ -69,9 +69,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all())
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):
@@ -90,9 +88,7 @@ class TeamForm(forms.ModelForm):
 
 class TeamEntryForm(forms.ModelForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True))
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
         if not( 1 <= len(data) <= 2) :
