@@ -1,36 +1,66 @@
 from splinter import Browser
 from django.test import LiveServerTestCase
 
-class SettingUpATournamentTestCase(LiveServerTestCase):
+class BaseWebTestCase(LiveServerTestCase):
     """
-    Tests setting up a tournament by entering rooms, judges, schools, debaters
-    and teams through the web interface
+    Abstract class to handle logic for web tests
     """
-    fixtures = ['testing_empty']
     username = 'tab'
     password = 'tab'
 
     def setUp(self):
         self.browser = Browser('phantomjs', wait_time=10)
-        super(RunningATournamentTestCase, self).setUp()
+        super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):
         self.browser.quit()
-        super(RunningATournamentTestCase, self).tearDown()
-
-    def test_tournament(self):
-        self._login()
-        self._add_rooms()
-        self._add_schools()
-        self._add_judges()
-        self._add_debaters()
-        self._add_teams()
+        super(BaseWebTestCase, self).tearDown()
 
     def _login(self):
         self.browser.visit(self.live_server_url)
         self.browser.fill('username', self.username)
         self.browser.fill('password', self.password)
         self.browser.find_by_text('Sign in').first.click()
+
+    def _go_home(self):
+        self.browser.click_link_by_text('Home')
+
+    def _setup_confirm(self):
+        """
+        First part of work-around to let phantomjs accept confirmation dialogs
+        http://stackoverflow.com/questions/19903146/confirm-alert-window-in-phantom-js
+        """
+        js_confirm = 'window.confirm = function() { return true }'
+        self.browser.execute_script(js_confirm)
+
+    def _accept_confirm(self):
+        """
+        Second part of work-around to let phantomjs accept confirmation dialogs
+        MUST call self._setup_confirm() for this to work
+        """
+        self.browser.execute_script('return window.confirm')
+
+
+class SettingUpATournamentTestCase(BaseWebTestCase):
+    """
+    Tests setting up a tournament by entering rooms, judges, schools, debaters
+    and teams through the web interface
+    """
+    fixtures = ['testing_empty']
+
+    def test_tournament(self):
+        print "Logging in..."
+        self._login()
+        print "Adding rooms..."
+        self._add_rooms()
+        print "Adding schools..."
+        self._add_schools()
+        print "Adding judges..."
+        self._add_judges()
+        print "Adding debaters..."
+        self._add_debaters()
+        print "Adding teams..."
+        self._add_teams()
 
         assert self.browser.is_text_present('Home')
         assert not self.browser.is_text_present('Sign in')
@@ -82,7 +112,8 @@ class SettingUpATournamentTestCase(LiveServerTestCase):
             self.browser.check("checkin_%s" % i)
 
         self.browser.find_by_value('Submit Changes').first.click()
-        assert "Judge [%s] has been successfully modified!(EDIT)" % name
+        msg = "Judge [%s] has been successfully modified!(EDIT)" % name
+        assert self.browser.is_text_present(msg)
 
 
     def _add_debater(self, name, varsity):
@@ -127,7 +158,6 @@ class SettingUpATournamentTestCase(LiveServerTestCase):
         for key in data:
             assert self.browser.is_text_present(str(data[key]))
 
-
     def _submit_form(self, **data):
         """
         Submits the generic form used for model data with the passed data.
@@ -138,9 +168,68 @@ class SettingUpATournamentTestCase(LiveServerTestCase):
             self.browser.fill(key, data[key])
         self.browser.find_by_value('Submit Changes').first.click()
 
-    def _go_home(self):
-        """
-        Navigate to the dashboard using the navigation bar
-        """
-        self.browser.click_link_by_text('Home')
 
+class PairingARoundTestCase(BaseWebTestCase):
+    """
+    Test pairing a round, assigning judges, entering ballots and restoring from
+    the back-up
+    """
+    fixtures = ['testing_db']
+
+    def test_pairing_round(self):
+        self._login()
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+
+        self.browser.click_link_by_text('Prepare Next Round')
+        self.browser.find_by_value('Pair This Round').first.click()
+
+        self._setup_confirm()
+        self.browser.find_by_text('Assign Judges').first.click()
+        self._accept_confirm()
+
+        assert self.browser.is_text_present('Round Status for Round: 1')
+        assert self.browser.is_text_present('We have a valid Pairing')
+
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        self._enter_results(winner='GOV',
+                pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 26, 'ranks': 2 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
+                mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
+
+        assert self.browser.is_text_present('has been successfully modified')
+        self.browser.click_link_by_text('Go To Ballot Entry')
+        assert self.browser.is_text_present('GOV win')
+
+
+    def _enter_results(self, **results):
+        """
+        Enters results for a ballot, where results are a dict in the following
+        format:
+
+        {
+            "winner": String
+            "pm": { "first": {Bool}, "speaks": {Float}, "ranks": {Int} }
+            "mg": { "first": {Bool}, "speaks": {Float}, "ranks": {Int} }
+            "lo": { "first": {Bool}, "speaks": {Float}, "ranks": {Int} }
+            "mo": { "first": {Bool}, "speaks": {Float}, "ranks": {Int} }
+        }
+
+        the "first" option is true if the debater to select is the first debater
+        in the drop-down
+        """
+        self.browser.find_option_by_text(results['winner']).first.click()
+
+        positions = ['pm', 'mg', 'lo', 'mo']
+        for position in positions:
+            result_data = results[position]
+
+            debater_name_index = 2 if result_data['first'] else 3
+            debater_name_xpath = '//select[@name="%s_debater"]/option[%s]' % (position, debater_name_index)
+            self.browser.find_by_xpath(debater_name_xpath).first.click()
+
+            self.browser.select("%s_ranks" % position, result_data['ranks'])
+            self.browser.fill("%s_speaks" % position, result_data['speaks'])
+
+        self.browser.find_by_value('Submit Changes').first.click()
