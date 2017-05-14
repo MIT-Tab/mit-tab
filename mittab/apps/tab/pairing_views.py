@@ -156,6 +156,7 @@ def pair_round(request):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    print "GOT ASSIGN JUDGES REQUEST"
     if request.method == 'POST':
         print "Assigning judges"
         print request.POST
