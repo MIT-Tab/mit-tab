@@ -171,8 +171,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
 
 class PairingARoundTestCase(BaseWebTestCase):
     """
-    Test pairing a round, assigning judges, entering ballots and restoring from
-    the back-up
+    Test pairing a round, assigning judges, and enterring ballots
     """
     fixtures = ['testing_db']
 
