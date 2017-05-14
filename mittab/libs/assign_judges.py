@@ -27,10 +27,6 @@ import pprint
 
 def add_judges(pairings, judges, panel_points):
     # First clear any existing judge assignments
-    print "-"*80
-    print "STARTING JUDGE ASSIGNMENT"
-    print "-"*80
-
     for pairing in pairings:
         pairing.judges.clear()
 
