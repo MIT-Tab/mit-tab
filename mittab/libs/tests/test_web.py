@@ -191,6 +191,62 @@ class PairingARoundTestCase(BaseWebTestCase):
 
         self.browser.find_by_text('Enter Ballot').first.click()
 
+        # Ranks dont correspond with winner
+        self._enter_results(winner='OPP',
+                pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 26, 'ranks': 2 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
+                mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
+        assert self.browser.is_text_present('Low Point Win!!')
+
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        # Speaks dont correspond with winner
+        self._enter_results(winner='GOV',
+                pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 25, 'ranks': 4 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 2 },
+                mo={ 'first': False, 'speaks': 26, 'ranks': 3 })
+        assert self.browser.is_text_present('Low Point Win!!')
+
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        # Ranks dont correspond with speaks
+        self._enter_results(winner='GOV',
+                pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 25, 'ranks': 2 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
+                mo={ 'first': False, 'speaks': 25, 'ranks': 4 })
+        assert self.browser.is_text_present('These speaks are too high for the rank')
+
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        # Invalid speaks
+        self._enter_results(winner='GOV',
+                pm={ 'first': True, 'speaks': 55, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 26, 'ranks': 2 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
+                mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
+        assert self.browser.is_text_present('invalid speaker score')
+
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        # Incomplete
+        self._enter_results(winner='GOV',
+                pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
+                mg={ 'first': False, 'speaks': 26, 'ranks': 2 },
+                lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
+                mo={ 'first': False, 'ranks': 4})
+        assert self.browser.is_text_present('This field is required')
+
+        self.browser.visit("%s/pairings/status" % self.live_server_url)
+        self.browser.find_by_text('Enter Ballot').first.click()
+
+        # Correct ballot
         self._enter_results(winner='GOV',
                 pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
                 mg={ 'first': False, 'speaks': 26, 'ranks': 2 },
@@ -228,7 +284,9 @@ class PairingARoundTestCase(BaseWebTestCase):
             debater_name_xpath = '//select[@name="%s_debater"]/option[%s]' % (position, debater_name_index)
             self.browser.find_by_xpath(debater_name_xpath).first.click()
 
-            self.browser.select("%s_ranks" % position, result_data['ranks'])
-            self.browser.fill("%s_speaks" % position, result_data['speaks'])
+            if result_data.get('ranks'):
+                self.browser.select("%s_ranks" % position, result_data['ranks'])
+            if result_data.get('speaks'):
+                self.browser.fill("%s_speaks" % position, result_data['speaks'])
 
         self.browser.find_by_value('Submit Changes').first.click()
