@@ -173,7 +173,7 @@ def view_scratches(request, team_id):
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/team/"+str(team_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
-    links = [('/team/'+str(team_id)+'/scratches/add/1/','Add Scratch', False)]
+    links = [('/team/'+str(team_id)+'/scratches/add/1/','Add Scratch')]
     return render(request, 'data_entry_multiple.html',
                            {'forms': zip(forms,delete_links),
                             'data_type':'Scratch',

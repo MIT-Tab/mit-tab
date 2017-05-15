@@ -13,7 +13,7 @@ web:
 tests: test
 
 test:
-	python manage.py initialize_tourney test .
+	python manage.py initialize_tourney test . --tab-password tab
 	python -m pytest mittab
 
 shell:

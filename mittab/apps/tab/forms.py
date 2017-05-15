@@ -28,9 +28,7 @@ class RoomForm(forms.ModelForm):
         fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(), 
-                                             widget=FilteredSelectMultiple("Affiliated Schools", 
-                                             is_stacked=False))
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all())
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -71,9 +69,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all())
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):
@@ -92,9 +88,7 @@ class TeamForm(forms.ModelForm):
 
 class TeamEntryForm(forms.ModelForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True))
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
         if not( 1 <= len(data) <= 2) :
@@ -104,7 +98,7 @@ class TeamEntryForm(forms.ModelForm):
     class Meta:
         model = Team
         fields = '__all__'
-        
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
@@ -112,13 +106,13 @@ class ScratchForm(forms.ModelForm):
     class Meta:
         model = Scratch
         fields = '__all__'
-        
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
         fields = '__all__'
-        
-        
+
+
 def validate_speaks(value):
     if not (21.0 <= value <= 29.0 or value == 0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
