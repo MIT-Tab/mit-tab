@@ -22,6 +22,9 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.fill('password', self.password)
         self.browser.find_by_text('Sign in').first.click()
 
+        assert self.browser.is_text_present('Home')
+        assert not self.browser.is_text_present('Sign in')
+
     def _go_home(self):
         self.browser.click_link_by_text('Home')
 
@@ -43,8 +46,8 @@ class BaseWebTestCase(LiveServerTestCase):
 
 class SettingUpATournamentTestCase(BaseWebTestCase):
     """
-    Tests setting up a tournament by entering rooms, judges, schools, debaters
-    and teams through the web interface
+    Tests setting up a tournament by entering rooms, judges, schools, debaters,
+    teams, and scratches through the web interface
     """
     fixtures = ['testing_empty']
 
@@ -61,9 +64,20 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         self._add_debaters()
         print "Adding teams..."
         self._add_teams()
+        print "Adding a scratch..."
+        self._go_home()
 
-        assert self.browser.is_text_present('Home')
-        assert not self.browser.is_text_present('Sign in')
+        self.browser.click_link_by_partial_text('Team 0')
+        self.browser.click_link_by_text('Scratches for Team 0')
+        self.browser.click_link_by_text('Add Scratch')
+
+        self.browser.find_option_by_text('Team 0').first.click()
+        self.browser.find_option_by_text('Judge 2').first.click()
+        self.browser.find_option_by_text('Tab Scratch').first.click()
+        self.browser.find_by_value('Submit Changes').first.click()
+
+        msg = "Scratch from Team 0 on Judge 2 has been successfully modified!(CREATED)"
+        assert self.browser.is_text_present(msg)
 
     def _add_teams(self):
         for i in range(4):
