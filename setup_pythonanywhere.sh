@@ -22,9 +22,10 @@ mkvirtualenv mittab
 workon mittab
 pip install -r requirements.txt
 
-echo -e "${BLUE}STEP 2: Set your password${NC}"
-python manage.py initialize_tourney
-python manage.py changepassword tab
+echo -e "${BLUE}STEP 2: Set up the tournament${NC}"
+prinf "Please enter a password for the 'tab' user: "
+read tab_password
+python manage.py initialize_tourney --tab-password $tab_password $USER .
 
 echo -e "${BLUE}STEP 3: Collecting HTML, CSS and JS files${NC}"
 python manage.py collectstatic
