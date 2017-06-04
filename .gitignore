@@ -37,3 +37,10 @@ nosetests.xml
 
 # Vim
 *.swp
+
+# PyCharm
+.idea/*
+.idea
+
+# Stuff in the MIT-TAB backups directory
+mittab/backups/*

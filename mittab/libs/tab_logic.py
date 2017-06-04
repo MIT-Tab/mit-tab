@@ -262,13 +262,16 @@ def have_properly_entered_data(round_to_check):
         # Both teams should not have byes or noshows
         gov_team, opp_team = prev_round.gov_team, prev_round.opp_team
         for team in gov_team, opp_team:
+
             had_bye = Bye.objects.filter(bye_team=team,
                                          round_number=last_round)
             had_noshow = NoShow.objects.filter(no_show_team=team,
                                                round_number=last_round)
+
             if had_bye:
                 raise errors.ByeAssignmentError(
                     "{0} both had a bye and debated last round".format(team))
+
             if had_noshow:
                 raise errors.NoShowAssignmentError(
                     "{0} both debated and had a no show".format(team))

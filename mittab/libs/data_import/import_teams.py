@@ -1,28 +1,31 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+# Copyright (C) 2011 by Julia Boortz and Joseph Lynch
 
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import SchoolForm
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+import collections
+from types import IntType
 
 import xlrd
-from xlwt import Workbook
+from django.core.exceptions import ObjectDoesNotExist
+
+from mittab.apps.tab.forms import SchoolForm
+from mittab.apps.tab.models import *
+
 
 def import_teams(fileToImport):
     try:
@@ -35,35 +38,53 @@ def import_teams(fileToImport):
     while found_end == False:
         try:
             sh.cell(num_teams, 0).value
-            num_teams +=1
+            num_teams += 1
         except IndexError:
             found_end = True
 
-        #Verify sheet has required number of columns
+        # Verify sheet has required number of columns
         try:
             sh.cell(0, 8).value
         except:
             team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
 
+    # verify no duplicate debaters, give error messages
+    deb_indicies = []
+    for i in range(1, num_teams):
+        deb_indicies.append((sh.cell(i, 3).value.strip(), i))  # tuple saves debater name and row
+        deb_indicies.append((sh.cell(i, 7).value.strip(), i))
+    deb_names = [i[0] for i in deb_indicies]
+    names_dict = collections.Counter(deb_names)
+    for deb_index in deb_indicies:
+        if names_dict.get(deb_index[0]) > 1:  # if dict says appears more than once
+            # inform that duplicate exists at location, report relevant information
+            row_num = deb_index[1]
+            msg = "Check for duplicate debater " + deb_index[0] + " in team " + sh.cell(row_num, 0).value + \
+                  ", on XLS file row " + str(row_num)
+            team_errors.append(msg)
+
     for i in range(1, num_teams):
 
+        # Name, School, Seed [full, half, free, none], D1 name, D1 v/n?, D1 phone, D1 prov,
+        # D2 name, D2 v/n?, D2 phone, D2 prov
+
+        # team name, check for duplicates
+        duplicate = False
         team_name = sh.cell(i, 0).value
         if team_name == '':
-            team_errors.append('Row ' + str(i) + ': Empty Team Name')
+            team_errors.append('Skipped row ' + str(i) + ': empty Team Name')
             continue
-        try:
-            Team.objects.get(name=team_name)
-            team_errors.append(team_name + ': Duplicate Team Name')
-            continue
-        except:
-            pass
+        if Team.objects.filter(name=team_name).first() is not None:  # inform that duplicates exist
+            duplicate = True
+            team_errors.append(team_name + ': duplicate team, overwriting data')
 
+        # school, check for nonexistence
         school_name = sh.cell(i, 1).value.strip()
         try:
             team_school = School.objects.get(name__iexact=school_name)
         except:
-            #Create school through SchoolForm because for some reason they don't save otherwise
+            # Create school through SchoolForm because for some reason they don't save otherwise
             form = SchoolForm(data={'name': school_name})
             if form.is_valid():
                 form.save()
@@ -72,100 +93,100 @@ def import_teams(fileToImport):
                 continue
             team_school = School.objects.get(name__iexact=school_name)
 
+        # check seeds
+        team_seed, changed_seed = create_seed(team_name=team_name, seed=sh.cell(i, 2).value.strip().lower())
+        if changed_seed:
+            team_errors.append('Changed ' + team_name + ' from "' + sh.cell(i, 2).value.strip().lower()
+                               + '" to unseeded. Note and confirm with school.')
 
-        #TODO: Verify there are not multiple free seeds from the same school
-        team_seed = sh.cell(i,2).value.strip().lower()
-        if team_seed == 'full seed' or team_seed == 'full':
-            team_seed = 3
-        elif team_seed == 'half seed' or team_seed == 'half':
-            team_seed = 2
-        elif team_seed == 'free seed' or team_seed == 'free':
-            team_seed = 1
-        elif team_seed == 'unseeded' or team_seed == 'un' or team_seed == 'none' or team_seed == '':
-            team_seed = 0
-        else:
-            team_errors.append(team_name + ': Invalid Seed Value')
-            continue
+        deb1_name = sh.cell(i, 3).value.strip()
+        deb1_status = create_status(sh.cell(i, 4).value.lower())
+        deb1_phone = sh.cell(i, 5).value.strip()
+        deb1_provider = sh.cell(i, 6).value.strip()
+        deb1, deb1_created = Debater.objects.get_or_create(name=deb1_name, novice_status=deb1_status, phone=deb1_phone,
+                                                           provider=deb1_provider)
 
-        deb1_name = sh.cell(i,3).value
-        if deb1_name == '':
-            team_errors.append(team_name + ': Empty Debater-1 Name')
-            continue
-        try:
-            Debater.objects.get(name=deb1_name)
-            team_errors.append(team_name + ': Duplicate Debater-1 Name')
-            continue
-        except:
-            pass
-        deb1_status = sh.cell(i,4).value.lower()
-        if deb1_status == 'novice' or deb1_status == 'nov' or deb1_status == 'n':
-            deb1_status = 1
-        else:
-            deb1_status = 0
-        deb1_phone = sh.cell(i,5).value
-        deb1_provider = sh.cell(i,6).value
-
-
-        iron_man = False
-        deb2_name = sh.cell(i,7).value
-        if deb2_name == '':
-            iron_man = True
-        if (not iron_man):
+        iron_man = True
+        deb2_name = sh.cell(i, 7).value.strip()
+        if deb2_name is not '':
+            iron_man = False
+            deb2_status = create_status(sh.cell(i, 8).value.lower())
             try:
-                Debater.objects.get(name=deb2_name)
-                team_errors.append(team_name + ': Duplicate Debater-2 Name')
-                continue
-            except:
-                pass
-            deb2_status = sh.cell(i,8).value.lower()
-            if deb2_status == 'novice' or deb2_status == 'nov' or deb2_status == 'n':
-                deb2_status = 1
-            else:
-                deb2_status = 0
-
-            #Since this is not required data and at the end of the sheet, be ready for index errors
-            try: 
-                deb2_phone = sh.cell(i,9).value
+                deb2_phone = sh.cell(i, 9).value
             except IndexError:
                 deb2_phone = ''
             try:
-                deb2_provider = sh.cell(i,10).value
+                deb2_provider = sh.cell(i, 10).value
             except IndexError:
                 deb2_provider = ''
+            deb2, deb2_created = Debater.objects.get_or_create(name=deb2_name, novice_status=deb2_status,
+                                                               phone=deb2_phone,
+                                                               provider=deb2_provider)
 
-
-        #Save Everything
-        try:
-            deb1 = Debater(name = deb1_name, novice_status = deb1_status, phone = deb1_phone, provider = deb1_provider)
-            deb1.save()
-        except:
-            team_errors.append(team_name + ': Unkown Error Saving Debater 1')
-            continue
-        if (not iron_man):
-            try:
-                deb2 = Debater(name = deb2_name, novice_status = deb2_status, phone = deb2_phone, provider = deb2_provider)
-                deb2.save()
-            except:
-                team_errors.append(team_name + ': Unkown Error Saving Debater 2')
-                team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                    'Please Check this Manually')
-                continue
-        
-        team = Team(name=team_name, school=team_school, seed=team_seed)
-        try:
+        if not duplicate:
+            team = Team(name=team_name, school=team_school, seed=team_seed)
             team.save()
             team.debaters.add(deb1)
-            if (not iron_man):
+            if not iron_man:
                 team.debaters.add(deb2)
             else:
-                team_errors.append(team_name + ": Detected to be Iron Man - Still added successfully")
+                team_errors.append(team_name + ': Team is an iron-man, added successfully')
             team.save()
-        except:
-            team_errors.append(team_name + ': Unknown Error Saving Team')
-            team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                'Please Check this Manually')
+
+        else:
+            team = Team.objects.get(name=team_name)
+            team.school = team_school
+            team.seed = team_seed
+
+            team.debaters.clear()
+            team.debaters.add(deb1)
+            if not iron_man:
+                team.debaters.add(deb2)
+            else:
+                team_errors.append(team_name + ': Team is an iron-man, added successfully')
+            team.save()
 
     return team_errors
 
-    
 
+def create_status(status):
+    """Translates the string for varsity-novice status into a integer pseudo-enum"""
+    if status == 'novice' or status == 'nov' or status == 'n':
+        return 1
+    else:
+        return 0
+
+
+def create_seed(team_name, seed):
+    """Translates the string version of the seed into the pseudo-enum. Checks for duplicate free seeds and changes it
+    as necessary. Also notes that change so a message can be returned.
+    :type team_name: str
+    :type seed: str
+    :return tuple with the integer version of the seed and whether that team's seed was changed
+    """
+    seed_int = 0
+    seed_changed = False
+
+    if seed == 'full seed' or seed == 'full':
+        seed_int = 3
+    elif seed == 'half seed' or seed == 'half':
+        seed_int = 2
+    elif seed == 'free seed' or seed == 'free':
+        seed_int = 1
+
+        multiple_free_seeds = False
+        try:
+            school_name = Team.objects.get(name=team_name).school  # get school_name
+            for team in Team.objects.filter(school=school_name).all():  # get teams with that name
+                if int(team.seed) == 1:  # 1 is the free seed
+                    if team.name != team_name:  # if there is a free seed already, change and note change
+                        multiple_free_seeds = True
+
+        except ObjectDoesNotExist:
+            pass
+
+        if multiple_free_seeds:  # force free, note this
+            seed_changed = True
+            seed_int = 0
+
+    return seed_int, seed_changed
