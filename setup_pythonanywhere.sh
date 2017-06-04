@@ -3,7 +3,7 @@
 # ONLY WORKS IF YOU ARE NOT USING CUSTOM DOMAINS
 
 BLUE='\033[0;34m'
-GREEN='\032[0;34m'
+GREEN='\033[0;32m'
 NC='\033[0m'
 
 echo -e "${BLUE}STEP 1: Installing dependencies${NC}"
