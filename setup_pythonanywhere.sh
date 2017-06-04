@@ -8,8 +8,6 @@ else
   BASE=$1
   WSGI="/var/www/${BASE//./_}_wsgi.py"
 fi
-echo $WSGI
-exit 1
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
