@@ -23,6 +23,7 @@ workon mittab
 pip install -r requirements.txt
 
 echo -e "${BLUE}STEP 2: Set your password${NC}"
+python manage.py initialize_tourney
 python manage.py changepassword tab
 
 echo -e "${BLUE}STEP 3: Collecting HTML, CSS and JS files${NC}"
