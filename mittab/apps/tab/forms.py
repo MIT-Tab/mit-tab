@@ -112,7 +112,7 @@ class DebaterForm(forms.ModelForm):
         
         
 def validate_speaks(value):
-    if not (21.0 <= value <= 29.0 or value == 0):
+    if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
     
 #TODO: Rewrite this, it is ugly as hell
