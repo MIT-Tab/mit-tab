@@ -23,7 +23,7 @@ workon mittab
 pip install -r requirements.txt
 
 echo -e "${BLUE}STEP 2: Set up the tournament${NC}"
-prinf "Please enter a password for the 'tab' user: "
+printf "Please enter a password for the 'tab' user: "
 read tab_password
 python manage.py initialize_tourney --tab-password $tab_password $USER .
 
