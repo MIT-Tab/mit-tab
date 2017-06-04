@@ -29,6 +29,7 @@ class RoomForm(forms.ModelForm):
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all())
+
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -114,7 +115,7 @@ class DebaterForm(forms.ModelForm):
 
 
 def validate_speaks(value):
-    if not (21.0 <= value <= 29.0 or value == 0):
+    if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
     
 #TODO: Rewrite this, it is ugly as hell
