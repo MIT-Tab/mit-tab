@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 echo '' >> ~/.bashrc && echo 'source virtualenvwrapper.sh' >> ~/.bashrc
 source virtualenvwrapper.sh
 
