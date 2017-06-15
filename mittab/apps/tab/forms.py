@@ -25,8 +25,8 @@ class RoomForm(forms.ModelForm):
         model = Room
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(), 
-                                             widget=FilteredSelectMultiple("Affiliated Schools", 
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
+                                             widget=FilteredSelectMultiple("Affiliated Schools",
                                              is_stacked=False))
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
@@ -45,7 +45,7 @@ class JudgeForm(forms.ModelForm):
                                                                        required = False)
             except:
                 pass
-            
+
     def save(self, force_insert=False, force_update=False, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -60,12 +60,12 @@ class JudgeForm(forms.ModelForm):
                     checked_in.save()
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
-                    
+
         return judge
-                
+
     class Meta:
         model = Judge
-        
+
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
@@ -113,7 +113,7 @@ class DebaterForm(forms.ModelForm):
 
 
 def validate_speaks(value):
-    if not (21.0 <= value <= 29.0 or value == 0):
+    if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
 
 #TODO: Rewrite this, it is ugly as hell

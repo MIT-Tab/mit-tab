@@ -59,7 +59,7 @@ def import_judges(fileToImport):
         #Load and validate judge_rank
         judge_rank = sh.cell(i, 1).value
         try:
-            judge_rank = Decimal(judge_rank)
+            judge_rank = round(float(judge_rank), 2)
         except:
             judge_errors.append(judge_name + ": Rank not number")
             continue
@@ -69,7 +69,7 @@ def import_judges(fileToImport):
 
         #Because this data is not required, be prepared for IndexErrors
         try:
-            judge_phone = sh.cell(i, 2).value
+            judge_phone = str(int(sh.cell(i, 2).value))
         except IndexError:
             judge_phone = ''
         try: 
@@ -103,12 +103,15 @@ def import_judges(fileToImport):
             except IndexError:
                 break
             cur_col += 1
-        form = JudgeForm(data={'name': judge_name, 'rank': judge_rank, 'phone': judge_phone,
-                                'provider': judge_provider, 'schools': schools})
+
+        data = {'name': judge_name, 'rank': judge_rank, 'phone': judge_phone, 'provider': judge_provider, 'schools': schools}
+        form = JudgeForm(data=data)
         if (form.is_valid()):
             form.save()
         else:
-            judge_errors.append(judge_name + ": Unknown Error")
+            error_messages = sum([ error[1] for error in form.errors.items() ], [])
+            error_string = ', '.join(error_messages)
+            judge_errors.append("%s: %s" % (judge_name, error_string))
 
     return judge_errors
 
