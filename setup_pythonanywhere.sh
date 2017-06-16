@@ -1,6 +1,8 @@
 #!/bin/bash
 # sets up a server on PythonAnywhere
 
+set -e
+
 echo $1
 if [ -z $1 ]; then
   WSGI="/var/www/${USER}_pythonanywhere_com_wsgi.py"
