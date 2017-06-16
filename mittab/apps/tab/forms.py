@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
@@ -33,6 +33,7 @@ class JudgeForm(forms.ModelForm):
         if entry:
             kwargs.pop('first_entry')
         super(JudgeForm, self).__init__(*args, **kwargs)
+        self.fields['ballot_code'].widget = forms.HiddenInput()
         if not entry:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
@@ -81,7 +82,7 @@ class TeamForm(forms.ModelForm):
         if not( 1 <= len(data) <= 2) :
             raise forms.ValidationError("You must select 1 or 2 debaters!") 
         return data
-    
+
     class Meta:
         model = Team
 
@@ -98,26 +99,26 @@ class TeamEntryForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
-        
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        
-        
+
+
 def validate_speaks(value):
     if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
-    
+
 #TODO: Rewrite this, it is ugly as hell
 class ResultEntryForm(forms.Form):
-    
+
     NAMES = {
         "pm" : "Prime Minister",
         "mg" : "Member of Government",
@@ -159,17 +160,14 @@ class ResultEntryForm(forms.Form):
 
         self.fields['round_instance'] = forms.IntegerField(initial=round_object.pk,
                                                            widget=forms.HiddenInput())
+
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
         gov_debaters = [(-1,'---')]+[(d.id, d.name) for d in gov_team.debaters.all()]
         opp_debaters = [(-1,'---')]+[(d.id, d.name) for d in opp_team.debaters.all()]
 
-        # TODO: Combine these loops?
-        for d in self.GOV:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=gov_debaters)
-            self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
-            self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
-        for d in self.OPP:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=opp_debaters)
+        for d in self.GOV + self.OPP:
+            debater_choices = gov_debaters if d in self.GOV else opp_debaters
+            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=debater_choices)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
         if round_object.victor != 0 and not no_fill:
@@ -181,6 +179,7 @@ class ResultEntryForm(forms.Form):
                     self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
                 except:
                     pass
+
 
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -236,26 +235,74 @@ class ResultEntryForm(forms.Form):
 
     def save(self):
         cleaned_data = self.cleaned_data
-        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
-        round_obj.victor = cleaned_data["winner"]
-        debaters = self.GOV + self.OPP
-        #How do we handle iron men? Do I enter both speaks?
-        for debater in debaters:
-            old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
-            if len(old_stats) > 0:
-                old_stats.delete()
+        with transaction.atomic():
+            round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+            round_obj.victor = cleaned_data["winner"]
+            debaters = self.GOV + self.OPP
+            #How do we handle iron men? Do I enter both speaks?
+            for debater in debaters:
+                old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
+                if len(old_stats) > 0:
+                    old_stats.delete()
 
-            debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
-            debater_role_obj = debater
-            speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
-            stats = RoundStats(debater = debater_obj, 
-                               round = round_obj, 
-                               speaks = speaks_obj, 
-                               ranks = ranks_obj, 
-                               debater_role = debater_role_obj)
-            stats.save()
-        round_obj.save()
+                debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
+                debater_role_obj = debater
+                speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
+                stats = RoundStats(debater = debater_obj, 
+                                round = round_obj, 
+                                speaks = speaks_obj, 
+                                ranks = ranks_obj, 
+                                debater_role = debater_role_obj)
+                stats.save()
+            round_obj.save()
         return round_obj
+
+class EBallotForm(ResultEntryForm):
+
+    def __init__(self, *args, **kwargs):
+        super(EBallotForm, self).__init__(*args, **kwargs)
+        self.fields['ballot_code'] = forms.CharField(max_length=6, min_length=6)
+
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        try:
+            ballot_code = cleaned_data.get("ballot_code")
+            judge = Judge.objects.filter(ballot_code=ballot_code).first()
+            if not judge:
+                # If there is no judge with that ballot code
+                msg = "Incorrect ballot code. Enter again."
+                self._errors["ballot_code"] = self.error_class([msg])
+            else:
+                round_obj = Round.objects.filter(pk=cleaned_data["round_instance"])
+                if round_obj.chair.ballot_code != judge.ballot_code:
+                    msg = "You are not judging the round, or you are not the chair"
+                    self._errors["ballot_code"] = self.error_class([msg])
+                elif RoundStats.objects.filter(round=round_obj).first():
+                    # If there was already a ballot submitted for the round
+                    msg =  "A ballot has already been completed for this round."
+                    msg += "Go to tab if you need to change the results "
+                    msg += "for this round."
+                    self._errors["ballot_code"] = self.error_class([msg])
+
+            if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
+                message = "Go to tab to submit a result other than a win or loss."
+                self._errors["winner"] = self.error_class([message])
+
+            for d in (self.GOV + self.OPP):
+                speaks = cleaned_data.get("%s_speaks" % d)
+                split = str(speaks).split(".")
+                if len(split) == 2 and int(split[-1]) not in [0, 25, 5, 50, 75]:
+                    # speaks do not end in quarter points
+                    msg = "Speaks must be given in quarter points."
+                    self._errors["%s_speaks" % d] = self.error_class([msg])
+                elif speaks >= 26.75 or speaks <= 23.25:
+                    msg = "Speaks must be justified to tab."
+                    self._errors["%s_speaks" % d] = self.error_class([msg])
+        except Exception, e:
+            print "Caught error %s" %(e)
+            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+
+        return super(EBallotForm, self).clean()
 
 def validate_panel(result):
     all_good = True
@@ -339,6 +386,4 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
-
-
 
