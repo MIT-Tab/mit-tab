@@ -3,6 +3,7 @@ Django==1.6.1
 wsgiref==0.1.2
 South==0.8.4
 mock==1.0.1
+numpy==1.12.1
 pytest==2.4.2
 django-localflavor==1.0
 xlrd==0.9.4
