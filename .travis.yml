@@ -6,4 +6,4 @@ install:
   - pip install -r requirements.txt
   - python manage.py migrate --fake-initial
 # command to run tests
-script: python manage.py test
+script: travis_wait 20 make test
