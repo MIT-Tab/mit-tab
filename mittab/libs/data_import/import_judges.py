@@ -1,9 +1,4 @@
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import JudgeForm
-
-from decimal import *
-import xlrd
-from xlwt import Workbook
+from mittab.libs.data_import import JudgeImporter
 
 def import_judges(fileToImport):
     try:
