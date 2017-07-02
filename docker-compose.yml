@@ -5,7 +5,7 @@ web:
   expose:
     - "8000"
   volumes:
-    - ./:/var/www/tab
+    - /var/www/tab
   command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000
 
 nginx:
@@ -16,8 +16,6 @@ nginx:
     - "80:80"
   volumes:
     - /www/static
-    - ./:/var/www/tab
-    - ./nginx.conf:/etc/nginx/sites-enabled/mittab
   volumes_from:
     - web
   links:
