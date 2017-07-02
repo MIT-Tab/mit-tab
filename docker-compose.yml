@@ -1,0 +1,23 @@
+web:
+  dockerfile: Dockerfile.web
+  restart: always
+  build: .
+  expose:
+    - "8000"
+  volumes:
+    - /var/www/tab
+    - /var/www/tab/static
+  command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000
+
+nginx:
+  dockerfile: Dockerfile.nginx
+  restart: always
+  build: .
+  ports:
+    - "80:80"
+  volumes:
+    - /www/static
+  volumes_from:
+    - web
+  links:
+    - web:web
