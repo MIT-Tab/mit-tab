@@ -1,0 +1,19 @@
+FROM python:2.7
+ARG password
+
+# install dependenices
+RUN apt-get update && apt-get upgrade -y && \
+  apt-get install sqlite3
+
+WORKDIR /var/www/tab
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# setup django
+COPY manage.py ./
+COPY setup.py ./
+COPY ./mittab ./mittab
+
+RUN python manage.py migrate
+RUN python manage.py collectstatic --noinput
+RUN python manage.py initialize_tourney --tab-password "$password" tournament .

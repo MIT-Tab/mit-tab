@@ -1,0 +1,28 @@
+version: "2.0"
+services:
+  web:
+    restart: always
+    build:
+      dockerfile: Dockerfile.web
+      context: .
+      args:
+        - "password"
+    expose:
+      - "8000"
+    volumes:
+      - /var/www/tab
+    command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000
+
+  nginx:
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+    volumes:
+      - /www/static
+    volumes_from:
+      - web
+    links:
+      - web:web
