@@ -2,7 +2,6 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
-from django.contrib.auth.models import User
 from django.contrib.auth.views import login
 from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
