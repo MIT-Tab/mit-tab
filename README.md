@@ -42,6 +42,33 @@ python manage.py runserver
 
 At this time it is recommended to run v2.0 (Django 1.6)
 
+
+Running with Docker
+-------------------
+If you'd like, you can also run the application with Docker. The docker
+configuration is meant to simulate a production server, so it's not ideal for
+debugging or general development. You must have docker-compose 1.14.0+ installed to run.
+
+To run on localhost
+Since it uses nginx, it doesn't need a port in the url. Just go to http://localhost
+
+
+```
+docker-compose build
+docker-compose up
+```
+
+With a specified password for the tab user:
+
+```
+docker-compose build --build-arg password={password} web
+docker-compose build nginx
+docker-compose up
+```
+
+The `build` command will automatically run migrations and other commands used to
+set up a production environment (i.e. `collectstatic`)
+
 Production Setup
 ----------------
 Do not attempt to run the django server in a production environment, you will
