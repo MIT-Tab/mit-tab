@@ -25,13 +25,11 @@ class Command(BaseCommand):
         tournament_name, backup_dir = args
         path = get_backup_prefix()
 
-        if options['tab_password'] is None:
-            self.stdout.write("No password provided for tab, generating password")
-            options['tab_password'] = User.objects.make_random_password(length=8)
-
-        if options['entry_password'] is None:
-            self.stdout.write("No password provided for entry, generating password")
-            options['entry_password'] = User.objects.make_random_password(length=8)
+        for user in ['tab', 'entry']:
+            option_name = '%s_password' % user
+            if options[option_name] is None or options[option_name].strip() == '':
+                self.stdout.write("No password provided for %s, generating password" % user)
+                options[option_name] = User.objects.make_random_password(length=8)
 
         self.stdout.write("Proceeding to tournament creation")
         self.stdout.write("Creating directory for current tournament in backup directory")

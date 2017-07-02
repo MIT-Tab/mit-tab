@@ -1,4 +1,5 @@
 FROM python:2.7
+ARG password
 
 # install dependenices
 RUN apt-get update && apt-get upgrade -y && \
@@ -12,8 +13,7 @@ RUN pip install -r requirements.txt
 COPY manage.py ./
 COPY setup.py ./
 COPY ./mittab ./mittab
-COPY ./bin ./bin
 
 RUN python manage.py migrate
 RUN python manage.py collectstatic --noinput
-RUN python manage.py initialize_tourney --tab-password password tournament .
+RUN python manage.py initialize_tourney --tab-password "$password" tournament .
