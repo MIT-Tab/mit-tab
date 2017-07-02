@@ -16,6 +16,8 @@ nginx:
     - "80:80"
   volumes:
     - /www/static
+    - ./:/var/www/tab
+    - ./nginx.conf:/etc/nginx/sites-enabled/mittab
   volumes_from:
     - web
   links:

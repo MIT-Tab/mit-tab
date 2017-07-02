@@ -8,6 +8,7 @@ login_white_list = ('/accounts/login/', '/static/css/stylesheet.css', '/static/i
 class Login:
     "This middleware requires a login for every view"
     def process_request(self, request):
+        return
         if request.path not in login_white_list and request.user.is_anonymous():
             if request.POST:
                 return login(request)
