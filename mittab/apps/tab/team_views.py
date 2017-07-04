@@ -64,11 +64,13 @@ def view_team(request, team_id):
                                      {'data_type': "Team",
                                       'data_name': "["+form.cleaned_data['name']+"]"}, 
                                       context_instance=RequestContext(request))
+
     else:
         form = TeamForm(instance=team)
         links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for '+str(team.name), False),
                  ('/team/'+str(team_id)+'/delete/', 'Delete', True)]
         for deb in team.debaters.all():
+            # TODO, perhaps include something that saying that the displayed debater has already been added to a team?
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
         return render_to_response('data_entry.html', 
                                  {'title':"Viewing Team: %s"%(team.name),
