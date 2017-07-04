@@ -18,8 +18,7 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
         def myExpensiveMethod(parm1, parm2, parm3):
             ....
             return expensiveResult
-`
-    """    
+    """
     def do_cache(f):
         def x(*args, **kwargs):
             key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
@@ -35,6 +34,6 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
 def invalidate(f):
     key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
     _djcache.delete(key)
-    
+
 def clear_cache():
     _djcache.clear()

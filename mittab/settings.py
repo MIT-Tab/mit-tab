@@ -28,7 +28,7 @@ TEMPLATE_DIRS = (
     os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
 )
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -103,5 +103,3 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.messages.context_processors.messages",
     "django.core.context_processors.request",
 )
-
-
