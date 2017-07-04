@@ -13,7 +13,7 @@ services:
       - /var/www/tab
     links:
       - memcached:memcached
-    command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000
+    command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000 -t 300
 
   nginx:
     restart: always

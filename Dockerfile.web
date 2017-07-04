@@ -3,7 +3,7 @@ ARG password
 
 # install dependenices
 RUN apt-get update && apt-get upgrade -y && \
-  apt-get install sqlite3
+  apt-get install sqlite3 && apt-get install -y vim
 
 WORKDIR /var/www/tab
 COPY requirements.txt ./
