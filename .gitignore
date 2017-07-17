@@ -18,6 +18,7 @@ develop-eggs
 lib
 lib64
 __pycache__
+*.DS_STORE
 
 # Installer logs
 pip-log.txt
@@ -37,3 +38,4 @@ nosetests.xml
 
 # Vim
 *.swp
+

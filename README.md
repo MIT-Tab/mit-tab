@@ -69,12 +69,16 @@ docker-compose up
 The `build` command will automatically run migrations and other commands used to
 set up a production environment (i.e. `collectstatic`)
 
-Production Setup
-----------------
-Do not attempt to run the django server in a production environment, you will
-be very sad. Instead checkout:
+Production Setup & Deployment
+-----------------------------
 
-[The production instructions](mittab/production_setup)
+Deployment to production is controlled by
+[benmusch/mittab-deploy](https://github.com/benmusch/mittab-deploy). The
+production environment is built using the dockerfiles in this repo, and the
+tournaments automatically pull the code that is currently on the master branch.
+
+
+Older versions of the production setup are documented [here.](mittab/production_setup)
 
 Why Should I Use This?
 ----------------------
