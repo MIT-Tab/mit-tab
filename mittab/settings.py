@@ -22,17 +22,7 @@ SECRET_KEY = '=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG')
 
-<<<<<<< HEAD
-ALLOWED_HOSTS = []
-=======
-TEMPLATE_DEBUG = True
-
-TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
-)
-
 ALLOWED_HOSTS = ['*']
->>>>>>> master
 
 
 # Application definition
