@@ -53,11 +53,11 @@ def view_team(request, team_id):
             try:
                form.save()
             except ValueError:
-                return render(request, 'error.html', 
+                return render(request, 'error.html',
                                          {'error_type': "Team",
                                           'error_name': "["+form.cleaned_data['name']+"]",
                                           'error_info':"Team name cannot be validated, most likely a non-existent team"})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Team",
                                     'data_name': "["+form.cleaned_data['name']+"]"})
     else:
@@ -66,7 +66,7 @@ def view_team(request, team_id):
                  ('/team/'+str(team_id)+'/delete/', 'Delete', True)]
         for deb in team.debaters.all():
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
-        return render(request, 'data_entry.html', 
+        return render(request, 'data_entry.html',
                                {'title':"Viewing Team: %s"%(team.name),
                                 'form': form,
                                 'links': links,
@@ -143,7 +143,7 @@ def add_scratches(request, team_id, number_scratches):
                                     'data_modification': "CREATED"})
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
-    return render(request, 'data_entry_multiple.html', 
+    return render(request, 'data_entry_multiple.html',
                            {'forms': zip(forms,[None]*len(forms)),
                             'data_type':'Scratch',
                             'title':"Adding Scratch(es) for %s"%(team.name)})
@@ -290,7 +290,7 @@ def tab_card(request, team_id):
     #Duplicates Debater 1 for display if Ironman team    
     if (iron_man):
       d2 = d1
-    return render(request, 'tab_card.html', 
+    return render(request, 'tab_card.html',
                            {'team_name': team.name,
                             'team_school': team.school,
                             'debater_1': d1.name,

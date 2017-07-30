@@ -81,7 +81,7 @@ def enter_debater(request):
                 return render(request, 'error.html',
                                        {'error_type': "Debater",'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"Debater name cannot be validated, most likely a duplicate debater"})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Debater",
                                     'data_name': "["+form.cleaned_data['name']+"]",
                                     'data_modification': "CREATED",

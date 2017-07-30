@@ -3,13 +3,11 @@ import sys
 import traceback
 import time
 import datetime
-import os
-import pprint
 import simplejson as json
 
 from django.shortcuts import render
 from django.template import RequestContext
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from errors import *
@@ -210,7 +208,7 @@ def upload_backup(request):
         form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
             backup.handle_backup(request.FILES['file'])
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Backup",
                                     'data_name': request.FILES['file'].name,
                                     'data_modification': "CREATE"})
@@ -439,7 +437,7 @@ def enter_result(request, round_id):
     else:
         is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
         form = ResultEntryForm(round_instance=round_obj)
-    return render(request, 'round_entry.html', 
+    return render(request, 'round_entry.html',
                            {'form': form,
                             'title': "Entering Ballot for {}".format(str(round_obj)),
                             'gov_team': round_obj.gov_team,

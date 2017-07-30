@@ -58,7 +58,7 @@ def add_scratch(request):
 def view_schools(request):
     #Get a list of (id,school_name) tuples
     c_schools = [(s.pk,s.name) for s in School.objects.all().order_by("name")]
-    return render(request, 'list_data.html', 
+    return render(request, 'list_data.html',
                            {'item_type':'school',
                             'title': "Viewing All Schools",
                             'item_list':c_schools})
@@ -69,7 +69,7 @@ def view_school(request, school_id):
     try:
         school = School.objects.get(pk=school_id)
     except School.DoesNotExist:
-        return render(request, 'error.html', 
+        return render(request, 'error.html',
                                {'error_type': "View School",
                                 'error_name': str(school_id),
                                 'error_info':"No such school"})
@@ -83,7 +83,7 @@ def view_school(request, school_id):
                                        {'error_type': "School",
                                         'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"School name cannot be validated, most likely a non-existent school"})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "School",
                                     'data_name': "["+form.cleaned_data['name']+"]"})
     else:
@@ -112,7 +112,7 @@ def enter_school(request):
                                     'enter_again': True})
     else:
         form = SchoolForm()
-    return render(request, 'data_entry.html', {'form': form, 'title': "Create School"}) 
+    return render(request, 'data_entry.html', {'form': form, 'title': "Create School"})
 
 @permission_required('tab.school.can_delete', login_url="/403/")    
 def delete_school(request, school_id):
@@ -126,14 +126,14 @@ def delete_school(request, school_id):
     except Exception, e:
         error_msg = str(e)
     if error_msg:
-        return render(request, 'error.html', 
+        return render(request, 'error.html',
                                {'error_type': "Delete School",
                                 'error_name': "School with id %s" % (school_id),
                                 'error_info': error_msg})
     return render(request, 'thanks.html',
                            {'data_type': "School",
                             'data_name': "["+str(school_id)+"]",
-                            'data_modification': 'DELETED'}) 
+                            'data_modification': 'DELETED'})
 
 #### END SCHOOL ###
 
@@ -168,7 +168,7 @@ def view_room(request, room_id):
         return render(request, 'error.html', 
                                {'error_type': "View Room",
                                 'error_name': str(room_id),
-                                'error_info':"No such room"}) 
+                                'error_info':"No such room"})
     if request.method == 'POST':
         form = RoomForm(request.POST,instance=room)
         if form.is_valid():
@@ -178,14 +178,14 @@ def view_room(request, room_id):
                 return render(request, 'error.html', 
                                        {'error_type': "Room",
                                         'error_name': "["+form.cleaned_data['name']+"]",
-                                        'error_info':"Room name cannot be validated, most likely a non-existent room"}) 
+                                        'error_info':"Room name cannot be validated, most likely a non-existent room"})
             return render(request, 'thanks.html', 
                                    {'data_type': "Room",
-                                    'data_name': "["+form.cleaned_data['name']+"]"}) 
+                                    'data_name': "["+form.cleaned_data['name']+"]"})
     else:
         form = RoomForm(instance=room)
         links = [('/room/'+str(room_id)+'/delete/', 'Delete', True)]
-        return render(request, 'data_entry.html', 
+        return render(request, 'data_entry.html',
                                {'form': form,
                                 'links': links,
                                 'title': "Viewing Room: %s"%(room.name)})
@@ -204,7 +204,7 @@ def enter_room(request):
                                    {'data_type': "Room",
                                     'data_name': "["+form.cleaned_data['name']+"]",
                                     'data_modification': "CREATED",
-                                    'enter_again': True}) 
+                                    'enter_again': True})
     else:
         form = RoomForm()
     return render(request, 'data_entry.html',
