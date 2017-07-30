@@ -7,7 +7,7 @@ import simplejson as json
 
 from django.shortcuts import render
 from django.template import RequestContext
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from errors import *
@@ -431,7 +431,7 @@ def enter_result(request, round_id):
                                        {'error_type': "Round Result",
                                         'error_name': "["+str(round_obj)+"]",
                                         'error_info':"Invalid round result, could not remedy."})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Round Result",
                                     'data_name': "["+str(round_obj)+"]"})
     else:

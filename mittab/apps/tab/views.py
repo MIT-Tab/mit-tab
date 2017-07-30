@@ -79,7 +79,7 @@ def view_school(request, school_id):
             try:
                form.save()
             except ValueError:
-                return render(request, 'error.html', 
+                return render(request, 'error.html',
                                        {'error_type': "School",
                                         'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"School name cannot be validated, most likely a non-existent school"})
@@ -179,7 +179,7 @@ def view_room(request, room_id):
                                        {'error_type': "Room",
                                         'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"Room name cannot be validated, most likely a non-existent room"})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Room",
                                     'data_name': "["+form.cleaned_data['name']+"]"})
     else:
@@ -240,12 +240,12 @@ def delete_scratch(request, item_id, scratch_id):
     return render(request, 'thanks.html', 
                            {'data_type': "Scratch",
                             'data_name': "["+str(scratch_id)+"]",
-                            'data_modification': 'DELETED'}) 
+                            'data_modification': 'DELETED'})
 
 def view_scratches(request):
     # Get a list of (id,school_name) tuples
     c_scratches = [(s.team.pk, str(s)) for s in Scratch.objects.all()]
-    return render(request, 'list_data.html', 
+    return render(request, 'list_data.html',
                              {'item_type':'team',
                               'title': "Viewing All Scratches for Teams",
                               'item_list':c_scratches})
