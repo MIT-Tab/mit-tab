@@ -14,7 +14,7 @@ tests: test
 
 test:
 	python manage.py initialize_tourney test . --tab-password tab
-	python -m pytest mittab
+	python manage.py test
 
 shell:
 	python manage.py shell
