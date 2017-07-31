@@ -1,6 +1,4 @@
 from django.shortcuts import render
-from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from forms import DebaterForm
 from errors import *
@@ -51,7 +49,7 @@ def view_debater(request, debater_id):
                                 'debater_rounds': rounds,
                                 'title':"Viewing Debater: %s"%(debater.name)})
 
-@permission_required('tab.debater.can_delete', login_url="/403/")    
+@permission_required('tab.debater.can_delete', login_url="/403/")
 def delete_debater(request, debater_id):
     error_msg = None
     try :
@@ -98,13 +96,13 @@ def rank_debaters_ajax(request):
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
-                 tab_logic.tot_speaks_deb(s), 
-                 tab_logic.tot_ranks_deb(s), 
+                 tab_logic.tot_speaks_deb(s),
+                 tab_logic.tot_ranks_deb(s),
                  tab_logic.deb_team(s)) for s in speakers]
 
     nov_speakers = tab_logic.rank_nov_speakers()
     nov_debaters = [(s,
-                     tab_logic.tot_speaks_deb(s), 
+                     tab_logic.tot_speaks_deb(s),
                      tab_logic.tot_ranks_deb(s),
                      tab_logic.deb_team(s)) for s in nov_speakers]
 

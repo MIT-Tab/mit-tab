@@ -102,7 +102,7 @@ def enter_school(request):
             try:
                 form.save()
             except ValueError:
-                return render(request, 'error.html', 
+                return render(request, 'error.html',
                                        {'error_type': "School",'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"School name cannot be validated, most likely a duplicate school"})
             return render(request, 'thanks.html',
@@ -200,7 +200,7 @@ def enter_room(request):
                 return render(request, 'error.html', 
                                        {'error_type': "Room",'error_name': "["+form.cleaned_data['name']+"]",
                                         'error_info':"Room name cannot be validated, most likely a duplicate room"})
-            return render(request, 'thanks.html', 
+            return render(request, 'thanks.html',
                                    {'data_type': "Room",
                                     'data_name': "["+form.cleaned_data['name']+"]",
                                     'data_modification': "CREATED",
