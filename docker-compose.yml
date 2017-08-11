@@ -23,7 +23,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - /www/static
+      - ./:/www/static
     volumes_from:
       - web
     links:
