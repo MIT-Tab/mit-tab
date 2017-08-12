@@ -24,7 +24,6 @@ DEBUG = os.environ.get('DEBUG')
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
 INSTALLED_APPS = (
@@ -82,8 +81,13 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
+
 STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'static'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'javascript'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'images'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'css'),
 )
 
 TEMPLATES = [
