@@ -58,17 +58,6 @@ docker-compose build
 docker-compose up
 ```
 
-With a specified password for the tab user:
-
-```
-docker-compose build --build-arg password={password} web
-docker-compose build nginx
-docker-compose up
-```
-
-The `build` command will automatically run migrations and other commands used to
-set up a production environment (i.e. `collectstatic`)
-
 Production Setup & Deployment
 -----------------------------
 
