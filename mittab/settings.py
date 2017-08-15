@@ -42,6 +42,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'south',
     'mittab.apps.tab',
+    'raven.contrib.django.raven_compat',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -69,6 +70,12 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'mittab', 'pairing_db.sqlite3'),
         'ATOMIC_REQUESTS': True,
     }
+}
+
+# Error monitoring
+# https://docs.sentry.io/clients/python/integrations/django/
+RAVEN_CONFIG = {
+    'dsn': os.environ.get('SENTRY_DSN')
 }
 
 # Internationalization
