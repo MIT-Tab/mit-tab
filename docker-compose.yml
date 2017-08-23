@@ -13,7 +13,9 @@ services:
       - ./:/var/www/tab
     links:
       - memcached:memcached
-    env_file: .env
+    env_file:
+      - .env
+      - .env.secret
     command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000 -t 300
 
   nginx:
