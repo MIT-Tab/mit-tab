@@ -4,7 +4,7 @@ from mittab.apps.tab.models import Round, RoundStats
 import random
 
 # Speaks every quarter point
-speak_range = [23 + .25 * i for i in range(17)]
+speak_range = [5 + 1 * i for i in range(40)]
 
 def generate_speaks_for_debater(debater, is_forfeit=False):
     """
@@ -18,7 +18,7 @@ def generate_speaks_for_debater(debater, is_forfeit=False):
     is_forfeit (boolean) -- Whether a forfeit occurred
 
     Returns:
-    speaks (int) -- A number in speak_range (23-27) that the debater spoke,
+    speaks (int) -- A number in speak_range (5-45) that the debater spoke,
                     unless there was a forfeit in which case 0.0
     """
     if is_forfeit:
