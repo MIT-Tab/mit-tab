@@ -46,7 +46,10 @@ def handle_backup(f):
 def list_backups():
     print "Checking backups directory"
     prefix = get_backup_prefix()
-    return os.listdir(prefix+"/backups/")
+    path = prefix + "/backups/"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return os.listdir(path)
 
 def restore_from_backup(src_filename):
     print "Restoring from backups directory"
