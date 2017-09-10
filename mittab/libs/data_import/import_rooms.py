@@ -15,19 +15,18 @@ def import_rooms(fileToImport):
     found_end = False
     room_errors = []
 
+    #Verify sheet has required number of columns
+    try:
+        sh.cell(0, 1).value
+    except:
+        room_errors.append("ERROR: Insufficient Columns in Sheet. No Data Read")
+        return room_errors
+
     while found_end == False:
-        room_name = value_or_empty(sh, num_rooms, 0)
-        if room_name:
+        if value_or_empty(sh, num_rooms, 0):
             num_judges += 1
         else:
             found_end = True
-
-        #Verify sheet has required number of columns
-        try:
-            sh.cell(0, 1).value
-        except:
-            room_errors.append("ERROR: Insufficient Columns in Sheet. No Data Read")
-            return room_errors
 
     for i in range(1, num_rooms):
         room_name = sh.cell(i, 0).value
