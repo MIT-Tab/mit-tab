@@ -102,14 +102,8 @@ def import_teams(fileToImport):
                 deb2_status = 0
 
             #Since this is not required data and at the end of the sheet, be ready for index errors
-            try: 
-                deb2_phone = sh.cell(i,9).value
-            except IndexError:
-                deb2_phone = ''
-            try:
-                deb2_provider = sh.cell(i,10).value
-            except IndexError:
-                deb2_provider = ''
+            deb2_phone = value_or_empty(sh, i, 9)
+            deb2_provider = value_or_empty(sh, i, 10)
 
 
         #Save Everything
