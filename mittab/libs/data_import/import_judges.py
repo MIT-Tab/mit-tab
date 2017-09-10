@@ -20,6 +20,7 @@
 
 from mittab.apps.tab.models import *
 from mittab.apps.tab.forms import JudgeForm
+from mittab.libs.data_import import value_or_empty
 
 from decimal import *
 import xlrd
@@ -68,40 +69,33 @@ def import_judges(fileToImport):
             continue
 
         #Because this data is not required, be prepared for IndexErrors
-        try:
-            judge_phone = str(int(sh.cell(i, 2).value))
-        except IndexError:
-            judge_phone = ''
-        try: 
-            judge_provider = sh.cell(i, 3).value
-        except IndexError:
-            judge_provider = ''
+        judge_phone = value_or_empty(sh, i, 2)
+        if judge_phone:
+            judge_phone = str(int(judge_phone))
+        judge_provider = value_or_empty(i, 3)
 
         #iterate through schools until none are left
         cur_col = 4
         schools = []
         while(True):
-            try:
-                judge_school = sh.cell(i, cur_col).value
-                #If other judges have more schools but this judge doesn't, we get an empty string
-                #If blank, keep iterating in case user has a random blank column for some reason
-                if (judge_school != ''):
+            judge_school = value_or_empty(i, cur_col)
+            #If other judges have more schools but this judge doesn't, we get an empty string
+            #If blank, keep iterating in case user has a random blank column for some reason
+            if (judge_school != ''):
+                try:
+                    #Get id from the name because JudgeForm requires we use id
+                    s = School.objects.get(name__iexact=judge_school).id
+                    schools.append(s)
+                except IndexError:
+                    break
+                except:
                     try:
-                        #Get id from the name because JudgeForm requires we use id
-                        s = School.objects.get(name__iexact=judge_school).id 
-                        schools.append(s)
-                    except IndexError:
-                        break
+                        s = School(name=judge_school)
+                        s.save()
+                        schools.append(s.id)
                     except:
-                        try:
-                            s = School(name=judge_school)
-                            s.save()
-                            schools.append(s.id)
-                        except:
-                            judge_errors.append(judge_name + ': Invalid School')
-                            continue
-            except IndexError:
-                break
+                        judge_errors.append(judge_name + ': Invalid School')
+                        continue
             cur_col += 1
 
         data = {'name': judge_name, 'rank': judge_rank, 'phone': judge_phone, 'provider': judge_provider, 'schools': schools}

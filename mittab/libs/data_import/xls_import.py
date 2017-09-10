@@ -32,8 +32,4 @@ if __name__ == "__main__":
         import_scratches.import_scratches("../ScratchEntry.xls")
     except:
         print "There was an error importing scratches"
-    sep() 
-   
-   
-   
-   
+    sep()
