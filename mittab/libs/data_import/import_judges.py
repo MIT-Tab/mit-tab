@@ -68,9 +68,10 @@ def import_judges(fileToImport):
             continue
 
         #Because this data is not required, be prepared for IndexErrors
+        #or ValueErrors when int() attempts to parse empty string
         try:
             judge_phone = str(int(sh.cell(i, 2).value))
-        except IndexError:
+        except (IndexError, ValueError) as e:
             judge_phone = ''
         try: 
             judge_provider = sh.cell(i, 3).value
