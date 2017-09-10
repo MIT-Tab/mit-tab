@@ -14,19 +14,23 @@ def import_judges(fileToImport):
     num_judges = 0
     found_end = False
     judge_errors = []
+
+    #Verify sheet has required number of columns
+    try:
+        sh.cell(0, 1).value
+    except:
+        team_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
+        return team_errors
+
+    # Get the number of judges
+    # TODO: refactor this to a shared function
     while found_end == False:
-        try:
-            sh.cell(num_judges, 0).value
+        judge_name = value_or_empty(sh, num_judges, 0)
+        if judge_name:
             num_judges += 1
-        except IndexError:
+        else:
             found_end = True
 
-        #Verify sheet has required number of columns
-        try:
-            sh.cell(0, 1).value
-        except:
-            team_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
-            return team_errors
     for i in range(1, num_judges):
         #Load and validate Judge's Name
         judge_name = sh.cell(i, 0).value
@@ -52,13 +56,13 @@ def import_judges(fileToImport):
         judge_phone = value_or_empty(sh, i, 2)
         if judge_phone:
             judge_phone = str(int(judge_phone))
-        judge_provider = value_or_empty(i, 3)
+        judge_provider = value_or_empty(sh, i, 3)
 
         #iterate through schools until none are left
         cur_col = 4
         schools = []
         while(True):
-            judge_school = value_or_empty(i, cur_col)
+            judge_school = value_or_empty(sh, i, cur_col)
             #If other judges have more schools but this judge doesn't, we get an empty string
             #If blank, keep iterating in case user has a random blank column for some reason
             if (judge_school != ''):
