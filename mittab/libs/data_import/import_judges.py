@@ -69,7 +69,9 @@ def import_judges(fileToImport):
 
         #Because this data is not required, be prepared for IndexErrors
         try:
-            judge_phone = str(int(sh.cell(i, 2).value))
+            judge_phone = sh.cell(i, 2).value
+            if judge_phone:
+                judge_phone = str(int(judge_phone))
         except IndexError:
             judge_phone = ''
         try: 
