@@ -24,11 +24,8 @@ def import_judges(fileToImport):
 
     # Get the number of judges
     # TODO: refactor this to a shared function
-    while found_end == False:
-        if value_or_empty(sh, num_judges, 0):
-            num_judges += 1
-        else:
-            found_end = True
+    while value_or_empty(sh, num_judges, 0):
+        num_judges += 1
 
     for i in range(1, num_judges):
         #Load and validate Judge's Name

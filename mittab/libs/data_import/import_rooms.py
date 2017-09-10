@@ -22,11 +22,8 @@ def import_rooms(fileToImport):
         room_errors.append("ERROR: Insufficient Columns in Sheet. No Data Read")
         return room_errors
 
-    while found_end == False:
-        if value_or_empty(sh, num_rooms, 0):
-            num_judges += 1
-        else:
-            found_end = True
+    while value_or_empty(sh, num_rooms, 0):
+        num_judges += 1
 
     for i in range(1, num_rooms):
         room_name = sh.cell(i, 0).value
