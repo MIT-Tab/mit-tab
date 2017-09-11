@@ -7,5 +7,4 @@ def value_or_empty(sheet, row, column):
         val = sheet.cell(row, column).value
     except IndexError:
         val = ''
-    finally:
-        return val or ''
+    return val or ''
