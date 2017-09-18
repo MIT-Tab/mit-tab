@@ -1,50 +1,33 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Sep 13 18:36:46 2017
+#! /usr/local/bin/python
 
-@author: josepheddy
-"""
+import pprint
+import sqlite3
+
+import matplotlib
+matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 import numpy as np
 
-#W&M
-data_raw = \
-['15|1',
-'17|1',
-'19|2',
-'20|9',
-'21|1',
-'22|4',
-'23|10',
-'24|3',
-'25|24',
-'26|4',
-'27|10',
-'28|13',
-'29|7',
-'30|45',
-'31|10',
-'32|11',
-'33|22',
-'34|10',
-'35|27',
-'36|6',
-'37|4',
-'38|4',
-'40|4']
-
 speaks_hist = []
-for data_point in data_raw:
-    speak, count = tuple(data_point.split('|'))
+conn = sqlite3.connect('mittab/pairing_db.sqlite3')
+cursor = conn.cursor()
+row_count = 0
+raw_data = []
+
+for row in cursor.execute('SELECT speaks, count(*) FROM tab_roundstats GROUP BY speaks ORDER BY speaks'):
+    row_count += 1
+    raw_data.append(row)
+    speak, count = row
     speak, count = int(speak), int(count)
-    speaks_hist.extend([speak] * count)  
-    
-sns.distplot(speaks_hist, bins=len(data_raw))
-plt.show()
+    speaks_hist.extend([speak] * count)
+
+sns.distplot(speaks_hist, bins=row_count)
+out_png = './dist.png'
+plt.savefig(out_png, dpi=150)
+
+print('Speaks output to ./dist.png')
 
 def pearsonMedianSkew(dist):
     mean, med, s = np.mean(dist), np.median(dist), np.std(dist)
@@ -52,3 +35,5 @@ def pearsonMedianSkew(dist):
 
 print('Speaks standard deviation: %.3f' % np.std(speaks_hist))
 print('Speaks Pearson skewness: %.3f' % pearsonMedianSkew(speaks_hist))
+print('Raw Data:')
+pprint.pprint(raw_data)
