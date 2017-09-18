@@ -21,7 +21,10 @@ for row in cursor.execute('SELECT speaks, count(*) FROM tab_roundstats GROUP BY 
     speaks_hist.extend([speak] * count)
 
 sns.distplot(speaks_hist, bins=row_count)
-plt.show()
+out_png = './dist.png'
+plt.savefig(out_png, dpi=150)
+
+print('Speaks output to ./dist.png')
 
 def pearsonMedianSkew(dist):
     mean, med, s = np.mean(dist), np.median(dist), np.std(dist)
