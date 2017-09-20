@@ -6,7 +6,7 @@
 <form method="post" action=""> {% csrf_token %}
         <table>
             {% for form,delete in forms %}
-            
+
             {% if form.errors %}
             <p style="color: red;">
                 Please correct the error{{ form.errors|pluralize }} below.
@@ -17,7 +17,7 @@
             {% if delete%}
             <a class="btn confirmLink" href="{{delete}}">Delete</a>
             {% endif %}
-            
+
             </label></td></tr>
                 {% for field in form %}
                 <tr>
@@ -43,7 +43,7 @@
         {% else %}
         <p class="mid"> No scratches </p>
         {% endif %}
- 
+
    </form>
 
 {% endblock %}

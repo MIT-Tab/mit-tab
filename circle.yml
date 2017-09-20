@@ -1,0 +1,9 @@
+machine:
+  python:
+    version: 2.7.12
+dependencies:
+  pre:
+    - pip install -r requirements.txt
+test:
+  pre:
+    - python manage.py migrate --fake-initial

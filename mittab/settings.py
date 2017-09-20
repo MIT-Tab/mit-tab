@@ -22,14 +22,7 @@ SECRET_KEY = '=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG')
 
-TEMPLATE_DEBUG = True
-
-TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
-)
-
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -40,7 +33,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'south',
     'mittab.apps.tab',
     'raven.contrib.django.raven_compat',
 )
@@ -53,7 +45,6 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mittab.apps.tab.middleware.Login',
-    'django.middleware.transaction.TransactionMiddleware', #Be careful about ordering
 )
 
 ROOT_URLCONF = 'mittab.urls'
@@ -97,16 +88,31 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
+
 STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'static'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'javascript'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'images'),
+    os.path.join(BASE_DIR, 'mittab', 'static', 'css'),
 )
 
-
-TEMPLATE_CONTEXT_PROCESSORS = (
-    "django.contrib.auth.context_processors.auth",
-    "django.core.context_processors.debug",
-    "django.core.context_processors.i18n",
-    "django.core.context_processors.media",
-    "django.contrib.messages.context_processors.messages",
-    "django.core.context_processors.request",
-)
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [
+            os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
+        ],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.contrib.auth.context_processors.auth',
+                'django.template.context_processors.debug',
+                'django.template.context_processors.i18n',
+                'django.template.context_processors.media',
+                'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.request'
+            ],
+        }
+    }
+]

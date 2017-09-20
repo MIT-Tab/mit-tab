@@ -38,3 +38,6 @@ nosetests.xml
 # Vim
 *.swp
 
+# Testing log files
+ghostdriver.log
+geckodriver.log

@@ -1,11 +1,18 @@
-Django==1.6.1
-wsgiref==0.1.2
-South==0.8.4
+appdirs==1.4.3
+Django==1.11
+django-localflavor==1.0
+-e .
 mock==1.0.1
 numpy==1.12.1
+packaging==16.8
+py==1.4.33
+pyparsing==2.2.0
 pytest==2.4.2
-django-localflavor==1.0
-gunicorn==19.7.1
+pytz==2017.2
+selenium==3.4.1
+simplejson==3.10.0
+six==1.10.0
+splinter==0.7.5
 xlrd==0.9.4
 xlwt==1.0.0
 raven==6.1.0

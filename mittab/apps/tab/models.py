@@ -144,7 +144,6 @@ class Round(models.Model):
     opp_team = models.ForeignKey(Team, related_name="opp_team")
     chair = models.ForeignKey(Judge, null=True, blank=True, related_name="chair")
     judges = models.ManyToManyField(Judge,
-                                    null=True,
                                     blank=True,
                                     related_name="judges")
     NONE = 0
@@ -196,7 +195,7 @@ class Bye(models.Model):
 class NoShow(models.Model):
    no_show_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
-   lenient_late = models.BooleanField()
+   lenient_late = models.BooleanField(default=False)
 
    def __unicode__(self):
       return str(self.no_show_team) + " was no-show for round " + str(self.round_number)

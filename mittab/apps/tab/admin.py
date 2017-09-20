@@ -7,6 +7,7 @@ class RoundAdminForm(forms.ModelForm):
 
     class Meta:
         model = Round
+        fields = '__all__'
 
 class RoundAdmin(admin.ModelAdmin):
     form = RoundAdminForm

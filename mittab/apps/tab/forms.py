@@ -1,12 +1,12 @@
 from django.db import models
 from django import forms
-from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from models import *
 from decimal import Decimal
 import itertools
 import pprint
 
+#TODO clean up form fields
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
 
@@ -19,15 +19,16 @@ class UploadDataForm(forms.Form):
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
+        fields = '__all__'
 
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
+        fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
-                                             widget=FilteredSelectMultiple("Affiliated Schools",
-                                             is_stacked=False))
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all())
+
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -64,12 +65,11 @@ class JudgeForm(forms.ModelForm):
 
     class Meta:
         model = Judge
+        fields = '__all__'
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all())
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):
@@ -81,15 +81,14 @@ class TeamForm(forms.ModelForm):
         if not( 1 <= len(data) <= 2) :
             raise forms.ValidationError("You must select 1 or 2 debaters!") 
         return data
-    
+
     class Meta:
         model = Team
+        fields = '__all__'
 
 class TeamEntryForm(forms.ModelForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True))
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
         if not( 1 <= len(data) <= 2) :
@@ -98,19 +97,22 @@ class TeamEntryForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        
+        fields = '__all__'
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
-        
+        fields = '__all__'
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        
-        
+        fields = '__all__'
+
+
 def validate_speaks(value):
     if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
