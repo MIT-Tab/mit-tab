@@ -16,6 +16,7 @@ from cache_logic import cache
 
 
 MAXIMUM_DEBATER_RANKS = 3.5
+MINUMUM_DEBATER_SPEAKS = 0
 
 def pair_round():
     """
@@ -681,25 +682,14 @@ def speaks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_speaks.append(debater_forfeit_speaks(debater))
+                debater_speaks.append(MINIMUM_DEBATER_SPEAKS)
             else:
                 if average_ironmen:
                     debater_speaks.append(avg_speaks)
                 else:
                     debater_speaks.extend(speaks)
         else:
-            # Check for a bye or a noshow
-            had_bye = Bye.objects.filter(round_number=round_number,
-                                         bye_team=team)
-            had_noshow = NoShow.objects.filter(round_number=round_number,
-                                               no_show_team=team)
-            if had_bye:
-                debater_speaks.append(avg_deb_speaks(debater))
-            elif had_noshow:
-                if had_noshow.first().lenient_late:
-                    debater_speaks.append(avg_deb_speaks(debater))
-                else:
-                    debater_speaks.append(debater_forfeit_speaks(debater))
+            debater_speaks.append(debater_abnormal_round_speaks(debater, round_number))
 
     debater_speaks = map(float, debater_speaks)
     return debater_speaks
@@ -762,15 +752,6 @@ def avg_deb_ranks(debater):
     else:
         return float(sum(real_ranks)) / float(len(real_ranks))
 
-def debater_forfeit_ranks(debater):
-    """ Calculate a debater's speaks for a forfeit round
-
-    Note that right now we just return 3.5 (average of 3 and 4), but we may want to add support
-    for returning average ranks or some such
-    """
-    return 3.5
-
-
 @cache()
 def ranks_for_debater(debater, average_ironmen=True):
     """Returns a list of ranks for the provided debater
@@ -814,7 +795,6 @@ def ranks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
             elif forfeited_round(roundstat.round, team):
-                debater_ranks.append(debater_forfeit_ranks(debater))
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
@@ -827,7 +807,30 @@ def ranks_for_debater(debater, average_ironmen=True):
     debater_ranks = map(float, debater_ranks)
     return debater_ranks
 
-def debater_abornmal_round_ranks(debater, round_number):
+def debater_abnormal_round_speaks(debater, round_number):
+    """
+    Calculate the ranks for a bye/forfeit round
+
+    Forfeits:
+    If the round is set to `lenient_late`, it uses average ranks
+    Otherwise, it uses ranks of 0.0
+
+    Byes:
+    Uses average speaks
+    """
+    team = debater.team
+    had_bye = Bye.objects.filter(round_number=round_number,
+                                    bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number,
+                                        no_show_team=team)
+    if had_bye or had_noshow.first().lenient_late:
+        return avg_deb_speaks(debater)
+    elif had_noshow.first():
+        return MAXIMUM_DEBATER_RANKS
+    else:
+        raise RuntimeError('Abnormal ranks calculation for a normal round')
+
+def debater_abnormal_round_ranks(debater, round_number):
     """
     Calculate the ranks for a bye/forfeit round
 
