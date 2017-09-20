@@ -707,7 +707,7 @@ def debater_abnormal_round_speaks(debater, round_number):
     Byes:
     Uses average speaks
     """
-    team = debater.team
+    team = deb_team(debater)
     had_bye = Bye.objects.filter(round_number=round_number,
                                     bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
@@ -843,7 +843,7 @@ def debater_abnormal_round_ranks(debater, round_number):
     Byes:
     Uses average ranks
     """
-    team = debater.team
+    team = deb_team(debater)
     had_bye = Bye.objects.filter(round_number=round_number,
                                     bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
