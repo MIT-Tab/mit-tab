@@ -16,7 +16,7 @@ from cache_logic import cache
 
 
 MAXIMUM_DEBATER_RANKS = 3.5
-MINUMUM_DEBATER_SPEAKS = 0
+MINIMUM_DEBATER_SPEAKS = 0.0
 
 def pair_round():
     """
@@ -813,7 +813,7 @@ def debater_abnormal_round_speaks(debater, round_number):
 
     Forfeits:
     If the round is set to `lenient_late`, it uses average ranks
-    Otherwise, it uses ranks of 0.0
+    Otherwise, it uses speaks of 0.0
 
     Byes:
     Uses average speaks
@@ -826,7 +826,7 @@ def debater_abnormal_round_speaks(debater, round_number):
     if had_bye or had_noshow.first().lenient_late:
         return avg_deb_speaks(debater)
     elif had_noshow.first():
-        return MAXIMUM_DEBATER_RANKS
+        return MINIMUM_DEBATER_SPEAKS
     else:
         raise RuntimeError('Abnormal ranks calculation for a normal round')
 
