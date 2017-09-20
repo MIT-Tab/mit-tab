@@ -795,6 +795,7 @@ def ranks_for_debater(debater, average_ironmen=True):
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
             elif forfeited_round(roundstat.round, team):
+                debater_ranks.append(MAXIMUM_DEBATER_RANKS)
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
