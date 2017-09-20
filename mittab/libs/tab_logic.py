@@ -689,10 +689,33 @@ def speaks_for_debater(debater, average_ironmen=True):
                 else:
                     debater_speaks.extend(speaks)
         else:
-            debater_speaks.append(debater_abnormal_round_speaks(debater, round_number))
+            speaks = debater_abnormal_round_speaks(debater, round_number)
+            if speaks is not None:
+                debater_speaks.append(speaks)
 
     debater_speaks = map(float, debater_speaks)
     return debater_speaks
+
+def debater_abnormal_round_speaks(debater, round_number):
+    """
+    Calculate the ranks for a bye/forfeit round
+
+    Forfeits:
+    If the round is set to `lenient_late`, it uses average ranks
+    Otherwise, it uses speaks of 0.0
+
+    Byes:
+    Uses average speaks
+    """
+    team = debater.team
+    had_bye = Bye.objects.filter(round_number=round_number,
+                                    bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number,
+                                        no_show_team=team)
+    if had_bye or (had_noshow and had_noshow.first().lenient_late):
+        return avg_deb_speaks(debater)
+    elif had_noshow:
+        return MINIMUM_DEBATER_SPEAKS
 
 def single_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
@@ -802,34 +825,12 @@ def ranks_for_debater(debater, average_ironmen=True):
                 else:
                     debater_ranks.extend(ranks)
         else:
-            # Check for a bye or a noshow
-            debater_ranks.append(debater_abnormal_round_ranks(debater, round_number))
+            ranks = debater_abnormal_round_ranks(debater, round_number)
+            if ranks is not None:
+                debater_ranks.append(ranks)
 
     debater_ranks = map(float, debater_ranks)
     return debater_ranks
-
-def debater_abnormal_round_speaks(debater, round_number):
-    """
-    Calculate the ranks for a bye/forfeit round
-
-    Forfeits:
-    If the round is set to `lenient_late`, it uses average ranks
-    Otherwise, it uses speaks of 0.0
-
-    Byes:
-    Uses average speaks
-    """
-    team = debater.team
-    had_bye = Bye.objects.filter(round_number=round_number,
-                                    bye_team=team)
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                        no_show_team=team)
-    if had_bye or (had_noshow and had_noshow.first().lenient_late):
-        return avg_deb_speaks(debater)
-    elif had_noshow:
-        return MINIMUM_DEBATER_SPEAKS
-    else:
-        raise RuntimeError('Abnormal ranks calculation for a normal round')
 
 def debater_abnormal_round_ranks(debater, round_number):
     """
@@ -851,8 +852,6 @@ def debater_abnormal_round_ranks(debater, round_number):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS
-    else:
-        raise RuntimeError('Abnormal ranks calculation for a normal round')
 
 
 def single_adjusted_ranks_deb(debater):
