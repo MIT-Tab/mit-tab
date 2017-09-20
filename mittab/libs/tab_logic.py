@@ -824,9 +824,9 @@ def debater_abnormal_round_speaks(debater, round_number):
                                     bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                         no_show_team=team)
-    if had_bye or had_noshow.first().lenient_late:
+    if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
-    elif had_noshow.first():
+    elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
     else:
         raise RuntimeError('Abnormal ranks calculation for a normal round')
@@ -847,9 +847,9 @@ def debater_abnormal_round_ranks(debater, round_number):
                                     bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                         no_show_team=team)
-    if had_bye or had_noshow.first().lenient_late:
+    if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
-    elif had_noshow.first():
+    elif had_noshow:
         return MAXIMUM_DEBATER_RANKS
     else:
         raise RuntimeError('Abnormal ranks calculation for a normal round')
