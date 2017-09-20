@@ -14,6 +14,9 @@ import itertools
 
 from cache_logic import cache
 
+
+MAXIMUM_DEBATER_RANKS = 3.5
+
 def pair_round():
     """
     Pair the next round of debate.
@@ -819,20 +822,34 @@ def ranks_for_debater(debater, average_ironmen=True):
                     debater_ranks.extend(ranks)
         else:
             # Check for a bye or a noshow
-            had_bye = Bye.objects.filter(round_number=round_number,
-                                         bye_team=team)
-            had_noshow = NoShow.objects.filter(round_number=round_number,
-                                               no_show_team=team)
-            if had_bye:
-                debater_ranks.append(avg_deb_ranks(debater))
-            elif had_noshow:
-                if had_noshow.first().lenient_late:
-                    debater_ranks.append(avg_deb_ranks(debater))
-                else:
-                    debater_ranks.append(debater_forfeit_ranks(debater))
+            debater_ranks.append(debater_abnormal_round_ranks(debater, round_number))
 
     debater_ranks = map(float, debater_ranks)
     return debater_ranks
+
+def debater_abornmal_round_ranks(debater, round_number):
+    """
+    Calculate the ranks for a bye/forfeit round
+
+    Forfeits:
+    If the round is set to `lenient_late`, it uses average ranks
+    Otherwise, it uses ranks of 3.5
+
+    Byes:
+    Uses average ranks
+    """
+    team = debater.team
+    had_bye = Bye.objects.filter(round_number=round_number,
+                                    bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number,
+                                        no_show_team=team)
+    if had_bye or had_noshow.first().lenient_late:
+        return avg_deb_ranks(debater)
+    elif had_noshow.first():
+        return MAXIMUM_DEBATER_RANKS
+    else:
+        raise RuntimeError('Abnormal ranks calculation for a normal round')
+
 
 def single_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
