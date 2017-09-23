@@ -136,7 +136,7 @@ class Room(models.Model):
         if len(rounds) == 0:
             super(Room, self).delete()
         else:
-            raise Exception("Room is in round: %s" % ([r.name for r in rounds]))
+            raise Exception("Room is in round: %s" % ([str(r) for r in rounds]))
 
 
 class Round(models.Model):
