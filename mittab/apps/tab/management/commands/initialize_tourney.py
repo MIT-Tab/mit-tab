@@ -2,7 +2,7 @@ from optparse import make_option
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
-from mittab.libs.backup import get_backup_prefix
+from mittab.libs.backup import BACKUP_PREFIX
 
 import os
 import shutil
@@ -23,7 +23,7 @@ class Command(BaseCommand):
             raise CommandError('Please supply valid arguments')
 
         tournament_name, backup_dir = args
-        path = get_backup_prefix()
+        path = BACKUP_PREFIX
 
         for user in ['tab', 'entry']:
             option_name = '%s_password' % user
