@@ -32,7 +32,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
         dst_filename = "site_round_%i_%i" % (round_number, btime)
 
     if backup_exists(dst_filename):
-        dst_filname += "_%i" % btime
+        dst_filename += "_%i" % btime
 
     dst_filename = get_backup_filename(dst_filename)
     src_filename = settings.DATABASES['default']['NAME']
