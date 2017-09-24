@@ -74,9 +74,10 @@ DATABASES = {
 
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
-RAVEN_CONFIG = {
-    'dsn': os.environ.get('SENTRY_DSN')
-}
+if os.environ.get('SENTRY_DSN'):
+    RAVEN_CONFIG = {
+        'dsn': os.environ['SENTRY_DSN']
+    }
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
