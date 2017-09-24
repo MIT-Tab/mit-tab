@@ -13,7 +13,7 @@ BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
 
 
 def get_backup_filename(filename):
-    if len(filename) < 3 or filename[-3:] is not ".db":
+    if len(filename) < 3 or filename[-3:] != ".db":
         filename += ".db"
     return os.path.join(BACKUP_PATH, filename)
 
