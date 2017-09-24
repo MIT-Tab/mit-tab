@@ -40,6 +40,8 @@ nosetests.xml
 
 # Static files
 js/
+javascript/
+images/
 admin/
 css/
 img/
