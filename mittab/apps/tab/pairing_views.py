@@ -97,12 +97,10 @@ def pair_round(request):
             TabSettings.set('pairing_released', 0)
             backup.backup_round("round_%i_before_pairing" % (current_round_number))
 
-            #with transaction.atomic():
-            tab_logic.pair_round()
-            current_round.value = current_round.value + 1
-            current_round.save()
-
-            backup.backup_round("round_%i_after_pairing" % (current_round_number))
+            with transaction.atomic():
+                tab_logic.pair_round()
+                current_round.value = current_round.value + 1
+                current_round.save()
         except Exception as exp:
             traceback.print_exc(file=sys.stdout)
             return render_to_response('error.html',
