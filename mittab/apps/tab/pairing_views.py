@@ -95,12 +95,12 @@ def pair_round(request):
         # We should pair the round
         try:
             TabSettings.set('pairing_released', 0)
-            backup.backup_round("round_%i_before_pairing.db" % (current_round_number))
+            backup.backup_round("round_%i_before_pairing" % (current_round_number))
+
             with transaction.atomic():
                 tab_logic.pair_round()
                 current_round.value = current_round.value + 1
                 current_round.save()
-            backup.backup_round("round_%i_after_pairing.db" % (current_round_number))
         except Exception as exp:
             traceback.print_exc(file=sys.stdout)
             return render_to_response('error.html',
@@ -231,7 +231,7 @@ def manual_backup(request):
     try:
         cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(time.time())
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
-        backup.backup_round("manual_backup_round_{}_{}_{}.db".format(cur_round, btime, now))
+        backup.backup_round("manual_backup_round_{}_{}_{}".format(cur_round, btime, now))
     except:
         traceback.print_exc(file=sys.stdout)
         return render_to_response('error.html',

@@ -38,3 +38,13 @@ nosetests.xml
 # Vim
 *.swp
 
+# Static files
+js/
+javascript/
+images/
+admin/
+css/
+img/
+
+# Backups
+mittab/backups/
