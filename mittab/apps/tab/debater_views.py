@@ -46,7 +46,7 @@ def view_debater(request, debater_id):
         form = DebaterForm(instance=debater)
         # Really only should be one, TODO: change to get when we have tests
         teams = Team.objects.filter(debaters = debater)
-        links = [('/debater/'+str(debater_id)+'/delete/', 'Delete', True)]
+        links = []
         for team in teams:
             links.append(('/team/'+str(team.id)+'/', "View %s"%team.name, False))
 

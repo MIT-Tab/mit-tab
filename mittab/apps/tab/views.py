@@ -200,10 +200,9 @@ def view_room(request, room_id):
                                       context_instance=RequestContext(request))
     else:
         form = RoomForm(instance=room)
-        links = [('/room/'+str(room_id)+'/delete/', 'Delete', True)]
         return render_to_response('data_entry.html', 
                                  {'form': form,
-                                  'links': links,
+                                  'links': [],
                                   'title': "Viewing Room: %s"%(room.name)}, 
                                  context_instance=RequestContext(request))
 
