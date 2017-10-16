@@ -88,14 +88,13 @@ def view_judge(request, judge_id):
         base_url = '/judge/'+str(judge_id)+'/'
         scratch_url = base_url + 'scratches/view/'
         delete_url =  base_url + 'delete/'
-        links = [(scratch_url,'Scratches for '+str(judge.name),False),
-                 (delete_url,'Delete', True)]
+        links = [(scratch_url,'Scratches for '+str(judge.name),False)]
         return render_to_response('data_entry.html', 
                                  {'form': form,
                                   'links': links,
                                   'title': "Viewing Judge: %s" %(judge.name)}, 
                                   context_instance=RequestContext(request))
-    
+
 def enter_judge(request):
     if request.method == 'POST':
         form = JudgeForm(request.POST)
