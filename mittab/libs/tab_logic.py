@@ -505,6 +505,7 @@ def double_adjusted_ranks(team):
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
+@cache()
 def opp_strength(t):
     opponent_count = 0
     opponent_wins = 0
