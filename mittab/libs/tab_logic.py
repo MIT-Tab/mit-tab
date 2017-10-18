@@ -519,7 +519,10 @@ def opp_strength(t):
         opponent_wins += tot_wins(r.gov_team)
         opponent_count += 1
 
-    return float(opponent_wins) / float(opponent_rounds)
+    if opponent_count > 0:
+        return float(opponent_wins) / float(opponent_count)
+    else:
+        return 0.0
 
 # Return a list of all teams who have no varsity members 
 def all_nov_teams():
