@@ -507,6 +507,11 @@ def double_adjusted_ranks(team):
 
 @cache()
 def opp_strength(t):
+    """
+    Average number of wins per opponent
+    
+    Tracks opp strength while minimizing the effect that byes have on a team's opp strength
+    """
     opponent_count = 0
     opponent_wins = 0
 
