@@ -505,18 +505,8 @@ def double_adjusted_ranks(team):
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
-@cache()
-def tot_rounds(team):
-    """
-    Returns the total number of rounds that a team competed in (byes included)
-
-    This is used for the opp strength calculation, which shouldn't account for
-    opponents not having wins in rounds they never compete in.
-    """
-    return num_wins(team) + num_opps(team) + num_govs(team)
-
 def opp_strength(t):
-    opponent_rounds = 0
+    opponent_count = 0
     opponent_wins = 0
 
     gov_rounds = Round.objects.filter(gov_team = t)
@@ -524,10 +514,10 @@ def opp_strength(t):
 
     for r in gov_rounds:
         opponent_wins += tot_wins(r.opp_team)
-        opponent_rounds += tot_rounds(r.opp_team)
+        opponent_count += 1
     for r in opp_rounds:
         opponent_wins += tot_wins(r.gov_team)
-        opponent_rounds += tot_rounds(r.gov_team)
+        opponent_count += 1
 
     return float(opponent_wins) / float(opponent_rounds)
 
