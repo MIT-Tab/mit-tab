@@ -40,7 +40,7 @@ def view_team(request, team_id):
         stats.append(("Total Speaks", tab_logic.tot_speaks(team)))
         stats.append(("Govs", tab_logic.num_govs(team)))
         stats.append(("Opps", tab_logic.num_opps(team)))
-        stats.append(("Opp Wins", tab_logic.opp_strength(team)))
+        stats.append(("Avg. Opp Wins", tab_logic.opp_strength(team)))
         stats.append(("Been Pullup", tab_logic.pull_up_count(team)))
         stats.append(("Hit Pullup", tab_logic.hit_pull_up_count(team)))
     except Team.DoesNotExist:

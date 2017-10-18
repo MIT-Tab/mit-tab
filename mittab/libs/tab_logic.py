@@ -505,16 +505,31 @@ def double_adjusted_ranks(team):
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
+@cache()
 def opp_strength(t):
-    opp_record = 0
-    myGovRounds = Round.objects.filter(gov_team = t)
-    myOppRounds = Round.objects.filter(opp_team = t)
-    for r in myGovRounds:
-        opp_record +=tot_wins(r.opp_team)
-    for r in myOppRounds:
-        opp_record +=tot_wins(r.gov_team)
-    return opp_record
+    """
+    Average number of wins per opponent
     
+    Tracks opp strength while minimizing the effect that byes have on a team's opp strength
+    """
+    opponent_count = 0
+    opponent_wins = 0
+
+    gov_rounds = Round.objects.filter(gov_team = t)
+    opp_rounds = Round.objects.filter(opp_team = t)
+
+    for r in gov_rounds:
+        opponent_wins += tot_wins(r.opp_team)
+        opponent_count += 1
+    for r in opp_rounds:
+        opponent_wins += tot_wins(r.gov_team)
+        opponent_count += 1
+
+    if opponent_count > 0:
+        return float(opponent_wins) / float(opponent_count)
+    else:
+        return 0.0
+
 # Return a list of all teams who have no varsity members 
 def all_nov_teams():
     return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
