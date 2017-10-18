@@ -13,9 +13,11 @@
             Please correct the error{{ form.errors|pluralize }} below.
         </p>
     {% endif %}
+
     <script type="text/javascript" src="/dynamic-media/jsi18n/"></script> 
-    <link rel="stylesheet" type="text/css" href="/static/css/widgets.css" /> 
+
     {{ form.media }}
+
     <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
         {{ form.non_field_errors }}
 
@@ -24,16 +26,11 @@
             {{ hidden }}
         {% endfor %}
 
-        <div class="table ballot_entry">
-        {# Include the common fields to Gov and Opp #}
-
-
         <div class="row">
           <div class="common_fields col-md-12">
               {{ form.winner.errors }}
               <div>{{form.winner.label_tag}}</div>
               <div>{{ form.winner }}</div>
-              <div ""></div>
               <div class="col-md-4">
                   <div class="hidden winner" data-option=0>Please select a winner</div>
                   <div class="hidden winner" data-option=1>
@@ -75,10 +72,11 @@
               </div>
           </div>
         </div>
+
         <div class="row container-fluid">
           <div class="col-md-6 team_container" id="id_gov_container">
             <center>
-              <h4 class="header" id="id_gov_header">Government: {{gov_team.name}}</th>
+              <h4 class="header" id="id_gov_header">Government: {{gov_team.name}}</h4>
             </center>
 
             <div class="gov">
@@ -134,7 +132,7 @@
 
           <div class="col-md-6 team_container" id="id_opp_container">
             <center>
-              <h4 class="header" id="id_opp_header">Opposition: {{opp_team.name}}</th>
+              <h4 class="header" id="id_opp_header">Opposition: {{opp_team.name}}</h4>
             </center>
 
             <div class="opp">
@@ -189,17 +187,6 @@
         </div>
 
 
-        {% if form.ballot_code %}
-        <tr>
-          <td>
-            {{ form.ballot_code.errors }}
-            <label for="id_ballot_code">Ballot Code:</label>
-          </td>
-          <td> {{ form.ballot_code }}</td>
-        </tr>
-        {% endif %}
-
-        </table>
         {% if links %}
         <div class="btn-group">
             {% for link,text,confirm in links %}
@@ -210,7 +197,7 @@
 
         <div class="btn-submit">
             <input type="submit" value="Submit Changes">
-        <div>
+        </div>
     </form>
 
 </div>

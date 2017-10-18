@@ -912,6 +912,10 @@
   box-sizing: border-box;
 }
 
+/*
+ * Ballot styles, for some reason being in this file gives them proper priority
+ */
+
 .team_container {
   padding: 5px;
   border: 1px solid black;
