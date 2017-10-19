@@ -187,31 +187,32 @@ class ResultEntryForm(forms.Form):
         cleaned_data = self.cleaned_data
         #This is where we validate that the person entering data didn't mess up significantly
         gov, opp = self.GOV, self.OPP
-        debaters = gov + opp
         try:
-            speak_ranks = [ (cleaned_data["%s_speaks" % (d)], cleaned_data["%s_ranks" % (d)], d) for d in self.DEBATERS]
+            speak_ranks = [(self.deb_attr_val(d, "speaks"), self.deb_attr_val(d, "ranks"), d) for d in self.DEBATERS]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
 
             # Check to make sure everyone has different ranks
             if set([r[0] for r in self.RANKS]) != set([int(x[1]) for x in sorted_by_ranks]):
-                for debater in debaters:
-                    self._errors["%s_speaks"%(debater)] = self.error_class(["Ranks must be different"])
+                for d in self.DEBATERS:
+                    self._errors[self.deb_attr_name(d, "ranks")] = self.error_class(["Ranks must be different"])
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
-            for (speaks,rank,debater) in sorted_by_ranks:
+            for (speaks,rank,d) in sorted_by_ranks:
                 if speaks > high_score:
-                    self._errors["%s_speaks"%debater] = self.error_class(["These speaks are too high for the rank"])
+                    self._errors[self.deb_attr_name(d, "speaks")] = self.error_class(["These speaks are too high for the rank"])
                 high_score = speaks
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
-            gov_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in gov])
-            opp_speaks = sum([cleaned_data["%s_speaks"%(d)] for d in opp])
-            gov_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in gov])
-            opp_ranks = sum([int(cleaned_data["%s_ranks" % (d)]) for d in opp])
+            gov_speaks = sum([self.deb_attr_value(d, "speaks") for d in gov])
+            opp_speaks = sum([self.deb_attr_value(d, "speaks") for d in opp])
+            gov_ranks = sum([self.deb_attr_value(d, "ranks") for d in gov])
+            opp_ranks = sum([self.deb_attr_value(d, "ranks") for d in opp])
+
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
+
             cleaned_data["winner"] = int(cleaned_data["winner"])
 
             # No winner, this is bad
@@ -224,11 +225,11 @@ class ResultEntryForm(forms.Form):
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self._errors["winner"] = self.error_class(["Low Point Win!!"])
 
-            for deb in gov + opp:
+            for deb in self.DEBATERS:
                 # TODO: Take out this strange cast to int, perhaps have real
                 # error values?
-                if int(cleaned_data["%s_debater"%deb]) == -1:
-                    self._errors["%s_debater"%deb] = self.error_class(["You need to pick a debater"])
+                if int(self.deb_attr_val(deb, "debater")) == -1:
+                    self._errors[self.deb_attr_name(deb, "debater")] = self.error_class(["You need to pick a debater"])
 
         except Exception, e:
             print "Caught error %s" %(e)
@@ -239,27 +240,29 @@ class ResultEntryForm(forms.Form):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
-        debaters = self.GOV + self.OPP
         #How do we handle iron men? Do I enter both speaks?
-        for debater in debaters:
-            old_stats = RoundStats.objects.filter(round=round_obj, debater_role = debater)
+        # TODO: Make this atomic
+        for debater in self.DEBATERS:
+            # TODO: Have update as a separate endpoint?
+            old_stats = RoundStats.objects.filter(round=round_obj, debater_role=debater)
             if len(old_stats) > 0:
                 old_stats.delete()
 
-            debater_obj = Debater.objects.get(pk=cleaned_data["%s_debater"%(debater)])
-            debater_role_obj = debater
-            speaks_obj, ranks_obj = float(cleaned_data["%s_speaks"%(debater)]),int(cleaned_data["%s_ranks"%(debater)]) 
-            stats = RoundStats(debater = debater_obj, 
-                               round = round_obj, 
-                               speaks = speaks_obj, 
-                               ranks = ranks_obj, 
-                               debater_role = debater_role_obj)
+            debater_obj = Debater.objects.get(pk=self.deb_attr_val(debater, "debater"))
+            stats = RoundStats(debater=debater_obj,
+                               round=int(self.deb_attr_val(debater, "ranks")),
+                               speaks=float(self.deb_attr_val(debater, "speaks")),
+                               ranks=ranks_obj,
+                               debater_role=debater)
             stats.save()
         round_obj.save()
         return round_obj
 
-    def deb_attribute(position, attr):
-        return self.cleaned_data["%s_%s" % (position, attr)]
+    def deb_attr_val(self, position, attr):
+        return self.cleaned_data[self.deb_attr_name(position, attr)]
+
+    def deb_attr_name(self, position, attr):
+        return "%s_%s" % (position, attr)
 
 def validate_panel(result):
     all_good = True
