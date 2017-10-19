@@ -1,3 +1,4 @@
+import sys, traceback
 import itertools
 import pprint
 
@@ -212,10 +213,10 @@ class ResultEntryForm(forms.Form):
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
-            gov_speaks = sum([self.deb_attr_value(d, "speaks") for d in self.GOV])
-            opp_speaks = sum([self.deb_attr_value(d, "speaks") for d in self.OPP])
-            gov_ranks = sum([self.deb_attr_value(d, "ranks") for d in self.GOV])
-            opp_ranks = sum([self.deb_attr_value(d, "ranks") for d in self.OPP])
+            gov_speaks = sum([self.deb_attr_val(d, "speaks") for d in self.GOV])
+            opp_speaks = sum([self.deb_attr_val(d, "speaks") for d in self.OPP])
+            gov_ranks = sum([self.deb_attr_val(d, "ranks") for d in self.GOV])
+            opp_ranks = sum([self.deb_attr_val(d, "ranks") for d in self.OPP])
 
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
@@ -240,6 +241,7 @@ class ResultEntryForm(forms.Form):
         except Exception, e:
             print "Caught error %s" %(e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+            traceback.print_exc(file=sys.stdout)
         return cleaned_data
 
     def save(self):
@@ -271,7 +273,7 @@ class ResultEntryForm(forms.Form):
         return "%s_%s" % (position, attr)
 
     def has_invalid_ranks(self):
-        ranks = [ self.deb_attr_val(d, ranks) for d in self.DEBATERS ]
+        ranks = [ int(self.deb_attr_val(d, "ranks")) for d in self.DEBATERS ]
         return sorted(ranks) != [1, 2, 3, 4]
 
 def validate_panel(result):
