@@ -81,7 +81,7 @@ class TeamForm(forms.ModelForm):
         if not( 1 <= len(data) <= 2) :
             raise forms.ValidationError("You must select 1 or 2 debaters!") 
         return data
-    
+
     class Meta:
         model = Team
 
@@ -98,26 +98,26 @@ class TeamEntryForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        
+
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
     class Meta:
         model = Scratch
-        
+
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        
-        
+
+
 def validate_speaks(value):
     if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
-    
+
 #TODO: Rewrite this, it is ugly as hell
 class ResultEntryForm(forms.Form):
-    
+
     NAMES = {
         "pm" : "Prime Minister",
         "mg" : "Member of Government",
@@ -134,6 +134,8 @@ class ResultEntryForm(forms.Form):
         "lo",
         "mo"
     ]
+
+    DEBATERS = GOV + OPP
 
     RANKS = (
         (1, 1),
@@ -163,24 +165,23 @@ class ResultEntryForm(forms.Form):
         gov_debaters = [(-1,'---')]+[(d.id, d.name) for d in gov_team.debaters.all()]
         opp_debaters = [(-1,'---')]+[(d.id, d.name) for d in opp_team.debaters.all()]
 
-        # TODO: Combine these loops?
-        for d in self.GOV:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=gov_debaters)
+        for d in self.DEBATERS:
+            debater_choices = gov_debaters if d in self.GOV else opp_debaters
+            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=debater_choices)
             self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
             self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
-        for d in self.OPP:
-            self.fields["%s_debater"%(d)] = forms.ChoiceField(label="Who was %s?"%(self.NAMES[d]), choices=opp_debaters)
-            self.fields["%s_speaks"%(d)] = forms.DecimalField(label="%s Speaks"%(self.NAMES[d]),validators=[validate_speaks])
-            self.fields["%s_ranks"%(d)] = forms.ChoiceField(label="%s Rank"%(self.NAMES[d]), choices=self.RANKS)
-        if round_object.victor != 0 and not no_fill:
-            for d in self.GOV + self.OPP:
-                try:
-                    stats = RoundStats.objects.get(round=round_object, debater_role = d)
-                    self.fields["%s_debater"%(d)].initial = stats.debater.id
-                    self.fields["%s_speaks"%(d)].initial = stats.speaks
-                    self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
-                except:
-                    pass
+
+        if round_object.victor == 0 or no_fill:
+            return
+
+        for d in self.DEBATERS:
+            try:
+                stats = RoundStats.objects.get(round=round_object, debater_role = d)
+                self.fields["%s_debater"%(d)].initial = stats.debater.id
+                self.fields["%s_speaks"%(d)].initial = stats.speaks
+                self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
+            except:
+                pass
 
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -188,7 +189,7 @@ class ResultEntryForm(forms.Form):
         gov, opp = self.GOV, self.OPP
         debaters = gov + opp
         try:
-            speak_ranks = [ (cleaned_data["%s_speaks" % (d)] ,cleaned_data["%s_ranks" % (d)], d) for d in debaters]
+            speak_ranks = [ (cleaned_data["%s_speaks" % (d)], cleaned_data["%s_ranks" % (d)], d) for d in self.DEBATERS]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
 
             # Check to make sure everyone has different ranks
@@ -256,6 +257,9 @@ class ResultEntryForm(forms.Form):
             stats.save()
         round_obj.save()
         return round_obj
+
+    def deb_attribute(position, attr):
+        return self.cleaned_data["%s_%s" % (position, attr)]
 
 def validate_panel(result):
     all_good = True
