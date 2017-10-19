@@ -1,11 +1,13 @@
+import itertools
+import pprint
+
 from django.db import models, transaction
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
-from models import *
 from decimal import Decimal
-import itertools
-import pprint
+
+from models import *
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -115,7 +117,6 @@ def validate_speaks(value):
     if not (0.0 <= value <= 50.0):
         raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
 
-#TODO: Rewrite this, it is ugly as hell
 class ResultEntryForm(forms.Form):
 
     NAMES = {
@@ -224,9 +225,8 @@ class ResultEntryForm(forms.Form):
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self._errors["winner"] = self.error_class(["Low Point Win!!"])
 
+            # Make sure that all debaters were selected
             for deb in self.DEBATERS:
-                # TODO: Take out this strange cast to int, perhaps have real
-                # error values?
                 if int(self.deb_attr_val(deb, "debater")) == -1:
                     self._errors[self.deb_attr_name(deb, "debater")] = self.error_class(["You need to pick a debater"])
 
