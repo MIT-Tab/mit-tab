@@ -36,9 +36,3 @@ services:
     image: memcached
     ports:
       - "11211:11211"
-  speaks:
-    build:
-      context: .
-      dockerfile: Dockerfile.speaks
-    volumes_from:
-      - web
