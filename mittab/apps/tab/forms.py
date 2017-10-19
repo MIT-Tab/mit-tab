@@ -177,38 +177,37 @@ class ResultEntryForm(forms.Form):
         for d in self.DEBATERS:
             try:
                 stats = RoundStats.objects.get(round=round_object, debater_role = d)
-                self.fields["%s_debater"%(d)].initial = stats.debater.id
-                self.fields["%s_speaks"%(d)].initial = stats.speaks
-                self.fields["%s_ranks"%(d)].initial = int(round(stats.ranks))
+                self.fields[self.deb_attr_name(d, "debater")].initial = stats.debater.id
+                self.fields[self.deb_attr_name(d, "speaks")].initial = stats.speaks
+                self.fields[self.deb_attr_name(d, "ranks")].initial = int(round(stats.ranks))
             except:
                 pass
 
     def clean(self):
         cleaned_data = self.cleaned_data
-        #This is where we validate that the person entering data didn't mess up significantly
         gov, opp = self.GOV, self.OPP
         try:
             speak_ranks = [(self.deb_attr_val(d, "speaks"), self.deb_attr_val(d, "ranks"), d) for d in self.DEBATERS]
             sorted_by_ranks = sorted(speak_ranks, key=lambda x: x[1])
 
             # Check to make sure everyone has different ranks
-            if set([r[0] for r in self.RANKS]) != set([int(x[1]) for x in sorted_by_ranks]):
+            if self.has_invalid_ranks():
                 for d in self.DEBATERS:
                     self._errors[self.deb_attr_name(d, "ranks")] = self.error_class(["Ranks must be different"])
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
-            for (speaks,rank,d) in sorted_by_ranks:
+            for (speaks, rank, d) in sorted_by_ranks:
                 if speaks > high_score:
                     self._errors[self.deb_attr_name(d, "speaks")] = self.error_class(["These speaks are too high for the rank"])
                 high_score = speaks
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
-            gov_speaks = sum([self.deb_attr_value(d, "speaks") for d in gov])
-            opp_speaks = sum([self.deb_attr_value(d, "speaks") for d in opp])
-            gov_ranks = sum([self.deb_attr_value(d, "ranks") for d in gov])
-            opp_ranks = sum([self.deb_attr_value(d, "ranks") for d in opp])
+            gov_speaks = sum([self.deb_attr_value(d, "speaks") for d in self.GOV])
+            opp_speaks = sum([self.deb_attr_value(d, "speaks") for d in self.OPP])
+            gov_ranks = sum([self.deb_attr_value(d, "ranks") for d in self.GOV])
+            opp_ranks = sum([self.deb_attr_value(d, "ranks") for d in self.OPP])
 
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
@@ -240,7 +239,6 @@ class ResultEntryForm(forms.Form):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
-        #How do we handle iron men? Do I enter both speaks?
         # TODO: Make this atomic
         for debater in self.DEBATERS:
             # TODO: Have update as a separate endpoint?
@@ -263,6 +261,10 @@ class ResultEntryForm(forms.Form):
 
     def deb_attr_name(self, position, attr):
         return "%s_%s" % (position, attr)
+
+    def has_invalid_ranks(self):
+        ranks = [ self.deb_attr_val(d, ranks) for d in self.DEBATERS ]
+        return sorted(ranks) != [1, 2, 3, 4]
 
 def validate_panel(result):
     all_good = True
