@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
@@ -239,21 +239,22 @@ class ResultEntryForm(forms.Form):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
-        # TODO: Make this atomic
-        for debater in self.DEBATERS:
-            # TODO: Have update as a separate endpoint?
-            old_stats = RoundStats.objects.filter(round=round_obj, debater_role=debater)
-            if len(old_stats) > 0:
-                old_stats.delete()
 
-            debater_obj = Debater.objects.get(pk=self.deb_attr_val(debater, "debater"))
-            stats = RoundStats(debater=debater_obj,
-                               round=int(self.deb_attr_val(debater, "ranks")),
-                               speaks=float(self.deb_attr_val(debater, "speaks")),
-                               ranks=ranks_obj,
-                               debater_role=debater)
-            stats.save()
-        round_obj.save()
+        with transaction.atomic():
+            for debater in self.DEBATERS:
+                # TODO: Have update as a separate endpoint
+                old_stats = RoundStats.objects.filter(round=round_obj, debater_role=debater)
+                if len(old_stats) > 0:
+                    old_stats.delete()
+
+                debater_obj = Debater.objects.get(pk=self.deb_attr_val(debater, "debater"))
+                stats = RoundStats(debater=debater_obj,
+                                   round=int(self.deb_attr_val(debater, "ranks")),
+                                   speaks=float(self.deb_attr_val(debater, "speaks")),
+                                   ranks=ranks_obj,
+                                   debater_role=debater)
+                stats.save()
+            round_obj.save()
         return round_obj
 
     def deb_attr_val(self, position, attr):
