@@ -1,12 +1,13 @@
-from optparse import make_option
-
-from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand, CommandError
-from mittab.libs.backup import BACKUP_PREFIX
-
 import os
 import shutil
 import sys
+
+from optparse import make_option
+from django.core.management import execute_from_command_line
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand, CommandError
+
+from mittab.libs.backup import BACKUP_PREFIX
 
 class Command(BaseCommand):
     args = '<tournament_name> <backup_directory>'
@@ -48,25 +49,35 @@ class Command(BaseCommand):
             shutil.copytree(path + "/backups", tournament_dir + "/backups")
         except (IOError, os.error) as why:
            self.stdout.write("Failed to backup current tournament state")
-           print why
+           print(why)
            sys.exit(1)
 
-        self.stdout.write("Copying blank db to pairing_db.sqlite3")
+        self.stdout.write("Clearing data from database")
         try:
-            shutil.copy(path + "/pairing_db_clean.sqlite3", path + "/pairing_db.sqlite3")
+            execute_from_command_line(["manage.py", "flush"])
         except (IOError, os.error) as why:
-            self.stdout.write("Failed to copy clean database to pairing_db.sqlite3")
-            print why
+            self.stdout.write("Failed to clear database")
+            print(why)
             sys.exit(1)
 
-        self.stdout.write("Setting passwords for tab and entry")
-        tab = User.objects.get(username="tab")
-        entry = User.objects.get(username="entry")
+        self.stdout.write("Creating tab/entry users")
+        tab = User(username="tab")
+        tab.save()
 
-        tab.set_password(options['tab_password'])
-        entry.set_password(options['entry_password'])
+        entry = User(username="entry")
+        entry.save()
+
+        tab.set_password(options["tab_password"])
+        entry.set_password(options["entry_password"])
         tab.save()
         entry.save()
+
+        self.stdout.write("Setting default tab settings")
+        TabSettings.set("tot_rounds", 5)
+        TabSettings.set("lenient_late", 0)
+        TabSettings.set("nov_teams_to_break", 4)
+        TabSettings.set("var_teams_to_break", 8)
+        TabSettings.set("cur_round", 1)
 
         self.stdout.write("Cleaning up old backups")
         try:
