@@ -1,3 +1,6 @@
+import string
+import random
+
 from django.db import models
 from localflavor.us.models import PhoneNumberField
 from django.core.exceptions import ValidationError
@@ -100,6 +103,21 @@ class Judge(models.Model):
     schools = models.ManyToManyField(School)
     phone = PhoneNumberField(blank=True)
     provider = models.CharField(max_length=40, blank=True)
+    #ballot_code = models.CharField(max_length=6, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Generate a random ballot code for judges that don't have one
+        if not self.ballot_code:
+            choices = string.ascii_lowercase + string.digits
+            code = ''.join(random.choice(choices) for _ in range(6))
+
+            while Judge.objects.filter(ballot_code=code).first():
+                code = ''.join(random.choice(choices) for _ in range(6))
+
+            self.ballot_code = code
+
+        super(Judge, self).save(*args, **kwargs)
+
     def __unicode__(self):
         return self.name
 
@@ -218,3 +236,7 @@ class CheckIn(models.Model):
     round_number = models.IntegerField()
     def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
+
+# Necessary for migrations
+from south.modelsinspector import add_introspection_rules
+add_introspection_rules([], ["^localflavor\.us\.models\.PhoneNumberField"])
