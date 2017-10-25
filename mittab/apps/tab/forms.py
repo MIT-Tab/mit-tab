@@ -213,10 +213,10 @@ class ResultEntryForm(forms.Form):
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
-            gov_speaks = sum([self.deb_attr_val(d, "speaks") for d in self.GOV])
-            opp_speaks = sum([self.deb_attr_val(d, "speaks") for d in self.OPP])
-            gov_ranks = sum([self.deb_attr_val(d, "ranks") for d in self.GOV])
-            opp_ranks = sum([self.deb_attr_val(d, "ranks") for d in self.OPP])
+            gov_speaks = sum([self.deb_attr_val(d, "speaks", float) for d in self.GOV])
+            opp_speaks = sum([self.deb_attr_val(d, "speaks", float) for d in self.OPP])
+            gov_ranks = sum([self.deb_attr_val(d, "ranks", int) for d in self.GOV])
+            opp_ranks = sum([self.deb_attr_val(d, "ranks", int) for d in self.OPP])
 
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
@@ -258,16 +258,20 @@ class ResultEntryForm(forms.Form):
 
                 debater_obj = Debater.objects.get(pk=self.deb_attr_val(debater, "debater"))
                 stats = RoundStats(debater=debater_obj,
-                                   round=int(self.deb_attr_val(debater, "ranks")),
-                                   speaks=float(self.deb_attr_val(debater, "speaks")),
-                                   ranks=ranks_obj,
+                                   round=round_obj,
+                                   speaks=self.deb_attr_val(debater, "speaks", float),
+                                   ranks=self.deb_attr_val(debater, "ranks", int),
                                    debater_role=debater)
                 stats.save()
             round_obj.save()
         return round_obj
 
-    def deb_attr_val(self, position, attr):
-        return self.cleaned_data[self.deb_attr_name(position, attr)]
+    def deb_attr_val(self, position, attr, cast=None):
+        val = self.cleaned_data[self.deb_attr_name(position, attr)]
+        if cast:
+            return cast(val)
+        else:
+            return val
 
     def deb_attr_name(self, position, attr):
         return "%s_%s" % (position, attr)
