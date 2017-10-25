@@ -235,7 +235,7 @@ class ResultEntryForm(forms.Form):
 
             # Make sure that all debaters were selected
             for deb in self.DEBATERS:
-                if int(self.deb_attr_val(deb, "debater")) == -1:
+                if self.deb_attr_val(deb, "debater", int) == -1:
                     self._errors[self.deb_attr_name(deb, "debater")] = self.error_class(["You need to pick a debater"])
 
         except Exception, e:
