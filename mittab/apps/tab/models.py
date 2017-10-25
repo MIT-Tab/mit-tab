@@ -103,7 +103,7 @@ class Judge(models.Model):
     schools = models.ManyToManyField(School)
     phone = PhoneNumberField(blank=True)
     provider = models.CharField(max_length=40, blank=True)
-    #ballot_code = models.CharField(max_length=6, blank=True, null=True)
+    ballot_code = models.CharField(max_length=6, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         # Generate a random ballot code for judges that don't have one
