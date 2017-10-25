@@ -14,6 +14,7 @@ tests: test
 
 test:
 	python manage.py initialize_tourney test .
+	./bin/setup
 	python -m pytest mittab
 
 shell:
