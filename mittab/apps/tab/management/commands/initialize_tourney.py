@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 
 from mittab.libs.backup import BACKUP_PREFIX
+from mittab.apps.tab.models import TabSettings
 
 class Command(BaseCommand):
     args = '<tournament_name> <backup_directory>'
@@ -61,16 +62,10 @@ class Command(BaseCommand):
             sys.exit(1)
 
         self.stdout.write("Creating tab/entry users")
-        tab = User(username="tab")
+        tab = User.objects.create_user("tab", None, options["tab_password"])
+        tab.is_superuser = True
         tab.save()
-
-        entry = User(username="entry")
-        entry.save()
-
-        tab.set_password(options["tab_password"])
-        entry.set_password(options["entry_password"])
-        tab.save()
-        entry.save()
+        entry = User.objects.create_user("entry", None, options["entry_password"])
 
         self.stdout.write("Setting default tab settings")
         TabSettings.set("tot_rounds", 5)
