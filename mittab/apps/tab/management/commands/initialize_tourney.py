@@ -3,7 +3,7 @@ import shutil
 import sys
 
 from optparse import make_option
-from django.core.management import execute_from_command_line
+from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 
@@ -55,7 +55,7 @@ class Command(BaseCommand):
 
         self.stdout.write("Clearing data from database")
         try:
-            execute_from_command_line(["manage.py", "flush"])
+            call_command("flush", interactive=False)
         except (IOError, os.error) as why:
             self.stdout.write("Failed to clear database")
             print(why)
