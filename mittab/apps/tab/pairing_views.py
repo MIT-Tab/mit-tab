@@ -1,4 +1,4 @@
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
@@ -8,7 +8,8 @@ from errors import *
 from mittab.libs.errors import *
 from models import *
 from django.shortcuts import redirect
-from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
+from forms import ResultEntryForm, UploadBackupForm, score_panel, \
+        validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
@@ -442,7 +443,7 @@ def view_rounds(request):
 
 def e_ballot_search(request):
     if request.method == "POST":
-        return redirect("/e_ballots/%s", request.POST.get("ballot_code"))
+        return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
         return render(request, "e_ballot_search.html")
 
@@ -456,9 +457,9 @@ def enter_e_ballot(request, ballot_code):
 
     if not judge:
         message = """
-                  No judges with the ballot code "%s." Try submitting again, or
+                  No judges with the ballot code "{}." Try submitting again, or
                   go to tab to resolve the issue.
-                  """
+                  """.format(ballot_code)
     elif rounds.count() > 1:
         message = """
                   Found more than one ballot for you this round.

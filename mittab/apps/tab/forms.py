@@ -317,7 +317,7 @@ class EBallotForm(ResultEntryForm):
             for d in self.DEBATERS:
                 speaks = self.deb_attr_val(d, "speaks", float)
                 split = str(speaks).split(".")
-                elif speaks > 35.0  or speaks < 15.0:
+                if speaks > 35.0  or speaks < 15.0:
                     msg = "Speaks must be justified to tab."
                     self._errors[self.deb_attr_name(d, "speaks")] = self.error_class([msg])
 
