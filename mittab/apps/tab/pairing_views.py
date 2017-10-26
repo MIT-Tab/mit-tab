@@ -439,6 +439,47 @@ def view_rounds(request):
                                'show_delete': True},
                               context_instance=RequestContext(request))
 
+def e_ballot_search(request):
+    if request.method == "POST":
+        return redirect("/e_ballots/%s", request.POST.get("ballot_code"))
+    else:
+        return render(request, "e_ballot_search.html")
+
+def enter_e_ballot(request, ballot_code):
+    current_round = TabSettings.get(key="cur_round") - 1
+
+    rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
+    rounds = rounds.filter(round_number=current_round)
+    judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+    if not judge:
+        message = """
+                  No judges with the ballot code "%s." Try submitting again, or
+                  go to tab to resolve the issue.
+                  """
+    elif rounds.count() > 1:
+        message = """
+                  Found more than one ballot for you this round.
+                  Go to tab to resolve this error.
+                  """
+    elif rounds.count() == 0:
+        message = """
+                  Could not find a ballot for you this round. Go to tab
+                  to resolve the issue if you believe you were paired in.
+                  """
+    elif rounds.first().chair != judge:
+        message = """
+                  You are not the chair of this round. If you are on a panel,
+                  only the chair can submit an e-ballot. If you are not on a
+                  panel, go to tab and make sure the chair is properly set for
+                  the round.
+                  """
+    else:
+        return enter_result(request, rounds.first().id, True)
+
+    return render(request, "error.html",
+                  {"error_type": "Ballot retrieval", "error_info": message})
+
 def enter_result(request, round_id):
     round_obj = Round.objects.get(id=round_id)
     if request.method == 'POST':
@@ -563,49 +604,49 @@ def clear_db():
     for i in range(len(check_ins)):
         CheckIn.delete(check_ins[i])
     print "Cleared Checkins"
-    
+
     round_stats = RoundStats.objects.all()
     for i in range(len(round_stats)):
         RoundStats.delete(round_stats[i])
     print "Cleared RoundStats"
-        
+
     rounds = Round.objects.all()
     for i in range(len(rounds)):
         Round.delete(rounds[i])
     print "Cleared Rounds"
-        
+
     judges = Judge.objects.all()
     for i in range(len(judges)):
         Judge.delete(judges[i])
     print "Cleared Judges"
-        
+
     rooms = Room.objects.all()
     for i in range(len(rooms)):
         Room.delete(rooms[i])
     print "Cleared Rooms"
-        
+
     scratches = Scratch.objects.all()
     for i in range(len(scratches)):
         Scratch.delete(scratches[i])
     print "Cleared Scratches"
-        
+
     tab_set = TabSettings.objects.all()
     for i in range(len(tab_set)):
         TabSettings.delete(tab_set[i])
     print "Cleared TabSettings"
-        
+
     teams = Team.objects.all()
     for i in range(len(teams)):
-        Team.delete(teams[i])   
+        Team.delete(teams[i])
     print "Cleared Teams"
-    
+
     debaters = Debater.objects.all()
     for i in range(len(debaters)):
         Debater.delete(debaters[i])
     print "Cleared Debaters"
-    
+
     schools = School.objects.all()
     for i in range(len(schools)):
-        School.delete(schools[i])                     
+        School.delete(schools[i])
     print "Cleared Schools"
-                              
+
