@@ -439,11 +439,13 @@ def view_rounds(request):
                                'show_delete': True},
                               context_instance=RequestContext(request))
 
+
 def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s", request.POST.get("ballot_code"))
     else:
         return render(request, "e_ballot_search.html")
+
 
 def enter_e_ballot(request, ballot_code):
     current_round = TabSettings.get(key="cur_round") - 1
@@ -475,37 +477,48 @@ def enter_e_ballot(request, ballot_code):
                   the round.
                   """
     else:
-        return enter_result(request, rounds.first().id, True)
+        return enter_result(request, rounds.first().id, ballot_code.lower())
 
     return render(request, "error.html",
-                  {"error_type": "Ballot retrieval", "error_info": message})
+                  {"error_type": "Ballot Retrieval", "error_info": message})
 
-def enter_result(request, round_id):
+
+def enter_result(request, round_id, ballot_code=None):
     round_obj = Round.objects.get(id=round_id)
+
     if request.method == 'POST':
-        form = ResultEntryForm(request.POST, round_instance=round_obj)
+        if ballot_code:
+            form = EBallotForm(request.POST, round_instance=round_obj)
+        else:
+            form = ResultEntryForm(request.POST, round_instance=round_obj)
+
         if form.is_valid():
             try:
                 result = form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "Round Result",
-                                          'error_name': "["+str(round_obj)+"]",
-                                          'error_info':"Invalid round result, could not remedy."}, 
+                return render_to_response("error.html",
+                                          {"error_type": "Round Result",
+                                           "error_name": "[%s]" % str(round_obj),
+                                           "error_info": "Invalid round result, could not remedy."},
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Round Result",
-                                      'data_name': "["+str(round_obj)+"]"}, 
+            return render_to_response("thanks.html",
+                                      {"data_type": "Round Result",
+                                       "data_name": "[%s]" % str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
         is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
-        form = ResultEntryForm(round_instance=round_obj)
-    return render_to_response('round_entry.html', 
-                              {'form': form,
-                               'title': "Entering Ballot for {}".format(str(round_obj)),
-                               'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team}, 
-                               context_instance=RequestContext(request))
+        if ballot_code:
+            form = EBallotForm(round_instance=round_obj)
+        else:
+            form = ResultEntryForm(round_instance=round_obj)
+
+    return render_to_response("round_entry.html",
+                              {"form": form,
+                               "title": "Entering Ballot for %s" % str(round_obj),
+                               "gov_team": round_obj.gov_team,
+                               "opp_team": round_obj.opp_team,
+                               "ballot_code": ballot_code},
+                              context_instance=RequestContext(request))
 
 
 def enter_multiple_results(request, round_id, num_entered):
