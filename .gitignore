@@ -38,5 +38,6 @@ nosetests.xml
 # Vim
 *.swp
 
-# Backups
+# Dont commit the db files
 mittab/backups/
+*.sqlite3
