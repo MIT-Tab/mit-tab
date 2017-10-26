@@ -282,11 +282,16 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
+    ballot_code = forms.CharField(max_length=6, min_length=6)
 
     def __init__(self, *args, **kwargs):
+        ballot_code = ""
+
+        if "ballot_code" in kwargs:
+            ballot_code = kwargs.pop("ballot_code")
+
         super(EBallotForm, self).__init__(*args, **kwargs)
-        self.fields["ballot_code"] = forms.CharField(max_length=6, min_length=6)
-        self.fields["ballot_code"].initial = kwargs.get("ballot_code") or ""
+        self.fields["ballot_code"].initial = ballot_code
 
     def clean(self):
         cleaned_data = self.cleaned_data
