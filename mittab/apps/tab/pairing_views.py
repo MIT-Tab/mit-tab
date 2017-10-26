@@ -508,7 +508,7 @@ def enter_result(request, round_id, ballot_code=None):
     else:
         is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
         if ballot_code:
-            form = EBallotForm(round_instance=round_obj)
+            form = EBallotForm(ballot_code=ballot_code, round_instance=round_obj)
         else:
             form = ResultEntryForm(round_instance=round_obj)
 

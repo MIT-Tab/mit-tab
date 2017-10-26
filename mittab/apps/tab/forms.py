@@ -280,6 +280,54 @@ class ResultEntryForm(forms.Form):
         ranks = [ int(self.deb_attr_val(d, "ranks")) for d in self.DEBATERS ]
         return sorted(ranks) != [1, 2, 3, 4]
 
+
+class EBallotForm(ResultEntryForm):
+
+    def __init__(self, *args, **kwargs):
+        super(EBallotForm, self).__init__(*args, **kwargs)
+        self.fields["ballot_code"] = forms.CharField(max_length=6, min_length=6)
+        self.fields["ballot_code"].initial = kwargs.get("ballot_code") or ""
+
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        round_obj = Round.objects.filter(pk=cleaned_data["round_instance"])
+
+        try:
+            ballot_code = cleaned_data.get("ballot_code")
+            judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+            if not judge:
+                msg = "Incorrect ballot code. Enter again."
+                self._errors["ballot_code"] = self.error_class([msg])
+            else:
+                if round_obj.chair.ballot_code != judge.ballot_code:
+                    msg = "You are not judging the round, or you are not the chair"
+                    self._errors["ballot_code"] = self.error_class([msg])
+                elif RoundStats.objects.filter(round=round_obj).first():
+                    msg = """
+                          A ballot has already been completed for this round.
+                          Go to tab if you need to change the results.
+                          """
+                    self._errors["ballot_code"] = self.error_class([msg])
+
+            if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
+                msg = "Go to tab to submit a result other than a win or loss."
+                self._errors["winner"] = self.error_class([msg])
+
+            for d in self.DEBATERS:
+                speaks = self.deb_attr_val(d, "speaks", float)
+                split = str(speaks).split(".")
+                elif speaks > 35.0  or speaks < 15.0:
+                    msg = "Speaks must be justified to tab."
+                    self._errors[self.deb_attr_name(d, "speaks")] = self.error_class([msg])
+
+        except Exception, e:
+            print("Caught error %s" % e)
+            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+
+        return super(EBallotForm, self).clean()
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*result.values()))
