@@ -295,7 +295,7 @@ class EBallotForm(ResultEntryForm):
 
     def clean(self):
         cleaned_data = self.cleaned_data
-        round_obj = Round.objects.filter(pk=cleaned_data["round_instance"])
+        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
 
         try:
             ballot_code = cleaned_data.get("ballot_code")
