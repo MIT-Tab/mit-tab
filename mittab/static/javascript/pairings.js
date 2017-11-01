@@ -219,6 +219,3 @@ var bind_handlers = function() {
     $('select[name=winner]').change(select_info);
     $('.btn.release').click(toggle_pairing_release);
 }
-
-
-
