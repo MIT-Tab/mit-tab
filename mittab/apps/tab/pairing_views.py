@@ -460,6 +460,8 @@ def enter_e_ballot(request, ballot_code):
                   No judges with the ballot code "{}." Try submitting again, or
                   go to tab to resolve the issue.
                   """.format(ballot_code)
+    elif TabSettings.get("pairing_released", 0) != 1:
+        message = "Pairings for this round have not been released."
     elif rounds.count() > 1:
         message = """
                   Found more than one ballot for you this round.
@@ -487,7 +489,7 @@ def enter_e_ballot(request, ballot_code):
 def enter_result(request, round_id, ballot_code=None):
     round_obj = Round.objects.get(id=round_id)
 
-    if request.method == 'POST':
+    if request.method == "POST":
         if ballot_code:
             form = EBallotForm(request.POST, round_instance=round_obj)
         else:
@@ -507,7 +509,6 @@ def enter_result(request, round_id, ballot_code=None):
                                        "data_name": "[%s]" % str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
-        is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
         if ballot_code:
             form = EBallotForm(ballot_code=ballot_code, round_instance=round_obj)
         else:

@@ -296,6 +296,7 @@ class EBallotForm(ResultEntryForm):
     def clean(self):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+        cur_round = TabSettings.get("cur_round", 0) - 1
 
         try:
             ballot_code = cleaned_data.get("ballot_code")
@@ -304,6 +305,12 @@ class EBallotForm(ResultEntryForm):
             if not judge:
                 msg = "Incorrect ballot code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
+            elif round_obj.round_number != cur_round:
+                msg = """
+                      This ballot is for round %d, but the current round is %d.
+                      Go to tab to submit this result.
+                      """ % (round_obj.round_number, cur_round)
+                self._errors["winner"] = self.error_class([msg])
             else:
                 if round_obj.chair.ballot_code != judge.ballot_code:
                     msg = "You are not judging the round, or you are not the chair"
