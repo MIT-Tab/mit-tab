@@ -420,52 +420,58 @@ def e_ballot_search(request):
 
 
 def enter_e_ballot(request, ballot_code):
-    current_round = TabSettings.get(key="cur_round") - 1
+    if request.method == "POST":
+        round_id = request.POST.get("round_instance")
 
+        if round_id:
+            return enter_result(request, round_id, EBallotForm, ballot_code)
+        else:
+            message = """
+                      Missing necessary form data. Please go to tab if this
+                      error persists
+                      """
+
+    current_round = TabSettings.get(key="cur_round") - 1
     rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
     rounds = rounds.filter(round_number=current_round)
     judge = Judge.objects.filter(ballot_code=ballot_code).first()
 
     if not judge:
         message = """
-                  No judges with the ballot code "{}." Try submitting again, or
-                  go to tab to resolve the issue.
-                  """.format(ballot_code)
+                    No judges with the ballot code "%s." Try submitting again, or
+                    go to tab to resolve the issue.
+                    """ % ballot_code
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
     elif rounds.count() > 1:
         message = """
-                  Found more than one ballot for you this round.
-                  Go to tab to resolve this error.
-                  """
+                Found more than one ballot for you this round.
+                Go to tab to resolve this error.
+                """
     elif rounds.count() == 0:
         message = """
-                  Could not find a ballot for you this round. Go to tab
-                  to resolve the issue if you believe you were paired in.
-                  """
+                Could not find a ballot for you this round. Go to tab
+                to resolve the issue if you believe you were paired in.
+                """
     elif rounds.first().chair != judge:
         message = """
-                  You are not the chair of this round. If you are on a panel,
-                  only the chair can submit an e-ballot. If you are not on a
-                  panel, go to tab and make sure the chair is properly set for
-                  the round.
-                  """
+                You are not the chair of this round. If you are on a panel,
+                only the chair can submit an e-ballot. If you are not on a
+                panel, go to tab and make sure the chair is properly set for
+                the round.
+                """
     else:
-        return enter_result(request, rounds.first().id, ballot_code.lower())
+        return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
 
     return render(request, "error.html",
-                  {"error_type": "Ballot Retrieval", "error_info": message})
+                {"error_type": "Ballot Retrieval", "error_info": message})
 
 
-def enter_result(request, round_id, ballot_code=None):
+def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None):
     round_obj = Round.objects.get(id=round_id)
 
     if request.method == "POST":
-        if ballot_code:
-            form = EBallotForm(request.POST, round_instance=round_obj)
-        else:
-            form = ResultEntryForm(request.POST, round_instance=round_obj)
-
+        form = form_class(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
                 result = form.save()
@@ -480,10 +486,10 @@ def enter_result(request, round_id, ballot_code=None):
                                        "data_name": "[%s]" % str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
+        form_kwargs = { "round_instance": round_obj }
         if ballot_code:
-            form = EBallotForm(ballot_code=ballot_code, round_instance=round_obj)
-        else:
-            form = ResultEntryForm(round_instance=round_obj)
+            form_kwargs["ballot_code"] = ballot_code
+        form = form_class(**form_kwargs)
 
     return render_to_response("round_entry.html",
                               {"form": form,
