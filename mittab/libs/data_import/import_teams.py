@@ -1,25 +1,6 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
-
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
-
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
-
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
 from mittab.apps.tab.models import *
 from mittab.apps.tab.forms import SchoolForm
+from mittab.libs.data_import import value_or_empty
 
 import xlrd
 from xlwt import Workbook
@@ -32,19 +13,16 @@ def import_teams(fileToImport):
     num_teams = 0
     found_end = False
     team_errors = []
-    while found_end == False:
-        try:
-            sh.cell(num_teams, 0).value
-            num_teams +=1
-        except IndexError:
-            found_end = True
 
-        #Verify sheet has required number of columns
-        try:
-            sh.cell(0, 8).value
-        except:
-            team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
-            return team_errors
+    #Verify sheet has required number of columns
+    try:
+        sh.cell(0, 8).value
+    except:
+        team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
+        return team_errors
+
+    while value_or_empty(sh, num_judges, 0):
+        num_judges += 1
 
     for i in range(1, num_teams):
 
@@ -124,14 +102,8 @@ def import_teams(fileToImport):
                 deb2_status = 0
 
             #Since this is not required data and at the end of the sheet, be ready for index errors
-            try: 
-                deb2_phone = sh.cell(i,9).value
-            except IndexError:
-                deb2_phone = ''
-            try:
-                deb2_provider = sh.cell(i,10).value
-            except IndexError:
-                deb2_provider = ''
+            deb2_phone = value_or_empty(sh, i, 9)
+            deb2_provider = value_or_empty(sh, i, 10)
 
 
         #Save Everything

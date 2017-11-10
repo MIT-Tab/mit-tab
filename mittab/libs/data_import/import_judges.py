@@ -1,25 +1,6 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
-
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
-
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
-
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
 from mittab.apps.tab.models import *
 from mittab.apps.tab.forms import JudgeForm
+from mittab.libs.data_import import value_or_empty
 
 from decimal import *
 import xlrd
@@ -33,19 +14,19 @@ def import_judges(fileToImport):
     num_judges = 0
     found_end = False
     judge_errors = []
-    while found_end == False:
-        try:
-            sh.cell(num_judges, 0).value
-            num_judges += 1
-        except IndexError:
-            found_end = True
 
-        #Verify sheet has required number of columns
-        try:
-            sh.cell(0, 1).value
-        except:
-            team_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
-            return team_errors
+    #Verify sheet has required number of columns
+    try:
+        sh.cell(0, 1).value
+    except:
+        team_errors.append("ERROR: Insufficient Columns in sheet. No Data Read")
+        return team_errors
+
+    # Get the number of judges
+    # TODO: refactor this to a shared function
+    while value_or_empty(sh, num_judges, 0):
+        num_judges += 1
+
     for i in range(1, num_judges):
         #Load and validate Judge's Name
         judge_name = sh.cell(i, 0).value
@@ -68,41 +49,33 @@ def import_judges(fileToImport):
             continue
 
         #Because this data is not required, be prepared for IndexErrors
-        #or ValueErrors when int() attempts to parse empty string
-        try:
-            judge_phone = str(int(sh.cell(i, 2).value))
-        except (IndexError, ValueError) as e:
-            judge_phone = ''
-        try: 
-            judge_provider = sh.cell(i, 3).value
-        except IndexError:
-            judge_provider = ''
+        judge_phone = value_or_empty(sh, i, 2)
+        if judge_phone:
+            judge_phone = str(int(judge_phone))
+        judge_provider = value_or_empty(sh, i, 3)
 
         #iterate through schools until none are left
         cur_col = 4
         schools = []
         while(True):
-            try:
-                judge_school = sh.cell(i, cur_col).value
-                #If other judges have more schools but this judge doesn't, we get an empty string
-                #If blank, keep iterating in case user has a random blank column for some reason
-                if (judge_school != ''):
+            judge_school = value_or_empty(sh, i, cur_col)
+            #If other judges have more schools but this judge doesn't, we get an empty string
+            #If blank, keep iterating in case user has a random blank column for some reason
+            if (judge_school != ''):
+                try:
+                    #Get id from the name because JudgeForm requires we use id
+                    s = School.objects.get(name__iexact=judge_school).id
+                    schools.append(s)
+                except IndexError:
+                    break
+                except:
                     try:
-                        #Get id from the name because JudgeForm requires we use id
-                        s = School.objects.get(name__iexact=judge_school).id 
-                        schools.append(s)
-                    except IndexError:
-                        break
+                        s = School(name=judge_school)
+                        s.save()
+                        schools.append(s.id)
                     except:
-                        try:
-                            s = School(name=judge_school)
-                            s.save()
-                            schools.append(s.id)
-                        except:
-                            judge_errors.append(judge_name + ': Invalid School')
-                            continue
-            except IndexError:
-                break
+                        judge_errors.append(judge_name + ': Invalid School')
+                        continue
             cur_col += 1
 
         data = {'name': judge_name, 'rank': judge_rank, 'phone': judge_phone, 'provider': judge_provider, 'schools': schools}
