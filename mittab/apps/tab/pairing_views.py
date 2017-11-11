@@ -347,11 +347,15 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     try :
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
+        round_obj.judges.add(judge_obj)
+
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=int(remove_id))
             round_obj.judges.remove(remove_obj)
 
-        round_obj.judges.add(judge_obj)
+            if remove_obj == round_obj.chair:
+                round_obj.chair = round_obj.judges.order_by('-rank').first()
+
         round_obj.save()
         data = {"success":True,
                 "round_id": round_obj.id,
