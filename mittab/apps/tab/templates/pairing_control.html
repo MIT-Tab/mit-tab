@@ -58,7 +58,7 @@
                     {% endif %}
                     {% for pairing in round_info %}
                     <tr>
-                        <td class="team swappable" team-id="{{pairing.gov_team.id}}"
+                        <td class="team" team-id="{{pairing.gov_team.id}}"
                             round-id="{{pairing.id}}"
                             team-name="{{pairing.gov_team.name}}">
                             <a class="btn btn-link" href="/team/{{pairing.gov_team.id}}" >{{pairing.gov_team.name}}</a></td>
@@ -71,6 +71,7 @@
                             <span class="full_width btn-group block-tight"
                                 round-id="{{pairing.id}}"
                                 judge-id="{{judge.id}}">
+
                                 <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
                                     round-id="{{pairing.id}}"
                                     judge-id="{{judge.id}}" href="#">{{judge.name}} ({{judge.rank}})<span class="caret"></span>
@@ -78,6 +79,7 @@
                                 <ul class="dropdown-menu" round-id={{pairing.id}} judge-id={{judge.id}}></ul>
                             </span>
                         {% endfor %}
+
                         {% for slot in judge_slots %}
                         {% if pairing.judges.all|length < slot %}
                             <span class="full_width unassigned btn-group block-tight"
@@ -90,9 +92,11 @@
                         {% endif %}
                         {% endfor %}
                         </td>
+
                         <td rowspan=2>
                             <input type="text" name="panel_{{pairing.id}}" maxlength=4 class="input-super-mini">
                         </td>
+
                         <td rowspan=2><a class="btn btn-link" href="/room/{{pairing.room.id}}" >{{pairing.room.name}}</a></td>
                         <td rowspan=2>
 
@@ -128,7 +132,7 @@
 
                     </tr>
                     <tr>
-                        <td class="team swappable" team-id="{{pairing.opp_team.id}}"
+                        <td class="team" team-id="{{pairing.opp_team.id}}"
                             round-id="{{pairing.id}}"
                             team-name="{{pairing.opp_team.name}}">
                             <a class="btn btn-link" href="/team/{{pairing.opp_team.id}}" >{{pairing.opp_team.name}}</a></td>
