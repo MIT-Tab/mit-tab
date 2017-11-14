@@ -72,8 +72,6 @@ def import_teams(fileToImport):
                 continue
             team_school = School.objects.get(name__iexact=school_name)
 
-
-        #TODO: Verify there are not multiple free seeds from the same school
         team_seed = sh.cell(i,2).value.strip().lower()
         if team_seed == 'full seed' or team_seed == 'full':
             team_seed = 3

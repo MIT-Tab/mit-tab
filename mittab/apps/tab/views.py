@@ -33,7 +33,6 @@ def render_403(request):
     return HttpResponseForbidden(t.render(c))
 
 #View for manually adding scratches
-#TODO: Update logic here (and all other scratch methods) to prevent duplicate scratches
 def add_scratch(request):
     if request.method == 'POST':
         form = ScratchForm(request.POST)
@@ -280,7 +279,7 @@ def upload_data(request):
         judge_errors = room_errors = team_errors = []
         importName = ''
         results = ''
-        #TODO: Could probably turn these checks into a loop
+
         if 'team_file' in request.FILES:
           team_errors = import_teams.import_teams(request.FILES['team_file'])
           importName += request.FILES['team_file'].name + ' '
@@ -302,6 +301,7 @@ def upload_data(request):
             results += 'Room Import Errors (Please Check These Manually):\n'
             for e in room_errors:
               results += '            ' + e + '\n'
+
         return render_to_response('thanks.html', 
                                  {'data_type': "Database data",
                                   'data_name': importName,

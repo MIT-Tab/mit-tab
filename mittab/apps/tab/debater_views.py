@@ -44,7 +44,7 @@ def view_debater(request, debater_id):
         rounds = RoundStats.objects.filter(debater=debater)
         rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
         form = DebaterForm(instance=debater)
-        # Really only should be one, TODO: change to get when we have tests
+        # Really only should be one
         teams = Team.objects.filter(debaters = debater)
         links = []
         for team in teams:
