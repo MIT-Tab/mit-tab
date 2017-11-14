@@ -251,7 +251,6 @@ class ResultEntryForm(forms.Form):
 
         with transaction.atomic():
             for debater in self.DEBATERS:
-                # TODO: Have update as a separate endpoint
                 old_stats = RoundStats.objects.filter(round=round_obj, debater_role=debater)
                 if len(old_stats) > 0:
                     old_stats.delete()
