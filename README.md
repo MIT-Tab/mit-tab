@@ -1,11 +1,15 @@
+<div align="center">
+<img width="100%" src="https://image.ibb.co/ggYcLw/banner.png" alt="MIT-Tab">
+
 [![Build Status](https://travis-ci.org/jolynch/mit-tab.svg?branch=master)](https://travis-ci.org/jolynch/mit-tab)
 
-# MIT-TAB
+</div>
+
+MIT-Tab is a web application to manage APDA debate tournaments.
 
 Looking to learn how to use mit-tab? [Check out the wiki!](https://github.com/jolynch/mit-tab/wiki) It has articles on everything you need to know to run tournaments efficiently.
 
-A web application that allows APDA american debate tournaments to correctly tab
-and manage their tournaments. You add the following information:
+MIT-Tab can store the following information:
 
 1. Schools
 2. Debaters
