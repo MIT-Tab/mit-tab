@@ -96,6 +96,7 @@ urlpatterns = patterns('',
     url(r'^pairing/release/$', pairing_views.toggle_pairing_released),
     url(r'^pairing/view_backups/$', pairing_views.view_backups),
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
+    url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
 
 
     # Backups
