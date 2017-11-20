@@ -42,6 +42,51 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     return HttpResponse(data, mimetype='application/json')
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
+def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
+    try :
+        src_team = Team.objects.get(id=int(src_team))
+        dest_team = Team.objects.get(id=int(dest_team))
+        if int(src_round) == int(dest_round):
+            same_round = Round.objects.get(id=int(src_round))
+            gov_team = same_round.gov_team
+            opp_team = same_round.opp_team
+            same_round.gov_team = opp_team
+            same_round.opp_team = gov_team
+            same_round.save()
+        else:
+            src_round = Round.objects.get(id=int(src_round))
+            dest_round = Round.objects.get(id=int(dest_round))
+            if src_round.gov_team == src_team:
+                if dest_round.gov_team == dest_team:
+                    # Swap the two gov teams
+                    src_round.gov_team = dest_team
+                    dest_round.gov_team = src_team
+                else:
+                    # Swap src_rounds gov team with 
+                    # dest_round's opp team
+                    src_round.gov_team = dest_team
+                    dest_round.opp_team = src_team
+            else:
+                if dest_round.gov_team == dest_team:
+                    # Swap src_rounds opp team with
+                    # dest_round's gov team
+                    src_round.opp_team = dest_team
+                    dest_round.gov_team = src_team
+                else:
+                    # Swap the two opp teams
+                    src_round.opp_team = dest_team
+                    dest_round.opp_team = src_team
+            dest_round.save()
+            src_round.save()
+        data = {'success':True}
+    except Exception as e:
+        print "Unable to swap teams: ", e
+        data = {'success':False}
+    data = simplejson.dumps(data)
+    return HttpResponse(data, mimetype='application/json')
+
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
