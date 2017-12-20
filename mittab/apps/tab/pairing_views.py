@@ -541,10 +541,12 @@ def confirm_start_new_tourny(request):
 def start_new_tourny(request):
     try:
         clear_db()
-        TabSettings.objects.create(key = "cur_round", value = 1)
-        TabSettings.objects.create(key = "tot_rounds", value = 5)
-        TabSettings.objects.create(key = "var_teams_to_break", value = 8)
-        TabSettings.objects.create(key = "nov_teams_to_break", value = 4)
+        #TODO: Unify this with initialize_tourney
+        TabSettings.set("cur_round", 1)
+        TabSettings.set("tot_rounds", 5)
+        TabSettings.set("var_teams_to_break", 8)
+        TabSettings.set("nov_teams_to_break", 4)
+        TabSettings.set("lenient_late", 0)
 
 
     except Exception as e:

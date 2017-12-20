@@ -13,8 +13,9 @@ web:
 tests: test
 
 test:
+	./bin/setup
 	python manage.py initialize_tourney test .
-	python -m pytest mittab
+	python manage.py test
 
 shell:
 	python manage.py shell
