@@ -78,11 +78,11 @@ def view_team(request, team_id):
                                   'team_obj':team,
                                   'team_stats':stats}, 
                                   context_instance=RequestContext(request))
-    
+
     return render_to_response('data_entry.html', 
                              {'form': form}, 
                              context_instance=RequestContext(request))
-    
+
 def enter_team(request):
     if request.method == 'POST':
         form = TeamEntryForm(request.POST)

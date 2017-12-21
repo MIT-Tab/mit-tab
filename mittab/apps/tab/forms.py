@@ -22,10 +22,12 @@ class UploadDataForm(forms.Form):
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
+        fields = '__all__'
 
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
+        fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
@@ -67,6 +69,7 @@ class JudgeForm(forms.ModelForm):
 
     class Meta:
         model = Judge
+        fields = '__all__'
 
 
 class TeamForm(forms.ModelForm):
@@ -87,31 +90,28 @@ class TeamForm(forms.ModelForm):
 
     class Meta:
         model = Team
+        fields = '__all__'
 
-class TeamEntryForm(forms.ModelForm):
+class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
-    def clean_debaters(self):
-        data = self.cleaned_data['debaters']
-        if not( 1 <= len(data) <= 2) :
-            raise forms.ValidationError("You must select 1 or 2 debaters!") 
-        return data
 
     class Meta:
         model = Team
+        fields = '__all__'
 
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
     class Meta:
         model = Scratch
+        fields = '__all__'
 
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
+        fields = '__all__'
 
 
 def validate_speaks(value):
@@ -361,6 +361,4 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
-
-
 
