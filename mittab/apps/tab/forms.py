@@ -202,13 +202,13 @@ class ResultEntryForm(forms.Form):
             # Check to make sure everyone has different ranks
             if self.has_invalid_ranks():
                 for d in self.DEBATERS:
-                    self._errors[self.deb_attr_name(d, "ranks")] = self.error_class(["Ranks must be different"])
+                    self.add_error(self.deb_attr_name(d, "ranks"), self.error_class(["Ranks must be different"]))
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
             for (speaks, rank, d) in sorted_by_ranks:
                 if speaks > high_score:
-                    self._errors[self.deb_attr_name(d, "speaks")] = self.error_class(["These speaks are too high for the rank"])
+                    self.add_error(self.deb_attr_name(d, "speaks"), self.error_class(["These speaks are too high for the rank"]))
                 high_score = speaks
 
             # Check to make sure that the team with most speaks and the least
@@ -225,22 +225,22 @@ class ResultEntryForm(forms.Form):
 
             # No winner, this is bad
             if cleaned_data["winner"] == Round.NONE:
-                self._errors["winner"] = self.error_class(["Someone has to win!"])
+                self.add_error("winner", self.error_class(["Someone has to win!"]))
             # Gov won but opp has higher points
             if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
-                self._errors["winner"] = self.error_class(["Low Point Win!!"])
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
             # Opp won but gov has higher points
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
-                self._errors["winner"] = self.error_class(["Low Point Win!!"])
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
             # Make sure that all debaters were selected
             for deb in self.DEBATERS:
                 if self.deb_attr_val(deb, "debater", int) == -1:
-                    self._errors[self.deb_attr_name(deb, "debater")] = self.error_class(["You need to pick a debater"])
+                    self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
         except Exception, e:
             print "Caught error %s" %(e)
-            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+            self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
             traceback.print_exc(file=sys.stdout)
         return cleaned_data
 
