@@ -99,11 +99,6 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR
 
-STATICFILES_DIRS = (
-    os.path.join(STATIC_ROOT, 'mittab'),
-)
-
-
 TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.auth.context_processors.auth",
     "django.core.context_processors.debug",
