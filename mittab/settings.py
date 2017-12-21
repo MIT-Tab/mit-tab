@@ -52,8 +52,9 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mittab.apps.tab.middleware.Login',
-    'django.middleware.transaction.TransactionMiddleware', #Be careful about ordering
 )
+
+ATOMIC_REQUESTS = True
 
 ROOT_URLCONF = 'mittab.urls'
 
