@@ -11,7 +11,6 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.utils import simplejson
 from django.db import transaction
 from django.shortcuts import redirect
 
