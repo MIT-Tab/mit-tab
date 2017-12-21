@@ -100,7 +100,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR
 
 STATICFILE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'static')
+    os.path.join(BASE_DIR, 'mittab', 'static'),
 )
 
 TEMPLATE_CONTEXT_PROCESSORS = (
