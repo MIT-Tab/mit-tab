@@ -25,7 +25,7 @@ DEBUG = os.environ.get('DEBUG')
 TEMPLATE_DEBUG = True
 
 TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
+    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
 )
 
 ALLOWED_HOSTS = ['*']

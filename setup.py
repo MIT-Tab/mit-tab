@@ -14,7 +14,7 @@ setup(
     include_package_data=True,
     setup_requires=['setuptools'],
     install_requires=[
-        'Django==1.6.1',
+        'Django==1.7',
         'South',
         'mock',
         'pytest',
