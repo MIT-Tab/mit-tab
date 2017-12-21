@@ -94,13 +94,13 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/1.6/howto/static-files/
+# https://docs.djangoproject.com/en/1.7/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'mittab')
+STATIC_ROOT = BASE_DIR
 
 STATICFILES_DIRS = (
-    os.path.join(STATIC_ROOT, 'static'),
+    os.path.join(STATIC_ROOT, 'mittab'),
 )
 
 
