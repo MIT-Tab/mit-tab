@@ -15,7 +15,6 @@ setup(
     setup_requires=['setuptools'],
     install_requires=[
         'Django==1.7',
-        'South',
         'mock',
         'pytest',
         'xlrd',

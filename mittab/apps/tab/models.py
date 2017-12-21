@@ -222,7 +222,3 @@ class CheckIn(models.Model):
     round_number = models.IntegerField()
     def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
-
-# Necessary for migrations
-from south.modelsinspector import add_introspection_rules
-add_introspection_rules([], ["^localflavor\.us\.models\.PhoneNumberField"])
