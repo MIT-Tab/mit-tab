@@ -1,4 +1,4 @@
-Django==1.7
+Django==1.8
 wsgiref==0.1.2
 mock==1.0.1
 numpy==1.12.1
