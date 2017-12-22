@@ -1,5 +1,4 @@
 from datetime import datetime
-import json
 
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -378,7 +377,6 @@ def team_stats(request, team_id):
         data = {'success': True, 'result':stats}
     except Team.DoesNotExist:
         data = {'success': False}
-    data = json.dumps(data)
-    return JsonResponse(data, safe=False)
+    return JsonResponse(data)
 
 
