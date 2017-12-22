@@ -380,12 +380,6 @@ def remove_judge(request, round_id, judge_id):
         data = {"success":False}
     return JsonResponse(data)
 
-def get_pairing_released(request):
-    released = TabSettings.get("pairing_released", 0)
-    data = {"success": True,
-            "pairing_released": released == 1}
-    return JsonResponse(data)
-
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
     TabSettings.set("pairing_released", int(not old))
