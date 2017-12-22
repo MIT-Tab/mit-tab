@@ -362,24 +362,6 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         data = {"success":False}
     return JsonResponse(data)
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
-def remove_judge(request, round_id, judge_id):
-    try :
-        round_obj = Round.objects.get(id=int(round_id))
-        judge_obj = Judge.objects.get(id=int(judge_id))
-
-        round_obj.judges.remove(judge_obj)
-        round_obj.save()
-        data = {"success":True,
-                "round_id": round_obj.id,
-                "judge_name": judge_obj.name,
-                "judge_rank": float(judge_obj.rank),
-                "judge_id": judge_obj.id}
-    except Exception as e:
-        print "Failed to assign judge: ", e
-        data = {"success":False}
-    return JsonResponse(data)
-
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
     TabSettings.set("pairing_released", int(not old))
