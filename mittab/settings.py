@@ -22,12 +22,6 @@ SECRET_KEY = '=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG')
 
-TEMPLATE_DEBUG = True
-
-TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
-)
-
 ALLOWED_HOSTS = ['*']
 
 
@@ -106,9 +100,12 @@ STATICFILES_DIRS = (
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
+            'debug': True,
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
                 'django.core.context_processors.debug',
