@@ -31,6 +31,7 @@ class TestRankingLogic(TestCase):
         expected_scores = load_debater_rankings()
         dict_scores, dict_expected_scores = map(dict,
                                                 (scores, expected_scores))
+
         assert len(dict_scores) == len(dict_expected_scores)
         for k in dict_scores:
             left, right = dict_scores[k], dict_expected_scores[k]

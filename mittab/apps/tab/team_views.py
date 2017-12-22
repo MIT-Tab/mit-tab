@@ -1,14 +1,15 @@
+from datetime import datetime
+
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-import json
+
 from forms import TeamForm, TeamEntryForm, ScratchForm
 from errors import *
 from models import *
 import mittab.libs.tab_logic as tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
-from datetime import datetime
 
 def view_teams(request):
     def flags(team):
@@ -18,7 +19,7 @@ def view_teams(request):
         else:
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
-    
+
     c_teams = [(t.pk, t.name, flags(t), TabFlags.flags_to_symbols(flags(t)))
                for t in Team.objects.all().order_by("name")]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
@@ -76,11 +77,11 @@ def view_team(request, team_id):
                                   'team_obj':team,
                                   'team_stats':stats}, 
                                   context_instance=RequestContext(request))
-    
+
     return render_to_response('data_entry.html', 
                              {'form': form}, 
                              context_instance=RequestContext(request))
-    
+
 def enter_team(request):
     if request.method == 'POST':
         form = TeamEntryForm(request.POST)
@@ -376,7 +377,6 @@ def team_stats(request, team_id):
         data = {'success': True, 'result':stats}
     except Team.DoesNotExist:
         data = {'success': False}
-    data = json.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 

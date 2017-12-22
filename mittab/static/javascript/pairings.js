@@ -181,7 +181,8 @@ var select_info = function(element) {
     $(div).removeClass("hidden")
 }
 
-var toggle_pairing_release = function(element) {
+var toggle_pairing_release = function(event) {
+    event.preventDefault();
     var button = $(this);
     $.ajax({
         url:"/pairing/release",
@@ -219,6 +220,4 @@ var bind_handlers = function() {
     $('select[name=winner]').change(select_info);
     $('.btn.release').click(toggle_pairing_release);
 }
-
-
 

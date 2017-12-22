@@ -25,7 +25,7 @@ DEBUG = os.environ.get('DEBUG')
 TEMPLATE_DEBUG = True
 
 TEMPLATE_DIRS = (
-    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates')
+    os.path.join(BASE_DIR, 'mittab', 'apps', 'tab', 'templates'),
 )
 
 ALLOWED_HOSTS = ['*']
@@ -40,7 +40,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'south',
     'mittab.apps.tab',
     'raven.contrib.django.raven_compat',
 )
@@ -53,8 +52,9 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mittab.apps.tab.middleware.Login',
-    'django.middleware.transaction.TransactionMiddleware', #Be careful about ordering
 )
+
+ATOMIC_REQUESTS = True
 
 ROOT_URLCONF = 'mittab.urls'
 
@@ -94,14 +94,14 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/1.6/howto/static-files/
+# https://docs.djangoproject.com/en/1.7/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR
 
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'mittab', 'static'),
 )
-
 
 TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.auth.context_processors.auth",

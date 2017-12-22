@@ -22,10 +22,12 @@ class UploadDataForm(forms.Form):
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
+        fields = '__all__'
 
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
+        fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
@@ -67,6 +69,7 @@ class JudgeForm(forms.ModelForm):
 
     class Meta:
         model = Judge
+        fields = '__all__'
 
 
 class TeamForm(forms.ModelForm):
@@ -87,31 +90,28 @@ class TeamForm(forms.ModelForm):
 
     class Meta:
         model = Team
+        fields = '__all__'
 
-class TeamEntryForm(forms.ModelForm):
+class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.filter(team__debaters__isnull=True), 
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))
-    def clean_debaters(self):
-        data = self.cleaned_data['debaters']
-        if not( 1 <= len(data) <= 2) :
-            raise forms.ValidationError("You must select 1 or 2 debaters!") 
-        return data
 
     class Meta:
         model = Team
+        fields = '__all__'
 
 class ScratchForm(forms.ModelForm):
     team = forms.ModelChoiceField(queryset=Team.objects.all())
     judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
     class Meta:
         model = Scratch
+        fields = '__all__'
 
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
+        fields = '__all__'
 
 
 def validate_speaks(value):
@@ -202,13 +202,13 @@ class ResultEntryForm(forms.Form):
             # Check to make sure everyone has different ranks
             if self.has_invalid_ranks():
                 for d in self.DEBATERS:
-                    self._errors[self.deb_attr_name(d, "ranks")] = self.error_class(["Ranks must be different"])
+                    self.add_error(self.deb_attr_name(d, "ranks"), self.error_class(["Ranks must be different"]))
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
             for (speaks, rank, d) in sorted_by_ranks:
                 if speaks > high_score:
-                    self._errors[self.deb_attr_name(d, "speaks")] = self.error_class(["These speaks are too high for the rank"])
+                    self.add_error(self.deb_attr_name(d, "speaks"), self.error_class(["These speaks are too high for the rank"]))
                 high_score = speaks
 
             # Check to make sure that the team with most speaks and the least
@@ -225,22 +225,22 @@ class ResultEntryForm(forms.Form):
 
             # No winner, this is bad
             if cleaned_data["winner"] == Round.NONE:
-                self._errors["winner"] = self.error_class(["Someone has to win!"])
+                self.add_error("winner", self.error_class(["Someone has to win!"]))
             # Gov won but opp has higher points
             if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
-                self._errors["winner"] = self.error_class(["Low Point Win!!"])
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
             # Opp won but gov has higher points
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
-                self._errors["winner"] = self.error_class(["Low Point Win!!"])
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
             # Make sure that all debaters were selected
             for deb in self.DEBATERS:
                 if self.deb_attr_val(deb, "debater", int) == -1:
-                    self._errors[self.deb_attr_name(deb, "debater")] = self.error_class(["You need to pick a debater"])
+                    self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
         except Exception, e:
             print "Caught error %s" %(e)
-            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+            self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
             traceback.print_exc(file=sys.stdout)
         return cleaned_data
 
@@ -361,6 +361,4 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
-
-
 

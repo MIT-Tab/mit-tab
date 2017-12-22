@@ -1,25 +1,27 @@
-from django.shortcuts import render_to_response
-from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
-from django.contrib.auth.decorators import permission_required
-from django.utils import simplejson
-from django.db import transaction
-from errors import *
-from mittab.libs.errors import *
-from models import *
-from django.shortcuts import redirect
-from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
-import mittab.libs.cache_logic as cache_logic
-import mittab.libs.tab_logic as tab_logic
-import mittab.libs.assign_judges as assign_judges
 import random
 import sys
 import traceback
-import mittab.libs.backup as backup
 import time
 import datetime
 import os
 import pprint
+
+from django.shortcuts import render_to_response
+from django.template import RequestContext
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.contrib.auth.decorators import permission_required
+from django.db import transaction
+from django.shortcuts import redirect
+
+from errors import *
+from models import *
+from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
+from mittab.libs.errors import *
+import mittab.libs.cache_logic as cache_logic
+import mittab.libs.tab_logic as tab_logic
+import mittab.libs.assign_judges as assign_judges
+import mittab.libs.backup as backup
+
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -38,8 +40,7 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     except Exception as e:
         print "ARG ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
@@ -82,8 +83,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     except Exception as e:
         print "Unable to swap teams: ", e
         data = {'success':False}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -360,42 +360,14 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
-
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
-def remove_judge(request, round_id, judge_id):
-    try :
-        round_obj = Round.objects.get(id=int(round_id))
-        judge_obj = Judge.objects.get(id=int(judge_id))
-
-        round_obj.judges.remove(judge_obj)
-        round_obj.save()
-        data = {"success":True,
-                "round_id": round_obj.id,
-                "judge_name": judge_obj.name,
-                "judge_rank": float(judge_obj.rank),
-                "judge_id": judge_obj.id}
-    except Exception as e:
-        print "Failed to assign judge: ", e
-        data = {"success":False}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
-
-def get_pairing_released(request):
-    released = TabSettings.get("pairing_released", 0)
-    data = {"success": True,
-            "pairing_released": released == 1}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
     TabSettings.set("pairing_released", int(not old))
     data = {"success": True,
             "pairing_released": int(not old) == 1}
-    data = simplejson.dumps(data)
-    return HttpResponse(data, mimetype='application/json')
+    return JsonResponse(data)
 
 """dxiao: added a html page for showing tab for the current round.
 Uses view_status and view_round code from revision 108."""
