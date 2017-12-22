@@ -379,6 +379,6 @@ def team_stats(request, team_id):
     except Team.DoesNotExist:
         data = {'success': False}
     data = json.dumps(data)
-    return JsonResponse(data)
+    return JsonResponse(data, safe=False)
 
 

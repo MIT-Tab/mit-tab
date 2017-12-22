@@ -5,7 +5,6 @@ import time
 import datetime
 import os
 import pprint
-import simplejson
 
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -41,7 +40,6 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
     except Exception as e:
         print "ARG ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -85,7 +83,6 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     except Exception as e:
         print "Unable to swap teams: ", e
         data = {'success':False}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 
@@ -363,7 +360,6 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -382,14 +378,12 @@ def remove_judge(request, round_id, judge_id):
     except Exception as e:
         print "Failed to assign judge: ", e
         data = {"success":False}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 def get_pairing_released(request):
     released = TabSettings.get("pairing_released", 0)
     data = {"success": True,
             "pairing_released": released == 1}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 def toggle_pairing_released(request):
@@ -397,7 +391,6 @@ def toggle_pairing_released(request):
     TabSettings.set("pairing_released", int(not old))
     data = {"success": True,
             "pairing_released": int(not old) == 1}
-    data = simplejson.dumps(data)
     return JsonResponse(data)
 
 """dxiao: added a html page for showing tab for the current round.
