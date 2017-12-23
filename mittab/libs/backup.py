@@ -5,7 +5,7 @@ import os
 
 from mittab.apps.tab.models import TabSettings
 from django.conf import settings
-from django.core.servers.basehttp import FileWrapper
+from wsgiref.util import FileWrapper
 from mittab.settings import BASE_DIR
 
 
