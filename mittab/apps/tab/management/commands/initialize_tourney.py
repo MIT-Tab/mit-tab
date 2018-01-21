@@ -63,6 +63,8 @@ class Command(BaseCommand):
 
         self.stdout.write("Creating tab/entry users")
         tab = User.objects.create_user("tab", None, options["tab_password"])
+        tab.is_staff = True
+        tab.is_admin = True
         tab.is_superuser = True
         tab.save()
         entry = User.objects.create_user("entry", None, options["entry_password"])
