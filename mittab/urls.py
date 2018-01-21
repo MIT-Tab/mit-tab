@@ -1,4 +1,5 @@
-from django.conf.urls import patterns, include, url
+from django.views import i18n
+from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
 import apps.tab.views as views
@@ -10,21 +11,19 @@ import apps.tab.pairing_views as pairing_views
 from django.contrib import admin
 admin.autodiscover()
 
-urlpatterns = patterns('',
-    # Example:
-    # url(r'^tab/', include('tab.foo.urls')),
-
+urlpatterns = [
     # Uncomment the admin/doc line below to enable admin documentation:
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^dynamic-media/jsi18n/$', 'django.views.i18n.javascript_catalog'),
+    url(r'^dynamic-media/jsi18n/$', i18n.javascript_catalog),
 
     url(r'^$', views.index),
     url(r'^403/', views.render_403),
 
+    # TODO: named urls
     # Account related
-    url(r'^accounts/login/$',  views.tab_login),
+    url(r'^accounts/login/$', views.tab_login),
     url(r'^accounts/logout/$', logout),
 
     # Judge related
@@ -106,4 +105,4 @@ urlpatterns = patterns('',
 
     # Data Upload
     url(r'^import_data/$', views.upload_data)
-)
+]
