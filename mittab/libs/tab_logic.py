@@ -89,9 +89,9 @@ def pair_round():
         # Bucket all the teams into brackets
         # NOTE: We do not bucket teams that have only won by
         #       forfeit/bye/lenient_late in every round because they have no speaks
-        middle_of_bracket_teams = middle_of_bracket_teams()
+        middle_of_bracket = middle_of_bracket_teams()
         all_checked_in_teams = Team.objects.filter(checked_in=True)
-        normal_pairing_teams = all_checked_in_teams - middle_of_bracket_teams
+        normal_pairing_teams = all_checked_in_teams.exclude(pk__in=map(lambda t: t.id, middle_of_bracket))
 
         team_buckets = [ (tot_wins(team), team) for team in normal_pairing_teams ]
         list_of_teams = [rank_teams_except_record([team
@@ -99,12 +99,12 @@ def pair_round():
                                                   if w == i])
                          for i in range(current_round)]
 
-        for team in random.shuffle(middle_of_bracket_teams):
+        for team in middle_of_bracket:
             wins = tot_wins(team)
             print("Pairing %s into the middle of the %s-win bracket" % (team, wins))
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size / 2
-            list_of_teams[wins].insert(team)
+            list_of_teams[wins].insert(bracket_middle, team)
 
         print "these are the teams before pullups"
         print pprint.pprint(list_of_teams)
@@ -139,9 +139,6 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else:
                     pull_up = None
-                    # FIXME (jolynch): Try to use descriptive variable names. (julia) - I'll fix this.
-                    # instead of commenting
-
                     # i is the last team in the bracket below
                     i = len(list_of_teams[bracket-1]) - 1
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
@@ -159,7 +156,7 @@ def pair_round():
                             removed_teams = []
                             for t in list(Team.objects.filter(checked_in=True)):
                                 #They have all wins and they haven't forfeited so they need to get paired in
-                                if current_round-bye_teams.count(t) == 1 and tot_wins(t) == bracket:
+                                if t in middle_of_bracket and tot_wins(t) == bracket:
                                     removed_teams += [t]
                                     list_of_teams[bracket].remove(t)
                             list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
@@ -422,15 +419,16 @@ def middle_of_bracket_teams():
     3 - byes
 
     These teams have speaks of zero but _should_ have average speaks, so they
-    should be paired into the middle of their bracket
+    should be paired into the middle of their bracket. Randomized for fairness
     """
     teams = [] # TODO: Make this more efficient. Try to use a SQL query
     for team in Team.objects.filter(checked_in=True):
-        avg_speaks_rounds = Bye.objects.filter(team=team).count()
-        avg_speaks_rounds += NoShow.objects.filter(team=team, lenient_late=True).count()
-        avg_speaks_rounds += num_forefeit_wins(team)
+        avg_speaks_rounds = Bye.objects.filter(bye_team=team).count()
+        avg_speaks_rounds += NoShow.objects.filter(no_show_team=team, lenient_late=True).count()
+        avg_speaks_rounds += num_forfeit_wins(team)
         if TabSettings.get('cur_round') - 1 == avg_speaks_rounds:
-            teams += team
+            teams.append(team)
+    random.shuffle(teams)
     return teams
 
 
