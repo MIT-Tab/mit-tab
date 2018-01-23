@@ -707,17 +707,15 @@ def debater_abnormal_round_speaks(debater, round_number):
     Calculate the ranks for a bye/forfeit round
 
     Forfeits:
-    If the round is set to `lenient_late`, it uses average ranks
+    If the round is set to `lenient_late`, it uses average speaks
     Otherwise, it uses speaks of 0.0
 
     Byes:
     Uses average speaks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number,
-                                    bye_team=team)
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                        no_show_team=team)
+    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team)
     if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
