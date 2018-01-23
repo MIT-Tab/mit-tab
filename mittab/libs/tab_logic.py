@@ -84,40 +84,28 @@ def pair_round():
         # seeded teams are paired randomly.
         random.shuffle(list_of_teams)
         list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse = True)
-
-        #pairings = [None]* Team.objects.count()/2
     # Otherwise, pair by *speaks*
     else:
-        bye_teams = [bye.bye_team for bye in Bye.objects.all()]
-        # For each time that a team has won by forfeit, add them
-        # to the list of bye_teams
-        bye_teams = bye_teams + team_wins_by_forfeit()
-        # FIXME (jolynch): Why is this random thing here? - (julia) If there are multiple teams that have had the bye/won by forfeit,
-        #we want to order that they are inserted into the middle of the bracket to be random.  I need to change the code below so
-        #that this is actually true/used - See issue 3
-        random.shuffle(bye_teams, random=random.random)
-
         # Bucket all the teams into brackets
         # NOTE: We do not bucket teams that have only won by
-        #       forfeit/bye in every round because they have no speaks
+        #       forfeit/bye/lenient_late in every round because they have no speaks
+        middle_of_bracket_teams = middle_of_bracket_teams()
         all_checked_in_teams = Team.objects.filter(checked_in=True)
-        team_buckets = [(tot_wins(team), team)
-                        for team in all_checked_in_teams
-                        if current_round - bye_teams.count(team) != 1]
+        normal_pairing_teams = all_checked_in_teams - middle_of_bracket_teams
+
+        team_buckets = [ (tot_wins(team), team) for team in normal_pairing_teams ]
         list_of_teams = [rank_teams_except_record([team
                                                   for (w,team) in team_buckets
                                                   if w == i])
                          for i in range(current_round)]
 
-        # Take care of teams that only have forfeits/byes
-        # FIXME (julia): This should just look at the bye teams. No need to look at all teams, plus looking only at bye teams will
-        #insert them in a random order. See issue 3
-        if len(bye_teams) != 0:
-            for t in list(Team.objects.filter(checked_in=True)):
-                # pair into the middle
-                if current_round-bye_teams.count(t) == 1:
-                    print t
-                    list_of_teams[current_round-1].insert(int(float(len(list_of_teams[tot_wins(t)]))/2.0),t)
+        for team in random.shuffle(middle_of_bracket_teams):
+            wins = tot_wins(team)
+            print("Pairing %s into the middle of the %s-win bracket" % (team, wins))
+            bracket_size = len(list_of_teams[wins])
+            bracket_middle = bracket_size / 2
+            list_of_teams[wins].insert(team)
+
         print "these are the teams before pullups"
         print pprint.pprint(list_of_teams)
 
@@ -130,7 +118,6 @@ def pair_round():
         #  3) Otherwise, find a pull up from the next bracket
         for bracket in reversed(range(current_round)):
             if len(list_of_teams[bracket]) % 2 != 0:
-                #print "need pull-up"
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
                     byeint = len(list_of_teams[bracket]) - 1
@@ -205,8 +192,8 @@ def pair_round():
     # fullseed/freeseed, etc. - Julia to fix. Issue 6.
     # should randomize first
     if current_round == 1:
-        random.shuffle(pairings, random= random.random)
-        pairings = sorted(pairings, key = lambda team: highest_seed(team[0],team[1]), reverse = True)
+        random.shuffle(pairings, random=random.random)
+        pairings = sorted(pairings, key=lambda team: highest_seed(team[0],team[1]), reverse = True)
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
@@ -396,18 +383,16 @@ def num_byes(t):
     return Bye.objects.filter(bye_team = t).count()
 
 def num_forfeit_wins(team):
-    forfeit_wins = Round.objects.filter(
+    return Round.objects.filter(
             Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)|
             Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)|
             Q(gov_team=team, victor=Round.ALL_WIN)|
             Q(opp_team=team, victor=Round.ALL_WIN)).count()
-    return forfeit_wins
 
 def num_no_show(t):
     return NoShow.objects.filter(no_show_team = t).count()
 
-#Return true if the team forfeited the round, otherwise, return false
-def forfeited_round(r,t):
+def forfeited_round(r, t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
         if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
             return True
@@ -418,7 +403,6 @@ def forfeited_round(r,t):
         return False
 
 
-###Return true if the team won the round because the other team forfeited, otherwise return false
 def won_by_forfeit(r,t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
         if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
@@ -429,34 +413,45 @@ def won_by_forfeit(r,t):
     else:
         return False
 
+def middle_of_bracket_teams():
+    """
+    Finds teams whose only rounds have been one of the following results:
+
+    1 - win by forfeit
+    2 - lenient_late rounds
+    3 - byes
+
+    These teams have speaks of zero but _should_ have average speaks, so they
+    should be paired into the middle of their bracket
+    """
+    teams = [] # TODO: Make this more efficient. Try to use a SQL query
+    for team in Team.objects.filter(checked_in=True):
+        avg_speaks_rounds = Bye.objects.filter(team=team).count()
+        avg_speaks_rounds += NoShow.objects.filter(team=team, lenient_late=True).count()
+        avg_speaks_rounds += num_forefeit_wins(team)
+        if TabSettings.get('cur_round') - 1 == avg_speaks_rounds:
+            teams += team
+    return teams
+
+
 def team_wins_by_forfeit():
-    """ 
+    """
     Finds teams that have won by forfeit.
 
     A team can win by forfeit either by having XXX_VIA_FORFEIT
     or by having ALL_WIN situations.
-
-    Returns:
-        wins_by_forfeit - A list of *teams* for each time they 
-        have won by forfeit, there very well may be duplicates.
     """
     wins_by_forfeit = []
     for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
-        print r.round_number
-        print str(r.gov_team) + " won via forfeit"
         wins_by_forfeit.append(r.gov_team)
     for r in Round.objects.filter(victor = Round.OPP_VIA_FORFEIT):
-        print r.round_number
-        print str(r.opp_team) + " won via forfeit"
         wins_by_forfeit.append(r.opp_team)
     for r in Round.objects.filter(victor = Round.ALL_WIN):
-        print r.round_number
-        print str(r.gov_team)+ ", " + str(r.opp_team) + " won via forfeit"
         wins_by_forfeit.append(r.gov_team)
         wins_by_forfeit.append(r.opp_team)
-    return wins_by_forfeit
+    return list(set(wins_by_forfeit))
 
-#Calculate the total number of wins a team has
+# Calculate the total number of wins a team has
 def tot_wins(team):
     tot_wins = Round.objects.filter(
             Q(gov_team=team, victor=Round.GOV)|
@@ -558,11 +553,9 @@ def tab_nov_break():
 def team_comp(pairing, round_number):
     gov, opp = pairing.gov_team, pairing.opp_team
     if round_number == 1:
-        print "Using seeds"
         return (max(gov.seed, opp.seed),
                 min(gov.seed, opp.seed))
     else:
-        print "Using speaks"
         return (max(tot_wins(gov), tot_wins(opp)),
                 max(tot_speaks(gov), tot_speaks(opp)),
                 min(tot_speaks(gov), tot_speaks(opp)))
