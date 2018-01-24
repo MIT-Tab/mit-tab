@@ -7,6 +7,8 @@ import apps.tab.judge_views as judge_views
 import apps.tab.team_views as team_views
 import apps.tab.debater_views as debater_views
 import apps.tab.pairing_views as pairing_views
+from mittab.apps.tab import template_views
+from mittab.libs.data_import import export_xls_files
 
 from django.contrib import admin
 admin.autodiscover()
@@ -103,6 +105,12 @@ urlpatterns = [
     url(r'^backup/(.+)/$', pairing_views.view_backup),
     url(r'^upload_backup/$', pairing_views.upload_backup),
 
-    # Data Upload
-    url(r'^import_data/$', views.upload_data)
+    # Data upload and download
+    url(r'^import_data/$', views.upload_data),
+    url(r'^export/$', template_views.ExportXlsView.as_view()),
+    url(r'^export/teams', export_xls_files.export_teams),
+    url(r'^export/judges', export_xls_files.export_judges),
+    url(r'^export/rooms', export_xls_files.export_rooms),
+    url(r'^export/team-stats', export_xls_files.export_team_stats),
+    url(r'^export/speaker-stats', export_xls_files.export_debater_stats)
 ]

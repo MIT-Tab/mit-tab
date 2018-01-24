@@ -50,7 +50,8 @@
             <ul id = "sublist">
                 <li><a href="/admin">Admin Interface</a></li>
                 <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
-                <li><a class="{% active request upload_data %}" href="{{ upload_data }}">File Data Upload</a></li>
+                <li><a class="{% active request upload_data %}" href="{{ upload_data }}">Import XLS File</a></li>
+                <li><a href="/export">Export XLS File</a></li>
             </ul>
         </li>
         <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}">Backups</a>

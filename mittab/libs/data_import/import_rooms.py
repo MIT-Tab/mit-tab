@@ -18,12 +18,11 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from mittab.apps.tab.models import *
-from mittab.apps.tab.forms import RoomForm
-
 from decimal import *
 import xlrd
-from xlwt import Workbook
+
+from mittab.apps.tab.models import *
+
 
 def import_rooms(fileToImport):
     try:
@@ -33,6 +32,8 @@ def import_rooms(fileToImport):
     num_rooms = 0
     found_end = False
     room_errors = []
+
+    # TODO: Why is this even here? Why not just use the sh.nrows and sh.ncols -- Kevin
     while found_end == False:
         try:
             sh.cell(num_rooms, 0).value
@@ -48,37 +49,49 @@ def import_rooms(fileToImport):
             return room_errors
 
     for i in range(1, num_rooms):
+
+        # headers are
+        # name, room rank
+
         room_name = sh.cell(i, 0).value
         if room_name == '':
-            room_errors.append("Row " + str(i) + ": Empty Room Name")
+            room_errors.append("Row " + str(i) + ": Empty room name")
             continue
-        try:
-            Room.objects.get(name=room_name)
-            room_errors.append(room_name + ': Duplicate Room Name')
-            continue
-        except:
-            pass
 
-        #Load and validate room_rank
+        duplicate = False
+        if Room.objects.filter(name=room_name).first() is not None:  # check for duplicates
+            room_errors.append(room_name + ': Duplicate room name')
+            duplicate = True
+
+        # Load and validate room_rank
         room_rank = sh.cell(i, 1).value
-        room_string = str(room_rank)
         try:
-            room_rank = Decimal(room_rank)
-        except:
-            room_errors.append(room_name + ": Rank not number")
-            continue
-        if len(room_string) > 5 or (room_rank < 10 and len(room_string) > 4):
-            room_errors.append(room_name + ": Rank should have no more than two decimal places")
-            continue
-        if room_rank >= 100 or room_rank < 0:
-            room_errors.append(room_name + ": Rank should be between 0-99.99")
+            # auto-round to two floating point digits
+            room_rank = round(Decimal(room_rank), 2)
+        except TypeError or ValueError:
+            room_errors.append(room_name + ": Rank in file is not a number")
             continue
 
-        #Create the room
-        room = Room(name=room_name, rank=room_rank);
+        # cap room rank at 100
+        if room_rank >= 100:
+            room_rank = 99.99
+            room_errors.append(room_name + ": capped rank to 99.99")
+
+        # floor room rank at 0
+        if room_rank < 0:
+            room_rank = 0
+            room_errors.append(room_name + ": floored rank to 0")
+
+        if not duplicate:  # Create the room
+            room = Room(name=room_name, rank=room_rank)
+
+        else:  # else, update room
+            room = Room.objects.get(name=room_name)
+            room.rank = room_rank
+
         try:
             room.save()
         except:
-            room_errors.append(room_name + ": Unknown Error")
+            room_errors.append(room_name + ": Error in saving")
 
     return room_errors
