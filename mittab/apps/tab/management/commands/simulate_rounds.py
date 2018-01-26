@@ -28,10 +28,10 @@ class Command(BaseCommand):
         losing_positions = ["lo", "mo"] if winner == Round.GOV else ["pm", "mg"]
 
         debaters_rank_order = [
+            winning_team.debaters.first(),
+            winning_team.debaters.last(),
             losing_team.debaters.first(),
             losing_team.debaters.last(),
-            winning_team.debaters.first(),
-            winning_team.debaters.last()
         ]
 
         for rank in range(1, 5):
