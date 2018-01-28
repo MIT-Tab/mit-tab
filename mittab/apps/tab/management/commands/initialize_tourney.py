@@ -72,8 +72,6 @@ class Command(BaseCommand):
         self.stdout.write("Setting default tab settings")
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
-        TabSettings.set("nov_teams_to_break", 4)
-        TabSettings.set("var_teams_to_break", 8)
         TabSettings.set("cur_round", 1)
 
         self.stdout.write("Cleaning up old backups")
