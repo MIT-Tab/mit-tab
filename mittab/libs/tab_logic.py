@@ -190,7 +190,7 @@ def pair_round():
     # should randomize first
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
-        pairings = sorted(pairings, key=lambda team: highest_seed(team[0],team[1]), reverse = True)
+        pairings = sorted(pairings, key=lambda team: highest_seed(team[0], team[1]), reverse = True)
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
@@ -301,33 +301,13 @@ def add_scratches_for_school_affil():
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
     print "Done creating judge-affiliation scratches ", datetime.now()
 
-#This method is tested by testsUnitTests.all_highest_seed()
 def highest_seed(team1,team2):
-    if team1.seed > team2.seed:
-        return team1.seed
-    else:
-        return team2.seed
-
-def highest_speak(t1,t2):
-    if tot_speaks(t1) > tot_speaks(t2):
-        return tot_speaks(t1)
-    else:
-        return tot_speaks(t2)
-
-def most_wins(t1,t2):
-    if tot_wins(t1) > tot_wins(t2):
-        return tot_wins(t1)
-    else:
-        return tot_wins(t2)
+    return max(team1.seed, team2.seed)
 
 # Check if two teams have hit before
 def hit_before(t1, t2):
-    if Round.objects.filter(gov_team = t1, opp_team = t2).count() > 0:
-        return True
-    elif Round.objects.filter(gov_team = t2, opp_team = t1).count() > 0:
-        return True
-    else:
-        return False
+    return Round.objects.filter(gov_team=t1, opp_team=t2).exists() or \
+            Round.objects.filter(gov_team=t2, opp_team=t1).exists()
 
 #This should calculate whether or not team t has hit the pull-up before.
 def hit_pull_up(t):
@@ -364,20 +344,16 @@ def pull_up_count(t):
     return pullups
 
 def num_opps(t):
-    return Round.objects.filter(opp_team = t).count()
+    return Round.objects.filter(opp_team=t).count()
 
 def num_govs(t):
-    return Round.objects.filter(gov_team = t).count()
+    return Round.objects.filter(gov_team=t).count()
 
-#Return True if the team has already had the bye
 def had_bye(t):
-    if Bye.objects.filter(bye_team = t).count() > 0:
-        return True
-    else:
-        return False
+    return Bye.objects.filter(bye_team=t).exists()
 
 def num_byes(t):
-    return Bye.objects.filter(bye_team = t).count()
+    return Bye.objects.filter(bye_team=t).count()
 
 def num_forfeit_wins(team):
     return Round.objects.filter(
@@ -386,9 +362,6 @@ def num_forfeit_wins(team):
             Q(gov_team=team, victor=Round.ALL_WIN)|
             Q(opp_team=team, victor=Round.ALL_WIN)).count()
 
-def num_no_show(t):
-    return NoShow.objects.filter(no_show_team = t).count()
-
 def forfeited_round(r, t):
     if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
         if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
@@ -396,19 +369,16 @@ def forfeited_round(r, t):
     elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
         if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
             return True
-    else:
-        return False
+    return False
 
-
-def won_by_forfeit(r,t):
-    if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
+def won_by_forfeit(r, t):
+    if Round.objects.filter(gov_team=t, round_number=r.round_number).exists():
         if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
             return True
-    elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
+    elif Round.objects.filter(opp_team=t, round_number=r.round_number).exists():
         if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
             return True
-    else:
-        return False
+    return False
 
 def middle_of_bracket_teams():
     """
@@ -430,7 +400,6 @@ def middle_of_bracket_teams():
             teams.append(team)
     random.shuffle(teams)
     return teams
-
 
 def team_wins_by_forfeit():
     """
@@ -531,23 +500,6 @@ def all_nov_teams():
 def all_teams():
     return list(Team.objects.all())
 
-def tab_var_break():
-    teams = rank_teams()
-    the_break = teams[0:TabSettings.objects.get(key = "var_teams_to_break").value]
-    pairings = []
-    for i in range(len(the_break)):
-        pairings += [(the_break[i],the_break[len(the_break)-i-1])]
-    return pairings
-
-
-def tab_nov_break():
-    novice_teams = rank_nov_teams()
-    nov_break = novice_teams[0:TabSettings.objects.get(key = "nov_teams_to_break").value]
-    pairings = []
-    for i in range(len(nov_break)):
-        pairings += [(nov_break[i],nov_break[len(nov_break)-i-1])]
-    return pairings
-
 def team_comp(pairing, round_number):
     gov, opp = pairing.gov_team, pairing.opp_team
     if round_number == 1:
@@ -557,7 +509,6 @@ def team_comp(pairing, round_number):
         return (max(tot_wins(gov), tot_wins(opp)),
                 max(tot_speaks(gov), tot_speaks(opp)),
                 min(tot_speaks(gov), tot_speaks(opp)))
-
 
 def team_score(team):
     """A tuple representing the passed team's performance at the tournament"""
