@@ -230,6 +230,7 @@ class ResultEntryForm(forms.Form):
             if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
             # Opp won but gov has higher points
+            pprint.pprint(cleaned_data)
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
@@ -328,8 +329,8 @@ class EBallotForm(ResultEntryForm):
             for d in self.DEBATERS:
                 speaks = self.deb_attr_val(d, "speaks", float)
                 split = str(speaks).split(".")
-                if speaks > float(TabSettings.get("max_eballot_speak"), 35) or \
-                        speaks < float(TabSettings.get("min_eballot_speak"), 15):
+                if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
+                        speaks < float(TabSettings.get("min_eballot_speak", 15)):
                     msg = "Speaks must be justified to tab."
                     self._errors[self.deb_attr_name(d, "speaks")] = self.error_class([msg])
 
