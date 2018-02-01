@@ -66,7 +66,6 @@ class Command(BaseCommand):
         tab.is_staff = True
         tab.is_admin = True
         tab.is_superuser = True
-        tab.is_staff = True
         tab.save()
         entry = User.objects.create_user("entry", None, options["entry_password"])
 
