@@ -223,14 +223,10 @@ class ResultEntryForm(forms.Form):
 
             cleaned_data["winner"] = int(cleaned_data["winner"])
 
-            # No winner, this is bad
             if cleaned_data["winner"] == Round.NONE:
                 self.add_error("winner", self.error_class(["Someone has to win!"]))
-            # Gov won but opp has higher points
             if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
-            # Opp won but gov has higher points
-            pprint.pprint(cleaned_data)
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
