@@ -516,8 +516,6 @@ def start_new_tourny(request):
         #TODO: Unify this with initialize_tourney
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
-        TabSettings.set("var_teams_to_break", 8)
-        TabSettings.set("nov_teams_to_break", 4)
         TabSettings.set("lenient_late", 0)
 
 
