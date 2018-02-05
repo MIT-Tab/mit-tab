@@ -1,17 +1,14 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from forms import JudgeForm, ScratchForm
 
-from models import *
-from django.db import models
-from errors import *
+from forms import JudgeForm, ScratchForm
+from models import Judge, TabSettings, CheckIn, Scratch
 from mittab.libs.tab_logic import TabFlags
 
 
 def view_judges(request):
-    current_round = TabSettings.objects.get(key="cur_round").value - 1
+    current_round = TabSettings.get("cur_round") - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
     checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
     checked_in_judges = set([c.judge for c in checkins])
@@ -36,19 +33,20 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    c_judge = [(judge.pk,judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
+    c_judge = [(judge.pk, judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
                for judge in Judge.objects.order_by("name")]
 
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    print filters
-    return render_to_response('list_data.html', 
-                             {'item_type':'judge',
-                              'title': "Viewing All Judges",
-                              'item_list':c_judge,
-                              'filters': filters,
-                              'symbol_text': symbol_text}, context_instance=RequestContext(request))
+    print(filters)
+    return render_to_response("list_data.html",
+                              {"item_type": "judge",
+                               "title": "Viewing All Judges",
+                               "item_list": c_judge,
+                               "filters": filters,
+                               "symbol_text": symbol_text},
+                              context_instance=RequestContext(request))
 
 
 def view_judge(request, judge_id):
