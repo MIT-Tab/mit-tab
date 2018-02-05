@@ -1,10 +1,9 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
+
 from forms import DebaterForm
-from errors import *
-from models import *
+from models import Debater, RoundStats, Team
 import mittab.libs.tab_logic as tab_logic
 
 
