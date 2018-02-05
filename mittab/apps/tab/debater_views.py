@@ -7,6 +7,7 @@ from errors import *
 from models import *
 import mittab.libs.tab_logic as tab_logic
 
+
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
     c_debaters = [(debater.pk,debater.name) for debater in Debater.objects.order_by("name")]
@@ -14,6 +15,7 @@ def view_debaters(request):
                              {'item_type':'debater',
                               'title': "Viewing All Debaters",
                               'item_list':c_debaters}, context_instance=RequestContext(request))
+
 
 def view_debater(request, debater_id):
     debater_id = int(debater_id)
@@ -58,6 +60,7 @@ def view_debater(request, debater_id):
                                   'title':"Viewing Debater: %s"%(debater.name)}, 
                                   context_instance=RequestContext(request))
 
+
 @permission_required('tab.debater.can_delete', login_url="/403/")    
 def delete_debater(request, debater_id):
     error_msg = None
@@ -80,6 +83,7 @@ def delete_debater(request, debater_id):
                               'data_name': "["+str(debater_id)+"]",
                               'data_modification': 'DELETED'}, 
                               context_instance=RequestContext(request))
+
 def enter_debater(request):
     if request.method == 'POST':
         form = DebaterForm(request.POST)
@@ -104,11 +108,13 @@ def enter_debater(request):
                               'title': "Create Debater:"},
                               context_instance=RequestContext(request))
 
+
 def rank_debaters_ajax(request):
     return render_to_response('rank_debaters.html',
                              {'title': "Debater Rankings"},
                               context_instance=RequestContext(request))
-                              
+
+
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
@@ -127,21 +133,4 @@ def rank_debaters(request):
                               'nov_debaters' : nov_debaters,
                               'title': "Speaker Rankings"}, 
                              context_instance=RequestContext(request))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
