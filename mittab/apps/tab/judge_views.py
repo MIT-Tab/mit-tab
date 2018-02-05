@@ -1,9 +1,9 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from forms import JudgeForm, ScratchForm
-#New Models based approach
+
 from models import *
 from django.db import models
 from errors import *
@@ -11,7 +11,6 @@ from mittab.libs.tab_logic import TabFlags
 
 
 def view_judges(request):
-    #Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
     checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
@@ -50,6 +49,7 @@ def view_judges(request):
                               'item_list':c_judge,
                               'filters': filters,
                               'symbol_text': symbol_text}, context_instance=RequestContext(request))
+
 
 def view_judge(request, judge_id):
     judge_id = int(judge_id)
@@ -95,6 +95,7 @@ def view_judge(request, judge_id):
                                   'title': "Viewing Judge: %s" %(judge.name)}, 
                                   context_instance=RequestContext(request))
 
+
 def enter_judge(request):
     if request.method == 'POST':
         form = JudgeForm(request.POST)
@@ -118,6 +119,7 @@ def enter_judge(request):
     return render_to_response('data_entry.html',
                               {'form': form, 'title': "Create Judge"},
                               context_instance=RequestContext(request))
+
 
 @permission_required('tab.judge.can_delete', login_url="/403/")    
 def delete_judge(request, judge_id):
@@ -143,6 +145,7 @@ def delete_judge(request, judge_id):
                               'data_modification': 'DELETED'}, 
                               context_instance=RequestContext(request))
 
+
 def add_scratches(request, judge_id, number_scratches):
     try:
         judge_id,number_scratches = int(judge_id),int(number_scratches)
@@ -159,7 +162,6 @@ def add_scratches(request, judge_id, number_scratches):
                                   'error_name': str(judge_id),
                                   'error_info':"No such Judge"}, 
                                   context_instance=RequestContext(request))
-        
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) for i in range(1,number_scratches+1)]
         all_good = True
@@ -180,6 +182,7 @@ def add_scratches(request, judge_id, number_scratches):
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(judge.name)}, 
                               context_instance=RequestContext(request))
+
 
 def view_scratches(request, judge_id):
     try:
@@ -207,7 +210,6 @@ def view_scratches(request, judge_id):
                                       context_instance=RequestContext(request))  
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
-    
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
@@ -217,4 +219,3 @@ def view_scratches(request, judge_id):
                               'links':links,
                               'title':"Viewing Scratch Information for %s"%(judge.name)}, 
                               context_instance=RequestContext(request))
- 
