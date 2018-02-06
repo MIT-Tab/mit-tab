@@ -34,20 +34,20 @@ def view_judges(request):
         return result
 
     c_judge = [
-            (j.pk, j.name, flags(j), TabFlags.flags_to_symbols(flags(j)))
-            for j in Judge.objects.order_by("name")]
+        (j.pk, j.name, flags(j), TabFlags.flags_to_symbols(flags(j)))
+        for j in Judge.objects.order_by("name")]
 
     all_flags = [
-            [
-                TabFlags.JUDGE_CHECKED_IN_CUR,
-                TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
-                TabFlags.JUDGE_CHECKED_IN_NEXT,
-                TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
-            ], [
-                TabFlags.LOW_RANKED_JUDGE,
-                TabFlags.MID_RANKED_JUDGE,
-                TabFlags.HIGH_RANKED_JUDGE
-            ]]
+        [
+            TabFlags.JUDGE_CHECKED_IN_CUR,
+            TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
+            TabFlags.JUDGE_CHECKED_IN_NEXT,
+            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
+        ], [
+            TabFlags.LOW_RANKED_JUDGE,
+            TabFlags.MID_RANKED_JUDGE,
+            TabFlags.HIGH_RANKED_JUDGE
+        ]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     print(filters)
     return render_to_response("list_data.html",
@@ -76,11 +76,11 @@ def view_judge(request, judge_id):
                 form.save()
             except ValueError:
                 return render_to_response(
-                        "error.html",
-                        {"error_type": "Judge",
-                         "error_name": form.cleaned_data["name"],
-                         "error_info": "Judge information is invalid"},
-                        context_instance=RequestContext(request))
+                    "error.html",
+                    {"error_type": "Judge",
+                     "error_name": form.cleaned_data["name"],
+                     "error_info": "Judge information is invalid"},
+                    context_instance=RequestContext(request))
             return render_to_response("thanks.html",
                                       {"data_type": "Judge",
                                        "data_name": form.cleaned_data["name"],
@@ -98,11 +98,11 @@ def view_judge(request, judge_id):
         scratch_url = base_url + "scratches/view/"
         links = [(scratch_url, "Scratches for " + str(judge.name), False)]
         return render_to_response(
-                "data_entry.html",
-                {"form": form,
-                 "links": links,
-                 "title": "Viewing Judge: %s" % (judge.name)},
-                context_instance=RequestContext(request))
+            "data_entry.html",
+            {"form": form,
+             "links": links,
+             "title": "Viewing Judge: %s" % (judge.name)},
+            context_instance=RequestContext(request))
 
 
 def enter_judge(request):
@@ -113,11 +113,11 @@ def enter_judge(request):
                 form.save()
             except ValueError:
                 return render_to_response(
-                        "error.html",
-                        {"error_type": "Judge",
-                         "error_name": form.cleaned_data["name"],
-                         "error_info": "Invalid judge"},
-                        context_instance=RequestContext(request))
+                    "error.html",
+                    {"error_type": "Judge",
+                     "error_name": form.cleaned_data["name"],
+                     "error_info": "Invalid judge"},
+                    context_instance=RequestContext(request))
             return render_to_response("thanks.html",
                                       {"data_type": "Judge",
                                        "data_name": form.cleaned_data["name"],
@@ -192,11 +192,11 @@ def add_scratches(request, judge_id, number_scratches):
         forms = [ScratchForm(prefix=str(i), initial=initial_data)
                  for i in range(1, number_scratches + 1)]
     return render_to_response(
-            "data_entry_multiple.html",
-            {"forms": zip(forms, [None]*len(forms)),
-             "data_type": "Scratch",
-             "title": "Adding Scratch for %s" % (judge.name)},
-            context_instance=RequestContext(request))
+        "data_entry_multiple.html",
+        {"forms": zip(forms, [None] * len(forms)),
+         "data_type": "Scratch",
+         "title": "Adding Scratch for %s" % (judge.name)},
+        context_instance=RequestContext(request))
 
 
 def view_scratches(request, judge_id):
@@ -213,7 +213,7 @@ def view_scratches(request, judge_id):
     number_scratches = len(scratches)
     if request.method == "POST":
         data = request.POST
-        forms = [ScratchForm(data, prefix=str(i), instance=scratches[i-1])
+        forms = [ScratchForm(data, prefix=str(i), instance=scratches[i - 1])
                  for i in range(1, number_scratches + 1)]
         all_good = True
         for form in forms:
@@ -227,7 +227,7 @@ def view_scratches(request, judge_id):
                                        "data_modification": "EDITED"},
                                       context_instance=RequestContext(request))
     else:
-        forms = [ScratchForm(prefix=str(i), instance=scratches[i-1])
+        forms = [ScratchForm(prefix=str(i), instance=scratches[i - 1])
                  for i in range(1, len(scratches) + 1)]
 
     del_links = ["/judge/%s/scratches/delete/%s" % (judge_id, scratches[i].id)
