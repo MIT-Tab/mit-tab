@@ -33,13 +33,13 @@ def view_debater(request, debater_id):
                 form.save()
             except ValueError:
                 msg = "Debater name cannot be validated, most " \
-                        "likely a non-existent debater"
+                    "likely a non-existent debater"
                 return render_to_response(
-                        "error.html",
-                        {"error_type": "Debater",
-                         "error_name": form.cleaned_data["name"],
-                         "error_info": msg},
-                        context_instance=RequestContext(request))
+                    "error.html",
+                    {"error_type": "Debater",
+                     "error_name": form.cleaned_data["name"],
+                     "error_info": msg},
+                    context_instance=RequestContext(request))
             return render_to_response("thanks.html",
                                       {"data_type": "Debater",
                                        "data_name": form.cleaned_data["name"]},
@@ -97,11 +97,11 @@ def enter_debater(request):
                 form.save()
             except ValueError:
                 return render_to_response(
-                        "error.html",
-                        {"error_type": "Debater",
-                         "error_name": form.cleaned_data["name"],
-                         "error_info": "Ivalid name, check for duplicates"},
-                        context_instance=RequestContext(request))
+                    "error.html",
+                    {"error_type": "Debater",
+                     "error_name": form.cleaned_data["name"],
+                     "error_info": "Ivalid name, check for duplicates"},
+                    context_instance=RequestContext(request))
             return render_to_response("thanks.html",
                                       {"data_type": "Debater",
                                        "data_name": form.cleaned_data["name"],
