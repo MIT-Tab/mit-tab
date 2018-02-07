@@ -23,7 +23,7 @@ import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def swap_judges_in_round(
         request,
         src_round,
@@ -48,7 +48,7 @@ def swap_judges_in_round(
     return JsonResponse(data)
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
     try:
         src_team = Team.objects.get(id=int(src_team))
@@ -85,22 +85,22 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
                     dest_round.opp_team = src_team
             dest_round.save()
             src_round.save()
-        data = {'success': True}
+        data = {"success": True}
     except Exception as e:
         print "Unable to swap teams: ", e
-        data = {'success': False}
+        data = {"success": False}
     return JsonResponse(data)
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
     current_round_number = current_round.value
-    if request.method == 'POST':
+    if request.method == "POST":
         # We should pair the round
         try:
-            TabSettings.set('pairing_released', 0)
+            TabSettings.set("pairing_released", 0)
             backup.backup_round(
                 "round_%i_before_pairing" %
                 (current_round_number))
@@ -112,11 +112,11 @@ def pair_round(request):
         except Exception as exp:
             traceback.print_exc(file=sys.stdout)
             return render_to_response(
-                'error.html',
+                "error.html",
                 {
-                    'error_type': "Pair Next Round",
-                    'error_name': "Pairing Round %s" % (current_round.value + 1),
-                    'error_info': "Could not pair next round because of: [{0}]".format(exp)},
+                    "error_type": "Pair Next Round",
+                    "error_name": "Pairing Round %s" % (current_round.value + 1),
+                    "error_info": "Could not pair next round because of: [{0}]".format(exp)},
                 context_instance=RequestContext(request))
         return view_status(request)
     else:
@@ -173,20 +173,20 @@ def pair_round(request):
                  "You have a noshow and results. %s" %
                  str(e)))
 
-        return render_to_response('pair_round.html',
+        return render_to_response("pair_round.html",
                                   locals(),
                                   context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
-    if request.method == 'POST':
+    if request.method == "POST":
         print "Assigning judges"
         print request.POST
         panel_points, errors = [], []
         potential_panel_points = [
-            k for k in request.POST.keys() if k.startswith('panel_')]
+            k for k in request.POST.keys() if k.startswith("panel_")]
         for point in potential_panel_points:
             try:
                 point = int(point.split("_")[1])
@@ -205,61 +205,61 @@ def assign_judges_to_pairing(request):
         try:
             assign_judges.add_judges(rounds, judges, panel_points)
         except Exception as e:
-            return render_to_response('error.html',
-                                      {'error_type': "Judge Assignment",
-                                       'error_name': "",
-                                       'error_info': str(e)},
+            return render_to_response("error.html",
+                                      {"error_type": "Judge Assignment",
+                                       "error_name": "",
+                                       "error_info": str(e)},
                                       context_instance=RequestContext(request))
         return view_round(request, current_round_number)
     else:
         return view_round(request, current_round_number)
 
 
-@permission_required('tab.tab_settings.can_change', login_url='/403/')
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backup(request, filename):
     backups = backup.list_backups()
     item_list = []
-    item_type = 'backup'
+    item_type = "backup"
     title = "Viewing Backup: {}".format(filename)
     item_manip = "restore from that backup"
-    links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
-             ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
+    links = [("/backup/download/{}/".format(filename), "Download Backup", False),
+             ("/backup/restore/{}/".format(filename), "Restore From Backup", True)]
     return render_to_response(
-        'list_data.html',
+        "list_data.html",
         locals(),
         context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url='/403/')
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def download_backup(request, filename):
     print "Trying to download {}".format(filename)
     wrapper, size = backup.get_wrapped_file(filename)
-    response = HttpResponse(wrapper, content_type='text/plain')
-    response['Content-Length'] = size
-    response['Content-Disposition'] = "attachment; filename=%s" % filename
+    response = HttpResponse(wrapper, content_type="text/plain")
+    response["Content-Length"] = size
+    response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
 
 
-@permission_required('tab.tab_settings.can_change', login_url='/403/')
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def upload_backup(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
-            backup.handle_backup(request.FILES['file'])
-            return render_to_response('thanks.html',
-                                      {'data_type': "Backup",
-                                       'data_name': request.FILES['file'].name,
-                                       'data_modification': "CREATE"},
+            backup.handle_backup(request.FILES["file"])
+            return render_to_response("thanks.html",
+                                      {"data_type": "Backup",
+                                       "data_name": request.FILES["file"].name,
+                                       "data_modification": "CREATE"},
                                       context_instance=RequestContext(request))
     else:
         form = UploadBackupForm()
-    return render_to_response('data_entry.html',
-                              {'form': form,
-                               'title': 'Upload a Backup'},
+    return render_to_response("data_entry.html",
+                              {"form": form,
+                               "title": "Upload a Backup"},
                               context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def manual_backup(request):
     try:
         cur_round, btime = TabSettings.objects.get(
@@ -271,39 +271,41 @@ def manual_backup(request):
     except BaseException:
         traceback.print_exc(file=sys.stdout)
         return render_to_response(
-            'error.html',
+            "error.html",
             {
-                'error_type': "Manual Backup",
-                'error_name': "Backups",
-                'error_info': "Could not backup database. Something is wrong with your AWS setup."},
+                "error_type": "Manual Backup",
+                "error_name": "Backups",
+                "error_info": "Could not backup database. Something is wrong with your AWS setup."},
             context_instance=RequestContext(request))
     return render_to_response(
-        'thanks.html', {
-            'data_type': "Backing up database", 'data_name': " for round {} as version number {}".format(
-                cur_round, btime)}, context_instance=RequestContext(request))
+        "thanks.html", {
+            "data_type": "Backing up database",
+            "data_name": " for round {} as version number {}".format(
+                cur_round, btime)
+        }, context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backups(request):
     backups = backup.list_backups()
     item_list = [(i, i) for i in sorted(backups)]
-    item_type = 'backup'
+    item_type = "backup"
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
-    links = [('/upload_backup/', "Upload Backup", False)]
+    links = [("/upload_backup/", "Upload Backup", False)]
     return render_to_response(
-        'list_data.html',
+        "list_data.html",
         locals(),
         context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def restore_backup(request, filename):
     print "Trying to restore %s" % filename
     backup.restore_from_backup(filename)
-    return render_to_response('thanks.html',
-                              {'data_type': "Restored from backup",
-                               'data_name': "{}".format(filename)},
+    return render_to_response("thanks.html",
+                              {"data_type": "Restored from backup",
+                               "data_name": "{}".format(filename)},
                               context_instance=RequestContext(request))
 
 
@@ -359,7 +361,7 @@ def view_round(request, round_number, errors=None):
     excluded_people = zip(*map(lambda x: x + [""] * (size - len(x)), [
                           list(byes), list(excluded_judges), list(non_checkins)]))
 
-    return render_to_response('pairing_control.html',
+    return render_to_response("pairing_control.html",
                               locals(),
                               context_instance=RequestContext(request))
 
@@ -393,12 +395,12 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
-    return render_to_response('judge_dropdown.html',
+    return render_to_response("judge_dropdown.html",
                               locals(),
                               context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_judge(request, round_id, judge_id, remove_id=None):
     try:
         round_obj = Round.objects.get(id=int(round_id))
@@ -459,7 +461,7 @@ def pretty_pair(request, printable=False):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
-    return render_to_response('round_pairings.html',
+    return render_to_response("round_pairings.html",
                               locals(),
                               context_instance=RequestContext(request))
 
@@ -471,46 +473,46 @@ def pretty_pair_print(request):
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
     rounds = [(i, "Round %i" % i) for i in range(1, number_of_rounds + 1)]
-    return render_to_response('list_data.html',
-                              {'item_type': 'round',
-                               'item_list': rounds,
-                               'show_delete': True},
+    return render_to_response("list_data.html",
+                              {"item_type": "round",
+                               "item_list": rounds,
+                               "show_delete": True},
                               context_instance=RequestContext(request))
 
 
 def enter_result(request, round_id):
     round_obj = Round.objects.get(id=round_id)
-    if request.method == 'POST':
+    if request.method == "POST":
         form = ResultEntryForm(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
                 result = form.save()
             except ValueError:
-                return render_to_response('error.html',
-                                          {'error_type': "Round Result",
-                                           'error_name': "[" + str(round_obj) + "]",
-                                           'error_info': "Invalid round result, could not remedy."},
+                return render_to_response("error.html",
+                                          {"error_type": "Round Result",
+                                           "error_name": str(round_obj),
+                                           "error_info": "Invalid round result, could not remedy."},
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html',
-                                      {'data_type': "Round Result",
-                                       'data_name': "[" + str(round_obj) + "]"},
+            return render_to_response("thanks.html",
+                                      {"data_type": "Round Result",
+                                       "data_name": str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
         is_current = round_obj.round_number == TabSettings.objects.get(
             key="cur_round")
         form = ResultEntryForm(round_instance=round_obj)
-    return render_to_response('round_entry.html',
-                              {'form': form,
-                               'title': "Entering Ballot for {}".format(str(round_obj)),
-                               'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team},
+    return render_to_response("round_entry.html",
+                              {"form": form,
+                               "title": "Entering Ballot for {}".format(str(round_obj)),
+                               "gov_team": round_obj.gov_team,
+                               "opp_team": round_obj.opp_team},
                               context_instance=RequestContext(request))
 
 
 def enter_multiple_results(request, round_id, num_entered):
     round_obj = Round.objects.get(id=round_id)
     num_entered = max(int(num_entered), 1)
-    if request.method == 'POST':
+    if request.method == "POST":
         forms = [ResultEntryForm(request.POST,
                                  prefix=str(i),
                                  round_instance=round_obj,
@@ -558,9 +560,9 @@ def enter_multiple_results(request, round_id, num_entered):
                                               debater_role=role)
                 round_obj.victor = final_winner
                 round_obj.save()
-                return render_to_response('thanks.html',
-                                          {'data_type': "Round Result",
-                                           'data_name': "[" + str(round_obj) + "]"},
+                return render_to_response("thanks.html",
+                                          {"data_type": "Round Result",
+                                           "data_name": str(round_obj)},
                                           context_instance=RequestContext(request))
             else:
                 forms[0]._errors["winner"] = forms[0].error_class([error_msg])
@@ -572,23 +574,23 @@ def enter_multiple_results(request, round_id, num_entered):
                 no_fill=True) for i in range(
                 1,
                 num_entered + 1)]
-    return render_to_response('round_entry_multiple.html',
-                              {'forms': forms,
-                               'title': "Entering Ballots for {}".format(str(round_obj)),
-                               'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team},
+    return render_to_response("round_entry_multiple.html",
+                              {"forms": forms,
+                               "title": "Entering Ballots for {}".format(str(round_obj)),
+                               "gov_team": round_obj.gov_team,
+                               "opp_team": round_obj.opp_team},
                               context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def confirm_start_new_tourny(request):
-    return render_to_response('confirm.html',
-                              {'link': "/pairing/start_tourny/",
-                               'confirm_text': "Create New Tournament"},
+    return render_to_response("confirm.html",
+                              {"link": "/pairing/start_tourny/",
+                               "confirm_text": "Create New Tournament"},
                               context_instance=RequestContext(request))
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def start_new_tourny(request):
     try:
         clear_db()
@@ -599,15 +601,15 @@ def start_new_tourny(request):
 
     except Exception as e:
         return render_to_response(
-            'error.html',
+            "error.html",
             {
-                'error_type': "Could not Start Tournament",
-                'error_name': "",
-                'error_info': "Invalid Tournament State. Time to hand tab. [%s]" % (e)},
+                "error_type": "Could not Start Tournament",
+                "error_name": "",
+                "error_info": "Invalid Tournament State. Time to hand tab. [%s]" % (e)},
             context_instance=RequestContext(request))
-    return render_to_response('thanks.html',
-                              {'data_type': "Started New Tournament",
-                               'data_name': ""},
+    return render_to_response("thanks.html",
+                              {"data_type": "Started New Tournament",
+                               "data_name": ""},
                               context_instance=RequestContext(request))
 
 
