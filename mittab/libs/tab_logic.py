@@ -149,8 +149,8 @@ def pair_round():
                     # pulled-up. Fall-back to the lowest-ranked team if all have
                     # been pulled-up
                     not_pulled_up_teams = filter(
-                            list_of_teams[bracket-1],
-                            lambda t: t not in teams_been_pulled_up)
+                            lambda t: t not in teams_been_pulled_up,
+                            list_of_teams[bracket-1])
                     if len(not_pulled_up_teams) > 0:
                         pull_up = not_pulled_up_teams[-1]
                     else:
