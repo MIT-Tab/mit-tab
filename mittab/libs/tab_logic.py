@@ -146,11 +146,14 @@ def pair_round():
                     teams_been_pulled_up.extend([r.opp_team for r in pullup_rounds if r.pullup == Round.OPP])
                     #find the lowest team in bracket below that can be pulled up
                     while pull_up == None:
+                        if i < 0:
+                            pull_up = list_of_teams[bracket-1][-1]
                         if list_of_teams[bracket-1][i] not in teams_been_pulled_up:
                             pull_up = list_of_teams[bracket-1][i]
                             all_pull_ups.append(pull_up)
                             list_of_teams[bracket].append(pull_up)
                             list_of_teams[bracket-1].remove(pull_up)
+
                             #after adding pull-up to new bracket and deleting from old, sort again by speaks making sure to leave any first
                             #round bye in the correct spot
                             removed_teams = []
