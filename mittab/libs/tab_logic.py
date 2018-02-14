@@ -144,28 +144,36 @@ def pair_round():
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [r.gov_team for r in pullup_rounds if r.pullup == Round.GOV]
                     teams_been_pulled_up.extend([r.opp_team for r in pullup_rounds if r.pullup == Round.OPP])
-                    #find the lowest team in bracket below that can be pulled up
-                    while pull_up == None:
-                        if list_of_teams[bracket-1][i] not in teams_been_pulled_up:
-                            pull_up = list_of_teams[bracket-1][i]
-                            all_pull_ups.append(pull_up)
-                            list_of_teams[bracket].append(pull_up)
-                            list_of_teams[bracket-1].remove(pull_up)
-                            #after adding pull-up to new bracket and deleting from old, sort again by speaks making sure to leave any first
-                            #round bye in the correct spot
-                            removed_teams = []
-                            for t in list(Team.objects.filter(checked_in=True)):
-                                #They have all wins and they haven't forfeited so they need to get paired in
-                                if t in middle_of_bracket and tot_wins(t) == bracket:
-                                    removed_teams += [t]
-                                    list_of_teams[bracket].remove(t)
-                            list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
-                            print "list of teams in " + str(bracket) + " except removed"
-                            print list_of_teams[bracket]
-                            for t in removed_teams:
-                                list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
-                        else:
-                            i-=1
+
+                    # try to pull-up the lowest-ranked team that hasn't been
+                    # pulled-up. Fall-back to the lowest-ranked team if all have
+                    # been pulled-up
+                    not_pulled_up_teams = filter(
+                            lambda t: t not in teams_been_pulled_up,
+                            list_of_teams[bracket-1])
+                    if len(not_pulled_up_teams) > 0:
+                        pull_up = not_pulled_up_teams[-1]
+                    else:
+                        pull_up = list_of_teams[bracket-1][-1]
+
+                    all_pull_ups.append(pull_up)
+                    list_of_teams[bracket].append(pull_up)
+                    list_of_teams[bracket-1].remove(pull_up)
+
+                    # after adding pull-up to new bracket and deleting from old, sort again by speaks making sure to leave any first
+                    # round bye in the correct spot
+                    removed_teams = []
+                    for t in list(Team.objects.filter(checked_in=True)):
+                        # They have all wins and they haven't forfeited so they need to get paired in
+                        if t in middle_of_bracket and tot_wins(t) == bracket:
+                            removed_teams += [t]
+                            list_of_teams[bracket].remove(t)
+                    list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
+                    print "list of teams in " + str(bracket) + " except removed"
+                    print list_of_teams[bracket]
+                    for t in removed_teams:
+                        list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
+
     print "these are the teams after pullups"
     print pprint.pprint(list_of_teams)
     if current_round > 1:
