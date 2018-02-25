@@ -176,6 +176,7 @@ def assign_judges_to_pairing(request):
         rounds = list(Round.objects.filter(round_number=current_round_number))
         judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
         try:
+            backup.backup_round("round_%s_before_judge_assignment" % current_round_number)
             assign_judges.add_judges(rounds, judges, panel_points)
         except Exception as e:
             return render_to_response('error.html',
