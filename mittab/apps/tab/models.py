@@ -186,7 +186,7 @@ class Round(models.Model):
 
     def save(self):
         no_shows = NoShow.objects.filter(
-                round_number=self.round_number
+                round_number=self.round_number,
                 no_show_team__in=[self.gov_team, self.opp_team])
 
         if no_shows:
