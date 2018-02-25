@@ -158,8 +158,6 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == 'POST':
-        print "Assigning judges"
-        print request.POST
         panel_points, errors = [], []
         potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
         for point in potential_panel_points:
@@ -184,9 +182,7 @@ def assign_judges_to_pairing(request):
                                       'error_name': "",
                                       'error_info': str(e)},
                                       context_instance=RequestContext(request))
-        return view_round(request, current_round_number)
-    else:
-        return view_round(request, current_round_number)
+    return redirect('/pairings/status/')
 
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
