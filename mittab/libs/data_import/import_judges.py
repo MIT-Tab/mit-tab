@@ -67,19 +67,8 @@ def import_judges(fileToImport):
             judge_errors.append(judge_name + ": Rank should be between 0-100")
             continue
 
-        #Because this data is not required, be prepared for IndexErrors
-        #or ValueErrors when int() attempts to parse empty string
-        try:
-            judge_phone = str(int(sh.cell(i, 2).value))
-        except (IndexError, ValueError) as e:
-            judge_phone = ''
-        try: 
-            judge_provider = sh.cell(i, 3).value
-        except IndexError:
-            judge_provider = ''
-
         #iterate through schools until none are left
-        cur_col = 4
+        cur_col = 2
         schools = []
         while(True):
             try:
@@ -105,7 +94,7 @@ def import_judges(fileToImport):
                 break
             cur_col += 1
 
-        data = {'name': judge_name, 'rank': judge_rank, 'phone': judge_phone, 'provider': judge_provider, 'schools': schools}
+        data = {'name': judge_name, 'rank': judge_rank, 'schools': schools}
         form = JudgeForm(data=data)
         if (form.is_valid()):
             form.save()

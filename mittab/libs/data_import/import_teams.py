@@ -41,7 +41,7 @@ def import_teams(fileToImport):
 
         #Verify sheet has required number of columns
         try:
-            sh.cell(0, 9).value
+            sh.cell(0, 5).value
         except:
             team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
@@ -115,12 +115,10 @@ def import_teams(fileToImport):
             deb1_status = 1
         else:
             deb1_status = 0
-        deb1_phone = sh.cell(i, 6).value
-        deb1_provider = sh.cell(i, 7).value
-
 
         iron_man = False
-        deb2_name = sh.cell(i, 8).value
+        deb2_name = sh.cell(i, 6).value
+
         if deb2_name == '':
             iron_man = True
         if (not iron_man):
@@ -130,33 +128,23 @@ def import_teams(fileToImport):
                 continue
             except:
                 pass
-            deb2_status = sh.cell(i, 9).value.lower()
+            deb2_status = sh.cell(i, 7).value.lower()
+
             if deb2_status == 'novice' or deb2_status == 'nov' or deb2_status == 'n':
                 deb2_status = 1
             else:
                 deb2_status = 0
 
-            #Since this is not required data and at the end of the sheet, be ready for index errors
-            try: 
-                deb2_phone = sh.cell(i, 10).value
-            except IndexError:
-                deb2_phone = ''
-            try:
-                deb2_provider = sh.cell(i, 11).value
-            except IndexError:
-                deb2_provider = ''
-
-
         #Save Everything
         try:
-            deb1 = Debater(name = deb1_name, novice_status = deb1_status, phone = deb1_phone, provider = deb1_provider)
+            deb1 = Debater(name=deb1_name, novice_status=deb1_status)
             deb1.save()
         except:
             team_errors.append(team_name + ': Unkown Error Saving Debater 1')
             continue
         if (not iron_man):
             try:
-                deb2 = Debater(name = deb2_name, novice_status = deb2_status, phone = deb2_phone, provider = deb2_provider)
+                deb2 = Debater(name=deb2_name, novice_status=deb2_status)
                 deb2.save()
             except:
                 team_errors.append(team_name + ': Unkown Error Saving Debater 2')
@@ -166,6 +154,7 @@ def import_teams(fileToImport):
 
         team = Team(name=team_name, school=team_school,
                 hybrid_school=hybrid_school, seed=team_seed)
+
         try:
             team.save()
             team.debaters.add(deb1)
