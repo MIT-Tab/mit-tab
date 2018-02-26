@@ -304,7 +304,7 @@ def add_scratches_for_school_affil():
     for judge in all_judges:
         for team in all_teams:
             judge_schools = judge.schools.all()
-            if team.school in judge_schools or team.hybrid_school in judge_school:
+            if team.school in judge_schools or team.hybrid_school in judge_schools:
                 if not Scratch.objects.exists(judge=judge, team=team):
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
 
