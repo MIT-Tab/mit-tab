@@ -55,8 +55,6 @@ class Debater(models.Model):
         (VARSITY, u'Varsity'),
         (NOVICE, u'Novice'),
     )
-    phone = PhoneNumberField(blank=True)
-    provider = models.CharField(max_length=40, blank=True)
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
     def __unicode__(self):
