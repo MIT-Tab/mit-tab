@@ -299,7 +299,6 @@ def add_scratches_for_school_affil():
     Add scratches for teams/judges from the same school
     Only do this if they haven't already been added
     """
-    print "Creating judge-affiliation scratches ",datetime.now()
     all_judges = Judge.objects.all()
     all_teams = Team.objects.all()
     for judge in all_judges:
@@ -308,7 +307,6 @@ def add_scratches_for_school_affil():
             if team.school in judge_schools or team.hybrid_school in judge_school:
                 if not Scratch.objects.exists(judge=judge, team=team):
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
-    print "Done creating judge-affiliation scratches ", datetime.now()
 
 def highest_seed(team1,team2):
     return max(team1.seed, team2.seed)
