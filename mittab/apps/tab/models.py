@@ -72,6 +72,8 @@ class Debater(models.Model):
 class Team(models.Model):
     name = models.CharField(max_length=30, unique = True)
     school = models.ForeignKey('School')
+    hybrid_school = models.ForeignKey('School', blank=True, null=True,
+            related_name='hybrid_school')
     debaters = models.ManyToManyField(Debater)
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
     UNSEEDED = 0
