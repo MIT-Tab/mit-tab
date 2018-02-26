@@ -305,7 +305,7 @@ def add_scratches_for_school_affil():
         for team in all_teams:
             judge_schools = judge.schools.all()
             if team.school in judge_schools or team.hybrid_school in judge_schools:
-                if not Scratch.objects.exists(judge_id=judge.id, team=team):
+                if not Scratch.objects.filter(judge=judge, team=team).exists():
                     Scratch.objects.create(judge=judge, team=team, scratch_type=1)
 
 def highest_seed(team1,team2):
