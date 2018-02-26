@@ -41,7 +41,7 @@ def import_teams(fileToImport):
 
         #Verify sheet has required number of columns
         try:
-            sh.cell(0, 8).value
+            sh.cell(0, 9).value
         except:
             team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
@@ -72,7 +72,22 @@ def import_teams(fileToImport):
                 continue
             team_school = School.objects.get(name__iexact=school_name)
 
-        team_seed = sh.cell(i,2).value.strip().lower()
+        hybrid_school_name = sh.cell(i, 2).value.strip()
+        hybrid_school = None
+        if hybrid_school_name != '':
+            try:
+                hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
+            except:
+                #Create school through SchoolForm because for some reason they don't save otherwise
+                form = SchoolForm(data={'name': hybrid_school_name})
+                if form.is_valid():
+                    form.save()
+                else:
+                    team_errors.append(team_name + ": Invalid School")
+                    continue
+                 hyrbid_school = School.objects.get(name__iexact=hybrid_school_name)
+
+        team_seed = sh.cell(i, 3).value.strip().lower()
         if team_seed == 'full seed' or team_seed == 'full':
             team_seed = 3
         elif team_seed == 'half seed' or team_seed == 'half':
@@ -85,7 +100,7 @@ def import_teams(fileToImport):
             team_errors.append(team_name + ': Invalid Seed Value')
             continue
 
-        deb1_name = sh.cell(i,3).value
+        deb1_name = sh.cell(i, 4).value
         if deb1_name == '':
             team_errors.append(team_name + ': Empty Debater-1 Name')
             continue
@@ -95,17 +110,17 @@ def import_teams(fileToImport):
             continue
         except:
             pass
-        deb1_status = sh.cell(i,4).value.lower()
+        deb1_status = sh.cell(i, 5).value.lower()
         if deb1_status == 'novice' or deb1_status == 'nov' or deb1_status == 'n':
             deb1_status = 1
         else:
             deb1_status = 0
-        deb1_phone = sh.cell(i,5).value
-        deb1_provider = sh.cell(i,6).value
+        deb1_phone = sh.cell(i, 6).value
+        deb1_provider = sh.cell(i, 7).value
 
 
         iron_man = False
-        deb2_name = sh.cell(i,7).value
+        deb2_name = sh.cell(i, 8).value
         if deb2_name == '':
             iron_man = True
         if (not iron_man):
@@ -115,7 +130,7 @@ def import_teams(fileToImport):
                 continue
             except:
                 pass
-            deb2_status = sh.cell(i,8).value.lower()
+            deb2_status = sh.cell(i, 9).value.lower()
             if deb2_status == 'novice' or deb2_status == 'nov' or deb2_status == 'n':
                 deb2_status = 1
             else:
@@ -123,11 +138,11 @@ def import_teams(fileToImport):
 
             #Since this is not required data and at the end of the sheet, be ready for index errors
             try: 
-                deb2_phone = sh.cell(i,9).value
+                deb2_phone = sh.cell(i, 10).value
             except IndexError:
                 deb2_phone = ''
             try:
-                deb2_provider = sh.cell(i,10).value
+                deb2_provider = sh.cell(i, 11).value
             except IndexError:
                 deb2_provider = ''
 
@@ -148,8 +163,9 @@ def import_teams(fileToImport):
                 team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
                                     'Please Check this Manually')
                 continue
-        
-        team = Team(name=team_name, school=team_school, seed=team_seed)
+
+        team = Team(name=team_name, school=team_school,
+                hybrid_school=hybrid_school, seed=team_seed)
         try:
             team.save()
             team.debaters.add(deb1)
@@ -164,6 +180,4 @@ def import_teams(fileToImport):
                                 'Please Check this Manually')
 
     return team_errors
-
-    
 
