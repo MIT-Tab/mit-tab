@@ -197,10 +197,10 @@ def calc_weight_panel(judges):
 
 #return true if the judge is scratched from either team, false otherwise
 def judge_conflict(j, team1, team2):
-    if len(Scratch.objects.filter(judge = j).filter(team = team1)) != 0 or had_judge(j,team1) == True:
+    if len(Scratch.objects.filter(judge=j).filter(team=team1)) != 0 or had_judge(j,team1) == True:
         #judge scratched from team one
         return True
-    elif len(Scratch.objects.filter(judge = j).filter(team = team2)) != 0 or had_judge(j, team2) == True:
+    elif len(Scratch.objects.filter(judge=j).filter(team=team2)) != 0 or had_judge(j, team2) == True:
             #judge scratched from team two
             return True
     else:

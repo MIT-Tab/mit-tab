@@ -304,8 +304,9 @@ def add_scratches_for_school_affil():
     all_teams = Team.objects.all()
     for judge in all_judges:
         for team in all_teams:
-            if team.school in judge.schools.all():
-                if Scratch.objects.filter(judge = judge, team = team).count() == 0:
+            judge_schools = judge.schools.all()
+            if team.school in judge_schools or team.hybrid_school in judge_school:
+                if not Scratch.objects.exists(judge=judge, team=team):
                     Scratch.objects.create(judge = judge,team = team, scratch_type = 1)
     print "Done creating judge-affiliation scratches ", datetime.now()
 
