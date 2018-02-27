@@ -101,7 +101,7 @@ class Judge(models.Model):
     name = models.CharField(max_length=30, unique = True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
-    ballot_code = models.CharField(blank=True, null=True, unique=True)
+    ballot_code = models.CharField(max_length=256, blank=True, null=True, unique=True)
 
     def save(self, *args, **kwargs):
         # Generate a random ballot code for judges that don't have one
