@@ -1,7 +1,7 @@
 import string
 import random
 
-import haikunator
+from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
@@ -106,6 +106,7 @@ class Judge(models.Model):
     def save(self, *args, **kwargs):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
+            haikunator = Haikunator()
             code = haikunator.haikunate(token_length=0)
 
             while Judge.objects.filter(ballot_code=code).first():
