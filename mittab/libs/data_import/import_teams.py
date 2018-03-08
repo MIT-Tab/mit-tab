@@ -82,7 +82,7 @@ def import_teams(fileToImport):
                 form = SchoolForm(data={'name': hybrid_school_name})
                 if form.is_valid():
                     form.save()
-                    hyrbid_school = School.objects.get(name__iexact=hybrid_school_name)
+                    hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
                 else:
                     team_errors.append(team_name + ": Invalid Hybrid School")
                     continue
