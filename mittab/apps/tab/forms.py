@@ -278,7 +278,7 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
-    ballot_code = forms.CharField(max_length=6, min_length=6)
+    ballot_code = forms.CharField(max_length=30, min_length=1)
 
     def __init__(self, *args, **kwargs):
         ballot_code = ""
