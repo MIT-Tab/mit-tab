@@ -430,7 +430,7 @@ def enter_result(request, round_id):
         form = ResultEntryForm(round_instance=round_obj)
     return render_to_response('round_entry.html', 
                               {'form': form,
-                               'title': "Entering Ballot for {}".format(str(round_obj)),
+                               'title': u'Entering Ballot for {}'.format(round_obj),
                                'gov_team': round_obj.gov_team,
                                'opp_team': round_obj.opp_team}, 
                                context_instance=RequestContext(request))

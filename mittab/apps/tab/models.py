@@ -132,6 +132,7 @@ class Room(models.Model):
 
     def __unicode__(self):
         return self.name
+
     def delete(self):
         rounds = Round.objects.filter(room=self)
         if len(rounds) == 0:
@@ -179,7 +180,7 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __unicode__(self):
-        return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(self.opp_team) + " (OPP)"
+        return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
     def delete(self):
         rounds = RoundStats.objects.filter(round=self)
