@@ -67,7 +67,7 @@ def view_team(request, team_id):
                                       context_instance=RequestContext(request))
     else:
         form = TeamForm(instance=team)
-        links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for '+str(team.name), False)]
+        links = [('/team/'+str(team_id)+'/scratches/view/',u'Scratches for {}'.format(team.name), False)]
         for deb in team.debaters.all():
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
         return render_to_response('data_entry.html', 
