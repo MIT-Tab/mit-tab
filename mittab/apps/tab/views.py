@@ -42,7 +42,7 @@ def add_scratch(request):
         team = form.cleaned_data['team'].name
         return render_to_response('thanks.html', 
                                   {'data_type': "Scratch",
-                                  'data_name': " from {0} on {1}".format(team,judge),
+                                  'data_name': u' from {0} on {1}'.format(team, judge),
                                   'data_modification': "CREATED",
                                   'enter_again': True},
                                   context_instance=RequestContext(request))            
