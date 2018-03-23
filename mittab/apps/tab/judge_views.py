@@ -88,11 +88,11 @@ def view_judge(request, judge_id):
         base_url = '/judge/'+str(judge_id)+'/'
         scratch_url = base_url + 'scratches/view/'
         delete_url =  base_url + 'delete/'
-        links = [(scratch_url,'Scratches for '+str(judge.name),False)]
+        links = [(scratch_url, u'Scratches for {}'.format(judge.name), False)]
         return render_to_response('data_entry.html', 
                                  {'form': form,
                                   'links': links,
-                                  'title': "Viewing Judge: %s" %(judge.name)}, 
+                                  'title': u'Viewing Judge: {}'.format(judge.name)},
                                   context_instance=RequestContext(request))
 
 def enter_judge(request):
@@ -102,9 +102,10 @@ def enter_judge(request):
             try:
                 form.save()
             except ValueError:
+                cd = form.cleaned_data
                 return render_to_response('error.html',
                                          {'error_type': "Judge",
-                                          'error_name': "["+cd['name']+"]",
+                                          'error_name': u'[{}]'.format(cd['name']),
                                           'error_info': "Judge Cannot Validate!"},
                                           context_instance=RequestContext(request))
             return render_to_response('thanks.html',
@@ -119,7 +120,7 @@ def enter_judge(request):
                               {'form': form, 'title': "Create Judge"},
                               context_instance=RequestContext(request))
 
-@permission_required('tab.judge.can_delete', login_url="/403/")    
+@permission_required('tab.judge.can_delete', login_url="/403/")
 def delete_judge(request, judge_id):
     error_msg = None
     try :
