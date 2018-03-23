@@ -123,7 +123,7 @@ class Scratch(models.Model):
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
-        return u'{} <={}=> {}'.format(self.team, self.type, self.judge)
+        return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
 class Room(models.Model):
