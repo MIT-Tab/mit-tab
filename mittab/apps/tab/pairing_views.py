@@ -288,12 +288,12 @@ def view_round(request, round_number, errors = None):
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
-    non_checkins = Judge.objects.exclude(judges__round_number = round_number).exclude(checkin__round_number = round_number)
+    non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
+    available_rooms = Room.objects.exclude(round__round_number=round_number).exclude(rank=0)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
     judge_slots = [1,2,3]
-    print "4: ",time.time()
 
     # A seemingly complex one liner to do a fairly simple thing
     # basically this generates the table that the HTML will display such that the output looks like:
@@ -302,7 +302,7 @@ def view_round(request, round_number, errors = None):
     # [ Team2][             CJudge2              ][                 Judge2               ]
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
-    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins)])) 
+    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]))
 
     return render_to_response('pairing_control.html',
                                locals(),
