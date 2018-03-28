@@ -126,9 +126,19 @@ class Scratch(models.Model):
         return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
+class RoomGroup(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+    checked_in = models.BooleanField(default=False)
+    rank = models.DecimalField(max_digits=4, decimal_place=2)
+
+    def __unicode__(self):
+        return self.name
+
+
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    rank = models.DecimalField(max_digits=4, decimal_places=2)
+    rank_override = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
+    group = models.ForeignKey(RoomGroup, on_delete=models.CASCADE)
 
     def __unicode__(self):
         return self.name
