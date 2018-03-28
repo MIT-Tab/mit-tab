@@ -129,7 +129,7 @@ class Scratch(models.Model):
 class RoomGroup(models.Model):
     name = models.CharField(max_length=30, unique=True)
     checked_in = models.BooleanField(default=False)
-    rank = models.DecimalField(max_digits=4, decimal_place=2)
+    rank = models.DecimalField(max_digits=4, decimal_places=2)
 
     def __unicode__(self):
         return self.name
@@ -137,8 +137,8 @@ class RoomGroup(models.Model):
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    rank_override = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
-    group = models.ForeignKey(RoomGroup, on_delete=models.CASCADE)
+    rank = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
+    group = models.ForeignKey(RoomGroup, related_name="group", blank=True, null=True)
 
     def __unicode__(self):
         return self.name
