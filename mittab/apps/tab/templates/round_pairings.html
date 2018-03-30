@@ -40,6 +40,16 @@
         {
             margin:                 0em;
             padding:                .25em;
+            display:                inline-block;
+            float:                  left;
+        }
+
+        .pairings_header h3
+        {
+            margin:                 0em;
+            padding:                .5em;
+            display:                inline-block;
+            float:                  left;
         }
 
         .pairings_header_spacer
@@ -187,21 +197,22 @@
         <div id="scrollPage" class="hidden"></div>
         <!-- Floating top header -->
         <div class="pairings_header">
-          <h1>Pairings for Round {{round_number}} ({{team_count}} teams)</h1>
+          <h1>Pairings for Round {{round_number}} </h1>
+          <h3>({{team_count}} teams)</h3>
 
-        <table class="pairings_table">
-            <tr>
-            <th>
-                Government
-            </th> <th>
-                Opposition
-            </th> <th>
-                Judge
-            </th> <th>
-                Room
-            </th>
-            </tr>
-        </table>
+          <table class="pairings_table">
+              <tr>
+              <th>
+                  Government
+              </th> <th>
+                  Opposition
+              </th> <th>
+                  Judge
+              </th> <th>
+                  Room
+              </th>
+              </tr>
+          </table>
         </div>
 
         <div class="pairings_header_spacer"></div>
