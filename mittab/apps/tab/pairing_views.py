@@ -382,6 +382,7 @@ def pretty_pair(request, printable=False):
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
 
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
+    team_count = len(paired_teams) + len(byes)
 
     print "getting errors"
     for present_team in Team.objects.filter(checked_in=True):
