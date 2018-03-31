@@ -30,7 +30,7 @@ class RoomForm(forms.ModelForm):
         fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
                                              widget=FilteredSelectMultiple("Affiliated Schools",
                                              is_stacked=False))
     def __init__(self, *args, **kwargs):
@@ -73,7 +73,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'),
                                               widget=FilteredSelectMultiple("Debaters", 
                                               is_stacked=False))   
 #    def __init__(self, *args, **kwargs):
@@ -100,8 +100,8 @@ class TeamEntryForm(TeamForm):
         fields = '__all__'
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.all())
-    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    team = forms.ModelChoiceField(queryset=Team.objects.order_by('name'))
+    judge = forms.ModelChoiceField(queryset=Judge.objects.order_by('name'))
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
 
     class Meta:
