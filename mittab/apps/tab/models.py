@@ -85,6 +85,7 @@ class Team(models.Model):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
+    room_group_priority = models.ForeignKey(RoomGroup, related_name="room_group_priorty")
 
     def __unicode__(self):
         return self.name
@@ -100,6 +101,7 @@ class Judge(models.Model):
     name = models.CharField(max_length=30, unique = True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
+    room_group_priority = models.ForeignKey(RoomGroup, related_name="room_group_priority")
 
     def __unicode__(self):
         return self.name
@@ -182,7 +184,7 @@ class Round(models.Model):
         (ALL_DROP, u'ALL DROP'),
         (ALL_WIN, u'ALL WIN'),
     )
-    room = models.ForeignKey(Room)
+    room = models.ForeignKey(Room, blank=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
