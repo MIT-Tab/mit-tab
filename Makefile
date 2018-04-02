@@ -14,7 +14,6 @@ tests: test
 
 test:
 	./bin/setup
-	python manage.py initialize_tourney test .
 	python manage.py test
 
 shell:
