@@ -36,7 +36,7 @@ class Command(BaseCommand):
 
         self.stdout.write("Proceeding to tournament creation")
         self.stdout.write("Creating directory for current tournament in backup directory")
-        tournament_dir = os.path.join(backup_dir, int(time.time()))
+        tournament_dir = os.path.join(backup_dir, str(int(time.time())))
 
         if not os.path.exists(tournament_dir):
             os.makedirs(tournament_dir)
