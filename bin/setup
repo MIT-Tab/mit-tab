@@ -2,3 +2,4 @@
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+python manage.py initialize_tourney --tab-password $4 backups .
