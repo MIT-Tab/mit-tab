@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import time
 
 from optparse import make_option
 from django.core.management import call_command
@@ -11,7 +12,7 @@ from mittab.libs.backup import BACKUP_PREFIX
 from mittab.apps.tab.models import TabSettings
 
 class Command(BaseCommand):
-    args = '<tournament_name> <backup_directory>'
+    args = '<backup_directory>'
     help = 'Setup a new tounament and backup the last one'
     option_list = BaseCommand.option_list + (
             make_option("--tab-password", dest="tab_password",
@@ -20,11 +21,11 @@ class Command(BaseCommand):
                 help="Password for the entry user"))
 
     def handle(self, *args, **options):
-        if len(args) != 2:
+        if len(args) != 1:
             self.print_help('./manage.py', 'initialize_tourney')
             raise CommandError('Please supply valid arguments')
 
-        tournament_name, backup_dir = args
+        backup_dir = args
         path = BACKUP_PREFIX
 
         for user in ['tab', 'entry']:
@@ -35,7 +36,7 @@ class Command(BaseCommand):
 
         self.stdout.write("Proceeding to tournament creation")
         self.stdout.write("Creating directory for current tournament in backup directory")
-        tournament_dir = os.path.join(backup_dir, tournament_name)
+        tournament_dir = os.path.join(backup_dir, int(time.time()))
 
         if not os.path.exists(tournament_dir):
             os.makedirs(tournament_dir)
