@@ -70,10 +70,8 @@ def pair_round():
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
             if TabSettings.get('fair_bye', 1) == 0:
-                print "Bye: using only unseeded teams"
                 possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
             else:
-                print "Bye: using all teams"
                 possible_teams = list_of_teams
             bye_team = random.choice(possible_teams)
             b = Bye(bye_team=bye_team, round_number=current_round)
@@ -101,13 +99,9 @@ def pair_round():
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print("Pairing %s into the middle of the %s-win bracket" % (team, wins))
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size / 2
             list_of_teams[wins].insert(bracket_middle, team)
-
-        print "these are the teams before pullups"
-        print pprint.pprint(list_of_teams)
 
         # Correct for brackets with odd numbers of teams
         #  1) If we are in the bottom bracket, give someone a bye
@@ -169,16 +163,8 @@ def pair_round():
                             removed_teams += [t]
                             list_of_teams[bracket].remove(t)
                     list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
-                    print "list of teams in " + str(bracket) + " except removed"
-                    print list_of_teams[bracket]
                     for t in removed_teams:
                         list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
-
-    print "these are the teams after pullups"
-    print pprint.pprint(list_of_teams)
-    if current_round > 1:
-        for i in range(len(list_of_teams)):
-            print "Bracket %i has %i teams" % (i, len(list_of_teams[i]))
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
@@ -188,7 +174,6 @@ def pair_round():
             temp = pairing_alg.perfect_pairing(list_of_teams)
         else:
             temp = pairing_alg.perfect_pairing(list_of_teams[bracket])
-            print "Pairing round %i of size %i" % (bracket,len(temp))
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
@@ -202,12 +187,8 @@ def pair_round():
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
-        print sorted_teams
-        print "pairings"
-        print pairings
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
-    # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
 
@@ -243,7 +224,7 @@ def have_enough_judges(round_to_check):
 
 def have_enough_rooms(round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() / 2
-    num_rooms = Room.objects.filter(rank__gt=0).count()
+    num_rooms = Room.objects.filter(group__checked_in=True).count()
     if num_rooms < future_rounds:
         return False, (num_rooms, future_rounds)
     return True, (num_rooms, future_rounds)
@@ -858,6 +839,11 @@ def rank_speakers():
 
 def rank_nov_speakers():
     return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
+
+def room_group_preferences_for_round(*people):
+    groups = map(people, lambda person: person.room_group_priority)
+    groups = filter(groups, lambda group: group is not None)
+    return sorted(list(set(groups)), key=lambda g: g.rank, reverse=True)
 
 
 class TabFlags:

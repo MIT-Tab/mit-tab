@@ -29,6 +29,24 @@ class TabSettings(models.Model):
             obj = cls.objects.create(key=key, value=value)
 
 
+class RoomGroup(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+    checked_in = models.BooleanField(default=False)
+    rank = models.DecimalField(max_digits=4, decimal_places=2)
+
+    def __unicode__(self):
+        return self.name
+
+
+class Room(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+    rank = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
+    group = models.ForeignKey(RoomGroup, related_name="group")
+
+    def __unicode__(self):
+        return self.name
+
+
 class School(models.Model):
     name = models.CharField(max_length=50, unique = True)
     def __unicode__(self):
@@ -85,7 +103,8 @@ class Team(models.Model):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
-    room_group_priority = models.ForeignKey(RoomGroup, related_name="room_group_priorty")
+    room_group_priority = models.ForeignKey(RoomGroup,
+            related_name="room_group_priorty", null=True, blank=True)
 
     def __unicode__(self):
         return self.name
@@ -101,7 +120,8 @@ class Judge(models.Model):
     name = models.CharField(max_length=30, unique = True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
-    room_group_priority = models.ForeignKey(RoomGroup, related_name="room_group_priority")
+    room_group_priority = models.ForeignKey(RoomGroup,
+            related_name="room_group_priority", null=True, blank=True)
 
     def __unicode__(self):
         return self.name
@@ -126,31 +146,6 @@ class Scratch(models.Model):
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
         return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
-
-
-class RoomGroup(models.Model):
-    name = models.CharField(max_length=30, unique=True)
-    checked_in = models.BooleanField(default=False)
-    rank = models.DecimalField(max_digits=4, decimal_places=2)
-
-    def __unicode__(self):
-        return self.name
-
-
-class Room(models.Model):
-    name = models.CharField(max_length=30, unique=True)
-    rank = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
-    group = models.ForeignKey(RoomGroup, related_name="group")
-
-    def __unicode__(self):
-        return self.name
-
-    def delete(self):
-        rounds = Round.objects.filter(room=self)
-        if len(rounds) == 0:
-            super(Room, self).delete()
-        else:
-            raise Exception("Room is in round: %s" % ([str(r) for r in rounds]))
 
 
 class Round(models.Model):
@@ -184,7 +179,7 @@ class Round(models.Model):
         (ALL_DROP, u'ALL DROP'),
         (ALL_WIN, u'ALL WIN'),
     )
-    room = models.ForeignKey(Room, blank=True)
+    room = models.ForeignKey(Room, blank=True, null=True, on_delete=models.SET_NULL)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
@@ -194,11 +189,6 @@ class Round(models.Model):
     def __unicode__(self):
         return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
-    def delete(self):
-        rounds = RoundStats.objects.filter(round=self)
-        for rs in rounds:
-            rs.delete()
-        super(Round, self).delete()
 
 class Bye(models.Model):
    bye_team = models.ForeignKey(Team)
