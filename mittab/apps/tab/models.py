@@ -40,7 +40,6 @@ class RoomGroup(models.Model):
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    rank = models.DecimalField(max_digits=4, decimal_places=2, blank=True)
     group = models.ForeignKey(RoomGroup, related_name="group")
 
     def __unicode__(self):

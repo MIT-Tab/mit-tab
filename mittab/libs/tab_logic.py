@@ -189,25 +189,17 @@ def pair_round():
         sorted_teams = rank_teams()
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
-    rooms = Room.objects.all()
-    rooms = sorted(rooms, key=lambda r: r.rank, reverse = True)
-
-    for i in range(len(pairings)):
-        pairings[i][3] = rooms[i]
-
     # Enter into database
     for p in pairings:
         if isinstance(p[2], Judge):
-            r = Round(round_number = current_round,
-                      gov_team = p[0],
-                      opp_team = p[1],
-                      judge = p[2],
-                      room = p[3])
+            r = Round(round_number=current_round,
+                      gov_team=p[0],
+                      opp_team=p[1],
+                      judge=p[2])
         else:
             r = Round(round_number = current_round,
-                      gov_team = p[0],
-                      opp_team = p[1],
-                      room = p[3])
+                      gov_team=p[0],
+                      opp_team=p[1])
         if p[0] in all_pull_ups:
             r.pullup = Round.GOV
         elif p[1] in all_pull_ups:
@@ -263,16 +255,12 @@ def validate_round_data(round_to_check):
     If any of these fail we raise a specific error as to the type of error
     """
 
-    # Check that there are enough judges
     if not have_enough_judges(round_to_check)[0]:
         raise errors.NotEnoughJudgesError()
 
-    # Check there are enough rooms
     if not have_enough_rooms(round_to_check)[0]:
         raise errors.NotEnoughRoomsError()
 
-    # If we have results, they should be entered and there should be no
-    # byes or noshows for teams that debated
     have_properly_entered_data(round_to_check)
 
 def add_scratches_for_school_affil():
@@ -840,12 +828,8 @@ def rank_speakers():
 def rank_nov_speakers():
     return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
 
-def room_group_preferences_for_round(*people):
-    groups = map(people, lambda person: person.room_group_priority)
-    groups = filter(groups, lambda group: group is not None)
-    return sorted(list(set(groups)), key=lambda g: g.rank, reverse=True)
 
-
+# TODO: Update for RoomGroups
 class TabFlags:
     TEAM_CHECKED_IN =           1 << 0
     TEAM_NOT_CHECKED_IN =       1 << 1

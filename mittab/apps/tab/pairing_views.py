@@ -17,10 +17,7 @@ from errors import *
 from models import *
 from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
 from mittab.libs.errors import *
-import mittab.libs.cache_logic as cache_logic
-import mittab.libs.tab_logic as tab_logic
-import mittab.libs.assign_judges as assign_judges
-import mittab.libs.backup as backup
+from mittab.libs import cache_logic, tab_logic, assign_judges, assign_rooms, backup
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -156,7 +153,7 @@ def pair_round(request):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
     if request.method == 'POST':
         panel_points, errors = [], []
         potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
@@ -177,6 +174,7 @@ def assign_judges_to_pairing(request):
         try:
             backup.backup_round("round_%s_before_judge_assignment" % current_round_number)
             assign_judges.add_judges(rounds, judges, panel_points)
+            assign_rooms.add_rooms(rounds)
         except Exception as e:
             emit_current_exception()
             return render_to_response('error.html',
