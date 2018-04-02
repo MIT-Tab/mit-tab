@@ -25,7 +25,7 @@ class Command(BaseCommand):
             self.print_help('./manage.py', 'initialize_tourney')
             raise CommandError('Please supply valid arguments')
 
-        backup_dir = args
+        backup_dir = args[0]
         path = BACKUP_PREFIX
 
         for user in ['tab', 'entry']:
