@@ -6,7 +6,7 @@ from forms import DebaterForm
 from errors import *
 from models import *
 
-import mittab.libs import tab_logic, errors
+from mittab.libs import tab_logic, errors
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
