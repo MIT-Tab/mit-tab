@@ -849,7 +849,7 @@ def debater_score(debater):
                  -double_adjusted_speaks_deb(debater),
                   double_adjusted_ranks_deb(debater))
     except Exception:
-        sys.emit_current_exception()
+        errors.emit_current_exception()
     print "finished scoring {}".format(debater)
     return score
 
