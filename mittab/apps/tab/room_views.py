@@ -1,5 +1,9 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext
+from django.contrib.auth.decorators import permission_required
+
+from forms import RoomForm
+from models import *
 
 def view_rooms(request):
     def flags(room):
@@ -12,7 +16,7 @@ def view_rooms(request):
 
 
     all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
-    all_rooms = [(room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room))) 
+    all_rooms = [(room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room)))
                   for room in Room.objects.all().order_by("name")]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
 

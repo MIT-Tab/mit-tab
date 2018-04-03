@@ -1,13 +1,13 @@
 from django.shortcuts import render_to_response
 from django.template import RequestContext, loader
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
-from django.db import models
-from models import *
+
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams
+from models import *
+from forms import SchoolForm, UploadDataForm, ScratchForm
 
 def index(request):
     number_teams = Team.objects.count()
@@ -45,7 +45,7 @@ def add_scratch(request):
                                   'data_name': u' from {0} on {1}'.format(team, judge),
                                   'data_modification': "CREATED",
                                   'enter_again': True},
-                                  context_instance=RequestContext(request))            
+                                  context_instance=RequestContext(request))
     else:
         form = ScratchForm(initial={'scratch_type':0})
     return render_to_response('data_entry.html', 

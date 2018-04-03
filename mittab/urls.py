@@ -2,11 +2,8 @@ from django.views import i18n
 from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
-import apps.tab.views as views
-import apps.tab.judge_views as judge_views
-import apps.tab.team_views as team_views
-import apps.tab.debater_views as debater_views
-import apps.tab.pairing_views as pairing_views
+from apps.tab import view, judge_views, team_views, pairing_views, \
+        debater_views, room_views
 
 from django.contrib import admin
 admin.autodiscover()
@@ -41,10 +38,10 @@ urlpatterns = [
     url(r'^enter_school/$', views.enter_school),
 
     # Room related
-    url(r'^room/(\d+)/$', views.view_room),
-    url(r'^room/(\d+)/delete/$', views.delete_room),
-    url(r'^view_rooms/$', views.view_rooms),
-    url(r'^enter_room/$', views.enter_room),
+    url(r'^room/(\d+)/$', room_views.view_room),
+    url(r'^room/(\d+)/delete/$', room_views.delete_room),
+    url(r'^view_rooms/$', room_views.view_rooms),
+    url(r'^enter_room/$', room_views.enter_room),
 
     # Scratch related
     url(r'^judge/(\d+)/scratches/delete/(\d+)/', views.delete_scratch),
