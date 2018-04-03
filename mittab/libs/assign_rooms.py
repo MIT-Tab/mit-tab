@@ -10,6 +10,7 @@ def add_rooms(pairings):
     ]
 
     for round_obj, priority_list in rounds_and_priorities:
+        round_obj.room = None
         if len(priority_list) == 0:
             continue
 
@@ -24,7 +25,7 @@ def add_rooms(pairings):
         if round_obj.room is not None:
             continue
 
-        best_room = get_best_room_for_group(round_obj, None)
+        best_room = get_best_room_for_group(None, round_number)
         if best_room is None:
             raise RoomAssignmentError()
         round_obj.room = best_room

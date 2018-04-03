@@ -26,7 +26,6 @@ import errors
 import pprint
 
 def add_judges(pairings, judges, panel_points):
-    # First clear any existing judge assignments
     for pairing in pairings:
         pairing.judges.clear()
 
