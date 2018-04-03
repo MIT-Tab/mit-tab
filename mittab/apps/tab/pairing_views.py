@@ -21,7 +21,6 @@ import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
-import mittab.libs.errors as error_lib
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -39,7 +38,7 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
         src_round.save()
         data = {"success":True}
     except Exception as e:
-        error_lib.emit_current_exception()
+        emit_current_exception()
         data = {"success":False}
     return JsonResponse(data)
 
@@ -82,7 +81,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
             src_round.save()
         data = {'success':True}
     except Exception as e:
-        error_lib.emit_current_exception()
+        emit_current_exception()
         data = {'success':False}
     return JsonResponse(data)
 
@@ -103,7 +102,7 @@ def pair_round(request):
                 current_round.value = current_round.value + 1
                 current_round.save()
         except Exception as exp:
-            error_lib.emit_current_exception()
+            emit_current_exception()
             return render_to_response('error.html',
                                       {'error_type': "Pair Next Round",
                                        'error_name': "Pairing Round %s" % (current_round.value + 1),
@@ -168,7 +167,7 @@ def assign_judges_to_pairing(request):
                if num > 0.0:
                    panel_points.append((Round.objects.get(id=point), num))
            except Exception as e:
-               error_lib.emit_current_exception()
+               emit_current_exception()
                errors.append(e)
                pass
 
@@ -179,7 +178,7 @@ def assign_judges_to_pairing(request):
             backup.backup_round("round_%s_before_judge_assignment" % current_round_number)
             assign_judges.add_judges(rounds, judges, panel_points)
         except Exception as e:
-            error_lib.emit_current_exception()
+            emit_current_exception()
             return render_to_response('error.html',
                                      {'error_type': "Judge Assignment",
                                       'error_name': "",
@@ -233,7 +232,7 @@ def manual_backup(request):
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
         backup.backup_round("manual_backup_round_{}_{}_{}".format(cur_round, btime, now))
     except:
-        error_lib.emit_current_exception()
+        emit_current_exception()
         return render_to_response('error.html',
                                  {'error_type': "Manual Backup",'error_name': "Backups",
                                   'error_info': "Could not backup database. Something is wrong with your AWS setup."},
@@ -358,7 +357,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
                 "judge_rank": float(judge_obj.rank),
                 "judge_id": judge_obj.id}
     except Exception as e:
-        error_lib.emit_current_exception()
+        emit_current_exception()
         data = {"success": False}
     return JsonResponse(data)
 
@@ -521,7 +520,7 @@ def start_new_tourny(request):
 
 
     except Exception as e:
-        error_lib.emit_current_exception()
+        emit_current_exception()
         return render_to_response('error.html',
                             {'error_type': "Could not Start Tournament",
                             'error_name': "",
