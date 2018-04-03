@@ -1,3 +1,16 @@
+import sys
+import traceback
+
+from raven.contrib.django.raven_compat.models import client
+
+
+def emit_current_exception():
+    if os.environ.get('DEBUG') in ['1', 1, True, 'true']:
+        traceback.print_exc(file=sys.stdout)
+    else:
+        client.captureException()
+
+
 class ByeAssignmentError(Exception):
     pass
 

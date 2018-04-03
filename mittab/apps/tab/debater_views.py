@@ -5,7 +5,8 @@ from django.contrib.auth.decorators import permission_required
 from forms import DebaterForm
 from errors import *
 from models import *
-import mittab.libs.tab_logic as tab_logic
+
+import mittab.libs import tab_logic, errors
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
@@ -68,6 +69,7 @@ def delete_debater(request, debater_id):
     except Debater.DoesNotExist:
         error_msg = "Can't delete a non-existent debater"
     except Exception, e:
+        errors.emit_current_exception()
         error_msg = str(e)
     if error_msg:
         return render_to_response('error.html', 

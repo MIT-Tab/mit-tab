@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 from models import *
+from mittab.libs import errors
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -239,7 +240,7 @@ class ResultEntryForm(forms.Form):
                     self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
         except Exception, e:
-            print "Caught error %s" %(e)
+            errors.emit_current_exception()
             self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
             traceback.print_exc(file=sys.stdout)
         return cleaned_data
