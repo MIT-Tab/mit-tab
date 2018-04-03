@@ -1,5 +1,5 @@
 
-from mittab.apps.tab.models import Room
+from mittab.apps.tab.models import Room, TabSettings
 from errors import RoomAssignmentError
 
 
@@ -24,7 +24,7 @@ def add_rooms(pairings):
         if round_obj.room is not None:
             continue
 
-        best_room = get_best_room_for_group(None)
+        best_room = get_best_room_for_group(round_obj, None)
         if best_room is None:
             raise RoomAssignmentError()
         round_obj.room = best_room
@@ -44,7 +44,7 @@ def get_best_room_for_group(room_group, round_number):
 
 
 def room_group_preferences(round_obj):
-    people_in_round = list(round_obj.judges) + [round_obj.gov_team, round_obj.opp_team]
-    room_groups = map(people_in_round, lambda person: person.room_group_priority)
-    room_groups = filter(rooms_groups, lambda group: group is not None and group.checked_in)
+    people_in_round = list(round_obj.judges.all()) + [round_obj.gov_team, round_obj.opp_team]
+    room_groups = map(lambda person: person.room_group_priority, people_in_round)
+    room_groups = filter(lambda group: group is not None and group.checked_in, room_groups)
     return sorted(room_groups, key=lambda group: group.rank, reverse=True)

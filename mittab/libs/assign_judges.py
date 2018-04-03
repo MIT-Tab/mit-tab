@@ -44,8 +44,6 @@ def add_judges(pairings, judges, panel_points):
     pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
                   reverse = True)
 
-    pprint.pprint(pairings)
-
     pairing_groups = [list() for panel_point in panel_points] + [list()]
     panel_gaps = {}
     current_group = 0
@@ -68,7 +66,6 @@ def add_judges(pairings, judges, panel_points):
                                         judge_i + len(group),
                                         calc_weight(judge_i, pairing_i)))
         judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-        print "wat"
         # If there is no possible assignment of chairs, raise an error
         if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and len(graph_edges) == 0):
             if len(graph_edges) == 0:
