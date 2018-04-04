@@ -2,7 +2,7 @@ from django.views import i18n
 from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
-from apps.tab import view, judge_views, team_views, pairing_views, \
+from apps.tab import views, judge_views, team_views, pairing_views, \
         debater_views, room_views
 
 from django.contrib import admin
