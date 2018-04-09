@@ -164,7 +164,6 @@ def assign_judges_to_pairing(request):
                if num > 0.0:
                    panel_points.append((Round.objects.get(id=point), num))
            except Exception as e:
-               emit_current_exception()
                errors.append(e)
                pass
 
@@ -289,7 +288,7 @@ def view_round(request, round_number, errors = None):
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
     non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
-    available_rooms = Room.objects.exclude(round__round_number=round_number, group__checked_in=True)
+    available_rooms = Room.available_for_round(round_number)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5

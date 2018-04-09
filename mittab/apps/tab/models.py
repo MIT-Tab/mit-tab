@@ -42,6 +42,12 @@ class Room(models.Model):
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     groups = models.ManyToManyField(RoomGroup, related_name="groups")
 
+    @classmethod
+    def available_for_round(cls, round_number):
+        unavailable_groups = RoomGroup.objects.filter(unavailable=True)
+        return cls.objects.exclude(round__round_number=round_number) \
+                .exclude(groups=unavailable_groups)
+
     def __unicode__(self):
         return self.name
 
