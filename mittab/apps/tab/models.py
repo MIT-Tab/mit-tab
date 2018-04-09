@@ -31,7 +31,7 @@ class TabSettings(models.Model):
 
 class RoomGroup(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    checked_in = models.BooleanField(default=False)
+    unavailable = models.BooleanField(default=False)
 
     def __unicode__(self):
         return self.name
