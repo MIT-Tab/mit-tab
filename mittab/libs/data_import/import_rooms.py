@@ -74,11 +74,29 @@ def import_rooms(fileToImport):
             room_errors.append(room_name + ": Rank should be between 0-99.99")
             continue
 
-        #Create the room
-        room = Room(name=room_name, rank=room_rank);
+        room = Room(name=room_name, rank=room_rank)
         try:
             room.save()
         except:
             room_errors.append(room_name + ": Unknown Error")
+            continue
 
+        cur_col = 2
+        while(True):
+            try:
+                group_name = sh.cell(i, cur_col).value
+                if group_name == '':
+                    break
+
+                room_group = RoomGroup.objects.filter(name__iexact=group_name).first() \
+                        or RoomGroup.objects.create(name=group_name)
+                room.groups.add(room_group)
+            except IndexError:
+                break
+            cur_col += 1
+
+        try:
+            room.save()
+        except:
+            room_errors.append(room_name + ": Unknown Error")
     return room_errors

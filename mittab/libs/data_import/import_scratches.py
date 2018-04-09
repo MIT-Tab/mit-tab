@@ -43,7 +43,7 @@ def import_scratches(fileToImport):
             s_type = sh.cell(i,2).value.lower()
             if s_type == "team scratch" or s_type == "team":
                 s_type = 0
-            elif s_type == "tab scratch" or s_type == "tab":
+            else:
                 s_type = 1
             s = Scratch(judge = j, team = t, scratch_type = s_type)
             try:
