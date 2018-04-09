@@ -32,7 +32,6 @@ class TabSettings(models.Model):
 class RoomGroup(models.Model):
     name = models.CharField(max_length=30, unique=True)
     checked_in = models.BooleanField(default=False)
-    rank = models.DecimalField(max_digits=4, decimal_places=2)
 
     def __unicode__(self):
         return self.name
@@ -40,7 +39,8 @@ class RoomGroup(models.Model):
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    group = models.ForeignKey(RoomGroup, related_name="group")
+    rank = models.DecimalField(max_digits=4, decimal_places=2)
+    groups = models.ManyToManyField(RoomGroup, related_name="groups")
 
     def __unicode__(self):
         return self.name
