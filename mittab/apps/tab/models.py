@@ -124,6 +124,9 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    
+    class Meta:
+        verbose_name_plural = "stratches"
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
