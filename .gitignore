@@ -42,3 +42,6 @@ nosetests.xml
 mittab/backups/
 *.sqlite3
 *.sqlite3-journal
+
+# venv
+venv/

@@ -8,9 +8,13 @@ from django.core.exceptions import ValidationError
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
+    
+    class Meta:
+        verbose_name_plural = "tab settings"
+
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-
+    
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -135,6 +139,9 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    
+    class Meta:
+        verbose_name_plural = "scratches"
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
@@ -225,6 +232,9 @@ class RoundStats(models.Model):
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
     ranks = models.DecimalField(max_digits=6, decimal_places=4)
     debater_role = models.CharField(max_length=4, null=True)
+
+    class Meta:
+        verbose_name_plural = "round stats"
 
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
