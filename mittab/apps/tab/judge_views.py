@@ -37,7 +37,7 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    c_judge = [(judge.pk,judge.name, flags(judge), TabFlags.flags_to_symbols(flags(judge)))
+    c_judge = [(judge.pk, judge.name, flags(judge), "(%s)" % judge.ballot_code)
                for judge in Judge.objects.order_by("name")]
 
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
@@ -45,11 +45,13 @@ def view_judges(request):
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     print filters
     return render_to_response('list_data.html', 
-                             {'item_type':'judge',
-                              'title': "Viewing All Judges",
-                              'item_list':c_judge,
-                              'filters': filters,
-                              'symbol_text': symbol_text}, context_instance=RequestContext(request))
+                              {
+                                  'item_type':'judge',
+                                  'title': "Viewing All Judges",
+                                  'item_list':c_judge,
+                                  'filters': filters,
+                              },
+                              context_instance=RequestContext(request))
 
 def view_judge(request, judge_id):
     judge_id = int(judge_id)

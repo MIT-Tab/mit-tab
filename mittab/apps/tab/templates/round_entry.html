@@ -186,6 +186,13 @@
           </div>
         </div>
 
+        {% if form.ballot_code %}
+        <div class="row">
+          {{ form.ballot_code.errors }}
+          <label for="id_ballot_code">Ballot code:</label>
+          <div>{{ form.ballot_code }}</div>
+        </div>
+        {% endif %}
 
         {% if links %}
         <div class="btn-group">
