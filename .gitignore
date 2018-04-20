@@ -41,3 +41,6 @@ nosetests.xml
 # Dont commit the db files
 mittab/backups/
 *.sqlite3
+
+# venv
+venv/
