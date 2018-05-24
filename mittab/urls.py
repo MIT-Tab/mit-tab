@@ -92,6 +92,8 @@ urlpatterns = [
     url(r'^pairing/view_backups/$', pairing_views.view_backups),
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
     url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
+    url(r'^e_ballots/$', pairing_views.e_ballot_search),
+    url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot),
 
 
     # Backups

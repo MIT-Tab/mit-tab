@@ -6,7 +6,7 @@ import datetime
 import os
 import pprint
 
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
@@ -15,9 +15,11 @@ from django.shortcuts import redirect
 
 from errors import *
 from models import *
-from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
 from mittab.libs.errors import *
 from mittab.libs import cache_logic, tab_logic, assign_judges, assign_rooms, backup
+from django.shortcuts import redirect
+from forms import ResultEntryForm, UploadBackupForm, score_panel, \
+        validate_panel, EBallotForm
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -342,11 +344,15 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     try :
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
+        round_obj.judges.add(judge_obj)
+
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=int(remove_id))
             round_obj.judges.remove(remove_obj)
 
-        round_obj.judges.add(judge_obj)
+            if remove_obj == round_obj.chair:
+                round_obj.chair = round_obj.judges.order_by('-rank').first()
+
         round_obj.save()
         data = {"success":True,
                 "round_id": round_obj.id,
@@ -408,32 +414,93 @@ def view_rounds(request):
                                'show_delete': True},
                               context_instance=RequestContext(request))
 
-def enter_result(request, round_id):
+
+def e_ballot_search(request):
+    if request.method == "POST":
+        return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
+    else:
+        return render(request, "e_ballot_search.html")
+
+
+def enter_e_ballot(request, ballot_code):
+    if request.method == "POST":
+        round_id = request.POST.get("round_instance")
+
+        if round_id:
+            return enter_result(request, round_id, EBallotForm, ballot_code)
+        else:
+            message = """
+                      Missing necessary form data. Please go to tab if this
+                      error persists
+                      """
+
+    current_round = TabSettings.get(key="cur_round") - 1
+    rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
+    rounds = rounds.filter(round_number=current_round)
+    judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+    if not judge:
+        message = """
+                    No judges with the ballot code "%s." Try submitting again, or
+                    go to tab to resolve the issue.
+                    """ % ballot_code
+    elif TabSettings.get("pairing_released", 0) != 1:
+        message = "Pairings for this round have not been released."
+    elif rounds.count() > 1:
+        message = """
+                Found more than one ballot for you this round.
+                Go to tab to resolve this error.
+                """
+    elif rounds.count() == 0:
+        message = """
+                Could not find a ballot for you this round. Go to tab
+                to resolve the issue if you believe you were paired in.
+                """
+    elif rounds.first().chair != judge:
+        message = """
+                You are not the chair of this round. If you are on a panel,
+                only the chair can submit an e-ballot. If you are not on a
+                panel, go to tab and make sure the chair is properly set for
+                the round.
+                """
+    else:
+        return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
+
+    return render(request, "error.html",
+                {"error_type": "Ballot Retrieval", "error_info": message})
+
+
+def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None):
     round_obj = Round.objects.get(id=round_id)
-    if request.method == 'POST':
-        form = ResultEntryForm(request.POST, round_instance=round_obj)
+
+    if request.method == "POST":
+        form = form_class(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
                 result = form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "Round Result",
-                                          'error_name': "["+str(round_obj)+"]",
-                                          'error_info':"Invalid round result, could not remedy."}, 
+                return render_to_response("error.html",
+                                          {"error_type": "Round Result",
+                                           "error_name": "[%s]" % str(round_obj),
+                                           "error_info": "Invalid round result, could not remedy."},
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Round Result",
-                                      'data_name': "["+str(round_obj)+"]"}, 
+            return render_to_response("thanks.html",
+                                      {"data_type": "Round Result",
+                                       "data_name": "[%s]" % str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
-        is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
-        form = ResultEntryForm(round_instance=round_obj)
-    return render_to_response('round_entry.html', 
-                              {'form': form,
-                               'title': u'Entering Ballot for {}'.format(round_obj),
-                               'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team}, 
-                               context_instance=RequestContext(request))
+        form_kwargs = { "round_instance": round_obj }
+        if ballot_code:
+            form_kwargs["ballot_code"] = ballot_code
+        form = form_class(**form_kwargs)
+
+    return render_to_response("round_entry.html",
+                              {"form": form,
+                               "title": u'Entering Ballot for {}'.format(round_obj),
+                               "gov_team": round_obj.gov_team,
+                               "opp_team": round_obj.opp_team,
+                               "ballot_code": ballot_code},
+                              context_instance=RequestContext(request))
 
 
 def enter_multiple_results(request, round_id, num_entered):
@@ -506,6 +573,7 @@ def confirm_start_new_tourny(request):
                                'confirm_text': "Create New Tournament"},
                                context_instance=RequestContext(request))
 
+#TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def start_new_tourny(request):
     try:
@@ -514,8 +582,6 @@ def start_new_tourny(request):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
-
-
     except Exception as e:
         emit_current_exception()
         return render_to_response('error.html',
@@ -533,49 +599,49 @@ def clear_db():
     for i in range(len(check_ins)):
         CheckIn.delete(check_ins[i])
     print "Cleared Checkins"
-    
+
     round_stats = RoundStats.objects.all()
     for i in range(len(round_stats)):
         RoundStats.delete(round_stats[i])
     print "Cleared RoundStats"
-        
+
     rounds = Round.objects.all()
     for i in range(len(rounds)):
         Round.delete(rounds[i])
     print "Cleared Rounds"
-        
+
     judges = Judge.objects.all()
     for i in range(len(judges)):
         Judge.delete(judges[i])
     print "Cleared Judges"
-        
+
     rooms = Room.objects.all()
     for i in range(len(rooms)):
         Room.delete(rooms[i])
     print "Cleared Rooms"
-        
+
     scratches = Scratch.objects.all()
     for i in range(len(scratches)):
         Scratch.delete(scratches[i])
     print "Cleared Scratches"
-        
+
     tab_set = TabSettings.objects.all()
     for i in range(len(tab_set)):
         TabSettings.delete(tab_set[i])
     print "Cleared TabSettings"
-        
+
     teams = Team.objects.all()
     for i in range(len(teams)):
-        Team.delete(teams[i])   
+        Team.delete(teams[i])
     print "Cleared Teams"
-    
+
     debaters = Debater.objects.all()
     for i in range(len(debaters)):
         Debater.delete(debaters[i])
     print "Cleared Debaters"
-    
+
     schools = School.objects.all()
     for i in range(len(schools)):
-        School.delete(schools[i])                     
+        School.delete(schools[i])
     print "Cleared Schools"
-                              
+

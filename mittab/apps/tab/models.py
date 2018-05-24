@@ -1,15 +1,20 @@
 import string
 import random
 
+from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
+    
+    class Meta:
+        verbose_name_plural = "tab settings"
+
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-
+    
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -127,6 +132,20 @@ class Judge(models.Model):
     schools = models.ManyToManyField(School)
     room_group_priority = models.ForeignKey(RoomGroup,
             related_name="room_group_priority", null=True, blank=True)
+    ballot_code = models.CharField(max_length=256, blank=True, null=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        # Generate a random ballot code for judges that don't have one
+        if not self.ballot_code:
+            haikunator = Haikunator()
+            code = haikunator.haikunate(token_length=0)
+
+            while Judge.objects.filter(ballot_code=code).first():
+                code = haikunator.haikunate(token_length=0)
+
+            self.ballot_code = code
+
+        super(Judge, self).save(*args, **kwargs)
 
     def __unicode__(self):
         return self.name
@@ -147,6 +166,9 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    
+    class Meta:
+        verbose_name_plural = "scratches"
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
@@ -217,6 +239,9 @@ class RoundStats(models.Model):
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
     ranks = models.DecimalField(max_digits=6, decimal_places=4)
     debater_role = models.CharField(max_length=4, null=True)
+
+    class Meta:
+        verbose_name_plural = "round stats"
 
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
