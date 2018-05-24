@@ -28,7 +28,6 @@ def add_rooms(pairings):
         if best_room is None:
             raise RoomAssignmentError()
         round_obj.room = best_room
-        round_obj.room = best_room
         round_obj.save()
 
 
