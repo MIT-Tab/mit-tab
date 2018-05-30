@@ -30,41 +30,60 @@
 {% url "mittab.apps.tab.views.view_scratches" as view_scratches %}
 {% url "mittab.apps.tab.views.add_scratch" as add_scratch %}
 
-<div id="nab_bar">
-    <ul id="navlist">
-        <li><a class="{% active request home %}" href="{{ home }}">Home</a></li>
-        <li><a class="{%active request pair_round %}{% active request view_status %}{% active request view_rounds %}">Pairings</a>
-            <ul id = "sublist">
-                <li><a class="{%active request view_status %}" href="{{ view_status }}">Current Round</a></li>
-                <li><a class="{%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a></li>
-            </ul>
-        </li>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="{{ home }}">MIT TAB</a>
+  <div class="collapse navbar-collapse">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
+          Pairings
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_status %}" href="{{ view_status }}">Current Round</a>
+          <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
+        </div>
+      </li>
 
-        <li><a class="{% active request rank_teams %}{% active request rank_debaters %}">Rankings</a>
-            <ul id="sublist">
-                <li><a class="{% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a></li>
-                <li><a class="{% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request confirm_start_new_tourny %}">Admin</a>
-            <ul id = "sublist">
-                <li><a href="/admin">Admin Interface</a></li>
-                <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
-                <li><a class="{% active request upload_data %}" href="{{ upload_data }}">File Data Upload</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}">Backups</a>
-            <ul id = "sublist">
-                <li><a class="{%active request view_backups %}" href="{{ view_backups }}">View Backups</a></li>
-                <li><a class="{%active request backup %}" href="{{ backup }}">Backup Current</a></li>
-                <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
-            </ul>
-        </li>
-        <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">Scratches</a>
-            <ul id = "sublist">
-                <li><a class="{%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a></li>
-            </ul>
-        </li>
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}">
+          Rankings
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
+          <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}">
+          Backups
+        </a>
+
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
+          <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
+          <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
+          Scratches
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a>
+          <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a>
+        </div>
+      </li>
+      <li class="nav-item {% active request upload_data %}">
+        <a class="nav-link" href="{{ upload_data }}">Bulk Data Upload</a>
+      </li>
+      <li class="nav-item {% active request confirm_start_new_tourny %}">
+        <a class="nav-link" href="{{ confirm_start_new_tourny }}">New Tournament</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin">Admin Interface</a>
+      </li>
     </ul>
-<br>
+  </div>
+  <br>
 </div>
