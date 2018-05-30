@@ -30,10 +30,12 @@
     <div class="col-sm" id="school_list">
       <h4 class="text-center font-weight-normal">{{number_schools}} Schools</h4>
 
-      <div class="btn-group btn-group-sm">
-        <a class="btn btn-secondary" href="{{ view_schools }}">School List</a>
-        <a class="btn btn-secondary" href="{{ enter_school }}">Add School</a>
-      </div>
+      <center>
+        <div class="btn-group btn-group-sm">
+          <a class="btn btn-secondary" href="{{ view_schools }}">School List</a>
+          <a class="btn btn-secondary" href="{{ enter_school }}">Add School</a>
+        </div>
+      </center>
       <ol id="schools">
         {% for id,school in school_list %}
           <li><a href="/school/{{id}}/">{{school}}</a></li>
