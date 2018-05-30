@@ -13,9 +13,6 @@ a {
     width:100%;
 }
 
-/*Navigation.html styling  */
-/*finish navigation.html  */
-
 div.welcome {
     font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
     line-height: 2.5em;
@@ -40,10 +37,6 @@ img.banner{
     display:inline-block;
     height: 6em;
     margin:0 0 0 .8em;
-}
-
-div.index_list{
-    vertical-align: top;
 }
 
 .center-text {
