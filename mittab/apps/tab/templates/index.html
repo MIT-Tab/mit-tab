@@ -22,7 +22,7 @@
       <div class="input-group-prepend">
         <span class="input-group-text" id="basic-addon1">Quick Search:</span>
       </div>
-      <input type="text" class="form-control">
+      <input type="text" class="form-control" id="quick-search">
     </div>
   </div>
 
@@ -38,7 +38,7 @@
       </center>
       <ol id="schools">
         {% for id,school in school_list %}
-          <li><a href="/school/{{id}}/">{{school}}</a></li>
+          <li class="searchable"><a href="/school/{{id}}/">{{school}}</a></li>
         {% endfor %}
       </ol>
     </div>
@@ -54,7 +54,7 @@
 
       <ol id="judges">
         {% for id,judge in judge_list %}
-          <li> <a href="/judge/{{id}}/"> {{judge}}</a> </li>
+          <li class="searchable"><a href="/judge/{{id}}/"> {{judge}}</a> </li>
         {% endfor %}
       </ol>
     </div>
@@ -70,7 +70,7 @@
 
       <ol id="teams">
         {% for id,team in team_list %}
-          <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/team/{{id}}/"> {{team}}</a> </li>
+          <li class="searchable"><a href="/team/{{id}}/"> {{team}}</a></li>
         {% endfor %}
       </ol>
     </div>
@@ -86,7 +86,7 @@
 
       <ol id="debaters">
         {% for id,debater in debater_list %}
-          <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'> <a href="/debater/{{id}}/"> {{debater}}</a> </li>
+          <li class="searchable"><a href="/debater/{{id}}/"> {{debater}}</a></li>
         {% endfor %}
       </ol>
     </div>
@@ -102,9 +102,7 @@
 
       <ol id="rooms">
         {% for id, room in room_list %}
-          <li class='data_list {% if forloop.counter|divisibleby:2 %}even{%else%}odd{%endif%}'>
-              <a href="/room/{{id}}/">{{room}}</a>
-          </li>
+          <li class="searchable"><a href="/room/{{id}}/">{{room}}</a></li>
         {% endfor %}
       </ol>
     </div>
