@@ -11,26 +11,27 @@
   <title>{% block title %}{% endblock %}</title>
 </head>
 <body>
-  <div class="text-center">
-    <div class="container text-left">
-      <div id="dialog" class="invisible" title="Please Confirm">Are you sure?</div>
-      <div id="top_banner">
-        <div class="welcome">MIT-TAB</div>
-      </div>
-      {% if not no_navigation %}
-      {% include "navigation.html" %}
-      {% endif %}
-      <br>
-      <div id="banner">
-      {% block banner %}{% endblock %}
-      </div>
-      {% block content %}{% endblock %}
-      {% block footer %}
-      <hr>
-      <p>Need help? Check out <a href="https://github.com/jolynch/mit-tab/wiki">the wiki.</a></p>
-      <p>MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz</p>
-      {% endblock %}
+  <div class="container text-left">
+    <div id="dialog" class="invisible" title="Please Confirm">Are you sure?</div>
+
+    {% if no_navigation %}
+    <div id="top_banner">
+      <div class="welcome">MIT-TAB</div>
     </div>
+    {% else %}
+    {% include "navigation.html" %}
+    {% endif %}
+
+    <div id="banner">
+    {% block banner %}{% endblock %}
+    </div>
+    <br>
+    {% block content %}{% endblock %}
+    {% block footer %}
+    <hr>
+    <p>Need help? Check out <a href="https://github.com/jolynch/mit-tab/wiki">the wiki.</a></p>
+    <p>MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz</p>
+    {% endblock %}
   </div>
 
   <script type="text/javascript" src="/static/javascript/tab.js"></script>
