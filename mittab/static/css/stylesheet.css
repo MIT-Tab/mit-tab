@@ -13,9 +13,6 @@ a {
     width:100%;
 }
 
-/*Navigation.html styling  */
-/*finish navigation.html  */
-
 div.welcome {
     font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
     line-height: 2.5em;
@@ -42,58 +39,12 @@ img.banner{
     margin:0 0 0 .8em;
 }
 
-ul#schools{
-list-style: decimal;
-}
-
-ul#judges{
-list-style:decimal;
-}
-/*  I really need to get rid of this copy paste code*/
-div.index_list{
-    width: 18%;
-    vertical-align: top;
-    display:inline-block;
-    padding:.5em;
-}
-
-div.index_header {
-    text-decoration: none;
-    display: block;
-    font-size: 20px;
-    color: black;
-}
-
-.w100 {
-    width: 100%;
-}
-
-.w75 {
-    width: 75%;
-}
-
-.w60 {
-    width: 60%;
-}
-
-.w50 {
-    width: 50%;
-}
-
-.w25 {
-    width: 25%;
-}
-
 .center-text {
-    text-align: center;    
+    text-align: center;
 }
 
 td.center {
-    text-align: center;    
-}
-.div.index_list ol {
-    padding-left: 2em;
-    margin: 0;
+    text-align: center;
 }
 
 div.index_container {
@@ -101,11 +52,6 @@ div.index_container {
     overflow-y:scroll;
     height: 40em;
 }
-
-ul#teams{
-list-style:decimal;    
-}
-
 
 /*  Form Styling */
 .warning {
@@ -290,23 +236,9 @@ div.scroll{
     overflow: auto
 }
 
-li.data_list a{
-    display: block;
-    padding: .1em;
-    width: 100%;    
-}
-
-ul.list_item {
-    list-style: none;
-    padding-left: 1em;
-    padding-right: 1em;
-    margin: 0;
-}
-
 span.list_item {
     float: right;
     margin-left: .5em;
-    
 }
 
 .invisible {

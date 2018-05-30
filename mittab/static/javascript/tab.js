@@ -3,14 +3,14 @@ jQuery.expr[':'].Contains = function(a,i,m){
 };
 
 $(document).ready(function(){
-    
+
     function filter(matching_text) {
-        $('li.data_list:not(:Contains(' + matching_text+ '))').hide(); 
-        $('li.data_list:Contains(' + matching_text + ')').show();
+        $('li.searchable:not(:Contains(' + matching_text+ '))').hide(); 
+        $('li.searchable:Contains(' + matching_text + ')').show();
     };
-    
+
     filter_on_flags = function (flags) {
-        $('li.data_list').each(function(index, element) {
+        $('li.filterable').each(function(index, element) {
             var show = 1;
             for (var flag_group in flags) {
                 show &= (($(element).data("filters") & flags[flag_group]) > 0);
@@ -20,12 +20,12 @@ $(document).ready(function(){
             }
         });
     };
-    
+
     function show_all(type) {
         $(type).show();
     };
 
-    $('#filter_box').keyup(function() {
+    $('#quick-search').keyup(function() {
         if ($(this).val()) {
             filter($(this).val());
         }
@@ -33,7 +33,7 @@ $(document).ready(function(){
             show_all("li");
         }
     });
-    
+
     $('.dataEntryForm').submit(function() {
         // Hacky way to figure out if this is a result entry form
         var pmDebater = $('.dataEntryForm :input').filter('#id_pm_debater').val()
