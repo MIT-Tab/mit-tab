@@ -243,23 +243,9 @@ div.scroll{
     overflow: auto
 }
 
-li.data_list a{
-    display: block;
-    padding: .1em;
-    width: 100%;    
-}
-
-ul.list_item {
-    list-style: none;
-    padding-left: 1em;
-    padding-right: 1em;
-    margin: 0;
-}
-
 span.list_item {
     float: right;
     margin-left: .5em;
-    
 }
 
 .invisible {
