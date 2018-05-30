@@ -42,58 +42,16 @@ img.banner{
     margin:0 0 0 .8em;
 }
 
-ul#schools{
-list-style: decimal;
-}
-
-ul#judges{
-list-style:decimal;
-}
-/*  I really need to get rid of this copy paste code*/
 div.index_list{
-    width: 18%;
     vertical-align: top;
-    display:inline-block;
-    padding:.5em;
-}
-
-div.index_header {
-    text-decoration: none;
-    display: block;
-    font-size: 20px;
-    color: black;
-}
-
-.w100 {
-    width: 100%;
-}
-
-.w75 {
-    width: 75%;
-}
-
-.w60 {
-    width: 60%;
-}
-
-.w50 {
-    width: 50%;
-}
-
-.w25 {
-    width: 25%;
 }
 
 .center-text {
-    text-align: center;    
+    text-align: center;
 }
 
 td.center {
-    text-align: center;    
-}
-.div.index_list ol {
-    padding-left: 2em;
-    margin: 0;
+    text-align: center;
 }
 
 div.index_container {
@@ -101,11 +59,6 @@ div.index_container {
     overflow-y:scroll;
     height: 40em;
 }
-
-ul#teams{
-list-style:decimal;    
-}
-
 
 /*  Form Styling */
 .warning {

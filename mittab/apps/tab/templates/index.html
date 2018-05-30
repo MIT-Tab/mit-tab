@@ -17,11 +17,13 @@
 {% url "mittab.apps.tab.views.enter_room" as enter_room %}
 
 
-<div id="filter">
-Quick Search: <input type="text" id="filter_box"></input>
+<div class="row">
+  <div id="filter" class="col-sm">
+  Quick Search: <input type="text" id="filter_box"></input>
+  </div>
 </div>
 
-<div class="index_container">
+<div class="row index_container">
     <div class="index_list" id="school_list">
         <div class="index_header">{{number_schools}} Schools</div>
 
