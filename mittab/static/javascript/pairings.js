@@ -96,7 +96,7 @@ var populate_tab_card = function(tab_card_element) {
         success: function(result) {
             result = result.result
             var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
-            tab_card_element.html("<a class=\"btn btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
+            tab_card_element.html("<a class=\"btn btn-sm btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
         },
     })
 }

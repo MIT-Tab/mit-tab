@@ -77,18 +77,18 @@ table.pretty {
 table.pretty th{
     border: 1px solid #666666;   
     padding: .25em;
-    font-size: 18px;
+    font-size: 1em;
     font-style: bold;
 }
 
 /* Pairing view */
 
-div#round_info{
-    font-size: 14px;
+#round_info {
+  padding: .25rem;
 }
 
-#round_info td, th {
-  padding: .25rem;
+#round_info table {
+  font-size: .875em;
 }
 
 table.check_status {
@@ -107,6 +107,7 @@ table.check_status td {
 }
 
 .judge .dropdown-menu.show {
+  font-size: .875em;
   max-height: 20rem;
   display: block;
   overflow-y: scroll;
