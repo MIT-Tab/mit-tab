@@ -73,12 +73,8 @@ th.header{
 }
 
 div#banner {
-    font-size: 25px;  
+    font-size: 25px;
     padding: .2em;
-}
-
-.form_header{
-    text-align:center;    
 }
 
 table.pretty {
@@ -92,8 +88,13 @@ table.pretty th{
     font-size: 18px;
     font-style: bold;
 }
+
 div#round_info{
-    font-size: 14px;   
+    font-size: 14px;
+}
+
+#round_info td, th {
+  padding: .25rem;
 }
 
 table.check_status {
@@ -282,10 +283,6 @@ span.inline {
     border: 1px solid #dddddd;
     padding: 1em;
 
-}
-
-div.spacer {
-    margin: 1em;
 }
 
 .block-tight {
