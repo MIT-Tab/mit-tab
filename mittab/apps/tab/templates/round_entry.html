@@ -16,7 +16,7 @@
 
   {{ form.media }}
 
-  <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
+  <form action="{{ action }}" method="post" class="form-control dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
     {{ form.non_field_errors }}
 
     {# Include the hidden fields #}
@@ -24,12 +24,12 @@
       {{ hidden }}
     {% endfor %}
 
-    <div class="row-floid">
-      <div class="col-md-12">
+    <div class="row">
+      <div class="col-12">
         {{ form.winner.errors }}
         <div>{{form.winner.label_tag}}</div>
         <div>{{ form.winner }}</div>
-        <div class="col-md-4">
+        <div class="col-4">
           <div class="hidden winner" data-option=0>Please select a winner</div>
           <div class="hidden winner" data-option=1>
               The Government team has won.  Enter speaks and ranks
@@ -71,15 +71,15 @@
       </div>
     </div>
 
-    <div class="row-fluid">
-      <div class="col-md-6">
+    <div class="row">
+      <div class="col-6">
         <center>
           <h4 class="header">Government: {{gov_team.name}}</h4>
         </center>
 
         <div class="gov">
           <div class="pm row">
-            <div class="col-md-12">
+            <div class="col-12">
               {{ form.pm_debater.errors }}
               <label for="id_pm_debater">Prime Minister:</label>
               <div>{{ form.pm_debater }}</div>
@@ -99,7 +99,7 @@
           </div>
 
           <div class="mg row">
-            <div class="col-md-12">
+            <div class="col-12">
               {{ form.mg_debater.errors }}
               <label for="id_mg_debater">Member of Government:</label>
               <div>{{ form.mg_debater }}</div>
@@ -121,14 +121,14 @@
 
       </div>
 
-      <div class="col-md-6">
+      <div class="col-6">
         <center>
           <h4 class="header">Opposition: {{opp_team.name}}</h4>
         </center>
 
         <div class="opp">
           <div class="lo row">
-            <div class="col-md-12">
+            <div class="col-12">
               {{ form.lo_debater.errors }}
               <label for="id_lo_debater">Leader of Opposition:</label>
               <div>{{ form.lo_debater }}</div>
@@ -148,7 +148,7 @@
           </div>
 
           <div class="mo row">
-            <div class="col-md-12">
+            <div class="col-12">
               {{ form.mo_debater.errors }}
               <label for="id_mo_debater">Member of Opposition:</label>
               <div>{{ form.mo_debater }}</div>
