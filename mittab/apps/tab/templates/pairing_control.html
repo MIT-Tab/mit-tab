@@ -74,15 +74,14 @@
             <a class="btn btn-link" href="/team/card/{{pairing.gov_team.id}}">Loading Team Info...</a>
           </td>
           <td class="judge" rowspan=2>
-            {% for judge in pairing.judges.all %} 
-              <span class="full_width btn-group block-tight"
-                    round-id="{{pairing.id}}"
-                    judge-id="{{judge.id}}">
+            {% for judge in pairing.judges.all %}
+              <div class="btn-group block-tight" round-id="{{pairing.id}}" judge-id="{{judge.id}}">
                 <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
                       round-id="{{pairing.id}}"
-                      judge-id="{{judge.id}}" href="#">{{judge.name}} ({{judge.rank}})<span class="caret"></span>
+                      judge-id="{{judge.id}}" href="#">
+                  {{judge.name}} ({{judge.rank}})
                 </a>
-                <ul class="dropdown-menu" round-id={{pairing.id}} judge-id={{judge.id}}></ul>
+                <div class="dropdown-menu" round-id={{pairing.id}} judge-id={{judge.id}}></div>
               </span>
             {% endfor %}
             {% for slot in judge_slots %}
