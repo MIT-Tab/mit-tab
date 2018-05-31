@@ -73,8 +73,8 @@ $(document).ready(function(){
                         dest_obj.attr('team-id', from_team_id)
                         dest_obj.attr('team-name', from_team_name)
                         dest_team_tabcard.attr('team-id', from_team_id)
-                        populate_tab_card(from_team_tabcard)
-                        populate_tab_card(dest_team_tabcard)
+                        populate_tab_card(from_team_tabcard, true)
+                        populate_tab_card(dest_team_tabcard, true)
                     }
                     else {
                         alert("unable to swap those two teams, use the admin interface");
@@ -89,16 +89,19 @@ $(document).ready(function(){
     bind_handlers()
 });
 
-var populate_tab_card = function(tab_card_element) {
-    var team_id = tab_card_element.attr('team-id')
-    $.ajax({
-        url:"/team/" + team_id + "/stats/",
-        success: function(result) {
-            result = result.result
-            var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
-            tab_card_element.html("<a class=\"btn btn-sm btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
-        },
-    })
+var populate_tab_card = function(tab_card_element, force) {
+    if (force || !tab_card_element.hasClass("loaded")) {
+        tab_card_element.addClass("loaded")
+        var team_id = tab_card_element.attr('team-id')
+        $.ajax({
+            url:"/team/" + team_id + "/stats/",
+            success: function(result) {
+                result = result.result
+                var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
+                tab_card_element.html("<a class=\"btn btn-sm btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
+            },
+        })
+    }
 }
 
 
@@ -120,7 +123,6 @@ var populate_alternative_judges = function() {
                 judge_list = $(".dropdown-menu[round-id="+round_id+"][judge-pos="+judge_position+"]");
             }
             $(judge_list).html(result);
-            bind_handlers();
         },
     })
 }
@@ -150,7 +152,6 @@ var assign_judge = function() {
             $(judge_button).html(html);
             $(judge_button).attr('judge-id', result.judge_id);
             $(judge_button).removeClass('unassigned');
-            bind_handlers();
         },
     });
 }
