@@ -30,7 +30,7 @@ $(document).ready(function(){
         stack: "div",
         opacity: 0.9,
         start: function() {
-            // insert bad drag drop logic
+            // TODO: bad drag drop logic
         },
         stop: function() {
         }
@@ -56,10 +56,10 @@ $(document).ready(function(){
                 success: function(result) {
                     if(result.success) {
                         new_from_html = 
-                            "<a href=\"/team/" + dest_team_id + "/\">" + 
+                            "<a class=\"btn btn-sm btn-link\" href=\"/team/" + dest_team_id + "/\">" + 
                             dest_team_name + "</a>"
                         new_dest_html = 
-                            "<a href=\"/team/" + from_team_id + "/\">" + 
+                            "<a class=\"btn btn-sm btn-link\" href=\"/team/" + from_team_id + "/\">" + 
                             from_team_name + "</a>"
 
                         ui.draggable.html(new_from_html)
@@ -96,7 +96,7 @@ var populate_tab_card = function(tab_card_element) {
         success: function(result) {
             result = result.result
             var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
-            tab_card_element.html("<a class=\"btn btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
+            tab_card_element.html("<a class=\"btn btn-sm btn-link\" href=\"/team/card/"+team_id+"\">"+text+"</a>")
         },
     })
 }
@@ -115,12 +115,11 @@ var populate_alternative_judges = function() {
         url: populate_url,
         success: function(result) {
             if (judge_id) {
-                judge_list = $("ul[round-id="+round_id+"][judge-id="+judge_id+"]");
+                judge_list = $(".dropdown-menu[round-id="+round_id+"][judge-id="+judge_id+"]");
             } else {
-                judge_list = $("ul[round-id="+round_id+"][judge-pos="+judge_position+"]");
+                judge_list = $(".dropdown-menu[round-id="+round_id+"][judge-pos="+judge_position+"]");
             }
             $(judge_list).html(result);
-            bind_handlers();
         },
     })
 }
@@ -150,7 +149,6 @@ var assign_judge = function() {
             $(judge_button).html(html);
             $(judge_button).attr('judge-id', result.judge_id);
             $(judge_button).removeClass('unassigned');
-            bind_handlers();
         },
     });
 }

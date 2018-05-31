@@ -9,10 +9,6 @@ a {
     text-decoration: none;
 }
 
-.full_width {
-    width:100%;
-}
-
 div.welcome {
     font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
     line-height: 2.5em;
@@ -37,10 +33,6 @@ img.banner{
     display:inline-block;
     height: 6em;
     margin:0 0 0 .8em;
-}
-
-.center-text {
-    text-align: center;
 }
 
 td.center {
@@ -73,12 +65,8 @@ th.header{
 }
 
 div#banner {
-    font-size: 25px;  
+    font-size: 25px;
     padding: .2em;
-}
-
-.form_header{
-    text-align:center;    
 }
 
 table.pretty {
@@ -89,11 +77,22 @@ table.pretty {
 table.pretty th{
     border: 1px solid #666666;   
     padding: .25em;
-    font-size: 18px;
+    font-size: 1em;
     font-style: bold;
 }
-div#round_info{
-    font-size: 14px;   
+
+/* Pairing view */
+
+#round_info {
+  padding: .25rem;
+}
+
+#round_info table {
+  font-size: .875em;
+}
+
+#round_info td, #round_info th {
+  padding: .5em;
 }
 
 table.check_status {
@@ -109,6 +108,13 @@ table.check_status th {
 table.check_status td {
     border-right: 1px solid #BBBBBB;
     border-left: 1px solid #BBBBBB;
+}
+
+.judge .dropdown-menu.show {
+  font-size: .875em;
+  max-height: 20rem;
+  display: block;
+  overflow-y: scroll;
 }
 
 div.obj_info {
@@ -282,10 +288,6 @@ span.inline {
     border: 1px solid #dddddd;
     padding: 1em;
 
-}
-
-div.spacer {
-    margin: 1em;
 }
 
 .block-tight {
