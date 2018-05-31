@@ -30,7 +30,7 @@ $(document).ready(function(){
         stack: "div",
         opacity: 0.9,
         start: function() {
-            // insert bad drag drop logic
+            // TODO: bad drag drop logic
         },
         stop: function() {
         }
