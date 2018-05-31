@@ -115,9 +115,9 @@ var populate_alternative_judges = function() {
         url: populate_url,
         success: function(result) {
             if (judge_id) {
-                judge_list = $("ul[round-id="+round_id+"][judge-id="+judge_id+"]");
+                judge_list = $(".dropdown-menu[round-id="+round_id+"][judge-id="+judge_id+"]");
             } else {
-                judge_list = $("ul[round-id="+round_id+"][judge-pos="+judge_position+"]");
+                judge_list = $(".dropdown-menu[round-id="+round_id+"][judge-pos="+judge_position+"]");
             }
             $(judge_list).html(result);
             bind_handlers();

@@ -75,24 +75,24 @@
           </td>
           <td class="judge" rowspan=2>
             {% for judge in pairing.judges.all %}
-              <div class="btn-group block-tight" round-id="{{pairing.id}}" judge-id="{{judge.id}}">
+              <div class="btn-group block-tight w-100" round-id="{{pairing.id}}" judge-id="{{judge.id}}">
                 <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
                       round-id="{{pairing.id}}"
                       judge-id="{{judge.id}}" href="#">
                   {{judge.name}} ({{judge.rank}})
                 </a>
                 <div class="dropdown-menu" round-id={{pairing.id}} judge-id={{judge.id}}></div>
-              </span>
+              </div>
             {% endfor %}
             {% for slot in judge_slots %}
               {% if pairing.judges.all|length < slot %}
-                <span class="full_width unassigned btn-group block-tight"
-                      round-id="{{pairing.id}}"> 
+                <div class="unassigned btn-group block-tight w-100"
+                      round-id="{{pairing.id}}">
                   <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
                       round-id="{{pairing.id}}" judge-pos="{{slot}}" href="#">NA
                   </a>
-                  <ul class="dropdown-menu" round-id={{pairing.id}} judge-pos={{slot}}></ul>
-                </span>
+                  <div class="dropdown-menu" round-id={{pairing.id}} judge-pos={{slot}}></div>
+                </div>
               {% endif %}
             {% endfor %}
           </td>
