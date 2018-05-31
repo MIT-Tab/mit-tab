@@ -56,10 +56,10 @@ $(document).ready(function(){
                 success: function(result) {
                     if(result.success) {
                         new_from_html = 
-                            "<a href=\"/team/" + dest_team_id + "/\">" + 
+                            "<a class=\"btn btn-link\" href=\"/team/" + dest_team_id + "/\">" + 
                             dest_team_name + "</a>"
                         new_dest_html = 
-                            "<a href=\"/team/" + from_team_id + "/\">" + 
+                            "<a class=\"btn btn-link\" href=\"/team/" + from_team_id + "/\">" + 
                             from_team_name + "</a>"
 
                         ui.draggable.html(new_from_html)
