@@ -35,10 +35,6 @@ img.banner{
     margin:0 0 0 .8em;
 }
 
-.center-text {
-    text-align: center;
-}
-
 td.center {
     text-align: center;
 }
@@ -85,6 +81,8 @@ table.pretty th{
     font-style: bold;
 }
 
+/* Pairing view */
+
 div#round_info{
     font-size: 14px;
 }
@@ -106,6 +104,12 @@ table.check_status th {
 table.check_status td {
     border-right: 1px solid #BBBBBB;
     border-left: 1px solid #BBBBBB;
+}
+
+.judge .dropdown-menu.show {
+  max-height: 20rem;
+  display: block;
+  overflow-y: scroll;
 }
 
 div.obj_info {

@@ -6,20 +6,20 @@
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">Viable Judges Not Paired In</h6>
 {% for judge_name, judge_id, judge_rank in excluded_judges%}
-<a class="dropdown-item judge-assign" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
+<a href="#" class="dropdown-item judge-assign" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
   {{judge_name}} - {{judge_rank}}
 </a>
 {% empty %}
-    <li> No viable judges </li>
+<a class="dropdown-item">No viable judges</a>
 {% endfor %}
 
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">Viable Judges Within Pairing</h6>
 {% for judge_name, judge_id, judge_rank in included_judges%}
-<a class="dropdown-item judge-assign" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
+<a href="#" class="dropdown-item judge-assign" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
   {{judge_name}} - {{judge_rank}}
 </a>
 {% empty %}
-    <li> No viable judges </li>
+<a class="dropdown-item">No viable judges</a>
 {% endfor %}
 
