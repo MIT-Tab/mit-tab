@@ -23,16 +23,16 @@
         <link rel="stylesheet" type="text/css" href="/static/css/widgets.css" /> 
         {{ form.media }}
             {{ form.non_field_errors }}
-            
+
             {# Include the hidden fields #}
             {% for hidden in form.hidden_fields %}
                 {{ hidden }}
             {% endfor %}
-            
+
             <table class="table ballot_entry">
             {# Include the common fields to Gov and Opp #}
-            
-            <tr class="common_fields">
+
+            <tr>
                 {{ form.winner.errors }}
                 <td>{{form.winner.label_tag}}</td>
                 <td>{{ form.winner }}</td>

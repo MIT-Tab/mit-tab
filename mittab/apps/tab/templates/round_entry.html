@@ -21,11 +21,11 @@
 
     {# Include the hidden fields #}
     {% for hidden in form.hidden_fields %}
-        {{ hidden }}
+      {{ hidden }}
     {% endfor %}
 
-    <div class="row">
-      <div class="common_fields col-md-12">
+    <div class="row-floid">
+      <div class="col-md-12">
         {{ form.winner.errors }}
         <div>{{form.winner.label_tag}}</div>
         <div>{{ form.winner }}</div>
@@ -71,96 +71,83 @@
       </div>
     </div>
 
-    <div class="row container-fluid">
-      <div class="col-md-6 team_container" id="id_gov_container">
+    <div class="row-fluid">
+      <div class="col-md-6">
         <center>
-          <h4 class="header" id="id_gov_header">Government: {{gov_team.name}}</h4>
+          <h4 class="header">Government: {{gov_team.name}}</h4>
         </center>
 
         <div class="gov">
-
           <div class="pm row">
-
             <div class="col-md-12">
               {{ form.pm_debater.errors }}
               <label for="id_pm_debater">Prime Minister:</label>
               <div>{{ form.pm_debater }}</div>
 
               <div class="speaks">
-                  {{ form.pm_speaks.errors }}
-                  <label for="id_pm_speaks">Speaks:</label>
-                  <div> {{ form.pm_speaks }} </div>
+                {{ form.pm_speaks.errors }}
+                <label for="id_pm_speaks">Speaks:</label>
+                <div> {{ form.pm_speaks }} </div>
               </div>
 
               <div class="ranks">
-                  {{ form.pm_ranks.errors }}
-                  <label for="id_pm_ranks">Ranks:</label>
-                  <div> {{ form.pm_ranks }} </div>
+                {{ form.pm_ranks.errors }}
+                <label for="id_pm_ranks">Ranks:</label>
+                <div> {{ form.pm_ranks }} </div>
               </div>
             </div>
-
           </div>
 
-          <hr>
-
           <div class="mg row">
-
             <div class="col-md-12">
               {{ form.mg_debater.errors }}
               <label for="id_mg_debater">Member of Government:</label>
               <div>{{ form.mg_debater }}</div>
 
               <div class="speaks">
-                  {{ form.mg_speaks.errors }}
-                  <label for="id_mg_speaks">Speaks:</label>
-                  <div> {{ form.mg_speaks }} </div>
+                {{ form.mg_speaks.errors }}
+                <label for="id_mg_speaks">Speaks:</label>
+                <div> {{ form.mg_speaks }} </div>
               </div>
 
               <div class="ranks">
-                  {{ form.mg_ranks.errors }}
-                  <label for="id_mg_ranks">Ranks:</label>
-                  <div> {{ form.mg_ranks }} </div>
+                {{ form.mg_ranks.errors }}
+                <label for="id_mg_ranks">Ranks:</label>
+                <div> {{ form.mg_ranks }} </div>
               </div>
             </div>
-
           </div>
         </div>
 
       </div>
 
-      <div class="col-md-6 team_container" id="id_opp_container">
+      <div class="col-md-6">
         <center>
-          <h4 class="header" id="id_opp_header">Opposition: {{opp_team.name}}</h4>
+          <h4 class="header">Opposition: {{opp_team.name}}</h4>
         </center>
 
         <div class="opp">
-
           <div class="lo row">
-
             <div class="col-md-12">
               {{ form.lo_debater.errors }}
               <label for="id_lo_debater">Leader of Opposition:</label>
               <div>{{ form.lo_debater }}</div>
 
               <div class="speaks">
-                  {{ form.lo_speaks.errors }}
-                  <label for="id_pm_speaks">Speaks:</label>
-                  <div> {{ form.lo_speaks }} </div>
+                {{ form.lo_speaks.errors }}
+                <label for="id_pm_speaks">Speaks:</label>
+                <div> {{ form.lo_speaks }} </div>
               </div>
 
               <div class="ranks">
-                  {{ form.lo_ranks.errors }}
-                  <label for="id_lo_ranks">Ranks:</label>
-                  <div> {{ form.lo_ranks }} </div>
+                {{ form.lo_ranks.errors }}
+                <label for="id_lo_ranks">Ranks:</label>
+                <div> {{ form.lo_ranks }} </div>
               </div>
             </div>
-
           </div>
 
-          <hr>
-
           <div class="mo row">
-
             <div class="col-md-12">
               {{ form.mo_debater.errors }}
               <label for="id_mo_debater">Member of Opposition:</label>
@@ -178,7 +165,6 @@
                   <div> {{ form.mo_ranks }} </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -201,7 +187,7 @@
     {%endif%}
 
     <div class="btn-submit">
-        <input type="submit" value="Submit Changes">
+      <input type="submit" value="Submit Changes">
     </div>
   </form>
 </div>
