@@ -3,7 +3,6 @@ jQuery.expr[':'].Contains = function(a,i,m){
 };
 
 $(document).ready(function(){
-
     function filter(matching_text) {
         $('li.searchable:not(:Contains(' + matching_text+ '))').hide(); 
         $('li.searchable:Contains(' + matching_text + ')').show();
@@ -173,4 +172,9 @@ $(document).ready(function(){
     });
 
     apply_filters();
+    $("[multiple]").multiselect({
+      enableFiltering: true,
+      buttonClass: 'btn btn-outline-secondary',
+      buttonWidth: "20em"
+    })
 });
