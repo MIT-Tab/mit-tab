@@ -27,7 +27,7 @@
       </div>
 
       <div class="col-4">
-        <div class="hidden winner" data-option=0>Please select a winner</div>
+        <div class="hidden winner alert alert-warning" data-option=0>Please select a winner</div>
         <div class="hidden winner alert alert-info" data-option=1>
             The Government team has won.  Enter speaks and ranks
             normally.
@@ -69,98 +69,96 @@
   </div>
 
   <div class="row">
-    <div class="col-6 border-right p-4">
-      <center>
-        <h4 class="header">Government: {{gov_team.name}}</h4>
-      </center>
+    <div class="col-6 p-2">
+      <div class="card">
+        <div class="card-header">Government: {{gov_team.name}}</div>
+        <div class="gov card-body">
+          <div class="pm row pb-1">
+            <div class="col-12 form-group">
+              {{ form.pm_debater.errors }}
+              {{ form.pm_debater.label_tag }}
+              {% render_field form.pm_debater class="form-control" %}
+            </div>
 
-      <div class="gov">
-        <div class="pm row pb-1 border-bottom">
-          <div class="col-12 form-group">
-            {{ form.pm_debater.errors }}
-            {{ form.pm_debater.label_tag }}
-            {% render_field form.pm_debater class="form-control" %}
+            <div class="speaks col-6 form-group">
+              {{ form.pm_speaks.errors }}
+              {{ form.pm_speaks.label_tag }}
+              {% render_field form.pm_speaks class="form-control" step="1" %}
+            </div>
+
+            <div class="ranks col-6 form-group">
+              {{ form.pm_ranks.errors }}
+              {{ form.pm_ranks.label_tag }}
+              {% render_field form.pm_ranks class="form-control" %}
+            </div>
           </div>
+          <hr>
+          <div class="mg row pt-1">
+            <div class="col-12 form-group">
+              {{ form.mg_debater.errors }}
+              {{ form.mg_debater.label_tag }}
+              {% render_field form.mg_debater class="form-control" %}
+            </div>
 
-          <div class="speaks col-6 form-group">
-            {{ form.pm_speaks.errors }}
-            {{ form.pm_speaks.label_tag }}
-            {% render_field form.pm_speaks class="form-control" step="1" %}
-          </div>
+            <div class="speaks col-6 form-group">
+              {{ form.mg_speaks.errors }}
+              {{ form.mg_speaks.label_tag }}
+              {% render_field form.mg_speaks class="form-control" step="1" %}
+            </div>
 
-          <div class="ranks col-6 form-group">
-            {{ form.pm_ranks.errors }}
-            {{ form.pm_ranks.label_tag }}
-            {% render_field form.pm_ranks class="form-control" %}
-          </div>
-        </div>
-
-        <div class="mg row pt-1">
-          <div class="col-12 form-group">
-            {{ form.mg_debater.errors }}
-            {{ form.mg_debater.label_tag }}
-            {% render_field form.mg_debater class="form-control" %}
-          </div>
-
-          <div class="speaks col-6 form-group">
-            {{ form.mg_speaks.errors }}
-            {{ form.mg_speaks.label_tag }}
-            {% render_field form.mg_speaks class="form-control" step="1" %}
-          </div>
-
-          <div class="ranks col-6 form-group">
-            {{ form.mg_ranks.errors }}
-            {{ form.mg_ranks.label_tag }}
-            {% render_field form.mg_ranks class="form-control" %}
+            <div class="ranks col-6 form-group">
+              {{ form.mg_ranks.errors }}
+              {{ form.mg_ranks.label_tag }}
+              {% render_field form.mg_ranks class="form-control" %}
+            </div>
           </div>
         </div>
       </div>
-
     </div>
 
-    <div class="col-6 p-4">
-      <center>
-        <h4 class="header">Opposition: {{opp_team.name}}</h4>
-      </center>
+    <div class="col-6 p-2">
+      <div class="card">
+        <div class="card-header">Opposition: {{opp_team.name}}</div>
 
-      <div class="opp">
-        <div class="lo row pb-1 border-bottom">
-          <div class="col-12 form-group">
-            {{ form.lo_debater.errors }}
-            {{ form.lo_debater.label_tag }}
-            {% render_field form.lo_debater class="form-control" %}
+        <div class="opp card-body">
+          <div class="lo row pb-1">
+            <div class="col-12 form-group">
+              {{ form.lo_debater.errors }}
+              {{ form.lo_debater.label_tag }}
+              {% render_field form.lo_debater class="form-control" %}
+            </div>
+
+            <div class="speaks col-6 form-group">
+              {{ form.lo_speaks.errors }}
+              {{ form.lo_speaks.label_tag }}
+              {% render_field form.lo_speaks class="form-control" step="1" %}
+            </div>
+
+            <div class="ranks col-6 form-group">
+              {{ form.lo_ranks.errors }}
+              {{ form.lo_ranks.label_tag }}
+              {% render_field form.lo_ranks class="form-control" %}
+            </div>
           </div>
+          <hr>
+          <div class="mo row pt-1">
+            <div class="col-12 form-group">
+              {{ form.mo_debater.errors }}
+              {{ form.mo_debater.label_tag }}
+              {% render_field form.mo_debater class="form-control" %}
+            </div>
 
-          <div class="speaks col-6 form-group">
-            {{ form.lo_speaks.errors }}
-            {{ form.lo_speaks.label_tag }}
-            {% render_field form.lo_speaks class="form-control" step="1" %}
-          </div>
+            <div class="speaks col-6 form-group">
+              {{ form.mo_speaks.errors }}
+              {{ form.mo_speaks.label_tag }}
+              {% render_field form.mo_speaks class="form-control" step="1" %}
+            </div>
 
-          <div class="ranks col-6 form-group">
-            {{ form.lo_ranks.errors }}
-            {{ form.lo_ranks.label_tag }}
-            {% render_field form.lo_ranks class="form-control" %}
-          </div>
-        </div>
-
-        <div class="mo row pt-1">
-          <div class="col-12 form-group">
-            {{ form.mo_debater.errors }}
-            {{ form.mo_debater.label_tag }}
-            {% render_field form.mo_debater class="form-control" %}
-          </div>
-
-          <div class="speaks col-6 form-group">
-            {{ form.mo_speaks.errors }}
-            {{ form.mo_speaks.label_tag }}
-            {% render_field form.mo_speaks class="form-control" step="1" %}
-          </div>
-
-          <div class="ranks col-6 form-group">
-            {{ form.mo_ranks.errors }}
-            {{ form.mo_ranks.label_tag }}
-            {% render_field form.mo_ranks class="form-control" %}
+            <div class="ranks col-6 form-group">
+              {{ form.mo_ranks.errors }}
+              {{ form.mo_ranks.label_tag }}
+              {% render_field form.mo_ranks class="form-control" %}
+            </div>
           </div>
         </div>
       </div>
