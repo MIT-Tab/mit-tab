@@ -35,7 +35,7 @@
           <div class="list_wrapper">
           <ul class="list_item">
         {% endif %}
-        <li class="searchable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
           <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
         </li>
       {% endfor %}
