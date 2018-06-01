@@ -87,42 +87,40 @@
           <div class="pm row pb-1 border-bottom">
             <div class="col-12 form-group">
               {{ form.pm_debater.errors }}
-              <label for="id_pm_debater">Prime Minister</label>
-              <div>
-                {% render_field form.pm_debater class="form-control" %}
-              </div>
+              {{ form.pm_debater.label_tag }}
+              {% render_field form.pm_debater class="form-control" %}
             </div>
 
             <div class="speaks col-6 form-group">
               {{ form.pm_speaks.errors }}
-              <label for="id_pm_speaks">Speaks</label>
-              <div>{% render_field form.pm_speaks class="form-control" %}</div>
+              {{ form.pm_speaks.label_tag }}
+              {% render_field form.pm_speaks class="form-control" %}
             </div>
 
             <div class="ranks col-6 form-group">
               {{ form.pm_ranks.errors }}
-              <label for="id_pm_ranks">Ranks</label>
-              <div>{% render_field form.pm_ranks class="form-control" %}</div>
+              {{ form.pm_ranks.label_tag }}
+              {% render_field form.pm_ranks class="form-control" %}
             </div>
           </div>
 
           <div class="mg row pt-1">
             <div class="col-12 form-group">
               {{ form.mg_debater.errors }}
-              <label for="id_mg_debater">Member of Government</label>
-              <div>{% render_field form.mg_debater class="form-control" %}</div>
+              {{ form.mg_debater.label_tag }}
+              {% render_field form.mg_debater class="form-control" %}
             </div>
 
             <div class="speaks col-6 form-group">
               {{ form.mg_speaks.errors }}
-              <label for="id_mg_speaks">Speaks</label>
-              <div>{% render_field form.mg_speaks class="form-control" %}</div>
+              {{ form.mg_speaks.label_tag }}
+              {% render_field form.mg_speaks class="form-control" %}
             </div>
 
             <div class="ranks col-6 form-group">
               {{ form.mg_ranks.errors }}
-              <label for="id_mg_ranks">Ranks</label>
-              <div>{% render_field form.mg_ranks class="form-control" %}</div>
+              {{ form.mg_ranks.label_tag }}
+              {% render_field form.mg_ranks class="form-control" %}
             </div>
           </div>
         </div>
@@ -138,40 +136,40 @@
           <div class="lo row pb-1 border-bottom">
             <div class="col-12 form-group">
               {{ form.lo_debater.errors }}
-              <label for="id_lo_debater">Leader of Opposition</label>
-              <div>{% render_field form.lo_debater class="form-control" %}</div>
+              {{ form.lo_debater.label_tag }}
+              {% render_field form.lo_debater class="form-control" %}
             </div>
 
             <div class="speaks col-6 form-group">
               {{ form.lo_speaks.errors }}
-              <label for="id_pm_speaks">Speaks</label>
-              <div>{% render_field form.lo_speaks class="form-control" %}</div>
+              {{ form.lo_speaks.label_tag }}
+              {% render_field form.lo_speaks class="form-control" %}
             </div>
 
             <div class="ranks col-6 form-group">
               {{ form.lo_ranks.errors }}
-              <label for="id_lo_ranks">Ranks</label>
-              <div>{% render_field form.lo_ranks class="form-control" %}</div>
+              {{ form.lo_ranks.label_tag }}
+              {% render_field form.lo_ranks class="form-control" %}
             </div>
           </div>
 
           <div class="mo row pt-1">
             <div class="col-12 form-group">
               {{ form.mo_debater.errors }}
-              <label for="id_mo_debater">Member of Opposition</label>
-              <div>{% render_field form.mo_debater class="form-control" %}</div>
+              {{ form.mo_debater.label_tag }}
+              {% render_field form.mo_debater class="form-control" %}
             </div>
 
             <div class="speaks col-6 form-group">
               {{ form.mo_speaks.errors }}
-              <label for="id_mo_speaks">Speaks</label>
-              <div>{% render_field form.mo_speaks class="form-control" %}</div>
+              {{ form.mo_speaks.label_tag }}
+              {% render_field form.mo_speaks class="form-control" %}
             </div>
 
             <div class="ranks col-6 form-group">
               {{ form.mo_ranks.errors }}
-              <label for="id_mo_ranks">Ranks</label>
-              <div>{% render_field form.mo_ranks class="form-control" %}</div>
+              {{ form.mo_ranks.label_tag }}
+              {% render_field form.mo_ranks class="form-control" %}
             </div>
           </div>
         </div>
