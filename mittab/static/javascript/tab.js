@@ -17,6 +17,8 @@ $(document).ready(function(){
             }
             if (!show) {
                 $(element).hide();
+            } else {
+                $(element).show();
             }
         });
     };
@@ -127,8 +129,8 @@ $(document).ready(function(){
     $('#id_debaters').closest('tr').append(
     "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
     )
-    
-//  Taken from stackoverflow
+
+    //  Taken from stackoverflow
     $("#dialog").dialog({
         autoOpen: false,
         modal: true
@@ -151,25 +153,24 @@ $(document).ready(function(){
         $("#dialog").dialog("open");
     });
     //  End taken from stackoverflow
-        
+
     apply_filters = function() {
         show_all("li.data_list");
         var flags = 0;
         var filter_groups = {}
         $(".filter").each(function(index, value) {
+            console.log(flags)
             if (value.checked) {
                 filter_groups[$(value).data("filter-group")] |= $(value).data("filter");
                 flags |= $(value).data("filter");
             }
         });
-        if (flags) {
-            filter_on_flags(filter_groups);
-        }
+        filter_on_flags(filter_groups);
     }
-    
+
     $(".filter").change(function() {
         apply_filters();
     });
-    
+
     apply_filters();
 });
