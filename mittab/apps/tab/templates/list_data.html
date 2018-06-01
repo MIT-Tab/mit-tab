@@ -5,22 +5,25 @@
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-{% quick_search %}
 
 {% if filters %}
-  <div class="pretty">Quick Filters:
-  {% for filter_group in filters %}
-    <div class="clear"></div>
-    <span class="checkbox inline nowrap">(</span>
-    {% for key, value in filter_group %}
-      <label class="checkbox inline nowrap"><input type="checkbox" class="filter" name="filter{{key}}" data-filter-group={{forloop.parentloop.counter}} data-filter={{key}} value="{{value}}"> {{value}} </label> 
-      {% if not forloop.last %} <span class="checkbox inline">OR</span> {% endif %}
+<div class="card mb-2">
+  <div class="card-header">Quick Filters</div>
+  <div class="card-body">
+    {% for filter_group in filters %}
+      <div class="clear"></div>
+      <span class="checkbox inline nowrap">(</span>
+      {% for key, value in filter_group %}
+        <label class="checkbox inline nowrap"><input type="checkbox" class="filter" name="filter{{key}}" data-filter-group={{forloop.parentloop.counter}} data-filter={{key}} value="{{value}}"> {{value}} </label> 
+        {% if not forloop.last %} <span class="checkbox inline">OR</span> {% endif %}
+      {% endfor %}
+      <span class="checkbox inline ">)</span>
+      {% if not forloop.last %} <span class="checkbox inline">AND</span> {% endif %}
     {% endfor %}
-    <span class="checkbox inline ">)</span>
-    {% if not forloop.last %} <span class="checkbox inline">AND</span> {% endif %}
-  {% endfor %}
   </div>
+</div>
 {% endif %}
+{% quick_search %}
 
 <div id="view_items">
   <div class="list_wrapper">
