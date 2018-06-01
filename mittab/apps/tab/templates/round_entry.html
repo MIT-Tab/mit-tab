@@ -8,9 +8,9 @@
 {% block content %}
 <div class="container-fluid">
   {% if form.errors %}
-    <p style="color: red;">
+    <div class="alert alert-danger">
       Please correct the error{{ form.errors|pluralize }} below.
-    </p>
+    </div>
   {% endif %}
 
   <script type="text/javascript" src="/dynamic-media/jsi18n/"></script>
@@ -33,8 +33,6 @@
           {% render_field form.winner class="form-control" %}
         </div>
 
-        <div></div>
-        <div></div>
         <div class="col-4">
           <div class="hidden winner" data-option=0>Please select a winner</div>
           <div class="hidden winner alert alert-info" data-option=1>
@@ -94,7 +92,7 @@
             <div class="speaks col-6 form-group">
               {{ form.pm_speaks.errors }}
               {{ form.pm_speaks.label_tag }}
-              {% render_field form.pm_speaks class="form-control" %}
+              {% render_field form.pm_speaks class="form-control" step="1" %}
             </div>
 
             <div class="ranks col-6 form-group">
@@ -114,7 +112,7 @@
             <div class="speaks col-6 form-group">
               {{ form.mg_speaks.errors }}
               {{ form.mg_speaks.label_tag }}
-              {% render_field form.mg_speaks class="form-control" %}
+              {% render_field form.mg_speaks class="form-control" step="1" %}
             </div>
 
             <div class="ranks col-6 form-group">
@@ -143,7 +141,7 @@
             <div class="speaks col-6 form-group">
               {{ form.lo_speaks.errors }}
               {{ form.lo_speaks.label_tag }}
-              {% render_field form.lo_speaks class="form-control" %}
+              {% render_field form.lo_speaks class="form-control" step="1" %}
             </div>
 
             <div class="ranks col-6 form-group">
@@ -163,7 +161,7 @@
             <div class="speaks col-6 form-group">
               {{ form.mo_speaks.errors }}
               {{ form.mo_speaks.label_tag }}
-              {% render_field form.mo_speaks class="form-control" %}
+              {% render_field form.mo_speaks class="form-control" step="1" %}
             </div>
 
             <div class="ranks col-6 form-group">
@@ -179,22 +177,12 @@
     {% if form.ballot_code %}
     <div class="row">
       {{ form.ballot_code.errors }}
-      <label for="id_ballot_code">Ballot code</label>
-      <div>{% render_field form.ballot_code class="form-control" %}</div>
+      {{ form.ballot_code.label_tag }}
+      {% render_field form.ballot_code class="form-control" %}
     </div>
     {% endif %}
 
-    {% if links %}
-    <div class="btn-group">
-      {% for link,text,confirm in links %}
-        <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
-      {% endfor %}
-    </div>
-    {%endif%}
-
-    <div>
-      <input class="btn btn-primary" type="submit" value="Submit Changes">
-    </div>
+    <input class="btn btn-primary" type="submit" value="Submit Changes">
   </form>
 </div>
 

@@ -174,6 +174,7 @@ class ResultEntryForm(forms.Form):
                     label=self.NAMES[d],
                     choices=debater_choices)
             self.fields[self.deb_attr_name(d, "speaks")] = forms.DecimalField(
+                    decimal_places=2,
                     label="Speaks",
                     validators=[validate_speaks])
             self.fields[self.deb_attr_name(d, "ranks")] = forms.ChoiceField(
