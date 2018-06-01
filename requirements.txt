@@ -9,3 +9,4 @@ gunicorn==19.7.1
 xlrd==0.9.4
 xlwt==1.0.0
 raven==6.1.0
+django-widget-tweaks==1.4.2
