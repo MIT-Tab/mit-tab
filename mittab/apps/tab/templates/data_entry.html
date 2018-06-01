@@ -6,9 +6,36 @@
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="float_container">
+
+
+<div class="row">
+  <div class="col-{% if team_obj or debater_obj %}8{% else %}12{% endif %}">
+    {% if form.errors %}
+      <div class="alert alert-danger">
+        Please correct the error{{ form.errors|pluralize }} below.
+      </div>
+    {% endif %}
+    <script type="text/javascript" src="/dynamic-media/jsi18n/"></script>
+    {{ form.media }}
+    <form action="{{ action }}" method="post" class="form-control dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
+      <table>
+        {{ form|bootstrap }}
+        {{ other_data }}
+      </table>
+      {% if links %}
+        <div class="btn-group">
+          {% for link,text,confirm in links %}
+            <a class="btn btn-secondary{%if confirm%} confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <hr>
+      <input type="submit" class="btn btn-primary" value="Submit Changes">
+    </form>
+  </div>
+
   {% if team_obj %}
-    <div class="team_record">
+    <div class="col-4 team_record">
       Team Stats:
       <table>
         <tr><th>Stat</th><th>Value</th></tr>
@@ -22,7 +49,7 @@
 
 
   {% if debater_obj %}
-      <div class="team_record">
+      <div class="col-4 team_record">
       Debater Rounds:
       <table>
         <tr><th>Round #</th><th>Speaks</th><th>Ranks</th></tr>
@@ -36,29 +63,5 @@
       </table>
     </div>
   {% endif %}
-
-
-  {% if form.errors %}
-    <div class="alert alert-danger">
-      Please correct the error{{ form.errors|pluralize }} below.
-    </div>
-  {% endif %}
-  <script type="text/javascript" src="/dynamic-media/jsi18n/"></script>
-  {{ form.media }}
-  <form action="{{ action }}" method="post" class="form-control dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
-    <table>
-      {{ form|bootstrap }}
-      {{ other_data }}
-    </table>
-    {% if links %}
-      <div class="btn-group">
-        {% for link,text,confirm in links %}
-          <a class="btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
-        {% endfor %}
-      </div>
-    {% endif %}
-    <input type="submit" class="btn btn-primary" value="Submit Changes">
-  </form>
 </div>
-
 {% endblock %}
