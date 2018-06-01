@@ -72,10 +72,10 @@ div#banner {
 table.pretty {
     text-align: left;
     border-collapse: collapse;
-    border: 1px solid #666666;  
+    border: 1px solid #666666;
 }
 table.pretty th{
-    border: 1px solid #666666;   
+    border: 1px solid #666666;
     padding: .25em;
     font-size: 1em;
     font-style: bold;
@@ -87,12 +87,12 @@ table.pretty th{
   padding: .25rem;
 }
 
-#round_info table {
+.table-condensed {
   font-size: .875em;
 }
 
-#round_info td, #round_info th {
-  padding: .5em;
+.table-condensed td, .table-condensed th {
+  padding: .5em !important;
 }
 
 table.check_status {
