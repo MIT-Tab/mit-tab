@@ -171,14 +171,14 @@ class ResultEntryForm(forms.Form):
         for d in self.DEBATERS:
             debater_choices = gov_debaters if d in self.GOV else opp_debaters
             self.fields[self.deb_attr_name(d, "debater")] = forms.ChoiceField(
-                    label="Who was %s?" % (self.NAMES[d]),
-                    choices=debater_choices
-                    )
+                    label=self.NAMES[d],
+                    choices=debater_choices)
             self.fields[self.deb_attr_name(d, "speaks")] = forms.DecimalField(
-                    label="%s Speaks" % (self.NAMES[d]),
+                    decimal_places=2,
+                    label="Speaks",
                     validators=[validate_speaks])
             self.fields[self.deb_attr_name(d, "ranks")] = forms.ChoiceField(
-                    label="%s Rank" % (self.NAMES[d]),
+                    label="Ranks",
                     choices=self.RANKS)
 
         if round_object.victor == 0 or no_fill:

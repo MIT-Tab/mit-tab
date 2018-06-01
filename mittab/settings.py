@@ -36,6 +36,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'mittab.apps.tab',
     'raven.contrib.django.raven_compat',
+    'widget_tweaks',
 )
 
 MIDDLEWARE_CLASSES = (
