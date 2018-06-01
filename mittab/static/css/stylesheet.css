@@ -117,13 +117,6 @@ table.check_status td {
   overflow-y: scroll;
 }
 
-div.obj_info {
-    border: 1px solid #BBBBBB;
-    padding: .5em;
-    margin-botton: 1em;
-    overflow: hidden; 
-}
-
 .greyed_out {
     background : white;
     color: white;
