@@ -9,7 +9,7 @@
 
 
 <div class="row">
-  <div class="col-{% if team_obj or debater_obj %}8{% else %}12{% endif %}">
+  <div class="col-8">
     {% if form.errors %}
       <div class="alert alert-danger">
         Please correct the error{{ form.errors|pluralize }} below.
@@ -17,7 +17,7 @@
     {% endif %}
     <script type="text/javascript" src="/dynamic-media/jsi18n/"></script>
     {{ form.media }}
-    <form action="{{ action }}" method="post" class="form-control dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
+    <form action="{{ action }}" method="post" class="form-control-sm dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
       <table>
         {{ form|bootstrap }}
         {{ other_data }}
