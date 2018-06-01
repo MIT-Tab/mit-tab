@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tags %}
 
 {% block title %}Welcome to MIT Tab{% endblock %}
 
@@ -17,14 +18,7 @@
 {% url "mittab.apps.tab.views.enter_room" as enter_room %}
 
 <div class="container-fluid">
-  <div class="row">
-    <div class="input-group mb-3 pl-5 pr-5">
-      <div class="input-group-prepend">
-        <span class="input-group-text" id="basic-addon1">Quick Search:</span>
-      </div>
-      <input type="text" class="form-control" id="quick-search">
-    </div>
-  </div>
+  <div class="row">{% quick_search %}</div>
 
   <div class="row index_container">
     <div class="col-sm" id="school_list">
