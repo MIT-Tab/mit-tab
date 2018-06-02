@@ -175,6 +175,7 @@ $(document).ready(function(){
     $("[multiple]").multiselect({
       enableFiltering: true,
       buttonClass: 'btn btn-outline-secondary',
-      buttonWidth: "20em"
+      buttonWidth: "20em",
+      enableCaseInsensitiveFiltering: true
     })
 });
