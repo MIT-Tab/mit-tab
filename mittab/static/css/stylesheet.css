@@ -117,13 +117,6 @@ table.check_status td {
   overflow-y: scroll;
 }
 
-div.obj_info {
-    border: 1px solid #BBBBBB;
-    padding: .5em;
-    margin-botton: 1em;
-    overflow: hidden; 
-}
-
 .greyed_out {
     background : white;
     color: white;
@@ -153,33 +146,6 @@ ul.errorlist li:first-child::before {
     content: "";
 }
 
-div.team_record {
-    float: right;
-    padding: 1em;
-    border: 1px solid #BBBBBB;
-    font-size: 18px;
-    z-index: 5;
-    background-color: #FBFBF0
-}
-
-div.team_record table {
-    border-collapse: collapse;
-}
-div.team_record table th{
-    border-right: 1px solid black;
-    border-bottom: 1px solid black;
-    margin: .1em;
-}
-div.team_record table td{
-    border-right: 1px solid black;
-    margin: .1em;
-}
-
-
-div.list_wrapper {
-    float: left;
-}
-
 div.clear {
     clear: both;
 }
@@ -187,16 +153,6 @@ div.clear {
 a.obj_item {
     text-decoration: none;
     color: black;
-}
-
-div.team_record td {
-    padding-right: .5em;    
-    padding-left: .5em;    
-}
-
-div.team_record th {
-    padding-right: .5em;    
-    padding-left: .5em;    
 }
 
 .mid {

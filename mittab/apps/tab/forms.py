@@ -31,9 +31,7 @@ class RoomForm(forms.ModelForm):
         fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
-                                             widget=FilteredSelectMultiple("Affiliated Schools",
-                                             is_stacked=False))
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'))
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -74,9 +72,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'),
-                                              widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'))
 #    def __init__(self, *args, **kwargs):
 #        super(TeamForm, self).__init__(*args, **kwargs)
 #        if kwargs.has_key('instance'):
