@@ -1,34 +1,34 @@
 {% load tags %}
 
-{% url "mittab.apps.tab.views.index" as home%}
+{% url "index" as home%}
 
-{% url "mittab.apps.tab.views.enter_school" as enter_school %}
-{% url "mittab.apps.tab.views.view_schools" as view_schools %}
+{% url "enter_school" as enter_school %}
+{% url "view_schools" as view_schools %}
 
-{% url "mittab.apps.tab.views.enter_room" as enter_room %}
-{% url "mittab.apps.tab.views.view_rooms" as view_rooms %}
+{% url "enter_room" as enter_room %}
+{% url "view_rooms" as view_rooms %}
 
-{% url "mittab.apps.tab.judge_views.enter_judge" as enter_judge %}
-{% url "mittab.apps.tab.judge_views.view_judges" as view_judges%}
+{% url "enter_judge" as enter_judge %}
+{% url "view_judges" as view_judges%}
 
-{% url "mittab.apps.tab.team_views.enter_team" as enter_team %}
-{% url "mittab.apps.tab.team_views.view_teams" as view_teams%}
-{% url "mittab.apps.tab.team_views.rank_teams_ajax" as rank_teams %}
-{% url "mittab.apps.tab.team_views.all_tab_cards" as tab_cards %}
+{% url "enter_team" as enter_team %}
+{% url "view_teams" as view_teams%}
+{% url "rank_teams_ajax" as rank_teams %}
+{% url "all_tab_cards" as tab_cards %}
 
-{% url "mittab.apps.tab.debater_views.enter_debater" as enter_debater %}
-{% url "mittab.apps.tab.debater_views.view_debaters" as view_debaters %}
-{% url "mittab.apps.tab.debater_views.rank_debaters_ajax" as rank_debaters %}
+{% url "enter_debater" as enter_debater %}
+{% url "view_debaters" as view_debaters %}
+{% url "rank_debaters_ajax" as rank_debaters %}
 
-{% url "mittab.apps.tab.pairing_views.view_status" as view_status %}
-{% url "mittab.apps.tab.pairing_views.view_rounds" as view_rounds %}
-{% url "mittab.apps.tab.pairing_views.pair_round" as pair_round %}
-{% url "mittab.apps.tab.pairing_views.confirm_start_new_tourny" as confirm_start_new_tourny %}
-{% url "mittab.apps.tab.views.upload_data" as upload_data %}
-{% url "mittab.apps.tab.pairing_views.manual_backup" as backup %}
-{% url "mittab.apps.tab.pairing_views.view_backups" as view_backups %}
-{% url "mittab.apps.tab.views.view_scratches" as view_scratches %}
-{% url "mittab.apps.tab.views.add_scratch" as add_scratch %}
+{% url "view_status" as view_status %}
+{% url "view_rounds" as view_rounds %}
+{% url "pair_round" as pair_round %}
+{% url "confirm_start_new_tourny" as confirm_start_new_tourny %}
+{% url "upload_data" as upload_data %}
+{% url "manual_backup" as backup %}
+{% url "view_backups" as view_backups %}
+{% url "view_scratches" as view_scratches %}
+{% url "add_scratch" as add_scratch %}
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <a class="navbar-brand" href="{{ home }}">MIT TAB</a>
