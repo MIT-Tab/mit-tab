@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.template import loader
+from django.template import loader, RequestContext
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
@@ -22,7 +22,7 @@ def index(request):
     debater_list = [(debater.pk,debater.name) for debater in Debater.objects.order_by('name')]
     room_list = [(room.pk, room.name) for room in Room.objects.order_by('name')]
 
-    return render('index.html',locals(),context_instance=RequestContext(request))
+    return render('index.html',locals())
 
 def tab_login(request):
     return login(request, extra_context={'no_navigation': True})
