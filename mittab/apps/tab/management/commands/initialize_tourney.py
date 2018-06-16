@@ -15,7 +15,6 @@ class Command(BaseCommand):
     help = 'Setup a new tounament and backup the last one'
 
     def add_arguments(self, parser):
-        parser.add_argument('backup_directory', nargs='+')
         parser.add_argument('--tab-password',
                 dest='tab_password',
                 help='Password for the tab user',
@@ -26,6 +25,7 @@ class Command(BaseCommand):
                 help='Password for the entry user',
                 nargs='?',
                 default=User.objects.make_random_password(length=8))
+        parser.add_argument('backup_directory', nargs='+')
 
     def handle(self, *args, **options):
         if len(args) != 1:
