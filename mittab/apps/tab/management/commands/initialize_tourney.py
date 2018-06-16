@@ -28,7 +28,7 @@ class Command(BaseCommand):
         parser.add_argument('backup_directory')
 
     def handle(self, *args, **options):
-        backup_dir = args[0]
+        backup_dir = options['backup_dir']
         path = BACKUP_PREFIX
 
         self.stdout.write("Proceeding to tournament creation")
