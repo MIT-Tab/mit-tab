@@ -22,3 +22,6 @@ shell:
 clean:
 	find . -name '*.pyc' -delete
 	find . -name '__pycache__' -delete
+
+dev_server:
+	DEBUG=1 python manage.py runserver

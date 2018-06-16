@@ -1,7 +1,6 @@
 from datetime import datetime
 
-from django.shortcuts import render_to_response
-from django.template import RequestContext
+from django.shortcuts import render
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
 
@@ -24,13 +23,12 @@ def view_teams(request):
                for t in Team.objects.all().order_by("name")]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render_to_response('list_data.html', 
-                             {'item_type':'team',
-                              'title': "Viewing All Teams",
-                              'item_list': c_teams,
-                              'filters': filters,
-                              'symbol_text': symbol_text}, 
-                              context_instance=RequestContext(request))
+    return render(request, 'list_data.html', {
+        'item_type':'team',
+        'title': "Viewing All Teams",
+        'item_list': c_teams,
+        'filters': filters,
+        'symbol_text': symbol_text})
 
 def view_team(request, team_id):
     team_id = int(team_id)
@@ -45,42 +43,36 @@ def view_team(request, team_id):
         stats.append(("Been Pullup", tab_logic.pull_up_count(team)))
         stats.append(("Hit Pullup", tab_logic.hit_pull_up_count(team)))
     except Team.DoesNotExist:
-        return render_to_response('error.html', 
-                                 {'error_type': "View Team",
-                                  'error_name': str(team_id),
-                                  'error_info':"No such Team"}, 
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "View Team",
+            'error_name': str(team_id),
+            'error_info':"No such Team"})
     if request.method == 'POST':
         form = TeamForm(request.POST,instance=team)
         if form.is_valid():
             try:
                form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "Team",
-                                          'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"Team name cannot be validated, most likely a non-existent team"}, 
-                                          context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Team",
-                                      'data_name': "["+form.cleaned_data['name']+"]"}, 
-                                      context_instance=RequestContext(request))
+                return render(request, 'error.html', {
+                    'error_type': "Team",
+                    'error_name': "["+form.cleaned_data['name']+"]",
+                    'error_info':"Team name cannot be validated, most likely a non-existent team"})
+            return render(request, 'thanks.html', {
+                'data_type': "Team",
+                'data_name': "["+form.cleaned_data['name']+"]"})
     else:
         form = TeamForm(instance=team)
         links = [('/team/'+str(team_id)+'/scratches/view/',u'Scratches for {}'.format(team.name), False)]
         for deb in team.debaters.all():
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
-        return render_to_response('data_entry.html', 
-                                 {'title':"Viewing Team: %s"%(team.name),
-                                  'form': form,
-                                  'links': links,
-                                  'team_obj':team,
-                                  'team_stats':stats}, 
-                                  context_instance=RequestContext(request))
+        return render(request, 'data_entry.html', {
+            'title':"Viewing Team: %s"%(team.name),
+            'form': form,
+            'links': links,
+            'team_obj':team,
+            'team_stats':stats})
 
-    return render_to_response('data_entry.html', 
-                             {'form': form}, 
-                             context_instance=RequestContext(request))
+    return render(request, 'data_entry.html', {'form': form})
 
 def enter_team(request):
     if request.method == 'POST':
@@ -89,62 +81,55 @@ def enter_team(request):
             try:
                 team = form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "Team",'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"Team name cannot be validated, most likely a duplicate school"}, 
-                                          context_instance=RequestContext(request))
+                return render(request, 'error.html', {
+                    'error_type': "Team",
+                    'error_name': "["+form.cleaned_data['name']+"]",
+                    'error_info':"Team name cannot be validated, most likely a duplicate school"})
             num_forms = form.cleaned_data['number_scratches']
             if num_forms > 0:
                 return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
             else:
-                return render_to_response('thanks.html', 
-                                         {'data_type': "Team",
-                                          'data_name': u'[{}]'.format(team.name),
-                                          'data_modification': 'CREATED',
-                                          'enter_again': True},
-                                          context_instance=RequestContext(request))
+                return render(request, 'thanks.html', {
+                    'data_type': "Team",
+                    'data_name': u'[{}]'.format(team.name),
+                    'data_modification': 'CREATED',
+                    'enter_again': True})
 
     else:
         form = TeamEntryForm()
-    return render_to_response('data_entry.html',
-                             {'form': form, 'title': "Create Team"},
-                              context_instance=RequestContext(request))
-    
-@permission_required('tab.team.can_delete', login_url="/403/")                               
+    return render(request, 'data_entry.html', {'form': form, 'title': "Create Team"})
+
+@permission_required('tab.team.can_delete', login_url="/403/")
 def delete_team(request, team_id):
     team_id = int(team_id)
     try :
         team = Team.objects.get(pk=team_id)
         team.delete()
     except Team.DoesNotExist:
-        return render_to_response('error.html', 
-                                 {'error_type': "Team",
-                                 'error_name': str(team_id),
-                                 'error_info':"Team does not exist"}, 
-                                 context_instance=RequestContext(request))
-    return render_to_response('thanks.html', 
-                             {'data_type': "Team",
-                              'data_name': "["+str(team_id)+"]",
-                              'data_modification': 'DELETED'}, 
-                              context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "Team",
+            'error_name': str(team_id),
+            'error_info':"Team does not exist"})
+    return render(request, 'thanks.html', {
+        'data_type': "Team",
+        'data_name': "["+str(team_id)+"]",
+        'data_modification': 'DELETED'})
 
 def add_scratches(request, team_id, number_scratches):
     try:
         team_id,number_scratches = int(team_id),int(number_scratches)
     except ValueError:
-        return render_to_response('error.html', 
-                                 {'error_type': "Scratch",'error_name': "Data Entry",
-                                  'error_info':"I require INTEGERS!"}, 
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "Scratch",'error_name': "Data Entry",
+            'error_info':"I require INTEGERS!"})
     try:
         team = Team.objects.get(pk=team_id)
     except Team.DoesNotExist:
-        return render_to_response('error.html', 
-                                 {'error_type': "Add Scratches for Team",
-                                  'error_name': str(team_id),
-                                  'error_info':"No such Team"}, 
-                                  context_instance=RequestContext(request))
-        
+        return render(request, 'error.html', {
+            'error_type': "Add Scratches for Team",
+            'error_name': str(team_id),
+            'error_info':"No such Team"})
+
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) for i in range(1,number_scratches+1)]
         all_good = True
@@ -153,27 +138,25 @@ def add_scratches(request, team_id, number_scratches):
         if all_good:
             for form in forms:
                 form.save()
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Scratches for team",
-                                      'data_name': "["+str(team_id)+"]",
-                                      'data_modification': "CREATED"},
-                                      context_instance=RequestContext(request))            
+            return render(request, 'thanks.html', {
+                'data_type': "Scratches for team",
+                'data_name': "["+str(team_id)+"]",
+                'data_modification': "CREATED"})
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
-    return render_to_response('data_entry_multiple.html', 
-                             {'forms': zip(forms,[None]*len(forms)),
-                              'data_type':'Scratch',
-                              'title':"Adding Scratch(es) for %s"%(team.name)}, 
-                              context_instance=RequestContext(request))
-    
+    return render(request, 'data_entry_multiple.html', {
+        'forms': zip(forms,[None]*len(forms)),
+        'data_type':'Scratch',
+        'title':"Adding Scratch(es) for %s"%(team.name)})
+
 def view_scratches(request, team_id):
     try:
         team_id = int(team_id)
     except ValueError:
-        return render_to_response('error.html', 
-                                 {'error_type': "Scratch",'error_name': "Delete",
-                                  'error_info':"I require INTEGERS!"}, 
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "Scratch",
+            'error_name': "Delete",
+            'error_info':"I require INTEGERS!"})
     scratches = Scratch.objects.filter(team=team_id)
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
@@ -185,50 +168,44 @@ def view_scratches(request, team_id):
         if all_good:
             for form in forms:
                 form.save()
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Scratches for team",
-                                      'data_name': "["+str(team_id)+"]",
-                                      'data_modification': "EDITED"},
-                                      context_instance=RequestContext(request))  
+            return render(request, 'thanks.html', {
+                'data_type': "Scratches for team",
+                'data_name': "["+str(team_id)+"]",
+                'data_modification': "EDITED"})
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/team/"+str(team_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/team/'+str(team_id)+'/scratches/add/1/','Add Scratch', False)]
-    return render_to_response('data_entry_multiple.html', 
-                             {'forms': zip(forms,delete_links),
-                              'data_type':'Scratch',
-                              'links':links,
-                              'title':"Viewing Scratch Information for %s"%(team.name)}, 
-                              context_instance=RequestContext(request))
+    return render(request, 'data_entry_multiple.html', {
+        'forms': zip(forms,delete_links),
+        'data_type':'Scratch',
+        'links':links,
+        'title':"Viewing Scratch Information for %s"%(team.name)})
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
-    return render_to_response('all_tab_cards.html',
-                              locals(),
-                              context_instance=RequestContext(request))
+    return render(request, 'all_tab_cards.html', locals())
 
 def pretty_tab_card(request, team_id):
     try:
         team_id = int(team_id)
     except:
-        return render_to_response('error.html',
-                                 {'error_type': "Tab Card",'error_name': "View",
-                                  'error_info': "Team id must be an integer!"},
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "Tab Card",
+            'error_name': "View",
+            'error_info': "Team id must be an integer!"})
     team = Team.objects.get(pk=team_id)
-    return render_to_response('pretty_tab_card.html',
-                             {'team':team},
-                              context_instance=RequestContext(request))
+    return render(request, 'pretty_tab_card.html', {'team':team})
 
 def tab_card(request, team_id):
     try:
         team_id = int(team_id)
     except ValueError:
-        return render_to_response('error.html',
-                                 {'error_type': "Tab Card",'error_name': "View",
-                                  'error_info': "Team id must be an integer!"},
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html', {
+            'error_type': "Tab Card",
+            'error_name': "View",
+            'error_info': "Team id must be an integer!"})
     team = Team.objects.get(pk=team_id)
     rounds = ([r for r in Round.objects.filter(gov_team=team)] +
               [r for r in Round.objects.filter(opp_team=team)])
@@ -317,27 +294,24 @@ def tab_card(request, team_id):
     #Duplicates Debater 1 for display if Ironman team    
     if (iron_man):
       d2 = d1
-    return render_to_response('tab_card.html', 
-                             {'team_name': team.name,
-                              'team_school': team.school,
-                              'debater_1': d1.name,
-                              'debater_1_status': Debater.NOVICE_CHOICES[d1.novice_status][1],
-                              'debater_2': d2.name,
-                              'debater_2_status': Debater.NOVICE_CHOICES[d2.novice_status][1],
-                              'round_stats': round_stats,
-                              'd1st': tot_speaks_deb(d1),
-                              'd1rt': tot_ranks_deb(d1),
-                              'd2st': tot_speaks_deb(d2),
-                              'd2rt': tot_ranks_deb(d2),
-                              'ts': tot_speaks(team),
-                              'tr': tot_ranks(team),
-                              'bye_round': bye_round},
-                              context_instance=RequestContext(request))
+    return render(request, 'tab_card.html', {
+        'team_name': team.name,
+        'team_school': team.school,
+        'debater_1': d1.name,
+        'debater_1_status': Debater.NOVICE_CHOICES[d1.novice_status][1],
+        'debater_2': d2.name,
+        'debater_2_status': Debater.NOVICE_CHOICES[d2.novice_status][1],
+        'round_stats': round_stats,
+        'd1st': tot_speaks_deb(d1),
+        'd1rt': tot_ranks_deb(d1),
+        'd2st': tot_speaks_deb(d2),
+        'd2rt': tot_ranks_deb(d2),
+        'ts': tot_speaks(team),
+        'tr': tot_ranks(team),
+        'bye_round': bye_round})
 
 def rank_teams_ajax(request):
-    return render_to_response('rank_teams.html',
-                             {'title': "Team Rankings"},
-                              context_instance=RequestContext(request))
+    return render(request, 'rank_teams.html', {'title': "Team Rankings"})
 
 def rank_teams(request):
     print "starting rankings: ", datetime.now()
@@ -358,11 +332,10 @@ def rank_teams(request):
                   for team in ranked_novice_teams]
 
     print "Got ranked novice teams"
-    return render_to_response('rank_teams_component.html',
-                             {'varsity': teams,
-                              'novice': nov_teams,
-                              'title': "Team Rankings"},
-                              context_instance=RequestContext(request))
+    return render(request, 'rank_teams_component.html', {
+        'varsity': teams,
+        'novice': nov_teams,
+        'title': "Team Rankings"})
 
 def team_stats(request, team_id):
     team_id = int(team_id)

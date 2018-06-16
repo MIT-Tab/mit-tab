@@ -12,27 +12,24 @@ from mittab.libs.backup import BACKUP_PREFIX
 from mittab.apps.tab.models import TabSettings
 
 class Command(BaseCommand):
-    args = '<backup_directory>'
     help = 'Setup a new tounament and backup the last one'
-    option_list = BaseCommand.option_list + (
-            make_option("--tab-password", dest="tab_password",
-                help="Password for the tab user"),
-            make_option("--entry-password", dest="entry_password",
-                help="Password for the entry user"))
+
+    def add_arguments(self, parser):
+        parser.add_argument('--tab-password',
+                dest='tab_password',
+                help='Password for the tab user',
+                nargs='?',
+                default=User.objects.make_random_password(length=8))
+        parser.add_argument('--entry-password',
+                dest='entry_password',
+                help='Password for the entry user',
+                nargs='?',
+                default=User.objects.make_random_password(length=8))
+        parser.add_argument('backup_directory')
 
     def handle(self, *args, **options):
-        if len(args) != 1:
-            self.print_help('./manage.py', 'initialize_tourney')
-            raise CommandError('Please supply valid arguments')
-
-        backup_dir = args[0]
+        backup_dir = options['backup_directory']
         path = BACKUP_PREFIX
-
-        for user in ['tab', 'entry']:
-            option_name = '%s_password' % user
-            if options[option_name] is None or options[option_name].strip() == '':
-                self.stdout.write("No password provided for %s, generating password" % user)
-                options[option_name] = User.objects.make_random_password(length=8)
 
         self.stdout.write("Proceeding to tournament creation")
         self.stdout.write("Creating directory for current tournament in backup directory")

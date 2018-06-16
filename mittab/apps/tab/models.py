@@ -8,13 +8,13 @@ from django.core.exceptions import ValidationError
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
-    
+
     class Meta:
         verbose_name_plural = "tab settings"
 
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-    
+
     @classmethod
     def get(cls, key, default=None):
         try:
