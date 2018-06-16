@@ -28,10 +28,6 @@ class Command(BaseCommand):
         parser.add_argument('backup_directory')
 
     def handle(self, *args, **options):
-        if len(args) != 1:
-            self.print_help('./manage.py', 'initialize_tourney')
-            raise CommandError('Please supply valid arguments')
-
         backup_dir = args[0]
         path = BACKUP_PREFIX
 
