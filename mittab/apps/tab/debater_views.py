@@ -10,7 +10,7 @@ from mittab.libs import tab_logic, errors
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
     c_debaters = [(debater.pk,debater.name) for debater in Debater.objects.order_by("name")]
-    return render('list_data.html', {
+    return render(request, 'list_data.html', {
         'item_type':'debater',
         'title': 'Viewing All Debaters',
         'item_list': c_debaters})
@@ -20,7 +20,7 @@ def view_debater(request, debater_id):
     try:
         debater = Debater.objects.get(pk=debater_id)
     except Debater.DoesNotExist:
-        return render('error.html', {
+        return render(request, 'error.html', {
             'error_type': 'View Debater',
             'error_name': str(debater_id),
             'error_info':"No such debater"})
@@ -30,11 +30,11 @@ def view_debater(request, debater_id):
             try:
                form.save()
             except ValueError:
-                return render('error.html', {
+                return render(request, 'error.html', {
                     'error_type': 'Debater',
                     'error_name': "["+form.cleaned_data['name']+"]",
                     'error_info':"Debater name cannot be validated, most likely a non-existent debater"})
-            return render('thanks.html', {
+            return render(request, 'thanks.html', {
                 'data_type': "Debater",
                 'data_name': "["+form.cleaned_data['name']+"]"})
     else:
@@ -47,7 +47,7 @@ def view_debater(request, debater_id):
         for team in teams:
             links.append(('/team/'+str(team.id)+'/', "View %s"%team.name, False))
 
-        return render('data_entry.html', {
+        return render(request, 'data_entry.html', {
             'form': form,
             'debater_obj': debater,
             'links': links,
@@ -67,11 +67,11 @@ def delete_debater(request, debater_id):
         errors.emit_current_exception()
         error_msg = str(e)
     if error_msg:
-        return render('error.html', {
+        return render(request, 'error.html', {
             'error_type': 'Debater',
             'error_name': 'Error Deleting Debater',
             'error_info':error_msg})
-    return render('thanks.html', {
+    return render(request, 'thanks.html', {
         'data_type': "Debater",
         'data_name': "["+str(debater_id)+"]",
         'data_modification': 'DELETED'})
@@ -82,20 +82,20 @@ def enter_debater(request):
             try:
                 form.save()
             except ValueError:
-                return render('error.html', {
+                return render(request, 'error.html', {
                     'error_type': "Debater",'error_name': "["+form.cleaned_data['name']+"]",
                     'error_info': "Debater name cannot be validated, most likely a duplicate debater"})
-            return render('thanks.html', {
+            return render(request, 'thanks.html', {
                 'data_type': "Debater",
                 'data_name': "["+form.cleaned_data['name']+"]",
                 'data_modification': "CREATED",
                 'enter_again': True})
     else:
         form = DebaterForm()
-    return render('data_entry.html', {'form': form, 'title': 'Create Debater:'})
+    return render(request, 'data_entry.html', {'form': form, 'title': 'Create Debater:'})
 
 def rank_debaters_ajax(request):
-    return render('rank_debaters.html', {'title': "Debater Rankings"})
+    return render(request, 'rank_debaters.html', {'title': "Debater Rankings"})
 
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
@@ -110,7 +110,7 @@ def rank_debaters(request):
                      tab_logic.tot_ranks_deb(s),
                      tab_logic.deb_team(s)) for s in nov_speakers]
 
-    return render('rank_debaters_component.html', {
+    return render(request, 'rank_debaters_component.html', {
         'debaters': debaters,
         'nov_debaters' : nov_debaters,
         'title': 'Speaker Rankings'})
