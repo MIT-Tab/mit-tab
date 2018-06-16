@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 help='Password for the entry user',
                 nargs='?',
                 default=User.objects.make_random_password(length=8))
-        parser.add_argument('backup_directory', nargs='+')
+        parser.add_argument('backup_directory')
 
     def handle(self, *args, **options):
         if len(args) != 1:
