@@ -9,7 +9,7 @@ __log = logging.getLogger(__name__)
 
 def emit_current_exception():
     __log.exception("Got exception, caught it")
-    else:
+    if os.environ.get('DEBUG') not in ['1', 1, True, 'true']:
         client.captureException()
 
 
