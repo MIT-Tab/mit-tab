@@ -1,13 +1,14 @@
 import os
 import sys
-import traceback
+import logging
 
 from raven.contrib.django.raven_compat.models import client
 
 
+__log = logging.getLogger(__name__)
+
 def emit_current_exception():
-    if os.environ.get('DEBUG') in ['1', 1, True, 'true']:
-        traceback.print_exc(file=sys.stdout)
+    __log.exception("Got exception, caught it")
     else:
         client.captureException()
 

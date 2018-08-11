@@ -1,3 +1,4 @@
+import logging
 import os
 import csv
 from optparse import make_option
@@ -11,6 +12,7 @@ from mittab.libs import tab_logic
 class Command(BaseCommand):
     TEAM_ROWS = ('Team Name', 'School', 'Hyrbid School', 'Debater 1', 'Debater 2', 'Wins', 'Speaks', 'Ranks')
     DEBATER_ROWS = ('Name', 'School', 'Speaks', 'Ranks')
+    LOG = logging.getLogger(__name__)
 
     help = 'Dump novice & varsity team/speaker rankings as a csv'
     option_list = BaseCommand.option_list + (
@@ -54,13 +56,13 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         if not os.path.exists(kwargs["root"]): os.makedirs(kwargs["root"])
 
-        print('Calculating ranks')
+        self.LOG.info('Calculating ranks')
         teams = [ self.make_team_row(team) for team in tab_logic.rank_teams() ]
         nov_teams = [ self.make_team_row(team) for team in tab_logic.rank_nov_teams() ]
         debaters = [ self.make_debater_row(deb) for deb in tab_logic.rank_speakers() ]
         nov_debaters = [ self.make_debater_row(deb) for deb in tab_logic.rank_nov_speakers() ]
 
-        print('Writing to csv')
+        self.LOG.info('Writing to csv')
         self.write_to_csv(os.path.join(kwargs["root"], kwargs["team_file"]),
                 self.TEAM_ROWS, teams)
         self.write_to_csv(os.path.join(kwargs["root"], kwargs["nov_team_file"]),
@@ -69,4 +71,4 @@ class Command(BaseCommand):
                 self.DEBATER_ROWS, debaters)
         self.write_to_csv(os.path.join(kwargs["root"], kwargs["nov_debater_file"]),
                 self.DEBATER_ROWS, nov_debaters)
-        print('Done!')
+        self.LOG.info('Done!')

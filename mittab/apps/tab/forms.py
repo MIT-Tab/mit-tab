@@ -1,6 +1,7 @@
+import logging
 import sys, traceback
 import itertools
-import pprint
+from pprint import pformat
 
 from django.db import models, transaction
 from django import forms
@@ -10,6 +11,9 @@ from decimal import Decimal
 
 from models import *
 from mittab.libs import errors
+
+
+__log = logging.getLogger(__name__)
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -239,7 +243,6 @@ class ResultEntryForm(forms.Form):
         except Exception, e:
             errors.emit_current_exception()
             self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
-            traceback.print_exc(file=sys.stdout)
         return cleaned_data
 
     def save(self):
@@ -332,7 +335,7 @@ class EBallotForm(ResultEntryForm):
                     self._errors[self.deb_attr_name(d, "speaks")] = self.error_class([msg])
 
         except Exception, e:
-            print("Caught error %s" % e)
+            __log.exception("Error submitting e-ballot")
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
 
         return super(EBallotForm, self).clean()
@@ -390,8 +393,8 @@ def score_panel(result, discard_minority):
     ranked = [(d, rl, s, r+1)
               for (r, (d, rl, s, _)) in enumerate(ranked)]
 
-    print "Ranked Debaters"
-    pprint.pprint(ranked)
+    __log.debug("Ranked debaters:")
+    __log.debug(pformat(ranked))
 
     # Break any ties by taking the average of the tied ranks
     ties = {}
@@ -405,8 +408,8 @@ def score_panel(result, discard_minority):
         else:
             ties[tie_key] = [(score_i, score[3])]
 
-    print "Ties"
-    pprint.pprint(ties)
+    __log.debug("Ties")
+    __log.debug(pformat(ties))
 
     # Average over the tied ranks
     for k, v in ties.iteritems():
@@ -416,8 +419,8 @@ def score_panel(result, discard_minority):
             for i, _ in v:
                 fs = ranked[i]
                 ranked[i] = (fs[0], fs[1], fs[2], avg)
-    print "Final scores"
-    pprint.pprint(ranked)
+    __log.debug("Final scores:")
+    __log.debug(pformat(ranked))
 
     return ranked, final_winner
 

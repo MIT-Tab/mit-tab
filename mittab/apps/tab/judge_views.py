@@ -1,14 +1,18 @@
+import logging
+
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from forms import JudgeForm, ScratchForm
-#New Models based approach
-from models import *
 from django.db import models
+
+from forms import JudgeForm, ScratchForm
+from models import *
 from errors import *
 from mittab.libs.tab_logic import TabFlags
 
+
+__log = logging.getLogger(__name__)
 
 def view_judges(request):
     #Get a list of (id,school_name) tuples
@@ -43,7 +47,8 @@ def view_judges(request):
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    print filters
+    __log.debug('Filtering judges')
+    __log.debug(filters)
     return render_to_response('list_data.html', 
                               {
                                   'item_type':'judge',

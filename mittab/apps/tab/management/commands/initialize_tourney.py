@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import time
+import logging
 
 from optparse import make_option
 from django.core.management import call_command
@@ -12,6 +13,7 @@ from mittab.libs.backup import BACKUP_PREFIX
 from mittab.apps.tab.models import TabSettings
 
 class Command(BaseCommand):
+    LOG = logging.getLogger(__name__)
     args = '<backup_directory>'
     help = 'Setup a new tounament and backup the last one'
     option_list = BaseCommand.option_list + (
@@ -31,11 +33,11 @@ class Command(BaseCommand):
         for user in ['tab', 'entry']:
             option_name = '%s_password' % user
             if options[option_name] is None or options[option_name].strip() == '':
-                self.stdout.write("No password provided for %s, generating password" % user)
+                self.LOG.info("No password provided for %s, generating password" % user)
                 options[option_name] = User.objects.make_random_password(length=8)
 
-        self.stdout.write("Proceeding to tournament creation")
-        self.stdout.write("Creating directory for current tournament in backup directory")
+        self.LOG.info("Proceeding to tournament creation")
+        self.LOG.info("Creating directory for current tournament in backup directory")
         tournament_dir = os.path.join(backup_dir, str(int(time.time())))
 
         if not os.path.exists(tournament_dir):
@@ -44,25 +46,23 @@ class Command(BaseCommand):
         if not os.path.exists(path + "/backups"):
             os.makedirs(path + "/backups")
 
-        self.stdout.write("Copying current tournament state to backup tournament directory: %s" % tournament_dir)
+        self.LOG.info("Copying current tournament state to backup tournament directory: %s" % tournament_dir)
         try:
             shutil.copy(path + "/pairing_db.sqlite3", tournament_dir)
             shutil.rmtree(tournament_dir + "/backups", ignore_errors=True)
             shutil.copytree(path + "/backups", tournament_dir + "/backups")
         except (IOError, os.error) as why:
-           self.stdout.write("Failed to backup current tournament state")
-           print(why)
-           sys.exit(1)
+            self.LOG.exception("Failed to backup current tournament state")
+            sys.exit(1)
 
-        self.stdout.write("Clearing data from database")
+        self.LOG.info("Clearing data from database")
         try:
             call_command("flush", interactive=False)
         except (IOError, os.error) as why:
-            self.stdout.write("Failed to clear database")
-            print(why)
+            self.LOG.exception("Failed to clear database")
             sys.exit(1)
 
-        self.stdout.write("Creating tab/entry users")
+        self.LOG.info("Creating tab/entry users")
         tab = User.objects.create_user("tab", None, options["tab_password"])
         tab.is_staff = True
         tab.is_admin = True
@@ -70,22 +70,20 @@ class Command(BaseCommand):
         tab.save()
         entry = User.objects.create_user("entry", None, options["entry_password"])
 
-        self.stdout.write("Setting default tab settings")
+        self.LOG.info("Setting default tab settings")
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
 
-        self.stdout.write("Cleaning up old backups")
+        self.LOG.info("Cleaning up old backups")
         try:
             shutil.rmtree(path + "/backups")
             os.makedirs(path + "/backups")
         except (IOError, os.error) as why:
-            self.stdout.write("Failed to copy clean database to pairing_db.sqlite3")
-            print why
+            self.LOG.exception("Failed to copy clean database to pairing_db.sqlite3")
             sys.exit(1)
 
-        self.stdout.write("Done setting up tournament, after backing up old one. New tournament information:")
-        self.stdout.write("%s | %s" % ("Username".ljust(10," "), "Password".ljust(10, " ")))
-        self.stdout.write("%s | %s" % ("tab".ljust(10," "), options['tab_password'].ljust(10, " ")))
-        self.stdout.write("%s | %s" % ("entry".ljust(10," "), options['entry_password'].ljust(10, " ")))
-
+        self.LOG.info("Done setting up tournament, after backing up old one. New tournament information:")
+        self.LOG.info("%s | %s" % ("Username".ljust(10," "), "Password".ljust(10, " ")))
+        self.LOG.info("%s | %s" % ("tab".ljust(10," "), options['tab_password'].ljust(10, " ")))
+        self.LOG.info("%s | %s" % ("entry".ljust(10," "), options['entry_password'].ljust(10, " ")))
