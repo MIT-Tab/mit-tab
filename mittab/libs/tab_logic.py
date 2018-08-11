@@ -853,7 +853,7 @@ def debater_score(debater):
                   double_adjusted_ranks_deb(debater))
     except Exception:
         errors.emit_current_exception()
-    __log.trace("Finished scoring %s", debater)
+    __log.debug("Finished scoring %s", debater)
     return score
 
 def rank_speakers():
