@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import logging
 import shutil
 import time
 import os
@@ -14,6 +15,7 @@ BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
 DATABASE_PATH = settings.DATABASES['default']['NAME']
 
+__log = logging.getLogger(__name__)
 
 def get_backup_filename(filename):
     if len(filename) < 3 or filename[-3:] != ".db":
@@ -30,7 +32,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
     if btime is None:
         btime = int(time.time())
 
-    print("Trying to backup to backups directory")
+    __log.debug("Trying to backup to backups directory")
     if dst_filename == None:
         dst_filename = "site_round_%i_%i" % (round_number, btime)
 
@@ -41,7 +43,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
 
 def handle_backup(f):
     dst_filename = get_backup_filename(f.name)
-    print("Tried to write {}".format(dst_filename))
+    __log.debug("Tried to write %s", dst_filename)
     try:
         with open(dst_filename, "wb+") as destination:
             for chunk in f.chunks():
@@ -50,20 +52,19 @@ def handle_backup(f):
         errors.emit_current_exception()
 
 def list_backups():
-    print("Checking backups directory")
     if not os.path.exists(BACKUP_PATH):
         os.makedirs(BACKUP_PATH)
 
     return os.listdir(BACKUP_PATH)
 
 def restore_from_backup(src_filename):
-    print("Restoring from backups directory")
+    __log.debug("Restoring from backup %s", src_filename)
     return copy_db(get_backup_filename(src_filename), DATABASE_PATH)
 
 def copy_db(src_filename, dst_filename):
     try:
         shutil.copyfile(src_filename, dst_filename)
-        print("Copied %s to %s" % (src_filename, dst_filename))
+        __log.debug("Copied %s to %s", src_filename, dst_filename)
         return True
     except:
         errors.emit_current_exception()

@@ -19,6 +19,7 @@
 #THE SOFTWARE.
 
 from mittab.apps.tab.models import *
+from mittab.libs import errors
 import xlrd
 import csv
 from xlwt import Workbook
@@ -51,5 +52,5 @@ def import_scratches(fileToImport):
             except:
                 scratch_errors.append[[j,t]]
         except Exception as e:
-            print e
+            errors.emit_current_exception()
     return scratch_errors

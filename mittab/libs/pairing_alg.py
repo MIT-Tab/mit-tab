@@ -41,16 +41,11 @@ def perfect_pairing(list_of_teams):
                 # Add the edge to the graph
                 graph_edges += [(i,j,wt)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-    #print "Pairing numbers"
-    #print pairings_num
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):
             if [list_of_teams[pairings_num.index(pair)], list_of_teams[pair]] not in all_pairs and [list_of_teams[pair], list_of_teams[pairings_num.index(pair)]] not in all_pairs:
                 all_pairs +=[[list_of_teams[pairings_num.index(pair)], list_of_teams[pair]]]
-                #print "all pairs"
-                #print all_pairs
-    #print all_pairs
     return determine_gov_opp(all_pairs)
 
 #Determine the weight of the pairing between teamA and teamB, i.e. how bad it is
@@ -146,7 +141,6 @@ def totPairs(teams):
     for i in range(len(teams)):
         if i/2 != i/2.0:
             tot*=i
-   # print tot
     return tot
 
 

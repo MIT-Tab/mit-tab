@@ -1,22 +1,25 @@
+import logging
 import traceback
-from mittab.apps.tab.models import *
-from django.db.models import *
-
 from collections import defaultdict
 import random
+import itertools
+from pprint import pformat
+from decimal import *
+from datetime import datetime
+
+from django.db.models import *
+
+from mittab.apps.tab.models import *
 import pairing_alg
 import assign_judges
 import errors
-from decimal import *
-from datetime import datetime
-import pprint
-import itertools
-
 from cache_logic import cache
 
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
+
+__log = logging.getLogger(__name__)
 
 def pair_round():
     """
@@ -70,10 +73,10 @@ def pair_round():
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
             if TabSettings.get('fair_bye', 1) == 0:
-                print "Bye: using only unseeded teams"
+                __log.debug("Bye: using only unseeded teams")
                 possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
             else:
-                print "Bye: using all teams"
+                __log.debug("Bye: using all teams")
                 possible_teams = list_of_teams
             bye_team = random.choice(possible_teams)
             b = Bye(bye_team=bye_team, round_number=current_round)
@@ -101,13 +104,13 @@ def pair_round():
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print("Pairing %s into the middle of the %s-win bracket" % (team, wins))
+            __log.debug("Pairing %s into the middle of the %s-win bracket", team, wins)
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size / 2
             list_of_teams[wins].insert(bracket_middle, team)
 
-        print "these are the teams before pullups"
-        print pprint.pprint(list_of_teams)
+        __log.debug("these are the teams before pullups")
+        __log.debug(pformat(list_of_teams))
 
         # Correct for brackets with odd numbers of teams
         #  1) If we are in the bottom bracket, give someone a bye
@@ -169,16 +172,16 @@ def pair_round():
                             removed_teams += [t]
                             list_of_teams[bracket].remove(t)
                     list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
-                    print "list of teams in " + str(bracket) + " except removed"
-                    print list_of_teams[bracket]
+                    __log.debug("list of teams in %s except removed", bracket)
+                    __log.debug(list_of_teams[bracket])
                     for t in removed_teams:
                         list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
 
-    print "these are the teams after pullups"
-    print pprint.pprint(list_of_teams)
+    __log.info("these are the teams after pullups")
+    __log.info(pformat(list_of_teams))
     if current_round > 1:
         for i in range(len(list_of_teams)):
-            print "Bracket %i has %i teams" % (i, len(list_of_teams[i]))
+            __log.debug("Bracket %i has %i teams", i, len(list_of_teams[i]))
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
@@ -188,7 +191,7 @@ def pair_round():
             temp = pairing_alg.perfect_pairing(list_of_teams)
         else:
             temp = pairing_alg.perfect_pairing(list_of_teams[bracket])
-            print "Pairing round %i of size %i" % (bracket,len(temp))
+            __log.debug("Pairing round %i of size %i", bracket, len(temp))
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
@@ -202,9 +205,9 @@ def pair_round():
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
-        print sorted_teams
-        print "pairings"
-        print pairings
+        __log.info(pformat(sorted_teams))
+        __log.info("pairings")
+        __log.info(pformat(pairings))
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
     # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
@@ -850,7 +853,7 @@ def debater_score(debater):
                   double_adjusted_ranks_deb(debater))
     except Exception:
         errors.emit_current_exception()
-    print "finished scoring {}".format(debater)
+    __log.trace("Finished scoring %s", debater)
     return score
 
 def rank_speakers():
