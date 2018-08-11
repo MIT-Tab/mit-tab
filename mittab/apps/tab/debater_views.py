@@ -110,7 +110,7 @@ def rank_debaters_ajax(request):
     return render_to_response('rank_debaters.html',
                              {'title': "Debater Rankings"},
                               context_instance=RequestContext(request))
-                              
+
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
