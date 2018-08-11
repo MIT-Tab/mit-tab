@@ -1,5 +1,6 @@
 import os
 import csv
+from optparse import make_option
 
 from django.core.management.base import BaseCommand
 
@@ -12,13 +13,17 @@ class Command(BaseCommand):
     DEBATER_ROWS = ('Name', 'School', 'Speaks', 'Ranks')
 
     help = 'Dump novice & varsity team/speaker rankings as a csv'
-    optionList = BaseCommand.option_list + (
-            make_option("--root", dest="root", help="root path for all of the csv files"),
-            make_option("--team-file", dest="team_file", help="name of the teams file"),
-            make_option("--nov-team-file", dest="nov_team_file", help="name of the novice teams file"),
-            make_option("--debater-file", dest="debater_file", help="name of the debaters file"),
-            make_option("--nov-debater-file", dest="nov_debater_file", help="name of the novice debaters file"),
-            )
+    option_list = BaseCommand.option_list + (
+            make_option("--root", dest="root",
+                default=".", help="root path for all of the csv files"),
+            make_option("--team-file", dest="team_file",
+                default="teams.csv", help="name of the teams file"),
+            make_option("--nov-team-file", dest="nov_team_file",
+                default="nov-teams.csv", help="name of the novice teams file"),
+            make_option("--debater-file", dest="debater_file",
+                default="debaters.csv", help="name of the debaters file"),
+            make_option("--nov-debater-file", dest="nov_debater_file",
+                default="nov-debaters.csv", help="name of the novice debaters file"))
 
     def make_team_row(self, team):
         return (
@@ -47,21 +52,21 @@ class Command(BaseCommand):
             writer.writerows(rows)
 
     def handle(self, *args, **kwargs):
+        if not os.path.exists(kwargs["root"]): os.makedirs(kwargs["root"])
+
         print('Calculating ranks')
         teams = [ self.make_team_row(team) for team in tab_logic.rank_teams() ]
         nov_teams = [ self.make_team_row(team) for team in tab_logic.rank_nov_teams() ]
         debaters = [ self.make_debater_row(deb) for deb in tab_logic.rank_speakers() ]
         nov_debaters = [ self.make_debater_row(deb) for deb in tab_logic.rank_nov_speakers() ]
 
-        root = kwargs.get("root", ".")
-        team_file = kwargs.get("team_file", "teams.csv")
-        nov_team_file = kwargs.get("nov_team_file", "nov-teams.csv")
-        debater_file = kwargs.get("debater_file", "debaters.csv")
-        nov_debater_file = kwargs.get("nov_debater_file", "nov-debaters.csv")
-
         print('Writing to csv')
-        self.write_to_csv(os.path.join(root, team_file), self.TEAM_ROWS, teams)
-        self.write_to_csv(os.path.join(root, nov_team_file), self.TEAM_ROWS, nov_teams)
-        self.write_to_csv(os.path.join(root, debater_file), self.DEBATER_ROWS, debaters)
-        self.write_to_csv(os.path.join(root, nov_debater_file), self.DEBATER_ROWS, nov_debaters)
+        self.write_to_csv(os.path.join(kwargs["root"], kwargs["team_file"]),
+                self.TEAM_ROWS, teams)
+        self.write_to_csv(os.path.join(kwargs["root"], kwargs["nov_team_file"]),
+                self.TEAM_ROWS, nov_teams)
+        self.write_to_csv(os.path.join(kwargs["root"], kwargs["debater_file"]),
+                self.DEBATER_ROWS, debaters)
+        self.write_to_csv(os.path.join(kwargs["root"], kwargs["nov_debater_file"]),
+                self.DEBATER_ROWS, nov_debaters)
         print('Done!')
