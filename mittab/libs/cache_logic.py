@@ -24,7 +24,6 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
             key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
             result = _djcache.get(key)
             if result is None:
-                #print "busting cache"
                 result = f(*args, **kwargs)
                 _djcache.set(key, result, random.randint(seconds, seconds+stampede))
             return result

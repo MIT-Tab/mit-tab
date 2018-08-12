@@ -1,3 +1,4 @@
+import logging
 import random
 
 from django.core.management.base import BaseCommand
@@ -5,15 +6,16 @@ from django.core.management.base import BaseCommand
 from mittab.apps.tab.models import Round, TabSettings, RoundStats
 
 class Command(BaseCommand):
+    LOG = logging.getLogger(__name__)
     SPEAKS_RANGE = range(15, 35)
 
     def handle(self, *args, **options):
         cur_round = TabSettings.get("cur_round") - 1
-        print("Simulating round %s..." % cur_round)
+        self.LOG.info("Simulating rounds %s...", cur_round)
         rounds_to_simulate = Round.objects.filter(round_number=cur_round, victor=Round.NONE)
 
         for r in rounds_to_simulate:
-            print(r)
+            self.LOG.debug("%s", r)
             self.__simulate_round(r)
 
 

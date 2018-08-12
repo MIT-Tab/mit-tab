@@ -4,7 +4,8 @@ import traceback
 import time
 import datetime
 import os
-import pprint
+import logging
+from pprint import pformat
 
 from django.shortcuts import render_to_response, render
 from django.template import RequestContext
@@ -24,6 +25,8 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
 
+
+__log = logging.getLogger(__name__)
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
@@ -202,7 +205,7 @@ def view_backup(request, filename):
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def download_backup(request, filename):
-    print "Trying to download {}".format(filename)
+    __log.debug("Trying to download %s", filename)
     wrapper, size = backup.get_wrapped_file(filename)
     response = HttpResponse(wrapper, content_type='text/plain')
     response['Content-Length'] = size
@@ -256,7 +259,7 @@ def view_backups(request):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
-    print "Trying to restore %s" % filename
+    __log.debug("Trying to restore %s", filename)
     backup.restore_from_backup(filename)
     return render_to_response('thanks.html',
                              {'data_type': "Restored from backup",
@@ -392,11 +395,11 @@ def pretty_pair(request, printable=False):
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
     team_count = len(paired_teams) + len(byes)
 
-    print "getting errors"
+    __log.debug("getting errors")
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             if present_team not in byes:
-                print "got error for", present_team
+                __log.warn("Got error for %s", present_team)
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
@@ -543,7 +546,7 @@ def enter_multiple_results(request, round_id, num_entered):
             all_good, error_msg = validate_panel(result)
             if all_good:
                 final_scores, final_winner = score_panel(result, "discard_minority" in request.POST)
-                print final_scores
+                __log.debug(pformat(final_scores))
                 for (debater, role, speaks, ranks) in final_scores:
                     RoundStats.objects.create(debater = debater,
                                               round = round_obj,
@@ -601,50 +604,50 @@ def clear_db():
     check_ins = CheckIn.objects.all()
     for i in range(len(check_ins)):
         CheckIn.delete(check_ins[i])
-    print "Cleared Checkins"
+    __log.info("Cleared checkins")
 
     round_stats = RoundStats.objects.all()
     for i in range(len(round_stats)):
         RoundStats.delete(round_stats[i])
-    print "Cleared RoundStats"
+    __log.info("Cleared RoundStats")
 
     rounds = Round.objects.all()
     for i in range(len(rounds)):
         Round.delete(rounds[i])
-    print "Cleared Rounds"
+    __log.info("Cleared Rounds")
 
     judges = Judge.objects.all()
     for i in range(len(judges)):
         Judge.delete(judges[i])
-    print "Cleared Judges"
+    __log.info("Cleared Judges")
 
     rooms = Room.objects.all()
     for i in range(len(rooms)):
         Room.delete(rooms[i])
-    print "Cleared Rooms"
+    __log.info("Cleared Rooms")
 
     scratches = Scratch.objects.all()
     for i in range(len(scratches)):
         Scratch.delete(scratches[i])
-    print "Cleared Scratches"
+    __log.info("Cleared Scratches")
 
     tab_set = TabSettings.objects.all()
     for i in range(len(tab_set)):
         TabSettings.delete(tab_set[i])
-    print "Cleared TabSettings"
+    __log.info("Cleared TabSettings")
 
     teams = Team.objects.all()
     for i in range(len(teams)):
         Team.delete(teams[i])
-    print "Cleared Teams"
+    __log.info("Cleared Teams")
 
     debaters = Debater.objects.all()
     for i in range(len(debaters)):
         Debater.delete(debaters[i])
-    print "Cleared Debaters"
+    __log.info("Cleared Debaters")
 
     schools = School.objects.all()
     for i in range(len(schools)):
         School.delete(schools[i])
-    print "Cleared Schools"
+    __log.info("Cleared Schools")
 
