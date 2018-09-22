@@ -204,6 +204,16 @@ class Round(models.Model):
     def __unicode__(self):
         return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
+    def save(self):
+        no_shows = NoShow.objects.filter(
+                round_number=self.round_number,
+                no_show_team__in=[self.gov_team, self.opp_team])
+
+        if no_shows:
+            no_shows.delete()
+
+        super(Round, self).save()
+
     def delete(self):
         rounds = RoundStats.objects.filter(round=self)
         for rs in rounds:
