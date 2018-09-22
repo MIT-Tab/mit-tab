@@ -325,11 +325,15 @@ class EBallotForm(ResultEntryForm):
 
             for d in self.DEBATERS:
                 speaks = self.deb_attr_val(d, "speaks", float)
-                split = str(speaks).split(".")
+                _, decimal_val = str(speaks).split(".")
+                key = self.deb_attr_name(d, "speaks")
+                if int(decimal_val) != 0:
+                    msg = "Speaks must be whole numbers"
+                    self._errors[key] = self.error_class([msg])
                 if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
                         speaks < float(TabSettings.get("min_eballot_speak", 15)):
                     msg = "Speaks must be justified to tab."
-                    self._errors[self.deb_attr_name(d, "speaks")] = self.error_class([msg])
+                    self._errors[key] = self.error_class([msg])
 
         except Exception, e:
             print("Caught error %s" % e)
