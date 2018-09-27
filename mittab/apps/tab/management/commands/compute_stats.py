@@ -132,9 +132,3 @@ class Command(BaseCommand):
             with open(args[0], 'w') as f:
                 f.write(output)
 
-
-
-
-
-
-
