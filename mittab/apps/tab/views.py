@@ -23,7 +23,8 @@ def index(request):
     debater_list = get_objects_ordered_by_name(Debater)
     room_list = get_objects_ordered_by_name(Room)
 
-    return render_to_response('index.html',locals(),context_instance=RequestContext(request))
+    return render_to_response(
+        'index.html', locals(), context_instance=RequestContext(request))
 
 def get_objects_ordered_by_name(obj_name):
     return [ (obj.pk, obj.name) for obj in obj_name.objects.order_by("name") ]
@@ -52,7 +53,7 @@ def add_scratch(request):
              'enter_again': True},
             context_instance=RequestContext(request))            
     else:
-        form = ScratchForm(initial={'scratch_type':0})
+        form = ScratchForm(initial={'scratch_type': 0})
     return render_to_response(
         'data_entry.html', 
          {'title':"Adding Scratch",
@@ -102,7 +103,7 @@ def view_school(request, school_id):
                  context_instance=RequestContext(request))
     else:
         form = SchoolForm(instance=school)
-        links = [('/school/'+str(school_id)+'/delete/', 'Delete', True)]
+        links = [('/school/{}/delete/'.format(school_id), 'Delete', True)]
         return render_to_response(
             'data_entry.html', 
             {'form': form,
@@ -119,8 +120,9 @@ def enter_school(request):
             except ValueError:
                 return render_to_response(
                     'error.html', 
-                    {'error_type': "School",'error_name': "["+form.cleaned_data['name']+"]",
-                     'error_info':"School name cannot be validated, most likely a duplicate school"}, 
+                    {'error_type': "School",
+                     'error_name': "[" + form.cleaned_data['name'] + "]",
+                     'error_info': "School name cannot be validated, most likely a duplicate school"}, 
                     context_instance=RequestContext(request))
             return render_to_response(
                 'thanks.html',
@@ -174,16 +176,17 @@ def view_rooms(request):
         return result
 
     all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
-    all_rooms = [(room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room))) 
-                  for room in Room.objects.all().order_by("name")]
+    all_rooms = [
+        (room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room))) 
+        for room in Room.objects.all().order_by("name")]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
   
     return render_to_response(
         'list_data.html', 
-        {'item_type':'room',
+        {'item_type': 'room',
          'title': "Viewing All Rooms",
-         'item_list':all_rooms,
-         'symbol_text':symbol_text,
+         'item_list': all_rooms,
+         'symbol_text': symbol_text,
          "filters": filters},
         context_instance=RequestContext(request))
 
@@ -208,7 +211,7 @@ def view_room(request, room_id):
                     'error.html', 
                     {'error_type': "Room",
                      'error_name': "[" + form.cleaned_data['name'] + "]",
-                     'error_info':"Room name cannot be validated, most likely a non-existent room"}, 
+                     'error_info': "Room name cannot be validated, most likely a non-existent room"}, 
                     context_instance=RequestContext(request))
             return render_to_response(
                 'thanks.html', 
@@ -221,7 +224,7 @@ def view_room(request, room_id):
             'data_entry.html', 
             {'form': form,
              'links': [],
-             'title': "Viewing Room: %s"%(room.name)}, 
+             'title': "Viewing Room: %s" % (room.name)}, 
             context_instance=RequestContext(request))
 
 def enter_room(request):
@@ -296,9 +299,9 @@ def view_scratches(request):
     c_scratches = [(s.team.pk, str(s)) for s in Scratch.objects.all()]
     return render_to_response(
         'list_data.html', 
-        {'item_type':'team',
+        {'item_type': 'team',
          'title': "Viewing All Scratches for Teams",
-         'item_list':c_scratches}, 
+         'item_list': c_scratches}, 
         context_instance=RequestContext(request))
 
 def upload_data(request):
