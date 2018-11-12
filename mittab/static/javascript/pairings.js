@@ -36,8 +36,6 @@ $(document).ready(function(){
         }
     };
 
-
-  $
     team_drop_options = {
         hoverClass: "ui-state-hover",
         accept: ".team.swappable",
