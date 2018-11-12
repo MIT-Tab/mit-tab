@@ -88,7 +88,7 @@ def view_judge(request, judge_id):
                  'data_name': "[" + form.cleaned_data['name'] + "]",
                  'data_modification': "EDIT"}, 
                 context_instance=RequestContext(request))
-        else :
+        else:
             return render_to_response(
                 'error.html', 
                 {'error_type': "Judge",
@@ -139,7 +139,7 @@ def enter_judge(request):
 @permission_required('tab.judge.can_delete', login_url="/403/")
 def delete_judge(request, judge_id):
     error_msg = None
-    try :
+    try:
         judge_id = int(judge_id)
         judge = Judge.objects.get(pk=judge_id)
         judge.delete()
@@ -164,7 +164,7 @@ def delete_judge(request, judge_id):
 
 def add_scratches(request, judge_id, number_scratches):
     try:
-        judge_id,number_scratches = int(judge_id),int(number_scratches)
+        judge_id, number_scratches = int(judge_id), int(number_scratches)
     except ValueError:
         return render_to_response(
             'error.html', 
@@ -185,9 +185,7 @@ def add_scratches(request, judge_id, number_scratches):
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) 
                     for i in xrange(1, number_scratches + 1)]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
+        all_good = all(map(lambda form: form.is_valid(), forms))
         if all_good:
             for form in forms:
                 form.save()
@@ -228,9 +226,7 @@ def view_scratches(request, judge_id):
         forms = [
             ScratchForm(request.POST, prefix=str(i), instance=scratches[i-1]) 
             for i in xrange(1, number_scratches + 1)]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
+        all_good = all(map(lambda form: form.is_valid(), forms))
         if all_good:
             for form in forms:
                 form.save()
