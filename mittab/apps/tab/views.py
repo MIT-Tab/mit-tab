@@ -9,20 +9,24 @@ from models import *
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams
 
+
 def index(request):
     number_teams = Team.objects.count()
     number_judges = Judge.objects.count()
     number_schools = School.objects.count()
     number_debaters = Debater.objects.count()
     number_rooms = Room.objects.count()
-
-    school_list = [(school.pk,school.name) for school in School.objects.order_by('name')]
-    judge_list = [(judge.pk,judge.name) for judge in Judge.objects.order_by('name')]
-    team_list = [(team.pk,team.name) for team in Team.objects.order_by('name')]
-    debater_list = [(debater.pk,debater.name) for debater in Debater.objects.order_by('name')]
-    room_list = [(room.pk, room.name) for room in Room.objects.order_by('name')]
+    
+    school_list = get_obj_list(School)
+    judge_list = get_obj_list(Judge)
+    team_list = get_obj_list(Team)
+    debater_list = get_obj_list(Debater)
+    room_list = get_obj_list(Room)
 
     return render_to_response('index.html',locals(),context_instance=RequestContext(request))
+
+def get_obj_list(obj_name):
+    return [ (obj.pk, obj.name) for obj in obj_name.objects.order_by("name") ]
 
 def tab_login(request):
     return login(request, extra_context={'no_navigation': True})
@@ -37,7 +41,7 @@ def add_scratch(request):
     if request.method == 'POST':
         form = ScratchForm(request.POST)
         if (form.is_valid()):
-          form.save()
+            form.save()
         judge = form.cleaned_data['judge'].name
         team = form.cleaned_data['team'].name
         return render_to_response('thanks.html', 
@@ -48,80 +52,88 @@ def add_scratch(request):
                                   context_instance=RequestContext(request))            
     else:
         form = ScratchForm(initial={'scratch_type':0})
-    return render_to_response('data_entry.html', 
-                              {'title':"Adding Scratch",
-                              'form': form}, 
-                              context_instance=RequestContext(request))
-
+    return render_to_response(
+        'data_entry.html', 
+         {'title':"Adding Scratch",
+          'form': form}, 
+         context_instance=RequestContext(request))
 
 #### BEGIN SCHOOL ###
 #Three views for entering, viewing, and editing schools
 def view_schools(request):
     #Get a list of (id,school_name) tuples
     c_schools = [(s.pk,s.name) for s in School.objects.all().order_by("name")]
-    return render_to_response('list_data.html', 
-                             {'item_type':'school',
-                              'title': "Viewing All Schools",
-                              'item_list':c_schools}, context_instance=RequestContext(request))
-
+    return render_to_response(
+        'list_data.html', 
+         {'item_type':'school',
+          'title': "Viewing All Schools",
+          'item_list':c_schools}, 
+         context_instance=RequestContext(request))
 
 def view_school(request, school_id):
     school_id = int(school_id)
     try:
         school = School.objects.get(pk=school_id)
     except School.DoesNotExist:
-        return render_to_response('error.html', 
-                                 {'error_type': "View School",
-                                  'error_name': str(school_id),
-                                  'error_info':"No such school"}, 
-                                  context_instance=RequestContext(request))
+        return render_to_response(
+            'error.html', 
+            {'error_type': "View School",
+             'error_name': str(school_id),
+             'error_info':"No such school"}, 
+            context_instance=RequestContext(request))
+
     if request.method == 'POST':
         form = SchoolForm(request.POST,instance=school)
         if form.is_valid():
             try:
                form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "School",
-                                          'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"School name cannot be validated, most likely a non-existent school"}, 
-                                          context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
-                                     {'data_type': "School",
-                                      'data_name': "["+form.cleaned_data['name']+"]"}, 
-                                      context_instance=RequestContext(request))
+                return render_to_response(
+                    'error.html', 
+                    {'error_type': "School",
+                     'error_name': "[" + form.cleaned_data['name'] + "]",
+                     'error_info': "School name cannot be validated, most likely a non-existent school"}, 
+                    context_instance=RequestContext(request))
+            return render_to_response(
+                'thanks.html', 
+                 {'data_type': "School",
+                  'data_name': "[" + form.cleaned_data['name'] + "]"}, 
+                 context_instance=RequestContext(request))
     else:
         form = SchoolForm(instance=school)
         links = [('/school/'+str(school_id)+'/delete/', 'Delete', True)]
-        return render_to_response('data_entry.html', 
-                                 {'form': form,
-                                  'links': links,
-                                  'title': "Viewing School: %s" %(school.name)},
-                                  context_instance=RequestContext(request))
+        return render_to_response(
+            'data_entry.html', 
+            {'form': form,
+             'links': links,
+             'title': "Viewing School: {}".format(school.name)},
+            context_instance=RequestContext(request))
 
 def enter_school(request):
-
     if request.method == 'POST':
         form = SchoolForm(request.POST)
         if form.is_valid():
             try:
                 form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "School",'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"School name cannot be validated, most likely a duplicate school"}, 
-                                          context_instance=RequestContext(request))
-            return render_to_response('thanks.html',
-                                     {'data_type': "School",
-                                      'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED",
-                                      'enter_again': True},
-                                      context_instance=RequestContext(request))
+                return render_to_response(
+                    'error.html', 
+                    {'error_type': "School",'error_name': "["+form.cleaned_data['name']+"]",
+                     'error_info':"School name cannot be validated, most likely a duplicate school"}, 
+                    context_instance=RequestContext(request))
+            return render_to_response(
+                'thanks.html',
+                {'data_type': "School",
+                 'data_name': "[" + form.cleaned_data['name'] + "]",
+                 'data_modification': "CREATED",
+                 'enter_again': True},
+                context_instance=RequestContext(request))
     else:
         form = SchoolForm()
-    return render_to_response('data_entry.html', 
-                              {'form': form, 'title': "Create School"}, 
-                              context_instance=RequestContext(request))
+    return render_to_response(
+        'data_entry.html', 
+        {'form': form, 'title': "Create School"}, 
+        context_instance=RequestContext(request))
 
 @permission_required('tab.school.can_delete', login_url="/403/")    
 def delete_school(request, school_id):
@@ -135,16 +147,18 @@ def delete_school(request, school_id):
     except Exception, e:
         error_msg = str(e)
     if error_msg:
-        return render_to_response('error.html', 
-                                 {'error_type': "Delete School",
-                                  'error_name': "School with id %s" % (school_id),
-                                  'error_info': error_msg}, 
-                                  context_instance=RequestContext(request))
-    return render_to_response('thanks.html', 
-                             {'data_type': "School",
-                              'data_name': "["+str(school_id)+"]",
-                              'data_modification': 'DELETED'}, 
-                              context_instance=RequestContext(request)) 
+        return render_to_response(
+            'error.html', 
+            {'error_type': "Delete School",
+             'error_name': "School with id %s" % (school_id),
+             'error_info': error_msg}, 
+            context_instance=RequestContext(request))
+    return render_to_response(
+        'thanks.html', 
+        {'data_type': "School",
+         'data_name': "["+str(school_id)+"]",
+         'data_modification': 'DELETED'}, 
+        context_instance=RequestContext(request)) 
 
 #### END SCHOOL ###
 
@@ -157,7 +171,6 @@ def view_rooms(request):
         else:
             result |= TabFlags.ROOM_NON_ZERO_RANK
         return result
-    
 
     all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
     all_rooms = [(room.pk, room.name, flags(room), TabFlags.flags_to_symbols(flags(room))) 
