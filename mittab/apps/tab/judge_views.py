@@ -225,7 +225,7 @@ def batch_checkin(request):
     judges_and_checkins = []
 
     round_numbers = list(map(lambda i: i+1, range(TabSettings.get("tot_rounds"))))
-    for judge in Judge.objects.all():
+    for judge in Judge.objects.order_by('name'):
         checkins = []
         for round_number in round_numbers:
             checkins.append(judge.is_checked_in_for_round(round_number))

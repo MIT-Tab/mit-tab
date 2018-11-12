@@ -19,12 +19,12 @@
     <td>
       <button data-round-number="{{forloop.counter}}"
               data-judge-id="{{judge.id}}"
-              class="check-in btn btn-success {% if is_checked_in %}hidden{% endif %}">
+              class="check-in btn btn-small btn-success {% if is_checked_in %}hidden{% endif %}">
         Check In
       </button>
       <button data-round-number="{{forloop.counter}}"
               data-judge-id="{{judge.id}}"
-              class="check-out btn btn-danger {% if not is_checked_in %}hidden{% endif %}">
+              class="check-out btn btn-small btn-danger {% if not is_checked_in %}hidden{% endif %}">
         Check Out
       </button>
     </td>
