@@ -3,12 +3,11 @@ jQuery.expr[':'].Contains = function(a,i,m){
 };
 
 $(document).ready(function(){
-    
     function filter(matching_text) {
         $('li.data_list:not(:Contains(' + matching_text+ '))').hide(); 
         $('li.data_list:Contains(' + matching_text + ')').show();
     };
-    
+
     filter_on_flags = function (flags) {
         $('li.data_list').each(function(index, element) {
             var show = 1;
@@ -20,7 +19,7 @@ $(document).ready(function(){
             }
         });
     };
-    
+
     function show_all(type) {
         $(type).show();
     };
@@ -33,7 +32,47 @@ $(document).ready(function(){
             show_all("li");
         }
     });
-    
+
+    function checkInOrOut(target, isCheckIn) {
+        var $target = $(target);
+
+        var judgeId = $target.data("judge-id");
+        var roundNumber = $target.data("round-number");
+
+        var url = "/judge/" + judgeId + "/check_ins/round/" + roundNumber + "/";
+        var requestMethod = isCheckIn ? "POST" : "DELETE";
+
+        $.ajax({
+            url: url,
+            beforeSend: function(xhr) {
+              xhr.setRequestHeader("X-CSRFToken", $("[name=csrfmiddlewaretoken]").val())
+            },
+            method: requestMethod,
+            success: function(resp) {
+              var otherButtonClass = isCheckIn ? ".check-out" : ".check-in";
+              var $otherButton = $target.parent().find(otherButtonClass);
+              $otherButton.removeClass('hidden');
+              $target.removeClass('disabled');
+              $target.addClass('hidden');
+            },
+            error: function(_e) {
+              $target.removeClass('disabled')
+              alert('An error occured during check in/out. Refresh the page and try again');
+            }
+        })
+        $target.addClass('disabled');
+    }
+
+    $('.check-out').click(function(e) {
+        e.preventDefault();
+        checkInOrOut(e.target, false);
+    })
+
+    $('.check-in').click(function(e) {
+        e.preventDefault();
+        checkInOrOut(e.target, true);
+    })
+
     $('.dataEntryForm').submit(function() {
         // Hacky way to figure out if this is a result entry form
         var pmDebater = $('.dataEntryForm :input').filter('#id_pm_debater').val()
@@ -127,13 +166,13 @@ $(document).ready(function(){
     $('#id_debaters').closest('tr').append(
     "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
     )
-    
-//  Taken from stackoverflow
+
+    //  Taken from stackoverflow
     $("#dialog").dialog({
         autoOpen: false,
         modal: true
     });
- 
+
     $(".confirmLink").click(function(e) {
         e.preventDefault();
         var targetUrl = $(this).attr("href");
@@ -151,7 +190,8 @@ $(document).ready(function(){
         $("#dialog").dialog("open");
     });
     //  End taken from stackoverflow
-        
+  //
+
     apply_filters = function() {
         show_all("li.data_list");
         var flags = 0;
@@ -166,10 +206,12 @@ $(document).ready(function(){
             filter_on_flags(filter_groups);
         }
     }
+
     
+
     $(".filter").change(function() {
         apply_filters();
     });
-    
+
     apply_filters();
 });

@@ -1,6 +1,7 @@
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
+from django.http import Http404,HttpResponse,HttpResponseRedirect, \
+        JsonResponse
 from django.contrib.auth.decorators import permission_required
 from forms import JudgeForm, ScratchForm
 #New Models based approach
@@ -210,14 +211,47 @@ def view_scratches(request, judge_id):
                                       context_instance=RequestContext(request))  
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
-    
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
-    return render_to_response('data_entry_multiple.html', 
+    return render_to_response('data_entry_multiple.html',
                              {'forms': zip(forms,delete_links),
                               'data_type':'Scratch',
                               'links':links,
                               'title':"Viewing Scratch Information for %s"%(judge.name)}, 
                               context_instance=RequestContext(request))
- 
+
+def batch_checkin(request):
+    judges_and_checkins = []
+
+    round_numbers = list(map(lambda i: i+1, range(TabSettings.get("tot_rounds"))))
+    for judge in Judge.objects.all():
+        checkins = []
+        for round_number in round_numbers:
+            checkins.append(judge.is_checked_in_for_round(round_number))
+        judges_and_checkins.append((judge, checkins))
+
+    return render_to_response('batch_checkin.html',
+            {'judges_and_checkins': judges_and_checkins, 'round_numbers': round_numbers},
+            context_instance=RequestContext(request))
+
+@permission_required('tab.tab_settings.can_change', login_url='/403')
+def judge_check_in(request, judge_id, round_number):
+    judge_id, round_number = int(judge_id), int(round_number)
+
+    if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
+        raise Http404("Round does not exist")
+
+    judge = get_object_or_404(Judge, pk=judge_id)
+    if request.method == 'POST':
+        if not judge.is_checked_in_for_round(round_number):
+            check_in = CheckIn(judge=judge, round_number=round_number)
+            check_in.save()
+    elif request.method == 'DELETE':
+        if judge.is_checked_in_for_round(round_number):
+            check_ins = CheckIn.objects.filter(judge=judge,
+                    round_number=round_number)
+            check_ins.delete()
+    else:
+        raise Http404("Must be POST or DELETE")
+    return JsonResponse({'success': True})

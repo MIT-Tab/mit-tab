@@ -31,8 +31,10 @@ urlpatterns = [
     url(r'^judge/(\d+)/delete/$', judge_views.delete_judge),
     url(r'^judge/(\d+)/scratches/add/(\d+)/', judge_views.add_scratches),
     url(r'^judge/(\d+)/scratches/view/', judge_views.view_scratches),
+    url(r'^judge/(\d+)/check_ins/round/(\d+)/$', judge_views.judge_check_in),
     url(r'^view_judges/$', judge_views.view_judges),
     url(r'^enter_judge/$', judge_views.enter_judge),
+    url(r'^batch_checkin/$', judge_views.batch_checkin),
 
     # School related
     url(r'^school/(\d+)/$', views.view_school),
