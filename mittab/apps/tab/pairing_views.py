@@ -598,53 +598,19 @@ def start_new_tourny(request):
                             context_instance=RequestContext(request))
 
 def clear_db():
-    check_ins = CheckIn.objects.all()
-    for i in range(len(check_ins)):
-        CheckIn.delete(check_ins[i])
-    print "Cleared Checkins"
+    obj_types = [
+        CheckIn,
+        RoundStats,
+        Round,
+        Judge,
+        Room,
+        Scratch,
+        TabSettings,
+        Team,
+        School
+    ]
+    map(delete_obj, obj_types)
 
-    round_stats = RoundStats.objects.all()
-    for i in range(len(round_stats)):
-        RoundStats.delete(round_stats[i])
-    print "Cleared RoundStats"
-
-    rounds = Round.objects.all()
-    for i in range(len(rounds)):
-        Round.delete(rounds[i])
-    print "Cleared Rounds"
-
-    judges = Judge.objects.all()
-    for i in range(len(judges)):
-        Judge.delete(judges[i])
-    print "Cleared Judges"
-
-    rooms = Room.objects.all()
-    for i in range(len(rooms)):
-        Room.delete(rooms[i])
-    print "Cleared Rooms"
-
-    scratches = Scratch.objects.all()
-    for i in range(len(scratches)):
-        Scratch.delete(scratches[i])
-    print "Cleared Scratches"
-
-    tab_set = TabSettings.objects.all()
-    for i in range(len(tab_set)):
-        TabSettings.delete(tab_set[i])
-    print "Cleared TabSettings"
-
-    teams = Team.objects.all()
-    for i in range(len(teams)):
-        Team.delete(teams[i])
-    print "Cleared Teams"
-
-    debaters = Debater.objects.all()
-    for i in range(len(debaters)):
-        Debater.delete(debaters[i])
-    print "Cleared Debaters"
-
-    schools = School.objects.all()
-    for i in range(len(schools)):
-        School.delete(schools[i])
-    print "Cleared Schools"
-
+def delete_obj(obj_type):
+    objs = obj_type.objects.all()
+    for obj in objs: obj_type.delete(obj)

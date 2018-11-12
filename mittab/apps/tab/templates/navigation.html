@@ -10,6 +10,7 @@
 
 {% url "mittab.apps.tab.judge_views.enter_judge" as enter_judge %}
 {% url "mittab.apps.tab.judge_views.view_judges" as view_judges%}
+{% url "mittab.apps.tab.judge_views.batch_checkin" as batch_checkin %}
 
 {% url "mittab.apps.tab.team_views.enter_team" as enter_team %}
 {% url "mittab.apps.tab.team_views.view_teams" as view_teams%}
@@ -46,11 +47,12 @@
                 <li><a class="{% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a></li>
             </ul>
         </li>
-        <li><a class="{% active request confirm_start_new_tourny %}">Admin</a>
+        <li><a class="{% active request upload_data %}{% active request batch_checkin %}{% active request confirm_start_new_tourny %}">Admin</a>
             <ul id = "sublist">
                 <li><a href="/admin">Admin Interface</a></li>
                 <li><a class="{% active request confirm_start_new_tourny %}" href="{{ confirm_start_new_tourny }}">New Tournament</a></li>
                 <li><a class="{% active request upload_data %}" href="{{ upload_data }}">File Data Upload</a></li>
+                <li><a class="{% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Judge Checkin</a></li>
             </ul>
         </li>
         <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}">Backups</a>

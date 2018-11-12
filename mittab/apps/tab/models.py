@@ -120,6 +120,9 @@ class Judge(models.Model):
 
         super(Judge, self).save(*args, **kwargs)
 
+    def is_checked_in_for_round(self, round_number):
+        return CheckIn.objects.filter(judge=self, round_number=round_number).exists()
+
     def __unicode__(self):
         return self.name
 
@@ -139,7 +142,6 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
-    
     class Meta:
         verbose_name_plural = "scratches"
 
