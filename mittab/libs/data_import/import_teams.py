@@ -103,7 +103,6 @@ def import_teams(import_file, using_overwrite=False):
         if team_name == '':
             team_errors.append('Skipped row ' + str(i) + ': empty Team Name')
             continue
-
         if Team.objects.filter(name=team_name).exists():  # inform that duplicates exist
             duplicate = True
             team_errors.append(team_name + ': duplicate team, overwriting data')
@@ -161,6 +160,7 @@ def import_teams(import_file, using_overwrite=False):
                 team.debaters.add(deb2)
             else:
                 team_errors.append(team_name + ': Team is an iron-man, added successfully')
+
             team.save()
 
         else:  # update the team
@@ -182,3 +182,45 @@ def import_teams(import_file, using_overwrite=False):
 
     return team_errors
 
+
+def _create_status(status):
+    """Translates the string for varsity-novice status into MIT-TAB's integer pseudo-enum"""
+    if status == 'novice' or status == 'nov' or status == 'n':
+        return 1
+    else:
+        return 0
+
+
+def _create_seed(team_name, seed):
+    """Translates the string version of the seed into the pseudo-enum. Checks for duplicate free seeds and changes it
+    as necessary. Also notes that change so a message can be returned.
+    :type team_name: str
+    :type seed: str
+    :return tuple with the integer version of the seed and whether that team's seed was changed
+    """
+    seed_int = 0
+    seed_changed = False
+
+    if seed == 'full seed' or seed == 'full':
+        seed_int = 3
+    elif seed == 'half seed' or seed == 'half':
+        seed_int = 2
+    elif seed == 'free seed' or seed == 'free':
+        seed_int = 1
+
+        multiple_free_seeds = False
+        try:
+            school_name = Team.objects.get(name=team_name).school  # get school_name
+            for team in Team.objects.filter(school=school_name).all():  # get teams with that name
+                if int(team.seed) == 1:  # 1 is the free seed
+                    if team.name != team_name:  # if there is a free seed already, change and note change
+                        multiple_free_seeds = True
+
+        except ObjectDoesNotExist:
+            pass
+
+        if multiple_free_seeds:  # force free, note this
+            seed_changed = True
+            seed_int = 0
+
+    return seed_int, seed_changed
