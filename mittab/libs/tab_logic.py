@@ -456,16 +456,19 @@ def team_wins_by_forfeit():
         wins_by_forfeit.append(r.opp_team)
     return wins_by_forfeit
 
-#Calculate the total number of wins a team has
+
+# Calculate the total number of wins a team has
 def tot_wins(team):
-    tot_wins = Round.objects.filter(
-            Q(gov_team=team, victor=Round.GOV)|
-            Q(opp_team=team, victor=Round.OPP)).count()
-    # If a team had the bye, they won't have a round for that win so add one win
-    tot_wins += num_byes(team) 
-    # If a team has won by forfeit, we didn't count that yet
-    tot_wins += num_forfeit_wins(team)
-    return tot_wins
+    win_count = Round.objects.filter(
+        Q(gov_team=team, victor=Round.GOV) |  # gov win
+        Q(opp_team=team, victor=Round.OPP) |  # opp win
+        Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT) |  # gov via forfeit
+        Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT) |  # opp via forfeit
+        Q(gov_team=team, victor=Round.ALL_WIN) |  # gov all win
+        Q(opp_team=team, victor=Round.ALL_WIN)  # opp all win
+    ).count()
+    win_count += num_byes(team)
+    return win_count
 
 """ Speaks """
 @cache()

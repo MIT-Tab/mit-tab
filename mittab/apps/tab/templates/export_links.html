@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Export XLS file{% endblock %}
+{% block banner %}Export XLS file{% endblock %}
+{% block content %}
+
+    <p>Download links to dynamically generated and up-to-date XLS files each of which contains team, judge, and room
+        properties. These files are formatted so they can easily be re-imported using the <a href="/import_data">XLS
+            File Import</a> function. Note that when importing, the data in the Excel sheet will overwrite the data on
+        MIT-TAB's database.</p>
+    <br/>
+
+    <div style="padding-left: 10px;">
+        <ul>
+            <li class="export_links"><a href="{% url 'xls-teams' %}">Export Teams</a></li>
+            <li class="export_links"><a href="{% url 'xls-judges' %}">Export Judges</a></li>
+            <li class="export_links"><a href="{% url 'xls-rooms' %}">Export Rooms</a></li>
+        </ul>
+    </div>
+
+    <p>These links can be used to export team and speaker statistics which may be useful in calculating the break or
+        speaker awards if your tournament uses a custom tabulation policy which differs from the standard ranking
+        provided by MIT-TAB, which uses total speaks, ranks; single-adjusted speaks, ranks; double-adjusted speaks,
+        ranks; opp-strength; coin-flip.</p>
+    <div style="padding-left: 10px;">
+        <ul>
+            <li class="export_links"><a href="{% url 'xls-team-stats' %}">Export Team Statistics</a></li>
+            <li class="export_links"><a href="{% url 'xls-debater-stats' %}">Export Speaker Statistics</a></li>
+        </ul>
+    </div>
+{% endblock %}
