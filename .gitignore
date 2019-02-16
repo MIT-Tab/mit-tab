@@ -41,6 +41,11 @@ nosetests.xml
 # Dont commit the db files
 mittab/backups/
 *.sqlite3
+*.sqlite3-journal
 
-# don't commit pycharm files
+# venv
+venv/
+
+# no idea/pycharm
 /.idea
+.idea

@@ -11,6 +11,7 @@ from decimal import Decimal
 from django.utils.safestring import mark_safe
 
 from models import *
+from mittab.libs import errors
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -41,7 +42,7 @@ class RoomForm(forms.ModelForm):
         fields = '__all__'
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
                                              widget=FilteredSelectMultiple("Affiliated Schools",
                                              is_stacked=False))
     def __init__(self, *args, **kwargs):
@@ -84,7 +85,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(), 
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'),
                                               widget=FilteredSelectMultiple("Debaters", 
                                               is_stacked=False))   
 #    def __init__(self, *args, **kwargs):
@@ -111,8 +112,8 @@ class TeamEntryForm(TeamForm):
         fields = '__all__'
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.all())
-    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    team = forms.ModelChoiceField(queryset=Team.objects.order_by('name'))
+    judge = forms.ModelChoiceField(queryset=Judge.objects.order_by('name'))
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
 
     class Meta:
@@ -234,13 +235,10 @@ class ResultEntryForm(forms.Form):
 
             cleaned_data["winner"] = int(cleaned_data["winner"])
 
-            # No winner, this is bad
             if cleaned_data["winner"] == Round.NONE:
                 self.add_error("winner", self.error_class(["Someone has to win!"]))
-            # Gov won but opp has higher points
             if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
-            # Opp won but gov has higher points
             if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
@@ -250,7 +248,7 @@ class ResultEntryForm(forms.Form):
                     self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
         except Exception, e:
-            print "Caught error %s" %(e)
+            errors.emit_current_exception()
             self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
             traceback.print_exc(file=sys.stdout)
         return cleaned_data
@@ -289,6 +287,71 @@ class ResultEntryForm(forms.Form):
     def has_invalid_ranks(self):
         ranks = [ int(self.deb_attr_val(d, "ranks")) for d in self.DEBATERS ]
         return sorted(ranks) != [1, 2, 3, 4]
+
+
+class EBallotForm(ResultEntryForm):
+    ballot_code = forms.CharField(max_length=30, min_length=0)
+
+    def __init__(self, *args, **kwargs):
+        ballot_code = ""
+
+        if "ballot_code" in kwargs:
+            ballot_code = kwargs.pop("ballot_code")
+
+        super(EBallotForm, self).__init__(*args, **kwargs)
+        self.fields["ballot_code"].initial = ballot_code
+
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+        cur_round = TabSettings.get("cur_round", 0) - 1
+
+        try:
+            ballot_code = cleaned_data.get("ballot_code")
+            judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+            if not judge:
+                msg = "Incorrect ballot code. Enter again."
+                self._errors["ballot_code"] = self.error_class([msg])
+            elif round_obj.round_number != cur_round:
+                msg = """
+                      This ballot is for round %d, but the current round is %d.
+                      Go to tab to submit this result.
+                      """ % (round_obj.round_number, cur_round)
+                self._errors["winner"] = self.error_class([msg])
+            else:
+                if round_obj.chair.ballot_code != judge.ballot_code:
+                    msg = "You are not judging the round, or you are not the chair"
+                    self._errors["ballot_code"] = self.error_class([msg])
+                elif RoundStats.objects.filter(round=round_obj).first():
+                    msg = """
+                          A ballot has already been completed for this round.
+                          Go to tab if you need to change the results.
+                          """
+                    self._errors["ballot_code"] = self.error_class([msg])
+
+            if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
+                msg = "Go to tab to submit a result other than a win or loss."
+                self._errors["winner"] = self.error_class([msg])
+
+            for d in self.DEBATERS:
+                speaks = self.deb_attr_val(d, "speaks", float)
+                _, decimal_val = str(speaks).split(".")
+                key = self.deb_attr_name(d, "speaks")
+                if int(decimal_val) != 0:
+                    msg = "Speaks must be whole numbers"
+                    self._errors[key] = self.error_class([msg])
+                if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
+                        speaks < float(TabSettings.get("min_eballot_speak", 15)):
+                    msg = "Speaks must be justified to tab."
+                    self._errors[key] = self.error_class([msg])
+
+        except Exception, e:
+            print("Caught error %s" % e)
+            self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
+
+        return super(EBallotForm, self).clean()
+
 
 def validate_panel(result):
     all_good = True

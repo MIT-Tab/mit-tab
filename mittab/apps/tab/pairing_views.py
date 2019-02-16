@@ -6,7 +6,7 @@ import datetime
 import os
 import pprint
 
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
@@ -15,8 +15,10 @@ from django.shortcuts import redirect
 
 from errors import *
 from models import *
-from forms import ResultEntryForm, UploadBackupForm, score_panel, validate_panel
 from mittab.libs.errors import *
+from django.shortcuts import redirect
+from forms import ResultEntryForm, UploadBackupForm, score_panel, \
+        validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
@@ -38,7 +40,7 @@ def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
         src_round.save()
         data = {"success":True}
     except Exception as e:
-        print "ARG ", e
+        emit_current_exception()
         data = {"success":False}
     return JsonResponse(data)
 
@@ -81,7 +83,7 @@ def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
             src_round.save()
         data = {'success':True}
     except Exception as e:
-        print "Unable to swap teams: ", e
+        emit_current_exception()
         data = {'success':False}
     return JsonResponse(data)
 
@@ -102,7 +104,7 @@ def pair_round(request):
                 current_round.value = current_round.value + 1
                 current_round.save()
         except Exception as exp:
-            traceback.print_exc(file=sys.stdout)
+            emit_current_exception()
             return render_to_response('error.html',
                                       {'error_type': "Pair Next Round",
                                        'error_name': "Pairing Round %s" % (current_round.value + 1),
@@ -158,8 +160,6 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == 'POST':
-        print "Assigning judges"
-        print request.POST
         panel_points, errors = [], []
         potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
         for point in potential_panel_points:
@@ -169,6 +169,7 @@ def assign_judges_to_pairing(request):
                if num > 0.0:
                    panel_points.append((Round.objects.get(id=point), num))
            except Exception as e:
+               emit_current_exception()
                errors.append(e)
                pass
 
@@ -176,16 +177,16 @@ def assign_judges_to_pairing(request):
         rounds = list(Round.objects.filter(round_number=current_round_number))
         judges = [ci.judge for ci in CheckIn.objects.filter(round_number=current_round_number)]
         try:
+            backup.backup_round("round_%s_before_judge_assignment" % current_round_number)
             assign_judges.add_judges(rounds, judges, panel_points)
         except Exception as e:
+            emit_current_exception()
             return render_to_response('error.html',
                                      {'error_type': "Judge Assignment",
                                       'error_name': "",
                                       'error_info': str(e)},
                                       context_instance=RequestContext(request))
-        return view_round(request, current_round_number)
-    else:
-        return view_round(request, current_round_number)
+    return redirect('/pairings/status/')
 
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
@@ -233,7 +234,7 @@ def manual_backup(request):
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
         backup.backup_round("manual_backup_round_{}_{}_{}".format(cur_round, btime, now))
     except:
-        traceback.print_exc(file=sys.stdout)
+        emit_current_exception()
         return render_to_response('error.html',
                                  {'error_type': "Manual Backup",'error_name': "Backups",
                                   'error_info': "Could not backup database. Something is wrong with your AWS setup."},
@@ -291,12 +292,12 @@ def view_round(request, round_number, errors = None):
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
-    non_checkins = Judge.objects.exclude(judges__round_number = round_number).exclude(checkin__round_number = round_number)
+    non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
+    available_rooms = Room.objects.exclude(round__round_number=round_number).exclude(rank=0)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
     judge_slots = [1,2,3]
-    print "4: ",time.time()
 
     # A seemingly complex one liner to do a fairly simple thing
     # basically this generates the table that the HTML will display such that the output looks like:
@@ -305,7 +306,7 @@ def view_round(request, round_number, errors = None):
     # [ Team2][             CJudge2              ][                 Judge2               ]
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
-    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins)])) 
+    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]))
 
     return render_to_response('pairing_control.html',
                                locals(),
@@ -346,11 +347,15 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     try :
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
+        round_obj.judges.add(judge_obj)
+
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=int(remove_id))
             round_obj.judges.remove(remove_obj)
 
-        round_obj.judges.add(judge_obj)
+            if remove_obj == round_obj.chair:
+                round_obj.chair = round_obj.judges.order_by('-rank').first()
+
         round_obj.save()
         data = {"success":True,
                 "round_id": round_obj.id,
@@ -358,8 +363,8 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
                 "judge_rank": float(judge_obj.rank),
                 "judge_id": judge_obj.id}
     except Exception as e:
-        print "Failed to assign judge: ", e
-        data = {"success":False}
+        emit_current_exception()
+        data = {"success": False}
     return JsonResponse(data)
 
 def toggle_pairing_released(request):
@@ -385,6 +390,7 @@ def pretty_pair(request, printable=False):
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
 
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
+    team_count = len(paired_teams) + len(byes)
 
     print "getting errors"
     for present_team in Team.objects.filter(checked_in=True):
@@ -411,32 +417,93 @@ def view_rounds(request):
                                'show_delete': True},
                               context_instance=RequestContext(request))
 
-def enter_result(request, round_id):
+
+def e_ballot_search(request):
+    if request.method == "POST":
+        return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
+    else:
+        return render(request, "e_ballot_search.html")
+
+
+def enter_e_ballot(request, ballot_code):
+    if request.method == "POST":
+        round_id = request.POST.get("round_instance")
+
+        if round_id:
+            return enter_result(request, round_id, EBallotForm, ballot_code)
+        else:
+            message = """
+                      Missing necessary form data. Please go to tab if this
+                      error persists
+                      """
+
+    current_round = TabSettings.get(key="cur_round") - 1
+    rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
+    rounds = rounds.filter(round_number=current_round)
+    judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+    if not judge:
+        message = """
+                    No judges with the ballot code "%s." Try submitting again, or
+                    go to tab to resolve the issue.
+                    """ % ballot_code
+    elif TabSettings.get("pairing_released", 0) != 1:
+        message = "Pairings for this round have not been released."
+    elif rounds.count() > 1:
+        message = """
+                Found more than one ballot for you this round.
+                Go to tab to resolve this error.
+                """
+    elif rounds.count() == 0:
+        message = """
+                Could not find a ballot for you this round. Go to tab
+                to resolve the issue if you believe you were paired in.
+                """
+    elif rounds.first().chair != judge:
+        message = """
+                You are not the chair of this round. If you are on a panel,
+                only the chair can submit an e-ballot. If you are not on a
+                panel, go to tab and make sure the chair is properly set for
+                the round.
+                """
+    else:
+        return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
+
+    return render(request, "error.html",
+                {"error_type": "Ballot Retrieval", "error_info": message})
+
+
+def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None):
     round_obj = Round.objects.get(id=round_id)
-    if request.method == 'POST':
-        form = ResultEntryForm(request.POST, round_instance=round_obj)
+
+    if request.method == "POST":
+        form = form_class(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
                 result = form.save()
             except ValueError:
-                return render_to_response('error.html', 
-                                         {'error_type': "Round Result",
-                                          'error_name': "["+str(round_obj)+"]",
-                                          'error_info':"Invalid round result, could not remedy."}, 
+                return render_to_response("error.html",
+                                          {"error_type": "Round Result",
+                                           "error_name": "[%s]" % str(round_obj),
+                                           "error_info": "Invalid round result, could not remedy."},
                                           context_instance=RequestContext(request))
-            return render_to_response('thanks.html', 
-                                     {'data_type': "Round Result",
-                                      'data_name': "["+str(round_obj)+"]"}, 
+            return render_to_response("thanks.html",
+                                      {"data_type": "Round Result",
+                                       "data_name": "[%s]" % str(round_obj)},
                                       context_instance=RequestContext(request))
     else:
-        is_current = round_obj.round_number == TabSettings.objects.get(key="cur_round")
-        form = ResultEntryForm(round_instance=round_obj)
-    return render_to_response('round_entry.html', 
-                              {'form': form,
-                               'title': "Entering Ballot for {}".format(str(round_obj)),
-                               'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team}, 
-                               context_instance=RequestContext(request))
+        form_kwargs = { "round_instance": round_obj }
+        if ballot_code:
+            form_kwargs["ballot_code"] = ballot_code
+        form = form_class(**form_kwargs)
+
+    return render_to_response("round_entry.html",
+                              {"form": form,
+                               "title": u'Entering Ballot for {}'.format(round_obj),
+                               "gov_team": round_obj.gov_team,
+                               "opp_team": round_obj.opp_team,
+                               "ballot_code": ballot_code},
+                              context_instance=RequestContext(request))
 
 
 def enter_multiple_results(request, round_id, num_entered):
@@ -509,6 +576,7 @@ def confirm_start_new_tourny(request):
                                'confirm_text': "Create New Tournament"},
                                context_instance=RequestContext(request))
 
+#TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def start_new_tourny(request):
     try:
@@ -516,12 +584,9 @@ def start_new_tourny(request):
         #TODO: Unify this with initialize_tourney
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
-        TabSettings.set("var_teams_to_break", 8)
-        TabSettings.set("nov_teams_to_break", 4)
         TabSettings.set("lenient_late", 0)
-
-
     except Exception as e:
+        emit_current_exception()
         return render_to_response('error.html',
                             {'error_type': "Could not Start Tournament",
                             'error_name': "",
@@ -533,53 +598,19 @@ def start_new_tourny(request):
                             context_instance=RequestContext(request))
 
 def clear_db():
-    check_ins = CheckIn.objects.all()
-    for i in range(len(check_ins)):
-        CheckIn.delete(check_ins[i])
-    print "Cleared Checkins"
-    
-    round_stats = RoundStats.objects.all()
-    for i in range(len(round_stats)):
-        RoundStats.delete(round_stats[i])
-    print "Cleared RoundStats"
-        
-    rounds = Round.objects.all()
-    for i in range(len(rounds)):
-        Round.delete(rounds[i])
-    print "Cleared Rounds"
-        
-    judges = Judge.objects.all()
-    for i in range(len(judges)):
-        Judge.delete(judges[i])
-    print "Cleared Judges"
-        
-    rooms = Room.objects.all()
-    for i in range(len(rooms)):
-        Room.delete(rooms[i])
-    print "Cleared Rooms"
-        
-    scratches = Scratch.objects.all()
-    for i in range(len(scratches)):
-        Scratch.delete(scratches[i])
-    print "Cleared Scratches"
-        
-    tab_set = TabSettings.objects.all()
-    for i in range(len(tab_set)):
-        TabSettings.delete(tab_set[i])
-    print "Cleared TabSettings"
-        
-    teams = Team.objects.all()
-    for i in range(len(teams)):
-        Team.delete(teams[i])   
-    print "Cleared Teams"
-    
-    debaters = Debater.objects.all()
-    for i in range(len(debaters)):
-        Debater.delete(debaters[i])
-    print "Cleared Debaters"
-    
-    schools = School.objects.all()
-    for i in range(len(schools)):
-        School.delete(schools[i])                     
-    print "Cleared Schools"
-                              
+    obj_types = [
+        CheckIn,
+        RoundStats,
+        Round,
+        Judge,
+        Room,
+        Scratch,
+        TabSettings,
+        Team,
+        School
+    ]
+    map(delete_obj, obj_types)
+
+def delete_obj(obj_type):
+    objs = obj_type.objects.all()
+    for obj in objs: obj_type.delete(obj)

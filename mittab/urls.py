@@ -34,8 +34,10 @@ urlpatterns = [
     url(r'^judge/(\d+)/delete/$', judge_views.delete_judge),
     url(r'^judge/(\d+)/scratches/add/(\d+)/', judge_views.add_scratches),
     url(r'^judge/(\d+)/scratches/view/', judge_views.view_scratches),
+    url(r'^judge/(\d+)/check_ins/round/(\d+)/$', judge_views.judge_check_in),
     url(r'^view_judges/$', judge_views.view_judges),
     url(r'^enter_judge/$', judge_views.enter_judge),
+    url(r'^batch_checkin/$', judge_views.batch_checkin),
 
     # School related
     url(r'^school/(\d+)/$', views.view_school),
@@ -98,6 +100,8 @@ urlpatterns = [
     url(r'^pairing/view_backups/$', pairing_views.view_backups),
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
     url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
+    url(r'^e_ballots/$', pairing_views.e_ballot_search),
+    url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot),
 
     # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup),

@@ -7,6 +7,7 @@ from mittab.apps.tab.models import TabSettings
 from django.conf import settings
 from wsgiref.util import FileWrapper
 from mittab.settings import BASE_DIR
+import errors
 
 
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
@@ -46,8 +47,7 @@ def handle_backup(f):
             for chunk in f.chunks():
                 destination.write(chunk)
     except Exception as e:
-        print("Could not write {}".format(dst_filename))
-        print("ERROR: {}".format(str(e)))
+        errors.emit_current_exception()
 
 def list_backups():
     print("Checking backups directory")
@@ -66,7 +66,7 @@ def copy_db(src_filename, dst_filename):
         print("Copied %s to %s" % (src_filename, dst_filename))
         return True
     except:
-        print("Could not copy %s to %s; most likely non-existant file" % (src_filename, dst_filename))
+        errors.emit_current_exception()
         return False
 
 def get_wrapped_file(src_filename):

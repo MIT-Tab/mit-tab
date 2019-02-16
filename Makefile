@@ -13,8 +13,7 @@ web:
 tests: test
 
 test:
-	./bin/setup
-	python manage.py initialize_tourney test .
+	./bin/setup testpassword
 	python manage.py test
 
 shell:

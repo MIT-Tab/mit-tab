@@ -26,6 +26,34 @@ from mittab.apps.tab.forms import SchoolForm
 from mittab.apps.tab.models import *
 
 
+def _create_status(status):
+    """Translates the string for varsity-novice status into MIT-TAB's integer pseudo-enum"""
+    if status == 'novice' or status == 'nov' or status == 'n':
+        return Debater.NOVICE
+    else:
+        return Debater.VARSITY
+
+
+def _translate_seed(team_name, seed):
+    """Translates the string version of the seed into the pseudo-enum. Checks for duplicate free seeds and changes it
+    as necessary. Also notes that change so a message can be returned.
+    :type team_name: str
+    :type seed: str
+    :return seed integer code
+    """
+    seed_int = Team.FREE_SEED
+    seed_changed = False
+
+    if seed == 'full seed' or seed == 'full':
+        seed_int = Team.FULL_SEED
+    elif seed == 'half seed' or seed == 'half':
+        seed_int = Team.HALF_SEED
+    elif seed == 'free seed' or seed == 'free':
+        seed_int = Team.FREE_SEED
+
+    return seed_int
+
+
 def import_teams(import_file, using_overwrite=False):
     try:
         sh = xlrd.open_workbook(filename=None, file_contents=import_file.read()).sheet_by_index(0)
@@ -43,7 +71,7 @@ def import_teams(import_file, using_overwrite=False):
 
         # Verify sheet has required number of columns
         try:
-            sh.cell(0, 8).value
+            sh.cell(0, 5).value
         except:
             team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
@@ -94,6 +122,7 @@ def import_teams(import_file, using_overwrite=False):
             team_school = School.objects.get(name__iexact=school_name)
 
         # check seeds, do check for multiple free seeds and report
+        # todo something about hybrid schools?
         team_seed = _translate_seed(team_name=team_name, seed=sh.cell(i, 2).value.strip().lower())
         school = Team.objects.get(name=team_name).school  # get school_name
         if any([int(team.seed) == Team.FREE_SEED for team in list(school.team_set)]):  # multiple free seeds exist
@@ -153,30 +182,3 @@ def import_teams(import_file, using_overwrite=False):
 
     return team_errors
 
-
-def _create_status(status):
-    """Translates the string for varsity-novice status into MIT-TAB's integer pseudo-enum"""
-    if status == 'novice' or status == 'nov' or status == 'n':
-        return Debater.NOVICE
-    else:
-        return Debater.VARSITY
-
-
-def _translate_seed(team_name, seed):
-    """Translates the string version of the seed into the pseudo-enum. Checks for duplicate free seeds and changes it
-    as necessary. Also notes that change so a message can be returned.
-    :type team_name: str
-    :type seed: str
-    :return seed integer code
-    """
-    seed_int = Team.FREE_SEED
-    seed_changed = False
-
-    if seed == 'full seed' or seed == 'full':
-        seed_int = Team.FULL_SEED
-    elif seed == 'half seed' or seed == 'half':
-        seed_int = Team.HALF_SEED
-    elif seed == 'free seed' or seed == 'free':
-        seed_int = Team.FREE_SEED
-
-    return seed_int

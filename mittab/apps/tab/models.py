@@ -1,16 +1,20 @@
 import string
 import random
 
+from haikunator import Haikunator
 from django.db import models
-from localflavor.us.models import PhoneNumberField
 from django.core.exceptions import ValidationError
 
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
+    
+    class Meta:
+        verbose_name_plural = "tab settings"
+
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-
+    
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -55,8 +59,6 @@ class Debater(models.Model):
         (VARSITY, u'Varsity'),
         (NOVICE, u'Novice'),
     )
-    phone = PhoneNumberField(blank=True)
-    provider = models.CharField(max_length=40, blank=True)
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
     def __unicode__(self):
@@ -72,6 +74,8 @@ class Debater(models.Model):
 class Team(models.Model):
     name = models.CharField(max_length=30, unique = True)
     school = models.ForeignKey('School')
+    hybrid_school = models.ForeignKey('School', blank=True, null=True,
+            related_name='hybrid_school')
     debaters = models.ManyToManyField(Debater)
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
     UNSEEDED = 0
@@ -101,8 +105,23 @@ class Judge(models.Model):
     name = models.CharField(max_length=30, unique = True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
-    phone = PhoneNumberField(blank=True)
-    provider = models.CharField(max_length=40, blank=True)
+    ballot_code = models.CharField(max_length=256, blank=True, null=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        # Generate a random ballot code for judges that don't have one
+        if not self.ballot_code:
+            haikunator = Haikunator()
+            code = haikunator.haikunate(token_length=0)
+
+            while Judge.objects.filter(ballot_code=code).first():
+                code = haikunator.haikunate(token_length=0)
+
+            self.ballot_code = code
+
+        super(Judge, self).save(*args, **kwargs)
+
+    def is_checked_in_for_round(self, round_number):
+        return CheckIn.objects.filter(judge=self, round_number=round_number).exists()
 
     def __unicode__(self):
         return self.name
@@ -123,10 +142,12 @@ class Scratch(models.Model):
         (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+    class Meta:
+        verbose_name_plural = "scratches"
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
-        return str(self.team) + " <="+str(s_type)+"=> " + str(self.judge)
+        return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
 class Room(models.Model):
@@ -135,6 +156,7 @@ class Room(models.Model):
 
     def __unicode__(self):
         return self.name
+
     def delete(self):
         rounds = Round.objects.filter(room=self)
         if len(rounds) == 0:
@@ -149,7 +171,6 @@ class Round(models.Model):
     opp_team = models.ForeignKey(Team, related_name="opp_team")
     chair = models.ForeignKey(Judge, null=True, blank=True, related_name="chair")
     judges = models.ManyToManyField(Judge,
-                                    null=True,
                                     blank=True,
                                     related_name="judges")
     NONE = 0
@@ -183,7 +204,17 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __unicode__(self):
-        return "Round " + str(self.round_number) + " between " + str(self.gov_team) + " (GOV) and " + str(self.opp_team) + " (OPP)"
+        return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+
+    def save(self):
+        no_shows = NoShow.objects.filter(
+                round_number=self.round_number,
+                no_show_team__in=[self.gov_team, self.opp_team])
+
+        if no_shows:
+            no_shows.delete()
+
+        super(Round, self).save()
 
     def delete(self):
         rounds = RoundStats.objects.filter(round=self)
@@ -213,6 +244,9 @@ class RoundStats(models.Model):
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
     ranks = models.DecimalField(max_digits=6, decimal_places=4)
     debater_role = models.CharField(max_length=4, null=True)
+
+    class Meta:
+        verbose_name_plural = "round stats"
 
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)

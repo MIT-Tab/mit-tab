@@ -458,3 +458,7 @@ div.spacer {
 .input-super-mini {
   width: 40px;
 }
+
+.hidden {
+  display: none
+}

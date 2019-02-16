@@ -67,7 +67,7 @@ def view_team(request, team_id):
                                       context_instance=RequestContext(request))
     else:
         form = TeamForm(instance=team)
-        links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for '+str(team.name), False)]
+        links = [('/team/'+str(team_id)+'/scratches/view/',u'Scratches for {}'.format(team.name), False)]
         for deb in team.debaters.all():
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
         return render_to_response('data_entry.html', 
@@ -99,7 +99,7 @@ def enter_team(request):
             else:
                 return render_to_response('thanks.html', 
                                          {'data_type': "Team",
-                                          'data_name': "["+str(team.name)+"]",
+                                          'data_name': u'[{}]'.format(team.name),
                                           'data_modification': 'CREATED',
                                           'enter_again': True},
                                           context_instance=RequestContext(request))
