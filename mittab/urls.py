@@ -7,8 +7,11 @@ import apps.tab.judge_views as judge_views
 import apps.tab.team_views as team_views
 import apps.tab.debater_views as debater_views
 import apps.tab.pairing_views as pairing_views
+from mittab.apps.tab import template_views
+from mittab.libs.data_import import export_xls_files
 
 from django.contrib import admin
+
 admin.autodiscover()
 
 urlpatterns = [
@@ -96,13 +99,18 @@ urlpatterns = [
     url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_judges_in_round),
     url(r'^pairings/swap_team/(\d+)/(\d+)/with/(\d+)/(\d+)/$', pairing_views.swap_teams_in_round),
 
-
     # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup),
     url(r'^backup/download/(.+)/$', pairing_views.download_backup),
     url(r'^backup/(.+)/$', pairing_views.view_backup),
     url(r'^upload_backup/$', pairing_views.upload_backup),
 
-    # Data Upload
-    url(r'^import_data/$', views.upload_data)
+    # Data upload and download
+    url(r'^import_data/$', views.upload_data, name='upload-data'),
+    url(r'^export/$', template_views.export_xls_portal, name='xls-export'),
+    url(r'^export/teams', template_views.export_team_xls, name='xls-teams'),
+    url(r'^export/judges', template_views.export_judge_xls, name='xls-judges'),
+    url(r'^export/rooms', template_views.export_room_xls, name='xls-rooms'),
+    url(r'^export/team-stats', template_views.export_team_stats_xls, name='xls-team-stats'),
+    url(r'^export/speaker-stats', template_views.export_debater_stats_xls, name='xls-debater-stats')
 ]
