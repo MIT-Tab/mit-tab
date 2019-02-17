@@ -13,7 +13,7 @@ import pprint
 import itertools
 
 from cache_logic import cache
-
+from mittab.libs.structs import DebaterScores
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
@@ -462,7 +462,7 @@ def double_adjusted_speaks(team):
 @cache()
 def tot_ranks(team):
     tot_ranks = sum([tot_ranks_deb(deb, False)
-                     for deb in team.debaters.all()])    
+                     for deb in team.debaters.all()])
     return tot_ranks
 
 @cache()
@@ -502,7 +502,7 @@ def opp_strength(t):
     else:
         return 0.0
 
-# Return a list of all teams who have no varsity members 
+# Return a list of all teams who have no varsity members
 def all_nov_teams():
     return list(Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
 
@@ -840,7 +840,7 @@ def deb_team(d):
     except:
         return None
 
-# Returns a tuple used for comparing two debaters 
+# Returns a tuple used for comparing two debaters
 # in terms of their overall standing in the tournament
 def debater_score(debater):
     score = (0,0,0,0,0,0)
@@ -855,6 +855,11 @@ def debater_score(debater):
         errors.emit_current_exception()
     print "finished scoring {}".format(debater)
     return score
+
+
+def get_debater_scores():
+    return [DebaterScores(d, debater_score(d)) for d in Debater.objects.all()]
+
 
 def rank_speakers():
     return sorted(Debater.objects.all(), key=debater_score)

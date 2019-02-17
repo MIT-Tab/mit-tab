@@ -1,3 +1,5 @@
+import time
+
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
@@ -111,24 +113,49 @@ def rank_debaters_ajax(request):
                              {'title': "Debater Rankings"},
                               context_instance=RequestContext(request))
 
+
 def rank_debaters(request):
-    speakers = tab_logic.rank_speakers()
-    debaters = [(s,
-                 tab_logic.tot_speaks_deb(s), 
-                 tab_logic.tot_ranks_deb(s), 
-                 tab_logic.deb_team(s)) for s in speakers]
+    start_ms = int(round(time.time() * 1000))
 
-    nov_speakers = tab_logic.rank_nov_speakers()
-    nov_debaters = [(s,
-                     tab_logic.tot_speaks_deb(s), 
-                     tab_logic.tot_ranks_deb(s),
-                     tab_logic.deb_team(s)) for s in nov_speakers]
+    # old method
+    # speakers = tab_logic.rank_speakers()
+    # debaters = [(s,
+    #              tab_logic.tot_speaks_deb(s),
+    #              tab_logic.tot_ranks_deb(s),
+    #              tab_logic.deb_team(s)) for s in speakers]
+    #
+    # nov_speakers = tab_logic.rank_nov_speakers()
+    # nov_debaters = [(s,
+    #                  tab_logic.tot_speaks_deb(s),
+    #                  tab_logic.tot_ranks_deb(s),
+    #                  tab_logic.deb_team(s)) for s in nov_speakers]
 
-    return render_to_response('rank_debaters_component.html', 
-                             {'debaters': debaters, 
-                              'nov_debaters' : nov_debaters,
-                              'title': "Speaker Rankings"}, 
-                             context_instance=RequestContext(request))
+    debater_scores = tab_logic.get_debater_scores()
+    print('got debater information')
+
+    speakers = sorted(debater_scores, key=lambda d: d.create_scoring_tuple())
+    debaters = [(ds.speaker,
+                 ds.tot_speaks,
+                 ds.tot_ranks,
+                 tab_logic.deb_team(ds.speaker)) for ds in speakers]
+    print('got the visualised speaks and ranks')
+
+    # since removing entries has no effect on ordinal rank... just remove them
+    nov_debaters = [(ds.speaker,
+                     ds.tot_speaks,
+                     ds.tot_ranks,
+                     tab_logic.deb_team(ds.speaker)) for ds in speakers
+                    if ds.speaker.novice_status == Debater.NOVICE]  # save on mem allocation too
+    print('rendering')
+
+    end_ms = int(round(time.time() * 1000))
+    print('derivation took {} ms'.format(end_ms - start_ms))
+
+    return render_to_response('rank_debaters_component.html',
+                              {'debaters': debaters,
+                               'nov_debaters' : nov_debaters,
+                               'title': "Speaker Rankings"},
+                              context_instance=RequestContext(request))
 
 
 
