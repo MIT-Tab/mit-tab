@@ -45,10 +45,12 @@ class TeamScores(object):
         self.d_adj_ranks = data[6]
 
     def create_scoring_tuple(self):
-        return (-self.wins,
-                -self.tot_speaks,
-                self.tot_ranks,
-                -self.s_adj_speaks,
-                self.s_adj_ranks,
-                -self.d_adj_speaks,
-                self.d_adj_ranks)
+        return (
+            -self.wins,
+            -self.tot_speaks,
+            self.tot_ranks,
+            -self.s_adj_speaks,
+            self.s_adj_ranks,
+            -self.d_adj_speaks,
+            self.d_adj_ranks
+        )

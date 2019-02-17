@@ -457,19 +457,15 @@ def _team_speaks_list(team):
     return sorted([item for sublist in speaks for item in sublist])
 
 
-@cache()
 def tot_speaks(team):
-    tot_speaks = sum(_team_speaks_list(team))
-    return tot_speaks
+    return sum(_team_speaks_list(team))
 
 
-@cache()
 def single_adjusted_speaks(team):
     """ Lays out all the speaks gained by members of the team. Sorts them, then removes the lowest and highest. """
     return sum(_single_adjust(_team_speaks_list(team)))
 
 
-@cache()
 def double_adjusted_speaks(team):
     return sum(_double_adjust(_team_speaks_list(team)))
 
@@ -480,19 +476,19 @@ def _team_ranks_list(t):
     ranks = [ranks_for_debater(deb, False) for deb in t.debaters.all()]
     return sorted([item for sublist in ranks for item in sublist])
 
-@cache()
+
 def tot_ranks(team):
     return sum(_team_ranks_list)
 
-@cache()
+
 def single_adjusted_ranks(team):
-    return _single_adjust(_team_ranks_list(team))
+    return sum(_single_adjust(_team_ranks_list(team)))
 
-@cache()
+
 def double_adjusted_ranks(team):
-    return _double_adjust(_team_ranks_list(team))
+    return sum(_double_adjust(_team_ranks_list(team)))
 
-@cache()
+
 def opp_strength(t):
     """
     Average number of wins per opponent
