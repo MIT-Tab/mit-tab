@@ -18,6 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from __future__ import print_function
 from decimal import *
 import xlrd
 
@@ -113,7 +114,7 @@ def import_judges(import_file, using_overwrite=False):
             if form.is_valid():
                 form.save()
             else:
-                print form.errors  # print errors of console so they can actually be debugged
+                print(form.errors)
                 errors.append(judge_name + ": Form invalid. Check inputs.")
 
         else:
