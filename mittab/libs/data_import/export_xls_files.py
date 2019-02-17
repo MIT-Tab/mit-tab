@@ -9,20 +9,14 @@ from mittab.apps.tab.models import Team, Judge, Room, Debater
 from mittab.libs import tab_logic
 
 
-def _vn_status_to_str(novice_status):
+def _vn_status_to_str(debater_vn):
     """Creates varsity-novice status string from the integer pseudo-enum used by the model"""
-    try:
-        return next(description for i, description in Debater.NOVICE_CHOICES if novice_status == i)
-    except StopIteration:
-        return 'NO STATUS'
+    return next((description for i, description in Debater.NOVICE_CHOICES if i == debater_vn), 'NO STATUS')
 
 
 def _seed_to_str(seed_int):
     """Creates seed status string from the integer pseudo-enum used by the model"""
-    try:
-        return next(description for i, description in Team.SEED_CHOICES if seed_int == i)
-    except StopIteration:
-        return 'NO SEED'
+    return next((description for i, description in Team.SEED_CHOICES if i == seed_int), 'NO SEED')
 
 
 def export_teams_df():
