@@ -384,6 +384,7 @@ def rank_teams(request):
                                'title': "Team Rankings"},
                               context_instance=RequestContext(request))
 
+
 def team_stats(request, team_id):
     team_id = int(team_id)
     try:

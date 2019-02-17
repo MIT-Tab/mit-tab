@@ -452,41 +452,45 @@ def _double_adjust(sorted_list):
 
 """ Speaks """
 @cache()
+def _team_speaks_list(team):
+    speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
+    return sorted([item for sublist in speaks for item in sublist])
+
+
+@cache()
 def tot_speaks(team):
-    tot_speaks = sum([tot_speaks_deb(deb, False)
-                      for deb in team.debaters.all()])
+    tot_speaks = sum(_team_speaks_list(team))
     return tot_speaks
+
 
 @cache()
 def single_adjusted_speaks(team):
-    speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
-    speaks = sorted([item for sublist in speaks for item in sublist])
-    return sum(_single_adjust(speaks))
+    """ Lays out all the speaks gained by members of the team. Sorts them, then removes the lowest and highest. """
+    return sum(_single_adjust(_team_speaks_list(team)))
+
 
 @cache()
 def double_adjusted_speaks(team):
-    speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
-    speaks = sorted([item for sublist in speaks for item in sublist])
-    return sum(_double_adjust(speaks))
+    return sum(_double_adjust(_team_speaks_list(team)))
+
 
 """ Ranks """
 @cache()
+def _team_ranks_list(t):
+    ranks = [ranks_for_debater(deb, False) for deb in t.debaters.all()]
+    return sorted([item for sublist in ranks for item in sublist])
+
+@cache()
 def tot_ranks(team):
-    tot_ranks = sum([tot_ranks_deb(deb, False)
-                     for deb in team.debaters.all()])
-    return tot_ranks
+    return sum(_team_ranks_list)
 
 @cache()
 def single_adjusted_ranks(team):
-    ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
-    ranks = sorted([item for sublist in ranks for item in sublist])
-    return sum(ranks[1:-1])
+    return _single_adjust(_team_ranks_list(team))
 
 @cache()
 def double_adjusted_ranks(team):
-    ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
-    ranks = sorted([item for sublist in ranks for item in sublist])
-    return sum(ranks[2:-2])
+    return _double_adjust(_team_ranks_list(team))
 
 @cache()
 def opp_strength(t):
@@ -531,23 +535,28 @@ def team_comp(pairing, round_number):
                 max(tot_speaks(gov), tot_speaks(opp)),
                 min(tot_speaks(gov), tot_speaks(opp)))
 
+
 def team_score(team):
     """A tuple representing the passed team's performance at the tournament"""
-    score = (0,0,0,0,0,0,0,0)
+    score = (0, 0, 0, 0, 0, 0, 0, 0)
     try:
+        team_speaks = _team_speaks_list(team)
+        team_ranks = _team_ranks_list(team)
         score = (-tot_wins(team),
-                 -tot_speaks(team),
-                  tot_ranks(team),
-                 -single_adjusted_speaks(team),
-                  single_adjusted_ranks(team),
-                 -double_adjusted_speaks(team),
-                  double_adjusted_ranks(team),
+                 -sum(team_speaks),
+                  sum(team_ranks),
+                 -sum(_single_adjust(team_speaks)),
+                  sum(_single_adjust(team_ranks)),
+                 -sum(_double_adjust(team_speaks)),
+                  sum(_double_adjust(team_ranks)),
                  -opp_strength(team))
+
     except Exception:
         errors.emit_current_exception()
 
     print('scored team {}'.format(team.name))
     return score
+
 
 def team_score_except_record(team):
     return team_score(team)[1:]
