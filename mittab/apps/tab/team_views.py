@@ -372,7 +372,7 @@ def rank_teams(request):
 
     # since removing entries has no effect on ordinal rank... just remove them
     # all members must be novices to be a novice team
-    nov_teams = [t for t in teams if all(s for s in t[0].debaters.all() if s.novice_status == Debater.NOVICE)]
+    nov_teams = [t for t in teams if all(s.novice_status == Debater.NOVICE for s in t[0].debaters.all())]
     print('rendering')
 
     end_ms = int(round(time.time() * 1000))
