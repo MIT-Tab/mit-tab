@@ -84,6 +84,7 @@ def import_rooms(import_file, using_overwrite=False):
         # save
         if not duplicate:  # Create the room
             room = Room(name=room_name, rank=room_rank)
+            room.save()
 
         else:  # else, update room
             if using_overwrite:
