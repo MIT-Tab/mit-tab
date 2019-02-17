@@ -34,8 +34,6 @@ def export_teams_df():
             root = 'debater_{}_'.format(debater_count + 1)
             entry[root + 'name'] = debater.name
             entry[root + 'status'] = _vn_status_to_str(debater.novice_status)
-            entry[root + 'phone'] = debater.phone
-            entry[root + 'provider'] = debater.provider
 
         entries.append(entry)
 
@@ -51,8 +49,7 @@ def export_teams():
 
     # write headers
     headers = ['team_name', 'team_school', 'team_seed', 'team_debater_1_name', 'team_debater_1_status',
-               'team_debater_1_phone', 'team_debater_1_provider', 'team_debater_2_name',
-               'team_debater_2_status', 'team_debater_2_phone', 'team_debater_2_provider']
+               'team_debater_2_name', 'team_debater_2_status']
     for i, header in enumerate(headers):
         sheet.write(0, i, header)
 
@@ -71,7 +68,6 @@ def export_teams():
         deb1_name = debaters[0].name
         deb1_status = _vn_status_to_str(debaters[0].novice_status)  # 0 = Varsity, 1 = Novice
         deb1_phone = debaters[0].phone
-        deb1_provider = debaters[0].provider
 
         sheet.write(row, 0, name)
         sheet.write(row, 1, school)
@@ -79,20 +75,14 @@ def export_teams():
 
         sheet.write(row, 3, deb1_name)
         sheet.write(row, 4, deb1_status)
-        sheet.write(row, 5, deb1_phone)
-        sheet.write(row, 6, deb1_provider)
 
         if len(debaters) > 1:
             # implicitly caps to two debater teams
             deb2_name = debaters[1].name
             deb2_status = _vn_status_to_str(debaters[1].novice_status)
-            deb2_phone = debaters[1].phone
-            deb2_prov = debaters[1].provider
 
-            sheet.write(row, 7, deb2_name)
-            sheet.write(row, 8, deb2_status)
-            sheet.write(row, 9, deb2_phone)
-            sheet.write(row, 10, deb2_prov)
+            sheet.write(row, 5, deb2_name)
+            sheet.write(row, 6, deb2_status)
 
     return book
 
@@ -102,9 +92,7 @@ def export_judges_df():
     for judge in Judge.objects.all():
         entry = {
             'judge_name': judge.name,
-            'judge_rank': judge.rank,
-            'judge_phone': judge.phone,
-            'judge_provider': judge.provider
+            'judge_rank': judge.rank
         }
 
         for judge_i, school in enumerate(judge.schools.all()):
@@ -122,8 +110,8 @@ def export_judges():
     book = Workbook('utf-8')
     sheet = book.add_sheet('Judges')
 
-    # 0 name, 1 rank, 2 phone, 3 provider, 4+ schools
-    headers = ['judge_name', 'judge_rank', 'judge_phone', 'judge_provider', 'judge_schools']
+    # 0 name, 1 rank, 2+ schools
+    headers = ['judge_name', 'judge_rank', 'judge_schools']
     for i, header in enumerate(headers):
         sheet.write(0, i, header)
 
@@ -132,17 +120,13 @@ def export_judges():
 
         name = judge.name
         rank = judge.rank
-        phone = judge.phone
-        provider = judge.provider
         schools = judge.schools.all()
 
         sheet.write(row, 0, name)
         sheet.write(row, 1, rank)
-        sheet.write(row, 2, phone)
-        sheet.write(row, 3, provider)
 
         for j, school in enumerate(schools):  # iterate through other school affiliations
-            sheet.write(row, j + 4, school.name)
+            sheet.write(row, j + 2, school.name)
 
     return book
 
@@ -165,7 +149,7 @@ def export_rooms():
     book = Workbook('utf-8')
     sheet = book.add_sheet('Rooms')
 
-    # 0 name, 1 rank, 2 phone, 3 provider, 4+ schools
+    # 0 name, 1 rank
     headers = ['room_name', 'room_rank']
     for i, header in enumerate(headers):
         sheet.write(1, i, header)

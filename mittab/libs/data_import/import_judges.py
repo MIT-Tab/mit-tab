@@ -54,9 +54,7 @@ def import_judges(import_file, using_overwrite=False):
 
         # 0     name
         # 1     rank
-        # 2     phone
-        # 3     provider
-        # 4+    schools
+        # 2+    schools
 
         is_duplicate = False
 
@@ -78,11 +76,8 @@ def import_judges(import_file, using_overwrite=False):
             errors.append(judge_name + ": Rank should be between 0-100")
             continue
 
-        judge_phone = sh.cell(i, 2).value
-        judge_provider = sh.cell(i, 3).value
-
         # iterate through schools until none are left
-        cur_col = 4
+        cur_col = 2
         schools = []
         while True:
             try:
@@ -109,8 +104,7 @@ def import_judges(import_file, using_overwrite=False):
             cur_col += 1
 
         if not is_duplicate:
-            form = JudgeForm(data={'name': judge_name, 'rank': judge_rank, 'phone': judge_phone,
-                                   'provider': judge_provider, 'schools': schools})
+            form = JudgeForm(data={'name': judge_name, 'rank': judge_rank, 'schools': schools})
             if form.is_valid():
                 form.save()
             else:
@@ -122,8 +116,6 @@ def import_judges(import_file, using_overwrite=False):
                 # overwrite the parameters for that judge if using overwrite
                 judge = Judge.objects.get(name=judge_name)
                 judge.rank = judge_rank
-                judge.phone = judge_phone
-                judge.provider = judge_provider
                 judge.school = schools
                 judge.save()
 
