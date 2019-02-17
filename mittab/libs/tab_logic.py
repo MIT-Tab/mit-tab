@@ -13,7 +13,7 @@ import pprint
 import itertools
 
 from cache_logic import cache
-from mittab.libs.structs import DebaterScores
+from mittab.libs.structs import DebaterScores, TeamScores
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
@@ -545,10 +545,18 @@ def team_score(team):
                  -opp_strength(team))
     except Exception:
         errors.emit_current_exception()
+
+    print('scored team {}'.format(team.name))
     return score
 
 def team_score_except_record(team):
     return team_score(team)[1:]
+
+
+def get_team_scores():
+    return [TeamScores(t, team_score(t)) for t in
+            Team.objects.prefetch_related('debaters', 'debaters__roundstats_set').all()]
+
 
 def rank_teams():
     return sorted(all_teams(), key=team_score)
@@ -689,8 +697,8 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team).exists()
-    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team).exists()
+    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team)
     if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
@@ -827,8 +835,8 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team).exists()
-    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team).exists()
+    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
+    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team)
 
     if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
@@ -883,7 +891,7 @@ def debater_score(debater):
 
 def get_debater_scores():
     return [DebaterScores(d, debater_score(d)) for d in
-            Debater.objects.prefetch_related('roundstats_set', 'roundstats_set__round').all()]
+            Debater.objects.prefetch_related('roundstats_set', 'roundstats_set__round', 'team_set').all()]
     # prefetch roundstats to save on ORM time
 
 
