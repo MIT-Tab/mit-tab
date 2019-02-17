@@ -11,12 +11,14 @@ from mittab.libs import tab_logic
 
 def _vn_status_to_str(debater_vn):
     """Creates varsity-novice status string from the integer pseudo-enum used by the model"""
-    return next((description for i, description in Debater.NOVICE_CHOICES if i == debater_vn), 'NO STATUS')
+    return next((description for i, description in Debater.NOVICE_CHOICES if i == debater_vn),
+                'NO STATUS')
 
 
 def _seed_to_str(seed_int):
     """Creates seed status string from the integer pseudo-enum used by the model"""
-    return next((description for i, description in Team.SEED_CHOICES if i == seed_int), 'NO SEED')
+    return next((description for i, description in Team.SEED_CHOICES if i == seed_int),
+                'NO SEED')
 
 
 def export_teams_df():
@@ -24,7 +26,7 @@ def export_teams_df():
     cross-compatible with the parsing system used in the import_teams file. """
 
     entries = []
-    for i, team in enumerate(Team.objects.all()):
+    for team in Team.objects.all():
         entry = {
             'team_name': team.name,
             'team_school': team.school.name,
@@ -84,6 +86,7 @@ def export_teams():
         sheet.write(row, 6, deb1_provider)
 
         if len(debaters) > 1:
+            # implicitly caps to two debater teams
             deb2_name = debaters[1].name
             deb2_status = _vn_status_to_str(debaters[1].novice_status)
             deb2_phone = debaters[1].phone
@@ -99,7 +102,7 @@ def export_teams():
 
 def export_judges_df():
     entries = []
-    for i, judge in enumerate(Judge.objects.all()):
+    for judge in Judge.objects.all():
         entry = {
             'judge_name': judge.name,
             'judge_rank': judge.rank,
@@ -149,7 +152,7 @@ def export_judges():
 
 def export_rooms_df():
     entries = []
-    for i, room in enumerate(Room.objects.all()):
+    for room in Room.objects.all():
         entry = {
             'room_name': room.name,
             'room_rank': room.rank
