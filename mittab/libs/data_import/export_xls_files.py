@@ -12,7 +12,8 @@ from mittab.libs import tab_logic
 def _create_vn_str(novice_status):
     """Creates varsity-novice status string from the integer pseudo-enum used by the model"""
     for status, description in Debater.NOVICE_CHOICES:
-        if status == novice_status: return status
+        if status == novice_status:
+            return status
 
     return 'NO STATUS'
 
@@ -65,8 +66,8 @@ def export_teams():
     headers = ['team_name', 'team_school', 'team_seed', 'team_debater_1_name', 'team_debater_1_status',
                'team_debater_1_phone', 'team_debater_1_provider', 'team_debater_2_name',
                'team_debater_2_status', 'team_debater_2_phone', 'team_debater_2_provider']
-    for i in xrange(len(headers)):
-        sheet.write(0, i, headers[i])
+    for i, header in enumerate(headers):
+        sheet.write(0, i, header)
 
     # write rows
     for i, team in enumerate(Team.objects.all()):
