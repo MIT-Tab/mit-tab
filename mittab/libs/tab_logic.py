@@ -478,7 +478,7 @@ def _team_ranks_list(t):
 
 
 def tot_ranks(team):
-    return sum(_team_ranks_list)
+    return sum(_team_ranks_list(team))
 
 
 def single_adjusted_ranks(team):
