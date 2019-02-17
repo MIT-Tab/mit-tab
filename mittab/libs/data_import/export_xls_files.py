@@ -28,7 +28,7 @@ def _seed_to_str(seed_int):
     elif seed_int is 3:
         return 'full'
 
-    return 'no seed'
+    return 'NO SEED'
 
 
 def export_teams_df():
