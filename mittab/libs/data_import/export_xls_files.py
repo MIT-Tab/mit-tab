@@ -9,26 +9,20 @@ from mittab.apps.tab.models import Team, Judge, Room, Debater
 from mittab.libs import tab_logic
 
 
-def _create_vn_str(novice_status):
+def _vn_status_to_str(novice_status):
     """Creates varsity-novice status string from the integer pseudo-enum used by the model"""
-    for status, description in Debater.NOVICE_CHOICES:
-        if status == novice_status:
-            return status
-
-    return 'NO STATUS'
+    try:
+        return next(description for i, description in Debater.NOVICE_CHOICES if novice_status == i)
+    except StopIteration:
+        return 'NO STATUS'
 
 
 def _seed_to_str(seed_int):
-    if seed_int is 0:
-        return 'unseeded'
-    elif seed_int is 1:
-        return 'free'
-    elif seed_int is 2:
-        return 'half'
-    elif seed_int is 3:
-        return 'full'
-
-    return 'NO SEED'
+    """Creates seed status string from the integer pseudo-enum used by the model"""
+    try:
+        return next(description for i, description in Team.SEED_CHOICES if seed_int == i)
+    except StopIteration:
+        return 'NO SEED'
 
 
 def export_teams_df():
@@ -46,7 +40,7 @@ def export_teams_df():
         for debater_count, debater in enumerate(team.debaters.all()):
             root = 'debater_{}_'.format(debater_count + 1)
             entry[root + 'name'] = debater.name
-            entry[root + 'status'] = _create_vn_str(debater.novice_status)
+            entry[root + 'status'] = _vn_status_to_str(debater.novice_status)
             entry[root + 'phone'] = debater.phone
             entry[root + 'provider'] = debater.provider
 
@@ -82,7 +76,7 @@ def export_teams():
 
         debaters = team.debaters.all()
         deb1_name = debaters[0].name
-        deb1_status = _create_vn_str(debaters[0].novice_status)  # 0 = Varsity, 1 = Novice
+        deb1_status = _vn_status_to_str(debaters[0].novice_status)  # 0 = Varsity, 1 = Novice
         deb1_phone = debaters[0].phone
         deb1_provider = debaters[0].provider
 
@@ -97,7 +91,7 @@ def export_teams():
 
         if len(debaters) > 1:
             deb2_name = debaters[1].name
-            deb2_status = _create_vn_str(debaters[1].novice_status)
+            deb2_status = _vn_status_to_str(debaters[1].novice_status)
             deb2_phone = debaters[1].phone
             deb2_prov = debaters[1].provider
 
