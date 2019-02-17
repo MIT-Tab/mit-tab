@@ -576,7 +576,7 @@ def avg_deb_speaks(debater):
     """
     real_speaks = []
     num_speaks = TabSettings.objects.get(key = 'cur_round').value - 1
-    debater_roundstats = debater.roundstats_set.select_related('round').all()
+    debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
     speaks_per_round = defaultdict(list)
@@ -635,7 +635,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 speaks
     num_speaks = TabSettings.objects.get(key="cur_round").value - 1
 
-    debater_roundstats = debater.roundstats_set.select_related('round').all()
+    debater_roundstats = debater.roundstats_set.all()
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -728,7 +728,7 @@ def avg_deb_ranks(debater):
     """
     real_ranks = []
     num_ranks = TabSettings.objects.get(key='cur_round').value - 1
-    debater_roundstats = debater.roundstats_set.select_related('round').all()
+    debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
     ranks_per_round = defaultdict(list)
@@ -778,7 +778,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 ranks
     num_ranks = TabSettings.objects.get(key="cur_round").value - 1
 
-    debater_roundstats = debater.roundstats_set.select_related('round').all()
+    debater_roundstats = debater.roundstats_set.all()
     debater_ranks = []
 
     ranks_per_round = defaultdict(list)
@@ -792,15 +792,15 @@ def ranks_for_debater(debater, average_ironmen=True):
         if len(roundstats) > 0:
             ranks = [float(rs.ranks) for rs in roundstats]
             avg_ranks = sum(ranks) / float(len(roundstats))
-
+            
             # check first round
             roundstat = roundstats[0]
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
-
+                
             elif forfeited_round(roundstat.round, team):
                 debater_ranks.append(MAXIMUM_DEBATER_RANKS)
-
+                
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
@@ -883,7 +883,7 @@ def debater_score(debater):
 
 def get_debater_scores():
     return [DebaterScores(d, debater_score(d)) for d in
-            Debater.objects.prefetch_related('roundstats_set').all()]
+            Debater.objects.prefetch_related('roundstats_set', 'roundstats_set__round').all()]
     # prefetch roundstats to save on ORM time
 
 
