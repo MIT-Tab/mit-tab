@@ -1,6 +1,3 @@
-from django.contrib.auth.decorators import permission_required
-from django.http import HttpResponse
-
 # data stuff
 from xlwt import Workbook
 import pandas as pd
@@ -234,7 +231,7 @@ def export_team_stats():
 def export_debater_stats_df():
     entries = []
     for debater in Debater.objects.all():
-        debater_team = Team.objects.get(debaters=debater)
+        debater_team = debater.team_set.first()
         entries.append({
             'debater_name': debater.name,
             'debater_speaks': tab_logic.tot_speaks_deb(debater, average_ironmen=True),
@@ -269,7 +266,7 @@ def export_debater_stats():
 
     for i, debater in enumerate(Debater.objects.all()):
         row = i + 2
-        debater_team = Team.objects.get(debaters=debater)
+        debater_team = debater.team_set.first()
 
         sheet.write(row, 0, debater.name)
         sheet.write(row, 1, tab_logic.tot_speaks_deb(debater, average_ironmen=True))
