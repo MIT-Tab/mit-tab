@@ -2,10 +2,8 @@ import time
 
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from forms import DebaterForm
-from errors import *
 from models import *
 
 from mittab.libs import tab_logic, errors

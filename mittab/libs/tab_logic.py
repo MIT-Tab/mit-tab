@@ -439,6 +439,17 @@ def tot_wins(team):
     win_count += num_byes(team)
     return win_count
 
+
+def _single_adjust(sorted_list):
+    """ NOTE: Does not run a sort """
+    return sorted_list[1: -1]
+
+
+def _double_adjust(sorted_list):
+    """ NOTE: Does not run a sort """
+    return sorted_list[2: -2]
+
+
 """ Speaks """
 @cache()
 def tot_speaks(team):
@@ -450,13 +461,13 @@ def tot_speaks(team):
 def single_adjusted_speaks(team):
     speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
-    return sum(speaks[1:-1])
+    return sum(_single_adjust(speaks))
 
 @cache()
 def double_adjusted_speaks(team):
     speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
-    return sum(speaks[2:-2])
+    return sum(_double_adjust(speaks))
 
 """ Ranks """
 @cache()
@@ -684,13 +695,12 @@ def debater_abnormal_round_speaks(debater, round_number):
 
 def single_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
-    debater_speaks.sort()
-    return sum(debater_speaks[1:-1])
+    return _single_adjust(sorted(debater_speaks))
+
 
 def double_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
-    debater_speaks.sort()
-    return sum(debater_speaks[2:-2])
+    return _double_adjust(sorted(debater_speaks))
 
 @cache()
 def tot_speaks_deb(debater, average_ironmen=True):
@@ -836,23 +846,29 @@ def tot_ranks_deb(debater, average_ironmen=True):
 
 def deb_team(d):
     try:
-        return d.team_set.all()[0]
+        return d.team_set.first()
     except:
         return None
 
 # Returns a tuple used for comparing two debaters
 # in terms of their overall standing in the tournament
 def debater_score(debater):
-    score = (0,0,0,0,0,0)
+    score = (0, 0, 0, 0, 0, 0)
     try:
-        score = (-tot_speaks_deb(debater),
-                  tot_ranks_deb(debater),
-                 -single_adjusted_speaks_deb(debater),
-                  single_adjusted_ranks_deb(debater),
-                 -double_adjusted_speaks_deb(debater),
-                  double_adjusted_ranks_deb(debater))
+        speaks_list = sorted(speaks_for_debater(debater))
+        ranks_list = sorted(ranks_for_debater(debater))
+        score = (
+            -sum(speaks_list),
+             sum(ranks_list),
+            -sum(_single_adjust(speaks_list)),
+             sum(_single_adjust(ranks_list)),
+            -sum(_double_adjust(speaks_list)),
+             sum(_double_adjust(ranks_list))
+        )
+
     except Exception:
         errors.emit_current_exception()
+
     print "finished scoring {}".format(debater)
     return score
 
