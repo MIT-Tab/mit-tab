@@ -576,7 +576,7 @@ def avg_deb_speaks(debater):
     """
     real_speaks = []
     num_speaks = TabSettings.objects.get(key = 'cur_round').value - 1
-    debater_roundstats = debater.roundstats_set.all()
+    debater_roundstats = debater.roundstats_set.select_related('round').all()
     team = deb_team(debater)
 
     speaks_per_round = defaultdict(list)
@@ -585,7 +585,7 @@ def avg_deb_speaks(debater):
     for roundstat in debater_roundstats:
         speaks_per_round[roundstat.round.round_number].append(roundstat)
 
-    for round_number in range(1, num_speaks + 1):
+    for round_number in xrange(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
             speaks = [float(rs.speaks) for rs in roundstats]
@@ -608,7 +608,6 @@ def debater_forfeit_speaks(debater):
     Note that right now we just return 0, but we may want to add support
     for returning average speaks or some such
     """
-
     return 0.0
 
 @cache()
@@ -647,7 +646,7 @@ def speaks_for_debater(debater, average_ironmen=True):
 
     for round_number in xrange(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
-        if roundstats:
+        if len(roundstats) > 0:
             # This is so if in the odd chance we get a debater paired in
             # twice we take the speaks they actually got
             roundstats.sort(key=lambda rs: rs.speaks, reverse=True)
@@ -728,8 +727,8 @@ def avg_deb_ranks(debater):
     forfeits to count as average ranks.
     """
     real_ranks = []
-    num_ranks = TabSettings.objects.get(key = 'cur_round').value - 1
-    debater_roundstats = debater.roundstats_set.all()
+    num_ranks = TabSettings.objects.get(key='cur_round').value - 1
+    debater_roundstats = debater.roundstats_set.select_related('round').all()
     team = deb_team(debater)
 
     ranks_per_round = defaultdict(list)
@@ -738,15 +737,15 @@ def avg_deb_ranks(debater):
     for roundstat in debater_roundstats:
         ranks_per_round[roundstat.round.round_number].append(roundstat)
 
-    for round_number in range(1, num_ranks + 1):
+    for round_number in xrange(1, num_ranks + 1):
         roundstats = ranks_per_round[round_number]
         if roundstats:
             ranks = [float(rs.ranks) for rs in roundstats]
             avg_ranks = sum(ranks) / float(len(roundstats))
             roundstat = roundstats[0]
-            if (won_by_forfeit(roundstat.round, team) or
-                forfeited_round(roundstat.round, team)):
+            if won_by_forfeit(roundstat.round, team) or forfeited_round(roundstat.round, team):
                 continue
+
             real_ranks.append(avg_ranks)
 
     if len(real_ranks) == 0:
@@ -788,16 +787,20 @@ def ranks_for_debater(debater, average_ironmen=True):
     for roundstat in debater_roundstats:
         ranks_per_round[roundstat.round.round_number].append(roundstat)
 
-    for round_number in range(1, num_ranks + 1):
+    for round_number in xrange(1, num_ranks + 1):
         roundstats = ranks_per_round[round_number]
-        if roundstats:
+        if len(roundstats) > 0:
             ranks = [float(rs.ranks) for rs in roundstats]
             avg_ranks = sum(ranks) / float(len(roundstats))
+
+            # check first round
             roundstat = roundstats[0]
             if won_by_forfeit(roundstat.round, team):
                 debater_ranks.append(avg_deb_ranks(debater))
+
             elif forfeited_round(roundstat.round, team):
                 debater_ranks.append(MAXIMUM_DEBATER_RANKS)
+
             else:
                 if average_ironmen:
                     debater_ranks.append(avg_ranks)
