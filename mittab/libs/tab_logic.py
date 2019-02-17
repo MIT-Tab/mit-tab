@@ -560,7 +560,9 @@ def team_score_except_record(team):
 
 def get_team_scores():
     return [TeamScores(t, team_score(t)) for t in
-            Team.objects.prefetch_related('debaters', 'debaters__roundstats_set').all()]
+            Team.objects.prefetch_related('debaters', 'debaters__roundstats_set',
+                                          'debaters__roundstats_set', 'debaters__roundstats_set__round',
+                                          'debaters__team_set__bye_set', 'debaters__team_set__noshow_set').all()]
 
 
 def rank_teams():
@@ -711,12 +713,12 @@ def debater_abnormal_round_speaks(debater, round_number):
 
 def single_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
-    return _single_adjust(sorted(debater_speaks))
+    return sum(_single_adjust(sorted(debater_speaks)))
 
 
 def double_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
-    return _double_adjust(sorted(debater_speaks))
+    return sum(_double_adjust(sorted(debater_speaks)))
 
 @cache()
 def tot_speaks_deb(debater, average_ironmen=True):
@@ -852,11 +854,11 @@ def debater_abnormal_round_ranks(debater, round_number):
 
 def single_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
-    return _single_adjust(sorted(debater_ranks))
+    return sum(_single_adjust(sorted(debater_ranks)))
 
 def double_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
-    return _double_adjust(sorted(debater_ranks))
+    return sum(_double_adjust(sorted(debater_ranks)))
 
 @cache()
 def tot_ranks_deb(debater, average_ironmen=True):
@@ -896,7 +898,8 @@ def debater_score(debater):
 
 def get_debater_scores():
     return [DebaterScores(d, debater_score(d)) for d in
-            Debater.objects.prefetch_related('roundstats_set', 'roundstats_set__round', 'team_set').all()]
+            Debater.objects.prefetch_related('roundstats_set', 'roundstats_set__round', 'team_set',
+                                             'team_set__bye_set', 'team_set__noshow_set').all()]
     # prefetch roundstats to save on ORM time
 
 

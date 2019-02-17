@@ -133,11 +133,11 @@ def rank_debaters(request):
     debater_scores = tab_logic.get_debater_scores()
     print('got debater information')
 
-    speakers = sorted(debater_scores, key=lambda d: d.create_scoring_tuple())
+    scores = sorted(debater_scores, key=lambda d: d.create_scoring_tuple())
     debaters = [(ds.speaker,
                  ds.tot_speaks,
                  ds.tot_ranks,
-                 tab_logic.deb_team(ds.speaker)) for ds in speakers]
+                 tab_logic.deb_team(ds.speaker)) for ds in scores]
     print('got the visualised speaks and ranks')
 
     # since removing entries has no effect on ordinal rank... just remove them
