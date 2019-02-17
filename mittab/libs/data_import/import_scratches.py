@@ -19,6 +19,7 @@
 # THE SOFTWARE.
 from __future__ import print_function
 import pandas as pd
+from django.db import IntegrityError
 
 from xlrd import XLRDError
 
@@ -85,6 +86,13 @@ def import_scratches(import_file):
             scratch = Scratch(team=team, judge=judge, scratch_type=clean_stype)
             scratch.save()
             print('saved scratch on {} by {}'.format(judge.name, team.name))
+
+        except IntegrityError:
+            # duplicated? skip
+            scratch_errors.append('could not save scratch on {} by team {},'
+                                  ' exists. skipped'.format(judge_name, team_name))
+            continue
+
         except Exception as e:
             scratch_errors.append('could not save scratch on {} by team {}, unknown err'.format(judge_name, team_name))
             print(e)
