@@ -70,22 +70,20 @@ def import_scratches(import_file):
             print(e)
             continue
 
-        try:  # try to find the team
+        try:
             team = Team.objects.get(name=team_name)
+            judge = Judge.objects.get(name=judge_name)
+            scratch = Scratch(team=team, judge=judge, scratch_type=clean_stype)
+            scratch.save()
+            print('saved scratch on {} by {}'.format(judge.name, team.name))
+
         except Team.DoesNotExist:
             scratch_errors.append('could not find team with name {}. skipped'.format(team_name))
             continue
 
-        try:  # try to find the judge
-            judge = Judge.objects.get(name=judge_name)
         except Judge.DoesNotExist:
             scratch_errors.append('could not find judge with name {}. skipped'.format(judge_name))
             continue
-
-        try:  # try to save the scratch
-            scratch = Scratch(team=team, judge=judge, scratch_type=clean_stype)
-            scratch.save()
-            print('saved scratch on {} by {}'.format(judge.name, team.name))
 
         except IntegrityError:
             # duplicated? skip
