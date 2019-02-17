@@ -636,7 +636,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 speaks
     num_speaks = TabSettings.objects.get(key="cur_round").value - 1
 
-    debater_roundstats = debater.roundstats_set.all()
+    debater_roundstats = debater.roundstats_set.select_related('round').all()
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -645,7 +645,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     for roundstat in debater_roundstats:
         speaks_per_round[roundstat.round.round_number].append(roundstat)
 
-    for round_number in range(1, num_speaks + 1):
+    for round_number in xrange(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
             # This is so if in the odd chance we get a debater paired in
@@ -657,15 +657,19 @@ def speaks_for_debater(debater, average_ironmen=True):
 
             speaks = [float(rs.speaks) for rs in roundstats]
             avg_speaks = sum(speaks) / float(len(roundstats))
+
             if won_by_forfeit(roundstat.round, team):
                 debater_speaks.append(avg_deb_speaks(debater))
+
             elif forfeited_round(roundstat.round, team):
                 debater_speaks.append(MINIMUM_DEBATER_SPEAKS)
+
             else:
                 if average_ironmen:
                     debater_speaks.append(avg_speaks)
                 else:
                     debater_speaks.extend(speaks)
+
         else:
             speaks = debater_abnormal_round_speaks(debater, round_number)
             if speaks is not None:
@@ -686,8 +690,8 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
-    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team)
+    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team).exists()
+    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team).exists()
     if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
@@ -775,7 +779,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 ranks
     num_ranks = TabSettings.objects.get(key="cur_round").value - 1
 
-    debater_roundstats = debater.roundstats_set.all()
+    debater_roundstats = debater.roundstats_set.select_related('round').all()
     debater_ranks = []
 
     ranks_per_round = defaultdict(list)
@@ -807,6 +811,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     debater_ranks = map(float, debater_ranks)
     return debater_ranks
 
+
 def debater_abnormal_round_ranks(debater, round_number):
     """
     Calculate the ranks for a bye/forfeit round
@@ -819,36 +824,36 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number,
-                                    bye_team=team)
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                        no_show_team=team)
+    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team).exists()
+    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team).exists()
+
     if had_bye or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
+
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS
 
 
 def single_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
-    debater_ranks.sort()
-    return sum(debater_ranks[1:-1])
+    return _single_adjust(sorted(debater_ranks))
 
 def double_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
-    debater_ranks.sort()
-    return sum(debater_ranks[2:-2])
+    return _double_adjust(sorted(debater_ranks))
 
 @cache()
 def tot_ranks_deb(debater, average_ironmen=True):
     debater_ranks = ranks_for_debater(debater, average_ironmen=average_ironmen)
     return sum(debater_ranks)
 
+
 def deb_team(d):
     try:
         return d.team_set.first()
-    except:
+    except Team.DoesNotExist:
         return None
+
 
 # Returns a tuple used for comparing two debaters
 # in terms of their overall standing in the tournament
@@ -874,7 +879,9 @@ def debater_score(debater):
 
 
 def get_debater_scores():
-    return [DebaterScores(d, debater_score(d)) for d in Debater.objects.all()]
+    return [DebaterScores(d, debater_score(d)) for d in
+            Debater.objects.prefetch_related('roundstats_set').all()]
+    # prefetch roundstats to save on ORM time
 
 
 def rank_speakers():
