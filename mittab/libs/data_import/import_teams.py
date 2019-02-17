@@ -59,6 +59,7 @@ def import_teams(import_file, using_overwrite=False):
         sh = xlrd.open_workbook(filename=None, file_contents=import_file.read()).sheet_by_index(0)
     except:
         return ['ERROR: Please upload an .xlsx file. This filetype is not compatible']
+
     num_teams = 0
     found_end = False
     team_errors = []
@@ -121,13 +122,12 @@ def import_teams(import_file, using_overwrite=False):
             team_school = School.objects.get(name__iexact=school_name)
 
         # check seeds, do check for multiple free seeds and report
-        # todo something about hybrid schools?
         team_seed = _translate_seed(team_name=team_name, seed=sh.cell(i, 2).value.strip().lower())
         school = Team.objects.get(name=team_name).school  # get school_name
-        if any([int(team.seed) == Team.FREE_SEED for team in list(school.team_set)]):  # multiple free seeds exist
-            team_errors.append('school ' + school.name + ' has more than one free seed.'
-                                                         ' assigned free seed to team ' + team_name)
+        if any(int(team.seed) == Team.FREE_SEED for team in school.team_set):  # multiple free seeds exist
+            team_errors.append('school ' + school.name + ' has more than one free seed. confirm this.')
 
+        # todo something about hybrid schools?
         deb1_name = sh.cell(i, 3).value.strip()
         deb1_status = _create_status(sh.cell(i, 4).value.lower())
         deb1, deb1_created = Debater.objects.get_or_create(name=deb1_name, novice_status=deb1_status)

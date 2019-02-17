@@ -67,7 +67,6 @@ def export_teams():
         debaters = team.debaters.all()
         deb1_name = debaters[0].name
         deb1_status = _vn_status_to_str(debaters[0].novice_status)  # 0 = Varsity, 1 = Novice
-        deb1_phone = debaters[0].phone
 
         sheet.write(row, 0, name)
         sheet.write(row, 1, school)
@@ -152,7 +151,7 @@ def export_rooms():
     # 0 name, 1 rank
     headers = ['room_name', 'room_rank']
     for i, header in enumerate(headers):
-        sheet.write(1, i, header)
+        sheet.write(0, i, header)
 
     for i, room in enumerate(Room.objects.all()):
         row = i + 1

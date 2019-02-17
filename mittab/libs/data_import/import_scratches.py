@@ -52,7 +52,7 @@ def import_scratches(import_file):
     if set(scratch_df.columns.values.tolist()) != required_columns:
         # checks whether the required columns are contained, if false, then...
         scratch_errors.append('missing columns, needed columns are {}'.format(required_columns))
-        return
+        return scratch_errors
 
     for i, row in scratch_df.iterrows():
         team_name = row['team_name']
