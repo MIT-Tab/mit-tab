@@ -220,8 +220,8 @@ def export_team_stats():
 
     headers = ['team_name', 'team_wins', 'team_speaks', 'team_ranks', 'team_speaks_single_adj',
                'team_ranks_single_adj', 'team_speaks_double_adj', 'team_ranks_double_adj', 'team_opp_str']
-    for i in xrange(len(headers)):
-        sheet.write(1, i, headers[i])
+    for i, header in enumerate(headers):
+        sheet.write(1, i, header)
 
     for i, team in enumerate(Team.objects.all()):
         row = i + 2
