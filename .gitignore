@@ -45,3 +45,7 @@ mittab/backups/
 
 # venv
 venv/
+
+# no idea/pycharm
+/.idea
+.idea

@@ -272,47 +272,48 @@ def view_scratches(request):
                               'title': "Viewing All Scratches for Teams",
                               'item_list':c_scratches}, context_instance=RequestContext(request))
 
+
 def upload_data(request):
     if request.method == 'POST':
-      form = UploadDataForm(request.POST, request.FILES)
-      if form.is_valid():
-        judge_errors = room_errors = team_errors = []
-        importName = ''
-        results = ''
+        form = UploadDataForm(request.POST, request.FILES)
+        if form.is_valid():
+            import_name = ''
+            results = ''
 
-        if 'team_file' in request.FILES:
-          team_errors = import_teams.import_teams(request.FILES['team_file'])
-          importName += request.FILES['team_file'].name + ' '
-          if len(team_errors) > 0:
-            results += 'Team Import Errors (Please Check These Manually):\n'
-            for e in team_errors:
-              results += '            ' + e + '\n'
-        if 'judge_file' in request.FILES:
-          judge_errors = import_judges.import_judges(request.FILES['judge_file'])
-          importName += request.FILES['judge_file'].name + ' '
-          if len(judge_errors) > 0:
-            results += 'Judge Import Errors (Please Check These Manually):\n'
-            for e in judge_errors:
-              results += '            ' + e + '\n'
-        if 'room_file' in request.FILES:
-          room_errors = import_rooms.import_rooms(request.FILES['room_file'])
-          importName += request.FILES['room_file'].name + ' '
-          if len(room_errors) > 0:
-            results += 'Room Import Errors (Please Check These Manually):\n'
-            for e in room_errors:
-              results += '            ' + e + '\n'
+            if 'team_file' in request.FILES:
+                team_errors = import_teams.import_teams(request.FILES['team_file'])
+                import_name += request.FILES['team_file'].name + ' '
+                if len(team_errors) > 0:
+                    results += 'Team Import Errors (Please Check These Manually):\n'
+                    for e in team_errors:
+                        results += '            ' + e + '\n'
 
-        return render_to_response('thanks.html', 
-                                 {'data_type': "Database data",
-                                  'data_name': importName,
-                                  'data_modification': "INPUT",
-                                  'results': True,
-                                  'data_results': results}, 
-                                  context_instance=RequestContext(request))
+            if 'judge_file' in request.FILES:
+                judge_errors = import_judges.import_judges(request.FILES['judge_file'])
+                import_name += request.FILES['judge_file'].name + ' '
+                if len(judge_errors) > 0:
+                    results += 'Judge Import Errors (Please Check These Manually):\n'
+                    for e in judge_errors:
+                        results += '            ' + e + '\n'
+
+            if 'room_file' in request.FILES:
+                room_errors = import_rooms.import_rooms(request.FILES['room_file'])
+                import_name += request.FILES['room_file'].name + ' '
+                if len(room_errors) > 0:
+                    results += 'Room Import Errors (Please Check These Manually):\n'
+                    for e in room_errors:
+                        results += '            ' + e + '\n'
+
+            return render_to_response('thanks.html',
+                                      {'data_type': "Database data",
+                                       'data_name': import_name,
+                                       'data_modification': "INPUT",
+                                       'results': True,
+                                       'data_results': results},
+                                      context_instance=RequestContext(request))
     else:
-      form = UploadDataForm()
-    return render_to_response('data_entry.html', 
+        form = UploadDataForm()
+    return render_to_response('data_entry.html',
                               {'form': form,
-                               'title': 'Upload Input Files'}, 
-                               context_instance=RequestContext(request))
-    
+                               'title': 'Upload Input Files'},
+                              context_instance=RequestContext(request))

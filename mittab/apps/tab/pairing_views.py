@@ -267,37 +267,45 @@ def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     return view_round(request, current_round_number)
 
-def view_round(request, round_number, errors = None):
-    if errors is None:
-        errors = []
+
+def view_round(request, round_number, errors=[]):
+    start_time = start_ms = int(round(time.time() * 1000))
+
     valid_pairing, byes = True, []
-    round_pairing = list(Round.objects.filter(round_number=round_number))
+    round_pairing = list(Round.objects.select_related('gov_team', 'opp_team')
+                         .prefetch_related('gov_team__debaters__roundstats_set',
+                                           'opp_team__debaters__roundstats_set',
+                                           'judges')
+                         .filter(round_number=round_number))
 
     random.seed(1337)
     random.shuffle(round_pairing)
-    round_pairing.sort(key = lambda x: tab_logic.team_comp(x, round_number),
-                       reverse = True)
+    round_pairing.sort(key=lambda x: tab_logic.team_comp(x, round_number),
+                       reverse=True)
 
-    #For the template since we can't pass in something nicer like a hash
+    # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 
-    paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
+    paired_teams = [p_round.gov_team for p_round in round_pairing] + [p_round.opp_team for p_round in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
     valid_pairing = len(round_pairing) >= n_over_two or round_number == 0
+
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
-            errors.append("%s was not in the pairing" % (present_team))
+            errors.append("%s was not in the pairing" % present_team)
             byes.append(present_team)
+
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
-    excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
-    non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
+
+    excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number=round_number)
+    non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number=round_number)
     available_rooms = Room.objects.exclude(round__round_number=round_number).exclude(rank=0)
     size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
-    judge_slots = [1,2,3]
+    judge_slots = [1, 2, 3]
 
     # A seemingly complex one liner to do a fairly simple thing
     # basically this generates the table that the HTML will display such that the output looks like:
@@ -306,11 +314,15 @@ def view_round(request, round_number, errors = None):
     # [ Team2][             CJudge2              ][                 Judge2               ]
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
-    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]))
+    excluded_people = zip(*map(lambda x: x+[""]*(size - len(x)), [list(byes), list(excluded_judges), list(non_checkins),
+                                                                  list(available_rooms)]))
+
+    end_time = int(round(time.time() * 1000))
+    print('took {} ms to render main pairings (ajax not included)'.format(end_time - start_time))
 
     return render_to_response('pairing_control.html',
-                               locals(),
-                               context_instance=RequestContext(request))
+                              locals(),
+                              context_instance=RequestContext(request))
 
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
