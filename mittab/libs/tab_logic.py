@@ -350,11 +350,14 @@ def pull_up_count(t):
             pullups += 1
     return pullups
 
+
 def num_opps(t):
-    return Round.objects.filter(opp_team=t).count()
+    return t.opp_team.count()
+
 
 def num_govs(t):
-    return Round.objects.filter(gov_team=t).count()
+    return t.gov_team.count()
+
 
 def had_bye(t):
     return Bye.objects.filter(bye_team=t).exists()
@@ -428,14 +431,19 @@ def team_wins_by_forfeit():
 
 # Calculate the total number of wins a team has
 def tot_wins(team):
-    win_count = Round.objects.filter(
-        Q(gov_team=team, victor=Round.GOV) |  # gov win
-        Q(opp_team=team, victor=Round.OPP) |  # opp win
-        Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT) |  # gov via forfeit
-        Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT) |  # opp via forfeit
-        Q(gov_team=team, victor=Round.ALL_WIN) |  # gov all win
-        Q(opp_team=team, victor=Round.ALL_WIN)  # opp all win
+    gov_wins = team.gov_team.filter(
+        Q(victor=Round.GOV) |  # gov win
+        Q(victor=Round.GOV_VIA_FORFEIT) |  # gov via forfeit
+        Q(victor=Round.ALL_WIN)  # gov all win
     ).count()
+
+    opp_wins = team.opp_team.filter(
+        Q(victor=Round.OPP) |  # opp win
+        Q(victor=Round.OPP_VIA_FORFEIT) |  # opp via forfeit
+        Q(victor=Round.ALL_WIN)  # opp all win
+    ).count()
+
+    win_count = gov_wins + opp_wins
     win_count += num_byes(team)
     return win_count
 
@@ -520,6 +528,7 @@ def all_nov_teams():
 # Return a list of all teams in the Database
 def all_teams():
     return list(Team.objects.all())
+
 
 def team_comp(pairing, round_number):
     gov, opp = pairing.gov_team, pairing.opp_team

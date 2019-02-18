@@ -388,16 +388,20 @@ def rank_teams(request):
 def team_stats(request, team_id):
     team_id = int(team_id)
     try:
-        team = Team.objects.get(pk=team_id)
-        stats = {}
-        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
-        stats["wins"] = tab_logic.tot_wins(team)
-        stats["total_speaks"] = tab_logic.tot_speaks(team)
-        stats["govs"] = tab_logic.num_govs(team)
-        stats["opps"] = tab_logic.num_opps(team)
-        data = {'success': True, 'result':stats}
+        team = Team.objects.prefetch_related('gov_team', 'opp_team', 'debaters__roundstats_set').get(pk=team_id)
+
+        stats = {
+            "seed": Team.get_seed_display(team).split(" ")[0],
+            "wins": tab_logic.tot_wins(team),
+            "total_speaks": tab_logic.tot_speaks(team),
+            "govs": tab_logic.num_govs(team),
+            "opps": tab_logic.num_opps(team)
+        }
+        data = {'success': True, 'result': stats}
+
     except Team.DoesNotExist:
         data = {'success': False}
+
     return JsonResponse(data)
 
 
