@@ -21,7 +21,7 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
     """
     def do_cache(f):
         def x(*args, **kwargs):
-            key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
+            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)).encode("utf-8")).hexdigest()
             result = _djcache.get(key)
             if result is None:
                 #print "busting cache"
@@ -32,7 +32,7 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
     return do_cache
 
 def invalidate(f):
-    key = sha1(str(f.__module__) + str(f.__name__) + str(args) + str(kwargs)).hexdigest()
+    key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)).encode("utf-8")).hexdigest()
     _djcache.delete(key)
 
 def clear_cache():
