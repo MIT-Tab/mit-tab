@@ -13,11 +13,11 @@ from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
 
-from .errors import *
-from .models import *
+from errors import *
+from models import *
 from mittab.libs.errors import *
 from django.shortcuts import redirect
-from .forms import ResultEntryForm, UploadBackupForm, score_panel, \
+from forms import ResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
@@ -161,7 +161,7 @@ def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == 'POST':
         panel_points, errors = [], []
-        potential_panel_points = [k for k in list(request.POST.keys()) if k.startswith('panel_')]
+        potential_panel_points = [k for k in request.POST.keys() if k.startswith('panel_')]
         for point in potential_panel_points:
            try:
                point = int(point.split("_")[1])
@@ -202,7 +202,7 @@ def view_backup(request, filename):
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def download_backup(request, filename):
-    print("Trying to download {}".format(filename))
+    print "Trying to download {}".format(filename)
     wrapper, size = backup.get_wrapped_file(filename)
     response = HttpResponse(wrapper, content_type='text/plain')
     response['Content-Length'] = size
@@ -256,7 +256,7 @@ def view_backups(request):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
-    print("Trying to restore %s" % filename)
+    print "Trying to restore %s" % filename
     backup.restore_from_backup(filename)
     return render_to_response('thanks.html',
                              {'data_type': "Restored from backup",
@@ -294,7 +294,7 @@ def view_round(request, round_number, errors = None):
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
     non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
     available_rooms = Room.objects.exclude(round__round_number=round_number).exclude(rank=0)
-    size = max(list(map(len, [excluded_judges, non_checkins, byes])))
+    size = max(map(len, [excluded_judges, non_checkins, byes]))
     # The minimum rank you want to warn on
     warning = 5
     judge_slots = [1,2,3]
@@ -306,7 +306,7 @@ def view_round(request, round_number, errors = None):
     # [ Team2][             CJudge2              ][                 Judge2               ]
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
-    excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
+    excluded_people = zip(*map( lambda x: x+[""]*(size-len(x)), [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]))
 
     return render_to_response('pairing_control.html',
                                locals(),
@@ -392,11 +392,11 @@ def pretty_pair(request, printable=False):
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
     team_count = len(paired_teams) + len(byes)
 
-    print("getting errors")
+    print "getting errors"
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             if present_team not in byes:
-                print("got error for", present_team)
+                print "got error for", present_team
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
@@ -499,7 +499,7 @@ def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None
 
     return render_to_response("round_entry.html",
                               {"form": form,
-                               "title": 'Entering Ballot for {}'.format(round_obj),
+                               "title": u'Entering Ballot for {}'.format(round_obj),
                                "gov_team": round_obj.gov_team,
                                "opp_team": round_obj.opp_team,
                                "ballot_code": ballot_code},
@@ -543,7 +543,7 @@ def enter_multiple_results(request, round_id, num_entered):
             all_good, error_msg = validate_panel(result)
             if all_good:
                 final_scores, final_winner = score_panel(result, "discard_minority" in request.POST)
-                print(final_scores)
+                print final_scores
                 for (debater, role, speaks, ranks) in final_scores:
                     RoundStats.objects.create(debater = debater,
                                               round = round_obj,
@@ -609,7 +609,7 @@ def clear_db():
         Team,
         School
     ]
-    list(map(delete_obj, obj_types))
+    map(delete_obj, obj_types)
 
 def delete_obj(obj_type):
     objs = obj_type.objects.all()

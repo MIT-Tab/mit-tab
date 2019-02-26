@@ -5,11 +5,11 @@ from django.core.management.base import BaseCommand
 from mittab.apps.tab.models import Round, TabSettings, RoundStats
 
 class Command(BaseCommand):
-    SPEAKS_RANGE = list(range(15, 35))
+    SPEAKS_RANGE = range(15, 35)
 
     def handle(self, *args, **options):
         cur_round = TabSettings.get("cur_round") - 1
-        print(("Simulating round %s..." % cur_round))
+        print("Simulating round %s..." % cur_round)
         rounds_to_simulate = Round.objects.filter(round_number=cur_round, victor=Round.NONE)
 
         for r in rounds_to_simulate:

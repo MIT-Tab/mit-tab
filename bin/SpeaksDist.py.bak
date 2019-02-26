@@ -33,7 +33,7 @@ def pearsonMedianSkew(dist):
     mean, med, s = np.mean(dist), np.median(dist), np.std(dist)
     return (3 * (mean - med)) / s
 
-print(('Speaks standard deviation: %.3f' % np.std(speaks_hist)))
-print(('Speaks Pearson skewness: %.3f' % pearsonMedianSkew(speaks_hist)))
+print('Speaks standard deviation: %.3f' % np.std(speaks_hist))
+print('Speaks Pearson skewness: %.3f' % pearsonMedianSkew(speaks_hist))
 print('Raw Data:')
 pprint.pprint(raw_data)

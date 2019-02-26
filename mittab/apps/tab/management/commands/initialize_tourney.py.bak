@@ -81,7 +81,7 @@ class Command(BaseCommand):
             os.makedirs(path + "/backups")
         except (IOError, os.error) as why:
             self.stdout.write("Failed to copy clean database to pairing_db.sqlite3")
-            print(why)
+            print why
             sys.exit(1)
 
         self.stdout.write("Done setting up tournament, after backing up old one. New tournament information:")

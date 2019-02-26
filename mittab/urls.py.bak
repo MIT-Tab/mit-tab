@@ -2,11 +2,11 @@ from django.views import i18n
 from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
-from . import apps.tab.views as views
-from . import apps.tab.judge_views as judge_views
-from . import apps.tab.team_views as team_views
-from . import apps.tab.debater_views as debater_views
-from . import apps.tab.pairing_views as pairing_views
+import apps.tab.views as views
+import apps.tab.judge_views as judge_views
+import apps.tab.team_views as team_views
+import apps.tab.debater_views as debater_views
+import apps.tab.pairing_views as pairing_views
 
 from django.contrib import admin
 admin.autodiscover()

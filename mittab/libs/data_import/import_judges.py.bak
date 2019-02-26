@@ -99,7 +99,7 @@ def import_judges(fileToImport):
         if (form.is_valid()):
             form.save()
         else:
-            error_messages = sum([ error[1] for error in list(form.errors.items()) ], [])
+            error_messages = sum([ error[1] for error in form.errors.items() ], [])
             error_string = ', '.join(error_messages)
             judge_errors.append("%s: %s" % (judge_name, error_string))
 

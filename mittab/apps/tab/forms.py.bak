@@ -8,7 +8,7 @@ from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-from .models import *
+from models import *
 from mittab.libs import errors
 
 class UploadBackupForm(forms.Form):
@@ -43,7 +43,7 @@ class JudgeForm(forms.ModelForm):
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 judge = kwargs['instance']
-                checkins = [c.round_number for c in CheckIn.objects.filter(judge=judge)]
+                checkins = map(lambda c: c.round_number, CheckIn.objects.filter(judge=judge))
                 for i in range(num_rounds):
                     self.fields['checkin_%s' % i] = forms.BooleanField(label ="Checked in for round %s?"%(i+1),
                                                                        initial = i+1 in checkins,
@@ -117,7 +117,7 @@ class DebaterForm(forms.ModelForm):
 
 def validate_speaks(value):
     if not (TabSettings.get("min_speak", 0) <= value <= TabSettings.get("max_speak", 50)):
-        raise ValidationError('%s is an entirely invalid speaker score, try again.' % value)
+        raise ValidationError(u'%s is an entirely invalid speaker score, try again.' % value)
 
 class ResultEntryForm(forms.Form):
 
@@ -236,7 +236,7 @@ class ResultEntryForm(forms.Form):
                 if self.deb_attr_val(deb, "debater", int) == -1:
                     self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
-        except Exception as e:
+        except Exception, e:
             errors.emit_current_exception()
             self.add_error("winner", self.error_class(["Non handled error, preventing data contamination"]))
             traceback.print_exc(file=sys.stdout)
@@ -335,8 +335,8 @@ class EBallotForm(ResultEntryForm):
                     msg = "Speaks must be justified to tab."
                     self._errors[key] = self.error_class([msg])
 
-        except Exception as e:
-            print(("Caught error %s" % e))
+        except Exception, e:
+            print("Caught error %s" % e)
             self._errors["winner"] = self.error_class(["Non handled error, preventing data contamination"])
 
         return super(EBallotForm, self).clean()
@@ -344,8 +344,8 @@ class EBallotForm(ResultEntryForm):
 
 def validate_panel(result):
     all_good = True
-    all_results = list(itertools.chain(*list(result.values())))
-    debater_roles = list(zip(*all_results))
+    all_results = list(itertools.chain(*result.values()))
+    debater_roles = zip(*all_results)
 
     # Check everyone is in the same position
     for debater in debater_roles:
@@ -355,8 +355,8 @@ def validate_panel(result):
             break
 
     # Check the winner makes sense
-    final_winner = max([(len(v), k) for k,v in result.items()])[1]
-    debater_roles = list(zip(*result[final_winner]))
+    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    debater_roles = zip(*result[final_winner])
     for debater in debater_roles:
         ds = [(d,rl) for (d,rl,s,r) in debater]
         if ((len(ds) != len(result[final_winner])) or
@@ -367,13 +367,13 @@ def validate_panel(result):
     return all_good, "Inconsistent Panel results, please check yourself"
 
 def score_panel(result, discard_minority):
-    final_winner = max([(len(v), k) for k,v in result.items()])[1]
-    debater_roles = list(zip(*result[final_winner]))
+    final_winner = max([(len(v), k) for k,v in result.iteritems()])[1]
+    debater_roles = zip(*result[final_winner])
 
     # Take all speaks and ranks even if they are a minority judge
     if not discard_minority:
-        all_results = list(itertools.chain(*list(result.values())))
-        debater_roles = list(zip(*all_results))
+        all_results = list(itertools.chain(*result.values()))
+        debater_roles = zip(*all_results)
 
     final_scores = []
     for debater in debater_roles:
@@ -394,7 +394,7 @@ def score_panel(result, discard_minority):
     ranked = [(d, rl, s, r+1)
               for (r, (d, rl, s, _)) in enumerate(ranked)]
 
-    print("Ranked Debaters")
+    print "Ranked Debaters"
     pprint.pprint(ranked)
 
     # Break any ties by taking the average of the tied ranks
@@ -409,18 +409,18 @@ def score_panel(result, discard_minority):
         else:
             ties[tie_key] = [(score_i, score[3])]
 
-    print("Ties")
+    print "Ties"
     pprint.pprint(ties)
 
     # Average over the tied ranks
-    for k, v in ties.items():
+    for k, v in ties.iteritems():
         if len(v) > 1:
             tied_ranks = [x[1] for x in v]
             avg = sum(tied_ranks) / float(len(tied_ranks))
             for i, _ in v:
                 fs = ranked[i]
                 ranked[i] = (fs[0], fs[1], fs[2], avg)
-    print("Final scores")
+    print "Final scores"
     pprint.pprint(ranked)
 
     return ranked, final_winner

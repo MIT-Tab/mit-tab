@@ -31,9 +31,9 @@ class Command(BaseCommand):
         else:
             percentiles = [0]*5
             mean, std = 0, 0
-        print("{0} ".format(header), end=' ')
-        print((("| %05.2f "*5) + "|") % tuple(percentiles),"|", end=' ')
-        print((("|  %05.2f  "*2) + "|") % (mean, std))
+        print "{0} ".format(header),
+        print (("| %05.2f "*5) + "|") % tuple(percentiles),"|",
+        print (("|  %05.2f  "*2) + "|") % (mean, std)
         return percentiles, mean, std
 
     def valid_speaks_for_round(self, round_number):
@@ -72,8 +72,8 @@ class Command(BaseCommand):
         return bracket_results
 
     def print_header(self, header):
-        print(header)
-        print("            |  min  |  25%  |  50%  |  75%  |  max  | | |   mean  | stddev |") 
+        print header
+        print "            |  min  |  25%  |  50%  |  75%  |  max  | | |   mean  | stddev |" 
 
     def handle(self, *args, **options):
         stats = {}
@@ -87,11 +87,11 @@ class Command(BaseCommand):
                 novice_speaks.append(float(speak.speaks))
 
         speaks = [float(rs.speaks) for rs in valid_speaks]
-        print("#" * 80)
-        print("Tournament Statistics:")
-        print("1) Number of teams: {0} competed out of {1} regged".format(*self.count_valid_teams()))
-        print("#" * 80)
-        print("Speaking Statistics:")
+        print "#" * 80
+        print "Tournament Statistics:"
+        print "1) Number of teams: {0} competed out of {1} regged".format(*self.count_valid_teams())
+        print "#" * 80
+        print "Speaking Statistics:"
         self.print_header("Speaking statistics for the entire tournament")
         stats["overall"] = {}
         stats["overall"]["Combined"] = self.speaks_stats(speaks,        "Combined  ")
@@ -121,13 +121,13 @@ class Command(BaseCommand):
             value = stats["round_5"][key]
             output += key + " Speaking Statistics in Round 5,min,25%,50%,75%,max,mean,stddev\n"
             rounds = []
-            for round_number, vvalue in value.items():
+            for round_number, vvalue in value.iteritems():
                 rounds.append((round_number, vvalue))
             rounds.sort()
             for round_number, vvalue in rounds:
                 output += round_number + "," + make_csv(vvalue) + "\n"
 
-        print(args)
+        print args
         if len(args) == 1:
             with open(args[0], 'w') as f:
                 f.write(output)

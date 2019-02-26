@@ -56,8 +56,8 @@ class Debater(models.Model):
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
-        (VARSITY, 'Varsity'),
-        (NOVICE, 'Novice'),
+        (VARSITY, u'Varsity'),
+        (NOVICE, u'Novice'),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
@@ -83,10 +83,10 @@ class Team(models.Model):
     HALF_SEED = 2
     FULL_SEED = 3
     SEED_CHOICES= (
-        (UNSEEDED, 'Unseeded'),
-        (FREE_SEED, 'Free Seed'),
-        (HALF_SEED, 'Half Seed'),
-        (FULL_SEED, 'Full Seed'),
+        (UNSEEDED, u'Unseeded'),
+        (FREE_SEED, u'Free Seed'),
+        (HALF_SEED, u'Half Seed'),
+        (FULL_SEED, u'Full Seed'),
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
@@ -138,8 +138,8 @@ class Scratch(models.Model):
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
-        (TEAM_SCRATCH, 'Team Scratch'),
-        (TAB_SCRATCH, 'Tab Scratch'),
+        (TEAM_SCRATCH, u'Team Scratch'),
+        (TAB_SCRATCH, u'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
     class Meta:
@@ -147,7 +147,7 @@ class Scratch(models.Model):
 
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
-        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
+        return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
 class Room(models.Model):
@@ -177,9 +177,9 @@ class Round(models.Model):
     GOV = 1
     OPP = 2
     PULLUP_CHOICES = (
-        (NONE, 'NONE'),
-        (GOV, 'GOV'),
-        (OPP, 'OPP'),
+        (NONE, u'NONE'),
+        (GOV, u'GOV'),
+        (OPP, u'OPP'),
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
     UNKNOWN = 0
@@ -188,13 +188,13 @@ class Round(models.Model):
     ALL_DROP = 5
     ALL_WIN = 6
     VICTOR_CHOICES = (
-        (UNKNOWN, 'UNKNOWN'),
-        (GOV, 'GOV'),
-        (OPP, 'OPP'),
-        (GOV_VIA_FORFEIT, 'GOV via Forfeit'),
-        (OPP_VIA_FORFEIT, 'OPP via Forfeit'),
-        (ALL_DROP, 'ALL DROP'),
-        (ALL_WIN, 'ALL WIN'),
+        (UNKNOWN, u'UNKNOWN'),
+        (GOV, u'GOV'),
+        (OPP, u'OPP'),
+        (GOV_VIA_FORFEIT, u'GOV via Forfeit'),
+        (OPP_VIA_FORFEIT, u'OPP via Forfeit'),
+        (ALL_DROP, u'ALL DROP'),
+        (ALL_WIN, u'ALL WIN'),
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -204,7 +204,7 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __unicode__(self):
-        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+        return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
     def save(self):
         no_shows = NoShow.objects.filter(
