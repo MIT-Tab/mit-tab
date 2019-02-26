@@ -3,11 +3,11 @@ from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect, \
         JsonResponse
 from django.contrib.auth.decorators import permission_required
-from .forms import JudgeForm, ScratchForm
+from mittab.apps.tab.forms import JudgeForm, ScratchForm
 #New Models based approach
-from .models import *
+from mittab.apps.tab.models import *
 from django.db import models
-from .errors import *
+from mittab.apps.tab.errors import *
 from mittab.libs.tab_logic import TabFlags
 
 

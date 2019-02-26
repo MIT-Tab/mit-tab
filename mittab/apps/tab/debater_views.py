@@ -2,9 +2,9 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from .forms import DebaterForm
-from .errors import *
-from .models import *
+from mittab.apps.tab.forms import DebaterForm
+from mittab.apps.tab.errors import *
+from mittab.apps.tab.models import *
 
 from mittab.libs import tab_logic, errors
 

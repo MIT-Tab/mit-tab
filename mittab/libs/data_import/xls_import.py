@@ -13,9 +13,7 @@ def sep():
 
 if __name__ == "__main__":
     setup_environ(settings)
-    from . import import_judges
-    from . import import_teams
-    from . import import_scratches
+    from mittab.libs.data_import import import_judges, import_teams, import_scratches
     print("Importing Judges")
     sep()
     try:

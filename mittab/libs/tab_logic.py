@@ -4,15 +4,13 @@ from django.db.models import *
 
 from collections import defaultdict
 import random
-from . import pairing_alg
-from . import assign_judges
-from . import errors
+from mittab.libs import pairing_alg, assign_judges, errors
 from decimal import *
 from datetime import datetime
 import pprint
 import itertools
 
-from .cache_logic import cache
+from mittab.libs.cache_logic import cache
 
 
 MAXIMUM_DEBATER_RANKS = 3.5

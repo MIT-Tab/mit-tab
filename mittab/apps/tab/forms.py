@@ -8,7 +8,7 @@ from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
-from .models import *
+from mittab.apps.tab.models import *
 from mittab.libs import errors
 
 class UploadBackupForm(forms.Form):

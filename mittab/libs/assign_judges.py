@@ -18,11 +18,9 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from . import tab_logic
+from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
-from . import mwmatching
 import random
-from . import errors
 import pprint
 
 def add_judges(pairings, judges, panel_points):

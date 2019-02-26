@@ -13,11 +13,11 @@ from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
 
-from .errors import *
-from .models import *
+from mittab.apps.tab.errors import *
+from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from django.shortcuts import redirect
-from .forms import ResultEntryForm, UploadBackupForm, score_panel, \
+from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic

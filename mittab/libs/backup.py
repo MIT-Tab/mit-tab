@@ -7,7 +7,7 @@ from mittab.apps.tab.models import TabSettings
 from django.conf import settings
 from wsgiref.util import FileWrapper
 from mittab.settings import BASE_DIR
-from . import errors
+from mittab.libs import errors
 
 
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")

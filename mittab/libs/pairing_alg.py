@@ -18,9 +18,8 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-from . import tab_logic
+from mittab.libs import tab_logic, mwmatching
 from mittab.apps.tab.models import *
-from . import mwmatching
 import random
 
 def perfect_pairing(list_of_teams):

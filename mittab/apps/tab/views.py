@@ -3,9 +3,9 @@ from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from .forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
+from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
-from .models import *
+from mittab.apps.tab.models import *
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams
 

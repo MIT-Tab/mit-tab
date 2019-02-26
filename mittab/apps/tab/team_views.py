@@ -5,9 +5,9 @@ from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
 
-from .forms import TeamForm, TeamEntryForm, ScratchForm
-from .errors import *
-from .models import *
+from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.apps.tab.errors import *
+from mittab.apps.tab.models import *
 import mittab.libs.tab_logic as tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 
