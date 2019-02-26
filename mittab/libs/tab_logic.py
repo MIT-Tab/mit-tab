@@ -4,7 +4,7 @@ from django.db.models import *
 
 from collections import defaultdict
 import random
-from mittab.libs import errors
+from mittab.libs import errors, mwmatching
 from decimal import *
 from datetime import datetime
 import pprint
@@ -957,7 +957,7 @@ def calc_weight(team_a,
         team_a_opt_ind - the position in the pairing of team_a_opt
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
-    
+
     # Get configuration values
     all_settings = dict([(ts.key, ts.value) for ts in TabSettings.objects.all()])
     def try_get(key, default= None):
@@ -974,45 +974,32 @@ def calc_weight(team_a,
     same_school_penalty = try_get("same_school_penalty", -1000)
     hit_pull_up_before = try_get("hit_pull_up_before", -10000)
     hit_team_before = try_get("hit_team_before", -100000)
-    
-    # Penalize for being far away from ideal power pairings
+
     if current_round == 1:
         wt = power_pairing_multiple * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))/2.0
     else:
         wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
-   
+
     half = int(tot_rounds / 2) + 1
-    # Penalize for both teams having n/2 + 1 opps, meaning we'll have to give
-    # a fifth opp to one of the teams
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
         wt += high_opp_penalty
 
-    # Penalize for both teams having n/2+2 opps, meaning we'll have to give
-    # a fourth opp to one of the teams
     if num_opps(team_a) >= half+1 and num_opps(team_b) >= half+1:
         wt += high_high_opp_penalty
-    
-    # Penalize for both teams having n/2 + 1 govs, meaning we'll have to give
-    # a fourth gov to one of the teams
+
     if num_govs(team_a) >= half and num_govs(team_b) >= half:
         wt += high_gov_penalty
-        
-    # Penalize for teams being from the same school
+
     if team_a.school == team_b.school:
         wt += same_school_penalty
-        
-    # Penalize for team hitting pull-up more than once
+
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
         wt += hit_pull_up_before
 
-    # Penalize for teams hitting each other before 
     if hit_before(team_a, team_b):
         wt += hit_team_before
-        
+
     return wt
-
-
-
 
 def determine_gov_opp(all_pairs):
     final_pairings = []
