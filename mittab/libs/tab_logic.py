@@ -4,7 +4,7 @@ from django.db.models import *
 
 from collections import defaultdict
 import random
-from mittab.libs import assign_judges, errors
+from mittab.libs import errors
 from decimal import *
 from datetime import datetime
 import pprint
