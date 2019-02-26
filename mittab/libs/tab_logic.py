@@ -4,7 +4,7 @@ from django.db.models import *
 
 from collections import defaultdict
 import random
-from mittab.libs import pairing_alg, assign_judges, errors
+from mittab.libs import assign_judges, errors
 from decimal import *
 from datetime import datetime
 import pprint
@@ -181,9 +181,9 @@ def pair_round():
     pairings = []
     for bracket in range(current_round):
         if current_round == 1:
-            temp = pairing_alg.perfect_pairing(list_of_teams)
+            temp = perfect_pairing(list_of_teams)
         else:
-            temp = pairing_alg.perfect_pairing(list_of_teams[bracket])
+            temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing round %i of size %i" % (bracket,len(temp)))
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
@@ -914,3 +914,119 @@ class TabFlags:
                         for flag in flat_flags
                         if TabFlags.translate_flag(flag, True)]
         return filters, symbol_text
+
+def perfect_pairing(list_of_teams):
+    """ Uses the mwmatching library to assign teams in a pairing """
+    graph_edges = []
+    for i in range(len(list_of_teams)):
+        for j in range(len(list_of_teams)):
+            if i > j:
+                wt = calc_weight(list_of_teams[i],
+                                 list_of_teams[j], i, j,
+                                 list_of_teams[len(list_of_teams) - i - 1],
+                                 list_of_teams[len(list_of_teams) - j - 1],
+                                 len(list_of_teams) - i - 1,
+                                 len(list_of_teams) - j - 1)
+                graph_edges += [(i,j,wt)]
+    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    all_pairs = []
+    for pair in pairings_num:
+        if pair < len(list_of_teams):
+            if [list_of_teams[pairings_num.index(pair)], list_of_teams[pair]] not in all_pairs and [list_of_teams[pair], list_of_teams[pairings_num.index(pair)]] not in all_pairs:
+                all_pairs +=[[list_of_teams[pairings_num.index(pair)], list_of_teams[pair]]]
+    return determine_gov_opp(all_pairs)
+
+def calc_weight(team_a,
+                team_b,
+                team_a_ind,
+                team_b_ind,
+                team_a_opt,
+                team_b_opt,
+                team_a_opt_ind,
+                team_b_opt_ind):
+    """ 
+    Calculate the penalty for a given pairing
+
+    Args:
+        team_a - the first team in the pairing
+        team_b - the second team in the pairing
+        team_a_ind - the position in the pairing of team_a
+        team_b_ind - the position in the pairing of team_b
+        team_a_opt - the optimal power paired team for team_a to be paired with
+        team_b_opt - the optimal power paired team for team_b to be paired with
+        team_a_opt_ind - the position in the pairing of team_a_opt
+        team_b_opt_ind - the position in the pairing of team_b_opt
+    """
+    
+    # Get configuration values
+    all_settings = dict([(ts.key, ts.value) for ts in TabSettings.objects.all()])
+    def try_get(key, default= None):
+        try:
+            return int(all_settings[key])
+        except:
+            return default
+    current_round = try_get("cur_round", 1)
+    tot_rounds = try_get("tot_rounds", 5)
+    power_pairing_multiple = try_get("power_pairing_multiple", -1)
+    high_opp_penalty = try_get("high_opp_penalty", 0)
+    high_gov_penalty = try_get("high_gov_penalty", -100)
+    high_high_opp_penalty = try_get("higher_opp_penalty", -10)
+    same_school_penalty = try_get("same_school_penalty", -1000)
+    hit_pull_up_before = try_get("hit_pull_up_before", -10000)
+    hit_team_before = try_get("hit_team_before", -100000)
+    
+    # Penalize for being far away from ideal power pairings
+    if current_round == 1:
+        wt = power_pairing_multiple * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))/2.0
+    else:
+        wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
+   
+    half = int(tot_rounds / 2) + 1
+    # Penalize for both teams having n/2 + 1 opps, meaning we'll have to give
+    # a fifth opp to one of the teams
+    if tab_logic.num_opps(team_a) >= half and tab_logic.num_opps(team_b) >= half:
+        wt += high_opp_penalty
+
+    # Penalize for both teams having n/2+2 opps, meaning we'll have to give
+    # a fourth opp to one of the teams
+    if tab_logic.num_opps(team_a) >= half+1 and tab_logic.num_opps(team_b) >= half+1:
+        wt += high_high_opp_penalty
+    
+    # Penalize for both teams having n/2 + 1 govs, meaning we'll have to give
+    # a fourth gov to one of the teams
+    if tab_logic.num_govs(team_a) >= half and tab_logic.num_govs(team_b) >= half:
+        wt += high_gov_penalty
+        
+    # Penalize for teams being from the same school
+    if team_a.school == team_b.school:
+        wt += same_school_penalty
+        
+    # Penalize for team hitting pull-up more than once
+    if (tab_logic.hit_pull_up(team_a) and tab_logic.tot_wins(team_b) < tab_logic.tot_wins(team_a)) or (tab_logic.hit_pull_up(team_b) and tab_logic.tot_wins(team_a) < tab_logic.tot_wins(team_b)):
+        wt += hit_pull_up_before
+
+    # Penalize for teams hitting each other before 
+    if tab_logic.hit_before(team_a, team_b):
+        wt += hit_team_before
+        
+    return wt
+
+
+
+
+def determine_gov_opp(all_pairs):
+    final_pairings = []
+    for p in all_pairs:
+        if tab_logic.num_govs(p[0]) < tab_logic.num_govs(p[1]): #p[0] should be gov
+            final_pairings +=[[p[0],p[1]]]
+        elif tab_logic.num_govs(p[1]) < tab_logic.num_govs(p[0]): #p[1] should be gov
+            final_pairings +=[[p[1],p[0]]]
+        elif tab_logic.num_opps(p[0]) < tab_logic.num_opps(p[1]): #p[1] should be gov
+            final_pairings +=[[p[1],p[0]]]
+        elif tab_logic.num_opps(p[1]) < tab_logic.num_opps(p[0]): #p[0] should be gov
+            final_pairings +=[[p[0],p[1]]]
+        elif random.randint(0,1) == 0:
+            final_pairings +=[[p[0],p[1]]]
+        else:
+            final_pairings +=[[p[1],p[0]]]
+    return final_pairings
