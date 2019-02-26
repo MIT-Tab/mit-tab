@@ -984,17 +984,17 @@ def calc_weight(team_a,
     half = int(tot_rounds / 2) + 1
     # Penalize for both teams having n/2 + 1 opps, meaning we'll have to give
     # a fifth opp to one of the teams
-    if tab_logic.num_opps(team_a) >= half and tab_logic.num_opps(team_b) >= half:
+    if num_opps(team_a) >= half and num_opps(team_b) >= half:
         wt += high_opp_penalty
 
     # Penalize for both teams having n/2+2 opps, meaning we'll have to give
     # a fourth opp to one of the teams
-    if tab_logic.num_opps(team_a) >= half+1 and tab_logic.num_opps(team_b) >= half+1:
+    if num_opps(team_a) >= half+1 and num_opps(team_b) >= half+1:
         wt += high_high_opp_penalty
     
     # Penalize for both teams having n/2 + 1 govs, meaning we'll have to give
     # a fourth gov to one of the teams
-    if tab_logic.num_govs(team_a) >= half and tab_logic.num_govs(team_b) >= half:
+    if num_govs(team_a) >= half and num_govs(team_b) >= half:
         wt += high_gov_penalty
         
     # Penalize for teams being from the same school
@@ -1002,11 +1002,11 @@ def calc_weight(team_a,
         wt += same_school_penalty
         
     # Penalize for team hitting pull-up more than once
-    if (tab_logic.hit_pull_up(team_a) and tab_logic.tot_wins(team_b) < tab_logic.tot_wins(team_a)) or (tab_logic.hit_pull_up(team_b) and tab_logic.tot_wins(team_a) < tab_logic.tot_wins(team_b)):
+    if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
         wt += hit_pull_up_before
 
     # Penalize for teams hitting each other before 
-    if tab_logic.hit_before(team_a, team_b):
+    if hit_before(team_a, team_b):
         wt += hit_team_before
         
     return wt
@@ -1017,13 +1017,13 @@ def calc_weight(team_a,
 def determine_gov_opp(all_pairs):
     final_pairings = []
     for p in all_pairs:
-        if tab_logic.num_govs(p[0]) < tab_logic.num_govs(p[1]): #p[0] should be gov
+        if num_govs(p[0]) < num_govs(p[1]): #p[0] should be gov
             final_pairings +=[[p[0],p[1]]]
-        elif tab_logic.num_govs(p[1]) < tab_logic.num_govs(p[0]): #p[1] should be gov
+        elif num_govs(p[1]) < num_govs(p[0]): #p[1] should be gov
             final_pairings +=[[p[1],p[0]]]
-        elif tab_logic.num_opps(p[0]) < tab_logic.num_opps(p[1]): #p[1] should be gov
+        elif num_opps(p[0]) < num_opps(p[1]): #p[1] should be gov
             final_pairings +=[[p[1],p[0]]]
-        elif tab_logic.num_opps(p[1]) < tab_logic.num_opps(p[0]): #p[0] should be gov
+        elif num_opps(p[1]) < num_opps(p[0]): #p[0] should be gov
             final_pairings +=[[p[0],p[1]]]
         elif random.randint(0,1) == 0:
             final_pairings +=[[p[0],p[1]]]
