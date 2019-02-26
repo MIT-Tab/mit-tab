@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import find_packages
-from setuptools import setup
+from distutils.core import setup
 
 setup(
     name='mittab',
@@ -10,7 +9,6 @@ setup(
     author='Joseph Lynch',
     author_email='jolynch@mit.edu',
     url='https://github.com/jolynch/mit-tab.git',
-    packages=find_packages(exclude=['tests']),
     include_package_data=True,
     setup_requires=['setuptools'],
     license='MIT License'
