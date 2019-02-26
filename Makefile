@@ -13,6 +13,7 @@ web:
 tests: test
 
 test:
+	python setup.py install
 	./bin/setup testpassword
 	python manage.py test
 

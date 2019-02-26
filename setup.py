@@ -13,15 +13,5 @@ setup(
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
     setup_requires=['setuptools'],
-    install_requires=[
-        'Django==1.7',
-        'mock',
-        'pytest',
-        'xlrd',
-        'xlwt'
-    ],
-    extras_require = {
-        'Statistical Analysis': ['numpy'],
-    },
     license='MIT License'
 )
