@@ -15,6 +15,9 @@ class TabSettings(models.Model):
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
 
+    def __str__(self):
+        return "%s => %s" % (self.key,self.value)
+
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -36,7 +39,11 @@ class TabSettings(models.Model):
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique = True)
+
     def __unicode__(self):
+        return self.name
+
+    def __str__(self):
         return self.name
 
     def delete(self):
@@ -91,6 +98,9 @@ class Team(models.Model):
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.name
+
     def __unicode__(self):
         return self.name
 
@@ -123,6 +133,9 @@ class Judge(models.Model):
     def is_checked_in_for_round(self, round_number):
         return CheckIn.objects.filter(judge=self, round_number=round_number).exists()
 
+    def __str__(self):
+        return self.name
+
     def __unicode__(self):
         return self.name
 
@@ -145,6 +158,11 @@ class Scratch(models.Model):
     class Meta:
         verbose_name_plural = "scratches"
 
+    def __str__(self):
+        s_type = ("Team","Tab")[self.scratch_type]
+        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
+
+
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
         return '{} <={}=> {}'.format(self.team, s_type, self.judge)
@@ -153,6 +171,9 @@ class Scratch(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+
+    def __str__(self):
+        return self.name
 
     def __unicode__(self):
         return self.name
@@ -203,6 +224,9 @@ class Round(models.Model):
         if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
+    def __str__(self):
+        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+
     def __unicode__(self):
         return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
@@ -226,6 +250,9 @@ class Bye(models.Model):
    bye_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
 
+   def __str__(self):
+      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+
    def __unicode__(self):
       return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
 
@@ -233,6 +260,9 @@ class NoShow(models.Model):
    no_show_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
    lenient_late = models.BooleanField(default=False)
+
+   def __str__(self):
+      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
 
    def __unicode__(self):
       return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
@@ -248,11 +278,18 @@ class RoundStats(models.Model):
     class Meta:
         verbose_name_plural = "round stats"
 
+    def __str__(self):
+        return "Results for %s in round %s" % (self.debater, self.round.round_number)
+
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
 
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
     round_number = models.IntegerField()
+
+    def __str__(self):
+        return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
+
     def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
