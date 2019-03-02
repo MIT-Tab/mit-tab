@@ -104,9 +104,6 @@ def pair_round():
             bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
 
-        print("these are the teams before pullups")
-        print(pprint.pprint(list_of_teams))
-
         # Correct for brackets with odd numbers of teams
         #  1) If we are in the bottom bracket, give someone a bye
         #  2) If we are in 1-up bracket and there are no all down
@@ -165,13 +162,9 @@ def pair_round():
                             removed_teams += [t]
                             list_of_teams[bracket].remove(t)
                     list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
-                    print("list of teams in " + str(bracket) + " except removed")
-                    print(list_of_teams[bracket])
                     for t in removed_teams:
                         list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
 
-    print("these are the teams after pullups")
-    print(pprint.pprint(list_of_teams))
     if current_round > 1:
         for i in range(len(list_of_teams)):
             print("Bracket %i has %i teams" % (i, len(list_of_teams[i])))
@@ -198,9 +191,7 @@ def pair_round():
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
-        print(sorted_teams)
         print("pairings")
-        print(pairings)
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
     # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
