@@ -114,13 +114,13 @@ def rank_debaters_ajax(request):
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
-                 tab_logic.tot_speaks_deb(s), 
-                 tab_logic.tot_ranks_deb(s), 
+                 tab_logic.tot_speaks_deb(s),
+                 tab_logic.tot_ranks_deb(s),
                  tab_logic.deb_team(s)) for s in speakers]
 
     nov_speakers = tab_logic.rank_nov_speakers()
     nov_debaters = [(s,
-                     tab_logic.tot_speaks_deb(s), 
+                     tab_logic.tot_speaks_deb(s),
                      tab_logic.tot_ranks_deb(s),
                      tab_logic.deb_team(s)) for s in nov_speakers]
 

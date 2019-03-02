@@ -8,13 +8,13 @@ from django.core.exceptions import ValidationError
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
-    
+
     class Meta:
         verbose_name_plural = "tab settings"
 
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-    
+
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -50,9 +50,6 @@ class School(models.Model):
 
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique = True)
-    #team_set is created by Team in the ManyToMany
-    #team = models.ForeignKey('Team')
-    #0 = Varsity, 1 = Novice
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -61,6 +58,9 @@ class Debater(models.Model):
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
+    def __str__(self):
+        return self.name
+
     def __unicode__(self):
         return self.name
 
@@ -68,7 +68,7 @@ class Debater(models.Model):
         teams = Team.objects.filter(debaters = self)
         if len(teams) == 0:
             super(Debater, self).delete()
-        else :
+        else:
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
 
 class Team(models.Model):
