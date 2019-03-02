@@ -101,7 +101,7 @@ def pair_round():
             wins = tot_wins(team)
             print(("Pairing %s into the middle of the %s-win bracket" % (team, wins)))
             bracket_size = len(list_of_teams[wins])
-            bracket_middle = bracket_size / 2
+            bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
 
         print("these are the teams before pullups")
@@ -980,7 +980,7 @@ def calc_weight(team_a,
     else:
         wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
 
-    half = int(tot_rounds / 2) + 1
+    half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
         wt += high_opp_penalty
 
