@@ -91,6 +91,7 @@ urlpatterns = [
     url(r'^pairing/confirm_start_tourny/$', pairing_views.confirm_start_new_tourny),
     url(r'^pairing/start_tourny/$', pairing_views.start_new_tourny),
     url(r'^pairings/pairinglist/$', pairing_views.pretty_pair),
+    url(r'^pairings/missing_ballots/$', pairing_views.missing_ballots),
     url(r'^pairings/pairinglist/printable/$', pairing_views.pretty_pair_print),
     url(r'^pairing/backup/$', pairing_views.manual_backup),
     url(r'^pairing/release/$', pairing_views.toggle_pairing_released),
