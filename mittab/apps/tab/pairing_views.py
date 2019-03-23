@@ -408,7 +408,7 @@ def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.filter(victor=Round.NONE, round_number=round_number)
     # need to do this to not reveal brackets
-    sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
+    rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     return render_to_response('missing_ballots.html', locals(),
             context_instance=RequestContext(request))
