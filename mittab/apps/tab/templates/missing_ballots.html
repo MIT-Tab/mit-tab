@@ -18,13 +18,12 @@
     {% endfor %}
     </ul>
 
+    <script>
+      window.setTimeout(function() { location.reload(true) }, 30000);
+    </script>
   {% else %}
     <h3>All ballots entered!</h3>
   {% endif %}
-
-  <script>
-    window.setTimeout(function() { location.reload(true) }, 30000);
-  </script>
 {% else %}
   <h3>Pairing not released</h3>
 {% endif %}
