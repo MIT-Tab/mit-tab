@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Missing Ballots{% endblock %}
+
+{% block banner %} {{title}} {% endblock %}
+
+{% block content %}
+
+{% if pairing_exists %}
+  {% if rounds %}
+    <h3>Missing Ballots:</h3>
+    <small>This list will refresh every 30 seconds</small>
+    <ul class="missing-rounds">
+    {% for r in rounds %}
+    <li class="missing-round-item">
+      <b>{{r.chair.name}}</b> (round between {{r.gov_team.name}} and {{r.opp_team.name}})
+    </li>
+    {% endfor %}
+    </ul>
+
+    <script>
+      window.setTimeout(function() { location.reload(true) }, 30000);
+    </script>
+  {% else %}
+    <h3>All ballots entered!</h3>
+  {% endif %}
+{% else %}
+  <h3>Pairing not released</h3>
+{% endif %}
+{% endblock %}

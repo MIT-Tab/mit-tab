@@ -2,9 +2,9 @@ from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from forms import DebaterForm
-from errors import *
-from models import *
+from mittab.apps.tab.forms import DebaterForm
+from mittab.apps.tab.errors import *
+from mittab.apps.tab.models import *
 
 from mittab.libs import tab_logic, errors
 
@@ -68,7 +68,7 @@ def delete_debater(request, debater_id):
         d.delete()
     except Debater.DoesNotExist:
         error_msg = "Can't delete a non-existent debater"
-    except Exception, e:
+    except Exception as e:
         errors.emit_current_exception()
         error_msg = str(e)
     if error_msg:
@@ -114,13 +114,13 @@ def rank_debaters_ajax(request):
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
     debaters = [(s,
-                 tab_logic.tot_speaks_deb(s), 
-                 tab_logic.tot_ranks_deb(s), 
+                 tab_logic.tot_speaks_deb(s),
+                 tab_logic.tot_ranks_deb(s),
                  tab_logic.deb_team(s)) for s in speakers]
 
     nov_speakers = tab_logic.rank_nov_speakers()
     nov_debaters = [(s,
-                     tab_logic.tot_speaks_deb(s), 
+                     tab_logic.tot_speaks_deb(s),
                      tab_logic.tot_ranks_deb(s),
                      tab_logic.deb_team(s)) for s in nov_speakers]
 

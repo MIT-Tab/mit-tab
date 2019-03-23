@@ -3,11 +3,11 @@ from django.template import RequestContext
 from django.http import Http404,HttpResponse,HttpResponseRedirect, \
         JsonResponse
 from django.contrib.auth.decorators import permission_required
-from forms import JudgeForm, ScratchForm
+from mittab.apps.tab.forms import JudgeForm, ScratchForm
 #New Models based approach
-from models import *
+from mittab.apps.tab.models import *
 from django.db import models
-from errors import *
+from mittab.apps.tab.errors import *
 from mittab.libs.tab_logic import TabFlags
 
 
@@ -44,7 +44,7 @@ def view_judges(request):
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    print filters
+    print(filters)
     return render_to_response('list_data.html', 
                               {
                                   'item_type':'judge',
@@ -91,11 +91,11 @@ def view_judge(request, judge_id):
         base_url = '/judge/'+str(judge_id)+'/'
         scratch_url = base_url + 'scratches/view/'
         delete_url =  base_url + 'delete/'
-        links = [(scratch_url, u'Scratches for {}'.format(judge.name), False)]
+        links = [(scratch_url, 'Scratches for {}'.format(judge.name), False)]
         return render_to_response('data_entry.html', 
                                  {'form': form,
                                   'links': links,
-                                  'title': u'Viewing Judge: {}'.format(judge.name)},
+                                  'title': 'Viewing Judge: {}'.format(judge.name)},
                                   context_instance=RequestContext(request))
 
 def enter_judge(request):
@@ -108,7 +108,7 @@ def enter_judge(request):
                 cd = form.cleaned_data
                 return render_to_response('error.html',
                                          {'error_type': "Judge",
-                                          'error_name': u'[{}]'.format(cd['name']),
+                                          'error_name': '[{}]'.format(cd['name']),
                                           'error_info': "Judge Cannot Validate!"},
                                           context_instance=RequestContext(request))
             return render_to_response('thanks.html',
@@ -180,7 +180,7 @@ def add_scratches(request, judge_id, number_scratches):
     else:
         forms = [ScratchForm(prefix=str(i), initial={'judge':judge_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
     return render_to_response('data_entry_multiple.html', 
-                             {'forms': zip(forms,[None]*len(forms)),
+                             {'forms': list(zip(forms,[None]*len(forms))),
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(judge.name)}, 
                               context_instance=RequestContext(request))
@@ -215,7 +215,7 @@ def view_scratches(request, judge_id):
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
     return render_to_response('data_entry_multiple.html',
-                             {'forms': zip(forms,delete_links),
+                             {'forms': list(zip(forms,delete_links)),
                               'data_type':'Scratch',
                               'links':links,
                               'title':"Viewing Scratch Information for %s"%(judge.name)}, 
@@ -224,7 +224,7 @@ def view_scratches(request, judge_id):
 def batch_checkin(request):
     judges_and_checkins = []
 
-    round_numbers = list(map(lambda i: i+1, range(TabSettings.get("tot_rounds"))))
+    round_numbers = list([i+1 for i in range(TabSettings.get("tot_rounds"))])
     for judge in Judge.objects.order_by('name'):
         checkins = []
         for round_number in round_numbers:

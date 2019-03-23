@@ -4,15 +4,13 @@ from django.db.models import *
 
 from collections import defaultdict
 import random
-import pairing_alg
-import assign_judges
-import errors
+from mittab.libs import errors, mwmatching
 from decimal import *
 from datetime import datetime
 import pprint
 import itertools
 
-from cache_logic import cache
+from mittab.libs.cache_logic import cache
 
 
 MAXIMUM_DEBATER_RANKS = 3.5
@@ -70,10 +68,10 @@ def pair_round():
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
             if TabSettings.get('fair_bye', 1) == 0:
-                print "Bye: using only unseeded teams"
+                print("Bye: using only unseeded teams")
                 possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
             else:
-                print "Bye: using all teams"
+                print("Bye: using all teams")
                 possible_teams = list_of_teams
             bye_team = random.choice(possible_teams)
             b = Bye(bye_team=bye_team, round_number=current_round)
@@ -91,7 +89,7 @@ def pair_round():
         #       forfeit/bye/lenient_late in every round because they have no speaks
         middle_of_bracket = middle_of_bracket_teams()
         all_checked_in_teams = Team.objects.filter(checked_in=True)
-        normal_pairing_teams = all_checked_in_teams.exclude(pk__in=map(lambda t: t.id, middle_of_bracket))
+        normal_pairing_teams = all_checked_in_teams.exclude(pk__in=[t.id for t in middle_of_bracket])
 
         team_buckets = [ (tot_wins(team), team) for team in normal_pairing_teams ]
         list_of_teams = [rank_teams_except_record([team
@@ -101,13 +99,10 @@ def pair_round():
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print("Pairing %s into the middle of the %s-win bracket" % (team, wins))
+            print(("Pairing %s into the middle of the %s-win bracket" % (team, wins)))
             bracket_size = len(list_of_teams[wins])
-            bracket_middle = bracket_size / 2
+            bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
-
-        print "these are the teams before pullups"
-        print pprint.pprint(list_of_teams)
 
         # Correct for brackets with odd numbers of teams
         #  1) If we are in the bottom bracket, give someone a bye
@@ -116,7 +111,7 @@ def pair_round():
         #  FIXME: Do we need to do special logic for smaller brackets? - (julia) I need to make the logic more general to deal
         # with if there are no teams in the all down or up one bracket. See Issue 4
         #  3) Otherwise, find a pull up from the next bracket
-        for bracket in reversed(range(current_round)):
+        for bracket in reversed(list(range(current_round))):
             if len(list_of_teams[bracket]) % 2 != 0:
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
@@ -148,9 +143,7 @@ def pair_round():
                     # try to pull-up the lowest-ranked team that hasn't been
                     # pulled-up. Fall-back to the lowest-ranked team if all have
                     # been pulled-up
-                    not_pulled_up_teams = filter(
-                            lambda t: t not in teams_been_pulled_up,
-                            list_of_teams[bracket-1])
+                    not_pulled_up_teams = [t for t in list_of_teams[bracket-1] if t not in teams_been_pulled_up]
                     if len(not_pulled_up_teams) > 0:
                         pull_up = not_pulled_up_teams[-1]
                     else:
@@ -169,26 +162,22 @@ def pair_round():
                             removed_teams += [t]
                             list_of_teams[bracket].remove(t)
                     list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
-                    print "list of teams in " + str(bracket) + " except removed"
-                    print list_of_teams[bracket]
                     for t in removed_teams:
                         list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
 
-    print "these are the teams after pullups"
-    print pprint.pprint(list_of_teams)
     if current_round > 1:
         for i in range(len(list_of_teams)):
-            print "Bracket %i has %i teams" % (i, len(list_of_teams[i]))
+            print("Bracket %i has %i teams" % (i, len(list_of_teams[i])))
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
     pairings = []
     for bracket in range(current_round):
         if current_round == 1:
-            temp = pairing_alg.perfect_pairing(list_of_teams)
+            temp = perfect_pairing(list_of_teams)
         else:
-            temp = pairing_alg.perfect_pairing(list_of_teams[bracket])
-            print "Pairing round %i of size %i" % (bracket,len(temp))
+            temp = perfect_pairing(list_of_teams[bracket])
+            print("Pairing round %i of size %i" % (bracket,len(temp)))
         for pair in temp:
             pairings.append([pair[0],pair[1],[None],[None]])
 
@@ -202,9 +191,7 @@ def pair_round():
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = rank_teams()
-        print sorted_teams
-        print "pairings"
-        print pairings
+        print("pairings")
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
     # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
@@ -657,7 +644,7 @@ def speaks_for_debater(debater, average_ironmen=True):
             if speaks is not None:
                 debater_speaks.append(speaks)
 
-    debater_speaks = map(float, debater_speaks)
+    debater_speaks = list(map(float, debater_speaks))
     return debater_speaks
 
 def debater_abnormal_round_speaks(debater, round_number):
@@ -791,7 +778,7 @@ def ranks_for_debater(debater, average_ironmen=True):
             if ranks is not None:
                 debater_ranks.append(ranks)
 
-    debater_ranks = map(float, debater_ranks)
+    debater_ranks = list(map(float, debater_ranks))
     return debater_ranks
 
 def debater_abnormal_round_ranks(debater, round_number):
@@ -850,7 +837,6 @@ def debater_score(debater):
                   double_adjusted_ranks_deb(debater))
     except Exception:
         errors.emit_current_exception()
-    print "finished scoring {}".format(debater)
     return score
 
 def rank_speakers():
@@ -918,3 +904,106 @@ class TabFlags:
                         for flag in flat_flags
                         if TabFlags.translate_flag(flag, True)]
         return filters, symbol_text
+
+def perfect_pairing(list_of_teams):
+    """ Uses the mwmatching library to assign teams in a pairing """
+    graph_edges = []
+    for i in range(len(list_of_teams)):
+        for j in range(len(list_of_teams)):
+            if i > j:
+                wt = calc_weight(list_of_teams[i],
+                                 list_of_teams[j], i, j,
+                                 list_of_teams[len(list_of_teams) - i - 1],
+                                 list_of_teams[len(list_of_teams) - j - 1],
+                                 len(list_of_teams) - i - 1,
+                                 len(list_of_teams) - j - 1)
+                graph_edges += [(i,j,wt)]
+    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    all_pairs = []
+    for pair in pairings_num:
+        if pair < len(list_of_teams):
+            if [list_of_teams[pairings_num.index(pair)], list_of_teams[pair]] not in all_pairs and [list_of_teams[pair], list_of_teams[pairings_num.index(pair)]] not in all_pairs:
+                all_pairs +=[[list_of_teams[pairings_num.index(pair)], list_of_teams[pair]]]
+    return determine_gov_opp(all_pairs)
+
+def calc_weight(team_a,
+                team_b,
+                team_a_ind,
+                team_b_ind,
+                team_a_opt,
+                team_b_opt,
+                team_a_opt_ind,
+                team_b_opt_ind):
+    """ 
+    Calculate the penalty for a given pairing
+
+    Args:
+        team_a - the first team in the pairing
+        team_b - the second team in the pairing
+        team_a_ind - the position in the pairing of team_a
+        team_b_ind - the position in the pairing of team_b
+        team_a_opt - the optimal power paired team for team_a to be paired with
+        team_b_opt - the optimal power paired team for team_b to be paired with
+        team_a_opt_ind - the position in the pairing of team_a_opt
+        team_b_opt_ind - the position in the pairing of team_b_opt
+    """
+
+    # Get configuration values
+    all_settings = dict([(ts.key, ts.value) for ts in TabSettings.objects.all()])
+    def try_get(key, default= None):
+        try:
+            return int(all_settings[key])
+        except:
+            return default
+    current_round = try_get("cur_round", 1)
+    tot_rounds = try_get("tot_rounds", 5)
+    power_pairing_multiple = try_get("power_pairing_multiple", -1)
+    high_opp_penalty = try_get("high_opp_penalty", 0)
+    high_gov_penalty = try_get("high_gov_penalty", -100)
+    high_high_opp_penalty = try_get("higher_opp_penalty", -10)
+    same_school_penalty = try_get("same_school_penalty", -1000)
+    hit_pull_up_before = try_get("hit_pull_up_before", -10000)
+    hit_team_before = try_get("hit_team_before", -100000)
+
+    if current_round == 1:
+        wt = power_pairing_multiple * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))/2.0
+    else:
+        wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))/2.0
+
+    half = int(tot_rounds // 2) + 1
+    if num_opps(team_a) >= half and num_opps(team_b) >= half:
+        wt += high_opp_penalty
+
+    if num_opps(team_a) >= half+1 and num_opps(team_b) >= half+1:
+        wt += high_high_opp_penalty
+
+    if num_govs(team_a) >= half and num_govs(team_b) >= half:
+        wt += high_gov_penalty
+
+    if team_a.school == team_b.school:
+        wt += same_school_penalty
+
+    if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
+        wt += hit_pull_up_before
+
+    if hit_before(team_a, team_b):
+        wt += hit_team_before
+
+    return wt
+
+def determine_gov_opp(all_pairs):
+    final_pairings = []
+    for p in all_pairs:
+        if num_govs(p[0]) < num_govs(p[1]): #p[0] should be gov
+            final_pairings +=[[p[0],p[1]]]
+        elif num_govs(p[1]) < num_govs(p[0]): #p[1] should be gov
+            final_pairings +=[[p[1],p[0]]]
+        elif num_opps(p[0]) < num_opps(p[1]): #p[1] should be gov
+            final_pairings +=[[p[1],p[0]]]
+        elif num_opps(p[1]) < num_opps(p[0]): #p[0] should be gov
+            final_pairings +=[[p[0],p[1]]]
+        elif random.randint(0,1) == 0:
+            final_pairings +=[[p[0],p[1]]]
+        else:
+            final_pairings +=[[p[1],p[0]]]
+    return final_pairings

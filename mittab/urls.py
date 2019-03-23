@@ -2,11 +2,11 @@ from django.views import i18n
 from django.conf.urls import include, url
 from django.contrib.auth.views import logout
 from django.conf import settings
-import apps.tab.views as views
-import apps.tab.judge_views as judge_views
-import apps.tab.team_views as team_views
-import apps.tab.debater_views as debater_views
-import apps.tab.pairing_views as pairing_views
+import mittab.apps.tab.views as views
+import mittab.apps.tab.judge_views as judge_views
+import mittab.apps.tab.team_views as team_views
+import mittab.apps.tab.debater_views as debater_views
+import mittab.apps.tab.pairing_views as pairing_views
 
 from django.contrib import admin
 admin.autodiscover()
@@ -91,6 +91,7 @@ urlpatterns = [
     url(r'^pairing/confirm_start_tourny/$', pairing_views.confirm_start_new_tourny),
     url(r'^pairing/start_tourny/$', pairing_views.start_new_tourny),
     url(r'^pairings/pairinglist/$', pairing_views.pretty_pair),
+    url(r'^pairings/missing_ballots/$', pairing_views.missing_ballots),
     url(r'^pairings/pairinglist/printable/$', pairing_views.pretty_pair_print),
     url(r'^pairing/backup/$', pairing_views.manual_backup),
     url(r'^pairing/release/$', pairing_views.toggle_pairing_released),

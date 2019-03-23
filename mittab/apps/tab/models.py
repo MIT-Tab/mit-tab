@@ -8,13 +8,16 @@ from django.core.exceptions import ValidationError
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
-    
+
     class Meta:
         verbose_name_plural = "tab settings"
 
     def __unicode__(self):
         return "%s => %s" % (self.key,self.value)
-    
+
+    def __str__(self):
+        return "%s => %s" % (self.key,self.value)
+
     @classmethod
     def get(cls, key, default=None):
         try:
@@ -36,7 +39,11 @@ class TabSettings(models.Model):
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique = True)
+
     def __unicode__(self):
+        return self.name
+
+    def __str__(self):
         return self.name
 
     def delete(self):
@@ -50,16 +57,16 @@ class School(models.Model):
 
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique = True)
-    #team_set is created by Team in the ManyToMany
-    #team = models.ForeignKey('Team')
-    #0 = Varsity, 1 = Novice
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
-        (VARSITY, u'Varsity'),
-        (NOVICE, u'Novice'),
+        (VARSITY, 'Varsity'),
+        (NOVICE, 'Novice'),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+
+    def __str__(self):
+        return self.name
 
     def __unicode__(self):
         return self.name
@@ -68,7 +75,7 @@ class Debater(models.Model):
         teams = Team.objects.filter(debaters = self)
         if len(teams) == 0:
             super(Debater, self).delete()
-        else :
+        else:
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
 
 class Team(models.Model):
@@ -83,13 +90,16 @@ class Team(models.Model):
     HALF_SEED = 2
     FULL_SEED = 3
     SEED_CHOICES= (
-        (UNSEEDED, u'Unseeded'),
-        (FREE_SEED, u'Free Seed'),
-        (HALF_SEED, u'Half Seed'),
-        (FULL_SEED, u'Full Seed'),
+        (UNSEEDED, 'Unseeded'),
+        (FREE_SEED, 'Free Seed'),
+        (HALF_SEED, 'Half Seed'),
+        (FULL_SEED, 'Full Seed'),
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
 
     def __unicode__(self):
         return self.name
@@ -123,6 +133,9 @@ class Judge(models.Model):
     def is_checked_in_for_round(self, round_number):
         return CheckIn.objects.filter(judge=self, round_number=round_number).exists()
 
+    def __str__(self):
+        return self.name
+
     def __unicode__(self):
         return self.name
 
@@ -138,21 +151,29 @@ class Scratch(models.Model):
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
-        (TEAM_SCRATCH, u'Team Scratch'),
-        (TAB_SCRATCH, u'Tab Scratch'),
+        (TEAM_SCRATCH, 'Team Scratch'),
+        (TAB_SCRATCH, 'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
     class Meta:
         verbose_name_plural = "scratches"
 
+    def __str__(self):
+        s_type = ("Team","Tab")[self.scratch_type]
+        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
+
+
     def __unicode__(self):
         s_type = ("Team","Tab")[self.scratch_type]
-        return u'{} <={}=> {}'.format(self.team, s_type, self.judge)
+        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+
+    def __str__(self):
+        return self.name
 
     def __unicode__(self):
         return self.name
@@ -177,9 +198,9 @@ class Round(models.Model):
     GOV = 1
     OPP = 2
     PULLUP_CHOICES = (
-        (NONE, u'NONE'),
-        (GOV, u'GOV'),
-        (OPP, u'OPP'),
+        (NONE, 'NONE'),
+        (GOV, 'GOV'),
+        (OPP, 'OPP'),
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
     UNKNOWN = 0
@@ -188,13 +209,13 @@ class Round(models.Model):
     ALL_DROP = 5
     ALL_WIN = 6
     VICTOR_CHOICES = (
-        (UNKNOWN, u'UNKNOWN'),
-        (GOV, u'GOV'),
-        (OPP, u'OPP'),
-        (GOV_VIA_FORFEIT, u'GOV via Forfeit'),
-        (OPP_VIA_FORFEIT, u'OPP via Forfeit'),
-        (ALL_DROP, u'ALL DROP'),
-        (ALL_WIN, u'ALL WIN'),
+        (UNKNOWN, 'UNKNOWN'),
+        (GOV, 'GOV'),
+        (OPP, 'OPP'),
+        (GOV_VIA_FORFEIT, 'GOV via Forfeit'),
+        (OPP_VIA_FORFEIT, 'OPP via Forfeit'),
+        (ALL_DROP, 'ALL DROP'),
+        (ALL_WIN, 'ALL WIN'),
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -203,8 +224,11 @@ class Round(models.Model):
         if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
 
+    def __str__(self):
+        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+
     def __unicode__(self):
-        return u'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
 
     def save(self):
         no_shows = NoShow.objects.filter(
@@ -226,6 +250,9 @@ class Bye(models.Model):
    bye_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
 
+   def __str__(self):
+      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+
    def __unicode__(self):
       return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
 
@@ -233,6 +260,9 @@ class NoShow(models.Model):
    no_show_team = models.ForeignKey(Team)
    round_number = models.IntegerField()
    lenient_late = models.BooleanField(default=False)
+
+   def __str__(self):
+      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
 
    def __unicode__(self):
       return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
@@ -248,11 +278,18 @@ class RoundStats(models.Model):
     class Meta:
         verbose_name_plural = "round stats"
 
+    def __str__(self):
+        return "Results for %s in round %s" % (self.debater, self.round.round_number)
+
     def __unicode__(self):
         return "Results for %s in round %s" % (self.debater, self.round.round_number)
 
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
     round_number = models.IntegerField()
+
+    def __str__(self):
+        return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
+
     def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge, self.round_number)

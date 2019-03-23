@@ -3,9 +3,9 @@ from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
-from forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
+from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
-from models import *
+from mittab.apps.tab.models import *
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams
 
@@ -42,7 +42,7 @@ def add_scratch(request):
         team = form.cleaned_data['team'].name
         return render_to_response('thanks.html', 
                                   {'data_type': "Scratch",
-                                  'data_name': u' from {0} on {1}'.format(team, judge),
+                                  'data_name': ' from {0} on {1}'.format(team, judge),
                                   'data_modification': "CREATED",
                                   'enter_again': True},
                                   context_instance=RequestContext(request))            
@@ -132,7 +132,7 @@ def delete_school(request, school_id):
         school.delete()
     except School.DoesNotExist:
         error_msg = "That school does not exist"
-    except Exception, e:
+    except Exception as e:
         error_msg = str(e)
     if error_msg:
         return render_to_response('error.html', 

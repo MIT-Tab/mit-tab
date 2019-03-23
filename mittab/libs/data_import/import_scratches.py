@@ -51,5 +51,5 @@ def import_scratches(fileToImport):
             except:
                 scratch_errors.append[[j,t]]
         except Exception as e:
-            print e
+            print(e)
     return scratch_errors

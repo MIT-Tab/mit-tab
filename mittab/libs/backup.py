@@ -7,7 +7,7 @@ from mittab.apps.tab.models import TabSettings
 from django.conf import settings
 from wsgiref.util import FileWrapper
 from mittab.settings import BASE_DIR
-import errors
+from mittab.libs import errors
 
 
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
@@ -41,7 +41,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
 
 def handle_backup(f):
     dst_filename = get_backup_filename(f.name)
-    print("Tried to write {}".format(dst_filename))
+    print(("Tried to write {}".format(dst_filename)))
     try:
         with open(dst_filename, "wb+") as destination:
             for chunk in f.chunks():
@@ -63,7 +63,7 @@ def restore_from_backup(src_filename):
 def copy_db(src_filename, dst_filename):
     try:
         shutil.copyfile(src_filename, dst_filename)
-        print("Copied %s to %s" % (src_filename, dst_filename))
+        print(("Copied %s to %s" % (src_filename, dst_filename)))
         return True
     except:
         errors.emit_current_exception()

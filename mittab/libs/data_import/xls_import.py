@@ -9,29 +9,27 @@ except ImportError:
     sys.exit(1)
 
 def sep():
-    print "#"*80
+    print("#"*80)
 
 if __name__ == "__main__":
     setup_environ(settings)
-    import import_judges
-    import import_teams
-    import import_scratches
-    print "Importing Judges"
+    from mittab.libs.data_import import import_judges, import_teams, import_scratches
+    print("Importing Judges")
     sep()
     try:
         import_judges.import_judges("../JudgeEntry.xls")
     except:
-        print "There was an error importing judges"
+        print("There was an error importing judges")
     sep()
     try:
         import_teams.import_teams("../TeamEntry.xls")
     except:
-        print "There was an error importing teams"
+        print("There was an error importing teams")
     sep()
     try:
         import_scratches.import_scratches("../ScratchEntry.xls")
     except:
-        print "There was an error importing scratches"
+        print("There was an error importing scratches")
     sep() 
    
    

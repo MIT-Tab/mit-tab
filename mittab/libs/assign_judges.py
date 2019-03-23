@@ -18,11 +18,9 @@
 #OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #THE SOFTWARE.
 
-import tab_logic
+from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
-import mwmatching
 import random
-import errors
 import pprint
 
 def add_judges(pairings, judges, panel_points):
@@ -68,7 +66,6 @@ def add_judges(pairings, judges, panel_points):
                                         judge_i + len(group),
                                         calc_weight(judge_i, pairing_i)))
         judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-        print "wat"
         # If there is no possible assignment of chairs, raise an error
         if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and len(graph_edges) == 0):
             if len(graph_edges) == 0:
@@ -97,7 +94,7 @@ def add_judges(pairings, judges, panel_points):
         def try_paneling(potential_pairings, all_judges, num_to_panel, gap):
             if len(potential_pairings) == 0 or num_to_panel <= 0:
                 # Base case, failed to panel
-                print "Failed to panel"
+                print("Failed to panel")
                 return {}
 
 
@@ -106,13 +103,13 @@ def add_judges(pairings, judges, panel_points):
                                            lambda j: j.rank).rank,) + \
                                            tuple([-1 * i for i in tab_logic.team_comp(r, current_round_number)]))
             base_judge = argmax(rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
-            print "Found maximally ranked judge {0}".format(base_judge)
+            print("Found maximally ranked judge {0}".format(base_judge))
             potential_panelists = [j for j in all_judges if
                                    j.rank > (float(base_judge.rank) - float(gap))]
-            print "Potential panelists:", potential_panelists
+            print("Potential panelists:", potential_panelists)
             # If we don't have enough potential panelists, try again with fewer panels
             if len(potential_panelists) < 2 * num_to_panel:
-                print "Not enough judges to panel!: ", len(potential_panelists), num_to_panel
+                print("Not enough judges to panel!: ", len(potential_panelists), num_to_panel)
                 return try_paneling(potential_pairings, all_judges, num_to_panel - 1, gap)
 
             panel_assignments = []
@@ -133,10 +130,10 @@ def add_judges(pairings, judges, panel_points):
                                                 calc_weight_panel(judges)))
                 pprint.pprint(graph_edges)
                 judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-                print judge_assignments
+                print(judge_assignments)
                 if ((-1 in judge_assignments[:num_to_panel]) or
                     (num_to_panel > 0 and len(graph_edges) == 0)):
-                    print "Scratches are causing a retry"
+                    print("Scratches are causing a retry")
                     return try_paneling(potential_pairings, all_judges, num_to_panel - 1, gap)
                 # Save the judges to the potential panel assignments
                 judges_used = []
@@ -146,10 +143,10 @@ def add_judges(pairings, judges, panel_points):
                     judges_used.append(judge)
                 # Remove any used judges from the potential panelist pool
                 for judge in judges_used:
-                    print "Removing {0}".format(judge)
+                    print("Removing {0}".format(judge))
                     potential_panelists.remove(judge)
 
-            print "panels: ", panel_assignments
+            print("panels: ", panel_assignments)
             result = {}
             for (panel_i, panel) in enumerate(panel_assignments):
                 result[rounds_to_panel[panel_i]] = panel
@@ -160,7 +157,7 @@ def add_judges(pairings, judges, panel_points):
         # rely on try_paneling's retries to fix it
         if group_i in panel_gaps and panel_gaps[group_i]:
             panels = try_paneling(group, judges, len(group), panel_gaps[group_i])
-            for (pairing, panelists) in panels.iteritems():
+            for (pairing, panelists) in panels.items():
                 for panelist in panelists:
                     if panelist not in pairing.judges.all():
                         pairing.judges.add(panelist)
