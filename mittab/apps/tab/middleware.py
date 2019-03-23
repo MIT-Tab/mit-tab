@@ -6,7 +6,7 @@ from django.core.cache import cache
 
 login_white_list = ('/accounts/login/', '/static/css/stylesheet.css',
         '/static/images/title_banner.png', '/pairings/pairinglist/', '/stat',
-        '/e_ballots/')
+        '/e_ballots/', '/pairings/missing_ballots/')
 
 e_ballot_regex = re.compile("/e_ballots/\S+")
 

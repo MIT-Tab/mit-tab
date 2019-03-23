@@ -374,10 +374,7 @@ def toggle_pairing_released(request):
             "pairing_released": int(not old) == 1}
     return JsonResponse(data)
 
-"""dxiao: added a html page for showing tab for the current round.
-Uses view_status and view_round code from revision 108."""
 def pretty_pair(request, printable=False):
-
     errors, byes = [], []
 
     round_number = TabSettings.get("cur_round") - 1
@@ -392,7 +389,6 @@ def pretty_pair(request, printable=False):
     byes = [bye.bye_team for bye in Bye.objects.filter(round_number=round_number)]
     team_count = len(paired_teams) + len(byes)
 
-    print("getting errors")
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             if present_team not in byes:
@@ -407,6 +403,15 @@ def pretty_pair(request, printable=False):
 
 def pretty_pair_print(request):
     return pretty_pair(request, True)
+
+def missing_ballots(request):
+    round_number = TabSettings.get("cur_round") - 1
+    # order by chair to effectively randomize it
+    # default sorting would inadvertantly reveal rankings within brackets
+    rounds = Round.objects.filter(victor=Round.NONE, round_number=round_number).order_by('-chair')
+    pairing_exists = TabSettings.get("pairing_released", 0) == 1
+    return render_to_response('missing_ballots.html', locals(),
+            context_instance=RequestContext(request))
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
