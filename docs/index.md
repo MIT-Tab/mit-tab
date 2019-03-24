@@ -8,9 +8,9 @@ If you have any other questions, contact Ben Muschol at muschol.b@husky.neu.edu
 Contents
 --------
 
-* [Setting up your server](Setting-up-your-server.md)
-* [Adding teams, rooms, judges, and debaters](Adding-Teams,-Judges,-Rooms-and-Debaters.md)
-* [MIT-Tab default tab policy](Tab-Policy.md)
+* [Setting Up Your Server](Setting-up-your-server.md)
+* [MIT-Tab Tab Policy](Tab-Policy.md)
+* [Adding Teams, Rooms, Judges, and Debaters](Adding-Teams,-Judges,-Rooms-and-Debaters.md)
 * [Before Round 1](Before-Round-1.md)
-* [Running the tournament](Running-a-Tournament.md)
+* [During the Tournament](Running-a-Tournament.md)
 * [Advanced topics](Advanced-Topics.md)
