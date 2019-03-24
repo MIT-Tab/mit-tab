@@ -1,5 +1,5 @@
 Adding Teams, Judges, Rooms, and Debaters
------------------------------------------
+=========================================
 
 There are two ways to enter teams, judges, rooms, and debaters:
 [Manually entering individually](#manual-data-entry) or
@@ -8,7 +8,8 @@ import is probably easier. However, you may need to enter data manually to add
 one or two teams at a time, or to fix any errors that may have occurred when
 importing data in bulk.
 
-# Batch Data Import
+Batch Data Import
+-----------------
 
 To import data in bulk: First, navigate to the "File Data Upload" link under
 the "Admin" section of the navigation menu:
@@ -51,7 +52,8 @@ Here is the format of the .xlsx file:
 |-------|------------------------|
 |       |                        |
 
-# Manual Data Entry
+Manual Data Entry
+-----------------
 
 From the home page, you can add and view all _Schools, Judges, Teams, Debaters,
 and Rooms_.  To enter information quickly, you should have multiple people

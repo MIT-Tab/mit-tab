@@ -1,11 +1,12 @@
 Running a Tournament
---------------------
+====================
 
 This document will cover anything you need to do after all the teams, judges, and rooms are registered and checked in.
 
 For each round after round 1, you need to enter results, make sure you have enough judges, and pair the next round. **Having multiple people logged in and entering result information and checking that information makes your tournament run significantly better (faster and more accurate).** It is **highly** advised that you do this.
 
-# Entering Results
+Entering Results
+----------------
 
 After pairing a round, you will mostly be dealing with the current round's pairing view located at `/pairings/status/`. This is kind of the control center for the whole tournament, and you can change pretty much anything from this view.  The areas of importance are shown below:
 [[result_entry_colored.png]]
@@ -18,7 +19,8 @@ After pairing a round, you will mostly be dealing with the current round's pairi
   4. All Win: Both teams win the round.  Useful for when a judge does not show up to a round and you don't want the tournament to run behind.  Both teams get average speaks and ranks for that round (recalculated with every round).
 * Blue: This is where you click to edit the round in the administration interface.  From that interface you can change anything you want about the round, e.g. which teams are debating, which judge is judging, which room the debate is in, etc ...  Note that you can also drag and drop judges around as well as teams from the pairing view, but only within the pairing (i.e. you can't drag a judge that wasn't paired in into the pairing, you can make this change from the admin interface, however).  Please do not delete rounds unless you also delete the corresponding Round Stats (viewable from the admin interface) for the debaters in that round.  You really should not need to ever delete a round, the various options for the results of a round should be sufficient. 
 
-# Pairing the Next Round
+Pairing the Next Round
+----------------------
 
 To pair a round, navigate to `/pairings/status/` and hit "Prepare Next Round". For any round after round 1, make sure that all results have been entered. After that, you should see this page:
 
@@ -28,7 +30,8 @@ This signals that it is safe to pair the round.  Backups before and after the pa
 
 Afterwards, hit the "Assign Judges" button to pair judges into the rounds.
 
-# Backing Up
+Backing Up
+----------
 
 MIT-TAB supports the concept of "backups" which allow you to create full backups of the state of your tournament at any given moment. Treat your tournament like a final paper: save early, and save often.
 
@@ -56,13 +59,15 @@ Use cases:
 
 NOTE: You may be logged out after restoring from a back-up. The username/password is still the same.
 
-# Re-pairing a round
+Re-pairing a round
+------------------
 
 If something went wrong in the pairings, you may want to pair the round again. In order to do this, all you have to do is restore from the before pairing back-up and then pair the round as described [above](#pairing-the-next-round)
 
 The find the back-up to restore from, go to "Backups" > "View Backups" and click on the one with the name `round_x_before_pairing.db`, where `x` is the round number that you want to re-pair.
 
-# Removing Teams, Rooms and Judges
+Removing Teams, Rooms and Judges
+--------------------------------
 
 Throughout a tournament, you may have to remove a room, drop a team, etc. There used to be a delete button, but deleting teams/rooms/judges can potentially delete results from rounds that occurred, so that button was removed.
 
