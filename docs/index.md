@@ -12,5 +12,5 @@ Contents
 * [Adding teams, rooms, judges, and debaters](Adding-Teams,-Judges,-Rooms-and-Debaters.md)
 * [MIT-Tab default tab policy](Tab-Policy.md)
 * [Before Round 1](Before-Round-1.md)
-* [Running the tournament a round](Running-a-Tournament.md)
+* [Running the tournament](Running-a-Tournament.md)
 * [Advanced topics](Advanced-Topics.md)
