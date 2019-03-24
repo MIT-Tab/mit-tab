@@ -45,3 +45,7 @@ mittab/backups/
 
 # venv
 venv/
+
+# doc stuff
+docs/_static/
+docs/_build/
