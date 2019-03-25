@@ -19,11 +19,14 @@ for the whole tournament, and you can change pretty much anything from this
 view.  The areas of importance are shown below:
 ![](img/result_entry_colored.png)
 
-* Red: These areas show you basic information about the government and
-opposition teams.  Use this to quickly check if the pairings make sense.
+* Red: This area shows you basic information about the government and
+  opposition teams.  Use this to quickly check if the pairings make sense.
+* Green: This area shows the judge(s) assigned to a round. In the case of a
+  panel, the chair is the one with the highest rank, not necessarily the one at
+  the top. Click the "NA" button to select panelists
 * Yellow: This is where you click to enter results for that round. Note that
-whenever entering forfeit wins or losses, enter speaks **of zero** and assign
-ranks arbitrarily.  The program will do the right thing. Possible results are
+  whenever entering forfeit wins or losses, enter speaks **of zero** and assign
+  ranks arbitrarily.  The program will do the right thing. Possible results are
   1. Gov/Opp win: The government or opposition team won outright, this is 99%
      of results.
   2. Gov/Opp win via forfeit: The government or opposition team won via a
