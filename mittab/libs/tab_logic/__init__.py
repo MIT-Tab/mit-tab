@@ -184,8 +184,7 @@ def pair_round():
         pairings = sorted(pairings, key=lambda team: highest_seed(team[0], team[1]), reverse = True)
     # sort with pairing with highest ranked team first
     else:
-        sorted_teams = rank_teams()
-        print("pairings")
+        sorted_teams = [ s.team for s in rank_teams() ]
         pairings = sorted(pairings, key=lambda team: min(sorted_teams.index(team[0]), sorted_teams.index(team[1])))
 
     # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
