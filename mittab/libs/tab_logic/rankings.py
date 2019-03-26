@@ -21,15 +21,15 @@ class DebaterScore(object):
         self.double_adjusted_ranks = double_adjusted_ranks_deb(debater)
 
     def __eq__(self, other):
-        return self._scoring_tuple() == other._scoring_tuple()
+        return self.scoring_tuple() == other.scoring_tuple()
 
     def __ne__(self, other):
         return not (self == other)
 
     def __lt__(self, other):
-        return self._scoring_tuple() < other._scoring_tuple()
+        return self.scoring_tuple() < other.scoring_tuple()
 
-    def _scoring_tuple(self):
+    def scoring_tuple(self):
         return (-self.speaks,
                 self.ranks,
                 -self.single_adjusted_speaks,
@@ -51,15 +51,15 @@ class TeamScore(object):
         self.opp_strength = opp_strength(team)
 
     def __eq__(self, other):
-        return self._scoring_tuple() == other._scoring_tuple()
+        return self.scoring_tuple() == other.scoring_tuple()
 
     def __ne__(self, other):
         return not (self == other)
 
     def __lt__(self, other):
-        return self._scoring_tuple() < other._scoring_tuple()
+        return self.scoring_tuple() < other.scoring_tuple()
 
-    def _scoring_tuple(self):
+    def scoring_tuple(self):
         return (-self.wins,
                 -self.speaks,
                 self.ranks,
