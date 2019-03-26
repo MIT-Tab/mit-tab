@@ -339,7 +339,7 @@ def team_comp(pairing, round_number):
 def team_score_except_record(team):
     ts = TeamScore(team)
     ts.wins = 0
-    return team_score(team)[1:]
+    return ts.scoring_tuple()
 
 def rank_teams_except_record(teams):
     return sorted(teams, key=team_score_except_record)
