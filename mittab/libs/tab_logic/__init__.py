@@ -4,6 +4,7 @@ from django.db.models import *
 import random
 from mittab.libs import errors, mwmatching
 from mittab.libs.tab_logic.stats import *
+from mittab.libs.tab_logic.rankings import *
 from decimal import *
 from datetime import datetime
 import pprint
@@ -295,63 +296,6 @@ def highest_seed(team1,team2):
 def hit_before(t1, t2):
     return Round.objects.filter(gov_team=t1, opp_team=t2).exists() or \
             Round.objects.filter(gov_team=t2, opp_team=t1).exists()
-
-#This should calculate whether or not team t has hit the pull-up before.
-def hit_pull_up(t):
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.OPP:
-            return True
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.GOV:
-            return True
-    return False
-
-def hit_pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    return pullups
-
-def pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    return pullups
-
-def num_opps(t):
-    return Round.objects.filter(opp_team=t).count()
-
-def num_govs(t):
-    return Round.objects.filter(gov_team=t).count()
-
-def had_bye(t):
-    return Bye.objects.filter(bye_team=t).exists()
-
-def forfeited_round(r, t):
-    if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
-    elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
-    return False
-
-def won_by_forfeit(r, t):
-    if Round.objects.filter(gov_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    elif Round.objects.filter(opp_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    return False
 
 def middle_of_bracket_teams():
     """
