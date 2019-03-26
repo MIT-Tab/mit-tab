@@ -11,7 +11,7 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 
 """ Team-related logic"""
 
-""" Helpers """
+""" General team info """
 
 def num_byes(t):
     return Bye.objects.filter(bye_team=t).count()
@@ -40,6 +40,44 @@ def forfeited_round(r, t):
         if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
             return True
     return False
+
+def hit_pull_up(t):
+    for a in list(Round.objects.filter(gov_team = t)):
+        if a.pullup == Round.OPP:
+            return True
+    for a in list(Round.objects.filter(opp_team = t)):
+        if a.pullup == Round.GOV:
+            return True
+    return False
+
+def hit_pull_up_count(t):
+    pullups = 0
+    for a in list(Round.objects.filter(gov_team = t)):
+        if a.pullup == Round.OPP:
+            pullups += 1
+    for a in list(Round.objects.filter(opp_team = t)):
+        if a.pullup == Round.GOV:
+            pullups += 1
+    return pullups
+
+def pull_up_count(t):
+    pullups = 0
+    for a in list(Round.objects.filter(gov_team = t)):
+        if a.pullup == Round.GOV:
+            pullups += 1
+    for a in list(Round.objects.filter(opp_team = t)):
+        if a.pullup == Round.OPP:
+            pullups += 1
+    return pullups
+
+def num_opps(t):
+    return Round.objects.filter(opp_team=t).count()
+
+def num_govs(t):
+    return Round.objects.filter(gov_team=t).count()
+
+def had_bye(t):
+    return Bye.objects.filter(bye_team=t).exists()
 
 """ Team Wins """
 @cache()
