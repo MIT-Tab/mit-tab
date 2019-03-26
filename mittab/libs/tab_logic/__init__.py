@@ -336,58 +336,13 @@ def team_comp(pairing, round_number):
                 max(tot_speaks(gov), tot_speaks(opp)),
                 min(tot_speaks(gov), tot_speaks(opp)))
 
-def team_score(team):
-    """A tuple representing the passed team's performance at the tournament"""
-    score = (0,0,0,0,0,0,0,0)
-    try:
-        score = (-tot_wins(team),
-                 -tot_speaks(team),
-                  tot_ranks(team),
-                 -single_adjusted_speaks(team),
-                  single_adjusted_ranks(team),
-                 -double_adjusted_speaks(team),
-                  double_adjusted_ranks(team),
-                 -opp_strength(team))
-    except Exception:
-        errors.emit_current_exception()
-    return score
-
 def team_score_except_record(team):
+    ts = TeamScore(team)
+    ts.wins = 0
     return team_score(team)[1:]
-
-def rank_teams():
-    return sorted(all_teams(), key=team_score)
 
 def rank_teams_except_record(teams):
     return sorted(teams, key=team_score_except_record)
-
-def rank_nov_teams():
-    return sorted(all_nov_teams(), key=team_score)
-
-""" Debater Speaks Calculations """
-
-
-# Returns a tuple used for comparing two debaters 
-# in terms of their overall standing in the tournament
-def debater_score(debater):
-    score = (0,0,0,0,0,0)
-    try:
-        score = (-tot_speaks_deb(debater),
-                  tot_ranks_deb(debater),
-                 -single_adjusted_speaks_deb(debater),
-                  single_adjusted_ranks_deb(debater),
-                 -double_adjusted_speaks_deb(debater),
-                  double_adjusted_ranks_deb(debater))
-    except Exception:
-        errors.emit_current_exception()
-    return score
-
-def rank_speakers():
-    return sorted(Debater.objects.all(), key=debater_score)
-
-def rank_nov_speakers():
-    return sorted(Debater.objects.filter(novice_status=1), key=debater_score)
-
 
 class TabFlags:
     TEAM_CHECKED_IN =           1 << 0
