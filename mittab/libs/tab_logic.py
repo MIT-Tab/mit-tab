@@ -163,7 +163,7 @@ def pair_round():
                             list_of_teams[bracket].remove(t)
                     list_of_teams[bracket] = rank_teams_except_record(list_of_teams[bracket])
                     for t in removed_teams:
-                        list_of_teams[bracket].insert(len(list_of_teams[bracket])/2,t)
+                        list_of_teams[bracket].insert(len(list_of_teams[bracket])//2,t)
 
     if current_round > 1:
         for i in range(len(list_of_teams)):
