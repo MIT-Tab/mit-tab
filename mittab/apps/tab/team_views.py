@@ -12,7 +12,7 @@ import mittab.libs.tab_logic as tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
 
 def view_teams(request):
-    def flags(team):
+    def flags(t):
         result = 0
         if t.checked_in:
             result |= TabFlags.TEAM_CHECKED_IN
