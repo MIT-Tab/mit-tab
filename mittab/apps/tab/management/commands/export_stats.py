@@ -1,5 +1,5 @@
 import os
-import unicodecsv as csv
+import csv
 from optparse import make_option
 
 from django.core.management.base import BaseCommand
