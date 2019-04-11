@@ -380,3 +380,120 @@ def team_stats(request, team_id):
     return JsonResponse(data)
 
 
+def public_status_by_team(request, team_name, team_ref=None):
+    if team_ref:
+        matches = [team_ref]
+    else:
+        clean = team_name.replace('_', ' ')
+        matches = [*Team.objects.filter(name__iexact=clean)]
+    
+    if matches:
+        round_number = TabSettings.get('cur_round') - 1        
+        pairing_exists = TabSettings.get('pairing_released', 0) == 1
+
+        if pairing_exists:
+            return _public_status_paring_exists(request, team_name, matches, 
+                                                round_number)
+        else:
+            out = {
+                    'no_navigation': True,
+                    'bye': False,
+                    'pairing_exists': False,
+                    'team_name': None,
+                    'gov_or_opp': None,
+                    'other_team': None,
+                    'room': None,
+                    'judges': None,
+                    'round_number': round_number,
+                  }
+
+            return render_to_response('public_status.html', out,
+                                  context_instance=RequestContext(request))
+    else:
+        return render_to_response('error.html',
+                                 {'error_type': 'Tab Card','error_name': 'View',
+                                  'error_info': "That's not a registered team!",
+                                  'no_navigation': True},
+                                  context_instance=RequestContext(request))
+                                  
+
+def _public_status_paring_exists(request, team_name, matches, round_number):
+    # Note here that the queries returned by Model.objects.filter are evaluated
+    # lazily, so there is no performance penalty to defining them all up here
+    gov_pairings = Round.objects.filter(round_number=round_number, 
+                                        gov_team=matches[0])
+    opp_pairings = Round.objects.filter(round_number=round_number, 
+                                        opp_team=matches[0])
+    byes = Bye.objects.filter(round_number=round_number,
+                              bye_team=matches[0])   
+        
+    if gov_pairings:
+        out = {
+                'no_navigation': True,
+                'bye': False,
+                'pairing_exists': True,
+                'team_name': gov_pairings[0].gov_team.name,
+                'gov_or_opp': 'gov',
+                'other_team': gov_pairings[0].opp_team.name,
+                'room': gov_pairings[0].room.name,
+                'judges': _judge_names(gov_pairings[0].judges),
+                'round_number': round_number,
+              }
+    elif opp_pairings:
+        out = {
+                'no_navigation': True,
+                'bye': False,
+                'pairing_exists': True,
+                'team_name': opp_pairings[0].opp_team.name,
+                'gov_or_opp': 'opp',
+                'other_team': opp_pairings[0].gov_team.name,
+                'room': opp_pairings[0].room.name,
+                'judges': _judge_names(opp_pairings[0].judges),
+                'round_number': round_number,
+              }
+    elif byes:
+        out = {
+                'no_navigation': True,
+                'bye': True,
+                'pairing_exists': True,
+                'team_name': byes[0].bye_team.name,
+                'gov_or_opp': '',
+                'other_team': '',
+                'room': '',
+                'judges': '',
+                'round_number': round_number,
+              }
+    else:
+        return render_to_response('error.html', 
+                                 {'error_type': 'Public Status',
+                                  'error_name': 'Expected a pairing',
+                                  'error_info': 'Pairings are released, but\n' +\
+                                  ' this team is not in a bye or a round'}, 
+                                  context_instance=RequestContext(request))
+
+    return render_to_response('public_status.html', out,
+                          context_instance=RequestContext(request))
+
+def _judge_names(judges):
+    return ', '.join(judge.name for judge in judges.all())
+    
+def public_status_by_debater(request, debater_name):
+    matches = [*Debater.objects.filter(name__iexact=debater_name.replace('_', ' '))]
+    
+    if matches:
+        teams = [*Team.objects.filter(debaters=matches[0])]
+        if teams:
+            return public_status_by_team(request, '', teams[0])
+        else:
+            return render_to_response('error.html',
+                                     {'error_type': 'Tab Card','error_name': 'View',
+                                      'error_info': 'That debater is not\n' + \
+                                      ' registered to a team!',
+                                      'no_navigation': True},
+                                      context_instance=RequestContext(request))
+    else:
+        return render_to_response('error.html',
+                                 {'error_type': 'Tab Card','error_name': 'View',
+                                  'error_info': "That's not a registered debater!",
+                                  'no_navigation': True},
+                                  context_instance=RequestContext(request))

@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-
+  
+  <script type="text/javascript" src="/static/javascript/login.js"></script>
+  
   {% if form.errors %}
     <p class="error">Sorry, that's not a valid username or password</p>
   {% endif %}
@@ -13,7 +15,7 @@
   </div>
 
   <div class="row-fluid">
-    <div class="span6">
+    <div class="span4">
       <h3> Tab Staff Login </h3>
       <form action="" method="post" class="form-horizontal">{% csrf_token %}
         <div class="control-group">
@@ -26,7 +28,8 @@
         <input type="hidden" name="next" value="{{ next|escape }}" />
       </form>
     </div>
-    <div class="span6">
+    
+    <div class="span4">
       <h3> Participant Access </h3>
       <div class="control-group">
         <a class="btn btn-large btn-info" href="/pairings/pairinglist/">
@@ -47,6 +50,24 @@
           Submit an e-ballot
         </a>
       </div>
+    </div>
+    
+    <div class="span4">
+      <h3> Next Round Look-up </h3>
+      
+      <div class="control-group">
+        
+        <label for="debater">Next Round for Debater:</label>
+        <input type="text" name="debater" value="" id="debater" placeholder="John Doe">          
+        <button class="btn inline"  id="debater_btn"> Check Team </button>
+        
+        <br> <br>
+        
+        <label for="debater">Next Round for Team:</label>
+        <input type="text" name="team" value="" id="team" placeholder="Team name">
+        <button class="btn inline"  id="team_btn"> Check Team </button>
+
+      </div> 
     </div>
   </div>
 
