@@ -10,8 +10,8 @@ string_white_list = ('/accounts/login/', '/static/css/stylesheet.css',
 
 regex_white_list = (
     re.compile("/e_ballots/\S+"),
-    re.compile("/public_status/team_name/([\w-]+)/"),
-    re.compile("/public_status/debater_name/([\w-]+)/"),
+    re.compile("/public_status/team_name/([\w-]+)"),
+    re.compile("/public_status/debater_name/([\w-]+)"),
 )
 
 
@@ -20,7 +20,7 @@ class Login:
     def process_request(self, request):
 
         whitelisted = any(request.path == elem for elem in string_white_list) or \
-                      any(elem.fullmatch(request.path) for elem in regex_white_list)
+                      any(elem.match(request.path) for elem in regex_white_list)
 
         if not whitelisted and request.user.is_anonymous():
             if request.POST:
