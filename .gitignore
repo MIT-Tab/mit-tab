@@ -18,10 +18,10 @@ lib
 lib64
 __pycache__
 *.DS_STORE
-admin
-css
-images
-javascript
+/admin
+/css
+/images
+/javascript
 
 # Installer logs
 pip-log.txt

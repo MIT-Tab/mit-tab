@@ -25,7 +25,8 @@ def index(request):
     return render_to_response('index.html',locals(),context_instance=RequestContext(request))
 
 def tab_login(request):
-    return login(request, extra_context={'no_navigation': True})
+    teams = [(team.pk, team.name) for team in Team.objects.order_by('name')]
+    return login(request, extra_context={'no_navigation': True, 'teams': teams})
 
 def render_403(request):
     t = loader.get_template('403.html')

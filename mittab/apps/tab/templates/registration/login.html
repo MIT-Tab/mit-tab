@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 
+{% block headers %}
+<script type="text/javascript" src="/static/javascript/login.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
+{% endblock %}
+
 {% block content %}
-  
-  <script type="text/javascript" src="/static/javascript/login.js"></script>
-  
+    
   {% if form.errors %}
     <p class="error">Sorry, that's not a valid username or password</p>
   {% endif %}
@@ -57,15 +61,15 @@
       
       <div class="control-group">
         
-        <label for="debater">Next Round for Debater:</label>
-        <input type="text" name="debater" value="" id="debater" placeholder="John Doe">          
-        <button class="btn inline"  id="debater_btn"> Check Team </button>
+        <select id="teams-lookup">
+          
+          {% for team in teams %}
+          <option value={{team.0}}> {{team.1}} </option>
+          {% endfor %}
+
+        </select>
         
-        <br> <br>
-        
-        <label for="debater">Next Round for Team:</label>
-        <input type="text" name="team" value="" id="team" placeholder="Team name">
-        <button class="btn inline"  id="team_btn"> Check Team </button>
+        <button class="btn inline"  id="team_btn"> Check </button> 
 
       </div> 
     </div>

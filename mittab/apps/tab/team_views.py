@@ -380,20 +380,15 @@ def team_stats(request, team_id):
     return JsonResponse(data)
 
 
-def public_status_by_team(request, team_name, team_ref=None):
-    if team_ref:
-        matches = [team_ref]
-    else:
-        clean = team_name.replace('_', ' ')
-        matches = [*Team.objects.filter(name__iexact=clean)]
+def public_status(request, team_id, team_ref=None):
+    matches = Team.objects.filter(pk=team_id)
     
     if matches:
         round_number = TabSettings.get('cur_round') - 1        
         pairing_exists = TabSettings.get('pairing_released', 0) == 1
 
         if pairing_exists:
-            return _public_status_paring_exists(request, team_name, matches, 
-                                                round_number)
+            return _public_status_pairing_exists(request, matches, round_number)
         else:
             out = {
                     'no_navigation': True,
@@ -417,9 +412,7 @@ def public_status_by_team(request, team_name, team_ref=None):
                                   context_instance=RequestContext(request))
                                   
 
-def _public_status_paring_exists(request, team_name, matches, round_number):
-    # Note here that the queries returned by Model.objects.filter are evaluated
-    # lazily, so there is no performance penalty to defining them all up here
+def _public_status_pairing_exists(request, matches, round_number):
     gov_pairings = Round.objects.filter(round_number=round_number, 
                                         gov_team=matches[0])
     opp_pairings = Round.objects.filter(round_number=round_number, 
@@ -476,24 +469,3 @@ def _public_status_paring_exists(request, team_name, matches, round_number):
 
 def _judge_names(judges):
     return ', '.join(judge.name for judge in judges.all())
-    
-def public_status_by_debater(request, debater_name):
-    matches = [*Debater.objects.filter(name__iexact=debater_name.replace('_', ' '))]
-    
-    if matches:
-        teams = [*Team.objects.filter(debaters=matches[0])]
-        if teams:
-            return public_status_by_team(request, '', teams[0])
-        else:
-            return render_to_response('error.html',
-                                     {'error_type': 'Tab Card','error_name': 'View',
-                                      'error_info': 'That debater is not\n' + \
-                                      ' registered to a team!',
-                                      'no_navigation': True},
-                                      context_instance=RequestContext(request))
-    else:
-        return render_to_response('error.html',
-                                 {'error_type': 'Tab Card','error_name': 'View',
-                                  'error_info': "That's not a registered debater!",
-                                  'no_navigation': True},
-                                  context_instance=RequestContext(request))
