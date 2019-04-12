@@ -383,7 +383,7 @@ def team_stats(request, team_id):
 def public_status(request, team_id, team_ref=None):
     matches = Team.objects.filter(pk=team_id)
     
-    if matches:
+    if int(team_id) < len(teams):
         round_number = TabSettings.get('cur_round') - 1        
         pairing_exists = TabSettings.get('pairing_released', 0) == 1
 
@@ -414,11 +414,11 @@ def public_status(request, team_id, team_ref=None):
 
 def _public_status_pairing_exists(request, matches, round_number):
     gov_pairings = Round.objects.filter(round_number=round_number, 
-                                        gov_team=matches[0])
+                                        gov_team=team)
     opp_pairings = Round.objects.filter(round_number=round_number, 
-                                        opp_team=matches[0])
+                                        opp_team=team)
     byes = Bye.objects.filter(round_number=round_number,
-                              bye_team=matches[0])   
+                              bye_team=team)   
         
     if gov_pairings:
         out = {
