@@ -383,27 +383,25 @@ def team_stats(request, team_id):
 def public_status(request, team_id, team_ref=None):
     matches = Team.objects.filter(pk=team_id)
     
-    if int(team_id) < len(teams):
+    if matches:
         round_number = TabSettings.get('cur_round') - 1        
         pairing_exists = TabSettings.get('pairing_released', 0) == 1
 
         if pairing_exists:
             return _public_status_pairing_exists(request, matches, round_number)
         else:
-            out = {
-                    'no_navigation': True,
-                    'bye': False,
-                    'pairing_exists': False,
-                    'team_name': None,
-                    'gov_or_opp': None,
-                    'other_team': None,
-                    'room': None,
-                    'judges': None,
-                    'round_number': round_number,
-                  }
-
-            return render_to_response('public_status.html', out,
-                                  context_instance=RequestContext(request))
+            return render_to_response('public_status.html',
+                                      {
+                                        'no_navigation': True,
+                                        'bye': False,
+                                        'pairing_exists': False,
+                                        'team_name': None,
+                                        'gov_or_opp': None,
+                                        'other_team': None,
+                                        'room': None,
+                                        'judges': None,
+                                        'round_number': round_number,
+                                      }, context_instance=RequestContext(request))
     else:
         return render_to_response('error.html',
                                  {'error_type': 'Tab Card','error_name': 'View',
@@ -414,48 +412,40 @@ def public_status(request, team_id, team_ref=None):
 
 def _public_status_pairing_exists(request, matches, round_number):
     gov_pairings = Round.objects.filter(round_number=round_number, 
-                                        gov_team=team)
+                                        gov_team=matches[0])
     opp_pairings = Round.objects.filter(round_number=round_number, 
-                                        opp_team=team)
+                                        opp_team=matches[0])
     byes = Bye.objects.filter(round_number=round_number,
-                              bye_team=team)   
+                              bye_team=matches[0])   
         
     if gov_pairings:
-        out = {
-                'no_navigation': True,
-                'bye': False,
-                'pairing_exists': True,
-                'team_name': gov_pairings[0].gov_team.name,
-                'gov_or_opp': 'gov',
-                'other_team': gov_pairings[0].opp_team.name,
-                'room': gov_pairings[0].room.name,
-                'judges': _judge_names(gov_pairings[0].judges),
-                'round_number': round_number,
-              }
+        return render_to_response('public_status.html',
+                                    {
+                                        'no_navigation': True,
+                                        'pairing_exists': True,
+                                        'bye': False,
+                                        'gov': True,
+                                        'round': gov_pairings[0],
+                                        'judges': _judge_names(gov_pairings[0].judges),
+                                    }, context_instance=RequestContext(request))
     elif opp_pairings:
-        out = {
-                'no_navigation': True,
-                'bye': False,
-                'pairing_exists': True,
-                'team_name': opp_pairings[0].opp_team.name,
-                'gov_or_opp': 'opp',
-                'other_team': opp_pairings[0].gov_team.name,
-                'room': opp_pairings[0].room.name,
-                'judges': _judge_names(opp_pairings[0].judges),
-                'round_number': round_number,
-              }
+        return render_to_response('public_status.html',
+                                    {
+                                        'no_navigation': True,
+                                        'pairing_exists': True,
+                                        'bye': False,
+                                        'gov': False,
+                                        'round': opp_pairings[0],
+                                        'judges': _judge_names(opp_pairings[0].judges),
+                                    }, context_instance=RequestContext(request))
     elif byes:
-        out = {
-                'no_navigation': True,
-                'bye': True,
-                'pairing_exists': True,
-                'team_name': byes[0].bye_team.name,
-                'gov_or_opp': '',
-                'other_team': '',
-                'room': '',
-                'judges': '',
-                'round_number': round_number,
-              }
+        return render_to_response('public_status.html',
+                                    {
+                                        'no_navigation': True,
+                                        'pairing_exists': True,
+                                        'bye': True,
+                                        'round': byes[0],
+                                    }, context_instance=RequestContext(request))
     else:
         return render_to_response('error.html', 
                                  {'error_type': 'Public Status',
@@ -463,9 +453,6 @@ def _public_status_pairing_exists(request, matches, round_number):
                                   'error_info': 'Pairings are released, but\n' +\
                                   ' this team is not in a bye or a round'}, 
                                   context_instance=RequestContext(request))
-
-    return render_to_response('public_status.html', out,
-                          context_instance=RequestContext(request))
 
 def _judge_names(judges):
     return ', '.join(judge.name for judge in judges.all())

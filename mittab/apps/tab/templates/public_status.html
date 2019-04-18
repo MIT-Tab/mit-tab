@@ -6,13 +6,20 @@
   {% if pairing_exists %}
     {% if bye %}
       
-      {{team_name}} is on a bye this round.
+      {{round.bye_team.name}} is on a bye this round.
       
     {% else %}
-    
-      {{team_name}} will {{gov_or_opp}} next round against {{other_team}}
-      in {{room}}, judged by {{judges}}.
+      {% if gov %}
       
+        {{round.gov_team.name}} will gov next round against 
+        {{round.opp_team.name}} in {{round.room.name}}, judged by {{judges}}.
+      
+      {% else %}
+      
+        {{round.opp_team.name}} will opp next round against 
+        {{round.gov_team.name}} in {{round.room.name}}, judged by {{judges}}.
+
+      {% endif %}
     {% endif %}
   {% else %}
 
