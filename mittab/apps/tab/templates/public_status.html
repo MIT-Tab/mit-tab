@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %} Public Status for {{ team_name }} {% endblock %}
+
+{% block content %}
+  {% if pairing_exists %}
+    {% if bye %}
+      
+      {{round.bye_team.name}} is on a bye this round.
+      
+    {% else %}
+      {% if gov %}
+      
+        {{round.gov_team.name}} will gov next round against 
+        {{round.opp_team.name}} in {{round.room.name}}, judged by {{judges}}.
+      
+      {% else %}
+      
+        {{round.opp_team.name}} will opp next round against 
+        {{round.gov_team.name}} in {{round.room.name}}, judged by {{judges}}.
+
+      {% endif %}
+    {% endif %}
+  {% else %}
+
+    Round {{round_number}} does not yet have a valid pairing. Please wait until
+    your tournament directors release a valid pairing before viewing this page.
+
+  {% endif %}
+{% endblock %}

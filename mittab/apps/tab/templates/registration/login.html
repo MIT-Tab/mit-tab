@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 
-{% block content %}
+{% block headers %}
+<script type="text/javascript" src="/static/javascript/login.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
+{% endblock %}
 
+{% block content %}
+    
   {% if form.errors %}
     <p class="error">Sorry, that's not a valid username or password</p>
   {% endif %}
@@ -13,7 +19,7 @@
   </div>
 
   <div class="row-fluid">
-    <div class="span6">
+    <div class="span4">
       <h3> Tab Staff Login </h3>
       <form action="" method="post" class="form-horizontal">{% csrf_token %}
         <div class="control-group">
@@ -26,7 +32,8 @@
         <input type="hidden" name="next" value="{{ next|escape }}" />
       </form>
     </div>
-    <div class="span6">
+    
+    <div class="span4">
       <h3> Participant Access </h3>
       <div class="control-group">
         <a class="btn btn-large btn-info" href="/pairings/pairinglist/">
@@ -47,6 +54,24 @@
           Submit an e-ballot
         </a>
       </div>
+    </div>
+    
+    <div class="span4">
+      <h3> Next Round Look-up </h3>
+      
+      <div class="control-group">
+        
+        <select id="teams-lookup">
+          
+          {% for team in teams %}
+          <option value={{team.0}}> {{team.1}} </option>
+          {% endfor %}
+
+        </select>
+        
+        <button class="btn inline"  id="team_btn"> Check </button> 
+
+      </div> 
     </div>
   </div>
 
