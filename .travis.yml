@@ -9,3 +9,4 @@ install:
 script:
   - ./bin/setup testpassword
   - travis_wait 25 coverage run --source=. manage.py test
+after_success: coveralls
