@@ -6,4 +6,7 @@ install:
  - "pip3 install ."
  - "pip3 install -r requirements.txt"
 # command to run tests
-script: travis_wait 25 make test
+script:
+  - ./bin/setup testpassword
+  - travis_wait 25 coverage run --source=. manage.py test
+after_success: coveralls
