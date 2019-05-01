@@ -112,38 +112,18 @@ def rank_debaters_ajax(request):
                               context_instance=RequestContext(request))
 
 def rank_debaters(request):
+    start_ms = int(round(time.time() * 1000))
     speakers = tab_logic.rank_speakers()
-    debaters = [(s,
-                 tab_logic.tot_speaks_deb(s),
-                 tab_logic.tot_ranks_deb(s),
-                 tab_logic.deb_team(s)) for s in speakers]
+    debaters = [(s.debater,
+                 s.speaks,
+                 s.ranks,
+                 s.debater.team_set.first()) for s in speakers]
 
-    nov_speakers = tab_logic.rank_nov_speakers()
-    nov_debaters = [(s,
-                     tab_logic.tot_speaks_deb(s),
-                     tab_logic.tot_ranks_deb(s),
-                     tab_logic.deb_team(s)) for s in nov_speakers]
-
+    nov_debaters = filter(lambda s: s[0].novice_status == Debater.NOVICE,
+            debaters)
     return render_to_response('rank_debaters_component.html', 
                              {'debaters': debaters, 
                               'nov_debaters' : nov_debaters,
                               'title': "Speaker Rankings"}, 
                              context_instance=RequestContext(request))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

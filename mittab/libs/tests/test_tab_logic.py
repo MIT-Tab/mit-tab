@@ -11,6 +11,7 @@ from mittab.libs.tests.assertion import assert_nearly_equal
 from mittab.libs.tests.data.load_data import load_debater_rankings
 from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tests.helpers import generate_results
+from mittab.libs.tab_logic.rankings import TeamScore, DebaterScore
 
 import random
 
@@ -26,7 +27,7 @@ class TestRankingLogic(TestCase):
         etc ...)
         """
         debaters = Debater.objects.all()
-        scores = [(debater.name, tab_logic.debater_score(debater))
+        scores = [(debater.name, DebaterScore(debater).scoring_tuple())
                   for debater in debaters]
         expected_scores = load_debater_rankings()
         dict_scores, dict_expected_scores = list(map(dict,
@@ -43,7 +44,7 @@ class TestRankingLogic(TestCase):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
         teams = Team.objects.all()
-        scores = [(team.name, tab_logic.team_score(team)) for team in teams]
+        scores = [(team.name, TeamScore(team).scoring_tuple()) for team in teams]
         expected_scores = load_team_rankings()
         dict_scores, dict_expected_scores = list(map(dict,
                                                 (scores, expected_scores)))
