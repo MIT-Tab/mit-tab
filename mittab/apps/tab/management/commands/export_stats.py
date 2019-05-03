@@ -13,17 +13,18 @@ class Command(BaseCommand):
     DEBATER_ROWS = ('Name', 'School', 'Speaks', 'Ranks')
 
     help = 'Dump novice & varsity team/speaker rankings as a csv'
-    option_list = BaseCommand.option_list + (
-            make_option("--root", dest="root",
-                default=".", help="root path for all of the csv files"),
-            make_option("--team-file", dest="team_file",
-                default="teams.csv", help="name of the teams file"),
-            make_option("--nov-team-file", dest="nov_team_file",
-                default="nov-teams.csv", help="name of the novice teams file"),
-            make_option("--debater-file", dest="debater_file",
-                default="debaters.csv", help="name of the debaters file"),
-            make_option("--nov-debater-file", dest="nov_debater_file",
-                default="nov-debaters.csv", help="name of the novice debaters file"))
+
+    def add_arguments(self, parser):
+        parser.add_argument("--root", dest="root",
+            default=".", help="root path for all of the csv files"),
+        parser.add_argument("--team-file", dest="team_file",
+            default="teams.csv", help="name of the teams file"),
+        parser.add_argument("--nov-team-file", dest="nov_team_file",
+            default="nov-teams.csv", help="name of the novice teams file"),
+        parser.add_argument("--debater-file", dest="debater_file",
+            default="debaters.csv", help="name of the debaters file"),
+        parser.add_argument("--nov-debater-file", dest="nov_debater_file",
+            default="nov-debaters.csv", help="name of the novice debaters file")
 
     def make_team_row(self, team):
         return (

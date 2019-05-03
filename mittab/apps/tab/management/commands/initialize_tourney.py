@@ -14,11 +14,12 @@ from mittab.apps.tab.models import TabSettings
 class Command(BaseCommand):
     args = '<backup_directory>'
     help = 'Setup a new tounament and backup the last one'
-    option_list = BaseCommand.option_list + (
-            make_option("--tab-password", dest="tab_password",
-                help="Password for the tab user"),
-            make_option("--entry-password", dest="entry_password",
-                help="Password for the entry user"))
+
+    def add_arguments(self, parser):
+        parser.add_argument("--tab-password", dest="tab_password",
+            help="Password for the tab user"),
+        parser.add_argument("--entry-password", dest="entry_password",
+            help="Password for the entry user")
 
     def handle(self, *args, **options):
         if len(args) != 1:
