@@ -1,3 +1,4 @@
+import os
 import sys, traceback
 import itertools
 import pprint
@@ -10,6 +11,7 @@ from decimal import Decimal
 
 from mittab.apps.tab.models import *
 from mittab.libs import errors
+from mittab import settings
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -92,6 +94,12 @@ class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
         fields = '__all__'
+
+    class Media:
+        css = {
+            'all': (os.path.join(settings.BASE_DIR, '/static/admin/css/widgets.css'),),
+        }
+        js = ('/admin/jsi18n'),
 
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
