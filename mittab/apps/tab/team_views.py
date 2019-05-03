@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
@@ -390,24 +390,20 @@ def public_status(request, team_id, team_ref=None):
         if pairing_exists:
             return _public_status_pairing_exists(request, matches, round_number)
         else:
-            return render_to_response('public_status.html',
-                                      {
-                                        'no_navigation': True,
-                                        'bye': False,
-                                        'pairing_exists': False,
-                                        'team_name': None,
-                                        'gov_or_opp': None,
-                                        'other_team': None,
-                                        'room': None,
-                                        'judges': None,
-                                        'round_number': round_number,
-                                      }, context_instance=RequestContext(request))
+            return render(request, 'public_status.html',
+                          {
+                            'no_navigation': True,
+                            'bye': False,
+                            'pairing_exists': False,
+                            'round_number': round_number,
+                          })
     else:
-        return render_to_response('error.html',
-                                 {'error_type': 'Tab Card','error_name': 'View',
-                                  'error_info': "That's not a registered team!",
-                                  'no_navigation': True},
-                                  context_instance=RequestContext(request))
+        return render(request, 'error.html',
+                     {
+                        'error_type': 'Tab Card','error_name': 'View',
+                        'error_info': "That's not a registered team!",
+                        'no_navigation': True
+                     })
                                   
 
 def _public_status_pairing_exists(request, matches, round_number):
@@ -419,40 +415,41 @@ def _public_status_pairing_exists(request, matches, round_number):
                               bye_team=matches[0])   
         
     if gov_pairings:
-        return render_to_response('public_status.html',
-                                    {
-                                        'no_navigation': True,
-                                        'pairing_exists': True,
-                                        'bye': False,
-                                        'gov': True,
-                                        'round': gov_pairings[0],
-                                        'judges': _judge_names(gov_pairings[0].judges),
-                                    }, context_instance=RequestContext(request))
+        return render(request, 'public_status.html',
+                     {
+                         'no_navigation': True,
+                         'pairing_exists': True,
+                         'bye': False,
+                         'gov': True,
+                         'round': gov_pairings[0],
+                         'judges': _judge_names(gov_pairings[0].judges),
+                     })
     elif opp_pairings:
-        return render_to_response('public_status.html',
-                                    {
-                                        'no_navigation': True,
-                                        'pairing_exists': True,
-                                        'bye': False,
-                                        'gov': False,
-                                        'round': opp_pairings[0],
-                                        'judges': _judge_names(opp_pairings[0].judges),
-                                    }, context_instance=RequestContext(request))
+        return render(request, 'public_status.html',
+                    {
+                        'no_navigation': True,
+                        'pairing_exists': True,
+                        'bye': False,
+                        'gov': False,
+                        'round': opp_pairings[0],
+                        'judges': _judge_names(opp_pairings[0].judges),
+                    })
     elif byes:
-        return render_to_response('public_status.html',
-                                    {
-                                        'no_navigation': True,
-                                        'pairing_exists': True,
-                                        'bye': True,
-                                        'round': byes[0],
-                                    }, context_instance=RequestContext(request))
+        return render(request, 'public_status.html',
+                     {
+                         'no_navigation': True,
+                         'pairing_exists': True,
+                         'bye': True,
+                         'round': byes[0],
+                     })
     else:
-        return render_to_response('error.html', 
-                                 {'error_type': 'Public Status',
-                                  'error_name': 'Expected a pairing',
-                                  'error_info': 'Pairings are released, but\n' +\
-                                  ' this team is not in a bye or a round'}, 
-                                  context_instance=RequestContext(request))
-
+        return render(request, 'error.html', 
+                     {
+                        'error_type': 'Public Status',
+                        'error_name': 'Expected a pairing',
+                        'error_info': 'Pairings are released, but\n' +\
+                        ' this team is not in a bye or a round'
+                    })
+                    
 def _judge_names(judges):
     return ', '.join(judge.name for judge in judges.all())
