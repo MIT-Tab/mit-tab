@@ -28,7 +28,7 @@
                       <a class="mid btn btn-warning release"
                          href="#" title="Release the pairings to the participants">Release Pairing</a>
                       {% endif %}
-                      {% url 'mittab.apps.tab.pairing_views.pair_round' as pair_round_url %}
+                      {% url 'pair_round' as pair_round_url %}
                       <a class="mid btn btn-info"
                          href="{{ pair_round_url }}"
                          title="Pair the next round of debate">Prepare Next Round</a>

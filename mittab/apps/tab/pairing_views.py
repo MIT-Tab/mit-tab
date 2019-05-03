@@ -108,8 +108,7 @@ def pair_round(request):
             return render_to_response('error.html',
                                       {'error_type': "Pair Next Round",
                                        'error_name': "Pairing Round %s" % (current_round.value + 1),
-                                       'error_info': "Could not pair next round because of: [{0}]".format(exp)},
-                                        context_instance=RequestContext(request))
+                                       'error_info': "Could not pair next round because of: [{0}]".format(exp)})
         return view_status(request)
     else:
         # See if we can pair the round
@@ -153,8 +152,7 @@ def pair_round(request):
             check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
 
         return render_to_response('pair_round.html',
-                                  locals(),
-                                  context_instance=RequestContext(request))
+                                  locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
@@ -184,8 +182,7 @@ def assign_judges_to_pairing(request):
             return render_to_response('error.html',
                                      {'error_type': "Judge Assignment",
                                       'error_name': "",
-                                      'error_info': str(e)},
-                                      context_instance=RequestContext(request))
+                                      'error_info': str(e)})
     return redirect('/pairings/status/')
 
 
@@ -198,7 +195,7 @@ def view_backup(request, filename):
     item_manip = "restore from that backup"
     links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
              ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
-    return render_to_response('list_data.html', locals(), context_instance=RequestContext(request))
+    return render_to_response('list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def download_backup(request, filename):
@@ -218,14 +215,12 @@ def upload_backup(request):
             return render_to_response('thanks.html', 
                                      {'data_type': "Backup",
                                       'data_name': request.FILES['file'].name,
-                                      'data_modification': "CREATE"}, 
-                                      context_instance=RequestContext(request))
+                                      'data_modification': "CREATE"})
     else:
         form = UploadBackupForm()
     return render_to_response('data_entry.html', 
                               {'form': form,
-                               'title': 'Upload a Backup'}, 
-                               context_instance=RequestContext(request))
+                               'title': 'Upload a Backup'})
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
@@ -237,12 +232,10 @@ def manual_backup(request):
         emit_current_exception()
         return render_to_response('error.html',
                                  {'error_type': "Manual Backup",'error_name': "Backups",
-                                  'error_info': "Could not backup database. Something is wrong with your AWS setup."},
-                                  context_instance=RequestContext(request))
+                                  'error_info': "Could not backup database. Something is wrong with your AWS setup."})
     return render_to_response('thanks.html',
                              {'data_type': "Backing up database",
-                              'data_name': " for round {} as version number {}".format(cur_round, btime)},
-                               context_instance=RequestContext(request))
+                              'data_name': " for round {} as version number {}".format(cur_round, btime)})
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def view_backups(request):
@@ -252,7 +245,7 @@ def view_backups(request):
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
     links = [('/upload_backup/', "Upload Backup", False)]
-    return render_to_response('list_data.html', locals(), context_instance=RequestContext(request))
+    return render_to_response('list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
@@ -260,8 +253,7 @@ def restore_backup(request, filename):
     backup.restore_from_backup(filename)
     return render_to_response('thanks.html',
                              {'data_type': "Restored from backup",
-                              'data_name': "{}".format(filename)},
-                               context_instance=RequestContext(request))
+                              'data_name': "{}".format(filename)})
 
 def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
@@ -309,8 +301,7 @@ def view_round(request, round_number, errors = None):
     excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
 
     return render_to_response('pairing_control.html',
-                               locals(),
-                               context_instance=RequestContext(request))
+                               locals())
 
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
@@ -339,8 +330,7 @@ def alternative_judges(request, round_id, judge_id=None):
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
     return render_to_response('judge_dropdown.html',
-                              locals(),
-                              context_instance=RequestContext(request))
+                              locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judge(request, round_id, judge_id, remove_id=None):
@@ -398,8 +388,7 @@ def pretty_pair(request, printable=False):
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
     return render_to_response('round_pairings.html',
-                               locals(),
-                               context_instance=RequestContext(request))
+                               locals())
 
 def pretty_pair_print(request):
     return pretty_pair(request, True)
@@ -410,8 +399,7 @@ def missing_ballots(request):
     # need to do this to not reveal brackets
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    return render_to_response('missing_ballots.html', locals(),
-            context_instance=RequestContext(request))
+    return render_to_response('missing_ballots.html', locals())
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -419,8 +407,7 @@ def view_rounds(request):
     return render_to_response('list_data.html',
                               {'item_type':'round',
                                'item_list': rounds,
-                               'show_delete': True},
-                              context_instance=RequestContext(request))
+                               'show_delete': True})
 
 
 def e_ballot_search(request):
@@ -490,12 +477,10 @@ def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None
                 return render_to_response("error.html",
                                           {"error_type": "Round Result",
                                            "error_name": "[%s]" % str(round_obj),
-                                           "error_info": "Invalid round result, could not remedy."},
-                                          context_instance=RequestContext(request))
+                                           "error_info": "Invalid round result, could not remedy."})
             return render_to_response("thanks.html",
                                       {"data_type": "Round Result",
-                                       "data_name": "[%s]" % str(round_obj)},
-                                      context_instance=RequestContext(request))
+                                       "data_name": "[%s]" % str(round_obj)})
     else:
         form_kwargs = { "round_instance": round_obj }
         if ballot_code:
@@ -507,8 +492,7 @@ def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None
                                "title": 'Entering Ballot for {}'.format(round_obj),
                                "gov_team": round_obj.gov_team,
                                "opp_team": round_obj.opp_team,
-                               "ballot_code": ballot_code},
-                              context_instance=RequestContext(request))
+                               "ballot_code": ballot_code})
 
 
 def enter_multiple_results(request, round_id, num_entered):
@@ -559,8 +543,7 @@ def enter_multiple_results(request, round_id, num_entered):
                 round_obj.save()
                 return render_to_response('thanks.html', 
                                          {'data_type': "Round Result",
-                                          'data_name': "["+str(round_obj)+"]"}, 
-                                          context_instance=RequestContext(request))
+                                          'data_name': "["+str(round_obj)+"]"})
             else:
                 forms[0]._errors["winner"] = forms[0].error_class([error_msg])
     else:
@@ -571,15 +554,13 @@ def enter_multiple_results(request, round_id, num_entered):
                               {'forms': forms,
                                'title': "Entering Ballots for {}".format(str(round_obj)),
                                'gov_team': round_obj.gov_team,
-                               'opp_team': round_obj.opp_team},
-                               context_instance=RequestContext(request))
+                               'opp_team': round_obj.opp_team})
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def confirm_start_new_tourny(request):
     return render_to_response('confirm.html',
                               {'link': "/pairing/start_tourny/",
-                               'confirm_text': "Create New Tournament"},
-                               context_instance=RequestContext(request))
+                               'confirm_text': "Create New Tournament"})
 
 #TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -595,12 +576,10 @@ def start_new_tourny(request):
         return render_to_response('error.html',
                             {'error_type': "Could not Start Tournament",
                             'error_name': "",
-                            'error_info':"Invalid Tournament State. Time to hand tab. [%s]"%(e)},
-                            context_instance=RequestContext(request))
+                            'error_info':"Invalid Tournament State. Time to hand tab. [%s]"%(e)})
     return render_to_response('thanks.html',
                             {'data_type': "Started New Tournament",
-                            'data_name': ""},
-                            context_instance=RequestContext(request))
+                            'data_name': ""})
 
 def clear_db():
     obj_types = [
