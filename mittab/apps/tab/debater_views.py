@@ -112,7 +112,6 @@ def rank_debaters_ajax(request):
                               context_instance=RequestContext(request))
 
 def rank_debaters(request):
-    start_ms = int(round(time.time() * 1000))
     speakers = tab_logic.rank_speakers()
     debaters = [(s.debater,
                  s.speaks,
