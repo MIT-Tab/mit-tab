@@ -1,3 +1,4 @@
+import os
 import sys, traceback
 import itertools
 import pprint
@@ -10,6 +11,7 @@ from decimal import Decimal
 
 from mittab.apps.tab.models import *
 from mittab.libs import errors
+from mittab import settings
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -32,8 +34,9 @@ class RoomForm(forms.ModelForm):
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
-                                             widget=FilteredSelectMultiple("Affiliated Schools",
-                                             is_stacked=False))
+                                             widget=FilteredSelectMultiple("Schools",
+                                             False),
+                                             required=False)
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -72,17 +75,17 @@ class JudgeForm(forms.ModelForm):
         model = Judge
         fields = '__all__'
 
+    class Media:
+        css = {
+            'all': (os.path.join(settings.BASE_DIR, '/static/admin/css/widgets.css'),),
+        }
+        js = ('/admin/jsi18n', 'javascript/forms.js')
+
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'),
                                               widget=FilteredSelectMultiple("Debaters", 
-                                              is_stacked=False))   
-#    def __init__(self, *args, **kwargs):
-#        super(TeamForm, self).__init__(*args, **kwargs)
-#        if kwargs.has_key('instance'):
-#            instance = kwargs['instance']
-#            self.fields['debaters'].initial = [d.pk for d in instance.debaters.all()]
-
+                                              is_stacked=False))
     def clean_debaters(self):
         data = self.cleaned_data['debaters']
         if not( 1 <= len(data) <= 2) :
@@ -92,6 +95,12 @@ class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
         fields = '__all__'
+
+    class Media:
+        css = {
+            'all': (os.path.join(settings.BASE_DIR, '/static/admin/css/widgets.css'),),
+        }
+        js = ('/admin/jsi18n'),
 
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?", initial=0)
