@@ -10,7 +10,7 @@ from mittab.libs import tab_logic, errors
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
-    c_debaters = [(debater.pk,debater.name) for debater in Debater.objects.order_by("name")]
+    c_debaters = [(debater.pk,debater.name,0,"") for debater in Debater.objects.order_by("name")]
     return render(request, 'list_data.html', 
                              {'item_type':'debater',
                               'title': "Viewing All Debaters",
