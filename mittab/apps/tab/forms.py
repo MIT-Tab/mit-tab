@@ -35,7 +35,8 @@ class RoomForm(forms.ModelForm):
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
                                              widget=FilteredSelectMultiple("Schools",
-                                             is_stacked=False))
+                                             False),
+                                             required=False)
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
         if entry:
@@ -78,7 +79,7 @@ class JudgeForm(forms.ModelForm):
         css = {
             'all': (os.path.join(settings.BASE_DIR, '/static/admin/css/widgets.css'),),
         }
-        js = ('/admin/jsi18n'),
+        js = ('/admin/jsi18n', 'javascript/forms.js')
 
 
 class TeamForm(forms.ModelForm):
