@@ -24,8 +24,10 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.quit()
         try:
             super(BaseWebTestCase, self).tearDown()
-        except IndexError:
-            print("Ignoring IndexError in tearDown...")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print("Ignoring exception in tear-town")
 
     def _login(self):
         self._visit("")
