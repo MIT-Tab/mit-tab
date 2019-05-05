@@ -35,9 +35,11 @@ jobs:
           name: run tests
           command: |
             . venv/bin/activate
+            ./bin/setup password
             TESTFILES=$(circleci tests glob "mittab/libs/tests/*/test_*.py")
+            echo 'Testfiles:'
             echo $TESTFILES
-            coverage run --source=. manage.py test $TESTFILES
+            coverage run --source=. pytest --reuse-db $TESTFILES
 
       - store_artifacts:
           path: test-reports
