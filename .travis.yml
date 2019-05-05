@@ -8,5 +8,5 @@ install:
 # command to run tests
 script:
   - ./bin/setup testpassword
-  - travis_wait 35 coverage run --source=. manage.py test
+  - travis_wait 35 coverage run --source=. manage.py test mittab.libs.tests.test_web
 after_success: coveralls
