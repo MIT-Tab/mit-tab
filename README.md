@@ -1,7 +1,8 @@
 <div align="center">
 <img width="100%" src="https://image.ibb.co/ggYcLw/banner.png" alt="MIT-Tab">
 
-[![Build Status](https://travis-ci.org/MIT-Tab/mit-tab.svg?branch=master)](https://travis-ci.org/jolynch/mit-tab)
+[![CircleCI](https://circleci.com/gh/MIT-Tab/mit-tab.svg?style=svg)](https://circleci.com/gh/MIT-Tab/mit-tab)
+[![Coverage Status](https://coveralls.io/repos/github/MIT-Tab/mit-tab/badge.svg?branch=master)](https://coveralls.io/github/MIT-Tab/mit-tab?branch=master)
 [![Documentation Status](https://readthedocs.org/projects/mit-tab/badge/?version=latest)](https://mit-tab.readthedocs.io/en/latest/?badge=latest)
 
 
