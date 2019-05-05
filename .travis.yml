@@ -4,7 +4,7 @@ python:
   - "3.4"
 # command to install dependencies
 install:
- - sudo apt-cache show sqlite3
+ - sudo apt-cache show sqlite3~travis1
  - 'echo $(python -c "import sqlite3; print(sqlite3.version); print(sqlite3.sqlite_version)")'
  - "sqlite3 --version"
  - "pip3 install ."
