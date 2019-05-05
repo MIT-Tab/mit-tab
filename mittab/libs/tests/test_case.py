@@ -25,7 +25,6 @@ class BaseWebTestCase(LiveServerTestCase):
         super(BaseWebTestCase, self).tearDown()
 
     def _post_teardown(self):
-        print("executing")
         try:
             super(BaseWebTestCase, self)._post_teardown()
         except Exception as e:
