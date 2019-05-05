@@ -2,7 +2,6 @@ coverage==4.0.3
 Django==1.10.8
 haikunator==2.1
 mock==1.0.1
-python-coveralls==2.9
 django-localflavor==1.0
 gunicorn==19.7.1
 xlrd==0.9.4
