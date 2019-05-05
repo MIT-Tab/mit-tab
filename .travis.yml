@@ -6,10 +6,8 @@ python:
 install:
  - "pip3 install ."
  - "pip3 install -r requirements.txt"
-# command to run tests
+ - ln --symbolic /usr/lib/chromium-browser/chromedriver "${HOME}/bin/chromedriver"
 script:
-  - which chrome
-  - which chromedriver
   - ./bin/setup password
   - travis_wait 35 coverage run --source=. manage.py test
 after_success: coveralls
