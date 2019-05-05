@@ -4,6 +4,7 @@ python:
   - "3.4"
 # command to install dependencies
 install:
+ - sudo apt search sqlite3
  - 'echo $(python -c "import sqlite3; print(sqlite3.version); print(sqlite3.sqlite_version)")'
  - "sqlite3 --version"
  - "pip3 install ."
@@ -21,4 +22,3 @@ addons:
       - travis-ci/sqlite3
     packages:
       - chromium-chromedriver
-      - sqlite3.25.3.1-1~travis1
