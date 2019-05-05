@@ -5,6 +5,7 @@ jobs:
       # specify the version you desire here
       # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
       - image: circleci/python:3.6.1-browsers
+    parallelism: 4
 
     working_directory: ~/repo
 
@@ -34,7 +35,9 @@ jobs:
           name: run tests
           command: |
             . venv/bin/activate
-            coverage run --source=. manage.py test
+            TESTFILES=$(circleci tests glob "mittab/libs/tests/*/test_*.py")
+            echo $TESTFILES
+            coverage run --source=. manage.py test $TESTFILES
 
       - store_artifacts:
           path: test-reports
