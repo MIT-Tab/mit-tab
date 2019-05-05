@@ -34,11 +34,11 @@ jobs:
           command: |
             . venv/bin/activate
             ./bin/setup password
-            coverage run -m pytest --circleci-parallelize --reuse-db
+            pytest --cov=./ --circleci-parallelize --reuse-db
 
       - store_artifacts:
           path: test-reports
           destination: test-reports
 
       - codecov/upload:
-          file: {{ coverage_report_filepath }}
+          file: ./
