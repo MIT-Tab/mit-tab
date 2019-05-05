@@ -21,7 +21,6 @@
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 import random
-import pprint
 
 def add_judges(pairings, judges, panel_points):
     # First clear any existing judge assignments
@@ -42,8 +41,6 @@ def add_judges(pairings, judges, panel_points):
     pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
                   reverse = True)
 
-    pprint.pprint(pairings)
-
     pairing_groups = [list() for panel_point in panel_points] + [list()]
     panel_gaps = {}
     current_group = 0
@@ -52,8 +49,6 @@ def add_judges(pairings, judges, panel_points):
         if current_group < len(panel_points) and pairing == panel_points[current_group][0]:
             panel_gaps[current_group] = panel_points[current_group][1]
             current_group += 1
-
-    pprint.pprint(panel_points)
 
     for (group_i, group) in enumerate(pairing_groups):
         num_rounds = len(group)
@@ -128,7 +123,6 @@ def add_judges(pairings, judges, panel_points):
                             graph_edges.append((pairing_i,
                                                 judge_i + num_to_panel,
                                                 calc_weight_panel(judges)))
-                pprint.pprint(graph_edges)
                 judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
                 print(judge_assignments)
                 if ((-1 in judge_assignments[:num_to_panel]) or
