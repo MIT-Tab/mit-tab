@@ -4,7 +4,6 @@ import traceback
 import time
 import datetime
 import os
-import pprint
 
 from django.shortcuts import render
 from django.template import RequestContext
