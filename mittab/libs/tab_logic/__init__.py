@@ -7,7 +7,6 @@ from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 from decimal import *
 from datetime import datetime
-import pprint
 import itertools
 
 def pair_round():
