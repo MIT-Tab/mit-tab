@@ -10,10 +10,12 @@ class BaseWebTestCase(LiveServerTestCase):
     """
     username = 'tab'
     password = 'password'
-    wait_seconds = 1.0
+    wait_seconds = 3.0
 
     def setUp(self):
         chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--no-sandbox")
         self.browser = Browser('chrome', headless=True, wait_time=10, options=chrome_options)
         super(BaseWebTestCase, self).setUp()
@@ -33,6 +35,7 @@ class BaseWebTestCase(LiveServerTestCase):
 
     def _go_home(self):
         self.browser.click_link_by_text('Home')
+        time.sleep(self.wait_seconds)
 
     def _setup_confirm(self):
         """
@@ -52,6 +55,7 @@ class BaseWebTestCase(LiveServerTestCase):
     def _visit(self, path):
         path = self.live_server_url + path
         self.browser.visit(path)
+        time.sleep(self.wait_seconds)
 
 
 class SettingUpATournamentTestCase(BaseWebTestCase):
@@ -132,10 +136,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
 
         self.browser.find_by_value('Submit Changes').first.click()
         msg = "Judge [%s] has been successfully modified!(EDIT)" % name
-        try:
-            assert self.browser.is_text_present(msg)
-        except:
-            import pdb; pdb.set_trace()
+        assert self.browser.is_text_present(msg)
 
 
     def _add_debater(self, name, varsity):
