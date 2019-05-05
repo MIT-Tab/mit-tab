@@ -35,15 +35,15 @@ Here is the format of the .xlsx file:
 **NOTE:** Debaters will automatically be created from this sheet, too.
 
 ```eval_rst
++-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
+| Name* | School*                  | Hybrid School         | Seed              | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
+|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          | (leave blank for iron-person) | (“N” or blank)          |  |
+|       | protection they take)    | whose protection they | “Free”, or empty) |                 |                         |                               |                         |  |
+|       |                          | don't take, otherwise |                   |                 |                         |                               |                         |  |
+|       |                          | leave empty)          |                   |                 |                         |                               |                         |  |
 +-------+--------------------------+-----------------------+-------------------+------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-| Name* | School*                  | Hybrid School         | Seed              | Free | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
-|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |      |                 | (“N” or blank)          | (leave blank for iron-person) | (“N” or blank)          |  |
-|       | protection they take)    | whose protection they | “Free”, or empty) |      |                 |                         |                               |                         |  |
-|       |                          | don't take, otherwise |                   |      |                 |                         |                               |                         |  |
-|       |                          | leave empty)          |                   |      |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-|       |                          |                       |                   |      |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+------+-----------------+-------------------------+-------------------------------+-------------------------+--+
+|       |                          |                       |                   |                 |                         |                               |                         |  |
++-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
 ```
 
 ### Judges
