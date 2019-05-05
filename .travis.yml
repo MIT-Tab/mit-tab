@@ -10,3 +10,5 @@ script:
   - ./bin/setup password
   - travis_wait 35 coverage run --source=. manage.py test
 after_success: coveralls
+addons:
+  chrome: stable
