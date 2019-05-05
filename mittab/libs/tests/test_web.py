@@ -178,10 +178,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         self._submit_form(**data)
 
         msg = "%s [%s] has been successfully modified!(CREATED)" % (entity_name, data['name'])
-        try:
-            assert self.browser.is_text_present(msg)
-        except:
-            import pdb; pdb.set_trace()
+        assert self.browser.is_text_present(msg)
 
         self._go_home()
         self.browser.click_link_by_partial_text(data['name'])
