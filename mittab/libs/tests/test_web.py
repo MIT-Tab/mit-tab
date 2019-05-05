@@ -15,7 +15,7 @@ class BaseWebTestCase(LiveServerTestCase):
     def setUp(self):
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--no-sandbox")
-        self.browser = Browser('chrome', wait_time=10, options=chrome_options)
+        self.browser = Browser('chrome', headless=True, wait_time=10, options=chrome_options)
         super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):
