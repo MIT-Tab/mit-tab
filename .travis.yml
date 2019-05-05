@@ -1,12 +1,19 @@
 language: python
+dist: trusty
 python:
   - "3.4"
 # command to install dependencies
 install:
  - "pip3 install ."
  - "pip3 install -r requirements.txt"
+ - ln --symbolic /usr/lib/chromium-browser/chromedriver "${HOME}/bin/chromedriver"
 # command to run tests
 script:
-  - ./bin/setup testpassword
-  - travis_wait 25 coverage run --source=. manage.py test
+  - ./bin/setup password
+  - travis_wait 35 coverage run --source=. manage.py test
 after_success: coveralls
+addons:
+  chrome: stable
+  apt:
+    packages:
+      - chromium-chromedriver

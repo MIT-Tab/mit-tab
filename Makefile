@@ -13,7 +13,7 @@ web:
 tests: test
 
 test:
-	./bin/setup testpassword
+	./bin/setup password
 	python manage.py test
 
 shell:

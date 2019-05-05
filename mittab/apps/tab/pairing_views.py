@@ -240,7 +240,7 @@ def manual_backup(request):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def view_backups(request):
     backups = backup.list_backups()
-    item_list = [(i,i) for i in sorted(backups)]
+    item_list = [(i,i,0,"") for i in sorted(backups)]
     item_type='backup'
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
@@ -403,7 +403,7 @@ def missing_ballots(request):
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
-    rounds = [(i, "Round %i" % i) for i in range(1,number_of_rounds+1)]
+    rounds = [(i, "Round %i" % i, 0, "") for i in range(1,number_of_rounds+1)]
     return render(request, 'list_data.html',
                               {'item_type':'round',
                                'item_list': rounds,
