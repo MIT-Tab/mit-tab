@@ -9,3 +9,5 @@ gunicorn==19.7.1
 xlrd==0.9.4
 xlwt==1.3.0
 raven==6.1.0
+selenium==3.141.0
+splinter==0.10.0
