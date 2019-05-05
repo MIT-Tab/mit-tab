@@ -16,8 +16,7 @@ from mittab.libs.tab_logic.rankings import TeamScore, DebaterScore
 import random
 
 
-
-class TestRankingLogic:
+class TestRankingLogic(TestCase):
     """Tests that the methods related to debater and team scoring work as
     expected"""
     fixtures = ['testing_finished_db']
@@ -56,7 +55,7 @@ class TestRankingLogic:
             [assert_nearly_equal(*pair, message=msg) for pair
              in zip(set(left), set(right))]
 
-class TestPairingLogic:
+class TestPairingLogic(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
     """
@@ -94,6 +93,7 @@ class TestPairingLogic:
         self.generate_checkins()
         judges = [ci.judge for ci in
                   CheckIn.objects.filter(round_number=cur_round)]
+        print(len(rounds), len(judges))
         assign_judges.add_judges(rounds, judges, panel_points)
 
     def round_number(self):
@@ -120,3 +120,5 @@ class TestPairingLogic:
         last_round = 6
         for _ in range(1, last_round):
             self.check_pairing(self.round_number(), last_round)
+
+
