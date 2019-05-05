@@ -22,7 +22,10 @@ class BaseWebTestCase(LiveServerTestCase):
 
     def tearDown(self):
         self.browser.quit()
-        super(BaseWebTestCase, self).tearDown()
+        try:
+            super(BaseWebTestCase, self).tearDown()
+        except IndexError:
+            print("Ignoring IndexError in tearDown...")
 
     def _login(self):
         self._visit("")
