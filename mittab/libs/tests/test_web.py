@@ -1,6 +1,7 @@
 import time
 
 from django.test import LiveServerTestCase
+from selenium import webdriver
 from splinter import Browser
 
 class BaseWebTestCase(LiveServerTestCase):
@@ -12,7 +13,9 @@ class BaseWebTestCase(LiveServerTestCase):
     wait_seconds = 1.0
 
     def setUp(self):
-        self.browser = Browser('chrome', wait_time=10)
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument("--no-sandbox")
+        self.browser = Browser('chrome', wait_time=10, options=chrome_options)
         super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):
