@@ -32,7 +32,7 @@ jobs:
           command: |
             . venv/bin/activate
             ./bin/setup password
-            pytest --circleci-parallelize --reuse-db
+            coverage run -m pytest --circleci-parallelize --reuse-db
 
       - store_artifacts:
           path: test-reports
