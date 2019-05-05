@@ -2,9 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      # specify the version you desire here
-      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
-      - image: circleci/python:3.6.1-browsers
+      - image: circleci/python:3.7.2-browsers
     parallelism: 4
 
     working_directory: ~/repo
@@ -12,11 +10,9 @@ jobs:
     steps:
       - checkout
 
-      # Download and cache dependencies
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "requirements.txt" }}
-            # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
       - run:
@@ -36,10 +32,7 @@ jobs:
           command: |
             . venv/bin/activate
             ./bin/setup password
-            TESTFILES=$(circleci tests glob "mittab/libs/tests/*/test_*.py")
-            echo 'Testfiles:'
-            echo $TESTFILES
-            pytest --reuse-db $TESTFILES
+            pytest --circleci-parallelize --reuse-db
 
       - store_artifacts:
           path: test-reports
