@@ -22,12 +22,16 @@ class BaseWebTestCase(LiveServerTestCase):
 
     def tearDown(self):
         self.browser.quit()
+        super(BaseWebTestCase, self).tearDown()
+
+    def _post_teardown(self):
+        print("executing")
         try:
-            super(BaseWebTestCase, self).tearDown()
+            super(BaseWebTestCase, self)._post_teardown()
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print("Ignoring exception in tear-town")
+            print("Ignoring exception in post-teardown")
 
     def _login(self):
         self._visit("")
