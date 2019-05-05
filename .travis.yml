@@ -1,5 +1,5 @@
 language: python
-dist: xenial
+dist: trusty
 python:
   - "3.4"
 # command to install dependencies
@@ -17,7 +17,5 @@ after_success: coveralls
 addons:
   chrome: stable
   apt:
-    sources:
-      - travis-ci/sqlite3
     packages:
       - chromium-chromedriver
