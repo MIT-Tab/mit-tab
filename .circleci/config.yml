@@ -34,6 +34,7 @@ jobs:
           command: |
             . venv/bin/activate
             pytest --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db
+          no_output_timeout: 20m
 
       - store_artifacts:
           path: test-reports
