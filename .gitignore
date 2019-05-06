@@ -55,7 +55,7 @@ docs/_static/
 docs/_build/
 
 # Webpack Bundles
-assets/webpack_bundles/
+webpack_bundles/
 webpack-stats.json
 
 # Logs
