@@ -12,8 +12,6 @@ COPY requirements.txt ./
 COPY package.json ./
 COPY package-lock.json ./
 RUN pip install -r requirements.txt
-RUN npm install
-RUN npm rebuild node-sass
 
 # setup django
 COPY manage.py ./
