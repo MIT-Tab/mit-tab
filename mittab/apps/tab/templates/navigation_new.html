@@ -1,0 +1,94 @@
+{% load tags %}
+
+{% url "index" as home %}
+
+{% url "enter_school" as enter_school %}
+{% url "view_schools" as view_schools %}
+
+{% url "enter_room" as enter_room %}
+{% url "view_rooms" as view_rooms %}
+
+{% url "enter_judge" as enter_judge %}
+{% url "view_judges" as view_judges%}
+{% url "batch_checkin" as batch_checkin %}
+
+{% url "enter_team" as enter_team %}
+{% url "view_teams" as view_teams%}
+{% url "rank_teams_ajax" as rank_teams %}
+{% url "all_tab_cards" as tab_cards %}
+
+{% url "enter_debater" as enter_debater %}
+{% url "view_debaters" as view_debaters %}
+{% url "rank_debaters_ajax" as rank_debaters %}
+
+{% url "view_status" as view_status %}
+{% url "view_rounds" as view_rounds %}
+{% url "pair_round" as pair_round %}
+{% url "confirm_start_tourny" as confirm_start_new_tourny %}
+{% url "upload_data" as upload_data %}
+{% url "manual_backup" as backup %}
+{% url "view_backups" as view_backups %}
+{% url "view_scratches" as view_scratches %}
+{% url "add_scratch" as add_scratch %}
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="{{ home }}">MIT TAB</a>
+  <div class="collapse navbar-collapse">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
+          Pairings
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_status %}" href="{{ view_status }}">Current Round</a>
+          <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}">
+          Rankings
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
+          <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}">
+          Backups
+        </a>
+
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
+          <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
+          <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
+          Scratches
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a>
+          <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a>
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
+          Admin
+        </a>
+        <div class="dropdown-menu">
+          <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Judge Checkin</a>
+          <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
+          <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
+          <a class="dropdown-item" href="/admin">Admin Interface</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+  <br>
+</nav>
