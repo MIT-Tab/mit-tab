@@ -1,7 +1,7 @@
 <div align="center">
 <img width="100%" src="https://image.ibb.co/ggYcLw/banner.png" alt="MIT-Tab">
 
-[![CircleCI](https://circleci.com/gh/MIT-Tab/mit-tab.svg?style=svg)](https://circleci.com/gh/MIT-Tab/mit-tab)
+[![CircleCI](https://circleci.com/gh/MIT-Tab/mit-tab/tree/master.svg?style=svg)](https://circleci.com/gh/MIT-Tab/mit-tab/tree/master)
 [![codecov](https://codecov.io/gh/MIT-Tab/mit-tab/branch/master/graph/badge.svg)](https://codecov.io/gh/MIT-Tab/mit-tab)
 [![Documentation Status](https://readthedocs.org/projects/mit-tab/badge/?version=latest)](https://mit-tab.readthedocs.io/en/latest/?badge=latest)
 
