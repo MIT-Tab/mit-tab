@@ -208,21 +208,6 @@ def enter_room(request):
                              {'form': form, 'title': 'Create Room'})
 
 @permission_required('tab.room.can_delete', login_url="/403/")
-def delete_room(request, room_id):
-    school_id = int(room_id)
-    try :
-        r = Room.objects.get(pk=room_id)
-        r.delete()
-    except Room.DoesNotExist:
-        return render(request, 'error.html',
-                                 {'error_type': "Delete Room",
-                                  'error_name': str(room_id),
-                                  'error_info':"This room does not exist, please try again with a valid id. "})
-    return render(request, 'thanks.html',
-                             {'data_type': "Room",
-                              'data_name': "["+str(room_id)+"]",
-                              'data_modification': 'DELETED'})
-
 @permission_required('tab.scratch.can_delete', login_url="/403/")
 def delete_scratch(request, item_id, scratch_id):
     try:

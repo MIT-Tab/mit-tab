@@ -113,28 +113,6 @@ def enter_judge(request):
     return render(request, 'data_entry.html',
                               {'form': form, 'title': "Create Judge"})
 
-@permission_required('tab.judge.can_delete', login_url="/403/")
-def delete_judge(request, judge_id):
-    error_msg = None
-    try :
-        judge_id = int(judge_id)
-        judge = Judge.objects.get(pk=judge_id)
-        judge.delete()
-    except Judge.DoesNotExist:
-        error_msg = "Judge does not exist"
-    except Exception as e:
-        error_msg = "Error deleting judge: %s" % (e)
-    
-    if error_msg:
-        return render(request, 'error.html', 
-                                 {'error_type': "Judge",
-                                 'error_name': str(judge_id),
-                                 'error_info':error_msg})
-    return render(request, 'thanks.html', 
-                             {'data_type': "Judge",
-                              'data_name': "["+str(judge_id)+"]",
-                              'data_modification': 'DELETED'})
-
 def add_scratches(request, judge_id, number_scratches):
     try:
         judge_id,number_scratches = int(judge_id),int(number_scratches)
