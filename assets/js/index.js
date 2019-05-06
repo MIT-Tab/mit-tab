@@ -1,6 +1,8 @@
 import '../css/app.scss'
 
 import $ from 'jquery'
+import 'popper.js'
+import 'bootstrap'
 
 $.expr[':'].Contains = function(a,i,m){
     return $(a).text().toUpperCase().indexOf(m[3].toUpperCase())>=0;
