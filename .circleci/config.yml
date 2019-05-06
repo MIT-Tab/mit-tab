@@ -34,7 +34,7 @@ jobs:
           name: run tests
           command: |
             . venv/bin/activate
-            ./bin/setup password > /dev/null 2>&1
+            ./bin/setup password
             pytest --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db
           no_output_timeout: 20m
 
