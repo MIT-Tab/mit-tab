@@ -39,17 +39,46 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self._add_debater("Debater %s" % (i * 2), False)
             self._add_debater("Debater %s" % (i * 2 + 1), True)
 
+        self._go_home()
+        self.browser.click_link_by_text("Debater List")
+        self._wait()
+
+        for i in range(4):
+            assert self.browser.is_text_present("Debater %s" % (i * 2))
+            assert self.browser.is_text_present("Debater %s" % (i * 2 + 1))
+
     def _add_judges(self):
         for i in range(5):
             self._add_judge("Judge %s" % i, i, ["School %s" % i])
+
+        self._go_home()
+        self.browser.click_link_by_text("Judge List")
+        self._wait()
+
+        for i in range(5):
+            assert self.browser.is_text_present("Judge %s" % i)
 
     def _add_rooms(self):
         for i in range(5):
             self._add_room("Room %s" % i, i)
 
+        self._go_home()
+        self.browser.click_link_by_text("Room List")
+        self._wait()
+
+        for i in range(5):
+            assert self.browser.is_text_present("Room %s" % i)
+
     def _add_schools(self):
         for i in range(5):
             self._add_school("School %s" % i)
+
+        self._go_home()
+        self.browser.click_link_by_text("School List")
+        self._wait()
+
+        for i in range(5):
+            assert self.browser.is_text_present("School %s" % i)
 
     def _add_team(self, name, debaters, school):
         def select_team_options():

@@ -28,7 +28,6 @@ urlpatterns = [
 
     # Judge related
     url(r'^judge/(\d+)/$', judge_views.view_judge, name='view_judge'),
-    url(r'^judge/(\d+)/delete/$', judge_views.delete_judge, name='delete_judge'),
     url(r'^judge/(\d+)/scratches/add/(\d+)/', judge_views.add_scratches,
         name='add_scratches'),
     url(r'^judge/(\d+)/scratches/view/', judge_views.view_scratches,
@@ -47,7 +46,6 @@ urlpatterns = [
 
     # Room related
     url(r'^room/(\d+)/$', views.view_room, name='view_room'),
-    url(r'^room/(\d+)/delete/$', views.delete_room, name='delete_room'),
     url(r'^view_rooms/$', views.view_rooms, name='view_rooms'),
     url(r'^enter_room/$', views.enter_room, name='enter_room'),
 
@@ -61,7 +59,6 @@ urlpatterns = [
 
     # Team related
     url(r'^team/(\d+)/$', team_views.view_team, name='view_team'),
-    url(r'^team/(\d+)/delete/$', team_views.delete_team, name='delete_team'),
     url(r'^team/(\d+)/scratches/add/(\d+)/', team_views.add_scratches,
             name='add_scratches'),
     url(r'^team/(\d+)/scratches/view/', team_views.view_scratches,
@@ -78,8 +75,6 @@ urlpatterns = [
 
     # Debater related
     url(r'^debater/(\d+)/$', debater_views.view_debater, name='view_debater'),
-    url(r'^debater/(\d+)/delete/$', debater_views.delete_debater,
-            name='delete_debater'),
     url(r'^view_debaters/$', debater_views.view_debaters, name='view_debaters'),
     url(r'^enter_debater/$', debater_views.enter_debater, name='enter_debater'),
     url(r'^debater/ranking/$', debater_views.rank_debaters_ajax,
