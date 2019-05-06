@@ -1,10 +1,8 @@
+/*global SelectBox, addEvent, gettext, interpolate, quickElement, SelectFilter*/
 /*
- * this entire file just monkey-patches the Django JS, which is buggy
- * compare to: https://github.com/django/django/blob/stable/1.10.x/django/contrib/admin/static/admin/js/SelectFilter2.js
- * to see the differences
- *
- * This seems to not be fixed even in newer versions of Django. Bug report
- * opened here: https://code.djangoproject.com/ticket/30440#ticket
+SelectFilter2 - Turns a multiple-select box into a filter interface.
+
+Requires jQuery, core.js, and SelectBox.js.
 */
 (function($) {
     'use strict';
@@ -165,7 +163,19 @@
             SelectFilter.refresh_icons(field_id);
         },
         any_selected: function(field) {
-            return $(field).children("option:selected").size() > 0
+            var any_selected = false;
+            try {
+                // Temporarily add the required attribute and check validity.
+                // This is much faster in WebKit browsers than the fallback.
+                field.attr('required', 'required');
+                any_selected = field.is(':valid');
+                field.removeAttr('required');
+            } catch (e) {
+                // Browsers that don't support :valid (IE < 10)
+                any_selected = field.find('option:selected').length > 0;
+                field.removeAttr('required');
+            }
+            return any_selected;
         },
         refresh_icons: function(field_id) {
             var from = $('#' + field_id + '_from');
