@@ -1,1 +1,12 @@
-@import "~bootstrap/dist/css/bootstrap";
+$body-bg: #BFD9FF;
+
+@import "node_modules/bootstrap/scss/bootstrap";
+
+.bg-dark {
+  background-color: #00438A !important;
+}
+
+#container {
+  background: #fff;
+  max-width: 95%;
+}

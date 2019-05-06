@@ -168,6 +168,8 @@ $(document).ready(function(){
         filter_on_flags(filter_groups);
     }
 
+    
+
     $(".filter").change(function() {
         apply_filters();
     });
