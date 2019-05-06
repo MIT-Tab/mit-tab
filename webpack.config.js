@@ -1,10 +1,19 @@
-var path = require('path');
-var webpack = require('webpack');
-var BundleTracker = require('webpack-bundle-tracker');
+const path = require('path');
+const webpack = require('webpack');
+const BundleTracker = require('webpack-bundle-tracker');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 
 module.exports = {
   context: __dirname,
   entry: './assets/js/index',
+  optimization: {
+    minimizer: [
+      new UglifyJsPlugin({ cache: true, parallel: true, sourceMap: false  }),
+      new OptimizeCSSAssetsPlugin({})
+    ]
+  },
   output: {
     path: path.resolve('./assets/webpack_bundles/'),
     filename: "[name]-[hash].js"
@@ -13,13 +22,13 @@ module.exports = {
     rules: [{
       test: /\.css/,
       use: [
-        "style-loader",
+        MiniCssExtractPlugin.loader,
         "css-loader"
       ]
     }, {
       test: /\.scss$/,
       use: [
-        "style-loader", // creates style nodes from JS strings
+        MiniCssExtractPlugin.loader,
         "css-loader", // translates CSS into CommonJS
         "sass-loader" // compiles Sass to CSS, using Node Sass by default
       ]
@@ -35,6 +44,7 @@ module.exports = {
 
   plugins: [
     new BundleTracker({filename: './webpack-stats.json'}),
+    new MiniCssExtractPlugin({ filename: '../css/app.css'  }),
     new webpack.ProvidePlugin({ // inject ES5 modules as global vars
       $: 'jquery',
       jQuery: 'jquery',
