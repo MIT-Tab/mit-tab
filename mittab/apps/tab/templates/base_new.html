@@ -1,12 +1,12 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
 <head>
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'main' %}
+
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
     <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
-
-    {% load render_bundle from webpack_loader %}
-    {% render_bundle 'main' %}
 
     <title>{% block title %}{% endblock %}</title>
 </head>

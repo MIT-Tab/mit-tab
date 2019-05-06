@@ -26,11 +26,20 @@ module.exports = {
     }]
   },
   resolve: {
+    alias: {
+      jquery: "jquery/src/jquery"
+    },
     extensions: ['.js', '.scss', '.css'],
   },
 
 
   plugins: [
-    new BundleTracker({filename: './webpack-stats.json'})
+    new BundleTracker({filename: './webpack-stats.json'}),
+    new webpack.ProvidePlugin({ // inject ES5 modules as global vars
+      $: 'jquery',
+      jQuery: 'jquery',
+      'window.jQuery': 'jquery',
+      Tether: 'tether'
+    })
   ]
 }
