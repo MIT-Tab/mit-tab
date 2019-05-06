@@ -88,7 +88,7 @@ class JudgeForm(forms.ModelForm):
         css = {
             'all': (os.path.join(settings.BASE_DIR, '/static/admin/css/widgets.css'),),
         }
-        js = ('/admin/jsi18n')
+        js = ('/admin/jsi18n'),
 
 
 class TeamForm(forms.ModelForm):
