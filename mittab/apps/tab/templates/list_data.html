@@ -2,9 +2,22 @@
 {% load tags %}
 
 {% block title %}Data Entry{% endblock %}
+
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
+<div class="col">
+  {% quick_search %}
+  <div class="data-list">
+    <ul class="list_item">
+      {% for id, item, flags, symbols in item_list%}
+        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
 
 {% if filters %}
 <div class="col-4">
@@ -41,28 +54,8 @@
 </div>
 {% endif %}
 
-<div class="col">
-  {% quick_search %}
-  <div class="data-list">
-    <ul class="list_item">
-      {% for id, item, flags, symbols in item_list%}
-        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
 
 <div class="clear"></div>
-
-{% if links %}
-<div class="btn-group">
-  {% for link,text,confirm in links %}
-    <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
-  {% endfor %}
-</div>
-{%endif%}
 
 <div class="clear"></div>
 {% endblock %}

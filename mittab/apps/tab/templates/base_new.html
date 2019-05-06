@@ -26,11 +26,22 @@
         <h3>{% block banner %}{% endblock %}</h3>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         {% block content %}{% endblock %}
       </div>
 
-      <div class="row-fluid mt-2 text-center border-top">
+      <div class="row p-3 mt-2">
+        {% if links %}
+        <div class="btn-group">
+          {% for link,text,confirm in links %}
+            <button class="btn btn-secondary {%if confirm%}confirmLink{%endif%}"
+              href='{{link}}'>{{text}}</button>
+          {% endfor %}
+        </div>
+        {%endif%}
+      </div>
+
+      <div class="row-fluid mt-3 p-2 text-center border-top">
         <p>Need help? Check out <a href="https://github.com/jolynch/mit-tab/wiki">the wiki.</a></p>
         <p>MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz</p>
       </div>
