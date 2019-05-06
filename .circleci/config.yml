@@ -4,7 +4,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/python:3.7.2-browsers
+      - image: circleci/python:3.7.2-node-browsers
     parallelism: 4
 
     working_directory: ~/repo
