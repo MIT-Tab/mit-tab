@@ -158,7 +158,7 @@ $(document).ready(function(){
     })
 
     function apply_filters() {
-        show_all("li.data_list");
+        show_all("li.data-list");
         var flags = 0;
         var filter_groups = {}
         $(".filter").each(function(index, value) {
@@ -170,9 +170,9 @@ $(document).ready(function(){
         filter_on_flags(filter_groups);
     }
 
-    $(".filter").change(function() {
-        apply_filters();
-    });
+    console.log($(".filter"))
+    $(".filter").change(console.log.bind("change"))
+    $(".filter").change(apply_filters)
 
     apply_filters();
 });
