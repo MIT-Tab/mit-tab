@@ -16,7 +16,14 @@ $font-size-base: 0.95rem !default;
 }
 
 .data-list {
-  column-count: 3;
+  column-count: 4;
+  ul {
+    list-style-type: none;
+  }
+
+  .list-group-item {
+    text-overflow: clip;
+  }
 }
 
 #container-main {
