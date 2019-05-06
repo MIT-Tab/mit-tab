@@ -46,8 +46,7 @@ class BaseWebTestCase(LiveServerTestCase):
         assert not self.browser.is_text_present('Sign in')
 
     def _go_home(self):
-        self.browser.click_link_by_text('Home')
-        self._wait()
+        self._visit("/")
 
     def _setup_confirm(self):
         """
