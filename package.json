@@ -1,0 +1,29 @@
+{
+  "name": "mit-tab",
+  "version": "1.0.0",
+  "description": "Front-end assets for the new version of mit-tab",
+  "main": "webpack.config.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MIT-Tab/mit-tab.git"
+  },
+  "author": "Ben Muschol",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MIT-Tab/mit-tab/issues"
+  },
+  "homepage": "https://github.com/MIT-Tab/mit-tab#readme",
+  "devDependencies": {
+    "babel": "^6.23.0",
+    "babel-loader": "^8.0.5",
+    "webpack": "^4.30.0",
+    "webpack-bundle-tracker": "^0.4.2-beta",
+    "webpack-cli": "^3.3.2"
+  }
+}
