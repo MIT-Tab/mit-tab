@@ -100,22 +100,6 @@ def enter_team(request):
         form = TeamEntryForm()
     return render(request, 'data_entry.html',
                              {'form': form, 'title': "Create Team"})
-    
-@permission_required('tab.team.can_delete', login_url="/403/")                               
-def delete_team(request, team_id):
-    team_id = int(team_id)
-    try :
-        team = Team.objects.get(pk=team_id)
-        team.delete()
-    except Team.DoesNotExist:
-        return render(request, 'error.html', 
-                                 {'error_type': "Team",
-                                 'error_name': str(team_id),
-                                 'error_info':"Team does not exist"})
-    return render(request, 'thanks.html', 
-                             {'data_type': "Team",
-                              'data_name': "["+str(team_id)+"]",
-                              'data_modification': 'DELETED'})
 
 def add_scratches(request, team_id, number_scratches):
     try:

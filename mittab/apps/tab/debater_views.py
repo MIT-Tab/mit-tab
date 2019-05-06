@@ -55,27 +55,6 @@ def view_debater(request, debater_id):
                                   'debater_rounds': rounds,
                                   'title':"Viewing Debater: %s"%(debater.name)})
 
-@permission_required('tab.debater.can_delete', login_url="/403/")    
-def delete_debater(request, debater_id):
-    error_msg = None
-    try :
-        debater_id = int(debater_id)
-        d = Debater.objects.get(pk=debater_id)
-        d.delete()
-    except Debater.DoesNotExist:
-        error_msg = "Can't delete a non-existent debater"
-    except Exception as e:
-        errors.emit_current_exception()
-        error_msg = str(e)
-    if error_msg:
-        return render(request, 'error.html', 
-                                 {'error_type': "Debater",
-                                 'error_name': "Error Deleting Debater",
-                                 'error_info':error_msg})
-    return render(request, 'thanks.html', 
-                             {'data_type': "Debater",
-                              'data_name': "["+str(debater_id)+"]",
-                              'data_modification': 'DELETED'})
 def enter_debater(request):
     if request.method == 'POST':
         form = DebaterForm(request.POST)
