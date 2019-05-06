@@ -1,5 +1,6 @@
 #!/bin/bash
 
 python manage.py migrate --noinput
+./node_modules/.bin/webpack --config webpack.config.js
 python manage.py collectstatic --noinput
 python manage.py initialize_tourney --tab-password $1 '.'
