@@ -120,7 +120,6 @@ urlpatterns = [
     url(r'^e_ballots/$', pairing_views.e_ballot_search, name='e_ballot_search'),
     url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot, name='enter_e_ballot'),
 
-
     # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup,
             name='restore_backup'),
@@ -130,5 +129,8 @@ urlpatterns = [
     url(r'^upload_backup/$', pairing_views.upload_backup, name='upload_backup'),
 
     # Data Upload
-    url(r'^import_data/$', views.upload_data, name='upload_data')
+    url(r'^import_data/$', views.upload_data, name='upload_data'),
+    
+    # Publicly accessible personal pages
+    url(r'^public_status/(\d+)/$', team_views.public_status), name='public_status'),
 ]
