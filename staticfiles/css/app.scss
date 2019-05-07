@@ -1,0 +1,92 @@
+$body-bg: #BFD9FF;
+$font-size-base: 0.95rem !default;
+
+.form-control {
+  background-image: none !important;
+}
+
+@import "node_modules/bootstrap/scss/bootstrap";
+
+.bg-dark {
+  background-color: #00438A !important;
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+}
+
+.no-nav {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.navbar-dark .nav-link {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.w-95 {
+  max-width: 95%;
+}
+
+.data-list {
+  column-count: 4;
+  ul {
+    list-style-type: none;
+  }
+
+  .list-group-item {
+    text-overflow: clip;
+  }
+}
+
+#container-main {
+  background: #fff;
+  margin-top: 10px;
+}
+
+.navbar-brand {
+  font-weight: 500;
+}
+
+.footer {
+  opacity: 0.75;
+}
+
+.hidden {
+  display: none;
+}
+
+.ballot-form {
+  height: 100%;
+}
+
+.not-paired-in {
+  height: 20em !important;
+}
+
+.pairing-card .card-body {
+  padding: 1em !important;
+}
+
+.pairing-card {
+  height: 90%;
+}
+
+.tabcard abbr {
+  text-decoration: none;
+}
+
+.judges > span > .btn-sm {
+  line-height: 2.5;
+}
+
+.chair small::after {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  content: " \f6c0";
+}
+
+.dropdown-menu {
+  max-height: 500px;
+  overflow-y: auto;
+}

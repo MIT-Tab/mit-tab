@@ -1,68 +1,61 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
+{% load tags %}
 
 {% block title %}Data Entry{% endblock %}
+
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<p>List of all {{item_type}}s (click to {{item_manip|default:"edit"}}):</p>
-<div id="filter">
-Quick Search: <input type="text" id="filter_box"></input>
+<div class="col pl-3 pr-3">
+  {% quick_search %}
+  <div class="data-list">
+    <ul class="list_item">
+      {% for id, item, flags, symbols in item_list%}
+        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
 </div>
 
 {% if filters %}
-    <div class="pretty">Quick Filters:
-    {% for filter_group in filters %}
-        <div class="clear"></div>
-        <span class="checkbox inline nowrap">(</span>
-        {% for key, value in filter_group %}
-            <label class="checkbox inline nowrap"><input type="checkbox" class="filter" name="filter{{key}}" data-filter-group={{forloop.parentloop.counter}} data-filter={{key}} value="{{value}}"> {{value}} </label> 
-            {% if not forloop.last %} <span class="checkbox inline">OR</span> {% endif %}
-        {% endfor %}
-        <span class="checkbox inline ">)</span>
-        {% if not forloop.last %} <span class="checkbox inline">AND</span> {% endif %}
-    {% endfor %}
-    </div>
-{% endif %}
-
-<div id="view_items"> 
-    <div class="list_wrapper">
-    <ul class="list_item">
-        {% for id, item, flags, symbols in item_list%}
-            {% if forloop.counter0 != 0 and forloop.counter0|divisibleby:20 %}
-                </ul>
-                </div>
-                <div class="list_wrapper">
-                <ul class="list_item">
-            {% endif %}
-            <li class="data_list {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-                <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
+<div class="col-4">
+  <div class="card mb-2">
+    <div class="card-header">Quick Filters</div>
+    <div class="card-body">
+      <ul class="list-group">
+        {% for filter_group in filters %}
+          {% for key, value in filter_group %}
+            <li class="list-group-item">
+              <div class="form-check">
+                <input class="form-check-input filter" type="checkbox" value="{{value}}"
+                      id="filter-{{key}}"
+                      data-filter-group="{{forloop.parent.counter}}"
+                      data-filter="{{key}}"/>
+                <label class="form-check-label" for="filter-{{key}}">
+                  {{value}}
+                </label>
+              </div>
             </li>
+          {% endfor %}
         {% endfor %}
-    </ul>
-    </div>
-</div>
+      </ul>
 
-{% if symbol_text%}
-    <div class="clear"></div>
-    <table class="pretty">
-        <tr>
-            <th>Key</th><th>Meaning</th>
-        </tr>
-        {% for key, value in symbol_text %}
-            <tr><td class="center-text">{{key}}</td><td>{{value}}</td></tr>
-        {% endfor %}
-    </table>
+      {% if symbol_text%}
+        <div class="symbol-legend mt-4">
+          {% for key, value in symbol_text %}
+          <span>{{key}}<small class="text-muted"> = {{value}}</small></span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endif %}
+
 
 <div class="clear"></div>
-
-{% if links %}
-<div class="btn-group">
-    {% for link,text,confirm in links %}
-        <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
-    {% endfor %}
-</div>
-{%endif%}
 
 <div class="clear"></div>
 {% endblock %}
