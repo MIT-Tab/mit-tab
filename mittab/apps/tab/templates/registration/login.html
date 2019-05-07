@@ -19,7 +19,7 @@
       <label for="password">Password</label>
       <input type="password" class="form-control" name="password" value="" id="password" placeholder="Password">
     </div>
-    <button type="submit" class="btn btn-primary">Sign in</button>
+    <button type="submit" class="btn btn-success btn-block">Sign in</button>
     <input type="hidden" name="next" value="{{ next|escape }}" />
   </form>
 </div>
@@ -27,15 +27,15 @@
 <div class="col pl-5 pr-5">
   <h4>Participant Access </h4>
   <div class="control-group">
-    <a class="btn btn-large btn-success btn-block" href="/pairings/pairinglist/">
+    <a class="btn btn-large btn-info btn-block" href="/pairings/pairinglist/">
       Released Pairings
     </a>
 
-    <a class="btn btn-large btn-success btn-block" href="/pairings/missing_ballots/">
+    <a class="btn btn-large btn-info btn-block" href="/pairings/missing_ballots/">
       Missing Ballots
     </a>
 
-    <a class="btn btn-large btn-success btn-block" href="/e_ballots/">
+    <a class="btn btn-large btn-info btn-block" href="/e_ballots/">
       Submit An E-Ballot
     </a>
   </div>
