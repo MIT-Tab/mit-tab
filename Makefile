@@ -14,7 +14,7 @@ tests: test
 
 test:
 	./bin/setup password
-	pytest --reuse-db
+	pytest --reuse-db mittab/
 
 shell:
 	python manage.py shell

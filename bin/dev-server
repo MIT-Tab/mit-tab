@@ -1,0 +1,25 @@
+#!/usr/bin/env python
+
+import os
+import signal
+import subprocess
+import sys
+
+server_env = os.environ.copy()
+server_env["DEBUG"] = "1"
+
+webpack_args = ["./node_modules/.bin/webpack", "--config", "webpack.config.js", "--watch"]
+server_args = ["python", "manage.py", "runserver"]
+
+webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stderr)
+server_proc = subprocess.Popen(server_args, stdout=sys.stdout, stderr=sys.stderr, env=server_env)
+
+def on_interrupt(*args):
+  print("Exiting webpack and python...", flush=True)
+  webpack_proc.terminate()
+  server_proc.terminate()
+  sys.exit(0)
+
+signal.signal(signal.SIGINT, on_interrupt)
+
+for p in [webpack_proc, server_proc]: p.communicate()
