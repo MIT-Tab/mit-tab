@@ -6,7 +6,9 @@
   <h4 class="text-center">Tab Staff Login</h4>
 
   {% if form.errors %}
-    <p class="error">Sorry, that's not a valid username or password</p>
+    <div class="alert alert-danger" role="alert">
+      Sorry, that's not a valid username or password
+    </div>
   {% endif %}
 
   <form action="" method="post">
