@@ -1,8 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.template import RequestContext, loader
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
+from django.contrib.auth import logout
+from django.contrib import messages
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from django.db import models
 from mittab.apps.tab.models import *
@@ -26,7 +28,12 @@ def index(request):
 
 def tab_login(request):
     teams = enumerate(Team.objects.order_by('name'))
-    return login(request, extra_context={'no_navigation': True, 'teams': teams})
+    return login(request, extra_context={'no_navigation': True, 'smaller_width': True, 'teams': teams})
+
+def tab_logout(request, *args):
+    logout(request)
+    messages.success(request, 'Successfully logged out')
+    return redirect("/accounts/login")
 
 def render_403(request):
     t = loader.get_template('403.html')

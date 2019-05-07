@@ -15,6 +15,7 @@ urlpatterns = [
     # Uncomment the admin/doc line below to enable admin documentation:
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
+    url(r'^(admin|accounts)/logout/$', views.tab_logout, name='logout'),
     url(r'^admin/', include(admin.site.urls), name='admin'),
     url(r'^dynamic-media/jsi18n/$', i18n.javascript_catalog, name='js18'),
 
@@ -24,7 +25,6 @@ urlpatterns = [
     # TODO: named urls
     # Account related
     url(r'^accounts/login/$', views.tab_login, name='tab_login'),
-    url(r'^accounts/logout/$', logout, name='logout'),
 
     # Judge related
     url(r'^judge/(\d+)/$', judge_views.view_judge, name='view_judge'),
