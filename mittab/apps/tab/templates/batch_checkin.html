@@ -1,35 +1,41 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
+{% load tags %}
 
 {% block title %}Judge Check-In{% endblock %}
 {% block banner %}Batch Judge Check-In{% endblock %}
 
 {% block content %}
 {% csrf_token %}
-<table class="table table-striped table-bordered">
-  <tr>
-    <th>Judge</th>
-    {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
-  </tr>
-  {% for judge, checkins in judges_and_checkins %}
-  <tr>
-    <td>
-      <a href="/judge/{{judge.id}}">{{ judge.name }}</a>
-    </td>
-    {% for is_checked_in in checkins %}
-    <td>
-      <button data-round-number="{{forloop.counter}}"
-              data-judge-id="{{judge.id}}"
-              class="check-in btn btn-small btn-success {% if is_checked_in %}hidden{% endif %}">
-        Check In
-      </button>
-      <button data-round-number="{{forloop.counter}}"
-              data-judge-id="{{judge.id}}"
-              class="check-out btn btn-small btn-danger {% if not is_checked_in %}hidden{% endif %}">
-        Check Out
-      </button>
-    </td>
+
+{% quick_search %}
+
+<div class="col">
+  <table class="table table-striped table-bordered table-sm">
+    <tr>
+      <th>Judge</th>
+      {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
+    </tr>
+    {% for judge, checkins in judges_and_checkins %}
+    <tr class="searchable">
+      <td>
+        <a href="/judge/{{judge.id}}">{{ judge.name }}</a>
+      </td>
+      {% for is_checked_in in checkins %}
+      <td>
+        <div class="custom-control custom-switch">
+          <input type="checkbox" class="custom-control-input checkin-toggle"
+                 data-judge-id="{{judge.id}}"
+                 data-round-number="{{forloop.counter}}"
+                 id="toggle-{{ judge.id }}-{{ forloop.counter }}"
+                 {% if is_checked_in %}checked{% endif %}>
+          <label class="custom-control-label" for="toggle-{{ judge.id }}-{{ forloop.counter }}">
+            Checked {% if is_checked_in %}In{% else %}Out{% endif %}
+          </label>
+        </div>
+      </td>
+      {% endfor %}
+    </tr>
     {% endfor %}
-  </tr>
-  {% endfor %}
-</table>
+  </table>
+</div>
 {% endblock %}

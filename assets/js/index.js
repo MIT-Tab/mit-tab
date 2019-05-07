@@ -10,12 +10,11 @@ $.expr[':'].Contains = function(a,i,m){
 
 $(document).ready(function(){
     function filter(matching_text) {
-        $('li.searchable:not(:Contains(' + matching_text+ '))').hide(); 
-        $('li.searchable:Contains(' + matching_text + ')').show();
+        $('.searchable:not(:Contains(' + matching_text+ '))').hide(); 
+        $('.searchable:Contains(' + matching_text + ')').show();
     };
 
     function filter_on_flags(flags) {
-        console.log('hello', flags)
         $('li.filterable').each(function(index, element) {
             var show = 1;
             for (var flag_group in flags) {
@@ -34,15 +33,19 @@ $(document).ready(function(){
             filter($(this).val());
         }
         else {
-            show_all("li");
+            show_all(".searchable");
         }
     });
 
     function checkInOrOut(target, isCheckIn) {
         var $target = $(target);
+        $target.prop('disabled', true)
 
         var judgeId = $target.data("judge-id");
         var roundNumber = $target.data("round-number");
+
+        var $label = $("label[for=" + $target.attr("id") + "]")
+        $label.text(isCheckIn ? 'Checked In' : 'Checked Out')
 
         var url = "/judge/" + judgeId + "/check_ins/round/" + roundNumber + "/";
         var requestMethod = isCheckIn ? "POST" : "DELETE";
@@ -54,28 +57,19 @@ $(document).ready(function(){
             },
             method: requestMethod,
             success: function(resp) {
-              var otherButtonClass = isCheckIn ? ".check-out" : ".check-in";
-              var $otherButton = $target.parent().find(otherButtonClass);
-              $otherButton.removeClass('hidden');
-              $target.removeClass('disabled');
-              $target.addClass('hidden');
+              $target.prop('disabled', false)
             },
             error: function(_e) {
-              $target.removeClass('disabled')
+              $target.prop('disabled', false)
+              $target.prop('checked', !isCheckIn)
+              $label.text(isCheckIn ? 'Checked Out' : 'Checked In')
               alert('An error occured during check in/out. Refresh the page and try again');
             }
         })
-        $target.addClass('disabled');
     }
 
-    $('.check-out').click(function(e) {
-        e.preventDefault();
-        checkInOrOut(e.target, false);
-    })
-
-    $('.check-in').click(function(e) {
-        e.preventDefault();
-        checkInOrOut(e.target, true);
+    $('.checkin-toggle').click(function(e) {
+        checkInOrOut(e.target, $(e.target).prop('checked'));
     })
 
     $('.dataEntryForm').submit(function() {
