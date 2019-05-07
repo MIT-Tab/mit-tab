@@ -24,6 +24,7 @@ __pycache__
 /images/
 /javascript/
 /js/
+stdout*.txt
 
 # Installer logs
 pip-log.txt
