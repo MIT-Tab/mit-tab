@@ -7,6 +7,15 @@ $font-size-base: 0.95rem !default;
   background-color: #00438A !important;
 }
 
+.navbar-brand {
+  font-size: 1.5rem;
+}
+
+.no-nav {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .navbar-dark .nav-link {
   color: rgba(255, 255, 255, 0.75) !important;
 }

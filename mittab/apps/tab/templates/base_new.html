@@ -11,15 +11,11 @@
     <title>{% block title %}{% endblock %}</title>
 </head>
 <body>
-  {% if no_navigation %}
-    <pre>TODO: no nav view</pre>
-  {% else %}
-    {% include "navigation_new.html" %}
-  {% endif %}
+  {% include "navigation_new.html" %}
 
   <div class="container-fluid text-left">
 
-    <div id="container-main" class="container w-95 rounded shadow-sm">
+    <div id="container-main" class="container {% if not smaller_width %}w-95{% endif %} rounded shadow-sm">
       <div id="dialog" class="invisible" title="Please Confirm">Are you sure?</div>
 
       <div class="row pl-3 pr-3">

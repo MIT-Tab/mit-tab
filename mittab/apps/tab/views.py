@@ -25,7 +25,7 @@ def index(request):
     return render(request, 'index.html',locals())
 
 def tab_login(request):
-    return login(request, extra_context={'no_navigation': True})
+    return login(request, extra_context={'no_navigation': True, 'smaller_width': True})
 
 def render_403(request):
     t = loader.get_template('403.html')

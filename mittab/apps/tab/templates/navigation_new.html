@@ -33,7 +33,9 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container w-95">
-    <a class="navbar-brand text-extra-bold" href="{{ home }}">MIT-TAB</a>
+    <a class="navbar-brand text-extra-bold{% if no_navigation %} no-nav{% endif %}" href="{{ home }}">MIT-TAB</a>
+
+    {% if not no_navigation %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -95,6 +97,7 @@
         </li>
       </ul>
     </div>
+    {% endif %}
   </div>
   <br>
 </nav>
