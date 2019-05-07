@@ -2,38 +2,41 @@
 
 {% block content %}
 
-<div class="col">
+<div class="col border-right pl-5 pr-5">
   <h4>Tab Staff Login</h4>
 
   {% if form.errors %}
     <p class="error">Sorry, that's not a valid username or password</p>
   {% endif %}
 
-  <form action="" method="post" class="form-horizontal">{% csrf_token %}
-    <div class="control-group">
-      <label for="username">User name:</label>
-      <input type="text" name="username" value="" id="username" placeholder="Username">
-      <label for="password">Password:</label>
-      <input type="password" name="password" value="" id="password" placeholder="Password">
+  <form action="" method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="username">Username</label>
+      <input type="text" class="form-control" name="username" value="" id="username" placeholder="Username">
     </div>
-    <button type="submit" class="btn inline">Sign in</button>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" class="form-control" name="password" value="" id="password" placeholder="Password">
+    </div>
+    <button type="submit" class="btn btn-primary">Sign in</button>
     <input type="hidden" name="next" value="{{ next|escape }}" />
   </form>
 </div>
 
-<div class="col">
+<div class="col pl-5 pr-5">
   <h4>Participant Access </h4>
   <div class="control-group">
-    <a class="btn btn-large btn-info" href="/pairings/pairinglist/">
-      View released pairings
+    <a class="btn btn-large btn-success btn-block" href="/pairings/pairinglist/">
+      Released Pairings
     </a>
 
-    <a class="btn btn-large btn-info" href="/pairings/missing_ballots/">
-      View missing ballots
+    <a class="btn btn-large btn-success btn-block" href="/pairings/missing_ballots/">
+      Missing Ballots
     </a>
 
-    <a class="btn btn-large btn-info" href="/e_ballots/">
-      Submit an e-ballot
+    <a class="btn btn-large btn-success btn-block" href="/e_ballots/">
+      Submit An E-Ballot
     </a>
   </div>
 </div>
