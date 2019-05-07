@@ -1,0 +1,40 @@
+$body-bg: #BFD9FF;
+$font-size-base: 0.95rem !default;
+
+@import "node_modules/bootstrap/scss/bootstrap";
+
+.bg-dark {
+  background-color: #00438A !important;
+}
+
+.navbar-dark .nav-link {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.w-95 {
+  max-width: 95%;
+}
+
+.data-list {
+  column-count: 4;
+  ul {
+    list-style-type: none;
+  }
+
+  .list-group-item {
+    text-overflow: clip;
+  }
+}
+
+#container-main {
+  background: #fff;
+  margin-top: 10px;
+}
+
+.navbar-brand {
+  font-weight: 500;
+}
+
+.footer {
+  opacity: 0.75;
+}

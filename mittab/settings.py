@@ -36,6 +36,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'mittab.apps.tab',
     'raven.contrib.django.raven_compat',
+    'webpack_loader',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -95,7 +96,15 @@ STATIC_ROOT = BASE_DIR
 
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'mittab', 'static'),
+    os.path.join(BASE_DIR, 'assets'),
 )
+
+WEBPACK_LOADER = {
+    'DEFAULT': {
+        'BUNDLE_DIR_NAME': 'webpack_bundles/',
+        'STATS_FILE': os.path.join(BASE_DIR, 'webpack-stats.json'),
+    }
+}
 
 TEMPLATES = [
     {

@@ -4,7 +4,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/python:3.7.2-browsers
+      - image: circleci/python:3.7.3-node-browsers
     parallelism: 4
 
     working_directory: ~/repo
@@ -23,6 +23,7 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             pip install -r requirements.txt
+            npm install
 
       - save_cache:
           paths:
@@ -34,7 +35,7 @@ jobs:
           command: |
             . venv/bin/activate
             ./bin/setup password > /dev/null 2>&1
-            pytest --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db
+            pytest --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db mittab/
           no_output_timeout: 20m
 
       - store_artifacts:

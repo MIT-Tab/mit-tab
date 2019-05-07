@@ -5,10 +5,10 @@ register = template.Library()
 
 @register.simple_tag
 def active(request, pattern):
-    try:
-        request.path
-    except:
-        import pdb; pdb.set_trace()
     if pattern == request.path:
         return 'active'
     return ''
+
+@register.inclusion_tag('quick_search.html')
+def quick_search():
+    return {}

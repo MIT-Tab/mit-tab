@@ -1,0 +1,56 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+<head>
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'main' %}
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
+    <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+
+    <title>{% block title %}{% endblock %}</title>
+</head>
+<body>
+  {% if no_navigation %}
+    <pre>TODO: no nav view</pre>
+  {% else %}
+    {% include "navigation_new.html" %}
+  {% endif %}
+
+  <div class="container-fluid text-left">
+
+    <div id="container-main" class="container w-95 rounded shadow-sm">
+      <div id="dialog" class="invisible" title="Please Confirm">Are you sure?</div>
+
+      <div class="row pl-3 pr-3">
+        <div class="col">
+          <h3>{% block banner %}{% endblock %}</h3>
+        </div>
+      </div>
+
+      <div class="row mt-2">
+        {% block content %}{% endblock %}
+      </div>
+
+      <div class="row p-3 mt-2">
+        {% if links %}
+        <div class="btn-group">
+          {% for link,text,confirm in links %}
+            <button class="btn btn-secondary {%if confirm%}confirmLink{%endif%}"
+              href='{{link}}'>{{text}}</button>
+          {% endfor %}
+        </div>
+        {%endif%}
+      </div>
+    </div>
+
+    <div class="row-fluid mt-3 p-2 text-center footer">
+      <small>
+        Need help? Check out <a href="https://github.com/jolynch/mit-tab/wiki">the wiki.</a>
+        <br/>
+        MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz
+      </small>
+    </div>
+  </div>
+</body>
+</html>
