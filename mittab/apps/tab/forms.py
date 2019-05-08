@@ -230,6 +230,20 @@ class ResultEntryForm(forms.Form):
                     self.add_error(self.deb_attr_name(d, "speaks"), self.error_class(["These speaks are too high for the rank"]))
                 high_score = speaks
 
+            # Make sure that all debaters were selected
+            for deb in self.DEBATERS:
+                if self.deb_attr_val(deb, "debater", int) == -1:
+                    self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
+
+            cleaned_data["winner"] = int(cleaned_data["winner"])
+
+            if cleaned_data["winner"] == Round.NONE:
+                self.add_error("winner", self.error_class(["Someone has to win!"]))
+            elif cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
+            elif cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
+
             # If we already have errors, don't bother with the other validations
             if self.errors: return
 
@@ -242,20 +256,6 @@ class ResultEntryForm(forms.Form):
 
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
-
-            cleaned_data["winner"] = int(cleaned_data["winner"])
-
-            if cleaned_data["winner"] == Round.NONE:
-                self.add_error("winner", self.error_class(["Someone has to win!"]))
-            if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
-                self.add_error("winner", self.error_class(["Low Point Win!!"]))
-            if cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
-                self.add_error("winner", self.error_class(["Low Point Win!!"]))
-
-            # Make sure that all debaters were selected
-            for deb in self.DEBATERS:
-                if self.deb_attr_val(deb, "debater", int) == -1:
-                    self.add_error(self.deb_attr_name(deb, "debater"), self.error_class(["You need to pick a debater"]))
 
         except Exception as e:
             errors.emit_current_exception()
