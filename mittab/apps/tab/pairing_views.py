@@ -566,7 +566,8 @@ def confirm_start_new_tourny(request):
     return render(request, 'confirm.html',
                               {'link': "/pairing/start_tourny/",
                                'confirm_text': "Create New Tournament",
-                               'title': 'Are you sure?'})
+                               'title': 'Are you sure?',
+                               'smaller_width': True})
 
 #TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
