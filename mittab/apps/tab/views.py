@@ -25,7 +25,7 @@ def index(request):
     return render(request, 'index.html',locals())
 
 def tab_login(request):
-    teams = [(team.pk, team.name) for team in Team.objects.order_by('name')]
+    teams = enumerate(Team.objects.order_by('name'))
     return login(request, extra_context={'no_navigation': True, 'teams': teams})
 
 def render_403(request):
