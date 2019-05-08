@@ -36,7 +36,8 @@ def tab_logout(request, *args):
 
 def render_403(request):
     t = loader.get_template('403.html')
-    c = RequestContext(request, {})
+    c = RequestContext(request, { 'request': request, 'no_navigation': True,
+        'smaller_width': True })
     return HttpResponseForbidden(t.render(c))
 
 #View for manually adding scratches
