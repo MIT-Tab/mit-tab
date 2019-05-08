@@ -37,7 +37,7 @@ INSTALLED_APPS = (
     'mittab.apps.tab',
     'raven.contrib.django.raven_compat',
     'webpack_loader',
-    'widget_tweaks'
+    'bootstrap4'
 )
 
 MIDDLEWARE_CLASSES = (
