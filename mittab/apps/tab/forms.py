@@ -230,6 +230,9 @@ class ResultEntryForm(forms.Form):
                     self.add_error(self.deb_attr_name(d, "speaks"), self.error_class(["These speaks are too high for the rank"]))
                 high_score = speaks
 
+            # If we already have errors, don't bother with the other validations
+            if self.errors: return
+
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
             gov_speaks = sum([self.deb_attr_val(d, "speaks", float) for d in self.GOV])
