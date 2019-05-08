@@ -42,7 +42,7 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.fill('password', self.password)
         self.browser.find_by_text('Sign in').first.click()
 
-        assert self.browser.is_text_present('Home')
+        assert self.browser.is_text_present('Admin') # checks that the nav is visible
         assert not self.browser.is_text_present('Sign in')
 
     def _go_home(self):
