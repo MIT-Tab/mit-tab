@@ -296,7 +296,7 @@ def tab_card(request, team_id):
 
 def rank_teams_ajax(request):
     return render(request, 'rank_teams.html',
-                             {'title': "Team Rankings"})
+            {'title': "Team Rankings", 'smaller_width': True})
 
 def rank_teams(request):
     ranked_teams = tab_logic.rankings.rank_teams()

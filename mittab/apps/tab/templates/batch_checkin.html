@@ -11,10 +11,10 @@
 
 <div class="col">
   <table class="table table-striped table-bordered table-sm">
-    <tr>
+    <thead>
       <th>Judge</th>
       {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
-    </tr>
+    </thead>
     {% for judge, checkins in judges_and_checkins %}
     <tr class="searchable">
       <td>

@@ -1,6 +1,8 @@
 import '../css/app.scss'
+import './pairing.js'
 
 import $ from 'jquery'
+
 import 'popper.js'
 import 'bootstrap'
 
