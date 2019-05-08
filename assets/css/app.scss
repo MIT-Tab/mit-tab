@@ -1,6 +1,10 @@
 $body-bg: #BFD9FF;
 $font-size-base: 0.95rem !default;
 
+.form-control {
+  background-image: none !important;
+}
+
 @import "node_modules/bootstrap/scss/bootstrap";
 
 .bg-dark {
@@ -50,4 +54,8 @@ $font-size-base: 0.95rem !default;
 
 .hidden {
   display: none;
+}
+
+.ballot-form {
+  height: 100%;
 }
