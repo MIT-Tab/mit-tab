@@ -239,10 +239,6 @@ class ResultEntryForm(forms.Form):
 
             if cleaned_data["winner"] == Round.NONE:
                 self.add_error("winner", self.error_class(["Someone has to win!"]))
-            elif cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
-                self.add_error("winner", self.error_class(["Low Point Win!!"]))
-            elif cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
-                self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
             # If we already have errors, don't bother with the other validations
             if self.errors: return
@@ -256,6 +252,10 @@ class ResultEntryForm(forms.Form):
 
             gov_points = (gov_speaks, -gov_ranks)
             opp_points = (opp_speaks, -opp_ranks)
+            if cleaned_data["winner"] == Round.GOV and opp_points > gov_points:
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
+            elif cleaned_data["winner"] == Round.OPP and gov_points > opp_points:
+                self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
         except Exception as e:
             errors.emit_current_exception()
