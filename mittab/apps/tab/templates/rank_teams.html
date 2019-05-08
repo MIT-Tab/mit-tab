@@ -1,10 +1,16 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %} {{title}} {% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="float_container" id="team_ranking"></div>
+<div class="col" id="team_ranking">
+  <div class="d-flex justify-content-center p-5">
+    <div class="spinner-border" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+</div>
 
 {% endblock %}
