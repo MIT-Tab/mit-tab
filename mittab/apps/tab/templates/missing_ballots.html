@@ -1,19 +1,22 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %}Missing Ballots{% endblock %}
 
-{% block banner %} {{title}} {% endblock %}
-
 {% block content %}
 
+<div class="col-2"></div>
+<div class="col-8">
 {% if pairing_exists %}
   {% if rounds %}
-    <h3>Missing Ballots:</h3>
-    <small>This list will refresh every 30 seconds</small>
-    <ul class="missing-rounds">
+    <h2 class="text-center">Missing Ballots</h2>
+    <p class="lead text-center">This list will refresh every 30 seconds</p>
+    <ul class="missing-rounds list-group list-group-flush">
     {% for r in rounds %}
-    <li class="missing-round-item">
-      <b>{{r.chair.name}}</b> (round between {{r.gov_team.name}} and {{r.opp_team.name}})
+    <li class="missing-round-item list-group-item text-lg">
+      <h5>
+        {{r.chair.name}}
+        <small class="text-muted">Round between {{r.gov_team.name}} and {{r.opp_team.name}}</small>
+      </h5>
     </li>
     {% endfor %}
     </ul>
@@ -22,9 +25,11 @@
       window.setTimeout(function() { location.reload(true) }, 30000);
     </script>
   {% else %}
-    <h3>All ballots entered!</h3>
+    <h3 class="text-center">All ballots entered!</h3>
   {% endif %}
 {% else %}
-  <h3>Pairing not released</h3>
+  <h3 class="text-center">Pairing not released</h3>
 {% endif %}
+<div class="col-2"></div>
 {% endblock %}
+</div>

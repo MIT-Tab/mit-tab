@@ -181,7 +181,7 @@ def pretty_tab_card(request, team_id):
                                   'error_info': "Team id must be an integer!"})
     team = Team.objects.get(pk=team_id)
     return render(request, 'pretty_tab_card.html',
-                             {'team':team})
+                             {'team':team, 'smaller_width': True})
 
 def tab_card(request, team_id):
     try:

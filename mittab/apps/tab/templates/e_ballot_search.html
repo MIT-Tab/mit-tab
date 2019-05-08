@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %}E-Ballot Search{% endblock %}
 
@@ -6,20 +6,22 @@
 
 {% block content %}
 
-<center>
-  <h2>E-Ballot Search</h2>
-  <br>
-  <form action="/e_ballots/" method="post" class="eBallotSearchForm" enctyp="multipate/form-data">
-    {% csrf_token %}
+<div class="col-4"></div>
+<div class="col">
+    <h2 class="text-center">E-Ballot Search</h2>
+    <br>
+    <form action="/e_ballots/" method="post" class="eBallotSearchForm" enctyp="multipate/form-data">
+      {% csrf_token %}
 
-    <label for="e_ballot_search">Ballot code:</label>
-    <input id="e_ballot_search" name="ballot_code" type="text" placeholder="Your ballot code. Go to tab to get it if you haven't.">
+      <div class="form-group">
+        <label for="e_ballot_search">Ballot code:</label>
+        <input id="e_ballot_search" class="form-control" name="ballot_code">
+        <small>Go to tab to get your ballot code it if you haven't.</small>
+      </div>
 
-    <div class="btn-submit">
-      <input type="submit" value="Get Ballot">
-    </div>
-
-  </form>
-</center>
+      <input class="btn btn-primary btn-block mb-3" type="submit" value="Get Ballot">
+    </form>
+</div>
+<div class="col-4"></div>
 
 {% endblock %}

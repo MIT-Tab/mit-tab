@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %}Tab Card for {{team.name}}{% endblock %}
 
@@ -6,12 +6,12 @@
 
 {% block content %}
 
-<div class="btn-group">
-    <a class="mid btn" href="/team/{{team.id}}/">View {{team.name}}</a>
-</div>
+<div class="col">
+  <a class="btn btn-secondary" href="/team/{{team.id}}/">View {{team.name}}</a>
 
-<div style="padding:1em 0 0"><div>
-<div class="tab_card_item" data-team-id={{team.id}}></div>
+  <div style="padding:1em 0 0"></div>
+  <div class="tab_card_item" data-team-id={{team.id}}></div>
+</div>
 {% endblock %}
 
 
