@@ -101,24 +101,25 @@
                 </table>
               </div>
 
-              <div class="col-4">
+              <div class="col-4 judges">
                 {% for judge in pairing.judges.all %}
-                  <a class="btn-sm btn-link dropdown-toggle" data-toggle="dropdown"
-                      round-id="{{pairing.id}}"
-                      judge-id="{{judge.id}}" href="#">
+                <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
+                  <a class="btn-sm btn-link dropdown-toggle" data-toggle="dropdown" href="#">
                     {{judge.name}} <small>({{judge.rank}}) <span class="caret"></span></small>
                   </a>
-                  <br/>
+                  <ul class="dropdown-menu"></ul>
+                </span>
+                <br>
                 {% endfor %}
                 {% for slot in judge_slots %}
                 {% if pairing.judges.all|length < slot %}
-                  <a class="btn btn-link dropdown-toggle" data-toggle="dropdown"
-                      round-id="{{pairing.id}}" judge-pos="{{slot}}" href="#">
-                    <small>
+                <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
+                  <a class="btn-sm btn-link dropdown-toggle" data-toggle="dropdown" href="#">
                       N/A <span class="caret"></span>
-                    </small>
                   </a>
-                  <br/>
+                  <ul class="dropdown-menu"></ul>
+                </span>
+                <br>
                 {% endif %}
                 {% endfor %}
               </div>
@@ -145,8 +146,7 @@
                 <a class="btn-sm btn-block btn-light" href="/room/{{pairing.room.id}}" >
                   <i class="far fa-building"></i> {{pairing.room.name}}
                 </a>
-                <a class="btn-sm btn-block btn-light"
-                  href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">
+                <a class="btn-sm btn-block btn-light" href="/admin/tab/round/{{pairing.id}}/change/">
                   <i class="fas fa-unlock-alt"></i> Edit in Admin
                 </a>
               </div>
