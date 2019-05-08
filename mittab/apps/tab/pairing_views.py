@@ -8,6 +8,7 @@ import os
 from django.shortcuts import render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
@@ -15,7 +16,6 @@ from django.shortcuts import redirect
 from mittab.apps.tab.errors import *
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
-from django.shortcuts import redirect
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
@@ -413,7 +413,8 @@ def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
-        return render(request, "e_ballot_search.html")
+        return render(request, "e_ballot_search.html",
+                { 'no_navigation': True, 'smaller_width': True })
 
 
 def enter_e_ballot(request, ballot_code):
@@ -460,8 +461,9 @@ def enter_e_ballot(request, ballot_code):
     else:
         return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
 
-    return render(request, "error.html",
-                {"error_type": "Ballot Retrieval", "error_info": message})
+
+    messages.error(request, message)
+    return redirect("/e_ballots")
 
 
 def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None):
@@ -559,7 +561,8 @@ def enter_multiple_results(request, round_id, num_entered):
 def confirm_start_new_tourny(request):
     return render(request, 'confirm.html',
                               {'link': "/pairing/start_tourny/",
-                               'confirm_text': "Create New Tournament"})
+                               'confirm_text': "Create New Tournament",
+                               'title': 'Are you sure?'})
 
 #TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
