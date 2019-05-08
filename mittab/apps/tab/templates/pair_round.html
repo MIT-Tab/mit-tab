@@ -1,35 +1,32 @@
-{% extends "base.html" %}
+{% extends "base_new.html" %}
 
 {% block title %}{{ title }}{% endblock %}
 
-{% block banner %} {{title}} {% endblock %}
-
 {% block content %}
 
-<div id="pairing_form">
-        <form action="." method="post"> {% csrf_token %}
-        <table class="check_status">
-            <tr><th>Sanity Check</th><th>Successful?</th></tr>
-            {% for check,status,alt in check_status%}
-                <tr>
-                    <td>{{check}}</td>
-                    {% if status == "No"%}
-                        <td class="warning" title="{{alt}}">
-                    {% else %}
-                        <td class="success" title="{{alt}}">
-                    {% endif %}
-                    {{status}}
-                    </td>
-                </tr>
-            {% endfor %}
-        </table>
-        <div>
-            <p class="warning">
-            This action will attempt to pair the next round, if you have ignored the warnings above it may fail. Be warned, and always backup if you are unsure.
-            </p>
-            <input type="submit" value="Pair This Round">
-        </div>
-    </form>
+<div class="col-3"></div>
+<div id="pairing_form" class="col-6">
+  <h3 class="text-center mb-4">{{ title }}</h3>
+  <form action="." method="post"> {% csrf_token %}
+    <table class="check_status table">
+      <thead class="thead-dark">
+        <th>Sanity Check</th><th>Successful?</th>
+      </thead>
+      {% for check,status,alt in check_status%}
+      <tr class="table-{% if status == "No" %}danger font-weight-bolder{% else %}light{% endif %}">
+        <td>{{check}}</td>
+        <td title="{{alt}}">{{status}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="mt-5">
+      <p class="alert alert-warning">
+        This action will attempt to pair the next round, if you have ignored the warnings above it may fail. Be warned, and always backup if you are unsure.
+      </p>
+      <input class="btn btn-primary btn-block btn-lg" type="submit" value="Pair This Round">
+    </div>
+  </form>
 </div>
+<div class="col-3"></div>
 
 {% endblock %}
