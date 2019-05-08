@@ -149,6 +149,7 @@ def pair_round(request):
             ready_to_pair = "No"
             ready_to_pair_alt = str(e) 
             check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
+        smaller_width = True
 
         return render(request, 'pair_round.html',
                                   locals())

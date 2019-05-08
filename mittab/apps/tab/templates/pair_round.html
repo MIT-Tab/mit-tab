@@ -4,8 +4,8 @@
 
 {% block content %}
 
-<div class="col-3"></div>
-<div id="pairing_form" class="col-6">
+<div class="col-2"></div>
+<div id="pairing_form" class="col-8">
   <h3 class="text-center mb-4">{{ title }}</h3>
   <form action="." method="post"> {% csrf_token %}
     <table class="check_status table">
@@ -27,6 +27,6 @@
     </div>
   </form>
 </div>
-<div class="col-3"></div>
+<div class="col-2"></div>
 
 {% endblock %}
