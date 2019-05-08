@@ -137,5 +137,5 @@ urlpatterns = [
     url(r'^import_data/$', views.upload_data, name='upload_data'),
     
     # Publicly accessible personal pages
-    url(r'^public_status/(\d+)/$', team_views.public_status), name='public_status'),
+    url(r'^public_status/(\d+)/$', team_views.public_status, name='public_status'),
 ]
