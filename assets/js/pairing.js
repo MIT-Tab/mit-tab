@@ -1,3 +1,5 @@
+import quickSearchInit from './quickSearch.js'
+
 var populate_tab_card = function(tab_card_element) {
     var team_id = tab_card_element.attr('team-id')
     $.ajax({
@@ -24,6 +26,7 @@ var populate_alternative_teams = function() {
         success: function(result) {
             $parent.find(".dropdown-menu").html(result);
             $parent.find(".dropdown-menu").find(".team-swap").click(assignTeam);
+            quickSearchInit($parent.find("#quick-search"))
         },
     })
 }
@@ -43,6 +46,7 @@ var populate_alternative_judges = function() {
         success: function(result) {
             $parent.find(".dropdown-menu").html(result);
             $parent.find(".dropdown-menu").find(".judge-assign").click(assign_judge);
+            quickSearchInit($parent.find("#quick-search"))
         },
     })
 }
