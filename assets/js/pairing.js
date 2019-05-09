@@ -78,6 +78,8 @@ var assign_judge = function(e) {
             $buttonWrapper.removeClass('unassigned')
             $buttonWrapper.attr('judge-id', result.judge_id);
             $button.html(result.judge_name + " <small>(" + result.judge_rank.toFixed(2) + ")")
+            $(".judges span[round-id=" + round_id + "] .judge-toggle").removeClass("chair")
+            $(".judges span[round-id=" + round_id + "][judge-id=" + result.chair_id + "] .judge-toggle").addClass("chair")
         },
     });
 }
@@ -147,13 +149,11 @@ var toggle_pairing_release = function(event) {
         url:"/pairing/release",
         success: function(result) {
             if (result.pairing_released) {
-                button.text("Close Pairings");
-                button.removeClass("btn-warning");
-                button.addClass("btn-success");
+                $("#close-pairings").removeClass("d-none")
+                $("#release-pairings").addClass("d-none")
             } else {
-                button.text("Release Pairings");
-                button.removeClass("btn-success");
-                button.addClass("btn-warning");
+                $("#close-pairings").addClass("d-none")
+                $("#release-pairings").removeClass("d-none")
             }
         },
     });

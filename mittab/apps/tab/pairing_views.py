@@ -340,6 +340,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
         round_obj.save()
         data = {"success":True,
+                "chair_id": round_obj.chair.id,
                 "round_id": round_obj.id,
                 "judge_name": judge_obj.name,
                 "judge_rank": float(judge_obj.rank),

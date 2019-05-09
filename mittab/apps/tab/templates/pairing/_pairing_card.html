@@ -71,7 +71,8 @@
       <div class="col-4 judges">
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-          <a class="btn-sm btn-link judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn-sm btn-link judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+             data-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
           </a>
           <ul class="dropdown-menu"></ul>
