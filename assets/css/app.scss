@@ -75,3 +75,8 @@ $font-size-base: 0.95rem !default;
 .judges > span > .btn-sm {
   line-height: 2.5;
 }
+
+.dropdown-menu {
+  max-height: 500px;
+  overflow-y: scroll;
+}

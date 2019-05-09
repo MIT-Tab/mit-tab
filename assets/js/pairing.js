@@ -12,6 +12,22 @@ var populate_tab_card = function(tab_card_element) {
     })
 }
 
+var populate_alternative_teams = function() {
+    var $parent = $(this).parent()
+    var teamId = $parent.attr('team-id');
+    var roundId = $parent.attr('round-id');
+    var position = $parent.attr('position')
+    var url = "/round/" + roundId + "/"+ teamId + "/alternative_teams/" + position;
+
+    $.ajax({
+        url: url,
+        success: function(result) {
+            $parent.find(".dropdown-menu").html(result);
+            $parent.find(".dropdown-menu").find(".team-swap").click(assignTeam);
+        },
+    })
+}
+
 var populate_alternative_judges = function() {
     var $parent = $(this).parent()
     var judge_id = $parent.attr('judge-id');
@@ -47,18 +63,51 @@ var assign_judge = function(e) {
     } else {
         $buttonWrapper = $("span[round-id="+round_id+"].unassigned").first()
     }
-    $buttonWrapper.addClass('disabled')
     var $button = $buttonWrapper.find('.btn-sm')
+    $button.addClass('disabled')
 
     var judge_button;
     $.ajax({
         url: assign_url,
         success: function(result) {
+            $button.removeClass('disabled')
             $buttonWrapper.removeClass('unassigned')
             $buttonWrapper.attr('judge-id', result.judge_id);
-            $button.html(result.judge_name + " <small>(" + result.judge_rank.toFixed(2) + ") <span class='caret'></span></small>")
+            $button.html(result.judge_name + " <small>(" + result.judge_rank.toFixed(2) + ")")
         },
     });
+}
+
+function assignTeam(e) {
+    var teamId = $(e.target).attr('team-id')
+    var oldTeamId = $(e.target).attr('src-team-id')
+    var roundId = $(e.target).attr('round-id')
+    var position = $(e.target).attr('position')
+    var url = "/pairings/assign_team/" + roundId + "/" + position + "/" + teamId
+    var alertMsg = 'An error occured. Refresh the page and try to fix any inconsistencies you may notice.'
+
+    $.ajax({
+        url: url,
+        success: function(result) {
+            if (result.success) {
+                var $container = $(".row[round-id=" + roundId + "] ." + position + '-team')
+                $container.find('.team-swap').attr('team-id', result.team.id)
+                $container.find('.team-link').text(result.team.name)
+                $container.find('.team-link').attr('href', '/team/' + result.team.id)
+                $container.find('.tabcard').attr('team-id', result.team.id)
+
+                populate_tab_card($('.tabcard[team-id=' + result.team.id + ']'))
+
+                $oldTeamTabcard = $('.tabcard[team-id=' + oldTeamId + ']')
+                $oldTeamTabcard = populate_tab_card($oldTeamTabcard)
+            } else {
+                alert(alertMsg)
+            }
+        },
+        failure: function() {
+            alert(alertMsg)
+        }
+    })
 }
 
 
@@ -117,7 +166,8 @@ var bind_handlers = function() {
         lazy_load($(element).parent(), "/debater/rank/");
     })
 
-    $('.dropdown-toggle').click(populate_alternative_judges);
+    $('.judge-toggle').click(populate_alternative_judges);
+    $('.team-toggle').click(populate_alternative_teams);
     $('.alert-link').click(alert_link);
     $('select[name=winner]').change(select_info);
     $('.btn.release').click(toggle_pairing_release);

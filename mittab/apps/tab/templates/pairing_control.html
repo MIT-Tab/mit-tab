@@ -1,7 +1,6 @@
 {% extends "base_new.html" %}
 
 {% block title %}Round Status{% endblock %}
-{% url 'pair_round' as pair_round_url %}
 
 {% block content %}
 <div class="col">
@@ -45,7 +44,7 @@
             <a class="btn btn-warning release" href="#"
                 title="Release the pairings to the participants">Release Pairing</a>
             {% endif %}
-            <a class="btn btn-info" href="{{ pair_round_url }}"
+            <a class="btn btn-info" href="/pairing/pair_round"
               title="Pair the next round of debate">Prepare Next Round</a>
           </div>
         </form>
@@ -66,16 +65,32 @@
       <div class="col-xl-6">
         <div class="card bg-light pairing-card mb-3">
           <div class="card-body container-fluid">
-            <div class="row">
+            <div class="row" round-id="{{pairing.id}}">
 
               <div class="col-5">
-                <table class="table table-borderless table-sm mb-0">
+                <table class="table table-borderless table-sm mb-0 team-table">
                   <tr>
                     <td>
-                      <h6>
-                        <a href="/team/{{pairing.gov_team.id}}" class="text-dark">{{pairing.gov_team.name}}</a>
+                      <h6 class="gov-team">
+                        <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
+                          {{pairing.gov_team.name}}
+                        </a>
                         <small>
                           <abbr title="Gov Team" class="attribute">GOV</abbr>
+
+                          <span class="team-swap"
+                            round-id={{pairing.id}}
+                            position="gov"
+                            team-id={{pairing.gov_team.id}}>
+                            <a class="dropdown-toggle team-toggle text-dark"
+                                data-toggle="dropdown"
+                                href="#"
+                                title="Swap teams">
+                              <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu"></ul>
+                          </span>
+
                           <p class="text-muted team tabcard pt-1"
                              team-id={{pairing.gov_team.id}}>
                             Loading results...
@@ -86,16 +101,33 @@
                   </tr>
                   <tr>
                     <td>
-                      <h6>
-                        <a href="/team/{{pairing.opp_team.id}}" class="text-dark">{{pairing.opp_team.name}}</a>
+                      <h6 class="opp-team">
+                        <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark">
+                          {{pairing.opp_team.name}}
+                        </a>
                         <small>
                           <abbr title="Opp Team" class="attribute">OPP</abbr>
+
+                          <span class="team-swap"
+                            round-id={{pairing.id}}
+                            position="opp"
+                            team-id={{pairing.opp_team.id}}>
+                            <a class="dropdown-toggle team-toggle text-dark"
+                                data-toggle="dropdown"
+                                href="#"
+                                title="Swap teams">
+                              <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu"></ul>
+                          </span>
+
                           <p class="text-muted team tabcard pt-1"
                              team-id={{pairing.opp_team.id}}>
                             Loading results...
                           </p>
                         </small>
                       </h6>
+
                     </td>
                   </tr>
                 </table>
@@ -104,8 +136,8 @@
               <div class="col-4 judges">
                 {% for judge in pairing.judges.all %}
                 <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-                  <a class="btn-sm btn-link dropdown-toggle" data-toggle="dropdown" href="#">
-                    {{judge.name}} <small>({{judge.rank}}) <span class="caret"></span></small>
+                  <a class="btn-sm btn-link judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+                    {{judge.name}} <small>({{judge.rank}})</small>
                   </a>
                   <ul class="dropdown-menu"></ul>
                 </span>
@@ -114,8 +146,8 @@
                 {% for slot in judge_slots %}
                 {% if pairing.judges.all|length < slot %}
                 <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-                  <a class="btn-sm btn-link dropdown-toggle" data-toggle="dropdown" href="#">
-                      N/A <span class="caret"></span>
+                  <a class="btn-sm btn-link judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+                      N/A
                   </a>
                   <ul class="dropdown-menu"></ul>
                 </span>
