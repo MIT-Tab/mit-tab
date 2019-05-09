@@ -10,7 +10,7 @@ class PairingARoundTestCase(BaseWebTestCase):
         self._login()
         self._visit("/pairings/status")
 
-        self.browser.click_link_by_text('Prepare Next Round')
+        self.browser.click_link_by_partial_text('Prepare Next Round')
         self.browser.find_by_value('Pair This Round').first.click()
 
         self._setup_confirm()
