@@ -7,9 +7,9 @@ var populate_tab_card = function(tab_card_element) {
         success: function(result) {
             result = result.result
             var text = [result.wins, result.total_speaks.toFixed(2), result.govs, result.opps, result.seed].join(" / ")
-            tab_card_element.html(
-              "<abbr title='Wins / Speaks / Govs / Opps / Seed'>" + text + "</abbr>"
-            )
+            tab_card_element.attr('title', 'Wins / Speaks / Govs / Opps / Seed')
+            tab_card_element.attr('href', '/team/card/' + team_id)
+            tab_card_element.text(text)
         },
     })
 }
@@ -85,6 +85,7 @@ var assign_judge = function(e) {
 }
 
 function assignTeam(e) {
+    e.preventDefault()
     var teamId = $(e.target).attr('team-id')
     var oldTeamId = $(e.target).attr('src-team-id')
     var roundId = $(e.target).attr('round-id')
