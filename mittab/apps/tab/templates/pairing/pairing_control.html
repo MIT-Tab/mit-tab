@@ -33,11 +33,11 @@
           onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
           <div class="btn-group btn-group-sm">
             {% if judges_assigned %}
-            <button type="submit" class="mid btn btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
+            <button id="assign-judges" type="submit" class="mid btn btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges Again
             </button>
             {% else %}
-            <button type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
+            <button id="assign-judges" type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
             {% endif %}
