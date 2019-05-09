@@ -14,7 +14,7 @@ class PairingARoundTestCase(BaseWebTestCase):
         self.browser.find_by_value('Pair This Round').first.click()
 
         self._setup_confirm()
-        self.browser.find_by_text('Assign Judges').first.click()
+        self.browser.find_by_partial_text('Assign Judges').first.click()
         self._accept_confirm()
 
         assert self.browser.is_text_present('Round Status for Round 1')
