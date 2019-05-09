@@ -190,8 +190,8 @@
       {% endfor %}
     </div> <!-- end pairings row -->
 
-    <div class="row">
-      <div class="col not-paired-in overflow-auto">
+    <div class="row mt-2 mb-2">
+      <div class="col not-paired-in overflow-auto border-bottom">
         <h5>People Not Paired In</h5>
         <table class="table table-striped table-sm">
           <thead>
@@ -209,7 +209,7 @@
               {% if cjudge %} <a href="/judge/{{cjudge.id}}" >{{cjudge.name}}</a> {% endif %}
             </td>
             <td>
-              {% if judge %} <a style="color:{% if judge.rank > warning %}red{%else%}black{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
+              {% if judge %} <a class="{% if judge.rank > warning %}text-danger{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
             </td>
             <td>
               {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a> {% endif %}
@@ -221,12 +221,5 @@
     </div><!-- end not-paired-in row -->
 
   </div>
-</div>
-
-<div id="round_info">
-        <div class="scroll">
-        </div>
-        <br>
-    </div>
 </div>
 {% endblock %}
