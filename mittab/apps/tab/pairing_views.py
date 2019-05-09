@@ -109,8 +109,7 @@ def pair_round(request):
             check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
         smaller_width = True
 
-        return render(request, 'pair_round.html',
-                                  locals())
+        return render(request, 'pairing/pair_round.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
@@ -260,8 +259,7 @@ def view_round(request, round_number, errors = None):
     # [      ][                                  ][                 Judge4               ]
     excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
 
-    return render(request, 'pairing_control.html',
-                               locals())
+    return render(request, 'pairing/pairing_control.html', locals())
 
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
@@ -289,7 +287,7 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
-    return render(request, 'judge_dropdown.html', locals())
+    return render(request, 'pairing/judge_dropdown.html', locals())
 
 def alternative_teams(request, round_id, current_team_id, position):
     round_obj = Round.objects.get(pk=round_id)
@@ -300,7 +298,7 @@ def alternative_teams(request, round_id, current_team_id, position):
         .exclude(pk=current_team_id)
     included_teams = Team.objects.exclude(pk__in=excluded_teams) \
         .exclude(pk=current_team_id)
-    return render(request, 'team_dropdown.html', locals())
+    return render(request, 'pairing/team_dropdown.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_team(request, round_id, position, team_id):
@@ -381,7 +379,7 @@ def pretty_pair(request, printable=False):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
-    return render(request, 'round_pairings.html',
+    return render(request, 'pairing/pairing_display.html',
                                locals())
 
 def pretty_pair_print(request):
