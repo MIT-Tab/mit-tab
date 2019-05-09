@@ -17,8 +17,8 @@ class PairingARoundTestCase(BaseWebTestCase):
         self.browser.find_by_text('Assign Judges').first.click()
         self._accept_confirm()
 
-        assert self.browser.is_text_present('Round Status for Round: 1')
-        assert self.browser.is_text_present('We have a valid Pairing')
+        assert self.browser.is_text_present('Round Status for Round 1')
+        assert self.browser.is_text_present('Valid pairing')
 
         self.browser.find_by_text('Enter Ballot').first.click()
 
