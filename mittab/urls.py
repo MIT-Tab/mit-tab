@@ -117,8 +117,6 @@ urlpatterns = [
             name='toggle_pairing_released'),
     url(r'^pairing/view_backups/$', pairing_views.view_backups,
             name='view_backups'),
-    url(r'^pairings/swap/(\d+)/(\d+)/with/(\d+)/(\d+)/$',
-            pairing_views.swap_judges_in_round, name='swap_judges_in_round'),
     url(r'^e_ballots/$', pairing_views.e_ballot_search, name='e_ballot_search'),
     url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot, name='enter_e_ballot'),
 

@@ -26,26 +26,6 @@ import mittab.libs.backup as backup
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
-def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
-    try :
-        src_judge = Judge.objects.get(id=int(src_judge))
-        dest_judge = Judge.objects.get(id=int(dest_judge))
-
-        src_round = Round.objects.get(id=int(src_round))
-        dest_round = Round.objects.get(id=int(dest_round))
-
-        dest_round.judge = src_judge
-        src_round.judge = dest_judge
-        dest_round.save()
-        src_round.save()
-        data = {"success":True}
-    except Exception as e:
-        emit_current_exception()
-        data = {"success":False}
-    return JsonResponse(data)
-
-
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
