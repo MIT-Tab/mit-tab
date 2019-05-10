@@ -131,7 +131,7 @@ def view_backup(request, filename):
     item_manip = "restore from that backup"
     links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
              ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
-    return render(request, 'list_data.html', locals())
+    return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
 def download_backup(request, filename):
@@ -154,7 +154,7 @@ def upload_backup(request):
                                       'data_modification': "CREATE"})
     else:
         form = UploadBackupForm()
-    return render(request, 'data_entry.html', 
+    return render(request, 'common/data_entry.html', 
                               {'form': form,
                                'title': 'Upload a Backup'})
 
@@ -181,7 +181,7 @@ def view_backups(request):
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
     links = [('/upload_backup/', "Upload Backup", False)]
-    return render(request, 'list_data.html', locals())
+    return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
@@ -373,12 +373,12 @@ def missing_ballots(request):
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     no_navigation = True
-    return render(request, 'missing_ballots.html', locals())
+    return render(request, 'ballots/missing_ballots.html', locals())
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
     rounds = [(i, "Round %i" % i, 0, "") for i in range(1,number_of_rounds+1)]
-    return render(request, 'list_data.html',
+    return render(request, 'common/list_data.html',
                               {'item_type':'round',
                                'item_list': rounds,
                                'show_delete': True})
@@ -388,7 +388,7 @@ def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
-        return render(request, "e_ballot_search.html", { 'no_navigation': True })
+        return render(request, "ballots/e_ballot_search.html", { 'no_navigation': True })
 
 
 def enter_e_ballot(request, ballot_code):
@@ -462,7 +462,7 @@ def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None
             form_kwargs["ballot_code"] = ballot_code
         form = form_class(**form_kwargs)
 
-    return render(request, "round_entry.html",
+    return render(request, "ballots/round_entry.html",
                               {"form": form,
                                "title": 'Entering Ballot for {}'.format(round_obj),
                                "gov_team": round_obj.gov_team,
@@ -525,7 +525,7 @@ def enter_multiple_results(request, round_id, num_entered):
         forms = [ResultEntryForm(prefix = str(i),
                                  round_instance=round_obj,
                                  no_fill = True) for i in range(1, num_entered + 1)]
-    return render(request, 'round_entry_multiple.html',
+    return render(request, 'ballots/round_entry_multiple.html',
                               {'forms': forms,
                                'title': "Entering Ballots for {}".format(str(round_obj)),
                                'gov_team': round_obj.gov_team,
@@ -533,7 +533,7 @@ def enter_multiple_results(request, round_id, num_entered):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def confirm_start_new_tourny(request):
-    return render(request, 'confirm.html',
+    return render(request, 'common/confirm.html',
                               {'link': "/pairing/start_tourny/",
                                'confirm_text': "Create New Tournament",
                                'title': 'Are you sure?'})

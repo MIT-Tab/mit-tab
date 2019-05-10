@@ -24,7 +24,7 @@ def view_teams(request):
                for t in Team.objects.all().order_by("name")]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                              {'item_type':'team',
                               'title': "Viewing All Teams",
                               'item_list': c_teams,
@@ -66,15 +66,14 @@ def view_team(request, team_id):
         links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for {}'.format(team.name), False)]
         for deb in team.debaters.all():
             links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
-        return render(request, 'data_entry.html', 
+        return render(request, 'common/data_entry.html', 
                                  {'title':"Viewing Team: %s"%(team.name),
                                   'form': form,
                                   'links': links,
                                   'team_obj':team,
                                   'team_stats':stats})
 
-    return render(request, 'data_entry.html', 
-                             {'form': form})
+    return render(request, 'common/data_entry.html', {'form': form})
 
 def enter_team(request):
     if request.method == 'POST':
@@ -98,7 +97,7 @@ def enter_team(request):
 
     else:
         form = TeamEntryForm()
-    return render(request, 'data_entry.html',
+    return render(request, 'common/data_entry.html',
                              {'form': form, 'title': "Create Team"})
 
 def add_scratches(request, team_id, number_scratches):
@@ -129,7 +128,7 @@ def add_scratches(request, team_id, number_scratches):
                                       'data_modification': "CREATED"})
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
-    return render(request, 'data_entry_multiple.html', 
+    return render(request, 'common/data_entry_multiple.html', 
                              {'forms': list(zip(forms,[None]*len(forms))),
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(team.name)})
@@ -160,7 +159,7 @@ def view_scratches(request, team_id):
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/team/"+str(team_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/team/'+str(team_id)+'/scratches/add/1/','Add Scratch')]
-    return render(request, 'data_entry_multiple.html', 
+    return render(request, 'common/data_entry_multiple.html', 
                              {'forms': list(zip(forms,delete_links)),
                               'data_type':'Scratch',
                               'links':links,
@@ -169,8 +168,7 @@ def view_scratches(request, team_id):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
-    return render(request, 'all_tab_cards.html',
-                              locals())
+    return render(request, 'tab/all_tab_cards.html', locals())
 
 def pretty_tab_card(request, team_id):
     try:
@@ -180,7 +178,7 @@ def pretty_tab_card(request, team_id):
                                  {'error_type': "Tab Card",'error_name': "View",
                                   'error_info': "Team id must be an integer!"})
     team = Team.objects.get(pk=team_id)
-    return render(request, 'pretty_tab_card.html', {'team':team})
+    return render(request, 'tab/pretty_tab_card.html', {'team':team})
 
 def tab_card(request, team_id):
     try:
@@ -277,7 +275,7 @@ def tab_card(request, team_id):
     #Duplicates Debater 1 for display if Ironman team    
     if (iron_man):
       d2 = d1
-    return render(request, 'tab_card.html', 
+    return render(request, 'tab/tab_card.html', 
                              {'team_name': team.name,
                               'team_school': team.school,
                               'debater_1': d1.name,
@@ -294,7 +292,7 @@ def tab_card(request, team_id):
                               'bye_round': bye_round})
 
 def rank_teams_ajax(request):
-    return render(request, 'rank_teams.html', {'title': "Team Rankings"})
+    return render(request, 'tab/rank_teams.html', {'title': "Team Rankings"})
 
 def rank_teams(request):
     ranked_teams = tab_logic.rankings.rank_teams()
@@ -303,7 +301,7 @@ def rank_teams(request):
     nov_teams = filter(
             lambda ts: all(map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.all())),
             teams)
-    return render(request, 'rank_teams_component.html',
+    return render(request, 'tab/rank_teams_component.html',
                              {'varsity': teams,
                               'novice': nov_teams,
                               'title': "Team Rankings"})

@@ -44,7 +44,7 @@ def view_judges(request):
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                               {
                                   'item_type':'judge',
                                   'title': "Viewing All Judges",
@@ -86,7 +86,7 @@ def view_judge(request, judge_id):
         scratch_url = base_url + 'scratches/view/'
         delete_url =  base_url + 'delete/'
         links = [(scratch_url, 'Scratches for {}'.format(judge.name), False)]
-        return render(request, 'data_entry.html', 
+        return render(request, 'common/data_entry.html', 
                                  {'form': form,
                                   'links': links,
                                   'title': 'Viewing Judge: {}'.format(judge.name)})
@@ -110,7 +110,7 @@ def enter_judge(request):
                                       'enter_again': True})
     else:
         form = JudgeForm(first_entry=True)
-    return render(request, 'data_entry.html',
+    return render(request, 'common/data_entry.html',
                               {'form': form, 'title': "Create Judge"})
 
 def add_scratches(request, judge_id, number_scratches):
@@ -142,7 +142,7 @@ def add_scratches(request, judge_id, number_scratches):
                                       'data_modification': "CREATED"})
     else:
         forms = [ScratchForm(prefix=str(i), initial={'judge':judge_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
-    return render(request, 'data_entry_multiple.html', 
+    return render(request, 'common/data_entry_multiple.html', 
                              {'forms': list(zip(forms,[None]*len(forms))),
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(judge.name)})
@@ -174,7 +174,7 @@ def view_scratches(request, judge_id):
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
-    return render(request, 'data_entry_multiple.html',
+    return render(request, 'common/data_entry_multiple.html',
                              {'forms': list(zip(forms,delete_links)),
                               'data_type':'Scratch',
                               'links':links,
@@ -190,7 +190,7 @@ def batch_checkin(request):
             checkins.append(judge.is_checked_in_for_round(round_number))
         judges_and_checkins.append((judge, checkins))
 
-    return render(request, 'batch_checkin.html',
+    return render(request, 'tab/batch_checkin.html',
             {'judges_and_checkins': judges_and_checkins, 'round_numbers': round_numbers})
 
 @permission_required('tab.tab_settings.can_change', login_url='/403')

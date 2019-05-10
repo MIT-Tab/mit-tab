@@ -9,11 +9,11 @@ def active(request, pattern):
         return 'active'
     return ''
 
-@register.inclusion_tag('quick_search.html')
+@register.inclusion_tag('common/_quick_search.html')
 def quick_search():
     return {}
 
 
-@register.inclusion_tag('round_form.html')
+@register.inclusion_tag('ballots/_round_form.html')
 def round_form(form, gov_team, opp_team):
     return { 'form': form, 'gov_team': gov_team, 'opp_team': opp_team }

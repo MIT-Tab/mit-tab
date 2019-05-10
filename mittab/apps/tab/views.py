@@ -24,7 +24,7 @@ def index(request):
     debater_list = [(debater.pk,debater.name) for debater in Debater.objects.order_by('name')]
     room_list = [(room.pk, room.name) for room in Room.objects.order_by('name')]
 
-    return render(request, 'index.html',locals())
+    return render(request, 'common/index.html',locals())
 
 def tab_login(request):
     return login(request, extra_context={'no_navigation': True})
@@ -35,7 +35,7 @@ def tab_logout(request, *args):
     return redirect("/")
 
 def render_403(request):
-    t = loader.get_template('403.html')
+    t = loader.get_template('common/403.html')
     c = RequestContext(request, { 'request': request, 'no_navigation': True })
     return HttpResponseForbidden(t.render(c))
 
@@ -54,7 +54,7 @@ def add_scratch(request):
                                   'enter_again': True})
     else:
         form = ScratchForm(initial={'scratch_type':0})
-    return render(request, 'data_entry.html', 
+    return render(request, 'common/data_entry.html', 
                               {'title':"Adding Scratch",
                               'form': form})
 
@@ -64,7 +64,7 @@ def add_scratch(request):
 def view_schools(request):
     #Get a list of (id,school_name) tuples
     c_schools = [(s.pk,s.name,0,"") for s in School.objects.all().order_by("name")]
-    return render(request, 'list_data.html',
+    return render(request, 'common/list_data.html',
             {'item_type':'school', 'title': "Viewing All Schools", 'item_list':c_schools})
 
 
@@ -93,7 +93,7 @@ def view_school(request, school_id):
     else:
         form = SchoolForm(instance=school)
         links = [('/school/'+str(school_id)+'/delete/', 'Delete', True)]
-        return render(request, 'data_entry.html', 
+        return render(request, 'common/data_entry.html', 
                                  {'form': form,
                                   'links': links,
                                   'title': "Viewing School: %s" %(school.name)})
@@ -116,7 +116,7 @@ def enter_school(request):
                                       'enter_again': True})
     else:
         form = SchoolForm()
-    return render(request, 'data_entry.html', 
+    return render(request, 'common/data_entry.html', 
                               {'form': form, 'title': "Create School"})
 
 @permission_required('tab.school.can_delete', login_url="/403/")    
@@ -158,7 +158,7 @@ def view_rooms(request):
                   for room in Room.objects.all().order_by("name")]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
   
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                              {'item_type':'room',
                               'title': "Viewing All Rooms",
                               'item_list':all_rooms,
@@ -189,7 +189,7 @@ def view_room(request, room_id):
                                       'data_name': "["+form.cleaned_data['name']+"]"})
     else:
         form = RoomForm(instance=room)
-        return render(request, 'data_entry.html', 
+        return render(request, 'common/data_entry.html', 
                                  {'form': form,
                                   'links': [],
                                   'title': "Viewing Room: %s"%(room.name)})
@@ -211,7 +211,7 @@ def enter_room(request):
                                       'enter_again': True})
     else:
         form = RoomForm()
-    return render(request, 'data_entry.html',
+    return render(request, 'common/data_entry.html',
                              {'form': form, 'title': 'Create Room'})
 
 @permission_required('tab.room.can_delete', login_url="/403/")
@@ -234,7 +234,7 @@ def delete_scratch(request, item_id, scratch_id):
 def view_scratches(request):
     # Get a list of (id,school_name) tuples
     c_scratches = [(s.team.pk, str(s), 0, "") for s in Scratch.objects.all()]
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                              {'item_type':'team',
                               'title': "Viewing All Scratches for Teams",
                               'item_list':c_scratches})
@@ -277,7 +277,7 @@ def upload_data(request):
                                   'data_results': results})
     else:
       form = UploadDataForm()
-    return render(request, 'data_entry.html', 
+    return render(request, 'common/data_entry.html', 
                               {'form': form,
                                'title': 'Upload Input Files'})
     

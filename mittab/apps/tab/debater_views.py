@@ -11,7 +11,7 @@ from mittab.libs import tab_logic, errors
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
     c_debaters = [(debater.pk,debater.name,0,"") for debater in Debater.objects.order_by("name")]
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                              {'item_type':'debater',
                               'title': "Viewing All Debaters",
                               'item_list':c_debaters})
@@ -48,7 +48,7 @@ def view_debater(request, debater_id):
         for team in teams:
             links.append(('/team/'+str(team.id)+'/', "View %s"%team.name, False))
 
-        return render(request, 'data_entry.html', 
+        return render(request, 'common/data_entry.html', 
                                  {'form': form,
                                   'debater_obj': debater,
                                   'links': links,
@@ -72,12 +72,12 @@ def enter_debater(request):
                                       'enter_again': True})
     else:
         form = DebaterForm()
-    return render(request, 'data_entry.html',
+    return render(request, 'common/data_entry.html',
                              {'form': form,
                               'title': "Create Debater:"})
 
 def rank_debaters_ajax(request):
-    return render(request, 'rank_debaters.html', {'title': "Debater Rankings"})
+    return render(request, 'tab/rank_debaters.html', {'title': "Debater Rankings"})
 
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
@@ -88,7 +88,7 @@ def rank_debaters(request):
 
     nov_debaters = filter(lambda s: s[0].novice_status == Debater.NOVICE,
             debaters)
-    return render(request, 'rank_debaters_component.html', 
+    return render(request, 'tab/rank_debaters_component.html', 
                              {'debaters': debaters, 
                               'nov_debaters' : nov_debaters,
                               'title': "Speaker Rankings"})
