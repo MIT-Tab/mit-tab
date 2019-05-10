@@ -77,8 +77,7 @@ def enter_debater(request):
                               'title': "Create Debater:"})
 
 def rank_debaters_ajax(request):
-    return render(request, 'rank_debaters.html',
-            {'title': "Debater Rankings", 'smaller_width': True})
+    return render(request, 'rank_debaters.html', {'title': "Debater Rankings"})
 
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
@@ -92,6 +91,5 @@ def rank_debaters(request):
     return render(request, 'rank_debaters_component.html', 
                              {'debaters': debaters, 
                               'nov_debaters' : nov_debaters,
-                              'title': "Speaker Rankings",
-                              'smaller_width': True})
+                              'title': "Speaker Rankings"})
 

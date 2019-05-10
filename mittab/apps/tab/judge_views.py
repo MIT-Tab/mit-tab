@@ -191,8 +191,7 @@ def batch_checkin(request):
         judges_and_checkins.append((judge, checkins))
 
     return render(request, 'batch_checkin.html',
-            {'smaller_width': True, 'judges_and_checkins': judges_and_checkins,
-                'round_numbers': round_numbers})
+            {'judges_and_checkins': judges_and_checkins, 'round_numbers': round_numbers})
 
 @permission_required('tab.tab_settings.can_change', login_url='/403')
 def judge_check_in(request, judge_id, round_number):

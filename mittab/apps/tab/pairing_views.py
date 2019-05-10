@@ -87,7 +87,6 @@ def pair_round(request):
             ready_to_pair = "No"
             ready_to_pair_alt = str(e) 
             check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
-        smaller_width = True
 
         return render(request, 'pairing/pair_round.html', locals())
 
@@ -374,7 +373,6 @@ def missing_ballots(request):
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     no_navigation = True
-    smaller_width = True
     return render(request, 'missing_ballots.html', locals())
 
 def view_rounds(request):
@@ -390,8 +388,7 @@ def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
-        return render(request, "e_ballot_search.html",
-                { 'no_navigation': True, 'smaller_width': True })
+        return render(request, "e_ballot_search.html", { 'no_navigation': True })
 
 
 def enter_e_ballot(request, ballot_code):
@@ -539,8 +536,7 @@ def confirm_start_new_tourny(request):
     return render(request, 'confirm.html',
                               {'link': "/pairing/start_tourny/",
                                'confirm_text': "Create New Tournament",
-                               'title': 'Are you sure?',
-                               'smaller_width': True})
+                               'title': 'Are you sure?'})
 
 #TODO: Unify this with initialize_tourney
 @permission_required('tab.tab_settings.can_change', login_url="/403/")

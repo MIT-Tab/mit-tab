@@ -27,7 +27,7 @@ def index(request):
     return render(request, 'index.html',locals())
 
 def tab_login(request):
-    return login(request, extra_context={'no_navigation': True, 'smaller_width': True})
+    return login(request, extra_context={'no_navigation': True})
 
 def tab_logout(request, *args):
     logout(request)
@@ -36,8 +36,7 @@ def tab_logout(request, *args):
 
 def render_403(request):
     t = loader.get_template('403.html')
-    c = RequestContext(request, { 'request': request, 'no_navigation': True,
-        'smaller_width': True })
+    c = RequestContext(request, { 'request': request, 'no_navigation': True })
     return HttpResponseForbidden(t.render(c))
 
 #View for manually adding scratches

@@ -180,8 +180,7 @@ def pretty_tab_card(request, team_id):
                                  {'error_type': "Tab Card",'error_name': "View",
                                   'error_info': "Team id must be an integer!"})
     team = Team.objects.get(pk=team_id)
-    return render(request, 'pretty_tab_card.html',
-                             {'team':team, 'smaller_width': True})
+    return render(request, 'pretty_tab_card.html', {'team':team})
 
 def tab_card(request, team_id):
     try:
@@ -295,8 +294,7 @@ def tab_card(request, team_id):
                               'bye_round': bye_round})
 
 def rank_teams_ajax(request):
-    return render(request, 'rank_teams.html',
-            {'title': "Team Rankings", 'smaller_width': True})
+    return render(request, 'rank_teams.html', {'title': "Team Rankings"})
 
 def rank_teams(request):
     ranked_teams = tab_logic.rankings.rank_teams()
