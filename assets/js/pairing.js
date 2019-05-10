@@ -25,7 +25,7 @@ var populate_alternative_teams = function() {
         url: url,
         success: function(result) {
             $parent.find(".dropdown-menu").html(result);
-            $parent.find(".dropdown-menu").find(".team-swap").click(assignTeam);
+            $parent.find(".dropdown-menu").find(".team-assign").click(assignTeam);
             quickSearchInit($parent.find("#quick-search"))
         },
     })
@@ -98,7 +98,7 @@ function assignTeam(e) {
         success: function(result) {
             if (result.success) {
                 var $container = $(".row[round-id=" + roundId + "] ." + position + '-team')
-                $container.find('.team-swap').attr('team-id', result.team.id)
+                $container.find('.team-assign-button').attr('team-id', result.team.id)
                 $container.find('.team-link').text(result.team.name)
                 $container.find('.team-link').attr('href', '/team/' + result.team.id)
                 $container.find('.tabcard').attr('team-id', result.team.id)
