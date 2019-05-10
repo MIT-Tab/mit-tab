@@ -1,4 +1,5 @@
 import '../css/app.scss'
+import quickSearchInit from './quickSearch.js'
 import './pairing.js'
 
 import $ from 'jquery'
@@ -6,16 +7,7 @@ import $ from 'jquery'
 import 'popper.js'
 import 'bootstrap'
 
-$.expr[':'].Contains = function(a,i,m){
-    return $(a).text().toUpperCase().indexOf(m[3].toUpperCase())>=0;
-};
-
 $(document).ready(function(){
-    function filter(matching_text) {
-        $('.searchable:not(:Contains(' + matching_text+ '))').hide(); 
-        $('.searchable:Contains(' + matching_text + ')').show();
-    };
-
     function filter_on_flags(flags) {
         $('li.filterable').each(function(index, element) {
             var show = 1;
@@ -29,15 +21,6 @@ $(document).ready(function(){
     function show_all(type) {
         $(type).show();
     };
-
-    $('#quick-search').keyup(function() {
-        if ($(this).val()) {
-            filter($(this).val());
-        }
-        else {
-            show_all(".searchable");
-        }
-    });
 
     function checkInOrOut(target, isCheckIn) {
         var $target = $(target);
@@ -171,4 +154,5 @@ $(document).ready(function(){
     $(".filter").change(apply_filters)
 
     apply_filters();
+    quickSearchInit();
 });
