@@ -4,6 +4,7 @@ import traceback
 import time
 import datetime
 import os
+import itertools
 
 from django.shortcuts import render
 from django.template import RequestContext
@@ -22,69 +23,6 @@ import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
-
-
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
-def swap_judges_in_round(request, src_round, src_judge, dest_round, dest_judge):
-    try :
-        src_judge = Judge.objects.get(id=int(src_judge))
-        dest_judge = Judge.objects.get(id=int(dest_judge))
-
-        src_round = Round.objects.get(id=int(src_round))
-        dest_round = Round.objects.get(id=int(dest_round))
-
-        dest_round.judge = src_judge
-        src_round.judge = dest_judge
-        dest_round.save()
-        src_round.save()
-        data = {"success":True}
-    except Exception as e:
-        emit_current_exception()
-        data = {"success":False}
-    return JsonResponse(data)
-
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
-def swap_teams_in_round(request, src_round, src_team, dest_round, dest_team):
-    try :
-        src_team = Team.objects.get(id=int(src_team))
-        dest_team = Team.objects.get(id=int(dest_team))
-        if int(src_round) == int(dest_round):
-            same_round = Round.objects.get(id=int(src_round))
-            gov_team = same_round.gov_team
-            opp_team = same_round.opp_team
-            same_round.gov_team = opp_team
-            same_round.opp_team = gov_team
-            same_round.save()
-        else:
-            src_round = Round.objects.get(id=int(src_round))
-            dest_round = Round.objects.get(id=int(dest_round))
-            if src_round.gov_team == src_team:
-                if dest_round.gov_team == dest_team:
-                    # Swap the two gov teams
-                    src_round.gov_team = dest_team
-                    dest_round.gov_team = src_team
-                else:
-                    # Swap src_rounds gov team with 
-                    # dest_round's opp team
-                    src_round.gov_team = dest_team
-                    dest_round.opp_team = src_team
-            else:
-                if dest_round.gov_team == dest_team:
-                    # Swap src_rounds opp team with
-                    # dest_round's gov team
-                    src_round.opp_team = dest_team
-                    dest_round.gov_team = src_team
-                else:
-                    # Swap the two opp teams
-                    src_round.opp_team = dest_team
-                    dest_round.opp_team = src_team
-            dest_round.save()
-            src_round.save()
-        data = {'success':True}
-    except Exception as e:
-        emit_current_exception()
-        data = {'success':False}
-    return JsonResponse(data)
 
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
@@ -151,8 +89,7 @@ def pair_round(request):
             check_status.append((msg, "No", "You have a noshow and results. %s" % str(e)))
         smaller_width = True
 
-        return render(request, 'pair_round.html',
-                                  locals())
+        return render(request, 'pairing/pair_round.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judges_to_pairing(request):
@@ -276,10 +213,12 @@ def view_round(request, round_number, errors = None):
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
     valid_pairing = len(round_pairing) >= n_over_two or round_number == 0
+
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
             errors.append("%s was not in the pairing" % (present_team))
             byes.append(present_team)
+
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
@@ -300,8 +239,7 @@ def view_round(request, round_number, errors = None):
     # [      ][                                  ][                 Judge4               ]
     excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
 
-    return render(request, 'pairing_control.html',
-                               locals())
+    return render(request, 'pairing/pairing_control.html', locals())
 
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
@@ -329,8 +267,42 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
-    return render(request, 'judge_dropdown.html',
-                              locals())
+    return render(request, 'pairing/judge_dropdown.html', locals())
+
+def alternative_teams(request, round_id, current_team_id, position):
+    round_obj = Round.objects.get(pk=round_id)
+    current_team = Team.objects.get(pk=current_team_id)
+    round_number = round_obj.round_number
+    excluded_teams = Team.objects.exclude(gov_team__round_number=round_number) \
+        .exclude(opp_team__round_number=round_number) \
+        .exclude(pk=current_team_id)
+    included_teams = Team.objects.exclude(pk__in=excluded_teams) \
+        .exclude(pk=current_team_id)
+    return render(request, 'pairing/team_dropdown.html', locals())
+
+@permission_required('tab.tab_settings.can_change', login_url="/403/")
+def assign_team(request, round_id, position, team_id):
+    try:
+        round_obj = Round.objects.get(id=int(round_id))
+        team_obj = Team.objects.get(id=int(team_id))
+
+        if position.lower() == 'gov':
+            round_obj.gov_team = team_obj
+        elif position.lower() == 'opp':
+            round_obj.opp_team = team_obj
+        else:
+            raise ValueError('Got invalid position: ' + position)
+        round_obj.save()
+
+        data = {
+            'success': True,
+            'team': { 'id': team_obj.id, 'name': team_obj.name },
+        }
+    except Exception as e:
+        emit_current_exception()
+        data = {'success':False}
+    return JsonResponse(data)
+
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def assign_judge(request, round_id, judge_id, remove_id=None):
@@ -348,6 +320,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
         round_obj.save()
         data = {"success":True,
+                "chair_id": round_obj.chair.id,
                 "round_id": round_obj.id,
                 "judge_name": judge_obj.name,
                 "judge_rank": float(judge_obj.rank),
@@ -387,7 +360,7 @@ def pretty_pair(request, printable=False):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
-    return render(request, 'round_pairings.html',
+    return render(request, 'pairing/pairing_display.html',
                                locals())
 
 def pretty_pair_print(request):

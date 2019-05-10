@@ -1,0 +1,33 @@
+<div class="form-group pl-2 pt-2 mb-1">
+  <input id="quick-search"
+        class="form-control form-control-sm" type="text" placeholder="Search...">
+</div>
+
+<h6 class="text-center dropdown-header">Team</h6>
+
+<a class="dropdown-item searchable" href="/team/{{current_team_id}}">
+  {{ current_team.name }}
+</a>
+<div class="dropdown-divider"></div>
+<h6 class="text-center dropdown-header">
+  Teams Not Paired In
+</h6>
+{% for team in excluded_teams %}
+<a href="#" class="dropdown-item team-swap searchable" position="{{position}}"
+            src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
+  {{ team.name }}
+</a>
+{% empty %}
+<a class="dropdown-item">No teams</a>
+{% endfor %}
+
+<div class="dropdown-divider"></div>
+<h6 class="text-center dropdown-header">Teams Paired In</h6>
+{% for team in included_teams%}
+<a href="#" class="dropdown-item team-swap searchable" position="{{position}}"
+            src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
+  {{ team.name }}
+</a>
+{% empty %}
+<a class="dropdown-item">No teams</a>
+{% endfor %}
