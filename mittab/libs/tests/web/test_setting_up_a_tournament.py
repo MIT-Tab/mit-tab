@@ -143,7 +143,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             custom_form_logic()
         self._submit_form(**data)
 
-        msg = "%s [%s] has been successfully modified!(CREATED)" % (entity_name, data['name'])
+        msg = "%s %s created successfully" % (entity_name, data['name'])
         assert self.browser.is_text_present(msg)
 
         self._go_home()
