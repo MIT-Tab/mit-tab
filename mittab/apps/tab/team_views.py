@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import permission_required
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.apps.tab.errors import *
+from mittab.apps.tab.helpers import redirect_and_flash_error, \
+        redirect_and_flash_success
 from mittab.apps.tab.models import *
 import mittab.libs.tab_logic as tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
@@ -44,23 +46,17 @@ def view_team(request, team_id):
         stats.append(("Been Pullup", tab_logic.pull_up_count(team)))
         stats.append(("Hit Pullup", tab_logic.hit_pull_up_count(team)))
     except Team.DoesNotExist:
-        return render(request, 'error.html', 
-                                 {'error_type': "View Team",
-                                  'error_name': str(team_id),
-                                  'error_info':"No such Team"})
+        return redirect_and_flash_error(request, "Team not found")
     if request.method == 'POST':
         form = TeamForm(request.POST,instance=team)
         if form.is_valid():
             try:
                form.save()
             except ValueError:
-                return render(request, 'error.html',
-                                         {'error_type': "Team",
-                                          'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"Team name cannot be validated, most likely a non-existent team"})
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Team",
-                                      'data_name': "["+form.cleaned_data['name']+"]"})
+                return redirect_and_flash_error(request,
+                        "An error occured, most likely a non-existent team")
+            return redirect_and_flash_success(request,
+                    "Team {} created successfully".format(form.cleaned_data["name"]))
     else:
         form = TeamForm(instance=team)
         links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for {}'.format(team.name), False)]
