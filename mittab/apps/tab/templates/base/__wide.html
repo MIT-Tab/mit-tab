@@ -37,19 +37,21 @@
         </div>
       </div>
 
-      <div class="row mt-2">
-        {% block content %}{% endblock %}
+      {% if links %}
+      <div class="row mt-2 mb-2">
+        <div class="col">
+          <div class="btn-group">
+            {% for link,text,confirm in links %}
+              <button class="btn btn-secondary {%if confirm%}confirmLink{%endif%}"
+                href='{{link}}'>{{text}}</button>
+            {% endfor %}
+          </div>
+        </div>
       </div>
+      {%endif%}
 
       <div class="row mt-2">
-        {% if links %}
-        <div class="btn-group">
-          {% for link,text,confirm in links %}
-            <button class="btn btn-secondary {%if confirm%}confirmLink{%endif%}"
-              href='{{link}}'>{{text}}</button>
-          {% endfor %}
-        </div>
-        {%endif%}
+        {% block content %}{% endblock %}
       </div>
     </div>
 

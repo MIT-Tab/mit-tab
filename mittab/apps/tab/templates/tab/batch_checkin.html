@@ -7,9 +7,9 @@
 {% block content %}
 {% csrf_token %}
 
-{% quick_search %}
-
 <div class="col">
+  {% quick_search %}
+
   <table class="table table-striped table-bordered table-sm">
     <thead>
       <th>Judge</th>
