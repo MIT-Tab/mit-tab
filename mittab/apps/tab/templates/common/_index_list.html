@@ -3,11 +3,13 @@
     {{count}} {{model_name}}
     <div class="btn-group btn-group-sm">
       <a class="btn btn-sm btn-light" href="{{ list_path }}"
-        title="List {{model_name|lower}}">
+        title="List {{model_name|lower}}"
+        id="{{ html_id }}-btn-list">
         <i class="fas fa-list"></i>
       </a>
       <a class="btn btn-sm btn-light" href="{{ enter_path }}"
-        title="Add {{model_name|lower}}">
+        title="Add {{model_name|lower}}"
+        id="{{ html_id }}-btn-add">
         <i class="fas fa-plus"></i>
       </a>
     </div>

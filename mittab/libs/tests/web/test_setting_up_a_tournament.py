@@ -40,7 +40,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self._add_debater("Debater %s" % (i * 2 + 1), True)
 
         self._go_home()
-        self.browser.click_link_by_text("Debater List")
+        self.browser.click_link_by_id("debater-list-btn-list")
         self._wait()
 
         for i in range(4):
@@ -52,7 +52,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self._add_judge("Judge %s" % i, i, ["School %s" % i])
 
         self._go_home()
-        self.browser.click_link_by_text("Judge List")
+        self.browser.click_link_by_id("judge-list-btn-list")
         self._wait()
 
         for i in range(5):
@@ -63,7 +63,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self._add_room("Room %s" % i, i)
 
         self._go_home()
-        self.browser.click_link_by_text("Room List")
+        self.browser.click_link_by_id("room-list-btn-list")
         self._wait()
 
         for i in range(5):
@@ -74,7 +74,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self._add_school("School %s" % i)
 
         self._go_home()
-        self.browser.click_link_by_text("School List")
+        self.browser.click_link_by_id("school-list-btn-list")
         self._wait()
 
         for i in range(5):
@@ -138,7 +138,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         self._go_home()
 
-        self.browser.click_link_by_text("Add %s" % entity_name)
+        self.browser.click_link_by_text("%s-list-btn-add" % entity_name.lower())
         if custom_form_logic:
             custom_form_logic()
         self._submit_form(**data)
