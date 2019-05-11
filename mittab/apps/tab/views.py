@@ -181,7 +181,8 @@ def enter_room(request):
                 return redirect_and_flash_error(request,
                         "Room name cannot be validated, most likely a duplicate room")
             return redirect_and_flash_success(request,
-                    "Room {} created successfully".format(form.cleaned_data['name']))
+                    "Room {} created successfully".format(form.cleaned_data['name']),
+                    path="/")
     else:
         form = RoomForm()
     return render(request, 'common/data_entry.html',

@@ -142,7 +142,7 @@ def view_scratches(request, judge_id):
             for form in forms:
                 form.save()
             return redirect_and_flash_success(request,
-                    "Scearches created successfully")
+                    "Scratches created successfully")
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
