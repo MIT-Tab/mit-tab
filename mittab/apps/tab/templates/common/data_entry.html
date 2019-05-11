@@ -1,14 +1,23 @@
-{% extends "base.html" %}
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
 
 {% block title %}Data Entry{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="float_container">
-    
-<div class="obj_info">
-    
+<div class="col-md-6">
+  <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
+    {% bootstrap_form form %}
+
+    {% csrf_token %}
+    {% buttons %}
+      <input type="submit" value="Save" class="btn btn-primary"/>
+    {% endbuttons %}
+  </form>
+</div>
+
+<!--
 {% if team_obj %}
 <div class="team_record">
     Team Stats:
@@ -67,5 +76,5 @@
 
 </div>
 </div>
-
+-->
 {% endblock %}

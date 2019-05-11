@@ -1,11 +1,13 @@
 import '../css/app.scss'
-import quickSearchInit from './quickSearch.js'
 import './pairing.js'
 
 import $ from 'jquery'
 
 import 'popper.js'
 import 'bootstrap'
+
+import quickSearchInit from './quickSearch.js'
+import multiselectInit from './multiselect.js'
 
 $(document).ready(function(){
     function filter_on_flags(flags) {
@@ -155,4 +157,5 @@ $(document).ready(function(){
 
     apply_filters();
     quickSearchInit();
+    multiselectInit();
 });
