@@ -25,85 +25,46 @@
   </div>
 
   <div class="row index_container">
-    <div class="col-sm" id="school_list">
-      <h4 class="text-center font-weight-normal">{{number_schools}} Schools</h4>
 
-      <center>
-        <div class="btn-group btn-group-sm mb-2">
-          <a class="btn btn-secondary" href="{{ view_schools }}">School List</a>
-          <a class="btn btn-secondary" href="{{ enter_school }}">Add School</a>
-        </div>
-      </center>
-      <ol id="schools">
-        {% for id,school in school_list %}
-          <li class="searchable"><a href="/school/{{id}}/">{{school}}</a></li>
-        {% endfor %}
-      </ol>
-    </div>
+    {% with count=number_schools model_name="Schools" list_data=school_list %}
+      {% with html_id="school-list" list_path="{{ view_schools }}" %}
+        {% with enter_path="{{ enter_school }}" view_path_prefix="school" %}
+          {% include "common/_index_list.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endwith %}
 
-    <div class="col-sm" id="judge_list">
-      <h4 class="text-center font-weight-normal">{{number_judges}} Judges</h4>
-      <center>
-        <div class="btn-group btn-group-sm mb-2">
-          <a class="btn btn-secondary" href="{{ view_judges }}">Judge List</a>
-          <a class="btn btn-secondary" href="{{ enter_judge }}">Add Judge</a>
-        </div>
-      </center>
+    {% with count=number_judges model_name="Judges" list_data=judge_list %}
+      {% with html_id="judge-list" list_path="{{ view_judges }}" %}
+        {% with enter_path="{{ enter_judge }}" view_path_prefix="judge" %}
+          {% include "common/_index_list.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endwith %}
 
-      <ol id="judges">
-        {% for id,judge in judge_list %}
-          <li class="searchable"><a href="/judge/{{id}}/"> {{judge}}</a> </li>
-        {% endfor %}
-      </ol>
-    </div>
+    {% with count=number_teams model_name="Teams" list_data=team_list %}
+      {% with html_id="team-list" list_path="{{ view_teams }}" %}
+        {% with enter_path="{{ enter_team }}" view_path_prefix="team" %}
+          {% include "common/_index_list.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endwith %}
 
-    <div class="col-sm" id="team_list">
-      <h4 class="text-center font-weight-normal">{{number_teams}} Teams</h4>
-      <center>
-        <div class="btn-group btn-group-sm mb-2">
-          <a class="btn btn-secondary" href="{{ view_teams }}">Team List</a>
-          <a class="btn btn-secondary" href="{{ enter_team }}">Add Team</a>
-        </div>
-      </center>
+    {% with count=number_debaters model_name="Debaters" list_data=debater_list %}
+      {% with html_id="debater-list" list_path="{{ view_debaters }}" %}
+        {% with enter_path="{{ enter_debater }}" view_path_prefix="debater" %}
+          {% include "common/_index_list.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endwith %}
 
-      <ol id="teams">
-        {% for id,team in team_list %}
-          <li class="searchable"><a href="/team/{{id}}/"> {{team}}</a></li>
-        {% endfor %}
-      </ol>
-    </div>
-
-    <div class="col-sm" id="debater_list">
-      <h4 class="text-center font-weight-normal">{{number_debaters}} Debaters</h4>
-      <center>
-        <div class="btn-group btn-group-sm mb-2">
-          <a class="btn btn-secondary" href="{{ view_debaters }}">Debater List</a>
-          <a class="btn btn-secondary" href="{{ enter_debater }}">Add Debater</a>
-        </div>
-      </center>
-
-      <ol id="debaters">
-        {% for id,debater in debater_list %}
-          <li class="searchable"><a href="/debater/{{id}}/"> {{debater}}</a></li>
-        {% endfor %}
-      </ol>
-    </div>
-
-    <div class="col-sm" id="room_list">
-      <h4 class="text-center font-weight-normal">{{number_rooms}} Rooms</h4>
-      <center>
-        <div class="btn-group btn-group-sm mb-2">
-          <a class="btn btn-secondary" href="{{ view_rooms }}">Room List</a>
-          <a class="btn btn-secondary" href="{{ enter_room }}">Add Room</a>
-        </div>
-      </center>
-
-      <ol id="rooms">
-        {% for id, room in room_list %}
-          <li class="searchable"><a href="/room/{{id}}/">{{room}}</a></li>
-        {% endfor %}
-      </ol>
-    </div>
+    {% with count=number_rooms model_name="Rooms" list_data=room_list %}
+      {% with html_id="room-list" list_path="{{ view_rooms }}" %}
+        {% with enter_path="{{ enter_room }}" view_path_prefix="room" %}
+          {% include "common/_index_list.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endwith %}
   </div>
 </div>
 {% endblock %}

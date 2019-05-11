@@ -1,0 +1,21 @@
+<div class="col-sm" id="school_list">
+  <h4 class="text-center font-weight-normal">
+    {{count}} {{model_name}}
+    <div class="btn-group btn-group-sm">
+      <a class="btn btn-sm btn-light" href="{{ list_path }}"
+        title="List {{model_name|lower}}">
+        <i class="fas fa-list"></i>
+      </a>
+      <a class="btn btn-sm btn-light" href="{{ enter_path }}"
+        title="Add {{model_name|lower}}">
+        <i class="fas fa-plus"></i>
+      </a>
+    </div>
+  </h4>
+
+  <ol id="{{ html_id }}">
+    {% for id, name in list_data %}
+      <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+    {% endfor %}
+  </ol>
+</div>
