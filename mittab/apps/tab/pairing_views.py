@@ -15,6 +15,8 @@ from django.db import transaction
 from django.shortcuts import redirect
 
 from mittab.apps.tab.errors import *
+from mittab.apps.tab.helpers import redirect_and_flash_error, \
+        redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
@@ -42,10 +44,8 @@ def pair_round(request):
                 current_round.save()
         except Exception as exp:
             emit_current_exception()
-            return render(request, 'error.html',
-                                      {'error_type': "Pair Next Round",
-                                       'error_name': "Pairing Round %s" % (current_round.value + 1),
-                                       'error_info': "Could not pair next round because of: [{0}]".format(exp)})
+            return redirect_and_flash_error(request,
+                    "Could not pair next round, got error: {}".format(exp))
         return view_status(request)
     else:
         # See if we can pair the round
@@ -115,10 +115,8 @@ def assign_judges_to_pairing(request):
             assign_judges.add_judges(rounds, judges, panel_points)
         except Exception as e:
             emit_current_exception()
-            return render(request, 'error.html',
-                                     {'error_type': "Judge Assignment",
-                                      'error_name': "",
-                                      'error_info': str(e)})
+            return redirect_and_flash_error(request,
+                    "Got error during judge assignment")
     return redirect('/pairings/status/')
 
 
@@ -148,15 +146,12 @@ def upload_backup(request):
         form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
             backup.handle_backup(request.FILES['file'])
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Backup",
-                                      'data_name': request.FILES['file'].name,
-                                      'data_modification': "CREATE"})
+            return redirect_and_flash_success(request,
+                    "Backup {} uploaded successfully".format(request.FILES['file'].name))
     else:
         form = UploadBackupForm()
-    return render(request, 'common/data_entry.html', 
-                              {'form': form,
-                               'title': 'Upload a Backup'})
+    return render(request, 'common/data_entry.html',
+                              {'form': form, 'title': 'Upload a Backup'})
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def manual_backup(request):
@@ -166,12 +161,9 @@ def manual_backup(request):
         backup.backup_round("manual_backup_round_{}_{}_{}".format(cur_round, btime, now))
     except:
         emit_current_exception()
-        return render(request, 'error.html',
-                                 {'error_type': "Manual Backup",'error_name': "Backups",
-                                  'error_info': "Could not backup database. Something is wrong with your AWS setup."})
-    return render(request, 'thanks.html',
-                             {'data_type': "Backing up database",
-                              'data_name': " for round {} as version number {}".format(cur_round, btime)})
+        return redirect_and_flash_error(request, "Error created backup")
+    return redirect_and_flash_success(request,
+            "Backup created for round {} at timestamp {}".format(cur_round, btime))
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def view_backups(request):
@@ -185,11 +177,10 @@ def view_backups(request):
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
-    print("Trying to restore %s" % filename)
     backup.restore_from_backup(filename)
-    return render(request, 'thanks.html',
-                             {'data_type': "Restored from backup",
-                              'data_name': "{}".format(filename)})
+    return redirect_and_flash_success(request,
+            "Restored from backup. This may have logged you out.",
+            path="/")
 
 def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
@@ -359,8 +350,7 @@ def pretty_pair(request, printable=False):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
-    return render(request, 'pairing/pairing_display.html',
-                               locals())
+    return render(request, 'pairing/pairing_display.html', locals())
 
 def pretty_pair_print(request):
     return pretty_pair(request, True)
@@ -434,10 +424,7 @@ def enter_e_ballot(request, ballot_code):
                 """
     else:
         return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
-
-
-    messages.error(request, message)
-    return redirect("/e_ballots")
+    return redirect_and_flash_error(request, message, path="/e_ballots")
 
 
 def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None):
@@ -449,13 +436,10 @@ def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None
             try:
                 result = form.save()
             except ValueError:
-                return render(request, "error.html",
-                                          {"error_type": "Round Result",
-                                           "error_name": "[%s]" % str(round_obj),
-                                           "error_info": "Invalid round result, could not remedy."})
-            return render(request, "thanks.html",
-                                      {"data_type": "Round Result",
-                                       "data_name": "[%s]" % str(round_obj)})
+                return redirect_and_flash_error(request,
+                        "Invalid round result, could not remedy.")
+            return redirect_and_flash_success(request,
+                    "Result entered successfully")
     else:
         form_kwargs = { "round_instance": round_obj }
         if ballot_code:
@@ -516,9 +500,8 @@ def enter_multiple_results(request, round_id, num_entered):
                                               debater_role = role)
                 round_obj.victor = final_winner
                 round_obj.save()
-                return render(request, 'thanks.html', 
-                                         {'data_type': "Round Result",
-                                          'data_name': "["+str(round_obj)+"]"})
+                return redirect_and_flash_success(request,
+                        "Round entered successfully")
             else:
                 forms[0]._errors["winner"] = forms[0].error_class([error_msg])
     else:
@@ -549,13 +532,9 @@ def start_new_tourny(request):
         TabSettings.set("lenient_late", 0)
     except Exception as e:
         emit_current_exception()
-        return render(request, 'error.html',
-                            {'error_type': "Could not Start Tournament",
-                            'error_name': "",
-                            'error_info':"Invalid Tournament State. Time to hand tab. [%s]"%(e)})
-    return render(request, 'thanks.html',
-                            {'data_type': "Started New Tournament",
-                            'data_name': ""})
+        return redirect_and_flash_error(request,
+                "Invalid tournament state, try resetting from a back-up")
+    return redirect_and_flash_success(request, "New tournament started")
 
 def clear_db():
     obj_types = [

@@ -56,7 +56,7 @@ def view_team(request, team_id):
                 return redirect_and_flash_error(request,
                         "An error occured, most likely a non-existent team")
             return redirect_and_flash_success(request,
-                    "Team {} created successfully".format(form.cleaned_data["name"]))
+                    "Team {} updated successfully".format(form.cleaned_data["name"]))
     else:
         form = TeamForm(instance=team)
         links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for {}'.format(team.name), False)]
@@ -78,19 +78,15 @@ def enter_team(request):
             try:
                 team = form.save()
             except ValueError:
-                return render(request, 'error.html', 
-                                         {'error_type': "Team",'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"Team name cannot be validated, most likely a duplicate school"})
+                return redirect_and_flash_error(request,
+                        "Team name cannot be validated, most likely a duplicate school")
             num_forms = form.cleaned_data['number_scratches']
             if num_forms > 0:
                 return HttpResponseRedirect('/team/'+str(team.pk)+'/scratches/add/'+str(num_forms))
             else:
-                return render(request, 'thanks.html', 
-                                         {'data_type': "Team",
-                                          'data_name': '[{}]'.format(team.name),
-                                          'data_modification': 'CREATED',
-                                          'enter_again': True})
-
+                return redirect_and_flash_success(request,
+                        "Team {} created successfully".format(team.name),
+                        path="/")
     else:
         form = TeamEntryForm()
     return render(request, 'common/data_entry.html',
@@ -100,16 +96,11 @@ def add_scratches(request, team_id, number_scratches):
     try:
         team_id,number_scratches = int(team_id),int(number_scratches)
     except ValueError:
-        return render(request, 'error.html', 
-                                 {'error_type': "Scratch",'error_name': "Data Entry",
-                                  'error_info':"I require INTEGERS!"})
+        return redirect_and_flash_error(request, "Received invalid data")
     try:
         team = Team.objects.get(pk=team_id)
     except Team.DoesNotExist:
-        return render(request, 'error.html', 
-                                 {'error_type': "Add Scratches for Team",
-                                  'error_name': str(team_id),
-                                  'error_info':"No such Team"})
+        return redirect_and_flash_error(request, "The selected team does not exist")
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) for i in range(1,number_scratches+1)]
         all_good = True
@@ -118,24 +109,20 @@ def add_scratches(request, team_id, number_scratches):
         if all_good:
             for form in forms:
                 form.save()
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Scratches for team",
-                                      'data_name': "["+str(team_id)+"]",
-                                      'data_modification': "CREATED"})
+            return redirect_and_flash_success(request,
+                    "Scratches created successfuly")
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
     return render(request, 'common/data_entry_multiple.html', 
                              {'forms': list(zip(forms,[None]*len(forms))),
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(team.name)})
-    
+
 def view_scratches(request, team_id):
     try:
         team_id = int(team_id)
     except ValueError:
-        return render(request, 'error.html', 
-                                 {'error_type': "Scratch",'error_name': "Delete",
-                                  'error_info':"I require INTEGERS!"})
+        return redirect_and_flash_error(request, "Received invalid data")
     scratches = Scratch.objects.filter(team=team_id)
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
@@ -147,10 +134,8 @@ def view_scratches(request, team_id):
         if all_good:
             for form in forms:
                 form.save()
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Scratches for team",
-                                      'data_name': "["+str(team_id)+"]",
-                                      'data_modification': "EDITED"})
+            return redirect_and_flash_success(request,
+                    "Scratches successfully modified")
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/team/"+str(team_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
@@ -170,9 +155,7 @@ def pretty_tab_card(request, team_id):
     try:
         team_id = int(team_id)
     except:
-        return render(request, 'error.html',
-                                 {'error_type': "Tab Card",'error_name': "View",
-                                  'error_info': "Team id must be an integer!"})
+        return redirect_and_flash_error(request, "Invalid team id")
     team = Team.objects.get(pk=team_id)
     return render(request, 'tab/pretty_tab_card.html', {'team':team})
 
@@ -180,9 +163,7 @@ def tab_card(request, team_id):
     try:
         team_id = int(team_id)
     except ValueError:
-        return render(request, 'error.html',
-                                 {'error_type': "Tab Card",'error_name': "View",
-                                  'error_info': "Team id must be an integer!"})
+        return redirect_and_flash_error(request, "Invalid team id")
     team = Team.objects.get(pk=team_id)
     rounds = ([r for r in Round.objects.filter(gov_team=team)] +
               [r for r in Round.objects.filter(opp_team=team)])
