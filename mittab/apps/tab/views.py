@@ -37,10 +37,20 @@ def tab_logout(request, *args):
             "Successfully logged out",
             path="/")
 
-def render_403(request):
-    t = loader.get_template('common/403.html')
-    c = RequestContext(request, { 'request': request, 'no_navigation': True })
-    return HttpResponseForbidden(t.render(c))
+def render_403(request, *args, **kwargs):
+    response = render(request, 'common/403.html', { 'no_navigation': True })
+    response.status_code = 403
+    return response
+
+def render_404(request, *args, **kwargs):
+    response = render(request, 'common/404.html', { 'no_navigation': True })
+    response.status_code = 404
+    return response
+
+def render_500(request, *args, **kwargs):
+    response = render(request, 'common/500.html', { 'no_navigation': True })
+    response.status_code = 500
+    return response
 
 #View for manually adding scratches
 def add_scratch(request):
