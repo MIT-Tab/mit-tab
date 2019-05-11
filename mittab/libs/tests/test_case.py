@@ -17,7 +17,7 @@ class BaseWebTestCase(LiveServerTestCase):
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--no-sandbox")
-        self.browser = Browser('chrome', headless=True, wait_time=30, options=chrome_options)
+        self.browser = Browser('chrome', headless=False, wait_time=30, options=chrome_options)
         self.browser.driver.set_page_load_timeout(240)
         super(BaseWebTestCase, self).setUp()
 
