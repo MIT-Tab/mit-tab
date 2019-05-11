@@ -13,7 +13,7 @@
   Teams Not Paired In
 </h6>
 {% for team in excluded_teams %}
-<a href="#" class="dropdown-item team-swap searchable" position="{{position}}"
+<a href="#" class="dropdown-item team-assign searchable" position="{{position}}"
             src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
   {{ team.name }}
 </a>
@@ -24,7 +24,7 @@
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">Teams Paired In</h6>
 {% for team in included_teams%}
-<a href="#" class="dropdown-item team-swap searchable" position="{{position}}"
+<a href="#" class="dropdown-item team-assign searchable" position="{{position}}"
             src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
   {{ team.name }}
 </a>

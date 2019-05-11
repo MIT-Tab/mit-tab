@@ -4,7 +4,8 @@ from django.http import Http404,HttpResponse,HttpResponseRedirect, \
         JsonResponse
 from django.contrib.auth.decorators import permission_required
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
-#New Models based approach
+from mittab.apps.tab.helpers import redirect_and_flash_error, \
+        redirect_and_flash_success
 from mittab.apps.tab.models import *
 from django.db import models
 from mittab.apps.tab.errors import *
@@ -44,7 +45,7 @@ def view_judges(request):
     all_flags = [[TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR, TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT],
                  [TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE, TabFlags.HIGH_RANKED_JUDGE]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(request, 'list_data.html', 
+    return render(request, 'common/list_data.html', 
                               {
                                   'item_type':'judge',
                                   'title': "Viewing All Judges",
@@ -57,39 +58,27 @@ def view_judge(request, judge_id):
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
-        return render(request, 'error.html', 
-                                 {'error_type': "View Judge",
-                                  'error_name': str(judge_id),
-                                  'error_info':"No such judge"})
+        return redirect_and_flash_error(request, "Judge not found")
     if request.method == 'POST':
         form = JudgeForm(request.POST,instance=judge)
         if form.is_valid():
             try:
                form.save()
             except ValueError:
-                return render(request, 'error.html', 
-                                         {'error_type': "Judge",
-                                          'error_name': "["+form.cleaned_data['name']+"]",
-                                          'error_info':"Judge information cannot be validated."})
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Judge",
-                                      'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "EDIT"})
-        else :
-            return render(request, 'error.html', 
-                                     {'error_type': "Judge",
-                                      'error_name': "",
-                                      'error_info': form.errors})
+                return redirect_and_flash_error(request,
+                        "Judge information cannot be validated")
+            return redirect_and_flash_success(request,
+                    "Judge {} updated successfully".format(form.cleaned_data['name']))
     else:
         form = JudgeForm(instance=judge)
-        base_url = '/judge/'+str(judge_id)+'/'
-        scratch_url = base_url + 'scratches/view/'
-        delete_url =  base_url + 'delete/'
-        links = [(scratch_url, 'Scratches for {}'.format(judge.name), False)]
-        return render(request, 'data_entry.html', 
-                                 {'form': form,
-                                  'links': links,
-                                  'title': 'Viewing Judge: {}'.format(judge.name)})
+    base_url = '/judge/'+str(judge_id)+'/'
+    scratch_url = base_url + 'scratches/view/'
+    delete_url =  base_url + 'delete/'
+    links = [(scratch_url, 'Scratches for {}'.format(judge.name), False)]
+    return render(request, 'common/data_entry.html', 
+                                {'form': form,
+                                'links': links,
+                                'title': 'Viewing Judge: {}'.format(judge.name)})
 
 def enter_judge(request):
     if request.method == 'POST':
@@ -99,35 +88,26 @@ def enter_judge(request):
                 form.save()
             except ValueError:
                 cd = form.cleaned_data
-                return render(request, 'error.html',
-                                         {'error_type': "Judge",
-                                          'error_name': '[{}]'.format(cd['name']),
-                                          'error_info': "Judge Cannot Validate!"})
-            return render(request, 'thanks.html',
-                                     {'data_type': "Judge",
-                                      'data_name': "["+form.cleaned_data['name']+"]",
-                                      'data_modification': "CREATED",
-                                      'enter_again': True})
+                return redirect_and_flash_error(request,
+                        "Judge cannot be validated")
+            return redirect_and_flash_success(request,
+                    "Judge {} created successfully".format(form.cleaned_data['name']),
+                    path="/")
     else:
         form = JudgeForm(first_entry=True)
-    return render(request, 'data_entry.html',
+    return render(request, 'common/data_entry.html',
                               {'form': form, 'title': "Create Judge"})
 
 def add_scratches(request, judge_id, number_scratches):
     try:
         judge_id,number_scratches = int(judge_id),int(number_scratches)
     except ValueError:
-        return render(request, 'error.html', 
-                                 {'error_type': "Scratch",'error_name': "Data Entry",
-                                  'error_info':"I require INTEGERS!"})
+        return redirect_and_flash_error(request, "Got invalid data")
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
-        return render(request, 'error.html', 
-                                 {'error_type': "Add Scratches for Judge",
-                                  'error_name': str(judge_id),
-                                  'error_info':"No such Judge"})
-        
+        return redirect_and_flash_error(request, "No such judge")
+
     if request.method == 'POST':
         forms = [ScratchForm(request.POST, prefix=str(i)) for i in range(1,number_scratches+1)]
         all_good = True
@@ -136,13 +116,11 @@ def add_scratches(request, judge_id, number_scratches):
         if all_good:
             for form in forms:
                 form.save()
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Scratches for Judge",
-                                      'data_name': "["+str(judge_id)+"]",
-                                      'data_modification': "CREATED"})
+            return redirect_and_flash_success(request,
+                    "Scratches created successfully")
     else:
         forms = [ScratchForm(prefix=str(i), initial={'judge':judge_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
-    return render(request, 'data_entry_multiple.html', 
+    return render(request, 'common/data_entry_multiple.html', 
                              {'forms': list(zip(forms,[None]*len(forms))),
                               'data_type':'Scratch',
                               'title':"Adding Scratch(es) for %s"%(judge.name)})
@@ -151,9 +129,7 @@ def view_scratches(request, judge_id):
     try:
         judge_id = int(judge_id)
     except ValueError:
-        return render(request, 'error.html', 
-                                 {'error_type': "Scratch",'error_name': "Delete",
-                                  'error_info':"I require INTEGERS!"})
+        return redirect_and_flash_error(request, "Received invalid data")
     scratches = Scratch.objects.filter(judge=judge_id)
     judge = Judge.objects.get(pk=judge_id)
     number_scratches = len(scratches)
@@ -165,16 +141,14 @@ def view_scratches(request, judge_id):
         if all_good:
             for form in forms:
                 form.save()
-            return render(request, 'thanks.html', 
-                                     {'data_type': "Scratches for judge",
-                                      'data_name': "["+str(judge_id)+"]",
-                                      'data_modification': "EDITED"})
+            return redirect_and_flash_success(request,
+                    "Scratches created successfully")
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
     links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
 
-    return render(request, 'data_entry_multiple.html',
+    return render(request, 'common/data_entry_multiple.html',
                              {'forms': list(zip(forms,delete_links)),
                               'data_type':'Scratch',
                               'links':links,
@@ -190,9 +164,8 @@ def batch_checkin(request):
             checkins.append(judge.is_checked_in_for_round(round_number))
         judges_and_checkins.append((judge, checkins))
 
-    return render(request, 'batch_checkin.html',
-            {'smaller_width': True, 'judges_and_checkins': judges_and_checkins,
-                'round_numbers': round_numbers})
+    return render(request, 'tab/batch_checkin.html',
+            {'judges_and_checkins': judges_and_checkins, 'round_numbers': round_numbers})
 
 @permission_required('tab.tab_settings.can_change', login_url='/403')
 def judge_check_in(request, judge_id, round_number):

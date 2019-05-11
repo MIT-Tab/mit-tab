@@ -21,6 +21,8 @@ urlpatterns = [
 
     url(r'^$', views.index, name='index'),
     url(r'^403/', views.render_403, name='403'),
+    url(r'^404/', views.render_404, name='404'),
+    url(r'^500/', views.render_500, name='500'),
 
     # TODO: named urls
     # Account related
@@ -134,3 +136,7 @@ urlpatterns = [
     # Publicly accessible personal pages
     url(r'^public_status/(\d+)/$', team_views.public_status, name='public_status'),
 ]
+
+handler403 = 'mittab.apps.tab.views.render_403'
+handler404 = 'mittab.apps.tab.views.render_404'
+handler500 = 'mittab.apps.tab.views.render_500'

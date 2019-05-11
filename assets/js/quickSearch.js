@@ -11,10 +11,9 @@ function filter(matching_text) {
 
 function quickSearchInit(elem) {
   if (!elem) {
-    elem = $('#quick-seach')
+    elem = $('#quick-search')
   }
   $(elem).keyup(function() {
-    console.log('hello')
     if ($(this).val()) {
       filter($(this).val());
     }

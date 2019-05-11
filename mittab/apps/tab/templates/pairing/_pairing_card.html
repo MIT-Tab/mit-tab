@@ -13,7 +13,7 @@
                 <small>
                   <abbr title="Gov Team" class="attribute">GOV</abbr>
 
-                  <span class="team-swap"
+                  <span class="team-assign-button"
                     round-id={{pairing.id}}
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
@@ -42,7 +42,7 @@
                 <small>
                   <abbr title="Opp Team" class="attribute">OPP</abbr>
 
-                  <span class="team-swap"
+                  <span class="team-assign-button"
                     round-id={{pairing.id}}
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
@@ -71,7 +71,7 @@
       <div class="col-4 judges">
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-          <a class="btn-sm btn-link judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
              data-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
           </a>
@@ -82,7 +82,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn-sm btn-link judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
