@@ -138,7 +138,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         self._go_home()
 
-        self.browser.click_link_by_text("%s-list-btn-add" % entity_name.lower())
+        self.browser.click_link_by_id("%s-list-btn-add" % entity_name.lower())
         if custom_form_logic:
             custom_form_logic()
         self._submit_form(**data)
