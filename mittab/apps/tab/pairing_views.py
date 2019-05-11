@@ -428,7 +428,7 @@ def enter_e_ballot(request, ballot_code):
     return redirect_and_flash_error(request, message, path="/e_ballots")
 
 
-def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None, redirect_to="/pairing/status"):
+def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None, redirect_to="/pairings/status"):
     round_obj = Round.objects.get(id=round_id)
 
     if request.method == "POST":
