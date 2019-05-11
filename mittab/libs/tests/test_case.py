@@ -22,7 +22,7 @@ class BaseWebTestCase(LiveServerTestCase):
         super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):
-        for error, _, _, _ in self._outcome.errors:
+        for error, _, in self._outcome.errors:
             print("Error in %s finished with this HTML:" % error.testMethod)
             print(self.browser.html)
         self.browser.quit()
