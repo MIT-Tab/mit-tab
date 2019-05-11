@@ -79,7 +79,7 @@ class PairingARoundTestCase(BaseWebTestCase):
                 lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
                 mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
 
-        assert self.browser.is_text_present('has been successfully modified')
+        assert self.browser.is_text_present('Result entered successfully')
         self.browser.click_link_by_text('Go To Ballot Entry')
         assert self.browser.is_text_present('GOV win')
 
