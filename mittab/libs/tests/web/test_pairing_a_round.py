@@ -30,9 +30,6 @@ class PairingARoundTestCase(BaseWebTestCase):
                 mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
         assert self.browser.is_text_present('Low Point Win!!')
 
-        self._visit("/pairings/status")
-        self.browser.find_by_text('Enter Ballot').first.click()
-
         # Speaks dont correspond with winner
         self._enter_results(winner='GOV',
                 pm={ 'first': True, 'speaks': 26, 'ranks': 1 },
@@ -40,9 +37,6 @@ class PairingARoundTestCase(BaseWebTestCase):
                 lo={ 'first': True, 'speaks': 26, 'ranks': 2 },
                 mo={ 'first': False, 'speaks': 26, 'ranks': 3 })
         assert self.browser.is_text_present('Low Point Win!!')
-
-        self._visit("/pairings/status")
-        self.browser.find_by_text('Enter Ballot').first.click()
 
         # Ranks dont correspond with speaks
         self._enter_results(winner='GOV',
@@ -52,9 +46,6 @@ class PairingARoundTestCase(BaseWebTestCase):
                 mo={ 'first': False, 'speaks': 25, 'ranks': 4 })
         assert self.browser.is_text_present('These speaks are too high for the rank')
 
-        self._visit("/pairings/status")
-        self.browser.find_by_text('Enter Ballot').first.click()
-
         # Invalid speaks
         self._enter_results(winner='GOV',
                 pm={ 'first': True, 'speaks': 55, 'ranks': 1 },
@@ -62,15 +53,6 @@ class PairingARoundTestCase(BaseWebTestCase):
                 lo={ 'first': True, 'speaks': 26, 'ranks': 3 },
                 mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
         assert self.browser.is_text_present('invalid speaker score')
-
-        self._visit("/pairings/status")
-        self.browser.find_by_text('Enter Ballot').first.click()
-
-        # TODO: Add test case for missing data, hard to do because it tests
-        # HTML5 form validations rather than server-side logic
-
-        self._visit("/pairings/status")
-        self.browser.find_by_text('Enter Ballot').first.click()
 
         # Correct ballot
         self._enter_results(winner='GOV',
@@ -80,7 +62,6 @@ class PairingARoundTestCase(BaseWebTestCase):
                 mo={ 'first': False, 'speaks': 26, 'ranks': 4 })
 
         assert self.browser.is_text_present('Result entered successfully')
-        self.browser.click_link_by_text('Go To Ballot Entry')
         assert self.browser.is_text_present('GOV win')
 
 
