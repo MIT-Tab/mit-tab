@@ -161,7 +161,7 @@ def manual_backup(request):
         backup.backup_round("manual_backup_round_{}_{}_{}".format(cur_round, btime, now))
     except:
         emit_current_exception()
-        return redirect_and_flash_error(request, "Error created backup")
+        return redirect_and_flash_error(request, "Error creating backup")
     return redirect_and_flash_success(request,
             "Backup created for round {} at timestamp {}".format(cur_round, btime))
 
