@@ -108,7 +108,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             self.browser.check("checkin_%s" % i)
 
         self.browser.find_by_value('Submit Changes').first.click()
-        msg = "Judge [%s] has been successfully modified!(EDIT)" % name
+        msg = "Judge %s updated successfully" % name
         assert self.browser.is_text_present(msg)
 
 
