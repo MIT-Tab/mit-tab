@@ -14,6 +14,6 @@ def quick_search():
     return {}
 
 
-@register.inclusion_tag('ballots/_round_form.html')
+@register.inclusion_tag('ballots/_form.html')
 def round_form(form, gov_team, opp_team):
     return { 'form': form, 'gov_team': gov_team, 'opp_team': opp_team }
