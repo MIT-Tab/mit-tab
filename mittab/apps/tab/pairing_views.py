@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
@@ -178,8 +179,9 @@ def view_backups(request):
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
     backup.restore_from_backup(filename)
+    logout(request)
     return redirect_and_flash_success(request,
-            "Restored from backup. This may have logged you out.",
+            "Restored from backup. You have been logged out as a result.",
             path="/")
 
 def view_status(request):
