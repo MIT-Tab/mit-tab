@@ -309,6 +309,8 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
             if remove_obj == round_obj.chair:
                 round_obj.chair = round_obj.judges.order_by('-rank').first()
+        elif not round_obj.chair:
+            round_obj.chair = judge_obj
 
         round_obj.save()
         data = {"success":True,
