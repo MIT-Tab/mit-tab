@@ -16,15 +16,15 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         self._add_teams()
         self._go_home()
 
-        self.browser.click_link_by_partial_text('Team 0')
-        self.browser.click_link_by_text('Scratches for Team 0')
+        self.browser.click_link_by_partial_text("Team 0")
+        self.browser.click_link_by_text("Scratches for Team 0")
         # first link is the invisible link in the banner
-        self.browser.find_link_by_text('Add Scratch').last.click()
+        self.browser.find_link_by_text("Add Scratch").last.click()
 
-        self.browser.find_option_by_text('Team 0').click()
-        self.browser.find_option_by_text('Judge 2').click()
-        self.browser.find_option_by_text('Tab Scratch').click()
-        self.browser.find_by_value('Submit').click()
+        self.browser.find_option_by_text("Team 0").click()
+        self.browser.find_option_by_text("Judge 2").click()
+        self.browser.find_option_by_text("Tab Scratch").click()
+        self.browser.find_by_value("Submit").click()
 
         msg = "Scratches created successfully"
         assert self.browser.is_text_present(msg)

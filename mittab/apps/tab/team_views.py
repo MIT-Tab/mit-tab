@@ -110,7 +110,7 @@ def add_scratches(request, team_id, number_scratches):
             for form in forms:
                 form.save()
             return redirect_and_flash_success(request,
-                    "Scratches created successfuly")
+                    "Scratches created successfully")
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
     return render(request, 'common/data_entry_multiple.html', 
