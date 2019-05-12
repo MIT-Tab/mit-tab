@@ -47,9 +47,9 @@
       <div class="row mt-2 mb-2">
         <div class="col">
           <hr/>
-          <div class="btn-group btn-group-sm">
+          <div class="btn-group">
             {% for link,text,confirm in links %}
-              <button class="btn-sm btn-secondary {%if confirm%}confirmLink{%endif%}"
+              <button class="btn btn-sm btn-secondary {%if confirm%}confirmLink{%endif%}"
                 href='{{link}}'>{{text}}</button>
             {% endfor %}
           </div>
