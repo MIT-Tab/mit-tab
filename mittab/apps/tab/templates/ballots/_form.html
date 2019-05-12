@@ -4,7 +4,7 @@
   <div class="alert alert-danger">
     Please correct the error{{ form.errors|pluralize }} below.
 
-    {{ form.non_field_errors }}
+    {% bootstrap_form_errors form type='non_fields' %}
   </div>
 {% endif %}
 

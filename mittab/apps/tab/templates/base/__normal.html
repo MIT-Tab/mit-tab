@@ -49,8 +49,7 @@
           <hr/>
           <div class="btn-group">
             {% for link,text,confirm in links %}
-              <button class="btn btn-sm btn-secondary {%if confirm%}confirmLink{%endif%}"
-                href='{{link}}'>{{text}}</button>
+              <a class="btn btn-sm btn-secondary" href="{{link}}">{{text}}</a>
             {% endfor %}
           </div>
         </div>

@@ -8,6 +8,7 @@ import 'bootstrap'
 
 import quickSearchInit from './quickSearch.js'
 import multiselectInit from './multiselect.js'
+import bsCustomFileInput from 'bs-custom-file-input'
 
 $(document).ready(function(){
     function filter_on_flags(flags) {
@@ -158,4 +159,5 @@ $(document).ready(function(){
     apply_filters();
     quickSearchInit();
     multiselectInit();
+    bsCustomFileInput.init();
 });

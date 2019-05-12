@@ -171,10 +171,6 @@ var lazy_load = function(element, url) {
     })
 }
 
-var alert_link = function(e) {
-    alert("Note that you have assigned a judge from within the pairing. You need to go and fix that round now.");
-}
-
 var select_info = function(element) {
     var div = $("div[data-option="+$(this).val()+"]");
     $(".winner").each(function(i,e){$(e).addClass("hidden")});
@@ -216,7 +212,6 @@ var bind_handlers = function() {
 
     $('.dropdown-toggle').click(populate_alternative_judges);
     $('.judge-assign').click(assign_judge);
-    $('.alert-link').click(alert_link);
     $('select[name=winner]').change(select_info);
     $('.btn.release').click(toggle_pairing_release);
 }

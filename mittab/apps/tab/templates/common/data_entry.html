@@ -1,5 +1,6 @@
 {% extends "base/__normal.html" %}
 {% load bootstrap4 %}
+{% load tags %}
 
 {% block title %}Data Entry{% endblock %}
 
@@ -9,7 +10,13 @@
 <div class="col-md-6">
   {{ form.media }}
   <form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">{% csrf_token %}
-    {% bootstrap_form form %}
+    {% bootstrap_form form exclude='file,team_file,judge_file,room_file' %}
+
+    {% for field in form %}
+      {% if field|is_file_field %}
+        {% include "common/_file_field.html" %}
+      {% endif %}
+    {% endfor %}
 
     {% csrf_token %}
     {% buttons %}
