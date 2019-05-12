@@ -128,8 +128,8 @@ def view_backup(request, filename):
     item_type='backup'
     title = "Viewing Backup: {}".format(filename)
     item_manip = "restore from that backup"
-    links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
-             ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
+    links = [('/backup/download/{}/'.format(filename), "Download Backup"),
+             ('/backup/restore/{}/'.format(filename), "Restore From Backup")]
     return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
@@ -173,7 +173,7 @@ def view_backups(request):
     item_type='backup'
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
-    links = [('/upload_backup/', "Upload Backup", False)]
+    links = [('/upload_backup/', "Upload Backup")]
     return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")

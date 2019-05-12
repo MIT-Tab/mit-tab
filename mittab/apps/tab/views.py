@@ -95,7 +95,7 @@ def view_school(request, school_id):
                     "School {} updated successfully".format(form.cleaned_data['name']))
     else:
         form = SchoolForm(instance=school)
-        links = [('/school/'+str(school_id)+'/delete/', 'Delete', True)]
+        links = [('/school/'+str(school_id)+'/delete/', 'Delete')]
         return render(request, 'common/data_entry.html', 
                                  {'form': form,
                                   'links': links,

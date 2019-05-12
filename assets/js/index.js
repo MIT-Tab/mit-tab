@@ -10,6 +10,14 @@ import quickSearchInit from './quickSearch.js'
 import multiselectInit from './multiselect.js'
 import bsCustomFileInput from 'bs-custom-file-input'
 
+function initializeConfirms() {
+  $("[confirm]").click(function(e) {
+    if (!window.confirm($(e.target).attr('confirm'))) {
+      e.preventDefault();
+    }
+  })
+}
+
 $(document).ready(function(){
     function filter_on_flags(flags) {
         $('li.filterable').each(function(index, element) {
@@ -160,4 +168,5 @@ $(document).ready(function(){
     quickSearchInit();
     multiselectInit();
     bsCustomFileInput.init();
+    initializeConfirms();
 });
