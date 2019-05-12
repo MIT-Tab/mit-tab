@@ -96,7 +96,7 @@ def view_school(request, school_id):
     else:
         form = SchoolForm(instance=school)
         links = [('/school/'+str(school_id)+'/delete/', 'Delete')]
-        return render(request, 'common/data_entry.html', 
+        return render(request, 'common/data_entry.html',
                                  {'form': form,
                                   'links': links,
                                   'title': "Viewing School: %s" %(school.name)})

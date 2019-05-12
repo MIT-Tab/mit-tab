@@ -42,7 +42,7 @@ def view_debater(request, debater_id):
         teams = Team.objects.filter(debaters = debater)
         links = []
         for team in teams:
-            links.append(('/team/'+str(team.id)+'/', "View %s"%team.name, False))
+            links.append(('/team/'+str(team.id)+'/', "View %s"%team.name))
 
         return render(request, 'common/data_entry.html', 
                                  {'form': form,
