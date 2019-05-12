@@ -107,7 +107,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         for i in range(5):
             self.browser.check("checkin_%s" % i)
 
-        self.browser.find_by_value('Submit Changes').first.click()
+        self.browser.find_by_value('Save').first.click()
         msg = "Judge %s updated successfully" % name
         # TODO: add back when data entry page works
         # assert self.browser.is_text_present(msg)
@@ -162,4 +162,4 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         for key in data:
             self.browser.fill(key, data[key])
-        self.browser.find_by_value('Submit Changes').first.click()
+        self.browser.find_by_value('Save').first.click()

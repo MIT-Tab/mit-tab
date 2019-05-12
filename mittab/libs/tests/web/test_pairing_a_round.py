@@ -95,4 +95,4 @@ class PairingARoundTestCase(BaseWebTestCase):
             if result_data.get('speaks'):
                 self.browser.fill("%s_speaks" % position, result_data['speaks'])
 
-        self.browser.find_by_value('Submit Changes').first.click()
+        self.browser.find_by_value('Save').first.click()
