@@ -6,6 +6,7 @@ import $ from 'jquery'
 import 'popper.js'
 import 'bootstrap'
 
+import filtersInit from './filtersInit.js'
 import quickSearchInit from './quickSearch.js'
 import multiselectInit from './multiselect.js'
 import bsCustomFileInput from 'bs-custom-file-input'
@@ -27,20 +28,6 @@ function initializeRevealButtons() {
 }
 
 $(document).ready(function(){
-    function filter_on_flags(flags) {
-        $('li.filterable').each(function(index, element) {
-            var show = 1;
-            for (var flag_group in flags) {
-                show &= (($(element).data("filters") & flags[flag_group]) > 0);
-            }
-            show ? $(element).show() : $(element).hide()
-        });
-    };
-
-    function show_all(type) {
-        $(type).show();
-    };
-
     function checkInOrOut(target, isCheckIn) {
         var $target = $(target);
         $target.prop('disabled', true)
@@ -106,21 +93,7 @@ $(document).ready(function(){
     "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
     )
 
-    function apply_filters() {
-        show_all("li.data-list");
-        var flags = 0;
-        var filter_groups = {}
-        $(".filter").each(function(index, value) {
-            if (value.checked) {
-                filter_groups[$(value).data("filter-group")] |= $(value).data("filter");
-                flags |= $(value).data("filter");
-            }
-        });
-        filter_on_flags(filter_groups);
-    }
-
-    $(".filter").change(apply_filters)
-    apply_filters();
+    filtersIinit();
     quickSearchInit();
     multiselectInit();
     bsCustomFileInput.init();

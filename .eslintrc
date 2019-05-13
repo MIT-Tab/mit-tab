@@ -3,6 +3,7 @@
   "plugins": ["prettier"],
   "rules": {
     "prettier/prettier": "error",
+    "no-bitwise": "off",
     "max-len": ["error", 80]
   },
   "env": {
