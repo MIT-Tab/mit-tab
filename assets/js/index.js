@@ -21,8 +21,8 @@ function initializeConfirms() {
 function initializeRevealButtons() {
   $(".content-reveal").click(function(e) {
     e.preventDefault()
-    $(e.target).hide()
-    $("#" + $(e.target).data("to-reveal")).show()
+    $(e.target).slideUp(250)
+    $("#" + $(e.target).data("to-reveal")).slideDown(250)
   })
 }
 
