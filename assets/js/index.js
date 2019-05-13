@@ -6,10 +6,11 @@ import $ from 'jquery'
 import 'popper.js'
 import 'bootstrap'
 
-import filtersInit from './filtersInit.js'
-import quickSearchInit from './quickSearch.js'
-import multiselectInit from './multiselect.js'
-import bsCustomFileInput from 'bs-custom-file-input'
+import checkinInit from "./batchCheckin.js";
+import filtersInit from "./filtersInit.js"
+import quickSearchInit from "./quickSearch.js"
+import multiselectInit from "./multiselect.js"
+import bsCustomFileInput from "bs-custom-file-input"
 
 function initializeConfirms() {
   $("[confirm]").click(function(e) {
@@ -28,40 +29,6 @@ function initializeRevealButtons() {
 }
 
 $(document).ready(function(){
-    function checkInOrOut(target, isCheckIn) {
-        var $target = $(target);
-        $target.prop('disabled', true)
-
-        var judgeId = $target.data("judge-id");
-        var roundNumber = $target.data("round-number");
-
-        var $label = $("label[for=" + $target.attr("id") + "]")
-        $label.text(isCheckIn ? 'Checked In' : 'Checked Out')
-
-        var url = "/judge/" + judgeId + "/check_ins/round/" + roundNumber + "/";
-        var requestMethod = isCheckIn ? "POST" : "DELETE";
-
-        $.ajax({
-            url: url,
-            beforeSend: function(xhr) {
-              xhr.setRequestHeader("X-CSRFToken", $("[name=csrfmiddlewaretoken]").val())
-            },
-            method: requestMethod,
-            success: function(resp) {
-              $target.prop('disabled', false)
-            },
-            error: function(_e) {
-              $target.prop('disabled', false)
-              $target.prop('checked', !isCheckIn)
-              $label.text(isCheckIn ? 'Checked Out' : 'Checked In')
-              alert('An error occured during check in/out. Refresh the page and try again');
-            }
-        })
-    }
-
-    $('.checkin-toggle').click(function(e) {
-        checkInOrOut(e.target, $(e.target).prop('checked'));
-    })
 
     $('.dataEntryForm').submit(function() {
         // Hacky way to figure out if this is a result entry form
@@ -93,7 +60,8 @@ $(document).ready(function(){
     "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
     )
 
-    filtersIinit();
+    checkinInit();
+    filtersInit();
     quickSearchInit();
     multiselectInit();
     bsCustomFileInput.init();
