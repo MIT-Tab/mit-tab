@@ -1,6 +1,14 @@
 import $ from "jquery";
 
+function selectInfo() {
+  const div = $(`div[data-option=${$(this).val()}]`);
+  $(".winner").each((_, el) => $(el).addClass("hidden"));
+  $(div).removeClass("hidden");
+}
+
 function ballotsInit() {
+  $("select[name=winner]").change(selectInfo);
+
   $(".ballot-form.single").submit(e => {
     const pmDebater = $(e.target)
       .find("#id_pm_debater")
