@@ -9,17 +9,15 @@
       <div class="col">
         <h3>
           Round Status for Round {{round_number}}:
-          <small class="{% if valid_pairing %}text-success{% else %}text-danger{% endif %}">
-            {% if valid_pairing %} Valid {% else %} Invalid {% endif %} pairing
+          <small class="{% if not errors %}text-success{% else %}text-danger{% endif %}">
+            {% if not errors %} Valid {% else %} Invalid {% endif %} pairing
           </small>
         </h3>
 
-        {% if not valid_pairing %}
-        <div class="alert alert-danger">
-          <ul>
-            {% for error in errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        </div>
+        {% if errors %}
+          {% for error in errors %}
+          <div class="alert alert-danger">{{ error }}</div>
+          {% endfor %}
         {% endif %}
       </div>
     </div> <!-- end heading row -->
@@ -85,7 +83,7 @@
         <h5>People Not Paired In</h5>
         <table class="table table-striped table-sm">
           <thead>
-            <th>Checked in Teams ({{ byes|length }})</th>
+            <th>Checked in Teams ({{ excluded_teams|length }})</th>
             <th>Checked in Judges ({{ excluded_judges|length }})</th>
             <th>Non Checked in Judges ({{ non_checkins|length }})</th>
             <th>Available Rooms ({{ available_rooms|length }})</th>
