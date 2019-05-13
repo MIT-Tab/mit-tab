@@ -1,5 +1,6 @@
 from django import template
 from django.core.urlresolvers import reverse
+from django.forms.fields import FileField
 
 register = template.Library()
 
@@ -17,3 +18,8 @@ def quick_search():
 @register.inclusion_tag('ballots/_form.html')
 def round_form(form, gov_team, opp_team):
     return { 'form': form, 'gov_team': gov_team, 'opp_team': opp_team }
+
+@register.filter('is_file_field')
+def is_file_field(field):
+    if not hasattr(field, 'field'): return False
+    return isinstance(field.field, FileField)

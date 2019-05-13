@@ -74,7 +74,7 @@ def view_judge(request, judge_id):
     base_url = '/judge/'+str(judge_id)+'/'
     scratch_url = base_url + 'scratches/view/'
     delete_url =  base_url + 'delete/'
-    links = [(scratch_url, 'Scratches for {}'.format(judge.name), False)]
+    links = [(scratch_url, 'Scratches for {}'.format(judge.name))]
     return render(request, 'common/data_entry.html', 
                                 {'form': form,
                                 'links': links,
@@ -146,7 +146,7 @@ def view_scratches(request, judge_id):
     else:
         forms = [ScratchForm(prefix=str(i), instance=scratches[i-1]) for i in range(1,len(scratches)+1)]
     delete_links = ["/judge/"+str(judge_id)+"/scratches/delete/"+str(scratches[i].id) for i in range(len(scratches))]
-    links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch',False)]
+    links = [('/judge/'+str(judge_id)+'/scratches/add/1/','Add Scratch')]
 
     return render(request, 'common/data_entry_multiple.html',
                              {'forms': list(zip(forms,delete_links)),

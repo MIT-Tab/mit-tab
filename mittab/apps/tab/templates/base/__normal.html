@@ -39,22 +39,22 @@
         </div>
       </div>
 
+      <div class="row mt-2">
+        {% block content %}{% endblock %}
+      </div>
+
       {% if links %}
       <div class="row mt-2 mb-2">
         <div class="col">
+          <hr/>
           <div class="btn-group">
-            {% for link,text,confirm in links %}
-              <button class="btn btn-secondary {%if confirm%}confirmLink{%endif%}"
-                href='{{link}}'>{{text}}</button>
+            {% for link,text in links %}
+              <a class="btn btn-sm btn-secondary" href="{{link}}">{{text}}</a>
             {% endfor %}
           </div>
         </div>
       </div>
       {%endif%}
-
-      <div class="row mt-2">
-        {% block content %}{% endblock %}
-      </div>
 
     </div>
 

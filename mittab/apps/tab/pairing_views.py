@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
@@ -127,8 +128,8 @@ def view_backup(request, filename):
     item_type='backup'
     title = "Viewing Backup: {}".format(filename)
     item_manip = "restore from that backup"
-    links = [('/backup/download/{}/'.format(filename), "Download Backup", False),
-             ('/backup/restore/{}/'.format(filename), "Restore From Backup", True)]
+    links = [('/backup/download/{}/'.format(filename), "Download Backup"),
+             ('/backup/restore/{}/'.format(filename), "Restore From Backup")]
     return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url='/403/')
@@ -172,14 +173,15 @@ def view_backups(request):
     item_type='backup'
     title = "Viewing All Backups"
     item_manip = "restore from that backup"
-    links = [('/upload_backup/', "Upload Backup", False)]
+    links = [('/upload_backup/', "Upload Backup")]
     return render(request, 'common/list_data.html', locals())
 
 @permission_required('tab.tab_settings.can_change', login_url="/403/")
 def restore_backup(request, filename):
     backup.restore_from_backup(filename)
+    logout(request)
     return redirect_and_flash_success(request,
-            "Restored from backup. This may have logged you out.",
+            "Restored from backup. You have been logged out as a result.",
             path="/")
 
 def view_status(request):
@@ -307,6 +309,8 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
             if remove_obj == round_obj.chair:
                 round_obj.chair = round_obj.judges.order_by('-rank').first()
+        elif not round_obj.chair:
+            round_obj.chair = judge_obj
 
         round_obj.save()
         data = {"success":True,

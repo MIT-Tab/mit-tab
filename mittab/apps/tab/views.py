@@ -96,8 +96,8 @@ def view_school(request, school_id):
                     "School {} updated successfully".format(form.cleaned_data['name']))
     else:
         form = SchoolForm(instance=school)
-        links = [('/school/'+str(school_id)+'/delete/', 'Delete', True)]
-        return render(request, 'common/data_entry.html', 
+        links = [('/school/'+str(school_id)+'/delete/', 'Delete')]
+        return render(request, 'common/data_entry.html',
                                  {'form': form,
                                   'links': links,
                                   'title': "Viewing School: %s" %(school.name)})
@@ -177,10 +177,9 @@ def view_room(request, room_id):
                     "School {} updated successfully".format(form.cleaned_data['name']))
     else:
         form = RoomForm(instance=room)
-        return render(request, 'common/data_entry.html', 
-                                 {'form': form,
-                                  'links': [],
-                                  'title': "Viewing Room: %s"%(room.name)})
+    return render(request, 'common/data_entry.html',
+                                {'form': form, 'links': [],
+                                'title': "Viewing Room: %s"%(room.name)})
 
 def enter_room(request):
     if request.method == 'POST':
@@ -224,35 +223,23 @@ def upload_data(request):
     if request.method == 'POST':
       form = UploadDataForm(request.POST, request.FILES)
       if form.is_valid():
-        judge_errors = room_errors = team_errors = []
-        importName = ''
-        results = ''
+        errors = []
 
         if 'team_file' in request.FILES:
-          team_errors = import_teams.import_teams(request.FILES['team_file'])
-          importName += request.FILES['team_file'].name + ' '
-          if len(team_errors) > 0:
-            results += 'Team Import Errors (Please Check These Manually):\n'
-            for e in team_errors:
-              results += '            ' + e + '\n'
+            team_errors = import_teams.import_teams(request.FILES['team_file'])
+            errors += team_errors
         if 'judge_file' in request.FILES:
-          judge_errors = import_judges.import_judges(request.FILES['judge_file'])
-          importName += request.FILES['judge_file'].name + ' '
-          if len(judge_errors) > 0:
-            results += 'Judge Import Errors (Please Check These Manually):\n'
-            for e in judge_errors:
-              results += '            ' + e + '\n'
+            judge_errors = import_judges.import_judges(request.FILES['judge_file'])
+            errors += judge_errors
         if 'room_file' in request.FILES:
-          room_errors = import_rooms.import_rooms(request.FILES['room_file'])
-          importName += request.FILES['room_file'].name + ' '
-          if len(room_errors) > 0:
-            results += 'Room Import Errors (Please Check These Manually):\n'
-            for e in room_errors:
-              results += '            ' + e + '\n'
+            room_errors = import_rooms.import_rooms(request.FILES['room_file'])
+            errors += room_errors
 
-        return redirect_and_flash_success(request, "Data imported successfully")
+        if not errors:
+            return redirect_and_flash_success(request, "Data imported successfully")
+        else:
+            for e in errors: messages.error(request, e)
     else:
       form = UploadDataForm()
-    return render(request, 'common/data_entry.html', 
-                              {'form': form,
-                               'title': 'Upload Input Files'})
+    return render(request, 'common/data_entry.html',
+                              {'form': form, 'title': 'Upload Input Files'})

@@ -1,11 +1,22 @@
 import '../css/app.scss'
-import quickSearchInit from './quickSearch.js'
 import './pairing.js'
 
 import $ from 'jquery'
 
 import 'popper.js'
 import 'bootstrap'
+
+import quickSearchInit from './quickSearch.js'
+import multiselectInit from './multiselect.js'
+import bsCustomFileInput from 'bs-custom-file-input'
+
+function initializeConfirms() {
+  $("[confirm]").click(function(e) {
+    if (!window.confirm($(e.target).attr('confirm'))) {
+      e.preventDefault();
+    }
+  })
+}
 
 $(document).ready(function(){
     function filter_on_flags(flags) {
@@ -155,4 +166,7 @@ $(document).ready(function(){
 
     apply_filters();
     quickSearchInit();
+    multiselectInit();
+    bsCustomFileInput.init();
+    initializeConfirms();
 });

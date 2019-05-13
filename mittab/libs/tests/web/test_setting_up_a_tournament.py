@@ -16,19 +16,18 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         self._add_teams()
         self._go_home()
 
-        self.browser.click_link_by_partial_text('Team 0')
-        self.browser.click_link_by_text('Scratches for Team 0')
+        self.browser.click_link_by_partial_text("Team 0")
+        self.browser.click_link_by_text("Scratches for Team 0")
         # first link is the invisible link in the banner
-        self.browser.find_link_by_text('Add Scratch').last.click()
+        self.browser.find_link_by_text("Add Scratch").last.click()
 
-        self.browser.find_option_by_text('Team 0').click()
-        self.browser.find_option_by_text('Judge 2').click()
-        self.browser.find_option_by_text('Tab Scratch').click()
-        self.browser.find_by_value('Submit').click()
+        self.browser.find_option_by_text("Team 0").click()
+        self.browser.find_option_by_text("Judge 2").click()
+        self.browser.find_option_by_text("Tab Scratch").click()
+        self.browser.find_by_value("Submit").click()
 
-        msg = "has been successfully modified!(CREATED)"
-        # TODO: add this test back when data entry pages are updated
-        # assert self.browser.is_text_present(msg)
+        msg = "Scratches created successfully"
+        assert self.browser.is_text_present(msg)
 
     def _add_teams(self):
         for i in range(4):
@@ -84,9 +83,7 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
     def _add_team(self, name, debaters, school):
         def select_team_options():
             for debater in debaters:
-                debater_option = self.browser.find_option_by_text(debater).first
-                debater_option.double_click()
-                #self.browser.click_link_by_id('id_debaters_add_link')
+                self.browser.find_option_by_text(debater).click()
 
             school_option = self.browser.find_option_by_text(school).first
             school_option.click()
@@ -98,19 +95,16 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
 
     def _add_judge(self, name, rank, schools):
         def click_schools():
-            self._wait()
             for school in schools:
-                el = self.browser.find_option_by_text(school).first
-                el.double_click()
+                self.browser.find_option_by_text(school).click()
 
         self._add_entity('Judge', click_schools, name=name, rank=rank)
         for i in range(5):
             self.browser.check("checkin_%s" % i)
 
-        self.browser.find_by_value('Submit Changes').first.click()
+        self.browser.find_by_value('Save').first.click()
         msg = "Judge %s updated successfully" % name
-        # TODO: add back when data entry page works
-        # assert self.browser.is_text_present(msg)
+        assert self.browser.is_text_present(msg)
 
 
     def _add_debater(self, name, varsity):
@@ -162,4 +156,4 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         for key in data:
             self.browser.fill(key, data[key])
-        self.browser.find_by_value('Submit Changes').first.click()
+        self.browser.find_by_value('Save').first.click()

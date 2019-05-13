@@ -59,9 +59,9 @@ def view_team(request, team_id):
                     "Team {} updated successfully".format(form.cleaned_data["name"]))
     else:
         form = TeamForm(instance=team)
-        links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for {}'.format(team.name), False)]
+        links = [('/team/'+str(team_id)+'/scratches/view/','Scratches for {}'.format(team.name))]
         for deb in team.debaters.all():
-            links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name, False))
+            links.append(('/debater/'+str(deb.id)+'/', "View %s" % deb.name))
         return render(request, 'common/data_entry.html', 
                                  {'title':"Viewing Team: %s"%(team.name),
                                   'form': form,
@@ -110,7 +110,7 @@ def add_scratches(request, team_id, number_scratches):
             for form in forms:
                 form.save()
             return redirect_and_flash_success(request,
-                    "Scratches created successfuly")
+                    "Scratches created successfully")
     else:
         forms = [ScratchForm(prefix=str(i), initial={'team':team_id,'scratch_type':0}) for i in range(1,number_scratches+1)]
     return render(request, 'common/data_entry_multiple.html', 

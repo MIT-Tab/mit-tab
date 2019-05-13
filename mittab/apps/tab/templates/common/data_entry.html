@@ -1,71 +1,62 @@
-{% extends "base.html" %}
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+{% load tags %}
 
 {% block title %}Data Entry{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="float_container">
-    
-<div class="obj_info">
-    
-{% if team_obj %}
-<div class="team_record">
-    Team Stats:
-    <table>
-    <tr><th>Stat</th><th>Value</th></tr>
-    {% for stat,val in team_stats %}
-        <tr><td>{{stat}}</td><td>{{val}}</td></tr>
+<div class="col-md-6">
+  {{ form.media }}
+  <form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">{% csrf_token %}
+    {% bootstrap_form form exclude='file,team_file,judge_file,room_file' %}
+
+    {% for field in form %}
+      {% if field|is_file_field %}
+        {% include "common/_file_field.html" %}
+      {% endif %}
     {% endfor %}
+
+    {% csrf_token %}
+    {% buttons %}
+      <input type="submit" value="Save" class="btn btn-primary"/>
+    {% endbuttons %}
+  </form>
+</div>
+
+{% if team_obj %}
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  <div class="team-record">
+    <h5>Team Stats</h5>
+    <table class="table table-striped">
+      <thead><th>Stat</th><th>Value</th></thead>
+      {% for stat,val in team_stats %}
+          <tr><td>{{stat}}</td><td>{{val}}</td></tr>
+      {% endfor %}
     </table>
-    <a href='/team/card/{{ team_obj.id }}/pretty/'>View Tab Card</a>
+    <a href='/team/card/{{ team_obj.id }}/pretty/' class="btn btn-link">View Tab Card</a>
+  </div>
 </div>
 {% endif %}
 
-
-    {% if debater_obj %}
-    <div class="team_record">
-
-        Debater Rounds:
-        <table>
-            <tr><th>Round #</th><th>Speaks</th><th>Ranks</th></tr>
-            {% for round in debater_rounds %}
-            <tr>
-              <td><a href='/round/{{ round.round.id }}/result/'>Round {{ round.round.round_number }}</a></td>
-                <td>{{round.speaks}}</td>
-                <td>{{round.ranks}}</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
-    {% endif %}
-
-
-    {% if form.errors %}
-        <p style="color: red;">
-            Please correct the error{{ form.errors|pluralize }} below.
-        </p>
-    {% endif %}
-    {{ form.media }}
-    <form action="{{ action }}" method="post" class="dataEntryForm" enctype="multipart/form-data">{% csrf_token %}
-        <table>
-            {{ form }}
-            {{ other_data }}
-            
-        </table>
-        {% if links %}
-        <div class="btn-group">
-            {% for link,text,confirm in links %}
-                <a class="mid btn {%if confirm%}confirmLink{%endif%}" href='{{link}}'>{{text}}</a>
-            {% endfor %}
-        </div>
-        {%endif%}
-        <div class="btn-submit">
-            <input type="submit" value="Submit Changes">
-        <div>
-    </form>
-
+{% if debater_obj %}
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  <div class="team-record">
+    <h5>Debater Rounds</h5>
+    <table class="table table-striped">
+      <thead><th>Round #</th><th>Speaks</th><th>Ranks</th></thead>
+      {% for round in debater_rounds %}
+      <tr>
+        <td><a href='/round/{{ round.round.id }}/result/'>Round {{ round.round.round_number }}</a></td>
+          <td>{{round.speaks}}</td>
+          <td>{{round.ranks}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
 </div>
-</div>
-
+{% endif %}
 {% endblock %}
