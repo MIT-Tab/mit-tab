@@ -63,7 +63,9 @@ jobs:
             npm install
       - run:
           name: Lint -- Python
-          command: pylint mittab/libs
+          command: |
+            . venv/bin/activate
+            pylint mittab/libs --load-plugins pylint_django
       - run:
           name: Lint -- JS
           command: npm run lint

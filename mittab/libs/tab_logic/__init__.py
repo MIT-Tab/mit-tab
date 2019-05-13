@@ -254,7 +254,7 @@ def have_enough_judges(round_to_check):
     return True, (num_judges, future_rounds)
 
 
-def have_enough_rooms(round_to_check):
+def have_enough_rooms(_):
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
     num_rooms = Room.objects.filter(rank__gt=0).count()
     if num_rooms < future_rounds:
@@ -350,7 +350,7 @@ def middle_of_bracket_teams():
     These teams have speaks of zero but _should_ have average speaks, so they
     should be paired into the middle of their bracket. Randomized for fairness
     """
-    teams = []  # TODO: Make this more efficient. Try to use a SQL query
+    teams = []
     for team in Team.objects.filter(checked_in=True):
         avg_speaks_rounds = Bye.objects.filter(bye_team=team).count()
         avg_speaks_rounds += NoShow.objects.filter(

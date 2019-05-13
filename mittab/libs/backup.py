@@ -12,7 +12,7 @@ from mittab.libs import errors
 
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
-DATABASE_PATH = settings.DATABASES['default']['NAME']
+DATABASE_PATH = settings.DATABASES["default"]["NAME"]
 
 
 def get_backup_filename(filename):
@@ -20,10 +20,12 @@ def get_backup_filename(filename):
         filename += ".db"
     return os.path.join(BACKUP_PATH, filename)
 
+
 def backup_exists(filename):
     return os.path.exists(get_backup_filename(filename))
 
-def backup_round(dst_filename = None, round_number = None, btime = None):
+
+def backup_round(dst_filename=None, round_number=None, btime=None):
     if round_number is None:
         round_number = TabSettings.get("cur_round")
 
@@ -39,6 +41,7 @@ def backup_round(dst_filename = None, round_number = None, btime = None):
 
     return copy_db(DATABASE_PATH, get_backup_filename(dst_filename))
 
+
 def handle_backup(f):
     dst_filename = get_backup_filename(f.name)
     print(("Tried to write {}".format(dst_filename)))
@@ -49,6 +52,7 @@ def handle_backup(f):
     except Exception as e:
         errors.emit_current_exception()
 
+
 def list_backups():
     print("Checking backups directory")
     if not os.path.exists(BACKUP_PATH):
@@ -56,9 +60,11 @@ def list_backups():
 
     return os.listdir(BACKUP_PATH)
 
+
 def restore_from_backup(src_filename):
     print("Restoring from backups directory")
     return copy_db(get_backup_filename(src_filename), DATABASE_PATH)
+
 
 def copy_db(src_filename, dst_filename):
     try:
@@ -68,6 +74,7 @@ def copy_db(src_filename, dst_filename):
     except:
         errors.emit_current_exception()
         return False
+
 
 def get_wrapped_file(src_filename):
     src_filename = get_backup_filename(src_filename)
