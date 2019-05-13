@@ -30,7 +30,7 @@ def index(request):
 
 def tab_login(request):
     teams = enumerate(Team.objects.order_by('name'))
-    return login(request, extra_context={'no_navigation': True, 'teams': teams})
+    return login(request, extra_context={'teams': teams})
 
 def tab_logout(request, *args):
     logout(request)
@@ -39,17 +39,17 @@ def tab_logout(request, *args):
             path="/accounts/login")
 
 def render_403(request, *args, **kwargs):
-    response = render(request, 'common/403.html', { 'no_navigation': True })
+    response = render(request, 'common/403.html')
     response.status_code = 403
     return response
 
 def render_404(request, *args, **kwargs):
-    response = render(request, 'common/404.html', { 'no_navigation': True })
+    response = render(request, 'common/404.html')
     response.status_code = 404
     return response
 
 def render_500(request, *args, **kwargs):
-    response = render(request, 'common/500.html', { 'no_navigation': True })
+    response = render(request, 'common/500.html')
     response.status_code = 500
     return response
 
