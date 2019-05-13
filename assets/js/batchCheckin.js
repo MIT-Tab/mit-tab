@@ -29,7 +29,7 @@ function checkInOrOut(target, isCheckIn) {
       $target.prop("disabled", false);
       $target.prop("checked", !isCheckIn);
       $label.text(isCheckIn ? "Checked Out" : "Checked In");
-      alert("An error occured during check in/out. Refresh and try again");
+      window.alert("An error occured. Refresh and try again");
     }
   });
 }

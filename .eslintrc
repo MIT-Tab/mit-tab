@@ -4,6 +4,7 @@
   "rules": {
     "prettier/prettier": "error",
     "no-bitwise": "off",
+    "no-alert": "off",
     "max-len": ["error", 80]
   },
   "env": {
