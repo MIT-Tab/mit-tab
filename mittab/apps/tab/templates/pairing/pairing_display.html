@@ -2,11 +2,8 @@
 
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="/static/css/bootstrap.css" />
-    <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.17/themes/smoothness/jquery-ui.css" />
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
-    <script type="text/javascript" src="/static/javascript/tab.js"></script>
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'main' 'js' %}
 
     <title>Pairings for Round {{round_number}}</title>
 
