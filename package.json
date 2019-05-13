@@ -22,10 +22,12 @@
   "homepage": "https://github.com/MIT-Tab/mit-tab#readme",
   "devDependencies": {
     "@babel/core": "^7.4.4",
+    "@babel/preset-env": "^7.4.4",
     "babel": "^6.23.0",
     "babel-loader": "^8.0.5",
     "css-loader": "^2.1.1",
     "eslint": "^5.16.0",
+    "eslint-config-airbnb-base": "^13.1.0",
     "eslint-config-prettier": "^4.2.0",
     "eslint-import-resolver-webpack": "^0.11.1",
     "eslint-plugin-import": "^2.17.2",
@@ -43,11 +45,9 @@
     "webpack-cli": "^3.3.2"
   },
   "dependencies": {
-    "@babel/preset-env": "^7.4.4",
     "@ttskch/select2-bootstrap4-theme": "^1.2.2",
     "bootstrap": "^4.3.1",
     "bs-custom-file-input": "^1.3.2",
-    "eslint-config-airbnb-base": "^13.1.0",
     "jquery": "^1.9.1",
     "popper.js": "^1.15.0",
     "select2": "^4.0.7-rc.0"
