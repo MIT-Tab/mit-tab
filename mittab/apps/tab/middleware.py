@@ -10,9 +10,10 @@ white_list = (
     re.compile('^/accounts/login/$'),
     re.compile('^/pairings/pairinglist/$'),
     re.compile('^/e_ballots/$'),
-    re.compile("/e_ballots/\S+"),
-    re.compile('^/pairings/missing_ballots/$'),
+    re.compile("/e_ballots/\S+$"),
     re.compile("/public_status/(\d+)"),
+    re.compile("/public_status/$"),
+    re.compile('^/pairings/missing_ballots/$'),
     re.compile("/(404|403|500)/$"),
 )
 

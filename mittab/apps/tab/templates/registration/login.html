@@ -40,7 +40,7 @@
   </a>
 
   <a class="btn btn-large btn-info btn-block content-reveal"
-    href="/e_ballots/"
+    href="#"
     data-to-reveal="e-ballot-search">
     Submit an E-Ballot
   </a>
@@ -55,6 +55,29 @@
              name="ballot_code">
       <div class="input-group-append">
         <input class="btn btn-info" type="submit" value="Get Ballot"/>
+      </div>
+    </div>
+  </form>
+
+  <a class="btn btn-large btn-info btn-block content-reveal mt-2"
+    href="#"
+    data-to-reveal="public-status-search">
+    View Your Team's Round
+  </a>
+
+  <form action="/public_status/" class="hidden mt-2" method="post" class="form-inline"
+    id="public-status-search" enctyp="multipate/form-data">
+    {% csrf_token %}
+
+    <div class="input-group">
+      <select class="custom-select" name="team_id">
+        <option selected>Search for your team...</option>
+        {% for team in teams %}
+        <option value="{{ team.id }}">{{ team.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="input-group-append">
+        <input class="btn btn-info" type="submit" value="View Status"/>
       </div>
     </div>
   </form>

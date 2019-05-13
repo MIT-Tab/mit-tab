@@ -120,7 +120,7 @@ urlpatterns = [
     url(r'^pairing/view_backups/$', pairing_views.view_backups,
             name='view_backups'),
     url(r'^e_ballots/$', pairing_views.e_ballot_search, name='e_ballot_search'),
-    url(r'e_ballots/(\S+)/$', pairing_views.enter_e_ballot, name='enter_e_ballot'),
+    url(r'^e_ballots/(\S+)/$', pairing_views.enter_e_ballot, name='enter_e_ballot'),
 
     # Backups
     url(r'^backup/restore/(.+)/$', pairing_views.restore_backup,
@@ -132,9 +132,12 @@ urlpatterns = [
 
     # Data Upload
     url(r'^import_data/$', views.upload_data, name='upload_data'),
-    
+
     # Publicly accessible personal pages
-    url(r'^public_status/(\d+)/$', team_views.public_status, name='public_status'),
+    url(r'^public_status/(\d+)/$', team_views.public_status,
+            name='public_status'),
+    url(r'^public_status/$', team_views.public_status_form,
+            name='public_status_form'),
 ]
 
 handler403 = 'mittab.apps.tab.views.render_403'

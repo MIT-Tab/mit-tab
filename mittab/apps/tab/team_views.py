@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
@@ -299,45 +299,42 @@ def team_stats(request, team_id):
     return JsonResponse(data)
 
 
-def public_status(request, team_id, team_ref=None):
-    teams = Team.objects.order_by("name")
-    match = teams[int(team_id)] if int(team_id) < len(teams) else None
-    
-    if match:
-        round_number = TabSettings.get('cur_round') - 1        
+def public_status_form(request):
+    if request.method == "POST":
+        return redirect("/public_status/%s" % request.POST.get("team_id"))
+    else:
+        return redirect("/404")
+
+
+def public_status(request, team_id):
+    try:
+        team = Team.objects.get(pk=team_id)
+        round_number = TabSettings.get('cur_round') - 1
         pairing_exists = TabSettings.get('pairing_released', 0) == 1
 
         if pairing_exists:
-            return _public_status_pairing_exists(request, match, round_number)
+            return _public_status_pairing_exists(request, team, round_number)
         else:
             return render(request, 'public_status.html',
                           {
-                            'no_navigation': True,
                             'bye': False,
                             'pairing_exists': False,
                             'round_number': round_number,
                           })
-    else:
-        return render(request, 'error.html',
-                     {
-                        'error_type': 'Tab Card','error_name': 'View',
-                        'error_info': "That's not a registered team!",
-                        'no_navigation': True
-                     })
-                                  
+    except Team.DoesNotExist:
+        return redirect_and_flash_error(request, "That's not a registered team!")
+
 
 def _public_status_pairing_exists(request, match, round_number):
-    gov_pairings = Round.objects.filter(round_number=round_number, 
+    gov_pairings = Round.objects.filter(round_number=round_number,
                                         gov_team=match)
-    opp_pairings = Round.objects.filter(round_number=round_number, 
+    opp_pairings = Round.objects.filter(round_number=round_number,
                                         opp_team=match)
-    byes = Bye.objects.filter(round_number=round_number,
-                              bye_team=match)   
-        
+    byes = Bye.objects.filter(round_number=round_number, bye_team=match)
+
     if gov_pairings:
-        return render(request, 'public_status.html',
+        return render(request, 'common/public_status.html',
                      {
-                         'no_navigation': True,
                          'pairing_exists': True,
                          'bye': False,
                          'gov': True,
@@ -345,9 +342,8 @@ def _public_status_pairing_exists(request, match, round_number):
                          'judges': _judge_names(gov_pairings[0].judges),
                      })
     elif opp_pairings:
-        return render(request, 'public_status.html',
+        return render(request, 'common/public_status.html',
                     {
-                        'no_navigation': True,
                         'pairing_exists': True,
                         'bye': False,
                         'gov': False,
@@ -355,9 +351,8 @@ def _public_status_pairing_exists(request, match, round_number):
                         'judges': _judge_names(opp_pairings[0].judges),
                     })
     elif byes:
-        return render(request, 'public_status.html',
+        return render(request, 'common/public_status.html',
                      {
-                         'no_navigation': True,
                          'pairing_exists': True,
                          'bye': True,
                          'round': byes[0],
@@ -370,6 +365,7 @@ def _public_status_pairing_exists(request, match, round_number):
                         'error_info': 'Pairings are released, but\n' +\
                         ' this team is not in a bye or a round'
                     })
-                    
+
+
 def _judge_names(judges):
     return ', '.join(judge.name for judge in judges.all())

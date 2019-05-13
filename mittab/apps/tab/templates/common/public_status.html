@@ -1,0 +1,45 @@
+{% extends "base/__normal.html" %}
+
+{% block title %} Public Status for {{ team_name }} {% endblock %}
+
+{% block content %}
+<div class="col-2"></div>
+<div class="col text-center">
+  <h3 class="mb-4">Team Status</h3>
+  <p class="lead">
+  {% if pairing_exists %}
+    {% if bye %}
+
+    <strong>{{ round.bye_team.name }}</strong> is on a <strong>bye</strong>
+    this round.
+
+    {% else %}
+      {% if gov %}
+
+      <strong>{{ round.gov_team.name }}</strong> will <strong>gov</strong> next
+      round against <strong>{{round.opp_team.name}}</strong> in
+      <strong>{{ round.room.name }}</strong>,
+      judged by <strong>{{ judges }}</strong>
+
+      {% else %}
+
+      <strong>{{ round.opp_team.nme }}</strong> will <strong>opp</strong> next
+      round against <strong>{{ round.gov_team.name }}</strong> in
+      <strong>{{ round.room.name }}</strong>,
+      judged by <strong>{{ judges }}</strong>
+
+      {% endif %}
+    {% endif %}
+
+    <br/><br/>
+    <a class="btn btn-lg btn-link" href="/pairings/pairinglist/">Full Pairings</a>
+  {% else %}
+
+    Round {{round_number}} does not yet have a valid pairing. Please wait until
+    your tournament directors release a valid pairing before viewing this page.
+
+  {% endif %}
+  </p>
+</div>
+<div class="col-2"></div>
+{% endblock %}

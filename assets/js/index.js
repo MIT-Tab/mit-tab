@@ -7,7 +7,7 @@ import 'popper.js'
 import 'bootstrap'
 
 import quickSearchInit from './quickSearch.js'
-import multiselectInit from './multiselect.js'
+import selectInit from './select.js'
 import bsCustomFileInput from 'bs-custom-file-input'
 
 function initializeConfirms() {
@@ -120,9 +120,11 @@ $(document).ready(function(){
     }
 
     $(".filter").change(apply_filters)
+
     apply_filters();
     quickSearchInit();
-    multiselectInit();
+    selectInit($("#data-entry-form select[multiple]"));
+    selectInit($("#public-status-search .custom-select"));
     bsCustomFileInput.init();
     initializeConfirms();
     initializeRevealButtons();

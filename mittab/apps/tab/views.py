@@ -29,7 +29,7 @@ def index(request):
     return render(request, 'common/index.html',locals())
 
 def tab_login(request):
-    teams = enumerate(Team.objects.order_by('name'))
+    teams = Team.objects.order_by('name')
     return login(request, extra_context={'teams': teams})
 
 def tab_logout(request, *args):
