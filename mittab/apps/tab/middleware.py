@@ -1,8 +1,10 @@
 import re
 
 from django.contrib.auth.views import login
-from django.http import HttpResponseRedirect
 from django.core.cache import cache
+
+from mittab.apps.tab.helpers import redirect_and_flash_info
+
 
 white_list = (
     re.compile('^/accounts/login/$'),
@@ -16,9 +18,8 @@ white_list = (
     re.compile("/public_status/(\d+)"),
 )
 
-
 class Login:
-    "This middleware requires a login for every view"
+    """This middleware requires a login for every view"""
     def process_request(self, request):
 
         whitelisted = any(regex.match(request.path) for regex in white_list)
@@ -27,4 +28,6 @@ class Login:
             if request.POST:
                 return login(request)
             else:
-                return HttpResponseRedirect('/accounts/login/?next=%s' % request.path)
+                return redirect_and_flash_info(request,
+                        'You must be logged in to view that page',
+                        path='/accounts/login/?next=%s' % request.path)
