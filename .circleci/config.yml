@@ -53,4 +53,9 @@ jobs:
       - run:
           name: Lint
           command: npm run lint
-
+workflows:
+  version: 2
+  test_and_lint:
+    jobs:
+      - build
+      - lint
