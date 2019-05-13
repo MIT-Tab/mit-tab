@@ -4,7 +4,8 @@ from mittab.apps.tab.models import Round, RoundStats
 import random
 
 # Speaks every quarter point
-speak_range = [23 + .25 * i for i in range(17)]
+speak_range = [23 + 0.25 * i for i in range(17)]
+
 
 def generate_speaks_for_debater(debater, is_forfeit=False):
     """
@@ -29,6 +30,7 @@ def generate_speaks_for_debater(debater, is_forfeit=False):
     # Limit to 0 -> len(speak_range) - 1
     sampled_speak = max(min(sampled_speak, len(speak_range) - 1), 0)
     return speak_range[sampled_speak]
+
 
 def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
     """
@@ -61,10 +63,14 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
             opp_debaters = [random.choice(opp_debaters)] * 2
 
     # Generate speak values using generate_speaks_for_debater
-    gov_speaks = [(debater, generate_speaks_for_debater(debater, is_forfeit))
-                  for debater in gov_debaters]
-    opp_speaks = [(debater, generate_speaks_for_debater(debater, is_forfeit))
-                  for debater in opp_debaters]
+    gov_speaks = [
+        (debater, generate_speaks_for_debater(debater, is_forfeit))
+        for debater in gov_debaters
+    ]
+    opp_speaks = [
+        (debater, generate_speaks_for_debater(debater, is_forfeit))
+        for debater in opp_debaters
+    ]
     all_speaks = gov_speaks + opp_speaks
 
     # Generate ranks based on the speak values, but first shuffle so that ties
@@ -94,35 +100,38 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
         round_obj.victor = random.choice((Round.GOV, Round.OPP))
     else:
         # Forfeit
-        round_obj.victor = random.choice((Round.GOV_VIA_FORFEIT,
-                                          Round.OPP_VIA_FORFEIT,
-                                          Round.ALL_DROP))
+        round_obj.victor = random.choice(
+            (Round.GOV_VIA_FORFEIT, Round.OPP_VIA_FORFEIT, Round.ALL_DROP)
+        )
 
     # Generate RoundStats, shuffle for role randomization
     random.shuffle(all_points)
-    gov_roles, opp_roles = ['pm', 'mg'], ['lo', 'mo']
+    gov_roles, opp_roles = ["pm", "mg"], ["lo", "mo"]
     round_stats = []
     for debater, points in all_points:
-        role = ''
+        role = ""
         if debater in gov_debaters:
             role = gov_roles.pop()
         else:
             role = opp_roles.pop()
-        stats = RoundStats(debater=debater, round=round_obj, speaks=points[0],
-                           ranks=points[1], debater_role=role)
+        stats = RoundStats(
+            debater=debater,
+            round=round_obj,
+            speaks=points[0],
+            ranks=points[1],
+            debater_role=role,
+        )
         round_stats.append(stats)
 
     return tuple([round_obj] + round_stats)
 
 
-def generate_results(round_number, prob_forfeit=0.0,
-                     prob_ironman=0.0, seed='BEEF'):
+def generate_results(round_number, prob_forfeit=0.0, prob_ironman=0.0, seed="BEEF"):
     """Generates results for the existing round"""
     random.seed(seed)
     for round_obj in Round.objects.filter(round_number=round_number):
-        results = generate_result_for_round(round_obj,
-                                            prob_forfeit=prob_forfeit,
-                                            prob_ironman=prob_ironman)
+        results = generate_result_for_round(
+            round_obj, prob_forfeit=prob_forfeit, prob_ironman=prob_ironman
+        )
         for result in results:
             result.save()
-

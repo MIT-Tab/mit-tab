@@ -1,11 +1,13 @@
 from mittab.libs.tests.test_case import BaseWebTestCase
 
+
 class SettingUpATournamentTestCase(BaseWebTestCase):
     """
     Tests setting up a tournament by entering rooms, judges, schools, debaters,
     teams, and scratches through the web interface
     """
-    fixtures = ['testing_empty']
+
+    fixtures = ["testing_empty"]
 
     def test_tournament(self):
         self._login()
@@ -88,40 +90,39 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             school_option = self.browser.find_option_by_text(school).first
             school_option.click()
 
-            seed_option = self.browser.find_option_by_text('Unseeded').first
+            seed_option = self.browser.find_option_by_text("Unseeded").first
             seed_option.click()
 
-        self._add_entity('Team', select_team_options, name=name)
+        self._add_entity("Team", select_team_options, name=name)
 
     def _add_judge(self, name, rank, schools):
         def click_schools():
             for school in schools:
                 self.browser.find_option_by_text(school).click()
 
-        self._add_entity('Judge', click_schools, name=name, rank=rank)
+        self._add_entity("Judge", click_schools, name=name, rank=rank)
         for i in range(5):
             self.browser.check("checkin_%s" % i)
 
-        self.browser.find_by_value('Save').first.click()
+        self.browser.find_by_value("Save").first.click()
         msg = "Judge %s updated successfully" % name
         assert self.browser.is_text_present(msg)
 
-
     def _add_debater(self, name, varsity):
         def select_varsity_status():
-            val = '0' if varsity else '1'
-            self.browser.select('novice_status', val)
+            val = "0" if varsity else "1"
+            self.browser.select("novice_status", val)
 
-        self._add_entity('Debater', select_varsity_status, name=name)
+        self._add_entity("Debater", select_varsity_status, name=name)
 
     def _add_school(self, name):
-        self._add_entity('School', name=name)
+        self._add_entity("School", name=name)
 
     def _add_room(self, name, rank):
         """
         Test submitting the room form and viewing the room on the dashboard
         """
-        self._add_entity('Room', name=name, rank=rank)
+        self._add_entity("Room", name=name, rank=rank)
 
     def _add_entity(self, entity_name, custom_form_logic=None, **data):
         """
@@ -139,11 +140,11 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
             custom_form_logic()
         self._submit_form(**data)
 
-        msg = "%s %s created successfully" % (entity_name, data['name'])
+        msg = "%s %s created successfully" % (entity_name, data["name"])
         assert self.browser.is_text_present(msg)
 
         self._go_home()
-        self.browser.click_link_by_partial_text(data['name'])
+        self.browser.click_link_by_partial_text(data["name"])
 
         for key in data:
             assert self.browser.is_text_present(str(data[key]))
@@ -156,4 +157,4 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         for key in data:
             self.browser.fill(key, data[key])
-        self.browser.find_by_value('Save').first.click()
+        self.browser.find_by_value("Save").first.click()
