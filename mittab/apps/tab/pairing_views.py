@@ -366,7 +366,6 @@ def missing_ballots(request):
 
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else '')
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    no_navigation = True
     return render(request, 'ballots/missing_ballots.html', locals())
 
 def view_rounds(request):
@@ -382,7 +381,7 @@ def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
-        return render(request, "ballots/e_ballot_search.html", { 'no_navigation': True })
+        return render(request, "ballots/e_ballot_search.html")
 
 
 def enter_e_ballot(request, ballot_code):
