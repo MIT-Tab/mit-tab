@@ -188,10 +188,8 @@ def view_status(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     return view_round(request, current_round_number)
 
-def view_round(request, round_number, errors = None):
-    if errors is None:
-        errors = []
-    valid_pairing, byes = True, []
+def view_round(request, round_number):
+    errors, excluded_teams = [], []
     round_pairing = list(Round.objects.filter(round_number=round_number))
 
     random.seed(1337)
@@ -204,12 +202,14 @@ def view_round(request, round_number, errors = None):
 
     paired_teams = [team.gov_team for team in round_pairing] + [team.opp_team for team in round_pairing]
     n_over_two = Team.objects.filter(checked_in=True).count() / 2
-    valid_pairing = len(round_pairing) >= n_over_two or round_number == 0
 
     for present_team in Team.objects.filter(checked_in=True):
         if not (present_team in paired_teams):
-            errors.append("%s was not in the pairing" % (present_team))
-            byes.append(present_team)
+            excluded_teams.append(present_team)
+
+    for team in excluded_teams:
+        if not Bye.objects.filter(round_number=round_number, bye_team=team).exists():
+            errors.append("{} is checked-in but has no round or bye".format(team))
 
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
@@ -217,7 +217,7 @@ def view_round(request, round_number, errors = None):
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number).filter(checkin__round_number = round_number)
     non_checkins = Judge.objects.exclude(judges__round_number=round_number).exclude(checkin__round_number = round_number)
     available_rooms = Room.objects.exclude(round__round_number=round_number).exclude(rank=0)
-    size = max(list(map(len, [excluded_judges, non_checkins, byes])))
+    size = max(list(map(len, [excluded_judges, non_checkins, excluded_teams])))
     # The minimum rank you want to warn on
     warning = 5
     judge_slots = [1,2,3]
@@ -229,7 +229,7 @@ def view_round(request, round_number, errors = None):
     # [ Team2][             CJudge2              ][                 Judge2               ]
     # [      ][             CJudge3              ][                 Judge3               ]
     # [      ][                                  ][                 Judge4               ]
-    excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(byes), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
+    excluded_people = list(zip(*[x+[""]*(size-len(x)) for x in [list(excluded_teams), list(excluded_judges), list(non_checkins), list(available_rooms)]]))
 
     return render(request, 'pairing/pairing_control.html', locals())
 
