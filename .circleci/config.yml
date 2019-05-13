@@ -44,3 +44,13 @@ jobs:
 
       - codecov/upload:
           file: ./cov.xml
+  lint:
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm install
+      - run:
+          name: Lint
+          command: npm run lint
+
