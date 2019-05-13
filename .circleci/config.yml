@@ -44,3 +44,20 @@ jobs:
 
       - codecov/upload:
           file: ./cov.xml
+  lint:
+    docker:
+      - image: circleci/node:latest
+    steps:
+      - checkout
+      - run:
+          name: Install
+          command: npm install
+      - run:
+          name: Lint
+          command: npm run lint
+workflows:
+  version: 2
+  test_and_lint:
+    jobs:
+      - lint
+      - build
