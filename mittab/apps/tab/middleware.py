@@ -8,14 +8,12 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 
 white_list = (
     re.compile('^/accounts/login/$'),
-    re.compile('^/static/css/stylesheet.css$'),
-    re.compile('^/static/images/title_banner.png$'),
     re.compile('^/pairings/pairinglist/$'),
-    re.compile('^/stat$'),
     re.compile('^/e_ballots/$'),
-    re.compile('^/pairings/missing_ballots/$'),
     re.compile("/e_ballots/\S+"),
+    re.compile('^/pairings/missing_ballots/$'),
     re.compile("/public_status/(\d+)"),
+    re.compile("/(404|403|500)/$"),
 )
 
 class Login:

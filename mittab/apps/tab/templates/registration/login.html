@@ -27,22 +27,36 @@
 </div>
 
 <div class="col pl-5 pr-5">
-  <h4 class="text-center">Participant Access </h4>
+  <h4 class="text-center">Participant Access</h4>
+
   <br/>
-  <div class="control-group">
-    <a class="btn btn-large btn-info btn-block" href="/pairings/pairinglist/">
-      Released Pairings
-    </a>
 
-    <a class="btn btn-large btn-info btn-block" href="/pairings/missing_ballots/">
-      Missing Ballots
-    </a>
+  <a class="btn btn-large btn-info btn-block" href="/pairings/pairinglist/">
+    Released Pairings
+  </a>
 
-    <a class="btn btn-large btn-info btn-block" href="/e_ballots/">
-      Submit An E-Ballot
-    </a>
-  </div>
+  <a class="btn btn-large btn-info btn-block" href="/pairings/missing_ballots/">
+    Missing Ballots
+  </a>
+
+  <a class="btn btn-large btn-info btn-block content-reveal"
+    href="/e_ballots/"
+    data-to-reveal="e-ballot-search">
+    Submit an E-Ballot
+  </a>
+
+  <form action="/e_ballots/" class="hidden mt-2" method="post" class="form-inline"
+    id="e-ballot-search" enctyp="multipate/form-data">
+    {% csrf_token %}
+
+    <div class="input-group">
+      <input placeholder="Ballot code (get yours from tab)"
+             id="e_ballot_search" class="form-control"
+             name="ballot_code">
+      <div class="input-group-append">
+        <input class="btn btn-info" type="submit" value="Get Ballot"/>
+      </div>
+    </div>
+  </form>
 </div>
-
-
 {% endblock %}
