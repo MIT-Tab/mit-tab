@@ -7,7 +7,10 @@ const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 
 module.exports = {
   context: __dirname,
-  entry: './assets/js/index',
+  entry: {
+    main: './assets/js/index',
+    pairingDisplay: './assets/js/pairingDisplay'
+  },
   optimization: {
     minimizer: [
       new UglifyJsPlugin({ cache: true, parallel: true, sourceMap: false  }),
@@ -52,7 +55,10 @@ module.exports = {
 
   plugins: [
     new BundleTracker({filename: './webpack-stats.json'}),
-    new MiniCssExtractPlugin({ filename: '../css/app.css'  }),
+    new MiniCssExtractPlugin({
+      filename: '[name].css',
+      chunkFilename: '[id].css'
+    }),
     new webpack.ProvidePlugin({ // inject ES5 modules as global vars
       $: 'jquery',
       jQuery: 'jquery',
