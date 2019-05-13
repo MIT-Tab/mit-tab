@@ -7,15 +7,17 @@ from mittab.libs import assign_judges
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
+
 class TestPairingLogic(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
     """
-    fixtures = ['testing_db']
+
+    fixtures = ["testing_db"]
 
     def pair_round(self):
         tab_logic.pair_round()
-        current_round = TabSettings.objects.get(key='cur_round')
+        current_round = TabSettings.objects.get(key="cur_round")
         current_round.value = current_round.value + 1
         current_round.save()
 
@@ -32,23 +34,23 @@ class TestPairingLogic(TestCase):
         if checkin_count < desired_judges:
             num_to_checkin = desired_judges - checkin_count
             judges_to_checkin = available[:num_to_checkin]
-            checkins = [CheckIn(judge=judge, round_number=cur_round) for
-                        judge in judges_to_checkin]
+            checkins = [
+                CheckIn(judge=judge, round_number=cur_round)
+                for judge in judges_to_checkin
+            ]
             for checkin in checkins:
                 checkin.save()
-
 
     def assign_judges(self):
         cur_round = self.round_number()
         panel_points = []
         rounds = list(Round.objects.filter(round_number=cur_round))
         self.generate_checkins()
-        judges = [ci.judge for ci in
-                  CheckIn.objects.filter(round_number=cur_round)]
+        judges = [ci.judge for ci in CheckIn.objects.filter(round_number=cur_round)]
         assign_judges.add_judges(rounds, judges, panel_points)
 
     def round_number(self):
-        return TabSettings.objects.get(key='cur_round').value - 1
+        return TabSettings.objects.get(key="cur_round").value - 1
 
     def check_pairing(self, round_number, last):
         assert self.round_number() == round_number
