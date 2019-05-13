@@ -18,6 +18,14 @@ function initializeConfirms() {
   })
 }
 
+function initializeRevealButtons() {
+  $(".content-reveal").click(function(e) {
+    e.preventDefault()
+    $(e.target).hide()
+    $("#" + $(e.target).data("to-reveal")).show()
+  })
+}
+
 $(document).ready(function(){
     function filter_on_flags(flags) {
         $('li.filterable').each(function(index, element) {
@@ -117,4 +125,5 @@ $(document).ready(function(){
     multiselectInit();
     bsCustomFileInput.init();
     initializeConfirms();
+    initializeRevealButtons();
 });
