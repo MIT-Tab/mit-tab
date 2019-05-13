@@ -45,6 +45,8 @@ jobs:
       - codecov/upload:
           file: ./cov.xml
   lint:
+    docker:
+      - image: circleci/node:latest
     steps:
       - checkout
       - run:
