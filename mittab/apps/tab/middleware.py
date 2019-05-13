@@ -5,9 +5,13 @@ from django.core.cache import cache
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
 
-login_white_list = ('/accounts/login/', '/static/css/stylesheet.css',
-        '/static/images/title_banner.png', '/pairings/pairinglist/', '/stat',
-        '/e_ballots/', '/pairings/missing_ballots/')
+login_white_list = ('/accounts/login/',
+        '/pairings/pairinglist/',
+        '/pairings/missing_ballots/',
+        '/e_ballots/',
+        '/404/',
+        '/403/',
+        '/500/')
 
 e_ballot_regex = re.compile("/e_ballots/\S+")
 

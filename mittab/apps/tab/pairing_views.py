@@ -381,7 +381,7 @@ def e_ballot_search(request):
     if request.method == "POST":
         return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
     else:
-        return render(request, "ballots/e_ballot_search.html")
+        return redirect("/404")
 
 
 def enter_e_ballot(request, ballot_code):
@@ -428,7 +428,7 @@ def enter_e_ballot(request, ballot_code):
                 """
     else:
         return enter_result(request, rounds.first().id, EBallotForm, ballot_code)
-    return redirect_and_flash_error(request, message, path="/e_ballots")
+    return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
 def enter_result(request, round_id, form_class=ResultEntryForm, ballot_code=None, redirect_to="/pairings/status"):
