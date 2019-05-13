@@ -1,12 +1,12 @@
 import $ from 'jquery'
 
 $.expr[':'].Contains = function(a,i,m){
-    return $(a).text().toUpperCase().indexOf(m[3].toUpperCase())>=0;
+    return $(a).text().toUpperCase().indexOf(m[3].toUpperCase())>=0
 };
 
 function filter(matching_text) {
-  $('.searchable:not(:Contains(' + matching_text+ '))').hide(); 
-  $('.searchable:Contains(' + matching_text + ')').show();
+  $('.searchable:not(:Contains(' + matching_text+ '))').hide()
+  $('.searchable:Contains(' + matching_text + ')').show()
 };
 
 function quickSearchInit(elem) {
@@ -15,12 +15,12 @@ function quickSearchInit(elem) {
   }
   $(elem).keyup(function() {
     if ($(this).val()) {
-      filter($(this).val());
+      filter($(this).val())
     }
     else {
-      $(".searchable").show();
+      $(".searchable").show()
     }
   });
 }
 
-export default quickSearchInit;
+export default quickSearchInit

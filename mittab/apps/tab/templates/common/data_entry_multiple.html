@@ -1,49 +1,35 @@
-{% extends "base.html" %}
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+
+{% block title %} {{title}} {% endblock %}
 {% block banner %} {{title}} {% endblock %}
 
-{% block title %}Multiple Data Entry{% endblock %}
 {% block content %}
-<form method="post" action=""> {% csrf_token %}
-        <table>
-            {% for form,delete in forms %}
-            
-            {% if form.errors %}
-            <p style="color: red;">
-                Please correct the error{{ form.errors|pluralize }} below.
-            </p>
-            {% endif %}
-            <tr><td colspan="2" class="form_header">
-            <label>{{data_type}} #{{ form.prefix }}
-            {% if delete%}
-            <a class="btn confirmLink" href="{{delete}}">Delete</a>
-            {% endif %}
-            
-            </label></td></tr>
-                {% for field in form %}
-                <tr>
-                {{ field.errors }}
-                <th><label class="form_label">{{ field.label }} :</label></th>
-                <td>{{ field }}</td>
-                {% endfor %}
-                </tr>
-                <tr><td>&nbsp</td></tr>
-            {% endfor %}
-        </table>
-        {% if links %}
-            <div class="btn-group">
-            {% for link,text in links %}
-                <a class="btn" href='{{link}}'>{{text}}</a>
-            {% endfor %}
-            </div>
+<div class="col-md-6">
+  <form method="post" action=""> {% csrf_token %}
+    {% for form, delete in forms %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="float-left">{{data_type}} #{{ form.prefix }}</h5>
+        {% if delete %}
+          <a class="btn btn-sm float-right btn-outline-danger"
+             confirm="Are you sure?"
+             href="{{delete}}">
+            <i class="fas fa-times"></i>
+          </a>
         {% endif %}
-        {% if forms %}
-        <div class="btn-submit">
-            <input type="submit" value="Submit">
-        <div>
-        {% else %}
-        <p class="mid"> No scratches </p>
-        {% endif %}
- 
-   </form>
+      </div>
+      <div class="card-body">
+        {% bootstrap_form form %}
+      </div>
+    </div>
+    {% endfor %}
 
+    {% if forms %}
+    <input type="submit" class="btn btn-primary" value="Submit"/>
+    {% else %}
+    <p class="text-center lead">No scratches</p>
+    {% endif %}
+  </form>
+</div>
 {% endblock %}

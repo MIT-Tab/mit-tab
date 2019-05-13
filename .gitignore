@@ -23,6 +23,7 @@ __pycache__
 /images/
 /javascript/
 /js/
+/staticfiles/
 stdout*.txt
 
 # Installer logs

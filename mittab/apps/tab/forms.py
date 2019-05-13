@@ -5,7 +5,6 @@ import pprint
 
 from django.db import models, transaction
 from django import forms
-from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 
@@ -13,15 +12,6 @@ from mittab.apps.tab.models import *
 from mittab.libs import errors
 from mittab import settings
 
-
-class PatchedFilteredSelectMultiple(FilteredSelectMultiple):
-    """
-    Temporary workaround for https://github.com/MIT-Tab/mit-tab/issues/179
-    """
-    @property
-    def media(self):
-        js = ["admin/js/core.js", "admin/js/SelectBox.js", "javascript/forms.js"]
-        return forms.Media(js=js)
 
 class UploadBackupForm(forms.Form):
     file  = forms.FileField(label="Your Backup File")
@@ -44,7 +34,6 @@ class RoomForm(forms.ModelForm):
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.order_by('name'),
-                                             widget=PatchedFilteredSelectMultiple("Schools", False),
                                              required=False)
     def __init__(self, *args, **kwargs):
         entry = 'first_entry' in kwargs
@@ -93,7 +82,6 @@ class JudgeForm(forms.ModelForm):
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.order_by('name'),
-                                              widget=PatchedFilteredSelectMultiple("Debaters", is_stacked=False),
                                               required=False)
     def clean_debaters(self):
         data = self.cleaned_data['debaters']

@@ -30,7 +30,7 @@ virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# set-up webpack assets (currently migrating from Django default assets to webpack)
+# set-up webpack assets
 npm install
 
 # load test data. username: tab password: password
