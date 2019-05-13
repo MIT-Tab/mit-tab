@@ -84,50 +84,7 @@ $(document).ready(function(){
         }
         return true;
     });
-    
-    var dir = 1;
-    var olddir = dir
-    var timer;
-    var pause = 5000;
-    var pause_left = 5000;
-    var increment = 50;
-    
-    $(".pairings_toggle").click(function() {
-        if($(this).data("toggle")) {
-            // Turn the timer off
-            $(this).removeClass("active");
-            window.clearInterval(timer);
-            $(this).data("toggle", 0);
-        } else {
-            $(this).addClass("active");
-            setupScroll();
-            $(this).data("toggle", 1);      
-        }
-    });
-    
-    function setupScroll() {
-        window.clearInterval(timer);
-        timer = window.setInterval(scrollWindow, increment);
-    }
-    
-    function scrollWindow() {
-        var change_direction = 0;
-        if($(window).scrollTop() == $(document).height() - $(window).height()) {
-            dir = -1;
-            change_direction = 1;
-        }
-        else if($(window).scrollTop() == 0) {
-            dir = 1;
-            change_direction = 1;
-        }
-        var pos = $(window).scrollTop() + 1*dir;
-        $(window).scrollTop(pos);
-        if (change_direction) {
-            window.clearInterval(timer);
-            timer = window.setInterval(setupScroll, pause);
-        }
-    }
-    
+
     $('.tab_card_item').each(function(index, value) {
         $.ajax({
             url:"/team/card/" + $(value).data('team-id') + '/',
@@ -140,12 +97,6 @@ $(document).ready(function(){
     $('#id_debaters').closest('tr').append(
     "<td><a href=\"/admin/tab/debater/add/\" class=\"add-another btn\" id=\"add_id_debaters\" onclick=\"return showAddAnotherPopup(this);\"> Or Add a Debater Directly</a></td>"
     )
-
-    $(".confirmLink").click(function(e) {
-        e.preventDefault();
-        confirm("TODO")
-        var targetUrl = $(this).attr("href");
-    })
 
     function apply_filters() {
         show_all("li.data-list");
@@ -160,10 +111,7 @@ $(document).ready(function(){
         filter_on_flags(filter_groups);
     }
 
-    console.log($(".filter"))
-    $(".filter").change(console.log.bind("change"))
     $(".filter").change(apply_filters)
-
     apply_filters();
     quickSearchInit();
     multiselectInit();
