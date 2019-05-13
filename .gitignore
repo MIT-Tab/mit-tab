@@ -58,8 +58,8 @@ docs/_static/
 docs/_build/
 
 # Webpack Bundles
-webpack_bundles/
-webpack-stats.json
+*webpack_bundles/
+webpack-stats*.json
 assets/css/app.css
 
 # Logs
