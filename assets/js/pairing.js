@@ -28,7 +28,7 @@ function assignTeam(e) {
   const oldTeamId = $(e.target).attr("src-team-id");
   const roundId = $(e.target).attr("round-id");
   const position = $(e.target).attr("position");
-  const url = `/pairings/assignTeam/${roundId}/${position}/${teamId}`;
+  const url = `/pairings/assign_team/${roundId}/${position}/${teamId}`;
   const alertMsg = `
     An error occured.
     Refresh the page and try to fix any inconsistencies you may notice.
@@ -84,12 +84,12 @@ function assignJudge(e) {
   e.preventDefault();
   const roundId = $(e.target).attr("round-id");
   const judgeId = $(e.target).attr("judge-id");
-  const currentJudgeId = $(e.target).attr("current-judge-id");
-  const url = `/round/${roundId}/assign_judge/${roundId}/${judgeId || "/"}`;
+  const curJudgeId = $(e.target).attr("current-judge-id");
+  const url = `/round/${roundId}/assign_judge/${judgeId}/${curJudgeId || ""}`;
 
   let $buttonWrapper;
-  if (currentJudgeId) {
-    $buttonWrapper = $(`span[round-id=${roundId}][judge-id=${currentJudgeId}]`);
+  if (curJudgeId) {
+    $buttonWrapper = $(`span[round-id=${roundId}][judge-id=${curJudgeId}]`);
   } else {
     $buttonWrapper = $(`span[round-id=${roundId}].unassigned`).first();
   }

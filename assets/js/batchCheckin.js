@@ -10,7 +10,7 @@ function checkInOrOut(target, isCheckIn) {
   const $label = $(`label[for=${$target.attr("id")}]`);
   $label.text(isCheckIn ? "Checked In" : "Checked Out");
 
-  const url = `/judge/${judgeId}/check_ins/round/${roundNumber}`;
+  const url = `/judge/${judgeId}/check_ins/round/${roundNumber}/`;
   const method = isCheckIn ? "POST" : "DELETE";
 
   $.ajax({
