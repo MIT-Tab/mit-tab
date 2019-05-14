@@ -21,7 +21,7 @@
 import random
 
 from mittab.libs import tab_logic, mwmatching, errors
-from mittab.apps.tab.models import Round, Scratch
+from mittab.apps.tab.models import Round, Scratch, TabSettings
 
 
 def add_judges(pairings, judges, panel_points):
@@ -29,7 +29,7 @@ def add_judges(pairings, judges, panel_points):
     for pairing in pairings:
         pairing.judges.clear()
 
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
 
     # Try to have consistent ordering with the round display
     random.seed(1337)
@@ -168,9 +168,9 @@ def add_judges(pairings, judges, panel_points):
                     )
                 # Save the judges to the potential panel assignments
                 judges_used = []
-                for i in range(num_to_panel):
-                    judge = potential_panelists[judge_assignments[i] - num_to_panel]
-                    panel_assignments[i].append(judge)
+                for j in range(num_to_panel):
+                    judge = potential_panelists[judge_assignments[j] - num_to_panel]
+                    panel_assignments[j].append(judge)
                     judges_used.append(judge)
                 # Remove any used judges from the potential panelist pool
                 for judge in judges_used:
@@ -196,12 +196,12 @@ def add_judges(pairings, judges, panel_points):
                 pairing.save()
 
 
-def argmin(seq, fn):
-    return min([(fn(i), i) for i in seq])[1]
+def argmin(seq, fun):
+    return min([(fun(i), i) for i in seq])[1]
 
 
-def argmax(seq, fn):
-    return max([(fn(i), i) for i in seq])[1]
+def argmax(seq, fun):
+    return max([(fun(i), i) for i in seq])[1]
 
 
 def calc_weight(judge_i, pairing_i):
@@ -227,28 +227,26 @@ def calc_weight_panel(judges):
 
 
 # return true if the judge is scratched from either team, false otherwise
-def judge_conflict(j, team1, team2):
+def judge_conflict(judge, team1, team2):
     if (
-        len(Scratch.objects.filter(judge=j).filter(team=team1)) != 0
-        or had_judge(j, team1) == True
+        Scratch.objects.filter(judge=judge, team=team1).exists()
+        or had_judge(judge, team1)
     ):
-        # judge scratched from team one
         return True
     elif (
-        len(Scratch.objects.filter(judge=j).filter(team=team2)) != 0
-        or had_judge(j, team2) == True
+        Scratch.objects.filter(judge=judge, team=team2) != 0
+        or had_judge(judge, team2)
     ):
-        # judge scratched from team two
         return True
     else:
         return False
 
 
 # returns true if team has had judge before, otherwise false
-def had_judge(j, t):
-    if Round.objects.filter(gov_team=t, judges=j).count() != 0:
+def had_judge(judge, team):
+    if Round.objects.filter(gov_team=team, judges=judge).exists():
         return True
-    elif Round.objects.filter(opp_team=t, judges=j).count() != 0:
+    elif Round.objects.filter(opp_team=t, judges=judge).exists():
         return True
     else:
         return False
