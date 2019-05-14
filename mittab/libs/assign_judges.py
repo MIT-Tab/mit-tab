@@ -18,9 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from mittab.libs import tab_logic, mwmatching, errors
-from mittab.apps.tab.models import *
 import random
+
+from mittab.libs import tab_logic, mwmatching, errors
+from mittab.apps.tab.models import Round, Scratch
 
 
 def add_judges(pairings, judges, panel_points):
@@ -36,7 +37,8 @@ def add_judges(pairings, judges, panel_points):
     random.seed(1337)
     random.shuffle(judges)
 
-    # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
+    # Order the judges and pairings by power ranking
+    # (high speaking teams get high ranked judges)
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
     pairings.sort(
         key=lambda x: tab_logic.team_comp(x, current_round_number), reverse=True
@@ -72,12 +74,11 @@ def add_judges(pairings, judges, panel_points):
             graph_edges, maxcardinality=True
         )
         # If there is no possible assignment of chairs, raise an error
-        if -1 in judge_assignments[:num_rounds] or (
-            num_rounds > 0 and len(graph_edges) == 0
-        ):
-            if len(graph_edges) == 0:
+        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and graph_edges):
+            if not graph_edges:
                 raise errors.JudgeAssignmentError(
-                    "Impossible to assign judges, consider reducing your gaps if you are making panels, otherwise find some more judges."
+                    "Impossible to assign judges, consider reducing your gaps " +
+                    "if you are making panels, otherwise find some more judges."
                 )
             elif -1 in judge_assignments[:num_rounds]:
                 pairing_list = judge_assignments[: len(pairings)]
@@ -103,7 +104,7 @@ def add_judges(pairings, judges, panel_points):
         # Has built in logic to retry with lower number of panels if we fail due
         # to either scratches or wanting to many rounds
         def try_paneling(potential_pairings, all_judges, num_to_panel, gap):
-            if len(potential_pairings) == 0 or num_to_panel <= 0:
+            if not potential_pairings or num_to_panel <= 0:
                 # Base case, failed to panel
                 print("Failed to panel")
                 return {}
@@ -159,7 +160,7 @@ def add_judges(pairings, judges, panel_points):
                 )
                 print(judge_assignments)
                 if (-1 in judge_assignments[:num_to_panel]) or (
-                    num_to_panel > 0 and len(graph_edges) == 0
+                    num_to_panel > 0 and not graph_edges
                 ):
                     print("Scratches are causing a retry")
                     return try_paneling(
