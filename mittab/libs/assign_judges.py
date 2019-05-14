@@ -69,9 +69,21 @@ def add_judges(pairings, judges, panel_points):
             else:
                 raise errors.JudgeAssignmentError()
 
-        # Save the judges to the pairings
         for i in range(num_rounds):
-            group[i].judges.add(judges[judge_assignments[i] - num_rounds])
+            try:
+                group[i].judges.add(judges[judge_assignments[i] - num_rounds])
+            except Exception:
+                raise Exception(
+                    "i=%s len(g)=%s len(jas)=%s ja[i]=%s num_rounds=%s len(js)=%s" %
+                    (
+                        i,
+                        len(group),
+                        len(judge_assignments),
+                        judge_assignments[i],
+                        num_rounds,
+                        len(judges)
+                    )
+                )
             group[i].chair = judges[judge_assignments[i] - num_rounds]
             group[i].save()
 
