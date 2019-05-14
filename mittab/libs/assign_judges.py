@@ -74,14 +74,11 @@ def add_judges(pairings, judges, panel_points):
                 group[i].judges.add(judges[judge_assignments[i] - num_rounds])
             except Exception:
                 raise Exception(
-                    "i=%s len(g)=%s len(jas)=%s ja[i]=%s num_rounds=%s len(js)=%s" %
+                    "i=%s len(g)=%s len(jas)=%s" %
                     (
                         i,
                         len(group),
-                        len(judge_assignments),
-                        judge_assignments[i],
-                        num_rounds,
-                        len(judges)
+                        len(judge_assignments)
                     )
                 )
             group[i].chair = judges[judge_assignments[i] - num_rounds]
