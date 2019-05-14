@@ -20,8 +20,6 @@
 
 from mittab.apps.tab.models import *
 import xlrd
-import csv
-from xlwt import Workbook
 
 
 def import_scratches(fileToImport):

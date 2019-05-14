@@ -422,6 +422,8 @@ function-naming-style=snake_case
 good-names=i,
            j,
            k,
+           f, # file objects
+           e, # exceptions
            ex,
            Run,
            _

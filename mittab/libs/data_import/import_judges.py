@@ -23,7 +23,6 @@ from mittab.apps.tab.forms import JudgeForm
 
 from decimal import *
 import xlrd
-from xlwt import Workbook
 
 
 def import_judges(fileToImport):

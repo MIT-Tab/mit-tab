@@ -23,7 +23,6 @@ from mittab.apps.tab.forms import RoomForm
 
 from decimal import *
 import xlrd
-from xlwt import Workbook
 
 
 def import_rooms(fileToImport):
