@@ -1,57 +1,36 @@
-# Copyright (C) 2011 by Julia Boortz and Joseph Lynch
+import xlrd
 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
-from mittab.apps.tab.models import *
+from mittab.apps.tab.models import Team, Debater, School
 from mittab.apps.tab.forms import SchoolForm
 
-import xlrd
-from xlwt import Workbook
 
-
-def import_teams(fileToImport):
+def import_teams(file_to_import):
     try:
-        sh = xlrd.open_workbook(
-            filename=None, file_contents=fileToImport.read()
+        sheet = xlrd.open_workbook(
+            filename=None, file_contents=file_to_import.read()
         ).sheet_by_index(0)
-    except:
-        return ["ERROR: Please upload an .xlsx file. This filetype is not compatible"]
+    except Exception:
+        return ["Please upload an .xlsx file. This filetype is not compatible"]
     num_teams = 0
     found_end = False
     team_errors = []
     while found_end == False:
         try:
-            sh.cell(num_teams, 0).value
+            sheet.cell(num_teams, 0).value
             num_teams += 1
         except IndexError:
             found_end = True
 
         # Verify sheet has required number of columns
         try:
-            sh.cell(0, 5).value
-        except:
+            sheet.cell(0, 5).value
+        except Exception:
             team_errors.append("ERROR: Insufficient Columns in Sheet. No Data Read")
             return team_errors
 
     for i in range(1, num_teams):
 
-        team_name = sh.cell(i, 0).value
+        team_name = sheet.cell(i, 0).value
         if team_name == "":
             team_errors.append("Row " + str(i) + ": Empty Team Name")
             continue
@@ -59,14 +38,15 @@ def import_teams(fileToImport):
             Team.objects.get(name=team_name)
             team_errors.append(team_name + ": Duplicate Team Name")
             continue
-        except:
+        except Exception:
             pass
 
-        school_name = sh.cell(i, 1).value.strip()
+        school_name = sheet.cell(i, 1).value.strip()
         try:
             team_school = School.objects.get(name__iexact=school_name)
-        except:
-            # Create school through SchoolForm because for some reason they don't save otherwise
+        except Exception:
+            # Create school through SchoolForm because for some reason they
+            # don't save otherwise
             form = SchoolForm(data={"name": school_name})
             if form.is_valid():
                 form.save()
@@ -75,13 +55,14 @@ def import_teams(fileToImport):
                 continue
             team_school = School.objects.get(name__iexact=school_name)
 
-        hybrid_school_name = sh.cell(i, 2).value.strip()
+        hybrid_school_name = sheet.cell(i, 2).value.strip()
         hybrid_school = None
         if hybrid_school_name != "":
             try:
                 hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
-            except:
-                # Create school through SchoolForm because for some reason they don't save otherwise
+            except Exception:
+                # Create school through SchoolForm because for some reason they don't
+                save otherwise
                 form = SchoolForm(data={"name": hybrid_school_name})
                 if form.is_valid():
                     form.save()
@@ -90,7 +71,7 @@ def import_teams(fileToImport):
                     team_errors.append(team_name + ": Invalid Hybrid School")
                     continue
 
-        team_seed = sh.cell(i, 3).value.strip().lower()
+        team_seed = sheet.cell(i, 3).value.strip().lower()
         if team_seed == "full seed" or team_seed == "full":
             team_seed = 3
         elif team_seed == "half seed" or team_seed == "half":
@@ -108,7 +89,7 @@ def import_teams(fileToImport):
             team_errors.append(team_name + ": Invalid Seed Value")
             continue
 
-        deb1_name = sh.cell(i, 4).value
+        deb1_name = sheet.cell(i, 4).value
         if deb1_name == "":
             team_errors.append(team_name + ": Empty Debater-1 Name")
             continue
@@ -116,16 +97,16 @@ def import_teams(fileToImport):
             Debater.objects.get(name=deb1_name)
             team_errors.append(team_name + ": Duplicate Debater-1 Name")
             continue
-        except:
+        except Exception:
             pass
-        deb1_status = sh.cell(i, 5).value.lower()
+        deb1_status = sheet.cell(i, 5).value.lower()
         if deb1_status == "novice" or deb1_status == "nov" or deb1_status == "n":
             deb1_status = 1
         else:
             deb1_status = 0
 
         iron_man = False
-        deb2_name = sh.cell(i, 6).value
+        deb2_name = sheet.cell(i, 6).value
 
         if deb2_name == "":
             iron_man = True
@@ -134,9 +115,9 @@ def import_teams(fileToImport):
                 Debater.objects.get(name=deb2_name)
                 team_errors.append(team_name + ": Duplicate Debater-2 Name")
                 continue
-            except:
+            except Exception:
                 pass
-            deb2_status = sh.cell(i, 7).value.lower()
+            deb2_status = sheet.cell(i, 7).value.lower()
 
             if deb2_status == "novice" or deb2_status == "nov" or deb2_status == "n":
                 deb2_status = 1
@@ -147,14 +128,14 @@ def import_teams(fileToImport):
         try:
             deb1 = Debater(name=deb1_name, novice_status=deb1_status)
             deb1.save()
-        except:
+        except Exception:
             team_errors.append(team_name + ": Unkown Error Saving Debater 1")
             continue
         if not iron_man:
             try:
                 deb2 = Debater(name=deb2_name, novice_status=deb2_status)
                 deb2.save()
-            except:
+            except Exception:
                 team_errors.append(team_name + ": Unkown Error Saving Debater 2")
                 team_errors.append(
                     "        WARNING: Debaters on this team may be added to database. "
@@ -179,7 +160,7 @@ def import_teams(fileToImport):
                     team_name + ": Detected to be Iron Man - Still added successfully"
                 )
             team.save()
-        except:
+        except Exception:
             team_errors.append(team_name + ": Unknown Error Saving Team")
             team_errors.append(
                 "        WARNING: Debaters on this team may be added to database. "
