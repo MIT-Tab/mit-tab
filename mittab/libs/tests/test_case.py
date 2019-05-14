@@ -29,9 +29,6 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.quit()
         super(BaseWebTestCase, self).tearDown()
 
-    def _post_teardown(self):
-        super(BaseWebTestCase, self)._post_teardown()
-
     def _wait(self):
         time.sleep(self.wait_seconds)
 
