@@ -70,18 +70,7 @@ def add_judges(pairings, judges, panel_points):
                 raise errors.JudgeAssignmentError()
 
         for i in range(num_rounds):
-            try:
-                group[i].judges.add(judges[judge_assignments[i] - num_rounds])
-            except Exception:
-                raise Exception(
-                    "i=%s len(g)=%s len(jas)=%s len(js)=%s" %
-                    (
-                        i,
-                        len(group),
-                        len(judge_assignments),
-                        len(judges)
-                    )
-                )
+            group[i].judges.add(judges[judge_assignments[i] - num_rounds])
             group[i].chair = judges[judge_assignments[i] - num_rounds]
             group[i].save()
 
@@ -224,7 +213,7 @@ def judge_conflict(judge, team1, team2):
     ):
         return True
     elif (
-        Scratch.objects.filter(judge=judge, team=team2) != 0
+        Scratch.objects.filter(judge=judge, team=team2).exists()
         or had_judge(judge, team2)
     ):
         return True
