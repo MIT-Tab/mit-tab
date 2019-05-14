@@ -54,14 +54,14 @@ def add_judges(pairings, judges, panel_points):
             graph_edges, maxcardinality=True
         )
         # If there is no possible assignment of chairs, raise an error
-        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and graph_edges):
+        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
             if not graph_edges:
                 raise errors.JudgeAssignmentError(
                     "Impossible to assign judges, consider reducing your gaps " +
                     "if you are making panels, otherwise find some more judges."
                 )
             elif -1 in judge_assignments[:num_rounds]:
-                pairing_list = judge_assignments[: len(pairings)]
+                pairing_list = judge_assignments[:len(pairings)]
                 bad_pairing = pairings[pairing_list.index(-1)]
                 raise errors.JudgeAssignmentError(
                     "Could not find a judge for: %s" % str(bad_pairing)
