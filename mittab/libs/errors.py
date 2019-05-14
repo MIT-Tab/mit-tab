@@ -76,36 +76,12 @@ class NotEnoughRoomsError(Exception):
     pass
 
 
-class DebaterOnMoreThanOneTeamError(Exception):
-    def __init__(self, debaters):
-        self.debaters = debaters
-
-    def __str__(self):
-        return repr(self.debaters)
-
-
 class NeedTwoDifferentDebatersError(Exception):
     pass
 
 
-class YouAreDumbError(Exception):
-    def __init__(self):
-        self.msg = "Really?  You don't have that many teams at your tournament"
-
-    def __str__(self):
-        return repr(self.msg)
-
-
 class NotEnoughNoviceTeamsError(Exception):
     pass
-
-
-class ToManyScratchesError(Exception):
-    def __init__(self):
-        self.msg = "Judge assignment impossible with current scratches"
-
-    def __str__(self):
-        return repr(self.msg)
 
 
 class JudgeAssignmentError(Exception):
@@ -114,6 +90,7 @@ class JudgeAssignmentError(Exception):
             self.msg = reason
         else:
             self.msg = "Could not assign judges"
+        super(JudgeAssignmentError, self).__init__()
 
     def __str__(self):
         return repr(self.msg)
@@ -122,6 +99,7 @@ class JudgeAssignmentError(Exception):
 class PrevRoundNotEnteredError(Exception):
     def __init__(self):
         self.msg = "You have not entered all the results from the previous round."
+        super(PrevRoundNotEnteredError, self).__init__()
 
     def __str__(self):
         return repr(self.msg)
