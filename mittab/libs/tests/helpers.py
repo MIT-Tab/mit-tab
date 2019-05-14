@@ -1,10 +1,9 @@
-"""Collection of useful methods for manipulating pairing data"""
-
-from mittab.apps.tab.models import Round, RoundStats
 import random
 
+from mittab.apps.tab.models import Round, RoundStats
+
 # Speaks every quarter point
-speak_range = [23 + 0.25 * i for i in range(17)]
+SPEAK_RANGE = [23 + 0.25 * i for i in range(17)]
 
 
 def generate_speaks_for_debater(debater, is_forfeit=False):
@@ -19,17 +18,17 @@ def generate_speaks_for_debater(debater, is_forfeit=False):
     is_forfeit (boolean) -- Whether a forfeit occurred
 
     Returns:
-    speaks (int) -- A number in speak_range (23-27) that the debater spoke,
+    speaks (int) -- A number in SPEAK_RANGE (23-27) that the debater spoke,
                     unless there was a forfeit in which case 0.0
     """
     if is_forfeit:
         return 0.0
 
-    debater_average = hash(debater.name) % len(speak_range)
+    debater_average = hash(debater.name) % len(SPEAK_RANGE)
     sampled_speak = int(random.gauss(debater_average, 2))
-    # Limit to 0 -> len(speak_range) - 1
-    sampled_speak = max(min(sampled_speak, len(speak_range) - 1), 0)
-    return speak_range[sampled_speak]
+    # Limit to 0 -> len(SPEAK_RANGE) - 1
+    sampled_speak = max(min(sampled_speak, len(SPEAK_RANGE) - 1), 0)
+    return SPEAK_RANGE[sampled_speak]
 
 
 def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
@@ -56,7 +55,6 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
     gov_debaters = gov_team.debaters.all()
     opp_debaters = opp_team.debaters.all()
     if is_ironman:
-        # FIXME: refactor so we can have two ironmen
         if random.choice([True, False]):
             gov_debaters = [random.choice(gov_debaters)] * 2
         else:
