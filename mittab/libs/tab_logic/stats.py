@@ -8,13 +8,15 @@ from mittab.libs.cache_logic import cache
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
 
-""" Team-related logic"""
+"""
+Team-related logic
 
-""" General team info """
+General team info
+"""
 
 
-def num_byes(t):
-    return Bye.objects.filter(bye_team=t).count()
+def num_byes(team):
+    return Bye.objects.filter(bye_team=team).count()
 
 
 def num_forfeit_wins(team):
@@ -26,14 +28,17 @@ def num_forfeit_wins(team):
     ).count()
 
 
-def won_by_forfeit(r, t):
-    if Round.objects.filter(gov_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    elif Round.objects.filter(opp_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    return False
+def won_by_forfeit(round_obj, team):
+    if team not in (round_obj.gov_team, round_obj.opp_team):
+        return False
+    elif round_obj.victor == Round.ALL_WIN:
+        return True
+    elif round_obj.victor == Round.GOV_VIA_FORFEIT:
+        return round_obj.gov_team == team
+    elif round_obj.victor == Round.OPP_VIA_FORFEIT:
+        return round_obj.opp_team == team
+    else:
+        return False
 
 
 def forfeited_round(r, t):
@@ -169,7 +174,8 @@ def opp_strength(t):
     """
     Average number of wins per opponent
 
-    Tracks opp strength while minimizing the effect that byes have on a team's opp strength
+    Tracks opp strength while minimizing the effect that byes have on a team's
+    opp strength
     """
     opponent_count = 0
     opponent_wins = 0

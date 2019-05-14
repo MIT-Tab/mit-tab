@@ -31,7 +31,7 @@ class DebaterScore(object):
         return self.scoring_tuple() == other.scoring_tuple()
 
     def __ne__(self, other):
-        return not (self == other)
+        return not self == other
 
     def __lt__(self, other):
         return self.scoring_tuple() < other.scoring_tuple()
@@ -64,7 +64,7 @@ class TeamScore(object):
         return self.scoring_tuple() == other.scoring_tuple()
 
     def __ne__(self, other):
-        return not (self == other)
+        return not self == other
 
     def __lt__(self, other):
         return self.scoring_tuple() < other.scoring_tuple()
