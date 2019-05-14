@@ -452,7 +452,7 @@ def perfect_pairing(list_of_teams):
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
-                wt = calc_weight(
+                weight = calc_weight(
                     team1,
                     team2,
                     i,
@@ -462,7 +462,7 @@ def perfect_pairing(list_of_teams):
                     len(list_of_teams) - i - 1,
                     len(list_of_teams) - j - 1,
                 )
-                graph_edges += [(i, j, wt)]
+                graph_edges += [(i, j, weight)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
     all_pairs = []
     for pair in pairings_num:
@@ -552,17 +552,17 @@ def calc_weight(
 
 def determine_gov_opp(all_pairs):
     final_pairings = []
-    for p in all_pairs:
-        if num_govs(p[0]) < num_govs(p[1]):  # p[0] should be gov
-            final_pairings += [[p[0], p[1]]]
-        elif num_govs(p[1]) < num_govs(p[0]):  # p[1] should be gov
-            final_pairings += [[p[1], p[0]]]
-        elif num_opps(p[0]) < num_opps(p[1]):  # p[1] should be gov
-            final_pairings += [[p[1], p[0]]]
-        elif num_opps(p[1]) < num_opps(p[0]):  # p[0] should be gov
-            final_pairings += [[p[0], p[1]]]
-        elif random.randint(0, 1) == 0:
-            final_pairings += [[p[0], p[1]]]
+    for team1, team2 in all_pairs:
+        if num_govs(team1) < num_govs(team2):  # p[0] should be gov
+            final_pairings += [[team1, team2]]
+        elif num_govs(team2) < num_govs(team1):  # p[1] should be gov
+            final_pairings += [[team2, team1]]
+        elif num_opps(team1) < num_opps(team2):  # p[1] should be gov
+            final_pairings += [[team2, team1]]
+        elif num_opps(team2) < num_opps(team1):  # p[0] should be gov
+            final_pairings += [[team1, team2]]
+        elif random.randint(0, 1):
+            final_pairings += [[team2, team1]]
         else:
-            final_pairings += [[p[1], p[0]]]
+            final_pairings += [[team2, team1]]
     return final_pairings
