@@ -140,7 +140,7 @@ def add_judges(pairings, judges, panel_points):
                 panel_assignments.append([j for j in pairing.judges.all()])
 
             # Do it twice so we get panels of 3
-            for i in (0, 1):
+            for _ in (0, 1):
                 graph_edges = []
                 for (judge_i, judge) in enumerate(potential_panelists):
                     for (pairing_i, pairing) in enumerate(rounds_to_panel):
@@ -168,9 +168,9 @@ def add_judges(pairings, judges, panel_points):
                     )
                 # Save the judges to the potential panel assignments
                 judges_used = []
-                for j in range(num_to_panel):
-                    judge = potential_panelists[judge_assignments[j] - num_to_panel]
-                    panel_assignments[j].append(judge)
+                for i in range(num_to_panel):
+                    judge = potential_panelists[judge_assignments[i] - num_to_panel]
+                    panel_assignments[i].append(judge)
                     judges_used.append(judge)
                 # Remove any used judges from the potential panelist pool
                 for judge in judges_used:
@@ -246,7 +246,7 @@ def judge_conflict(judge, team1, team2):
 def had_judge(judge, team):
     if Round.objects.filter(gov_team=team, judges=judge).exists():
         return True
-    elif Round.objects.filter(opp_team=t, judges=judge).exists():
+    elif Round.objects.filter(opp_team=team, judges=judge).exists():
         return True
     else:
         return False
