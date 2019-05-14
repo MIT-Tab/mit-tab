@@ -86,8 +86,10 @@ def num_govs(t):
     return Round.objects.filter(gov_team=t).count()
 
 
-def had_bye(t):
-    return Bye.objects.filter(bye_team=t).exists()
+def had_bye(team, round_number=None):
+    if round_number is None:
+        return Bye.objects.filter(bye_team=team).exists()
+    return Bye.objects.filter(bye_team=team, round_number=round_number)
 
 
 """ Team Wins """

@@ -46,7 +46,8 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/python:3.7.3-node
+      # note: this is 3.5.7 because pylint doesn't yet support 3.7
+      - image: circleci/python:3.5.7-node
     steps:
       - checkout
       - restore_cache:
