@@ -210,7 +210,7 @@ def pair_round():
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
     for i, pairing in enumerate(pairings):
-        pairing[3] = rooms[i]
+        pairing[2] = rooms[i]
 
     # Enter into database
     for gov_team, opp_team, room in pairings:
