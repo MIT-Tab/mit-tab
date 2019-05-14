@@ -62,7 +62,7 @@ def import_teams(file_to_import):
                 hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
             except Exception:
                 # Create school through SchoolForm because for some reason they don't
-                save otherwise
+                # save otherwise
                 form = SchoolForm(data={"name": hybrid_school_name})
                 if form.is_valid():
                     form.save()
