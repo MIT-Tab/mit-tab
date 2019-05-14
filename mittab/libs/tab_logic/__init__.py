@@ -1,13 +1,14 @@
-from mittab.apps.tab.models import *
+from datetime import datetime
+from decimal import *
+import itertools
+import random
+
 from django.db.models import *
 
-import random
+from mittab.apps.tab.models import *
 from mittab.libs import errors, mwmatching
 from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
-from decimal import *
-from datetime import datetime
-import itertools
 
 
 def pair_round():
@@ -502,33 +503,24 @@ def calc_weight(
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
 
-    # Get configuration values
-    all_settings = dict([(ts.key, ts.value) for ts in TabSettings.objects.all()])
-
-    def try_get(key, default=None):
-        try:
-            return int(all_settings[key])
-        except:
-            return default
-
-    current_round = try_get("cur_round", 1)
-    tot_rounds = try_get("tot_rounds", 5)
-    power_pairing_multiple = try_get("power_pairing_multiple", -1)
-    high_opp_penalty = try_get("high_opp_penalty", 0)
-    high_gov_penalty = try_get("high_gov_penalty", -100)
-    high_high_opp_penalty = try_get("higher_opp_penalty", -10)
-    same_school_penalty = try_get("same_school_penalty", -1000)
-    hit_pull_up_before = try_get("hit_pull_up_before", -10000)
-    hit_team_before = try_get("hit_team_before", -100000)
+    current_round = TabSettings("cur_round", 1)
+    tot_rounds = TabSettings("tot_rounds", 5)
+    power_pairing_multiple = TabSettings("power_pairing_multiple", -1)
+    high_opp_penalty = TabSettings("high_opp_penalty", 0)
+    high_gov_penalty = TabSettings("high_gov_penalty", -100)
+    high_high_opp_penalty = TabSettings("higher_opp_penalty", -10)
+    same_school_penalty = TabSettings("same_school_penalty", -1000)
+    hit_pull_up_before = TabSettings("hit_pull_up_before", -10000)
+    hit_team_before = TabSettings("hit_team_before", -100000)
 
     if current_round == 1:
-        wt = (
+        weight = (
             power_pairing_multiple
             * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))
             / 2.0
         )
     else:
-        wt = (
+        weight = (
             power_pairing_multiple
             * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))
             / 2.0
@@ -536,26 +528,26 @@ def calc_weight(
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
-        wt += high_opp_penalty
+        weight += high_opp_penalty
 
     if num_opps(team_a) >= half + 1 and num_opps(team_b) >= half + 1:
-        wt += high_high_opp_penalty
+        weight += high_high_opp_penalty
 
     if num_govs(team_a) >= half and num_govs(team_b) >= half:
-        wt += high_gov_penalty
+        weight += high_gov_penalty
 
     if team_a.school == team_b.school:
-        wt += same_school_penalty
+        weight += same_school_penalty
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
         hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
     ):
-        wt += hit_pull_up_before
+        weight += hit_pull_up_before
 
     if hit_before(team_a, team_b):
-        wt += hit_team_before
+        weight += hit_team_before
 
-    return wt
+    return weight
 
 
 def determine_gov_opp(all_pairs):
