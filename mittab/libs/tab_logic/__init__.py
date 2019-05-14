@@ -190,7 +190,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing round %i of size %i" % (bracket, len(temp)))
         for pair in temp:
-            pairings.append((pair[0], pair[1], None))
+            pairings.append([pair[0], pair[1], None])
 
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
