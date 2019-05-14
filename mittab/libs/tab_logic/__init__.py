@@ -117,7 +117,7 @@ def pair_round():
                     )
                     bye.save()
                     list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
-                elif bracket == 1 and list_of_teams[0]:
+                elif bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
                     for byeint in range(len(list_of_teams[1]) - 1, -1, -1):
