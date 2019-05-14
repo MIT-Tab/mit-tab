@@ -503,15 +503,15 @@ def calc_weight(
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
 
-    current_round = TabSettings("cur_round", 1)
-    tot_rounds = TabSettings("tot_rounds", 5)
-    power_pairing_multiple = TabSettings("power_pairing_multiple", -1)
-    high_opp_penalty = TabSettings("high_opp_penalty", 0)
-    high_gov_penalty = TabSettings("high_gov_penalty", -100)
-    high_high_opp_penalty = TabSettings("higher_opp_penalty", -10)
-    same_school_penalty = TabSettings("same_school_penalty", -1000)
-    hit_pull_up_before = TabSettings("hit_pull_up_before", -10000)
-    hit_team_before = TabSettings("hit_team_before", -100000)
+    current_round = TabSettings.get("cur_round", 1)
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+    power_pairing_multiple = TabSettings.get("power_pairing_multiple", -1)
+    high_opp_penalty = TabSettings.get("high_opp_penalty", 0)
+    high_gov_penalty = TabSettings.get("high_gov_penalty", -100)
+    high_high_opp_penalty = TabSettings.get("higher_opp_penalty", -10)
+    same_school_penalty = TabSettings.get("same_school_penalty", -1000)
+    hit_pull_up_before = TabSettings.get("hit_pull_up_before", -10000)
+    hit_team_before = TabSettings.get("hit_team_before", -100000)
 
     if current_round == 1:
         weight = (
