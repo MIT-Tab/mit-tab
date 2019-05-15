@@ -1,13 +1,14 @@
-from mittab.apps.tab.models import *
+from datetime import datetime
+from decimal import *
+import itertools
+import random
+
 from django.db.models import *
 
-import random
+from mittab.apps.tab.models import *
 from mittab.libs import errors, mwmatching
 from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
-from decimal import *
-from datetime import datetime
-import itertools
 
 
 def pair_round():
