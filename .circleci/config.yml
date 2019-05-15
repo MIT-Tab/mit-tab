@@ -46,14 +46,29 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/node:latest
+      # note: this is 3.5.7 because pylint doesn't yet support 3.7
+      - image: circleci/python:3.5.7-node
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "requirements.txt" }}
+            - v1-dependencies-
+
       - run:
-          name: Install
-          command: npm install
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r requirements.txt
+            npm install
       - run:
-          name: Lint
+          name: Lint -- Python
+          command: |
+            . venv/bin/activate
+            pylint mittab/libs --load-plugins pylint_django
+      - run:
+          name: Lint -- JS
           command: npm run lint
 workflows:
   version: 2
