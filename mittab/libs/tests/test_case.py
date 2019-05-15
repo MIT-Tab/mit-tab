@@ -19,24 +19,16 @@ class BaseWebTestCase(LiveServerTestCase):
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--no-sandbox")
-        self.browser = Browser(
-            "chrome", headless=False, wait_time=30, options=chrome_options
-        )
+        self.browser = Browser("chrome",
+                               headless=False,
+                               wait_time=30,
+                               options=chrome_options)
         self.browser.driver.set_page_load_timeout(240)
         super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):
         self.browser.quit()
         super(BaseWebTestCase, self).tearDown()
-
-    def _post_teardown(self):
-        try:
-            super(BaseWebTestCase, self)._post_teardown()
-        except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            print("Ignoring exception in post-teardown")
 
     def _wait(self):
         time.sleep(self.wait_seconds)
@@ -47,7 +39,8 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.fill("password", self.password)
         self.browser.find_by_text("Sign in").first.click()
 
-        assert self.browser.is_text_present("Admin")  # checks that the nav is visible
+        assert self.browser.is_text_present(
+            "Admin")  # checks that the nav is visible
         assert not self.browser.is_text_present("Sign in")
 
     def _go_home(self):

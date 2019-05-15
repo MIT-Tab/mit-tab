@@ -46,7 +46,9 @@ class TestPairingLogic(TestCase):
         panel_points = []
         rounds = list(Round.objects.filter(round_number=cur_round))
         self.generate_checkins()
-        judges = [ci.judge for ci in CheckIn.objects.filter(round_number=cur_round)]
+        judges = [
+            ci.judge for ci in CheckIn.objects.filter(round_number=cur_round)
+        ]
         assign_judges.add_judges(rounds, judges, panel_points)
 
     def round_number(self):
