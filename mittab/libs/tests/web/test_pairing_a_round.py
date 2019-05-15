@@ -27,50 +27,131 @@ class PairingARoundTestCase(BaseWebTestCase):
         # Ranks dont correspond with winner
         self._enter_results(
             winner="OPP",
-            pm={"first": True, "speaks": 26, "ranks": 1},
-            mg={"first": False, "speaks": 26, "ranks": 2},
-            lo={"first": True, "speaks": 26, "ranks": 3},
-            mo={"first": False, "speaks": 26, "ranks": 4},
+            pm={
+                "first": True,
+                "speaks": 26,
+                "ranks": 1
+            },
+            mg={
+                "first": False,
+                "speaks": 26,
+                "ranks": 2
+            },
+            lo={
+                "first": True,
+                "speaks": 26,
+                "ranks": 3
+            },
+            mo={
+                "first": False,
+                "speaks": 26,
+                "ranks": 4
+            },
         )
         assert self.browser.is_text_present("Low Point Win!!")
 
         # Speaks dont correspond with winner
         self._enter_results(
             winner="GOV",
-            pm={"first": True, "speaks": 26, "ranks": 1},
-            mg={"first": False, "speaks": 25, "ranks": 4},
-            lo={"first": True, "speaks": 26, "ranks": 2},
-            mo={"first": False, "speaks": 26, "ranks": 3},
+            pm={
+                "first": True,
+                "speaks": 26,
+                "ranks": 1
+            },
+            mg={
+                "first": False,
+                "speaks": 25,
+                "ranks": 4
+            },
+            lo={
+                "first": True,
+                "speaks": 26,
+                "ranks": 2
+            },
+            mo={
+                "first": False,
+                "speaks": 26,
+                "ranks": 3
+            },
         )
         assert self.browser.is_text_present("Low Point Win!!")
 
         # Ranks dont correspond with speaks
         self._enter_results(
             winner="GOV",
-            pm={"first": True, "speaks": 26, "ranks": 1},
-            mg={"first": False, "speaks": 25, "ranks": 2},
-            lo={"first": True, "speaks": 26, "ranks": 3},
-            mo={"first": False, "speaks": 25, "ranks": 4},
+            pm={
+                "first": True,
+                "speaks": 26,
+                "ranks": 1
+            },
+            mg={
+                "first": False,
+                "speaks": 25,
+                "ranks": 2
+            },
+            lo={
+                "first": True,
+                "speaks": 26,
+                "ranks": 3
+            },
+            mo={
+                "first": False,
+                "speaks": 25,
+                "ranks": 4
+            },
         )
-        assert self.browser.is_text_present("These speaks are too high for the rank")
+        assert self.browser.is_text_present(
+            "These speaks are too high for the rank")
 
         # Invalid speaks
         self._enter_results(
             winner="GOV",
-            pm={"first": True, "speaks": 55, "ranks": 1},
-            mg={"first": False, "speaks": 26, "ranks": 2},
-            lo={"first": True, "speaks": 26, "ranks": 3},
-            mo={"first": False, "speaks": 26, "ranks": 4},
+            pm={
+                "first": True,
+                "speaks": 55,
+                "ranks": 1
+            },
+            mg={
+                "first": False,
+                "speaks": 26,
+                "ranks": 2
+            },
+            lo={
+                "first": True,
+                "speaks": 26,
+                "ranks": 3
+            },
+            mo={
+                "first": False,
+                "speaks": 26,
+                "ranks": 4
+            },
         )
         assert self.browser.is_text_present("invalid speaker score")
 
         # Correct ballot
         self._enter_results(
             winner="GOV",
-            pm={"first": True, "speaks": 26, "ranks": 1},
-            mg={"first": False, "speaks": 26, "ranks": 2},
-            lo={"first": True, "speaks": 26, "ranks": 3},
-            mo={"first": False, "speaks": 26, "ranks": 4},
+            pm={
+                "first": True,
+                "speaks": 26,
+                "ranks": 1
+            },
+            mg={
+                "first": False,
+                "speaks": 26,
+                "ranks": 2
+            },
+            lo={
+                "first": True,
+                "speaks": 26,
+                "ranks": 3
+            },
+            mo={
+                "first": False,
+                "speaks": 26,
+                "ranks": 4
+            },
         )
 
         assert self.browser.is_text_present("Result entered successfully")
@@ -105,8 +186,10 @@ class PairingARoundTestCase(BaseWebTestCase):
             self.browser.find_by_xpath(debater_name_xpath).first.click()
 
             if result_data.get("ranks"):
-                self.browser.select("%s_ranks" % position, result_data["ranks"])
+                self.browser.select("%s_ranks" % position,
+                                    result_data["ranks"])
             if result_data.get("speaks"):
-                self.browser.fill("%s_speaks" % position, result_data["speaks"])
+                self.browser.fill("%s_speaks" % position,
+                                  result_data["speaks"])
 
         self.browser.find_by_value("Save").first.click()

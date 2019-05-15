@@ -63,14 +63,10 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
             opp_debaters = [random.choice(opp_debaters)] * 2
 
     # Generate speak values using generate_speaks_for_debater
-    gov_speaks = [
-        (debater, generate_speaks_for_debater(debater, is_forfeit))
-        for debater in gov_debaters
-    ]
-    opp_speaks = [
-        (debater, generate_speaks_for_debater(debater, is_forfeit))
-        for debater in opp_debaters
-    ]
+    gov_speaks = [(debater, generate_speaks_for_debater(debater, is_forfeit))
+                  for debater in gov_debaters]
+    opp_speaks = [(debater, generate_speaks_for_debater(debater, is_forfeit))
+                  for debater in opp_debaters]
     all_speaks = gov_speaks + opp_speaks
 
     # Generate ranks based on the speak values, but first shuffle so that ties
@@ -101,8 +97,7 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
     else:
         # Forfeit
         round_obj.victor = random.choice(
-            (Round.GOV_VIA_FORFEIT, Round.OPP_VIA_FORFEIT, Round.ALL_DROP)
-        )
+            (Round.GOV_VIA_FORFEIT, Round.OPP_VIA_FORFEIT, Round.ALL_DROP))
 
     # Generate RoundStats, shuffle for role randomization
     random.shuffle(all_points)
@@ -126,12 +121,15 @@ def generate_result_for_round(round_obj, prob_forfeit=0.0, prob_ironman=0.0):
     return tuple([round_obj] + round_stats)
 
 
-def generate_results(round_number, prob_forfeit=0.0, prob_ironman=0.0, seed="BEEF"):
+def generate_results(round_number,
+                     prob_forfeit=0.0,
+                     prob_ironman=0.0,
+                     seed="BEEF"):
     """Generates results for the existing round"""
     random.seed(seed)
     for round_obj in Round.objects.filter(round_number=round_number):
-        results = generate_result_for_round(
-            round_obj, prob_forfeit=prob_forfeit, prob_ironman=prob_ironman
-        )
+        results = generate_result_for_round(round_obj,
+                                            prob_forfeit=prob_forfeit,
+                                            prob_ironman=prob_ironman)
         for result in results:
             result.save()

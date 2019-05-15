@@ -19,12 +19,11 @@ class TestRankingLogic(TestCase):
         etc ...)
         """
         debaters = Debater.objects.all()
-        scores = [
-            (debater.name, DebaterScore(debater).scoring_tuple())
-            for debater in debaters
-        ]
+        scores = [(debater.name, DebaterScore(debater).scoring_tuple())
+                  for debater in debaters]
         expected_scores = load_debater_rankings()
-        dict_scores, dict_expected_scores = list(map(dict, (scores, expected_scores)))
+        dict_scores, dict_expected_scores = list(
+            map(dict, (scores, expected_scores)))
 
         assert len(dict_scores) == len(dict_expected_scores)
         for k in dict_scores:
@@ -39,9 +38,11 @@ class TestRankingLogic(TestCase):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
         teams = Team.objects.all()
-        scores = [(team.name, TeamScore(team).scoring_tuple()) for team in teams]
+        scores = [(team.name, TeamScore(team).scoring_tuple())
+                  for team in teams]
         expected_scores = load_team_rankings()
-        dict_scores, dict_expected_scores = list(map(dict, (scores, expected_scores)))
+        dict_scores, dict_expected_scores = list(
+            map(dict, (scores, expected_scores)))
         assert len(dict_scores) == len(dict_expected_scores)
         for k in dict_scores:
             left, right = dict_scores[k], dict_expected_scores[k]
