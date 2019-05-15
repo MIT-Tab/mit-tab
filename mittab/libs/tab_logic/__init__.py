@@ -49,12 +49,12 @@ def pair_round():
 
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
-    for t in forfeit_teams:
+    for team in forfeit_teams:
         lenient_late = TabSettings.get('lenient_late', 0) >= current_round
-        n = NoShow(no_show_team=t,
-                   round_number=current_round,
-                   lenient_late=lenient_late)
-        n.save()
+        no_show = NoShow(no_show_team=team,
+                         round_number=current_round,
+                         lenient_late=lenient_late)
+        no_show.save()
 
     # If it is the first round, pair by *seed*
     if current_round == 1:
@@ -71,9 +71,9 @@ def pair_round():
                 print("Bye: using all teams")
                 possible_teams = list_of_teams
             bye_team = random.choice(possible_teams)
-            b = Bye(bye_team=bye_team, round_number=current_round)
-            b.save()
-            list_of_teams.remove(b.bye_team)
+            bye = Bye(bye_team=bye_team, round_number=current_round)
+            bye.save()
+            list_of_teams.remove(bye.bye_team)
 
         # Sort the teams by seed. We must randomize beforehand so that similarly
         # seeded teams are paired randomly.
