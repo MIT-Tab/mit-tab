@@ -443,12 +443,12 @@ def perfect_pairing(list_of_teams):
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
-                wt = calc_weight(team1, team2, i, j,
+                weight = calc_weight(team1, team2, i, j,
                                  list_of_teams[len(list_of_teams) - i - 1],
                                  list_of_teams[len(list_of_teams) - j - 1],
                                  len(list_of_teams) - i - 1,
                                  len(list_of_teams) - j - 1)
-                graph_edges += [(i, j, wt)]
+                graph_edges += [(i, j, weight)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges,
                                                 maxcardinality=True)
     all_pairs = []
@@ -503,34 +503,34 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
     hit_team_before = try_get("hit_team_before", -100000)
 
     if current_round == 1:
-        wt = power_pairing_multiple * (
+        weight = power_pairing_multiple * (
             abs(team_a_opt.seed - team_b.seed) +
             abs(team_b_opt.seed - team_a.seed)) / 2.0
     else:
-        wt = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) +
+        weight = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) +
                                        abs(team_b_opt_ind - team_a_ind)) / 2.0
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
-        wt += high_opp_penalty
+        weight += high_opp_penalty
 
     if num_opps(team_a) >= half + 1 and num_opps(team_b) >= half + 1:
-        wt += high_high_opp_penalty
+        weight += high_high_opp_penalty
 
     if num_govs(team_a) >= half and num_govs(team_b) >= half:
-        wt += high_gov_penalty
+        weight += high_gov_penalty
 
     if team_a.school == team_b.school:
-        wt += same_school_penalty
+        weight += same_school_penalty
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
             hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
-        wt += hit_pull_up_before
+        weight += hit_pull_up_before
 
     if hit_before(team_a, team_b):
-        wt += hit_team_before
+        weight += hit_team_before
 
-    return wt
+    return weight
 
 
 def determine_gov_opp(all_pairs):
