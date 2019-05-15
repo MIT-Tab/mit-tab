@@ -45,7 +45,7 @@ suggestion-mode=yes
 unsafe-load-any-extension=no
 
 
- [MESSAGES CONTROL]
+[MESSAGES CONTROL]
 
  # Only show warnings with the listed confidence levels. Leave empty to show
 # all. Valid levels: HIGH, INFERENCE, INFERENCE_FAILURE, UNDEFINED.
@@ -150,8 +150,7 @@ disable=print-statement,
 # it should appear only once). See also the "--disable" option for examples.
 enable=c-extension-no-member
 
-
- [REPORTS]
+[REPORTS]
 
  # Python expression which should return a note less than 10 (10 is the highest
 # note). You have access to the variables errors warning, statement which
@@ -176,7 +175,7 @@ reports=no
 score=yes
 
 
- [REFACTORING]
+[REFACTORING]
 
  # Maximum number of nested blocks for function / method body
 max-nested-blocks=5
@@ -188,7 +187,7 @@ max-nested-blocks=5
 never-returning-functions=sys.exit
 
 
- [LOGGING]
+[LOGGING]
 
  # Format style used to check logging format string. `old` means using %
 # formatting, while `new` is for `{}` formatting.
@@ -199,7 +198,7 @@ logging-format-style=old
 logging-modules=logging
 
 
- [SPELLING]
+[SPELLING]
 
  # Limits count of emitted suggestions for spelling mistakes.
 max-spelling-suggestions=4
@@ -219,7 +218,7 @@ spelling-private-dict-file=
 spelling-store-unknown-words=no
 
 
- [MISCELLANEOUS]
+[MISCELLANEOUS]
 
  # List of note tags to take in consideration, separated by a comma.
 notes=FIXME,
@@ -227,7 +226,7 @@ notes=FIXME,
       TODO
 
 
- [TYPECHECK]
+[TYPECHECK]
 
  # List of decorators that produce context managers, such as
 # contextlib.contextmanager. Add to this list to register other decorators that
@@ -279,7 +278,7 @@ missing-member-hint-distance=1
 missing-member-max-choices=1
 
 
- [VARIABLES]
+[VARIABLES]
 
  # List of additional names supposed to be defined in builtins. Remember that
 # you should avoid defining new builtins when possible.
@@ -309,7 +308,7 @@ init-import=no
 redefining-builtins-modules=six.moves,past.builtins,future.builtins,builtins,io
 
 
- [FORMAT]
+[FORMAT]
 
  # Expected format of line ending, e.g. empty (any line ending), LF or CRLF.
 expected-line-ending-format=
@@ -346,7 +345,7 @@ single-line-class-stmt=no
 single-line-if-stmt=no
 
 
- [SIMILARITIES]
+[SIMILARITIES]
 
  # Ignore comments when computing similarities.
 ignore-comments=yes
@@ -361,7 +360,7 @@ ignore-imports=no
 min-similarity-lines=4
 
 
- [BASIC]
+[BASIC]
 
  # Naming style matching correct argument names.
 argument-naming-style=snake_case
@@ -472,7 +471,7 @@ variable-naming-style=snake_case
 #variable-rgx=
 
 
- [STRING]
+[STRING]
 
  # This flag controls whether the implicit-str-concat-in-sequence should
 # generate a warning on implicit string concatenation in sequences defined over
@@ -480,7 +479,7 @@ variable-naming-style=snake_case
 check-str-concat-over-line-jumps=no
 
 
- [IMPORTS]
+[IMPORTS]
 
  # Allow wildcard imports from modules that define __all__.
 allow-wildcard-with-all=no
@@ -513,7 +512,7 @@ known-standard-library=
 known-third-party=enchant
 
 
- [CLASSES]
+[CLASSES]
 
  # List of method names used to declare (i.e. assign) instance attributes.
 defining-attr-methods=__init__,
@@ -535,7 +534,7 @@ valid-classmethod-first-arg=cls
 valid-metaclass-classmethod-first-arg=cls
 
 
- [DESIGN]
+[DESIGN]
 
  # Maximum number of arguments for function / method.
 max-args=5
@@ -568,7 +567,7 @@ max-statements=50
 min-public-methods=2
 
 
- [EXCEPTIONS]
+[EXCEPTIONS]
 
  # Exceptions that will emit a warning when being caught. Defaults to
 # "BaseException, Exception".
