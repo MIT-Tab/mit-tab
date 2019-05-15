@@ -165,11 +165,13 @@ def pair_round():
                     list_of_teams[bracket].append(pull_up)
                     list_of_teams[bracket - 1].remove(pull_up)
 
-                    # after adding pull-up to new bracket and deleting from old, sort again by speaks making sure to leave any first
+                    # after adding pull-up to new bracket and deleting from old,
+                    # sort again by speaks making sure to leave any first
                     # round bye in the correct spot
                     removed_teams = []
                     for t in list(Team.objects.filter(checked_in=True)):
-                        # They have all wins and they haven't forfeited so they need to get paired in
+                        # They have all wins and they haven't forfeited so
+                        # they need to get paired in
                         if t in middle_of_bracket and tot_wins(t) == bracket:
                             removed_teams += [t]
                             list_of_teams[bracket].remove(t)
@@ -207,7 +209,8 @@ def pair_round():
                           key=lambda team: min(sorted_teams.index(team[0]),
                                                sorted_teams.index(team[1])))
 
-    # Assign rooms (does this need to be random? maybe bad to have top ranked teams/judges in top rooms?)
+    # Assign rooms (does this need to be random? maybe bad to have top
+    #               ranked teams/judges in top rooms?)
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
