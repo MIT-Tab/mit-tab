@@ -3,11 +3,19 @@ from functools import total_ordering
 from mittab.apps.tab.models import Debater
 from mittab.libs.tab_logic.stats import *
 
+
 def rank_speakers():
-    return sorted([ DebaterScore(d) for d in Debater.objects.prefetch_related('team_set').all() ])
+    return sorted([
+        DebaterScore(d)
+        for d in Debater.objects.prefetch_related('team_set').all()
+    ])
+
 
 def rank_teams():
-    return sorted([ TeamScore(d) for d in Team.objects.prefetch_related('debaters').all() ])
+    return sorted([
+        TeamScore(d) for d in Team.objects.prefetch_related('debaters').all()
+    ])
+
 
 @total_ordering
 class DebaterScore(object):
@@ -30,12 +38,10 @@ class DebaterScore(object):
         return self.scoring_tuple() < other.scoring_tuple()
 
     def scoring_tuple(self):
-        return (-self.speaks,
-                self.ranks,
-                -self.single_adjusted_speaks,
-                self.single_adjusted_ranks,
-                -self.double_adjusted_speaks,
+        return (-self.speaks, self.ranks, -self.single_adjusted_speaks,
+                self.single_adjusted_ranks, -self.double_adjusted_speaks,
                 self.double_adjusted_ranks)
+
 
 @total_ordering
 class TeamScore(object):
@@ -60,11 +66,7 @@ class TeamScore(object):
         return self.scoring_tuple() < other.scoring_tuple()
 
     def scoring_tuple(self):
-        return (-self.wins,
-                -self.speaks,
-                self.ranks,
-                -self.single_adjusted_speaks,
-                self.single_adjusted_ranks,
-                -self.double_adjusted_speaks,
-                self.double_adjusted_ranks,
+        return (-self.wins, -self.speaks, self.ranks,
+                -self.single_adjusted_speaks, self.single_adjusted_ranks,
+                -self.double_adjusted_speaks, self.double_adjusted_ranks,
                 -self.opp_strength)
