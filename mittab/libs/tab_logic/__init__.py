@@ -29,8 +29,6 @@ def pair_round():
 
     pairings are computed in the following format: [gov,opp,judge,room]
     and then saved immediately into the database
-
-    FIXME: Allow for good rollback behavior
     """
     current_round = TabSettings.get('cur_round')
     validate_round_data(current_round)
@@ -112,8 +110,6 @@ def pair_round():
         #  1) If we are in the bottom bracket, give someone a bye
         #  2) If we are in 1-up bracket and there are no all down
         #     teams, give someone a bye
-        #  FIXME: Do we need to do special logic for smaller brackets? - (julia) I need to make the logic more general to deal
-        # with if there are no teams in the all down or up one bracket. See Issue 4
         #  3) Otherwise, find a pull up from the next bracket
         for bracket in reversed(list(range(current_round))):
             if len(list_of_teams[bracket]) % 2 != 0:
@@ -199,10 +195,6 @@ def pair_round():
         for pair in temp:
             pairings.append([pair[0], pair[1], [None], [None]])
 
-    # FIXME: WHY DO WE RANDOMIZE THIS - we want the order of which fullseeded teams get the best judge to be random.
-    # We should possibly also sort on the weakest team first? I.e. a fullseed/halfseed should get a better judge than a
-    # fullseed/freeseed, etc. - Julia to fix. Issue 6.
-    # should randomize first
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
         pairings = sorted(pairings,
@@ -345,7 +337,7 @@ def middle_of_bracket_teams():
     These teams have speaks of zero but _should_ have average speaks, so they
     should be paired into the middle of their bracket. Randomized for fairness
     """
-    teams = []  # TODO: Make this more efficient. Try to use a SQL query
+    teams = []
     for team in Team.objects.filter(checked_in=True):
         avg_speaks_rounds = Bye.objects.filter(bye_team=team).count()
         avg_speaks_rounds += NoShow.objects.filter(no_show_team=team,
