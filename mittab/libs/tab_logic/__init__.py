@@ -192,7 +192,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing round %i of size %i" % (bracket, len(temp)))
         for pair in temp:
-            pairings.append([pair[0], pair[1], [None], [None]])
+            pairings.append([pair[0], pair[1], None])
 
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
@@ -212,26 +212,19 @@ def pair_round():
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
     for i, pairing in enumerate(pairings):
-        pairing[3] = rooms[i]
+        pairing[2] = rooms[i]
 
     # Enter into database
-    for p in pairings:
-        if isinstance(p[2], Judge):
-            r = Round(round_number=current_round,
-                      gov_team=p[0],
-                      opp_team=p[1],
-                      judge=p[2],
-                      room=p[3])
-        else:
-            r = Round(round_number=current_round,
-                      gov_team=p[0],
-                      opp_team=p[1],
-                      room=p[3])
-        if p[0] in all_pull_ups:
-            r.pullup = Round.GOV
-        elif p[1] in all_pull_ups:
-            r.pullup = Round.OPP
-        r.save()
+    for gov, opp, room in pairings:
+        round_obj = Round(round_number=current_round,
+                          gov_team=gov,
+                          opp_team=opp,
+                          room=room)
+        if gov in all_pull_ups:
+            round_obj.pullup = Round.GOV
+        elif opp in all_pull_ups:
+            round_obj.pullup = Round.OPP
+        round_obj.save()
 
 
 def have_enough_judges(round_to_check):
@@ -483,25 +476,15 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
 
-    # Get configuration values
-    all_settings = dict([(ts.key, ts.value)
-                         for ts in TabSettings.objects.all()])
-
-    def try_get(key, default=None):
-        try:
-            return int(all_settings[key])
-        except:
-            return default
-
-    current_round = try_get("cur_round", 1)
-    tot_rounds = try_get("tot_rounds", 5)
-    power_pairing_multiple = try_get("power_pairing_multiple", -1)
-    high_opp_penalty = try_get("high_opp_penalty", 0)
-    high_gov_penalty = try_get("high_gov_penalty", -100)
-    high_high_opp_penalty = try_get("higher_opp_penalty", -10)
-    same_school_penalty = try_get("same_school_penalty", -1000)
-    hit_pull_up_before = try_get("hit_pull_up_before", -10000)
-    hit_team_before = try_get("hit_team_before", -100000)
+    current_round = TabSettings.get("cur_round", 1)
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+    power_pairing_multiple = TabSettings.get("power_pairing_multiple", -1)
+    high_opp_penalty = TabSettings.get("high_opp_penalty", 0)
+    high_gov_penalty = TabSettings.get("high_gov_penalty", -100)
+    high_high_opp_penalty = TabSettings.get("higher_opp_penalty", -10)
+    same_school_penalty = TabSettings.get("same_school_penalty", -1000)
+    hit_pull_up_before = TabSettings.get("hit_pull_up_before", -10000)
+    hit_team_before = TabSettings.get("hit_team_before", -100000)
 
     if current_round == 1:
         weight = power_pairing_multiple * (
