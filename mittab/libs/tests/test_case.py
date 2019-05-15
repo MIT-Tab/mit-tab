@@ -30,15 +30,6 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.quit()
         super(BaseWebTestCase, self).tearDown()
 
-    def _post_teardown(self):
-        try:
-            super(BaseWebTestCase, self)._post_teardown()
-        except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            print("Ignoring exception in post-teardown")
-
     def _wait(self):
         time.sleep(self.wait_seconds)
 
