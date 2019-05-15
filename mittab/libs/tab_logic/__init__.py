@@ -156,7 +156,7 @@ def pair_round():
                         t for t in list_of_teams[bracket - 1]
                         if t not in teams_been_pulled_up
                     ]
-                    if len(not_pulled_up_teams) > 0:
+                    if not_pulled_up_teams:
                         pull_up = not_pulled_up_teams[-1]
                     else:
                         pull_up = list_of_teams[bracket - 1][-1]
@@ -180,10 +180,6 @@ def pair_round():
                     for t in removed_teams:
                         list_of_teams[bracket].insert(
                             len(list_of_teams[bracket]) // 2, t)
-
-    if current_round > 1:
-        for i in range(len(list_of_teams)):
-            print("Bracket %i has %i teams" % (i, len(list_of_teams[i])))
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
@@ -214,8 +210,8 @@ def pair_round():
     rooms = Room.objects.all()
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
-    for i in range(len(pairings)):
-        pairings[i][3] = rooms[i]
+    for i, pairing in enumerate(pairings):
+        pairing[3] = rooms[i]
 
     # Enter into database
     for p in pairings:
@@ -444,10 +440,10 @@ class TabFlags:
 def perfect_pairing(list_of_teams):
     """ Uses the mwmatching library to assign teams in a pairing """
     graph_edges = []
-    for i in range(len(list_of_teams)):
-        for j in range(len(list_of_teams)):
+    for i, team1 in enumerate(list_of_teams):
+        for j, team2 in enumerate(list_of_teams):
             if i > j:
-                wt = calc_weight(list_of_teams[i], list_of_teams[j], i, j,
+                wt = calc_weight(team1, team2, i, j,
                                  list_of_teams[len(list_of_teams) - i - 1],
                                  list_of_teams[len(list_of_teams) - j - 1],
                                  len(list_of_teams) - i - 1,
