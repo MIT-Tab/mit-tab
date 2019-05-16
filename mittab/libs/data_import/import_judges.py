@@ -1,6 +1,6 @@
 from mittab.apps.tab.models import School
 from mittab.apps.tab.forms import JudgeForm
-from mittab.libs.data_import import WorkbookImporter
+from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
 
 from decimal import *
 import xlrd
@@ -8,18 +8,19 @@ import xlrd
 
 def import_judges(file_to_import):
     try:
-        return JudgeImporter(file_to_import).import_data().errors
-    except Exception:
+        workbook = Workbook(file_to_import)
+    except InvalidWorkbookException:
         return ["Judges file is not a valid .xlsx file"]
+    return JudgeImporter(workbook).import_data().errors
 
 
 class JudgeImporter(WorkbookImporter):
-    min_row_size = 1
+    min_row_size = 2
     name = "Judge Importer"
 
     def import_row(self, row):
-        judge_name = self._get(row, 0)
-        judge_rank = self._get(row, 1)
+        judge_name = row[0]
+        judge_rank = row[1]
 
         try:
             judge_rank = round(float(judge_rank), 2)
@@ -28,11 +29,8 @@ class JudgeImporter(WorkbookImporter):
 
         col = 2
         schools = []
-        while self._get(row, col) not in ["", None]:
-            school_name = self._get(row, col)
-            col += 1
+        for school_name in row[2:]:
             school_query = School.objects.filter(name__iexact=school_name)
-
             if school_query.exists():
                 school = school_query.first()
             else:
@@ -41,11 +39,12 @@ class JudgeImporter(WorkbookImporter):
                     self.create(school)
                 except:
                     self.error("Invalid school '%s'" % school_name, row)
-            schools.append(school.id)
-        data = {'name': judge_name, 'rank': judge_rank, 'schools': schools}
+            schools.append(str(school.id))
+
+        data = {"name": judge_name, "rank": judge_rank, "schools": schools}
         form = JudgeForm(data=data)
         if form.is_valid():
-            self.create(form.instance)
+            self.create(form)
         else:
             for error_msg in form.errors.items():
                 self.error("%s - %s", (judge_name, error_msg), row)

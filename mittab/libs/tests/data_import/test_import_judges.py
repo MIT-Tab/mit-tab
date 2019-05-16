@@ -1,0 +1,41 @@
+from django.test import TestCase
+
+from mittab.apps.tab.models import School, Judge
+from mittab.libs.tests.data_import import MockWorkbook
+from mittab.libs.data_import.import_judges import JudgeImporter
+
+
+class TestImportingJudges(TestCase):
+    fixtures = ["testing_empty"]
+
+    def test_valid_judges(self):
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 0
+
+        data = [
+            ["Judge 1", "9.5", "Harvard"],
+            ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern"],
+            ["Judge 3", "20"]
+        ]
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert not errors
+        assert Judge.objects.count() == 3
+        assert School.objects.count() == 3
+
+        judge_1 = Judge.objects.get(name="Judge 1")
+        assert float(judge_1.rank) == 9.5
+        assert judge_1.name == "Judge 1"
+        assert sorted(map(lambda s: s.name, judge_1.schools.all())) == ["Harvard"]
+
+        judge_2 = Judge.objects.get(name="Judge 2")
+        assert float(judge_2.rank) == 10.56
+        assert judge_2.name == "Judge 2"
+        assert sorted(map(lambda s: s.name, judge_2.schools.all())) == \
+                ["Harvard", "Northeastern", "Yale"]
+
+        judge_3 = Judge.objects.get(name="Judge 3")
+        assert float(judge_3.rank) == 20.0
+        assert judge_3.name == "Judge 3"
+        assert not judge_3.schools.all()
