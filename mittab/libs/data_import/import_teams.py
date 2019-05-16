@@ -1,41 +1,25 @@
-#Copyright (C) 2011 by Julia Boortz and Joseph Lynch
-
-#Permission is hereby granted, free of charge, to any person obtaining a copy
-#of this software and associated documentation files (the "Software"), to deal
-#in the Software without restriction, including without limitation the rights
-#to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#copies of the Software, and to permit persons to whom the Software is
-#furnished to do so, subject to the following conditions:
-
-#The above copyright notice and this permission notice shall be included in
-#all copies or substantial portions of the Software.
-
-#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-#THE SOFTWARE.
-
 from mittab.apps.tab.models import *
 from mittab.apps.tab.forms import SchoolForm
 
 import xlrd
 from xlwt import Workbook
 
+
 def import_teams(fileToImport):
     try:
-        sh = xlrd.open_workbook(filename=None, file_contents=fileToImport.read()).sheet_by_index(0)
+        sh = xlrd.open_workbook(
+            filename=None, file_contents=fileToImport.read()).sheet_by_index(0)
     except:
-        return ['ERROR: Please upload an .xlsx file. This filetype is not compatible']
+        return [
+            'ERROR: Please upload an .xlsx file. This filetype is not compatible'
+        ]
     num_teams = 0
     found_end = False
     team_errors = []
     while found_end == False:
         try:
             sh.cell(num_teams, 0).value
-            num_teams +=1
+            num_teams += 1
         except IndexError:
             found_end = True
 
@@ -43,7 +27,8 @@ def import_teams(fileToImport):
         try:
             sh.cell(0, 5).value
         except:
-            team_errors.append('ERROR: Insufficient Columns in Sheet. No Data Read')
+            team_errors.append(
+                'ERROR: Insufficient Columns in Sheet. No Data Read')
             return team_errors
 
     for i in range(1, num_teams):
@@ -76,13 +61,15 @@ def import_teams(fileToImport):
         hybrid_school = None
         if hybrid_school_name != '':
             try:
-                hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
+                hybrid_school = School.objects.get(
+                    name__iexact=hybrid_school_name)
             except:
                 #Create school through SchoolForm because for some reason they don't save otherwise
                 form = SchoolForm(data={'name': hybrid_school_name})
                 if form.is_valid():
                     form.save()
-                    hybrid_school = School.objects.get(name__iexact=hybrid_school_name)
+                    hybrid_school = School.objects.get(
+                        name__iexact=hybrid_school_name)
                 else:
                     team_errors.append(team_name + ": Invalid Hybrid School")
                     continue
@@ -147,13 +134,17 @@ def import_teams(fileToImport):
                 deb2 = Debater(name=deb2_name, novice_status=deb2_status)
                 deb2.save()
             except:
-                team_errors.append(team_name + ': Unkown Error Saving Debater 2')
-                team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                    'Please Check this Manually')
+                team_errors.append(team_name +
+                                   ': Unkown Error Saving Debater 2')
+                team_errors.append(
+                    '        WARNING: Debaters on this team may be added to database. '
+                    + 'Please Check this Manually')
                 continue
 
-        team = Team(name=team_name, school=team_school,
-                hybrid_school=hybrid_school, seed=team_seed)
+        team = Team(name=team_name,
+                    school=team_school,
+                    hybrid_school=hybrid_school,
+                    seed=team_seed)
 
         try:
             team.save()
@@ -161,12 +152,14 @@ def import_teams(fileToImport):
             if (not iron_man):
                 team.debaters.add(deb2)
             else:
-                team_errors.append(team_name + ": Detected to be Iron Man - Still added successfully")
+                team_errors.append(
+                    team_name +
+                    ": Detected to be Iron Man - Still added successfully")
             team.save()
         except:
             team_errors.append(team_name + ': Unknown Error Saving Team')
-            team_errors.append('        WARNING: Debaters on this team may be added to database. ' +
-                                'Please Check this Manually')
+            team_errors.append(
+                '        WARNING: Debaters on this team may be added to database. '
+                + 'Please Check this Manually')
 
     return team_errors
-
