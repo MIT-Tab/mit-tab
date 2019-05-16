@@ -14,8 +14,8 @@ def import_judges(file_to_import):
 
 
 class JudgeImporter(WorkbookImporter):
-    min_row_size : int = 1
-    name : str = "Judge Importer"
+    min_row_size = 1
+    name = "Judge Importer"
 
     def import_row(self, row):
         judge_name = self._get(row, 0)

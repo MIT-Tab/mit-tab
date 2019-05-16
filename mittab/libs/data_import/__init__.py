@@ -4,8 +4,8 @@ import xlrd
 
 
 class WorkbookImporter:
-    min_row_size : int = 1
-    name : str = "Base Importer"
+    min_row_size = 1
+    name = "Base Importer"
 
     def __init__(self, file_to_import):
         self.file_to_import = file_to_import
