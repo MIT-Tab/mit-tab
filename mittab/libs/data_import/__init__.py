@@ -12,6 +12,9 @@ class WorkbookImporter:
         self.errors = []
         self.created_objs = []
 
+    def import_row(self):
+        raise ValueError("This method should be overridden!")
+
     def import_data(self):
         is_incorrect_size = lambda row: self._get(row - 1, self.min_row_size) is None
         if any(is_incorrect_size, self._rows()):
@@ -31,11 +34,11 @@ class WorkbookImporter:
         for obj in self.created_objs:
             obj.delete()
 
-    def error(self, msg, row):
+    def error(self, msg, row=None):
         if row is not None:
             self.errors.append("%s row %d: %s" % (self.name, row, msg))
         else:
-            self.errors.append("%s row %d: %s" % (self.name, msg))
+            self.errors.append("%s: %s" % (self.name, msg))
 
     def _get(self, row, col):
         try:
@@ -44,8 +47,8 @@ class WorkbookImporter:
             return None
 
     def _open(self):
-       self.sheet = xlrd.open_workbook(
-            filename=None, file_contents=self.file_to_import.read()).sheet_by_index(0)
+        self.sheet = xlrd.open_workbook(
+             filename=None, file_contents=self.file_to_import.read()).sheet_by_index(0)
 
     def _rows(self):
         """
@@ -53,6 +56,6 @@ class WorkbookImporter:
         in the first cell
         """
         row = 1
-        while self._get(row, col) is not None:
+        while self._get(row, 0) is not None:
             yield row
             row += 1
