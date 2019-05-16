@@ -1,8 +1,7 @@
 from collections import defaultdict
 from django.db.models import Q
 
-from mittab.apps.tab.models import Round, Debater, Team, Bye, \
-        NoShow, TabSettings
+from mittab.apps.tab.models import Round, Bye, NoShow, TabSettings
 from mittab.libs.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
@@ -66,8 +65,11 @@ def num_govs(team):
     return Round.objects.filter(gov_team=team).count()
 
 
-def had_bye(team):
-    return Bye.objects.filter(bye_team=team).exists()
+def had_bye(team, round_number=None):
+    if round_number is None:
+        return Bye.objects.filter(bye_team=team).exists()
+    else:
+        return Bye.objects.filter(bye_team=team, round_number=round_number).exists()
 
 
 ##############
@@ -77,12 +79,10 @@ def had_bye(team):
 
 @cache()
 def tot_wins(team):
-    tot_wins = Round.objects.filter(
+    normal_wins = Round.objects.filter(
         Q(gov_team=team, victor=Round.GOV)
         | Q(opp_team=team, victor=Round.OPP)).count()
-    tot_wins += num_byes(team)
-    tot_wins += num_forfeit_wins(team)
-    return tot_wins
+    return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
 
 ################
@@ -92,9 +92,7 @@ def tot_wins(team):
 
 @cache()
 def tot_speaks(team):
-    tot_speaks = sum(
-        [tot_speaks_deb(deb, False) for deb in team.debaters.all()])
-    return tot_speaks
+    return sum([tot_speaks_deb(deb, False) for deb in team.debaters.all()])
 
 
 @cache()
@@ -118,8 +116,7 @@ def double_adjusted_speaks(team):
 
 @cache()
 def tot_ranks(team):
-    tot_ranks = sum([tot_ranks_deb(deb, False) for deb in team.debaters.all()])
-    return tot_ranks
+    return sum([tot_ranks_deb(deb, False) for deb in team.debaters.all()])
 
 
 @cache()
@@ -163,8 +160,9 @@ def opp_strength(team):
         return 0.0
 
 
-""" Debater-related Logic """
-""" Debater Speaks"""
+###################
+# Debater speaks: #
+###################
 
 
 @cache()
@@ -206,7 +204,7 @@ def avg_deb_speaks(debater):
         return float(sum(real_speaks)) / float(len(real_speaks))
 
 
-def debater_forfeit_speaks(debater):
+def debater_forfeit_speaks(_debater):
     """ Calculate a debater's speaks for a forfeit round
 
     Note that right now we just return 0, but we may want to add support
@@ -291,10 +289,9 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
-    if had_bye or (had_noshow and had_noshow.first().lenient_late):
+    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
@@ -319,9 +316,9 @@ def tot_speaks_deb(debater, average_ironmen=True):
     return sum(debater_speaks)
 
 
-#################################
-""" Debater Rank Calculations """
-#################################
+##################
+# Debater ranks: #
+##################
 
 
 @cache()
@@ -434,10 +431,9 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
-    if had_bye or (had_noshow and had_noshow.first().lenient_late):
+    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS
@@ -463,5 +459,5 @@ def tot_ranks_deb(debater, average_ironmen=True):
     return sum(debater_ranks)
 
 
-def deb_team(d):
-    return d.team_set.first()
+def deb_team(debater):
+    return debater.team_set.first()
