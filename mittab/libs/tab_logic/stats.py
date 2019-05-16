@@ -202,7 +202,6 @@ def debater_forfeit_speaks(debater):
     Note that right now we just return 0, but we may want to add support
     for returning average speaks or some such
     """
-
     return 0.0
 
 
@@ -455,7 +454,4 @@ def tot_ranks_deb(debater, average_ironmen=True):
 
 
 def deb_team(d):
-    try:
-        return d.team_set.all()[0]
-    except:
-        return None
+    return d.team_set.first()
