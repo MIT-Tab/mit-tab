@@ -44,7 +44,7 @@ def view_team(request, team_id):
         stats.append(("Opps", tab_logic.num_opps(team)))
         stats.append(("Avg. Opp Wins", tab_logic.opp_strength(team)))
         stats.append(("Been Pullup", tab_logic.pull_up_count(team)))
-        stats.append(("Hit Pullup", tab_logic.hit_pull_up_count(team)))
+        stats.append(("Hit Pullup", tab_logic.hit_pull_up(team)))
     except Team.DoesNotExist:
         return redirect_and_flash_error(request, "Team not found")
     if request.method == 'POST':

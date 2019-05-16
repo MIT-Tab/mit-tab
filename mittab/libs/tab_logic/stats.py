@@ -1,112 +1,99 @@
 from collections import defaultdict
 from django.db.models import Q
 
-from mittab.apps.tab.models import Round, Debater, Team, Bye, \
-        NoShow, TabSettings
+from mittab.apps.tab.models import Round, Bye, NoShow, TabSettings
 from mittab.libs.cache_logic import cache
-
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
 
-""" Team-related logic"""
 
-""" General team info """
+##############################
+# General team calculations: #
+##############################
 
-def num_byes(t):
-    return Bye.objects.filter(bye_team=t).count()
+
+def num_byes(team):
+    return Bye.objects.filter(bye_team=team).count()
+
 
 def num_forfeit_wins(team):
     return Round.objects.filter(
-            Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)|
-            Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)|
-            Q(gov_team=team, victor=Round.ALL_WIN)|
-            Q(opp_team=team, victor=Round.ALL_WIN)).count()
+        Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)
+        | Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)
+        | Q(gov_team=team, victor=Round.ALL_WIN)
+        | Q(opp_team=team, victor=Round.ALL_WIN)).count()
 
-def won_by_forfeit(r, t):
-    if Round.objects.filter(gov_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    elif Round.objects.filter(opp_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
+
+def won_by_forfeit(round_obj, team):
+    if round_obj.opp_team != team and round_obj.gov_team != team:
+        return False
+    elif round_obj.victor == Round.ALL_WIN:
+        return True
+    elif round_obj.victor == Round.GOV_VIA_FORFEIT:
+        return round_obj.gov_team == team
+    elif round_obj.victor == Round.OPP_VIA_FORFEIT:
+        return round_obj.opp_team == team
     return False
 
-def forfeited_round(r, t):
-    if Round.objects.filter(gov_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
-    elif Round.objects.filter(opp_team = t, round_number = r.round_number).count() > 0:
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
+
+def forfeited_round(round_obj, team):
+    if round_obj.opp_team != team and round_obj.gov_team != team:
+        return False
+    elif round_obj.victor == Round.GOV_VIA_FORFEIT:
+        return round_obj.opp_team == team
+    elif round_obj.victor == Round.OPP_VIA_FORFEIT:
+        return round_obj.gov_team == team
     return False
 
-def hit_pull_up(t):
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.OPP:
-            return True
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.GOV:
-            return True
-    return False
 
-def hit_pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    return pullups
+def hit_pull_up(team):
+    return Round.objects.filter(gov_team=team, pullup=Round.OPP).exists() or \
+            Round.objects.filter(opp_team=team, pullup=Round.GOV).exists()
 
-def pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team = t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team = t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    return pullups
 
-def num_opps(t):
-    return Round.objects.filter(opp_team=t).count()
+def pull_up_count(team):
+    return Round.objects.filter(gov_team=team, pullup=Round.GOV).exists() + \
+            Round.objects.filter(opp_team=team, pullup=Round.OPP).exists()
 
-def num_govs(t):
-    return Round.objects.filter(gov_team=t).count()
 
-def had_bye(t):
-    return Bye.objects.filter(bye_team=t).exists()
+def num_opps(team):
+    return Round.objects.filter(opp_team=team).count()
 
-""" Team Wins """
-@cache()
-def team_wins_by_forfeit():
-    wins_by_forfeit = []
-    for r in Round.objects.filter(victor = Round.GOV_VIA_FORFEIT):
-        wins_by_forfeit.append(r.gov_team)
-    for r in Round.objects.filter(victor = Round.OPP_VIA_FORFEIT):
-        wins_by_forfeit.append(r.opp_team)
-    for r in Round.objects.filter(victor = Round.ALL_WIN):
-        wins_by_forfeit.append(r.gov_team)
-        wins_by_forfeit.append(r.opp_team)
-    return list(set(wins_by_forfeit))
+
+def num_govs(team):
+    return Round.objects.filter(gov_team=team).count()
+
+
+def had_bye(team, round_number=None):
+    if round_number is None:
+        return Bye.objects.filter(bye_team=team).exists()
+    else:
+        return Bye.objects.filter(bye_team=team, round_number=round_number).exists()
+
+
+##############
+# Team wins: #
+##############
+
 
 @cache()
 def tot_wins(team):
-    tot_wins = Round.objects.filter(
-            Q(gov_team=team, victor=Round.GOV)|
-            Q(opp_team=team, victor=Round.OPP)).count()
-    tot_wins += num_byes(team) 
-    tot_wins += num_forfeit_wins(team)
-    return tot_wins
+    normal_wins = Round.objects.filter(
+        Q(gov_team=team, victor=Round.GOV)
+        | Q(opp_team=team, victor=Round.OPP)).count()
+    return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
-""" Team Speaks """
+
+################
+# Team speaks: #
+################
+
+
 @cache()
 def tot_speaks(team):
-    tot_speaks = sum([tot_speaks_deb(deb, False)
-                      for deb in team.debaters.all()])
-    return tot_speaks
+    return sum([tot_speaks_deb(deb, False) for deb in team.debaters.all()])
+
 
 @cache()
 def single_adjusted_speaks(team):
@@ -114,18 +101,23 @@ def single_adjusted_speaks(team):
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[1:-1])
 
+
 @cache()
 def double_adjusted_speaks(team):
     speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[2:-2])
 
-""" Team Ranks """
+
+###############
+# Team ranks: #
+###############
+
+
 @cache()
 def tot_ranks(team):
-    tot_ranks = sum([tot_ranks_deb(deb, False)
-                     for deb in team.debaters.all()])    
-    return tot_ranks
+    return sum([tot_ranks_deb(deb, False) for deb in team.debaters.all()])
+
 
 @cache()
 def single_adjusted_ranks(team):
@@ -133,30 +125,33 @@ def single_adjusted_ranks(team):
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[1:-1])
 
+
 @cache()
 def double_adjusted_ranks(team):
     ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
+
 @cache()
-def opp_strength(t):
+def opp_strength(team):
     """
     Average number of wins per opponent
 
-    Tracks opp strength while minimizing the effect that byes have on a team's opp strength
+    Tracks opp strength while minimizing the effect that byes have on a team's
+    opp strength
     """
     opponent_count = 0
     opponent_wins = 0
 
-    gov_rounds = Round.objects.filter(gov_team = t)
-    opp_rounds = Round.objects.filter(opp_team = t)
+    gov_rounds = Round.objects.filter(gov_team=team)
+    opp_rounds = Round.objects.filter(opp_team=team)
 
-    for r in gov_rounds:
-        opponent_wins += tot_wins(r.opp_team)
+    for round_obj in gov_rounds:
+        opponent_wins += tot_wins(round_obj.opp_team)
         opponent_count += 1
-    for r in opp_rounds:
-        opponent_wins += tot_wins(r.gov_team)
+    for round_obj in opp_rounds:
+        opponent_wins += tot_wins(round_obj.gov_team)
         opponent_count += 1
 
     if opponent_count > 0:
@@ -165,10 +160,11 @@ def opp_strength(t):
         return 0.0
 
 
-""" Debater-related Logic """
+###################
+# Debater speaks: #
+###################
 
 
-""" Debater Speaks"""
 @cache()
 def avg_deb_speaks(debater):
     """ Computes the average debater speaks for the supplied debater
@@ -181,7 +177,7 @@ def avg_deb_speaks(debater):
     may want forfeits to count as average speaks.
     """
     real_speaks = []
-    num_speaks = TabSettings.objects.get(key = 'cur_round').value - 1
+    num_speaks = TabSettings.objects.get(key='cur_round').value - 1
     debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
@@ -197,25 +193,25 @@ def avg_deb_speaks(debater):
             speaks = [float(rs.speaks) for rs in roundstats]
             avg_speaks = sum(speaks) / float(len(roundstats))
             roundstat = roundstats[0]
-            if (won_by_forfeit(roundstat.round, team) or
-                forfeited_round(roundstat.round, team)):
+            if (won_by_forfeit(roundstat.round, team)
+                    or forfeited_round(roundstat.round, team)):
                 continue
             real_speaks.append(avg_speaks)
 
-    if len(real_speaks) == 0:
+    if not real_speaks:
         return 0
     else:
         return float(sum(real_speaks)) / float(len(real_speaks))
 
 
-def debater_forfeit_speaks(debater):
+def debater_forfeit_speaks(_debater):
     """ Calculate a debater's speaks for a forfeit round
 
     Note that right now we just return 0, but we may want to add support
     for returning average speaks or some such
     """
-
     return 0.0
+
 
 @cache()
 def speaks_for_debater(debater, average_ironmen=True):
@@ -280,6 +276,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     debater_speaks = list(map(float, debater_speaks))
     return debater_speaks
 
+
 def debater_abnormal_round_speaks(debater, round_number):
     """
     Calculate the ranks for a bye/forfeit round
@@ -292,22 +289,25 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number, bye_team=team)
-    had_noshow = NoShow.objects.filter(round_number=round_number, no_show_team=team)
-    if had_bye or (had_noshow and had_noshow.first().lenient_late):
+    had_noshow = NoShow.objects.filter(round_number=round_number,
+                                       no_show_team=team)
+    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
+
 
 def single_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
     debater_speaks.sort()
     return sum(debater_speaks[1:-1])
 
+
 def double_adjusted_speaks_deb(debater):
     debater_speaks = speaks_for_debater(debater)
     debater_speaks.sort()
     return sum(debater_speaks[2:-2])
+
 
 @cache()
 def tot_speaks_deb(debater, average_ironmen=True):
@@ -315,9 +315,11 @@ def tot_speaks_deb(debater, average_ironmen=True):
     debater_speaks = speaks_for_debater(debater, average_ironmen)
     return sum(debater_speaks)
 
-#################################
-""" Debater Rank Calculations """
-#################################
+
+##################
+# Debater ranks: #
+##################
+
 
 @cache()
 def avg_deb_ranks(debater):
@@ -331,7 +333,7 @@ def avg_deb_ranks(debater):
     forfeits to count as average ranks.
     """
     real_ranks = []
-    num_ranks = TabSettings.objects.get(key = 'cur_round').value - 1
+    num_ranks = TabSettings.objects.get(key='cur_round').value - 1
     debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
@@ -347,15 +349,16 @@ def avg_deb_ranks(debater):
             ranks = [float(rs.ranks) for rs in roundstats]
             avg_ranks = sum(ranks) / float(len(roundstats))
             roundstat = roundstats[0]
-            if (won_by_forfeit(roundstat.round, team) or
-                forfeited_round(roundstat.round, team)):
+            if (won_by_forfeit(roundstat.round, team)
+                    or forfeited_round(roundstat.round, team)):
                 continue
             real_ranks.append(avg_ranks)
 
-    if len(real_ranks) == 0:
+    if not real_ranks:
         return 0
     else:
         return float(sum(real_ranks)) / float(len(real_ranks))
+
 
 @cache()
 def ranks_for_debater(debater, average_ironmen=True):
@@ -414,6 +417,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     debater_ranks = list(map(float, debater_ranks))
     return debater_ranks
 
+
 @cache()
 def debater_abnormal_round_ranks(debater, round_number):
     """
@@ -427,14 +431,13 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = deb_team(debater)
-    had_bye = Bye.objects.filter(round_number=round_number,
-                                    bye_team=team)
     had_noshow = NoShow.objects.filter(round_number=round_number,
-                                        no_show_team=team)
-    if had_bye or (had_noshow and had_noshow.first().lenient_late):
+                                       no_show_team=team)
+    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS
+
 
 @cache()
 def single_adjusted_ranks_deb(debater):
@@ -442,19 +445,19 @@ def single_adjusted_ranks_deb(debater):
     debater_ranks.sort()
     return sum(debater_ranks[1:-1])
 
+
 @cache()
 def double_adjusted_ranks_deb(debater):
     debater_ranks = ranks_for_debater(debater)
     debater_ranks.sort()
     return sum(debater_ranks[2:-2])
 
+
 @cache()
 def tot_ranks_deb(debater, average_ironmen=True):
     debater_ranks = ranks_for_debater(debater, average_ironmen=average_ironmen)
     return sum(debater_ranks)
 
-def deb_team(d):
-    try:
-        return d.team_set.all()[0]
-    except:
-        return None
+
+def deb_team(debater):
+    return debater.team_set.first()

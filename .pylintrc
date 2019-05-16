@@ -142,6 +142,7 @@ disable=print-statement,
         missing-docstring,
         broad-except,
         R,
+        wildcard-import,       # should add back eventually, after everything else is good
         unused-wildcard-import # should add back eventually, after everything else is good
 
  # Enable the message, report, category or checker with the given id(s). You can
