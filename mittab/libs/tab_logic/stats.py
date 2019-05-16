@@ -226,7 +226,7 @@ def avg_deb_speaks(debater):
                 continue
             real_speaks.append(avg_speaks)
 
-    if len(real_speaks) == 0:
+    if not real_speaks:
         return 0
     else:
         return float(sum(real_speaks)) / float(len(real_speaks))
@@ -384,7 +384,7 @@ def avg_deb_ranks(debater):
                 continue
             real_ranks.append(avg_ranks)
 
-    if len(real_ranks) == 0:
+    if not real_ranks:
         return 0
     else:
         return float(sum(real_ranks)) / float(len(real_ranks))
