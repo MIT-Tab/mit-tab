@@ -1,6 +1,6 @@
 from functools import total_ordering
 
-from mittab.apps.tab.models import Debater
+from mittab.apps.tab.models import Debater, Team
 from mittab.libs.tab_logic.stats import *
 
 
