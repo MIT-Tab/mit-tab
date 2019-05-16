@@ -7,8 +7,11 @@ from mittab.libs.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
-""" Team-related logic"""
-""" General team info """
+"""
+Team-related logic
+
+General team info
+"""
 
 
 def num_byes(team):
@@ -132,7 +135,8 @@ def opp_strength(team):
     """
     Average number of wins per opponent
 
-    Tracks opp strength while minimizing the effect that byes have on a team's opp strength
+    Tracks opp strength while minimizing the effect that byes have on a team's
+    opp strength
     """
     opponent_count = 0
     opponent_wins = 0
