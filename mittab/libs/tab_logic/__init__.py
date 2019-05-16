@@ -257,7 +257,7 @@ def have_properly_entered_data(round_to_check):
             if had_bye(team, last_round):
                 raise errors.ByeAssignmentError(
                     "{} both had a bye and debated last round".format(team))
-            if had_no:
+            if had_noshow:
                 raise errors.NoShowAssignmentError(
                     "{} both debated and had a no show".format(team))
 
