@@ -11,8 +11,8 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 """ General team info """
 
 
-def num_byes(t):
-    return Bye.objects.filter(bye_team=t).count()
+def num_byes(team):
+    return Bye.objects.filter(bye_team=team).count()
 
 
 def num_forfeit_wins(team):
@@ -23,26 +23,25 @@ def num_forfeit_wins(team):
         | Q(opp_team=team, victor=Round.ALL_WIN)).count()
 
 
-def won_by_forfeit(r, t):
-    if Round.objects.filter(gov_team=t, round_number=r.round_number).exists():
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
-    elif Round.objects.filter(opp_team=t,
-                              round_number=r.round_number).exists():
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_WIN:
-            return True
+def won_by_forfeit(round_obj, team):
+    if round_obj.opp_team != team and round_obj.gov_team != team:
+        return False
+    elif round_obj.victor == Round.ALL_WIN:
+        return True
+    elif round_obj.victor == Round.GOV_VIA_FORFEIT:
+        return round_obj.gov_team == team
+    elif round_obj.victor == Round.OPP_VIA_FORFEIT:
+        return round_obj.opp_team == team
     return False
 
 
 def forfeited_round(r, t):
-    if Round.objects.filter(gov_team=t,
-                            round_number=r.round_number).count() > 0:
-        if r.victor == Round.OPP_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
-    elif Round.objects.filter(opp_team=t,
-                              round_number=r.round_number).count() > 0:
-        if r.victor == Round.GOV_VIA_FORFEIT or r.victor == Round.ALL_DROP:
-            return True
+    if round_obj.opp_team != team and round_obj.gov_team != team:
+        return False
+    elif round_obj.victor == Round.GOV_VIA_FORFEIT:
+        return round_obj.opp_team == team
+    elif round_obj.victor == Round.OPP_VIA_FORFEIT:
+        return round_obj.gov_team == team
     return False
 
 
