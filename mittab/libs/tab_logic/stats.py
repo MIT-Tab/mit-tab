@@ -50,6 +50,11 @@ def hit_pull_up(team):
             Round.objects.filter(opp_team=team, pullup=Round.GOV).exists()
 
 
+def pull_up_count(team):
+    return Round.objects.filter(gov_team=team, pullup=Round.GOV).exists() + \
+            Round.objects.filter(opp_team=team, pullup=Round.OPP).exists()
+
+
 def num_opps(team):
     return Round.objects.filter(opp_team=team).count()
 
@@ -63,19 +68,6 @@ def had_bye(team):
 
 
 """ Team Wins """
-
-
-@cache()
-def team_wins_by_forfeit():
-    wins_by_forfeit = []
-    for r in Round.objects.filter(victor=Round.GOV_VIA_FORFEIT):
-        wins_by_forfeit.append(r.gov_team)
-    for r in Round.objects.filter(victor=Round.OPP_VIA_FORFEIT):
-        wins_by_forfeit.append(r.opp_team)
-    for r in Round.objects.filter(victor=Round.ALL_WIN):
-        wins_by_forfeit.append(r.gov_team)
-        wins_by_forfeit.append(r.opp_team)
-    return list(set(wins_by_forfeit))
 
 
 @cache()
@@ -136,7 +128,7 @@ def double_adjusted_ranks(team):
 
 
 @cache()
-def opp_strength(t):
+def opp_strength(team):
     """
     Average number of wins per opponent
 
@@ -145,14 +137,14 @@ def opp_strength(t):
     opponent_count = 0
     opponent_wins = 0
 
-    gov_rounds = Round.objects.filter(gov_team=t)
-    opp_rounds = Round.objects.filter(opp_team=t)
+    gov_rounds = Round.objects.filter(gov_team=team)
+    opp_rounds = Round.objects.filter(opp_team=team)
 
-    for r in gov_rounds:
-        opponent_wins += tot_wins(r.opp_team)
+    for round_obj in gov_rounds:
+        opponent_wins += tot_wins(round_obj.opp_team)
         opponent_count += 1
-    for r in opp_rounds:
-        opponent_wins += tot_wins(r.gov_team)
+    for round_obj in opp_rounds:
+        opponent_wins += tot_wins(round_obj.gov_team)
         opponent_count += 1
 
     if opponent_count > 0:
