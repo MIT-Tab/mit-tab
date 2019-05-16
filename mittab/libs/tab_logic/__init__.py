@@ -129,7 +129,7 @@ def pair_round():
                             pass
                         elif not found_bye:
                             bye = Bye(bye_team=list_of_teams[1][byeint],
-                                    round_number=current_round)
+                                      round_number=current_round)
                             bye.save()
                             list_of_teams[1].remove(list_of_teams[1][byeint])
                             found_bye = True
@@ -425,25 +425,21 @@ def perfect_pairing(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
                 weight = calc_weight(team1, team2, i, j,
-                                 list_of_teams[len(list_of_teams) - i - 1],
-                                 list_of_teams[len(list_of_teams) - j - 1],
-                                 len(list_of_teams) - i - 1,
-                                 len(list_of_teams) - j - 1)
+                                     list_of_teams[len(list_of_teams) - i - 1],
+                                     list_of_teams[len(list_of_teams) - j - 1],
+                                     len(list_of_teams) - i - 1,
+                                     len(list_of_teams) - j - 1)
                 graph_edges += [(i, j, weight)]
-    pairings_num = mwmatching.maxWeightMatching(graph_edges,
-                                                maxcardinality=True)
+    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):
-            if [list_of_teams[pairings_num.index(pair)], list_of_teams[pair]
-                ] not in all_pairs and [
-                    list_of_teams[pair],
-                    list_of_teams[pairings_num.index(pair)]
-                ] not in all_pairs:
-                all_pairs += [[
-                    list_of_teams[pairings_num.index(pair)],
-                    list_of_teams[pair]
-                ]]
+            team = list_of_teams[pair]
+            matched_team = list_of_teams[pairings_num.index(pair)]
+            pairing = set([team, matched_team])
+
+            if pairing not in all_pairs:
+                all_pairs.append(pairing)
     return determine_gov_opp(all_pairs)
 
 
