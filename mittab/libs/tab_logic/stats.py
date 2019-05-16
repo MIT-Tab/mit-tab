@@ -35,7 +35,7 @@ def won_by_forfeit(round_obj, team):
     return False
 
 
-def forfeited_round(r, t):
+def forfeited_round(round_obj, team):
     if round_obj.opp_team != team and round_obj.gov_team != team:
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
