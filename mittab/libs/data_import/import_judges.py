@@ -18,7 +18,7 @@ class JudgeImporter(WorkbookImporter):
     min_row_size = 2
     name = "Judge Importer"
 
-    def import_row(self, row):
+    def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]
 
@@ -38,7 +38,7 @@ class JudgeImporter(WorkbookImporter):
                 try:
                     self.create(school)
                 except:
-                    self.error("Invalid school '%s'" % school_name, row)
+                    self.error("Invalid school '%s'" % school_name, row_number)
             schools.append(str(school.id))
 
         data = {"name": judge_name, "rank": judge_rank, "schools": schools}
@@ -46,5 +46,6 @@ class JudgeImporter(WorkbookImporter):
         if form.is_valid():
             self.create(form)
         else:
-            for error_msg in form.errors.items():
-                self.error("%s - %s", (judge_name, error_msg), row)
+            for field, error_msgs in form.errors.items():
+                for error_msg in error_msgs:
+                    self.error("%s - %s" % (judge_name, error_msg), row_number)

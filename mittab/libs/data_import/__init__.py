@@ -60,8 +60,8 @@ class WorkbookImporter(ABC):
         if any(map(is_incorrect_size, self.workbook.rows())):
             self.error("Insuficient columns in sheet. No data read.")
         else:
-            for row in self.workbook.rows():
-                self.import_row(row)
+            for row_number, row in enumerate(self.workbook.rows()):
+                self.import_row(row, row_number)
             if self.errors:
                 self.rollback()
         return self.errors
@@ -75,11 +75,11 @@ class WorkbookImporter(ABC):
         return obj
 
     def rollback(self):
-        for obj in self.created_objs:
+        for obj in reversed(self.created_objs):
             obj.delete()
 
-    def error(self, msg, row=None):
-        if row is not None:
-            self.errors.append("%s row %d: %s" % (self.name, row, msg))
+    def error(self, msg, row_number=None):
+        if row_number is not None:
+            self.errors.append("%s row %d: %s" % (self.name, row_number + 1, msg))
         else:
             self.errors.append("%s: %s" % (self.name, msg))
