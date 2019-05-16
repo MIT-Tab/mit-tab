@@ -117,24 +117,23 @@ def pair_round():
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
                     byeint = len(list_of_teams[bracket]) - 1
-                    b = Bye(bye_team=list_of_teams[bracket][byeint],
-                            round_number=current_round)
-                    b.save()
-                    list_of_teams[bracket].remove(
-                        list_of_teams[bracket][byeint])
+                    bye = Bye(bye_team=list_of_teams[bracket][byeint],
+                              round_number=current_round)
+                    bye.save()
+                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
                 elif bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
                     for byeint in range(len(list_of_teams[1]) - 1, -1, -1):
                         if had_bye(list_of_teams[1][byeint]):
                             pass
-                        elif found_bye == False:
-                            b = Bye(bye_team=list_of_teams[1][byeint],
+                        elif not found_bye:
+                            bye = Bye(bye_team=list_of_teams[1][byeint],
                                     round_number=current_round)
-                            b.save()
+                            bye.save()
                             list_of_teams[1].remove(list_of_teams[1][byeint])
                             found_bye = True
-                    if found_bye == False:
+                    if not found_bye:
                         raise errors.NotEnoughTeamsError()
                 else:
                     pull_up = None
@@ -170,17 +169,17 @@ def pair_round():
                     # sort again by speaks making sure to leave any first
                     # round bye in the correct spot
                     removed_teams = []
-                    for t in list(Team.objects.filter(checked_in=True)):
+                    for team in list(Team.objects.filter(checked_in=True)):
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
-                        if t in middle_of_bracket and tot_wins(t) == bracket:
-                            removed_teams += [t]
-                            list_of_teams[bracket].remove(t)
+                        if team in middle_of_bracket and tot_wins(team) == bracket:
+                            removed_teams += [team]
+                            list_of_teams[bracket].remove(team)
                     list_of_teams[bracket] = rank_teams_except_record(
-                        list_of_teams[bracket])
-                    for t in removed_teams:
+                            list_of_teams[bracket])
+                    for team in removed_teams:
                         list_of_teams[bracket].insert(
-                            len(list_of_teams[bracket]) // 2, t)
+                            len(list_of_teams[bracket]) // 2, team)
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
@@ -314,9 +313,9 @@ def highest_seed(team1, team2):
 
 
 # Check if two teams have hit before
-def hit_before(t1, t2):
-    return Round.objects.filter(gov_team=t1, opp_team=t2).exists() or \
-            Round.objects.filter(gov_team=t2, opp_team=t1).exists()
+def hit_before(team1, team2):
+    return Round.objects.filter(gov_team=team1, opp_team=team2).exists() or \
+            Round.objects.filter(gov_team=team2, opp_team=team1).exists()
 
 
 def middle_of_bracket_teams():
@@ -364,9 +363,9 @@ def team_comp(pairing, round_number):
 
 
 def team_score_except_record(team):
-    ts = TeamScore(team)
-    ts.wins = 0
-    return ts.scoring_tuple()
+    team_score = TeamScore(team)
+    team_score.wins = 0
+    return team_score.scoring_tuple()
 
 
 def rank_teams_except_record(teams):
@@ -519,17 +518,21 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
 
 def determine_gov_opp(all_pairs):
     final_pairings = []
-    for p in all_pairs:
-        if num_govs(p[0]) < num_govs(p[1]):  #p[0] should be gov
-            final_pairings += [[p[0], p[1]]]
-        elif num_govs(p[1]) < num_govs(p[0]):  #p[1] should be gov
-            final_pairings += [[p[1], p[0]]]
-        elif num_opps(p[0]) < num_opps(p[1]):  #p[1] should be gov
-            final_pairings += [[p[1], p[0]]]
-        elif num_opps(p[1]) < num_opps(p[0]):  #p[0] should be gov
-            final_pairings += [[p[0], p[1]]]
+    for team1, team2 in all_pairs:
+        if num_govs(team1) < num_govs(team2):
+            # team1 should be gov
+            final_pairings += [[team1, team2]]
+        elif num_govs(team2) < num_govs(team1):
+            # team2 should be gov
+            final_pairings += [[team2, team1]]
+        elif num_opps(team1) < num_opps(team2):
+            # team2 should be gov
+            final_pairings += [[team2, team1]]
+        elif num_opps(team2) < num_opps(team1):
+            # team1 should be gov
+            final_pairings += [[team1, team2]]
         elif random.randint(0, 1) == 0:
-            final_pairings += [[p[0], p[1]]]
+            final_pairings += [[team1, team2]]
         else:
-            final_pairings += [[p[1], p[0]]]
+            final_pairings += [[team2, team1]]
     return final_pairings
