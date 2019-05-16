@@ -8,7 +8,7 @@ import xlrd
 
 def import_judges(file_to_import):
     try:
-        return JudgeImporter(file_to_import).errors
+        return JudgeImporter(file_to_import).import_data().errors
     except Exception:
         return ["Judges file is not a valid .xlsx file"]
 
