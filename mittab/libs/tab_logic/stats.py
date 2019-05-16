@@ -7,11 +7,11 @@ from mittab.libs.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
-"""
-Team-related logic
 
-General team info
-"""
+
+##############################
+# General team calculations: #
+##############################
 
 
 def num_byes(team):
@@ -70,7 +70,9 @@ def had_bye(team):
     return Bye.objects.filter(bye_team=team).exists()
 
 
-""" Team Wins """
+##############
+# Team wins: #
+##############
 
 
 @cache()
@@ -83,7 +85,9 @@ def tot_wins(team):
     return tot_wins
 
 
-""" Team Speaks """
+################
+# Team speaks: #
+################
 
 
 @cache()
@@ -107,7 +111,9 @@ def double_adjusted_speaks(team):
     return sum(speaks[2:-2])
 
 
-""" Team Ranks """
+###############
+# Team ranks: #
+###############
 
 
 @cache()
