@@ -1,5 +1,3 @@
-from typing import Optional, List
-
 import xlrd
 
 
@@ -14,7 +12,7 @@ class WorkbookImporter:
         self.errors = []
         self.created_objs = []
 
-    def import_data(self) -> List[str]:
+    def import_data(self):
         is_incorrect_size = lambda row: self._get(row - 1, self.min_row_size) is None
         if any(is_incorrect_size, self._rows()):
             self.error("Insuficient columns in sheet. No data read.")
@@ -33,13 +31,13 @@ class WorkbookImporter:
         for obj in self.created_objs:
             obj.delete()
 
-    def error(self, msg : str, row : Optional[Int] = None):
+    def error(self, msg, row):
         if row is not None:
             self.errors.append("%s row %d: %s" % (self.name, row, msg))
         else:
             self.errors.append("%s row %d: %s" % (self.name, msg))
 
-    def _get(self, row : int, col : int) -> Optional[str]:
+    def _get(self, row, col):
         try:
             return str(self.sheet.cell(row, col).value)
         except IndexError:
