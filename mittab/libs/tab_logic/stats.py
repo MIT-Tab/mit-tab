@@ -45,48 +45,21 @@ def forfeited_round(round_obj, team):
     return False
 
 
-def hit_pull_up(t):
-    for a in list(Round.objects.filter(gov_team=t)):
-        if a.pullup == Round.OPP:
-            return True
-    for a in list(Round.objects.filter(opp_team=t)):
-        if a.pullup == Round.GOV:
-            return True
-    return False
+def hit_pull_up(team):
+    return Round.objects.filter(gov_team=team, pullup=Round.OPP).exists() or \
+            Round.objects.filter(opp_team=team, pullup=Round.GOV).exists()
 
 
-def hit_pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team=t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team=t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    return pullups
+def num_opps(team):
+    return Round.objects.filter(opp_team=team).count()
 
 
-def pull_up_count(t):
-    pullups = 0
-    for a in list(Round.objects.filter(gov_team=t)):
-        if a.pullup == Round.GOV:
-            pullups += 1
-    for a in list(Round.objects.filter(opp_team=t)):
-        if a.pullup == Round.OPP:
-            pullups += 1
-    return pullups
+def num_govs(team):
+    return Round.objects.filter(gov_team=team).count()
 
 
-def num_opps(t):
-    return Round.objects.filter(opp_team=t).count()
-
-
-def num_govs(t):
-    return Round.objects.filter(gov_team=t).count()
-
-
-def had_bye(t):
-    return Bye.objects.filter(bye_team=t).exists()
+def had_bye(team):
+    return Bye.objects.filter(bye_team=team).exists()
 
 
 """ Team Wins """
