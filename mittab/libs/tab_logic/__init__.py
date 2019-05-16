@@ -227,7 +227,6 @@ def pair_round():
 
 
 def have_enough_judges(round_to_check):
-    last_round = round_to_check - 1
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
     num_judges = CheckIn.objects.filter(round_number=round_to_check).count()
     if num_judges < future_rounds:
@@ -235,7 +234,7 @@ def have_enough_judges(round_to_check):
     return True, (num_judges, future_rounds)
 
 
-def have_enough_rooms(round_to_check):
+def have_enough_rooms(_round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
     num_rooms = Room.objects.filter(rank__gt=0).count()
     if num_rooms < future_rounds:
@@ -253,16 +252,16 @@ def have_properly_entered_data(round_to_check):
         # Both teams should not have byes or noshows
         gov_team, opp_team = prev_round.gov_team, prev_round.opp_team
         for team in gov_team, opp_team:
-            had_bye = Bye.objects.filter(bye_team=team,
-                                         round_number=last_round)
-            had_noshow = NoShow.objects.filter(no_show_team=team,
-                                               round_number=last_round)
-            if had_bye:
+            had_bye_last_round = Bye.objects.filter(bye_team=team,
+                                                    round_number=last_round)
+            had_noshow_last_round = NoShow.objects.filter(no_show_team=team,
+                                                          round_number=last_round)
+            if had_bye_last_round:
                 raise errors.ByeAssignmentError(
-                    "{0} both had a bye and debated last round".format(team))
-            if had_noshow:
+                    "{} both had a bye and debated last round".format(team))
+            if had_noshow_last_round:
                 raise errors.NoShowAssignmentError(
-                    "{0} both debated and had a no show".format(team))
+                    "{} both debated and had a no show".format(team))
 
 
 def validate_round_data(round_to_check):
@@ -339,17 +338,6 @@ def middle_of_bracket_teams():
             teams.append(team)
     random.shuffle(teams)
     return teams
-
-
-# Return a list of all teams who have no varsity members
-def all_nov_teams():
-    return list(
-        Team.objects.exclude(debaters__novice_status__exact=Debater.VARSITY))
-
-
-# Return a list of all teams in the Database
-def all_teams():
-    return list(Team.objects.all())
 
 
 def team_comp(pairing, round_number):
