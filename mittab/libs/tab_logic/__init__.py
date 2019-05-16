@@ -176,7 +176,7 @@ def pair_round():
                             removed_teams += [team]
                             list_of_teams[bracket].remove(team)
                     list_of_teams[bracket] = rank_teams_except_record(
-                            list_of_teams[bracket])
+                        list_of_teams[bracket])
                     for team in removed_teams:
                         list_of_teams[bracket].insert(
                             len(list_of_teams[bracket]) // 2, team)
@@ -445,7 +445,7 @@ def perfect_pairing(list_of_teams):
 
 def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
                 team_a_opt_ind, team_b_opt_ind):
-    """ 
+    """
     Calculate the penalty for a given pairing
 
     Args:
@@ -475,7 +475,7 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
             abs(team_b_opt.seed - team_a.seed)) / 2.0
     else:
         weight = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) +
-                                       abs(team_b_opt_ind - team_a_ind)) / 2.0
+                                           abs(team_b_opt_ind - team_a_ind)) / 2.0
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
