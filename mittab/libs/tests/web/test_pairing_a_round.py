@@ -1,3 +1,5 @@
+import time
+
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
@@ -16,6 +18,7 @@ class PairingARoundTestCase(BaseWebTestCase):
         self.browser.find_by_value("Pair This Round").first.click()
 
         self._setup_confirm()
+        time.sleep(30)
         self.browser.find_by_id("assign-judges").first.click()
         self._accept_confirm()
 
