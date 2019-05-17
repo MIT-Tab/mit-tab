@@ -1,3 +1,4 @@
+# pylint: skip-file
 """
 Taken from http://jorisvr.nl/maximummatching.html
 
