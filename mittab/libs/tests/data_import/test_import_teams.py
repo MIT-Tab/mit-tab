@@ -74,4 +74,4 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
         assert len(errors) == 1
         assert errors[0] == "Team Importer row 2: John - Debater with this" \
-                "Name already exists."
+                " Name already exists."
