@@ -7,14 +7,13 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 
 def import_judges(file_to_import):
     try:
-        workbook = Workbook(file_to_import)
+        workbook = Workbook(file_to_import, 2)
     except InvalidWorkbookException:
         return ["Judges file is not a valid .xlsx file"]
     return JudgeImporter(workbook).import_data()
 
 
 class JudgeImporter(WorkbookImporter):
-    min_row_size = 2
     name = "Judge Importer"
 
     def import_row(self, row, row_number):

@@ -5,14 +5,13 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 
 def import_teams(file_to_import):
     try:
-        workbook = Workbook(file_to_import)
+        workbook = Workbook(file_to_import, 8)
     except InvalidWorkbookException:
         return ["Teams file is not a valid .xlsx file"]
     return TeamImporter(workbook).import_data()
 
 
 class TeamImporter(WorkbookImporter):
-    min_row_size = 8
     name = "Team Importer"
     novice_values = ["n", "nov", "novice"]
     full_seed_values = ["full", "full seed"]
@@ -36,9 +35,8 @@ class TeamImporter(WorkbookImporter):
 
         hybrid_school_name = row[2]
         hybrid_school = None
-        if hybrid_school_name != "":
-            hybrid_school_query = School.objects.filter(
-                name__iexact=school_name)
+        if hybrid_school_name:
+            hybrid_school_query = School.objects.filter(name__iexact=hybrid_school_name)
             if hybrid_school_query.exists():
                 hybrid_school = hybrid_school_query.first()
             else:
@@ -66,14 +64,14 @@ class TeamImporter(WorkbookImporter):
             return
 
         deb1_name = row[4]
-        deb1_status = row[5]
-        if deb1_status == "novice" or deb1_status == "nov" or deb1_status == "n":
+        deb1_status = row[5].strip().lower()
+        if deb1_status in self.novice_values:
             deb1_status = Debater.NOVICE
         else:
             deb1_status = Debater.VARSITY
 
         deb2_name = row[6]
-        deb2_status = row[7]
+        deb2_status = row[7].strip().lower()
         if deb2_status in self.novice_values:
             deb2_status = Debater.NOVICE
         else:
@@ -106,8 +104,8 @@ class TeamImporter(WorkbookImporter):
         team_form = TeamForm(
             data={
                 "name": team_name,
-                "school": team_school.id,
-                "hybrid_school": hybrid_school.id,
+                "school": school.id,
+                "hybrid_school": hybrid_school and hybrid_school.id,
                 "debaters": [deb1_form.instance.id, deb2_form.instance.id],
                 "seed": team_seed
             })

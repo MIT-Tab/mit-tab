@@ -70,3 +70,20 @@ class TestImportingJudges(TestCase):
         assert len(errors) == 1
         assert errors[0] == "Judge Importer row 2: Judge 2 - Ensure that there are no" \
                 " more than 2 digits before the decimal point."
+
+    def test_schools_not_rolledback_if_existed_before(self):
+        school = School(name="NU")
+        school.save()
+
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 1
+
+        data = [["Judge 1", "10000", "NU"]]
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 1
+        assert len(errors) == 1
+        assert errors[0] == "Judge Importer row 1: Judge 1 - Ensure that there are" \
+                " no more than 4 digits in total."

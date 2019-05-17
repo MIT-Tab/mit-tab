@@ -13,7 +13,8 @@ class Workbook:
     A wrapper for an xlsx file, so that we can mock it in tests
     """
 
-    def __init__(self, file_to_import):
+    def __init__(self, file_to_import, min_rows):
+        self.min_rows = min_rows
         try:
             self.sheet = xlrd.open_workbook(
                 filename=None,
@@ -35,8 +36,8 @@ class Workbook:
         while self.get(row, 0) is not None:
             col = 0
             row_data = []
-            while self.get(row, col) is not None:
-                row_data.append(self.get(row, col))
+            while self.get(row, col) is not None or col < self.min_rows:
+                row_data.append(self.get(row, col) or "")
                 col += 1
             yield row_data
             row += 1
@@ -56,14 +57,10 @@ class WorkbookImporter(ABC):
         pass
 
     def import_data(self):
-        is_incorrect_size = lambda row: len(row) < self.min_row_size is None
-        if any(map(is_incorrect_size, self.workbook.rows())):
-            self.error("Insuficient columns in sheet. No data read.")
-        else:
-            for row_number, row in enumerate(self.workbook.rows()):
-                self.import_row(row, row_number)
-            if self.errors:
-                self.rollback()
+        for row_number, row in enumerate(self.workbook.rows()):
+            self.import_row(row, row_number)
+        if self.errors:
+            self.rollback()
         return self.errors
 
     def create(self, obj):
