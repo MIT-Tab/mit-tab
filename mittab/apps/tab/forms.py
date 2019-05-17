@@ -20,6 +20,7 @@ class UploadDataForm(forms.Form):
     team_file = forms.FileField(label="Teams Data File", required=False)
     judge_file = forms.FileField(label="Judge Data File", required=False)
     room_file = forms.FileField(label="Room Data File", required=False)
+    scratch_file = forms.FileField(label="Scratch Data File", required=False)
 
 
 class SchoolForm(forms.ModelForm):

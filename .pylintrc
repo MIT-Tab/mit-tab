@@ -28,7 +28,7 @@ limit-inference-results=100
 
  # List of plugins (as comma separated values of python modules names) to load,
 # usually to register additional checkers.
-load-plugins=pylint_django
+load-plugins=pylint_django,pylint_quotes
 
  # Pickle collected data for later comparisons.
 persistent=yes
@@ -43,6 +43,10 @@ suggestion-mode=yes
  # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
 unsafe-load-any-extension=no
+
+string-quote=double
+triple-quote=double
+docstring-quote=double
 
 
 [MESSAGES CONTROL]

@@ -11,7 +11,8 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from django.db import models
 from mittab.apps.tab.models import *
 from mittab.libs.tab_logic import TabFlags
-from mittab.libs.data_import import import_judges, import_rooms, import_teams
+from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
+        import_scratches
 
 def index(request):
     number_teams = Team.objects.count()
@@ -219,26 +220,33 @@ def view_scratches(request):
                               'item_list':c_scratches})
 
 def upload_data(request):
+    team_info = { 'errors': [], 'uploaded': False }
+    judge_info = { 'errors': [], 'uploaded': False }
+    room_info = { 'errors': [], 'uploaded': False }
+    scratch_info = { 'errors': [], 'uploaded': False }
+
     if request.method == 'POST':
-      form = UploadDataForm(request.POST, request.FILES)
-      if form.is_valid():
-        errors = []
+        form = UploadDataForm(request.POST, request.FILES)
+        if form.is_valid():
+            if 'team_file' in request.FILES:
+                team_info['errors'] = import_teams.import_teams(request.FILES['team_file'])
+                team_info['uploaded'] = True
+            if 'judge_file' in request.FILES:
+                judge_info['errors'] = import_judges.import_judges(request.FILES['judge_file'])
+                judge_info['uploaded'] = True
+            if 'room_file' in request.FILES:
+                room_info['errors'] = import_rooms.import_rooms(request.FILES['room_file'])
+                room_info['uploaded'] = True
+            if 'scratch_file' in request.FILES:
+                scratch_info['errors'] = import_scratches.import_scratches(request.FILES['scratch_file'])
+                scratch_info['uploaded'] = True
 
-        if 'team_file' in request.FILES:
-            team_errors = import_teams.import_teams(request.FILES['team_file'])
-            errors += team_errors
-        if 'judge_file' in request.FILES:
-            judge_errors = import_judges.import_judges(request.FILES['judge_file'])
-            errors += judge_errors
-        if 'room_file' in request.FILES:
-            room_errors = import_rooms.import_rooms(request.FILES['room_file'])
-            errors += room_errors
-
-        if not errors:
+        if not team_info['errors'] + judge_info['errors'] + \
+                room_info['errors'] + scratch_info['errors']:
             return redirect_and_flash_success(request, "Data imported successfully")
-        else:
-            for e in errors: messages.error(request, e)
     else:
-      form = UploadDataForm()
-    return render(request, 'common/data_entry.html',
-                              {'form': form, 'title': 'Upload Input Files'})
+        form = UploadDataForm()
+    return render(request, 'common/data_upload.html',
+            {'form': form, 'title': 'Upload Input Files',
+                'team_info': team_info, 'judge_info': judge_info,
+                'room_info': room_info, 'scratch_info': scratch_info})

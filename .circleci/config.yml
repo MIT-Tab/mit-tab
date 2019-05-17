@@ -35,8 +35,11 @@ jobs:
           command: |
             . venv/bin/activate
             ./bin/setup password > /dev/null 2>&1
-            pytest --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db mittab/
+            pytest --junitxml=test-reports/junit.xml --cov=mittab --cov-report xml:cov.xml --circleci-parallelize --reuse-db mittab/
           no_output_timeout: 20m
+
+      - store_test_results:
+          path: test-reports
 
       - store_artifacts:
           path: test-reports
@@ -68,6 +71,7 @@ jobs:
             . venv/bin/activate
             pylint mittab/libs/tests
             pylint mittab/libs/tab_logic
+            pylint mittab/libs/data_import
       - run:
           name: Lint -- JS
           command: npm run lint

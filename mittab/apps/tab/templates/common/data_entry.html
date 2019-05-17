@@ -1,6 +1,4 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
-{% load tags %}
 
 {% block title %}Data Entry{% endblock %}
 
@@ -8,21 +6,7 @@
 
 {% block content %}
 <div class="col-md-6">
-  {{ form.media }}
-  <form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">{% csrf_token %}
-    {% bootstrap_form form exclude='file,team_file,judge_file,room_file' %}
-
-    {% for field in form %}
-      {% if field|is_file_field %}
-        {% include "common/_file_field.html" %}
-      {% endif %}
-    {% endfor %}
-
-    {% csrf_token %}
-    {% buttons %}
-      <input type="submit" value="Save" class="btn btn-primary"/>
-    {% endbuttons %}
-  </form>
+  {% include "common/_form.html" %}
 </div>
 
 {% if team_obj %}
@@ -33,7 +17,7 @@
     <table class="table table-striped">
       <thead><th>Stat</th><th>Value</th></thead>
       {% for stat,val in team_stats %}
-          <tr><td>{{stat}}</td><td>{{val}}</td></tr>
+        <tr><td>{{stat}}</td><td>{{val}}</td></tr>
       {% endfor %}
     </table>
     <a href='/team/card/{{ team_obj.id }}/pretty/' class="btn btn-link">View Tab Card</a>
