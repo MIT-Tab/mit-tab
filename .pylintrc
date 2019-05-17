@@ -44,6 +44,10 @@ suggestion-mode=yes
 # active Python interpreter and may run arbitrary code.
 unsafe-load-any-extension=no
 
+string-quote=double
+triple-quote=double
+docstring-quote=double
+
 
 [MESSAGES CONTROL]
 
