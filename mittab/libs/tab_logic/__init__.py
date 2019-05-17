@@ -120,7 +120,8 @@ def pair_round():
                     bye = Bye(bye_team=list_of_teams[bracket][byeint],
                               round_number=current_round)
                     bye.save()
-                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
+                    list_of_teams[bracket].remove(
+                        list_of_teams[bracket][byeint])
                 elif bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
@@ -172,7 +173,8 @@ def pair_round():
                     for team in list(Team.objects.filter(checked_in=True)):
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
-                        if team in middle_of_bracket and tot_wins(team) == bracket:
+                        if team in middle_of_bracket and tot_wins(
+                                team) == bracket:
                             removed_teams += [team]
                             list_of_teams[bracket].remove(team)
                     list_of_teams[bracket] = rank_teams_except_record(
@@ -428,7 +430,8 @@ def perfect_pairing(list_of_teams):
                                      len(list_of_teams) - i - 1,
                                      len(list_of_teams) - j - 1)
                 graph_edges += [(i, j, weight)]
-    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    pairings_num = mwmatching.maxWeightMatching(graph_edges,
+                                                maxcardinality=True)
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):
@@ -472,8 +475,9 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
             abs(team_a_opt.seed - team_b.seed) +
             abs(team_b_opt.seed - team_a.seed)) / 2.0
     else:
-        weight = power_pairing_multiple * (abs(team_a_opt_ind - team_b_ind) +
-                                           abs(team_b_opt_ind - team_a_ind)) / 2.0
+        weight = power_pairing_multiple * (
+            abs(team_a_opt_ind - team_b_ind) +
+            abs(team_b_opt_ind - team_a_ind)) / 2.0
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:

@@ -5,7 +5,8 @@ import random
 
 CACHE_TIMEOUT = 20
 
-def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
+
+def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
     """
         Cache the result of a function call for the specified number of seconds, 
         using Django's caching mechanism.
@@ -19,21 +20,30 @@ def cache(seconds = CACHE_TIMEOUT, stampede = CACHE_TIMEOUT):
             ....
             return expensiveResult
     """
+
     def do_cache(f):
         def x(*args, **kwargs):
-            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)).encode("utf-8")).hexdigest()
+            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args,
+                                      kwargs)).encode("utf-8")).hexdigest()
             result = _djcache.get(key)
             if result is None:
                 #print "busting cache"
                 result = f(*args, **kwargs)
-                _djcache.set(key, result, random.randint(seconds, seconds+stampede))
+                _djcache.set(key, result,
+                             random.randint(seconds, seconds + stampede))
             return result
+
         return x
+
     return do_cache
 
+
 def invalidate(f):
-    key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)).encode("utf-8")).hexdigest()
+    key = sha1((
+        "%s%s%s%s" %
+        (f.__module__, f.__name__, args, kwargs)).encode("utf-8")).hexdigest()
     _djcache.delete(key)
+
 
 def clear_cache():
     _djcache.clear()
