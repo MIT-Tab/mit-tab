@@ -102,7 +102,7 @@ def add_judges(pairings, judges, panel_points):
             def sort_key(r):
                 team_comp_result = tab_logic.team_comp(r, current_round_number)
                 return (argmin(r.judges.all(), lambda j: j.rank).rank,) + \
-                        tuple([-1 * i for i in team_comp_result]))
+                        tuple([-1 * i for i in team_comp_result])
 
 
             rounds = sorted(potential_pairings, key=sort_key)
