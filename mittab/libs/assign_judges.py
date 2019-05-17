@@ -36,7 +36,7 @@ def add_judges(pairings, judges, panel_points):
     random.seed(1337)
     random.shuffle(judges)
 
-    # Order the judges and pairings by power ranking (high speaking teams get high ranked judges)
+    # Order the judges and pairings by power ranking
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
     pairings.sort(key=lambda x: tab_logic.team_comp(x, current_round_number),
                   reverse=True)
@@ -68,7 +68,8 @@ def add_judges(pairings, judges, panel_points):
                                                     and len(graph_edges) == 0):
             if len(graph_edges) == 0:
                 raise errors.JudgeAssignmentError(
-                    "Impossible to assign judges, consider reducing your gaps if you are making panels, otherwise find some more judges."
+                    "Impossible to assign judges, consider reducing your gaps if you"
+                    " are making panels, otherwise find some more judges."
                 )
             elif -1 in judge_assignments[:num_rounds]:
                 pairing_list = judge_assignments[:len(pairings)]
@@ -98,11 +99,13 @@ def add_judges(pairings, judges, panel_points):
                 print("Failed to panel")
                 return {}
 
+            def sort_key(r):
+                team_comp_result = tab_logic.team_comp(r, current_round_number)
+                return (argmin(r.judges.all(), lambda j: j.rank).rank,) + \
+                        tuple([-1 * i for i in team_comp_result]))
 
-            rounds = sorted(potential_pairings,
-                            key=lambda r: (argmin(r.judges.all(),
-                                           lambda j: j.rank).rank,) + \
-                                           tuple([-1 * i for i in tab_logic.team_comp(r, current_round_number)]))
+
+            rounds = sorted(potential_pairings, key=sort_key)
             base_judge = argmax(
                 rounds[:num_to_panel][-1].judges.all(), lambda j: j.rank)
             print("Found maximally ranked judge {0}".format(base_judge))
