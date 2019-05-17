@@ -5,8 +5,8 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 def import_rooms(file_to_import):
     try:
         workbook = Workbook(file_to_import, 2)
-    except:
-        return ["Room file is not a valid .xslx file"]
+    except InvalidWorkbookException:
+        return ["Rooms file is not a valid .xslx file"]
     return RoomImporter(workbook).import_data()
 
 

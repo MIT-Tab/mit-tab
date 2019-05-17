@@ -1,35 +1,53 @@
-from mittab.apps.tab.models import *
-import xlrd
-from xlwt import Workbook
+from mittab.apps.tab.models import Team, Judge, Scratch
+from mittab.apps.tab.forms import ScratchForm
+from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
 
 
-def import_scratches(fileToImport):
-    sh = xlrd.open_workbook(fileToImport).sheet_by_index(0)
-    num_scratches = 0
-    found_end = False
-    scratch_errors = []
-    while found_end == False:
-        try:
-            sh.cell(num_scratches, 0).value
-            num_scratches += 1
-        except IndexError:
-            found_end = True
-    for i in range(1, num_scratches):
-        try:
-            team_name = sh.cell(i, 0).value
-            t = Team.objects.get(name=team_name)
-            judge_name = sh.cell(i, 1).value
-            j = Judge.objects.get(name=judge_name)
-            s_type = sh.cell(i, 2).value.lower()
-            if s_type == "team scratch" or s_type == "team":
-                s_type = 0
-            elif s_type == "tab scratch" or s_type == "tab":
-                s_type = 1
-            s = Scratch(judge=j, team=t, scratch_type=s_type)
-            try:
-                s.save()
-            except:
-                scratch_errors.append[[j, t]]
-        except Exception as e:
-            print(e)
-    return scratch_errors
+def import_scratches(file_to_import):
+    try:
+        workbook = Workbook(file_to_import, 2)
+    except InvalidWorkbookException:
+        return ["Scratches file is not a valid .xlsx file"]
+    return ScratchImporter(workbook).import_data()
+
+
+class ImportScratches(WorkbookImporter):
+    name = "Scratch Importer"
+    team_scratch_values = ["team scratch", "team"]
+    tab_scratch_values = ["tab scratch", "tab"]
+
+    def import_row(self, row, row_number):
+        team_name = row[0]
+        judge_name = row[1]
+        scratch_type = row[2]
+
+        got_error = False
+        if not Team.objects.filter(name=team_name).exists():
+            self.error("Team '%s' does not exist" % team_name, row_number)
+            both_exist = True
+        if not Judge.objects.filter(name=judge_name).exists():
+            self.error("Judge '%s' does not exist" % judge_name, row_number)
+            both_exist = True
+
+        if scratch_type.strip().lower() in self.team_scratch_values:
+            scratch_type = Scratch.TEAM_SCRATCH
+        elif scratch_type.strip().lower() in self.tab_scratch_values:
+            scratch_type = Scratch.TAB_SCRATCH
+        else:
+            self.error("'%s' is not a valid scratch type" % scratch_type,
+                       row_number)
+
+        scratch_form = ScratchForm(
+            data={
+                "scratch_type": scratch_type,
+                "team": Team.objects.get(name=team_name).id,
+                "judge": Judge.objects.get(name=judge_name).id
+            })
+        if scratch_form.is_valid():
+            self.create(scratch_form)
+        else:
+            for _field, error_msgs in form.errors.items():
+                for error_msg in error_msgs:
+                    self.error(
+                        "%s x %s - %s" % (team_name, judge_name, error_msg),
+                        row_number)

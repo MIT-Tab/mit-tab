@@ -1,5 +1,3 @@
-from decimal import *
-
 from mittab.apps.tab.models import School
 from mittab.apps.tab.forms import JudgeForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
