@@ -44,6 +44,6 @@ class JudgeImporter(WorkbookImporter):
         if form.is_valid():
             self.create(form)
         else:
-            for field, error_msgs in form.errors.items():
+            for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
                     self.error("%s - %s" % (judge_name, error_msg), row_number)

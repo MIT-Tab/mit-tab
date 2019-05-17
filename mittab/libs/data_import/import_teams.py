@@ -84,7 +84,7 @@ class TeamImporter(WorkbookImporter):
         if deb1_form.is_valid():
             self.create(deb1_form)
         else:
-            for field, error_msgs in deb1_form.errors.items():
+            for _field, error_msgs in deb1_form.errors.items():
                 for error_msg in error_msgs:
                     self.error("%s - %s" % (deb1_name, error_msg), row_number)
             return
@@ -96,7 +96,7 @@ class TeamImporter(WorkbookImporter):
         if deb2_form.is_valid():
             self.create(deb2_form)
         else:
-            for field, error_msgs in deb2_form.errors.items():
+            for _field, error_msgs in deb2_form.errors.items():
                 for error_msg in error_msgs:
                     self.error("%s - %s" % (deb2_name, error_msg), row_number)
             return
@@ -113,7 +113,7 @@ class TeamImporter(WorkbookImporter):
         if team_form.is_valid():
             self.create(team_form)
         else:
-            for field, error_msgs in team_form.errors.items():
+            for _field, error_msgs in team_form.errors.items():
                 for error_msg in error_msgs:
                     self.error("%s - %s" % (deb2_name, error_msg), row_number)
             return
