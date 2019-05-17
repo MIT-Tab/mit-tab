@@ -52,8 +52,7 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
         assert len(errors) == 1
-        assert errors[
-            0] == "Judge Importer row 3: Judge 1 - Judge with this Name already exists."
+        assert errors[0] == "Row 3: Judge 1 - Judge with this Name already exists."
 
     def test_rollback_from_invalid_rank(self):
         assert Judge.objects.count() == 0
@@ -68,7 +67,7 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Judge Importer row 2: Judge 2 - Ensure that there are no" \
+        assert errors[0] == "Row 2: Judge 2 - Ensure that there are no" \
                 " more than 2 digits before the decimal point."
 
     def test_schools_not_rolledback_if_existed_before(self):
@@ -85,5 +84,5 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 1
         assert len(errors) == 1
-        assert errors[0] == "Judge Importer row 1: Judge 1 - Ensure that there are" \
+        assert errors[0] == "Row 1: Judge 1 - Ensure that there are" \
                 " no more than 4 digits in total."

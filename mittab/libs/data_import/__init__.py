@@ -45,7 +45,6 @@ class Workbook:
 
 class WorkbookImporter(ABC):
     min_row_size = 1
-    name = "Base Importer"
 
     def __init__(self, workbook):
         self.workbook = workbook
@@ -77,7 +76,6 @@ class WorkbookImporter(ABC):
 
     def error(self, msg, row_number=None):
         if row_number is not None:
-            self.errors.append("%s row %d: %s" %
-                               (self.name, row_number + 1, msg))
+            self.errors.append("Row %d: %s" % (row_number + 1, msg))
         else:
-            self.errors.append("%s: %s" % (self.name, msg))
+            self.errors.append(msg)

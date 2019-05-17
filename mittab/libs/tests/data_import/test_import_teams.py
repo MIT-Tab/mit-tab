@@ -73,8 +73,7 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Team Importer row 2: John - Debater with this" \
-                " Name already exists."
+        assert errors[0] == "Row 2: John - Debater with this Name already exists."
 
     def test_rollback_from_invalid_team(self):
         assert Team.objects.count() == 0
@@ -91,7 +90,7 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Team Importer row 2: Invalid seed value for team Team 2"
+        assert errors[0] == "Row 2: Invalid seed value for team Team 2"
 
     def test_schools_not_rolledback_if_existed_before(self):
         school = School(name="NU")
@@ -110,4 +109,4 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 1
         assert School.objects.first().name == "NU"
         assert len(errors) == 1
-        assert errors[0] == "Team Importer row 1: Invalid seed value for team Team 1"
+        assert errors[0] == "Row 1: Invalid seed value for team Team 1"

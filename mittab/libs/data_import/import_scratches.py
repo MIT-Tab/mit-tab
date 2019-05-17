@@ -12,7 +12,6 @@ def import_scratches(file_to_import):
 
 
 class ScratchImporter(WorkbookImporter):
-    name = "Scratch Importer"
     team_scratch_values = ["team scratch", "team"]
     tab_scratch_values = ["tab scratch", "tab"]
 

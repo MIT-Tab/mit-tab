@@ -12,7 +12,6 @@ def import_teams(file_to_import):
 
 
 class TeamImporter(WorkbookImporter):
-    name = "Team Importer"
     novice_values = ["n", "nov", "novice"]
     full_seed_values = ["full", "full seed"]
     half_seed_values = ["half", "half seed"]
