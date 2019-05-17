@@ -238,7 +238,7 @@ def upload_data(request):
                 room_info['errors'] = import_rooms.import_rooms(request.FILES['room_file'])
                 room_info['uploaded'] = True
             if 'scratch_file' in request.FILES:
-                scratch_info['errors'] = import_scratches.import_scratches(request.FILES['scratch_files'])
+                scratch_info['errors'] = import_scratches.import_scratches(request.FILES['scratch_file'])
                 scratch_info['uploaded'] = True
 
         if not team_info['errors'] + judge_info['errors'] + \

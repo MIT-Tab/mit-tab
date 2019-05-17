@@ -5,7 +5,7 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 
 def import_scratches(file_to_import):
     try:
-        workbook = Workbook(file_to_import, 2)
+        workbook = Workbook(file_to_import, 3)
     except InvalidWorkbookException:
         return ["Scratches file is not a valid .xlsx file"]
     return ScratchImporter(workbook).import_data()
