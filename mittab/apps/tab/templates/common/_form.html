@@ -1,0 +1,18 @@
+{% load bootstrap4 %}
+{% load tags %}
+
+{{ form.media }}
+<form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">{% csrf_token %}
+  {% bootstrap_form form exclude='file,team_file,judge_file,room_file,scratch_file' %}
+
+  {% for field in form %}
+    {% if field|is_file_field %}
+      {% include "common/_file_field.html" %}
+    {% endif %}
+  {% endfor %}
+
+  {% csrf_token %}
+  {% buttons %}
+    <input type="submit" value="Save" class="btn btn-primary"/>
+  {% endbuttons %}
+</form>
