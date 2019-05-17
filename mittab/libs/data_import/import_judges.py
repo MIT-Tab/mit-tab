@@ -1,9 +1,8 @@
+from decimal import *
+
 from mittab.apps.tab.models import School
 from mittab.apps.tab.forms import JudgeForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
-
-from decimal import *
-import xlrd
 
 
 def import_judges(file_to_import):
@@ -11,7 +10,7 @@ def import_judges(file_to_import):
         workbook = Workbook(file_to_import)
     except InvalidWorkbookException:
         return ["Judges file is not a valid .xlsx file"]
-    return JudgeImporter(workbook).import_data().errors
+    return JudgeImporter(workbook).import_data()
 
 
 class JudgeImporter(WorkbookImporter):
@@ -39,7 +38,7 @@ class JudgeImporter(WorkbookImporter):
                     self.create(school)
                 except:
                     self.error("Invalid school '%s'" % school_name, row_number)
-            schools.append(str(school.id))
+            schools.append(school.id)
 
         data = {"name": judge_name, "rank": judge_rank, "schools": schools}
         form = JudgeForm(data=data)
