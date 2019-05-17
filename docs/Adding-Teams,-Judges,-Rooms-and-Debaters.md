@@ -18,7 +18,10 @@ Then, you should see a page where you can add a file for judges, rooms and teams
 
 ![](img/data_import.png)
 
-You can upload xlsx files through this page to import data in bulk.
+You can upload xlsx files through this page to import data in bulk. When there is an
+error in the format of the xlsx files, all changes generated from the file are aborted,
+even if some were valid, so that you can simply re-upload a corrected version of the
+file
 
 **NOTE:** The files _must_ be `.xlsx` files. Not `.xls`, `.csv`, or anything
 similar
@@ -37,7 +40,7 @@ Here is the format of the .xlsx file:
 ```eval_rst
 +-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
 | Name* | School*                  | Hybrid School         | Seed              | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
-|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          | (leave blank for iron-person) | (“N” or blank)          |  |
+|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          |                               | (“N” or blank)          |  |
 |       | protection they take)    | whose protection they | “Free”, or empty) |                 |                         |                               |                         |  |
 |       |                          | don't take, otherwise |                   |                 |                         |                               |                         |  |
 |       |                          | leave empty)          |                   |                 |                         |                               |                         |  |
@@ -64,6 +67,16 @@ Here is the format of the .xlsx file:
 +-------+------------------------+
 |       |                        |
 +-------+------------------------+
+```
+
+### Scratches
+
+```eval_rst
++------------+-------------+---------------------------------+--+
+| Team Name* | Judge Name* | Scratch Type ("tab" or "team")* |  |
++------------+-------------+---------------------------------+--+
+|            |             |                                 |  |
++------------+-------------+---------------------------------+--+
 ```
 
 Manual Data Entry
