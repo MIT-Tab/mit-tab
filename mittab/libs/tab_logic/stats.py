@@ -177,7 +177,7 @@ def avg_deb_speaks(debater):
     may want forfeits to count as average speaks.
     """
     real_speaks = []
-    num_speaks = TabSettings.objects.get(key='cur_round').value - 1
+    num_speaks = TabSettings.get("cur_round").value - 1
     debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 
@@ -236,7 +236,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     team = deb_team(debater)
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
-    num_speaks = TabSettings.objects.get(key="cur_round").value - 1
+    num_speaks = TabSettings.get("cur_round") - 1
 
     debater_roundstats = debater.roundstats_set.all()
     debater_speaks = []
@@ -333,7 +333,7 @@ def avg_deb_ranks(debater):
     forfeits to count as average ranks.
     """
     real_ranks = []
-    num_ranks = TabSettings.objects.get(key='cur_round').value - 1
+    num_ranks = TabSettings.get("cur_round") - 1
     debater_roundstats = debater.roundstats_set.all()
     team = deb_team(debater)
 

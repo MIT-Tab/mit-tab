@@ -7,13 +7,13 @@ from mittab.libs.tab_logic.stats import *
 def rank_speakers():
     return sorted([
         DebaterScore(d)
-        for d in Debater.objects.prefetch_related('team_set').all()
+        for d in Debater.objects.prefetch_related("team_set").all()
     ])
 
 
 def rank_teams():
     return sorted([
-        TeamScore(d) for d in Team.objects.prefetch_related('debaters').all()
+        TeamScore(d) for d in Team.objects.prefetch_related("debaters").all()
     ])
 
 

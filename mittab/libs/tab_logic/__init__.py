@@ -31,11 +31,11 @@ def pair_round():
     pairings are computed in the following format: [gov,opp,judge,room]
     and then saved immediately into the database
     """
-    current_round = TabSettings.get('cur_round')
+    current_round = TabSettings.get("cur_round")
     validate_round_data(current_round)
 
     # Set released to false so we don't show pairings
-    TabSettings.set('pairing_released', 0)
+    TabSettings.set("pairing_released", 0)
 
     # Need a reproduceable random pairing order
     random.seed(0xBEEF)
@@ -50,7 +50,7 @@ def pair_round():
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for team in forfeit_teams:
-        lenient_late = TabSettings.get('lenient_late', 0) >= current_round
+        lenient_late = TabSettings.get("lenient_late", 0) >= current_round
         no_show = NoShow(no_show_team=team,
                          round_number=current_round,
                          lenient_late=lenient_late)
@@ -62,7 +62,7 @@ def pair_round():
 
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
-            if TabSettings.get('fair_bye', 1) == 0:
+            if TabSettings.get("fair_bye", 1) == 0:
                 print("Bye: using only unseeded teams")
                 possible_teams = [
                     t for t in list_of_teams if t.seed < Team.HALF_SEED
@@ -332,7 +332,7 @@ def middle_of_bracket_teams():
         avg_speaks_rounds += NoShow.objects.filter(no_show_team=team,
                                                    lenient_late=True).count()
         avg_speaks_rounds += num_forfeit_wins(team)
-        if TabSettings.get('cur_round') - 1 == avg_speaks_rounds:
+        if TabSettings.get("cur_round") - 1 == avg_speaks_rounds:
             teams.append(team)
     random.shuffle(teams)
     return teams
