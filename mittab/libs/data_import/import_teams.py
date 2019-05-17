@@ -1,5 +1,5 @@
-from mittab.apps.tab.models import School, Team
-from mittab.apps.tab.forms import SchoolForm, DebaterForm, TeamForm
+from mittab.apps.tab.models import School, Team, Debater
+from mittab.apps.tab.forms import DebaterForm, TeamForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
 
 
@@ -30,13 +30,13 @@ class TeamImporter(WorkbookImporter):
             school = School(name=school_name)
             try:
                 self.create(school)
-            except:
+            except Exception:
                 self.error("Invalid school '%s'" % school_name, row_number)
                 return
 
         hybrid_school_name = row[2]
         hybrid_school = None
-        if hybrid_school_name != '':
+        if hybrid_school_name != "":
             hybrid_school_query = School.objects.filter(
                 name__iexact=school_name)
             if hybrid_school_query.exists():
@@ -45,7 +45,7 @@ class TeamImporter(WorkbookImporter):
                 hybrid_school = School(name=hybrid_school_name)
                 try:
                     self.create(hybrid_school)
-                except:
+                except Exception:
                     self.error(
                         "Invalid hybrid school '%s'" % hybrid_school_name,
                         row_number)

@@ -69,4 +69,4 @@ class TestImportingJudges(TestCase):
         assert School.objects.count() == 0
         assert len(errors) == 1
         assert errors[0] == "Judge Importer row 2: Judge 2 - Ensure that there are no" \
-                "more than 2 digits before the decimal point."
+                " more than 2 digits before the decimal point."

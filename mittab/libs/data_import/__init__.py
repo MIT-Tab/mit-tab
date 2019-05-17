@@ -17,7 +17,7 @@ class Workbook:
         try:
             self.sheet = xlrd.open_workbook(
                 filename=None,
-                file_contents=self.file_to_import.read()).sheet_by_index(0)
+                file_contents=file_to_import.read()).sheet_by_index(0)
         except:
             raise InvalidWorkbookException("Could not open workbook")
 
@@ -52,7 +52,7 @@ class WorkbookImporter(ABC):
         self.created_objs = []
 
     @abstractmethod
-    def import_row(self, row):
+    def import_row(self, row, row_number):
         pass
 
     def import_data(self):
