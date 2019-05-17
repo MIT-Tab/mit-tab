@@ -16,8 +16,8 @@ class Workbook:
     def __init__(self, file_to_import):
         try:
             self.sheet = xlrd.open_workbook(
-                filename=None, file_contents=self.file_to_import.read()
-            ).sheet_by_index(0)
+                filename=None,
+                file_contents=self.file_to_import.read()).sheet_by_index(0)
         except:
             raise InvalidWorkbookException("Could not open workbook")
 
@@ -80,6 +80,7 @@ class WorkbookImporter(ABC):
 
     def error(self, msg, row_number=None):
         if row_number is not None:
-            self.errors.append("%s row %d: %s" % (self.name, row_number + 1, msg))
+            self.errors.append("%s row %d: %s" %
+                               (self.name, row_number + 1, msg))
         else:
             self.errors.append("%s: %s" % (self.name, msg))
