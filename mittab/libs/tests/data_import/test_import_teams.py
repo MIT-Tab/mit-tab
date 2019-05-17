@@ -15,7 +15,10 @@ class TestImportingTeams(TestCase):
 
         data = [["Team 1", "NU", "Deis", "full", "John", "", "Jane", "n"],
                 ["Team 2", "Harvard", "", "", "Alice", "", "Bob", ""],
-                ["Team 3", "Deis", "Harvard", "Half Seed ", "Carly", "Novice", "Dan", "Novice "]]
+                [
+                    "Team 3", "Deis", "Harvard", "Half Seed ", "Carly",
+                    "Novice", "Dan", "Novice "
+                ]]
 
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()
@@ -54,3 +57,21 @@ class TestImportingTeams(TestCase):
         debater_2 = team_3.debaters.get(name="Dan")
         assert debater_1.novice_status == Debater.NOVICE
         assert debater_2.novice_status == Debater.NOVICE
+
+    def test_rollback_from_duplicate_debater(self):
+        assert Team.objects.count() == 0
+        assert School.objects.count() == 0
+        assert Debater.objects.count() == 0
+
+        data = [["Team 1", "NU", "Deis", "full", "John", "", "Jane", "n"],
+                ["Team 2", "Harvard", "", "", "Alice", "", "John", ""]]
+
+        importer = TeamImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert Team.objects.count() == 0
+        assert School.objects.count() == 0
+        assert Debater.objects.count() == 0
+        assert len(errors) == 1
+        assert errors[0] == "Team Importer row 2: John - Debater with this" \
+                "Name already exists."
