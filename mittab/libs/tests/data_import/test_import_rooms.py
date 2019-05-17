@@ -11,9 +11,7 @@ class TestImportingJudges(TestCase):
     def test_valid_rooms(self):
         assert Room.objects.count() == 0
 
-        data = [["Room 1", "10.22"],
-                ["Room 2", "20"],
-                ["Room 3", "30.5"]]
+        data = [["Room 1", "10.22"], ["Room 2", "20"], ["Room 3", "30.5"]]
         importer = RoomImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -30,9 +28,7 @@ class TestImportingJudges(TestCase):
     def test_rollback_when_invalid_room(self):
         assert Room.objects.count() == 0
 
-        data = [["Room 1", "10.22"],
-                ["Room 2", "200000"],
-                ["Room 1", "30.5"]]
+        data = [["Room 1", "10.22"], ["Room 2", "200000"], ["Room 1", "30.5"]]
         importer = RoomImporter(MockWorkbook(data))
         errors = importer.import_data()
 

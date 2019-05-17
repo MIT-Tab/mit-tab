@@ -11,7 +11,6 @@ def import_rooms(file_to_import):
 
 
 class RoomImporter(WorkbookImporter):
-
     def import_row(self, row, row_number):
         room_name = row[0]
         room_rank = row[1]

@@ -73,7 +73,8 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Row 2: John - Debater with this Name already exists."
+        assert errors[
+            0] == "Row 2: John - Debater with this Name already exists."
 
     def test_rollback_from_invalid_team(self):
         assert Team.objects.count() == 0

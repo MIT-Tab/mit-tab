@@ -52,7 +52,8 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Row 3: Judge 1 - Judge with this Name already exists."
+        assert errors[
+            0] == "Row 3: Judge 1 - Judge with this Name already exists."
 
     def test_rollback_from_invalid_rank(self):
         assert Judge.objects.count() == 0

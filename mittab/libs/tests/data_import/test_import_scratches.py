@@ -13,12 +13,14 @@ class TestImportingScratches(TestCase):
         orig_judge_count = Judge.objects.count()
         orig_scratch_count = Scratch.objects.count()
 
-        assert not Scratch.objects.filter(team__name="AU Elle Woods",
-                                          judge__name="Adrienne Martinez",
-                                          scratch_type=Scratch.TEAM_SCRATCH).exists()
-        assert not Scratch.objects.filter(team__name="Bates Blouse",
-                                          judge__name="Christine Mercado",
-                                          scratch_type=Scratch.TAB_SCRATCH).exists()
+        assert not Scratch.objects.filter(
+            team__name="AU Elle Woods",
+            judge__name="Adrienne Martinez",
+            scratch_type=Scratch.TEAM_SCRATCH).exists()
+        assert not Scratch.objects.filter(
+            team__name="Bates Blouse",
+            judge__name="Christine Mercado",
+            scratch_type=Scratch.TAB_SCRATCH).exists()
 
         data = [["AU Elle Woods", "Adrienne Martinez", "team scratch"],
                 ["Bates Blouse", "Christine Mercado", "tab"]]
@@ -30,12 +32,14 @@ class TestImportingScratches(TestCase):
         assert Judge.objects.count() == orig_judge_count
         assert Team.objects.count() == orig_team_count
 
-        assert Scratch.objects.filter(team__name="AU Elle Woods",
-                                      judge__name="Adrienne Martinez",
-                                      scratch_type=Scratch.TEAM_SCRATCH).exists()
-        assert Scratch.objects.filter(team__name="Bates Blouse",
-                                      judge__name="Christine Mercado",
-                                      scratch_type=Scratch.TAB_SCRATCH).exists()
+        assert Scratch.objects.filter(
+            team__name="AU Elle Woods",
+            judge__name="Adrienne Martinez",
+            scratch_type=Scratch.TEAM_SCRATCH).exists()
+        assert Scratch.objects.filter(
+            team__name="Bates Blouse",
+            judge__name="Christine Mercado",
+            scratch_type=Scratch.TAB_SCRATCH).exists()
 
     def test_invalid_scratches(self):
         orig_team_count = Team.objects.count()

@@ -12,7 +12,6 @@ def import_judges(file_to_import):
 
 
 class JudgeImporter(WorkbookImporter):
-
     def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]

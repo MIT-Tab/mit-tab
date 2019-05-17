@@ -35,7 +35,8 @@ class TeamImporter(WorkbookImporter):
         hybrid_school_name = row[2]
         hybrid_school = None
         if hybrid_school_name:
-            hybrid_school_query = School.objects.filter(name__iexact=hybrid_school_name)
+            hybrid_school_query = School.objects.filter(
+                name__iexact=hybrid_school_name)
             if hybrid_school_query.exists():
                 hybrid_school = hybrid_school_query.first()
             else:
