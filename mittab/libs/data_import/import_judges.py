@@ -23,7 +23,6 @@ class JudgeImporter(WorkbookImporter):
         except ValueError:
             self.error("Judge rank is not a number", row)
 
-        col = 2
         schools = []
         for school_name in row[2:]:
             school_query = School.objects.filter(name__iexact=school_name)
@@ -33,7 +32,7 @@ class JudgeImporter(WorkbookImporter):
                 school = School(name=school_name)
                 try:
                     self.create(school)
-                except:
+                except Exception:
                     self.error("Invalid school '%s'" % school_name, row_number)
             schools.append(school.id)
 

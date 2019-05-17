@@ -20,13 +20,14 @@ class RoomImporter(WorkbookImporter):
         try:
             room_rank = float(room_rank)
         except ValueError:
-            self.error.append("Room %s has invalid rank '%s'" % (room_name, room_rank),
-                    row_number)
+            self.error(
+                "Room %s has invalid rank '%s'" % (room_name, room_rank),
+                row_number)
             return
 
-        room_form = RoomForm(data={"name": room_name, "rank": room_rank})
-        if room_form.is_valid():
-            self.create(room_form)
+        form = RoomForm(data={"name": room_name, "rank": room_rank})
+        if form.is_valid():
+            self.create(form)
         else:
             for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
