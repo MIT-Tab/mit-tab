@@ -43,7 +43,7 @@ class Command(BaseCommand):
             ) if rank <= 2 else losing_positions.pop()
 
             stat = RoundStats(debater=debater,
-                              round=r,
+                              round=round_obj,
                               speaks=speak,
                               ranks=rank,
                               debater_role=position)
