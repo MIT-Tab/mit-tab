@@ -1,10 +1,12 @@
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import Room
 from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_rooms import RoomImporter
 
 
+@pytest.mark.django_db
 class TestImportingJudges(TestCase):
     fixtures = ["testing_empty"]
 

@@ -1,11 +1,14 @@
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import Team, Judge, Scratch
 from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_scratches import ScratchImporter
 
 
+@pytest.mark.django_db
 class TestImportingScratches(TestCase):
+    pytestmark = pytest.mark.django_db
     fixtures = ["testing_db"]
 
     def test_valid_scratches(self):

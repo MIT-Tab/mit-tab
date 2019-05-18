@@ -1,11 +1,14 @@
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import School, Debater, Team
 from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_teams import TeamImporter
 
 
+@pytest.mark.django_db
 class TestImportingTeams(TestCase):
+    pytestmark = pytest.mark.django_db
     fixtures = ["testing_empty"]
 
     def test_valid_teams(self):

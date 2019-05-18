@@ -1,11 +1,14 @@
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import School, Judge
 from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_judges import JudgeImporter
 
 
+@pytest.mark.django_db
 class TestImportingJudges(TestCase):
+    pytestmark = pytest.mark.django_db
     fixtures = ["testing_empty"]
 
     def test_valid_judges(self):
