@@ -1,13 +1,17 @@
 import time
 
+import pytest
+
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
+@pytest.mark.django_db
 class PairingARoundTestCase(BaseWebTestCase):
     """
     Test pairing a round, assigning judges, and enterring ballots
     """
 
+    pytestmark = pytest.mark.django_db
     fixtures = ["testing_db"]
 
     def test_pairing_round(self):

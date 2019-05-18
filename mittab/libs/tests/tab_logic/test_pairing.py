@@ -1,6 +1,7 @@
 import random
 
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import CheckIn, Judge, TabSettings, Round
 from mittab.libs import assign_judges
@@ -8,12 +9,14 @@ from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
 
+@pytest.mark.django_db
 class TestPairingLogic(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
     """
 
     fixtures = ["testing_db"]
+    pytestmark = pytest.mark.django_db
 
     def pair_round(self):
         tab_logic.pair_round()

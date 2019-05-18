@@ -7,7 +7,6 @@ from mittab.libs.cache_logic import cache
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0
 
-
 ##############################
 # General team calculations: #
 ##############################
@@ -69,7 +68,8 @@ def had_bye(team, round_number=None):
     if round_number is None:
         return Bye.objects.filter(bye_team=team).exists()
     else:
-        return Bye.objects.filter(bye_team=team, round_number=round_number).exists()
+        return Bye.objects.filter(bye_team=team,
+                                  round_number=round_number).exists()
 
 
 ##############
@@ -291,7 +291,8 @@ def debater_abnormal_round_speaks(debater, round_number):
     team = deb_team(debater)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
-    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
+    if had_bye(team, round_number) or (had_noshow
+                                       and had_noshow.first().lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
@@ -433,7 +434,8 @@ def debater_abnormal_round_ranks(debater, round_number):
     team = deb_team(debater)
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
-    if had_bye(team, round_number) or (had_noshow and had_noshow.first().lenient_late):
+    if had_bye(team, round_number) or (had_noshow
+                                       and had_noshow.first().lenient_late):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS

@@ -1,4 +1,5 @@
 from django.test import TestCase
+import pytest
 
 from mittab.apps.tab.models import Debater, Team
 from mittab.libs.tests.assertion import assert_nearly_equal
@@ -7,11 +8,13 @@ from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tab_logic.rankings import TeamScore, DebaterScore
 
 
+@pytest.mark.django_db
 class TestRankingLogic(TestCase):
     """Tests that the methods related to debater and team scoring work as
     expected"""
 
     fixtures = ["testing_finished_db"]
+    pytestmark = pytest.mark.django_db
 
     def test_debater_score(self):
         """ Comprehensive test of ranking calculations, done on real world

@@ -1,12 +1,16 @@
+import pytest
+
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
+@pytest.mark.django_db
 class SettingUpATournamentTestCase(BaseWebTestCase):
     """
     Tests setting up a tournament by entering rooms, judges, schools, debaters,
     teams, and scratches through the web interface
     """
 
+    pytestmark = pytest.mark.django_db
     fixtures = ["testing_empty"]
 
     def test_tournament(self):

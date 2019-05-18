@@ -15,7 +15,6 @@ from django.contrib.auth.decorators import permission_required
 from django.db import transaction
 from django.shortcuts import redirect
 
-from mittab.apps.tab.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *

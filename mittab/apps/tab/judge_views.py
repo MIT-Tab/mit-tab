@@ -8,7 +8,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
 from django.db import models
-from mittab.apps.tab.errors import *
+from mittab.libs.errors import *
 from mittab.libs.tab_logic import TabFlags
 
 
