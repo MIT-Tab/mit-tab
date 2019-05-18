@@ -3,35 +3,34 @@ import shutil
 import sys
 import time
 
-from optparse import make_option
 from django.core.management import call_command
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from mittab.libs.backup import BACKUP_PREFIX
 from mittab.apps.tab.models import TabSettings
 
 
 class Command(BaseCommand):
-    help = 'Setup a new tounament and backup the last one'
+    help = "Setup a new tounament and backup the last one"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--tab-password',
-            dest='tab_password',
-            help='Password for the tab user',
-            nargs='?',
+            "--tab-password",
+            dest="tab_password",
+            help="Password for the tab user",
+            nargs="?",
             default=User.objects.make_random_password(length=8))
         parser.add_argument(
-            '--entry-password',
-            dest='entry_password',
-            help='Password for the entry user',
-            nargs='?',
+            "--entry-password",
+            dest="entry_password",
+            help="Password for the entry user",
+            nargs="?",
             default=User.objects.make_random_password(length=8))
-        parser.add_argument('backup_directory')
+        parser.add_argument("backup_directory")
 
     def handle(self, *args, **options):
-        backup_dir = options['backup_directory']
+        backup_dir = options["backup_directory"]
         path = BACKUP_PREFIX
 
         self.stdout.write(
@@ -70,8 +69,7 @@ class Command(BaseCommand):
         tab.is_admin = True
         tab.is_superuser = True
         tab.save()
-        entry = User.objects.create_user("entry", None,
-                                         options["entry_password"])
+        User.objects.create_user("entry", None, options["entry_password"])
 
         self.stdout.write("Setting default tab settings")
         TabSettings.set("tot_rounds", 5)
@@ -89,13 +87,14 @@ class Command(BaseCommand):
             sys.exit(1)
 
         self.stdout.write(
-            "Done setting up tournament, after backing up old one. New tournament information:"
+                "Done setting up tournament, after backing up old one. "
+                "New tournament information:"
         )
         self.stdout.write(
             "%s | %s" % ("Username".ljust(10, " "), "Password".ljust(10, " ")))
         self.stdout.write(
             "%s | %s" %
-            ("tab".ljust(10, " "), options['tab_password'].ljust(10, " ")))
+            ("tab".ljust(10, " "), options["tab_password"].ljust(10, " ")))
         self.stdout.write(
             "%s | %s" %
-            ("entry".ljust(10, " "), options['entry_password'].ljust(10, " ")))
+            ("entry".ljust(10, " "), options["entry_password"].ljust(10, " ")))
