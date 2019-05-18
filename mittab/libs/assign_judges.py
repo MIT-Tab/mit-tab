@@ -207,16 +207,16 @@ def calc_weight_panel(judges):
     return 1000000 * sum(judge_ranks) + sum_squares
 
 
-def judge_conflict(j, team1, team2):
-    return Scratch.objects.filter(judge=j, team=team1).exists() \
-            or had_judge(j, team1) \
-            or Scratch.objects.filter(judge=j, team=team2).exists() \
-            or had_judge(j, team2)
+def judge_conflict(judge, team1, team2):
+    return Scratch.objects.filter(judge=judge, team=team1).exists() \
+            or had_judge(judge, team1) \
+            or Scratch.objects.filter(judge=judge, team=team2).exists() \
+            or had_judge(judge, team2)
 
 
-def had_judge(j, t):
-    return Round.objects.filter(gov_team=t, judges=j).exists() \
-            or Round.objects.filter(opp_team=t, judges=j).exists()
+def had_judge(judge, team):
+    return Round.objects.filter(gov_team=team, judges=judge).exists() \
+            or Round.objects.filter(opp_team=team, judges=judge).exists()
 
 
 def can_judge_teams(list_of_judges, team1, team2):
