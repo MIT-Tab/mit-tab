@@ -64,9 +64,8 @@ def add_judges(pairings, judges, panel_points):
         judge_assignments = mwmatching.maxWeightMatching(graph_edges,
                                                          maxcardinality=True)
         # If there is no possible assignment of chairs, raise an error
-        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0
-                                                    and len(graph_edges) == 0):
-            if len(graph_edges) == 0:
+        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
+            if not graph_edges:
                 raise errors.JudgeAssignmentError(
                     "Impossible to assign judges, consider reducing your gaps if you"
                     " are making panels, otherwise find some more judges."
@@ -94,7 +93,7 @@ def add_judges(pairings, judges, panel_points):
         # Has built in logic to retry with lower number of panels if we fail due
         # to either scratches or wanting to many rounds
         def try_paneling(potential_pairings, all_judges, num_to_panel, gap):
-            if len(potential_pairings) == 0 or num_to_panel <= 0:
+            if not potential_pairings or num_to_panel <= 0:
                 # Base case, failed to panel
                 print("Failed to panel")
                 return {}
@@ -142,7 +141,7 @@ def add_judges(pairings, judges, panel_points):
                     graph_edges, maxcardinality=True)
                 print(judge_assignments)
                 if ((-1 in judge_assignments[:num_to_panel])
-                        or (num_to_panel > 0 and len(graph_edges) == 0)):
+                        or (num_to_panel > 0 and not graph_edges)):
                     print("Scratches are causing a retry")
                     return try_paneling(potential_pairings, all_judges,
                                         num_to_panel - 1, gap)
@@ -208,28 +207,16 @@ def calc_weight_panel(judges):
     return 1000000 * sum(judge_ranks) + sum_squares
 
 
-#return true if the judge is scratched from either team, false otherwise
 def judge_conflict(j, team1, team2):
-    if len(Scratch.objects.filter(judge=j).filter(
-            team=team1)) != 0 or had_judge(j, team1) == True:
-        #judge scratched from team one
-        return True
-    elif len(Scratch.objects.filter(judge=j).filter(
-            team=team2)) != 0 or had_judge(j, team2) == True:
-        #judge scratched from team two
-        return True
-    else:
-        return False
+    return Scratch.objects.filter(judge=j, team=team1).exists() \
+            or had_judge(j, team1) \
+            or Scratch.objects.filter(judge=j, team=team2).exists() \
+            or had_judge(j, team2)
 
 
-#returns true if team has had judge before, otherwise false
 def had_judge(j, t):
-    if Round.objects.filter(gov_team=t, judges=j).count() != 0:
-        return True
-    elif Round.objects.filter(opp_team=t, judges=j).count() != 0:
-        return True
-    else:
-        return False
+    return Round.objects.filter(gov_team=t, judges=j).exists() \
+            or Round.objects.filter(opp_team=t, judges=j).exists()
 
 
 def can_judge_teams(list_of_judges, team1, team2):
