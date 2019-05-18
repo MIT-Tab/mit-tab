@@ -19,7 +19,7 @@ class TabSettings(models.Model):
             return cls.objects.get(key=key).value
         else:
             if default is None:
-                raise e
+                raise ValueError("Invalid key '%s'" % key)
             return default
 
     @classmethod
@@ -38,7 +38,7 @@ class School(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         team_check = Team.objects.filter(school=self)
         judge_check = Judge.objects.filter(schools=self)
         if team_check.exists() or judge_check.exists():
@@ -46,7 +46,7 @@ class School(models.Model):
                 "School in use: [teams => %s,judges => %s]" %
                 ([t.name for t in team_check], [j.name for j in judge_check]))
         else:
-            super(School, self).delete()
+            super(School, self).delete(using, keep_parents)
 
 
 class Debater(models.Model):
@@ -60,9 +60,6 @@ class Debater(models.Model):
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
     def __str__(self):
-        return self.name
-
-    def __unicode__(self):
         return self.name
 
     def delete(self, *args, **kwargs):
@@ -97,11 +94,11 @@ class Team(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         scratches = Scratch.objects.filter(team=self)
         for scratch in scratches:
             scratch.delete()
-        super(Team, self).delete()
+        super(Team, self).delete(using, keep_parents)
 
 
 class Judge(models.Model):
@@ -113,7 +110,8 @@ class Judge(models.Model):
                                    null=True,
                                    unique=True)
 
-    def save(self, *args, **kwargs):
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
             haikunator = Haikunator()
@@ -124,7 +122,7 @@ class Judge(models.Model):
 
             self.ballot_code = code
 
-        super(Judge, self).save(*args, **kwargs)
+        super(Judge, self).save(force_insert, force_update, using, update_fields)
 
     def is_checked_in_for_round(self, round_number):
         return CheckIn.objects.filter(judge=self,
@@ -133,11 +131,11 @@ class Judge(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         checkins = CheckIn.objects.filter(judge=self)
         for checkin in checkins:
             checkin.delete()
-        super(Judge, self).delete()
+        super(Judge, self).delete(using, keep_parent)
 
 
 class Scratch(models.Model):
@@ -166,13 +164,12 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, using=None, keep_parents=False):
         rounds = Round.objects.filter(room=self)
-        if len(rounds) == 0:
-            super(Room, self).delete()
+        if rounds.exists():
+            raise Exception("Room is in round: %s" % ([str(r) for r in rounds]))
         else:
-            raise Exception("Room is in round: %s" % ([str(r)
-                                                       for r in rounds]))
+            super(Room, self).delete(using, keep_parents)
 
 
 class Round(models.Model):
@@ -219,7 +216,8 @@ class Round(models.Model):
                                                    self.gov_team,
                                                    self.opp_team)
 
-    def save(self):
+    def save(self, force_insert=False, force_update=False, using=None,
+             update_fields=None):
         no_shows = NoShow.objects.filter(
             round_number=self.round_number,
             no_show_team__in=[self.gov_team, self.opp_team])
@@ -227,13 +225,13 @@ class Round(models.Model):
         if no_shows:
             no_shows.delete()
 
-        super(Round, self).save()
+        super(Round, self).save(force_insert, force_update, using, update_fields)
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         rounds = RoundStats.objects.filter(round=self)
         for round_obj in rounds:
             round_obj.delete()
-        super(Round, self).delete()
+        super(Round, self).delete(using, keep_parents)
 
 
 class Bye(models.Model):
