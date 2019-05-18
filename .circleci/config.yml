@@ -70,6 +70,7 @@ jobs:
           command: |
             . venv/bin/activate
             pylint mittab/libs
+            pylint mittab/apps/tab/management
       - run:
           name: Lint -- JS
           command: npm run lint
