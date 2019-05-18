@@ -6,7 +6,7 @@ from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonRespons
 from django.contrib.auth.decorators import permission_required
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
-from mittab.apps.tab.errors import *
+from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
