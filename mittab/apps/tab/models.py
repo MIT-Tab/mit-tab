@@ -1,6 +1,3 @@
-import string
-import random
-
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -13,49 +10,43 @@ class TabSettings(models.Model):
     class Meta:
         verbose_name_plural = "tab settings"
 
-    def __unicode__(self):
-        return "%s => %s" % (self.key, self.value)
-
     def __str__(self):
         return "%s => %s" % (self.key, self.value)
 
     @classmethod
     def get(cls, key, default=None):
-        try:
+        if cls.objects.filter(key=key).exists():
             return cls.objects.get(key=key).value
-        except Exception as e:
+        else:
             if default is None:
                 raise e
             return default
 
     @classmethod
     def set(cls, key, value):
-        try:
+        if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
             obj.value = value
             obj.save()
-        except Exception as e:
+        else:
             obj = cls.objects.create(key=key, value=value)
 
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
 
-    def __unicode__(self):
-        return self.name
-
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
         team_check = Team.objects.filter(school=self)
         judge_check = Judge.objects.filter(schools=self)
-        if len(team_check) == 0 and len(judge_check) == 0:
-            super(School, self).delete()
-        else:
+        if team_check.exists() or judge_check.exists():
             raise Exception(
                 "School in use: [teams => %s,judges => %s]" %
                 ([t.name for t in team_check], [j.name for j in judge_check]))
+        else:
+            super(School, self).delete()
 
 
 class Debater(models.Model):
@@ -74,12 +65,12 @@ class Debater(models.Model):
     def __unicode__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
         teams = Team.objects.filter(debaters=self)
-        if len(teams) == 0:
-            super(Debater, self).delete()
-        else:
+        if teams.exists():
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
+        else:
+            super(Debater, self).delete()
 
 
 class Team(models.Model):
@@ -106,10 +97,10 @@ class Team(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
         scratches = Scratch.objects.filter(team=self)
-        for s in scratches:
-            s.delete()
+        for scratch in scratches:
+            scratch.delete()
         super(Team, self).delete()
 
 
@@ -142,10 +133,10 @@ class Judge(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
         checkins = CheckIn.objects.filter(judge=self)
-        for c in checkins:
-            c.delete()
+        for checkin in checkins:
+            checkin.delete()
         super(Judge, self).delete()
 
 
@@ -238,10 +229,10 @@ class Round(models.Model):
 
         super(Round, self).save()
 
-    def delete(self):
+    def delete(self, *args, **kwargs):
         rounds = RoundStats.objects.filter(round=self)
-        for rs in rounds:
-            rs.delete()
+        for round_obj in rounds:
+            round_obj.delete()
         super(Round, self).delete()
 
 
