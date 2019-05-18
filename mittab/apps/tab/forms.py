@@ -27,33 +27,33 @@ class UploadDataForm(forms.Form):
 class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
-        fields = '__all__'
+        fields = "__all__"
 
 
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
-        fields = '__all__'
+        fields = "__all__"
 
 
 class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(
-        queryset=School.objects.order_by('name'), required=False)
+        queryset=School.objects.order_by("name"), required=False)
 
     def __init__(self, *args, **kwargs):
-        entry = 'first_entry' in kwargs
+        entry = "first_entry" in kwargs
         if entry:
-            kwargs.pop('first_entry')
+            kwargs.pop("first_entry")
         super(JudgeForm, self).__init__(*args, **kwargs)
         if not entry:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
-                judge = kwargs['instance']
+                judge = kwargs["instance"]
                 checkins = [
                     c.round_number for c in CheckIn.objects.filter(judge=judge)
                 ]
                 for i in range(num_rounds):
-                    self.fields['checkin_%s' % i] = forms.BooleanField(
+                    self.fields["checkin_%s" % i] = forms.BooleanField(
                         label="Checked in for round %s?" % (i + 1),
                         initial=i + 1 in checkins,
                         required=False)
@@ -65,7 +65,7 @@ class JudgeForm(forms.ModelForm):
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(num_rounds):
             if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data['checkin_%s' % (i)]
+                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
                 checked_in = CheckIn.objects.filter(judge=judge,
                                                     round_number=i + 1)
                 # Two cases, either the judge is not checked in and the user says he is,
@@ -80,36 +80,36 @@ class JudgeForm(forms.ModelForm):
 
     class Meta:
         model = Judge
-        fields = '__all__'
+        fields = "__all__"
 
     class Media:
         css = {
-            'all': (os.path.join(settings.BASE_DIR,
-                                 '/static/admin/css/widgets.css'), ),
+            "all": (os.path.join(settings.BASE_DIR,
+                                 "/static/admin/css/widgets.css"), ),
         }
-        js = ('/admin/jsi18n'),
+        js = ("/admin/jsi18n"),
 
 
 class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(
-        queryset=Debater.objects.order_by('name'), required=False)
+        queryset=Debater.objects.order_by("name"), required=False)
 
     def clean_debaters(self):
-        data = self.cleaned_data['debaters']
+        data = self.cleaned_data["debaters"]
         if not (1 <= len(data) <= 2):
             raise forms.ValidationError("You must select 1 or 2 debaters!")
         return data
 
     class Meta:
         model = Team
-        fields = '__all__'
+        fields = "__all__"
 
     class Media:
         css = {
-            'all': (os.path.join(settings.BASE_DIR,
-                                 '/static/admin/css/widgets.css'), ),
+            "all": (os.path.join(settings.BASE_DIR,
+                                 "/static/admin/css/widgets.css"), ),
         }
-        js = ('/admin/jsi18n'),
+        js = ("/admin/jsi18n"),
 
 
 class TeamEntryForm(TeamForm):
@@ -118,30 +118,30 @@ class TeamEntryForm(TeamForm):
 
     class Meta:
         model = Team
-        fields = '__all__'
+        fields = "__all__"
 
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.order_by('name'))
-    judge = forms.ModelChoiceField(queryset=Judge.objects.order_by('name'))
+    team = forms.ModelChoiceField(queryset=Team.objects.order_by("name"))
+    judge = forms.ModelChoiceField(queryset=Judge.objects.order_by("name"))
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
 
     class Meta:
         model = Scratch
-        fields = '__all__'
+        fields = "__all__"
 
 
 class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
-        fields = '__all__'
+        fields = "__all__"
 
 
 def validate_speaks(value):
     if not (TabSettings.get("min_speak", 0) <= value <= TabSettings.get(
             "max_speak", 50)):
         raise ValidationError(
-            '%s is an entirely invalid speaker score, try again.' % value)
+            "%s is an entirely invalid speaker score, try again." % value)
 
 
 class ResultEntryForm(forms.Form):
@@ -171,22 +171,22 @@ class ResultEntryForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
-        round_object = kwargs.pop('round_instance')
+        round_object = kwargs.pop("round_instance")
         no_fill = False
-        if 'no_fill' in kwargs:
-            kwargs.pop('no_fill')
+        if "no_fill" in kwargs:
+            kwargs.pop("no_fill")
             no_fill = True
         super(ResultEntryForm, self).__init__(*args, **kwargs)
         # If we already have information, fill that into the form
         if round_object.victor != 0 and not no_fill:
             self.fields["winner"].initial = round_object.victor
 
-        self.fields['round_instance'] = forms.IntegerField(
+        self.fields["round_instance"] = forms.IntegerField(
             initial=round_object.pk, widget=forms.HiddenInput())
         gov_team, opp_team = round_object.gov_team, round_object.opp_team
-        gov_debaters = [(-1, '---')] + [(d.id, d.name)
+        gov_debaters = [(-1, "---")] + [(d.id, d.name)
                                         for d in gov_team.debaters.all()]
-        opp_debaters = [(-1, '---')] + [(d.id, d.name)
+        opp_debaters = [(-1, "---")] + [(d.id, d.name)
                                         for d in opp_team.debaters.all()]
 
         for d in self.DEBATERS:
@@ -434,9 +434,9 @@ def score_panel(result, discard_minority):
 
     # Rank by resulting average speaks
     ranked = sorted([score for score in final_scores],
-                    key=lambda x: Decimal(x[3]).quantize(Decimal('1.00')))
+                    key=lambda x: Decimal(x[3]).quantize(Decimal("1.00")))
     ranked = sorted([score for score in ranked],
-                    key=lambda x: Decimal(x[2]).quantize(Decimal('1.00')),
+                    key=lambda x: Decimal(x[2]).quantize(Decimal("1.00")),
                     reverse=True)
 
     ranked = [(d, rl, s, r + 1) for (r, (d, rl, s, _)) in enumerate(ranked)]
@@ -448,8 +448,8 @@ def score_panel(result, discard_minority):
     ties = {}
     for (score_i, score) in enumerate(ranked):
         # For floating point roundoff errors
-        d_score = Decimal(score[2]).quantize(Decimal('1.00'))
-        d_rank = Decimal(score[3]).quantize(Decimal('1.00'))
+        d_score = Decimal(score[2]).quantize(Decimal("1.00"))
+        d_rank = Decimal(score[3]).quantize(Decimal("1.00"))
         tie_key = (d_score, d_rank)
         if tie_key in ties:
             ties[tie_key].append((score_i, score[3]))
