@@ -1,9 +1,9 @@
 import os
-import sys, traceback
+import sys
 import itertools
 import pprint
 
-from django.db import models, transaction
+from django.db import transaction
 from django import forms
 from django.core.exceptions import ValidationError
 from decimal import Decimal
@@ -57,10 +57,10 @@ class JudgeForm(forms.ModelForm):
                         label="Checked in for round %s?" % (i + 1),
                         initial=i + 1 in checkins,
                         required=False)
-            except:
+            except Exception:
                 pass
 
-    def save(self, force_insert=False, force_update=False, commit=True):
+    def save(self, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(num_rounds):
@@ -96,7 +96,7 @@ class TeamForm(forms.ModelForm):
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
-        if not (1 <= len(data) <= 2):
+        if len(data) not in [1, 2]:
             raise forms.ValidationError("You must select 1 or 2 debaters!")
         return data
 
@@ -189,15 +189,15 @@ class ResultEntryForm(forms.Form):
         opp_debaters = [(-1, "---")] + [(d.id, d.name)
                                         for d in opp_team.debaters.all()]
 
-        for d in self.DEBATERS:
-            debater_choices = gov_debaters if d in self.GOV else opp_debaters
-            self.fields[self.deb_attr_name(d, "debater")] = forms.ChoiceField(
+        for deb in self.DEBATERS:
+            debater_choices = gov_debaters if deb in self.GOV else opp_debaters
+            self.fields[self.deb_attr_name(deb, "debater")] = forms.ChoiceField(
                 label="Who was %s?" % (self.NAMES[d]), choices=debater_choices)
-            self.fields[self.deb_attr_name(d, "speaks")] = forms.DecimalField(
+            self.fields[self.deb_attr_name(deb, "speaks")] = forms.DecimalField(
                 label="%s Speaks" % (self.NAMES[d]),
                 validators=[validate_speaks])
-            self.fields[self.deb_attr_name(d, "ranks")] = forms.ChoiceField(
-                label="%s Rank" % (self.NAMES[d]), choices=self.RANKS)
+            self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
+                label="%s Rank" % (self.NAMES[deb]), choices=self.RANKS)
 
         if round_object.victor == 0 or no_fill:
             return
@@ -217,7 +217,6 @@ class ResultEntryForm(forms.Form):
 
     def clean(self):
         cleaned_data = self.cleaned_data
-        gov, opp = self.GOV, self.OPP
         try:
             speak_ranks = [(self.deb_attr_val(d, "speaks"),
                             self.deb_attr_val(d, "ranks"), d)
@@ -233,10 +232,10 @@ class ResultEntryForm(forms.Form):
 
             # Check to make sure that the lowest ranks have the highest scores
             high_score = sorted_by_ranks[0][0]
-            for (speaks, rank, d) in sorted_by_ranks:
+            for (speaks, _rank, deb) in sorted_by_ranks:
                 if speaks > high_score:
                     self.add_error(
-                        self.deb_attr_name(d, "speaks"),
+                        self.deb_attr_name(deb, "speaks"),
                         self.error_class(
                             ["These speaks are too high for the rank"]))
                 high_score = speaks
@@ -255,7 +254,8 @@ class ResultEntryForm(forms.Form):
                                self.error_class(["Someone has to win!"]))
 
             # If we already have errors, don't bother with the other validations
-            if self.errors: return
+            if self.errors:
+                return
 
             # Check to make sure that the team with most speaks and the least
             # ranks win the round
@@ -276,16 +276,15 @@ class ResultEntryForm(forms.Form):
                     "winner"] == Round.OPP and gov_points > opp_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
-        except Exception as e:
+        except Exception:
             errors.emit_current_exception()
             self.add_error(
                 "winner",
                 self.error_class(
                     ["Non handled error, preventing data contamination"]))
-            traceback.print_exc(file=sys.stdout)
         return cleaned_data
 
-    def save(self):
+    def save(self, _commit=True):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
         round_obj.victor = cleaned_data["winner"]
@@ -294,7 +293,7 @@ class ResultEntryForm(forms.Form):
             for debater in self.DEBATERS:
                 old_stats = RoundStats.objects.filter(round=round_obj,
                                                       debater_role=debater)
-                if len(old_stats) > 0:
+                if old_stats.exists():
                     old_stats.delete()
 
                 debater_obj = Debater.objects.get(
@@ -369,8 +368,8 @@ class EBallotForm(ResultEntryForm):
                 msg = "Go to tab to submit a result other than a win or loss."
                 self._errors["winner"] = self.error_class([msg])
 
-            for d in self.DEBATERS:
-                speaks = self.deb_attr_val(d, "speaks", float)
+            for deb in self.DEBATERS:
+                speaks = self.deb_attr_val(deb, "speaks", float)
                 _, decimal_val = str(speaks).split(".")
                 key = self.deb_attr_name(d, "speaks")
                 if int(decimal_val) != 0:
@@ -396,8 +395,8 @@ def validate_panel(result):
 
     # Check everyone is in the same position
     for debater in debater_roles:
-        ds = [(d, rl) for (d, rl, s, r) in debater]
-        if not all(x == ds[0] for x in ds):
+        debs = [(deb, role) for (deb, role, _speak, _rank) in debater]
+        if not all(deb == debs[0] for deb in debs):
             all_good = False
             break
 
@@ -460,13 +459,13 @@ def score_panel(result, discard_minority):
     pprint.pprint(ties)
 
     # Average over the tied ranks
-    for k, v in ties.items():
-        if len(v) > 1:
-            tied_ranks = [x[1] for x in v]
+    for key, val in ties.items():
+        if len(val) > 1:
+            tied_ranks = [rank for _score_i, rank in val]
             avg = sum(tied_ranks) / float(len(tied_ranks))
-            for i, _ in v:
-                fs = ranked[i]
-                ranked[i] = (fs[0], fs[1], fs[2], avg)
+            for i, _rank in val:
+                final_score = ranked[i]
+                ranked[i] = (final_score[0], final_score[1], final_score[2], avg)
     print("Final scores")
     pprint.pprint(ranked)
 
