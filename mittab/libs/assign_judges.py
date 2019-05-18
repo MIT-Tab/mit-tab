@@ -177,12 +177,12 @@ def add_judges(pairings, judges, panel_points):
                 pairing.save()
 
 
-def argmin(seq, fn):
-    return min([(fn(i), i) for i in seq])[1]
+def argmin(seq, fun):
+    return min([(fun(i), i) for i in seq])[1]
 
 
-def argmax(seq, fn):
-    return max([(fn(i), i) for i in seq])[1]
+def argmax(seq, fun):
+    return max([(fun(i), i) for i in seq])[1]
 
 
 def calc_weight(judge_i, pairing_i):
