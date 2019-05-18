@@ -1,37 +1,36 @@
 import os
 import csv
-from optparse import make_option
 
 from django.core.management.base import BaseCommand
 
-from mittab.apps.tab.models import Team, Debater
+from mittab.apps.tab.models import Debater
 from mittab.libs import tab_logic
 
 
 class Command(BaseCommand):
-    TEAM_ROWS = ('Team Name', 'School', 'Hyrbid School', 'Debater 1',
-                 'Debater 2', 'Wins', 'Speaks', 'Ranks')
-    DEBATER_ROWS = ('Name', 'School', 'Speaks', 'Ranks')
+    TEAM_ROWS = ("Team Name", "School", "Hyrbid School", "Debater 1",
+                 "Debater 2", "Wins", "Speaks", "Ranks")
+    DEBATER_ROWS = ("Name", "School", "Speaks", "Ranks")
 
-    help = 'Dump novice & varsity team/speaker rankings as a csv'
+    help = "Dump novice & varsity team/speaker rankings as a csv"
 
     def add_arguments(self, parser):
         parser.add_argument("--root",
                             dest="root",
                             default=".",
-                            help="root path for all of the csv files"),
+                            help="root path for all of the csv files")
         parser.add_argument("--team-file",
                             dest="team_file",
                             default="teams.csv",
-                            help="name of the teams file"),
+                            help="name of the teams file")
         parser.add_argument("--nov-team-file",
                             dest="nov_team_file",
                             default="nov-teams.csv",
-                            help="name of the novice teams file"),
+                            help="name of the novice teams file")
         parser.add_argument("--debater-file",
                             dest="debater_file",
                             default="debaters.csv",
-                            help="name of the debaters file"),
+                            help="name of the debaters file")
         parser.add_argument("--nov-debater-file",
                             dest="nov_debater_file",
                             default="nov-debaters.csv",
@@ -58,22 +57,29 @@ class Command(BaseCommand):
             writer.writerows(rows)
 
     def handle(self, *args, **kwargs):
-        if not os.path.exists(kwargs["root"]): os.makedirs(kwargs["root"])
+        if not os.path.exists(kwargs["root"]):
+            os.makedirs(kwargs["root"])
 
-        print('Calculating ranks')
-        teams = [self.make_team_row(team) for team in tab_logic.rank_teams()]
+        print("Calculating ranks")
+        teams = [self.make_team_row(team) for team in tab_logic.rankings.rank_teams()]
+
+        def is_novice_team(team):
+            return team.debaters.filter(novice_status=Debater.NOVICE).count() == \
+                    team.debaters.count()
         nov_teams = [
-            self.make_team_row(team) for team in tab_logic.rank_nov_teams()
+            self.make_team_row(team) for team in tab_logic.rankings.rank_teams()
+            if is_novice_team(team)
         ]
         debaters = [
-            self.make_debater_row(deb) for deb in tab_logic.rank_speakers()
+            self.make_debater_row(deb) for deb in tab_logic.rankings.rank_speakers()
         ]
         nov_debaters = [
             self.make_debater_row(deb)
-            for deb in tab_logic.rank_nov_speakers()
+            for deb in tab_logic.rankings.rank_speakers()
+            if deb.novice_status == Debater.NOVICE
         ]
 
-        print('Writing to csv')
+        print("Writing to csv")
         self.write_to_csv(os.path.join(kwargs["root"], kwargs["team_file"]),
                           self.TEAM_ROWS, teams)
         self.write_to_csv(
@@ -84,4 +90,4 @@ class Command(BaseCommand):
         self.write_to_csv(
             os.path.join(kwargs["root"], kwargs["nov_debater_file"]),
             self.DEBATER_ROWS, nov_debaters)
-        print('Done!')
+        print("Done!")
