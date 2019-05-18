@@ -98,11 +98,11 @@ def add_judges(pairings, judges, panel_points):
                 print("Failed to panel")
                 return {}
 
-            def sort_key(r):
-                team_comp_result = tab_logic.team_comp(r, current_round_number)
-                return (argmin(r.judges.all(), lambda j: j.rank).rank,) + \
-                        tuple([-1 * i for i in team_comp_result])
-
+            def sort_key(round_obj):
+                team_comp_result = tab_logic.team_comp(round_obj, current_round_number)
+                get_rank = lambda judge: judge.rank
+                rank_tuple = (argmin(round_obj.judges.all(), get_rank).rank,)
+                return rank_tuple + tuple([-1 * i for i in team_comp_result])
 
             rounds = sorted(potential_pairings, key=sort_key)
             base_judge = argmax(
