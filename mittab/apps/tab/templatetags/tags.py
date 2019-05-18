@@ -1,5 +1,4 @@
 from django import template
-from django.core.urlresolvers import reverse
 from django.forms.fields import FileField
 
 register = template.Library()
