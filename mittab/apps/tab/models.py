@@ -62,12 +62,12 @@ class Debater(models.Model):
     def __str__(self):
         return self.name
 
-    def delete(self, *args, **kwargs):
+    def delete(self, using=None, keep_parents=False):
         teams = Team.objects.filter(debaters=self)
         if teams.exists():
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
         else:
-            super(Debater, self).delete()
+            super(Debater, self).delete(using, keep_parents)
 
 
 class Team(models.Model):
@@ -135,7 +135,7 @@ class Judge(models.Model):
         checkins = CheckIn.objects.filter(judge=self)
         for checkin in checkins:
             checkin.delete()
-        super(Judge, self).delete(using, keep_parent)
+        super(Judge, self).delete(using, keep_parents)
 
 
 class Scratch(models.Model):
