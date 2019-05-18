@@ -63,8 +63,8 @@ class Debater(models.Model):
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
-        (VARSITY, 'Varsity'),
-        (NOVICE, 'Novice'),
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
@@ -84,30 +84,26 @@ class Debater(models.Model):
 
 class Team(models.Model):
     name = models.CharField(max_length=30, unique=True)
-    school = models.ForeignKey('School')
-    hybrid_school = models.ForeignKey('School',
+    school = models.ForeignKey("School")
+    hybrid_school = models.ForeignKey("School",
                                       blank=True,
                                       null=True,
-                                      related_name='hybrid_school')
+                                      related_name="hybrid_school")
     debaters = models.ManyToManyField(Debater)
-    # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
     UNSEEDED = 0
     FREE_SEED = 1
     HALF_SEED = 2
     FULL_SEED = 3
     SEED_CHOICES = (
-        (UNSEEDED, 'Unseeded'),
-        (FREE_SEED, 'Free Seed'),
-        (HALF_SEED, 'Half Seed'),
-        (FULL_SEED, 'Full Seed'),
+        (UNSEEDED, "Unseeded"),
+        (FREE_SEED, "Free Seed"),
+        (HALF_SEED, "Half Seed"),
+        (FULL_SEED, "Full Seed"),
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.name
-
-    def __unicode__(self):
         return self.name
 
     def delete(self):
@@ -146,9 +142,6 @@ class Judge(models.Model):
     def __str__(self):
         return self.name
 
-    def __unicode__(self):
-        return self.name
-
     def delete(self):
         checkins = CheckIn.objects.filter(judge=self)
         for c in checkins:
@@ -162,8 +155,8 @@ class Scratch(models.Model):
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
-        (TEAM_SCRATCH, 'Team Scratch'),
-        (TAB_SCRATCH, 'Tab Scratch'),
+        (TEAM_SCRATCH, "Team Scratch"),
+        (TAB_SCRATCH, "Tab Scratch"),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
 
@@ -172,11 +165,7 @@ class Scratch(models.Model):
 
     def __str__(self):
         s_type = ("Team", "Tab")[self.scratch_type]
-        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
-
-    def __unicode__(self):
-        s_type = ("Team", "Tab")[self.scratch_type]
-        return '{} <={}=> {}'.format(self.team, s_type, self.judge)
+        return "{} <={}=> {}".format(self.team, s_type, self.judge)
 
 
 class Room(models.Model):
@@ -184,9 +173,6 @@ class Room(models.Model):
     rank = models.DecimalField(max_digits=4, decimal_places=2)
 
     def __str__(self):
-        return self.name
-
-    def __unicode__(self):
         return self.name
 
     def delete(self):
@@ -211,9 +197,9 @@ class Round(models.Model):
     GOV = 1
     OPP = 2
     PULLUP_CHOICES = (
-        (NONE, 'NONE'),
-        (GOV, 'GOV'),
-        (OPP, 'OPP'),
+        (NONE, "NONE"),
+        (GOV, "GOV"),
+        (OPP, "OPP"),
     )
     pullup = models.IntegerField(choices=PULLUP_CHOICES, default=0)
     UNKNOWN = 0
@@ -222,13 +208,13 @@ class Round(models.Model):
     ALL_DROP = 5
     ALL_WIN = 6
     VICTOR_CHOICES = (
-        (UNKNOWN, 'UNKNOWN'),
-        (GOV, 'GOV'),
-        (OPP, 'OPP'),
-        (GOV_VIA_FORFEIT, 'GOV via Forfeit'),
-        (OPP_VIA_FORFEIT, 'OPP via Forfeit'),
-        (ALL_DROP, 'ALL DROP'),
-        (ALL_WIN, 'ALL WIN'),
+        (UNKNOWN, "UNKNOWN"),
+        (GOV, "GOV"),
+        (OPP, "OPP"),
+        (GOV_VIA_FORFEIT, "GOV via Forfeit"),
+        (OPP_VIA_FORFEIT, "OPP via Forfeit"),
+        (ALL_DROP, "ALL DROP"),
+        (ALL_WIN, "ALL WIN"),
     )
     room = models.ForeignKey(Room)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -238,12 +224,7 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
-        return 'Round {} between {} and {}'.format(self.round_number,
-                                                   self.gov_team,
-                                                   self.opp_team)
-
-    def __unicode__(self):
-        return 'Round {} between {} and {}'.format(self.round_number,
+        return "Round {} between {} and {}".format(self.round_number,
                                                    self.gov_team,
                                                    self.opp_team)
 
@@ -272,11 +253,6 @@ class Bye(models.Model):
         return "Bye in round " + str(self.round_number) + " for " + str(
             self.bye_team)
 
-    def __unicode__(self):
-        return "Bye in round " + str(self.round_number) + " for " + str(
-            self.bye_team)
-
-
 class NoShow(models.Model):
     no_show_team = models.ForeignKey(Team)
     round_number = models.IntegerField()
@@ -285,11 +261,6 @@ class NoShow(models.Model):
     def __str__(self):
         return str(self.no_show_team) + " was no-show for round " + str(
             self.round_number)
-
-    def __unicode__(self):
-        return str(self.no_show_team) + " was no-show for round " + str(
-            self.round_number)
-
 
 class RoundStats(models.Model):
     debater = models.ForeignKey(Debater)
@@ -306,19 +277,10 @@ class RoundStats(models.Model):
         return "Results for %s in round %s" % (self.debater,
                                                self.round.round_number)
 
-    def __unicode__(self):
-        return "Results for %s in round %s" % (self.debater,
-                                               self.round.round_number)
-
-
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
     round_number = models.IntegerField()
 
     def __str__(self):
-        return "Judge %s is checked in for round %s" % (self.judge,
-                                                        self.round_number)
-
-    def __unicode__(self):
         return "Judge %s is checked in for round %s" % (self.judge,
                                                         self.round_number)
