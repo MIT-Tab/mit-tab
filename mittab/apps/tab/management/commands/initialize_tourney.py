@@ -87,8 +87,8 @@ class Command(BaseCommand):
             sys.exit(1)
 
         self.stdout.write(
-                "Done setting up tournament, after backing up old one. "
-                "New tournament information:"
+            "Done setting up tournament, after backing up old one. "
+            "New tournament information:"
         )
         self.stdout.write(
             "%s | %s" % ("Username".ljust(10, " "), "Password".ljust(10, " ")))

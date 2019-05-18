@@ -14,19 +14,18 @@ class Command(BaseCommand):
         rounds_to_simulate = Round.objects.filter(round_number=cur_round,
                                                   victor=Round.NONE)
 
-        for r in rounds_to_simulate:
-            print(r)
-            self.__simulate_round(r)
+        for round_obj in rounds_to_simulate:
+            self.__simulate_round(round_obj)
 
-    def __simulate_round(self, r):
+    def __simulate_round(self, round_obj):
         winner = random.choice([Round.GOV, Round.OPP])
         speaks = sorted([random.choice(self.SPEAKS_RANGE) for _ in range(4)])
 
-        winning_team = r.gov_team if winner == Round.GOV else r.opp_team
+        winning_team = round_obj.gov_team if winner == Round.GOV else round_obj.opp_team
         winning_positions = ["pm", "mg"
                              ] if winner == Round.GOV else ["lo", "mo"]
 
-        losing_team = r.opp_team if winner == Round.GOV else r.gov_team
+        losing_team = round_obj.opp_team if winner == Round.GOV else round_obj.gov_team
         losing_positions = ["lo", "mo"
                             ] if winner == Round.GOV else ["pm", "mg"]
 
@@ -49,5 +48,5 @@ class Command(BaseCommand):
                               ranks=rank,
                               debater_role=position)
             stat.save()
-        r.victor = winner
-        r.save()
+        round_obj.victor = winner
+        round_obj.save()
