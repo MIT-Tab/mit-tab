@@ -71,7 +71,7 @@ jobs:
             . venv/bin/activate
             pylint mittab/libs
             pylint mittab/apps/tab/management
-            pylint mittab/apps/tab/templates
+            pylint mittab/apps/tab/templatetags
             pylint mittab/apps/tab/models.py
             pylint mittab/apps/tab/admin.py
             pylint mittab/apps/tab/forms.py

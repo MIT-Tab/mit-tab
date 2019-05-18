@@ -5,6 +5,7 @@ from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
+
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
@@ -13,10 +14,10 @@ class TabSettings(models.Model):
         verbose_name_plural = "tab settings"
 
     def __unicode__(self):
-        return "%s => %s" % (self.key,self.value)
+        return "%s => %s" % (self.key, self.value)
 
     def __str__(self):
-        return "%s => %s" % (self.key,self.value)
+        return "%s => %s" % (self.key, self.value)
 
     @classmethod
     def get(cls, key, default=None):
@@ -38,7 +39,7 @@ class TabSettings(models.Model):
 
 
 class School(models.Model):
-    name = models.CharField(max_length=50, unique = True)
+    name = models.CharField(max_length=50, unique=True)
 
     def __unicode__(self):
         return self.name
@@ -52,11 +53,13 @@ class School(models.Model):
         if len(team_check) == 0 and len(judge_check) == 0:
             super(School, self).delete()
         else:
-            raise Exception("School in use: [teams => %s,judges => %s]" % ([t.name for t in team_check], [j.name for j in judge_check]))
+            raise Exception(
+                "School in use: [teams => %s,judges => %s]" %
+                ([t.name for t in team_check], [j.name for j in judge_check]))
 
 
 class Debater(models.Model):
-    name = models.CharField(max_length=30, unique = True)
+    name = models.CharField(max_length=30, unique=True)
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -72,24 +75,27 @@ class Debater(models.Model):
         return self.name
 
     def delete(self):
-        teams = Team.objects.filter(debaters = self)
+        teams = Team.objects.filter(debaters=self)
         if len(teams) == 0:
             super(Debater, self).delete()
         else:
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
 
+
 class Team(models.Model):
-    name = models.CharField(max_length=30, unique = True)
+    name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey('School')
-    hybrid_school = models.ForeignKey('School', blank=True, null=True,
-            related_name='hybrid_school')
+    hybrid_school = models.ForeignKey('School',
+                                      blank=True,
+                                      null=True,
+                                      related_name='hybrid_school')
     debaters = models.ManyToManyField(Debater)
     # seed = 0 if unseeded, seed = 1 if free seed, seed = 2 if half seed, seed = 3 if full seed
     UNSEEDED = 0
     FREE_SEED = 1
     HALF_SEED = 2
     FULL_SEED = 3
-    SEED_CHOICES= (
+    SEED_CHOICES = (
         (UNSEEDED, 'Unseeded'),
         (FREE_SEED, 'Free Seed'),
         (HALF_SEED, 'Half Seed'),
@@ -112,10 +118,13 @@ class Team(models.Model):
 
 
 class Judge(models.Model):
-    name = models.CharField(max_length=30, unique = True)
+    name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
-    ballot_code = models.CharField(max_length=256, blank=True, null=True, unique=True)
+    ballot_code = models.CharField(max_length=256,
+                                   blank=True,
+                                   null=True,
+                                   unique=True)
 
     def save(self, *args, **kwargs):
         # Generate a random ballot code for judges that don't have one
@@ -131,7 +140,8 @@ class Judge(models.Model):
         super(Judge, self).save(*args, **kwargs)
 
     def is_checked_in_for_round(self, round_number):
-        return CheckIn.objects.filter(judge=self, round_number=round_number).exists()
+        return CheckIn.objects.filter(judge=self,
+                                      round_number=round_number).exists()
 
     def __str__(self):
         return self.name
@@ -145,6 +155,7 @@ class Judge(models.Model):
             c.delete()
         super(Judge, self).delete()
 
+
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge)
     team = models.ForeignKey(Team)
@@ -155,16 +166,16 @@ class Scratch(models.Model):
         (TAB_SCRATCH, 'Tab Scratch'),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
+
     class Meta:
         verbose_name_plural = "scratches"
 
     def __str__(self):
-        s_type = ("Team","Tab")[self.scratch_type]
+        s_type = ("Team", "Tab")[self.scratch_type]
         return '{} <={}=> {}'.format(self.team, s_type, self.judge)
 
-
     def __unicode__(self):
-        s_type = ("Team","Tab")[self.scratch_type]
+        s_type = ("Team", "Tab")[self.scratch_type]
         return '{} <={}=> {}'.format(self.team, s_type, self.judge)
 
 
@@ -183,17 +194,19 @@ class Room(models.Model):
         if len(rounds) == 0:
             super(Room, self).delete()
         else:
-            raise Exception("Room is in round: %s" % ([str(r) for r in rounds]))
+            raise Exception("Room is in round: %s" % ([str(r)
+                                                       for r in rounds]))
 
 
 class Round(models.Model):
     round_number = models.IntegerField()
     gov_team = models.ForeignKey(Team, related_name="gov_team")
     opp_team = models.ForeignKey(Team, related_name="opp_team")
-    chair = models.ForeignKey(Judge, null=True, blank=True, related_name="chair")
-    judges = models.ManyToManyField(Judge,
-                                    blank=True,
-                                    related_name="judges")
+    chair = models.ForeignKey(Judge,
+                              null=True,
+                              blank=True,
+                              related_name="chair")
+    judges = models.ManyToManyField(Judge, blank=True, related_name="judges")
     NONE = 0
     GOV = 1
     OPP = 2
@@ -225,15 +238,19 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
-        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+        return 'Round {} between {} and {}'.format(self.round_number,
+                                                   self.gov_team,
+                                                   self.opp_team)
 
     def __unicode__(self):
-        return 'Round {} between {} and {}'.format(self.round_number, self.gov_team, self.opp_team)
+        return 'Round {} between {} and {}'.format(self.round_number,
+                                                   self.gov_team,
+                                                   self.opp_team)
 
     def save(self):
         no_shows = NoShow.objects.filter(
-                round_number=self.round_number,
-                no_show_team__in=[self.gov_team, self.opp_team])
+            round_number=self.round_number,
+            no_show_team__in=[self.gov_team, self.opp_team])
 
         if no_shows:
             no_shows.delete()
@@ -246,26 +263,33 @@ class Round(models.Model):
             rs.delete()
         super(Round, self).delete()
 
+
 class Bye(models.Model):
-   bye_team = models.ForeignKey(Team)
-   round_number = models.IntegerField()
+    bye_team = models.ForeignKey(Team)
+    round_number = models.IntegerField()
 
-   def __str__(self):
-      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+    def __str__(self):
+        return "Bye in round " + str(self.round_number) + " for " + str(
+            self.bye_team)
 
-   def __unicode__(self):
-      return "Bye in round " + str(self.round_number) + " for " + str(self.bye_team)
+    def __unicode__(self):
+        return "Bye in round " + str(self.round_number) + " for " + str(
+            self.bye_team)
+
 
 class NoShow(models.Model):
-   no_show_team = models.ForeignKey(Team)
-   round_number = models.IntegerField()
-   lenient_late = models.BooleanField(default=False)
+    no_show_team = models.ForeignKey(Team)
+    round_number = models.IntegerField()
+    lenient_late = models.BooleanField(default=False)
 
-   def __str__(self):
-      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
+    def __str__(self):
+        return str(self.no_show_team) + " was no-show for round " + str(
+            self.round_number)
 
-   def __unicode__(self):
-      return str(self.no_show_team) + " was no-show for round " + str(self.round_number)
+    def __unicode__(self):
+        return str(self.no_show_team) + " was no-show for round " + str(
+            self.round_number)
+
 
 class RoundStats(models.Model):
     debater = models.ForeignKey(Debater)
@@ -279,17 +303,22 @@ class RoundStats(models.Model):
         verbose_name_plural = "round stats"
 
     def __str__(self):
-        return "Results for %s in round %s" % (self.debater, self.round.round_number)
+        return "Results for %s in round %s" % (self.debater,
+                                               self.round.round_number)
 
     def __unicode__(self):
-        return "Results for %s in round %s" % (self.debater, self.round.round_number)
+        return "Results for %s in round %s" % (self.debater,
+                                               self.round.round_number)
+
 
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
     round_number = models.IntegerField()
 
     def __str__(self):
-        return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
+        return "Judge %s is checked in for round %s" % (self.judge,
+                                                        self.round_number)
 
     def __unicode__(self):
-        return "Judge %s is checked in for round %s" % (self.judge, self.round_number)
+        return "Judge %s is checked in for round %s" % (self.judge,
+                                                        self.round_number)
