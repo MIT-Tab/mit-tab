@@ -1,12 +1,11 @@
+from decimal import Decimal
 import os
-import sys
 import itertools
 import pprint
 
 from django.db import transaction
 from django import forms
 from django.core.exceptions import ValidationError
-from decimal import Decimal
 
 from mittab.apps.tab.models import *
 from mittab.libs import errors
@@ -202,17 +201,17 @@ class ResultEntryForm(forms.Form):
         if round_object.victor == 0 or no_fill:
             return
 
-        for d in self.DEBATERS:
+        for deb in self.DEBATERS:
             try:
                 stats = RoundStats.objects.get(round=round_object,
-                                               debater_role=d)
+                                               debater_role=deb)
                 self.fields[self.deb_attr_name(
-                    d, "debater")].initial = stats.debater.id
+                    deb, "debater")].initial = stats.debater.id
                 self.fields[self.deb_attr_name(
-                    d, "speaks")].initial = stats.speaks
-                self.fields[self.deb_attr_name(d, "ranks")].initial = int(
+                    deb, "speaks")].initial = stats.speaks
+                self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
                     round(stats.ranks))
-            except:
+            except Exception:
                 pass
 
     def clean(self):
@@ -404,8 +403,8 @@ def validate_panel(result):
     final_winner = max([(len(v), k) for k, v in result.items()])[1]
     debater_roles = list(zip(*result[final_winner]))
     for debater in debater_roles:
-        ds = [(d, rl) for (d, rl, s, r) in debater]
-        if ((len(ds) != len(result[final_winner])) or (len(ds) < 2)):
+        debs = [(deb, role) for (deb, role, _speak, _rank) in debater]
+        if ((len(debs) != len(result[final_winner])) or (len(debs) < 2)):
             all_good = False
             break
 
@@ -423,13 +422,13 @@ def score_panel(result, discard_minority):
 
     final_scores = []
     for debater in debater_roles:
-        ds = [(d, rl) for (d, rl, s, r) in debater]
-        d, rl = ds[0]
-        speaks = [s for (d, rl, s, r) in debater]
+        debs = [(deb, role) for (deb, role, _speak, _rank) in debater]
+        deb, role = debs[0]
+        speaks = [speak for (_deb, _role, speak, _rank) in debater]
         avg_speaks = sum(speaks) / float(len(speaks))
-        ranks = [r for (d, rl, s, r) in debater]
+        ranks = [rank for (_deb, _role, _speak, rank) in debater]
         avg_ranks = sum(ranks) / float(len(ranks))
-        final_scores.append((d, rl, avg_speaks, avg_ranks))
+        final_scores.append((deb, role, avg_speaks, avg_ranks))
 
     # Rank by resulting average speaks
     ranked = sorted([score for score in final_scores],
@@ -438,7 +437,8 @@ def score_panel(result, discard_minority):
                     key=lambda x: Decimal(x[2]).quantize(Decimal("1.00")),
                     reverse=True)
 
-    ranked = [(d, rl, s, r + 1) for (r, (d, rl, s, _)) in enumerate(ranked)]
+    ranked = [(deb, role, speak, rank + 1)
+              for (rank, (deb, role, speak, _)) in enumerate(ranked)]
 
     print("Ranked Debaters")
     pprint.pprint(ranked)
@@ -459,7 +459,7 @@ def score_panel(result, discard_minority):
     pprint.pprint(ties)
 
     # Average over the tied ranks
-    for key, val in ties.items():
+    for val in ties.values():
         if len(val) > 1:
             tied_ranks = [rank for _score_i, rank in val]
             avg = sum(tied_ranks) / float(len(tied_ranks))
