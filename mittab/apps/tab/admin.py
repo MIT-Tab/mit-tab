@@ -1,34 +1,35 @@
 from django.contrib import admin
 from django import forms
-from mittab.apps.tab.models import *
+
+from mittab.apps.tab import models
 
 
 class RoundAdminForm(forms.ModelForm):
-    chair = forms.ModelChoiceField(queryset=Judge.objects.order_by('name'))
+    chair = forms.ModelChoiceField(queryset=Judge.objects.order_by("name"))
 
     class Meta:
-        model = Round
-        fields = '__all__'
+        model = models.Round
+        fields = "__all__"
 
 
 class RoundAdmin(admin.ModelAdmin):
     form = RoundAdminForm
-    filter_horizontal = ('judges', )
+    filter_horizontal = ("judges", )
 
 
 class TeamAdmin(admin.ModelAdmin):
-    filter_horizontal = ('debaters', )
+    filter_horizontal = ("debaters", )
 
 
-admin.site.register(Debater)
-admin.site.register(Team, TeamAdmin)
-admin.site.register(School)
-admin.site.register(Judge)
-admin.site.register(Scratch)
-admin.site.register(Round, RoundAdmin)
-admin.site.register(RoundStats)
-admin.site.register(CheckIn)
-admin.site.register(TabSettings)
-admin.site.register(Room)
-admin.site.register(Bye)
-admin.site.register(NoShow)
+admin.site.register(models.Debater)
+admin.site.register(models.Team, TeamAdmin)
+admin.site.register(models.School)
+admin.site.register(models.Judge)
+admin.site.register(models.Scratch)
+admin.site.register(models.Round, RoundAdmin)
+admin.site.register(models.RoundStats)
+admin.site.register(models.CheckIn)
+admin.site.register(models.TabSettings)
+admin.site.register(models.Room)
+admin.site.register(models.Bye)
+admin.site.register(models.NoShow)
