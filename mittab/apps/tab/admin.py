@@ -5,7 +5,7 @@ from mittab.apps.tab import models
 
 
 class RoundAdminForm(forms.ModelForm):
-    chair = forms.ModelChoiceField(queryset=Judge.objects.order_by("name"))
+    chair = forms.ModelChoiceField(queryset=models.Judge.objects.order_by("name"))
 
     class Meta:
         model = models.Round
