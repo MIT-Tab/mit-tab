@@ -147,10 +147,10 @@ def add_judges(pairings, judges, panel_points):
                                         num_to_panel - 1, gap)
                 # Save the judges to the potential panel assignments
                 judges_used = []
-                for i in range(num_to_panel):
-                    judge = potential_panelists[judge_assignments[i] -
+                for j in range(num_to_panel):
+                    judge = potential_panelists[judge_assignments[j] -
                                                 num_to_panel]
-                    panel_assignments[i].append(judge)
+                    panel_assignments[j].append(judge)
                     judges_used.append(judge)
                 # Remove any used judges from the potential panelist pool
                 for judge in judges_used:
