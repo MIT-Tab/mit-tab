@@ -191,9 +191,9 @@ class ResultEntryForm(forms.Form):
         for deb in self.DEBATERS:
             debater_choices = gov_debaters if deb in self.GOV else opp_debaters
             self.fields[self.deb_attr_name(deb, "debater")] = forms.ChoiceField(
-                label="Who was %s?" % (self.NAMES[d]), choices=debater_choices)
+                label="Who was %s?" % (self.NAMES[deb]), choices=debater_choices)
             self.fields[self.deb_attr_name(deb, "speaks")] = forms.DecimalField(
-                label="%s Speaks" % (self.NAMES[d]),
+                label="%s Speaks" % (self.NAMES[deb]),
                 validators=[validate_speaks])
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label="%s Rank" % (self.NAMES[deb]), choices=self.RANKS)
@@ -224,9 +224,9 @@ class ResultEntryForm(forms.Form):
 
             # Check to make sure everyone has different ranks
             if self.has_invalid_ranks():
-                for d in self.DEBATERS:
+                for deb in self.DEBATERS:
                     self.add_error(
-                        self.deb_attr_name(d, "ranks"),
+                        self.deb_attr_name(deb, "ranks"),
                         self.error_class(["Ranks must be different"]))
 
             # Check to make sure that the lowest ranks have the highest scores
@@ -370,7 +370,7 @@ class EBallotForm(ResultEntryForm):
             for deb in self.DEBATERS:
                 speaks = self.deb_attr_val(deb, "speaks", float)
                 _, decimal_val = str(speaks).split(".")
-                key = self.deb_attr_name(d, "speaks")
+                key = self.deb_attr_name(deb, "speaks")
                 if int(decimal_val) != 0:
                     msg = "Speaks must be whole numbers"
                     self._errors[key] = self.error_class([msg])
