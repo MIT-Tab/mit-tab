@@ -1,17 +1,18 @@
-from contextlib import contextmanager
 import shutil
 import time
 import os
+from wsgiref.util import FileWrapper
+
+from django.conf import settings
 
 from mittab.apps.tab.models import TabSettings
-from django.conf import settings
-from wsgiref.util import FileWrapper
-from mittab.settings import BASE_DIR
 from mittab.libs import errors
+from mittab.settings import BASE_DIR
+
 
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
-DATABASE_PATH = settings.DATABASES['default']['NAME']
+DATABASE_PATH = settings.DATABASES["default"]["NAME"]
 
 
 def get_backup_filename(filename):
@@ -32,7 +33,7 @@ def backup_round(dst_filename=None, round_number=None, btime=None):
         btime = int(time.time())
 
     print("Trying to backup to backups directory")
-    if dst_filename == None:
+    if dst_filename is None:
         dst_filename = "site_round_%i_%i" % (round_number, btime)
 
     if backup_exists(dst_filename):
@@ -48,7 +49,7 @@ def handle_backup(f):
         with open(dst_filename, "wb+") as destination:
             for chunk in f.chunks():
                 destination.write(chunk)
-    except Exception as e:
+    except Exception:
         errors.emit_current_exception()
 
 
@@ -70,7 +71,7 @@ def copy_db(src_filename, dst_filename):
         shutil.copyfile(src_filename, dst_filename)
         print(("Copied %s to %s" % (src_filename, dst_filename)))
         return True
-    except:
+    except Exception:
         errors.emit_current_exception()
         return False
 
