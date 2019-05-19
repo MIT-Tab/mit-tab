@@ -2,13 +2,13 @@ from django.shortcuts import render
 from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
+
 from mittab.apps.tab.forms import DebaterForm
-from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
-
-from mittab.libs import tab_logic, errors
+from mittab.libs import tab_logic
+from mittab.libs.errors import *
 
 
 def view_debaters(request):
@@ -16,10 +16,10 @@ def view_debaters(request):
     c_debaters = [(debater.pk, debater.name, 0, "")
                   for debater in Debater.objects.order_by("name")]
     return render(
-        request, 'common/list_data.html', {
-            'item_type': 'debater',
-            'title': "Viewing All Debaters",
-            'item_list': c_debaters
+        request, "common/list_data.html", {
+            "item_type": "debater",
+            "title": "Viewing All Debaters",
+            "item_list": c_debaters
         })
 
 
@@ -29,7 +29,7 @@ def view_debater(request, debater_id):
         debater = Debater.objects.get(pk=debater_id)
     except Debater.DoesNotExist:
         return redirect_and_flash_error(request, "No such debater")
-    if request.method == 'POST':
+    if request.method == "POST":
         form = DebaterForm(request.POST, instance=debater)
         if form.is_valid():
             try:
@@ -41,7 +41,7 @@ def view_debater(request, debater_id):
                 )
             return redirect_and_flash_success(
                 request, "Debater {} updated successfully".format(
-                    form.cleaned_data['name']))
+                    form.cleaned_data["name"]))
     else:
         rounds = RoundStats.objects.filter(debater=debater)
         rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
@@ -51,20 +51,20 @@ def view_debater(request, debater_id):
         links = []
         for team in teams:
             links.append(
-                ('/team/' + str(team.id) + '/', "View %s" % team.name))
+                ("/team/" + str(team.id) + "/", "View %s" % team.name))
 
         return render(
-            request, 'common/data_entry.html', {
-                'form': form,
-                'debater_obj': debater,
-                'links': links,
-                'debater_rounds': rounds,
-                'title': "Viewing Debater: %s" % (debater.name)
+            request, "common/data_entry.html", {
+                "form": form,
+                "debater_obj": debater,
+                "links": links,
+                "debater_rounds": rounds,
+                "title": "Viewing Debater: %s" % (debater.name)
             })
 
 
 def enter_debater(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = DebaterForm(request.POST)
         if form.is_valid():
             try:
@@ -77,19 +77,19 @@ def enter_debater(request):
             return redirect_and_flash_success(
                 request,
                 "Debater {} created successfully".format(
-                    form.cleaned_data['name']),
+                    form.cleaned_data["name"]),
                 path="/")
     else:
         form = DebaterForm()
-    return render(request, 'common/data_entry.html', {
-        'form': form,
-        'title': "Create Debater:"
+    return render(request, "common/data_entry.html", {
+        "form": form,
+        "title": "Create Debater:"
     })
 
 
 def rank_debaters_ajax(request):
-    return render(request, 'tab/rank_debaters.html',
-                  {'title': "Debater Rankings"})
+    return render(request, "tab/rank_debaters.html",
+                  {"title": "Debater Rankings"})
 
 
 def rank_debaters(request):
@@ -100,8 +100,8 @@ def rank_debaters(request):
     nov_debaters = filter(lambda s: s[0].novice_status == Debater.NOVICE,
                           debaters)
     return render(
-        request, 'tab/rank_debaters_component.html', {
-            'debaters': debaters,
-            'nov_debaters': nov_debaters,
-            'title': "Speaker Rankings"
+        request, "tab/rank_debaters_component.html", {
+            "debaters": debaters,
+            "nov_debaters": nov_debaters,
+            "title": "Speaker Rankings"
         })

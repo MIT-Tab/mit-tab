@@ -1,9 +1,7 @@
-from datetime import datetime
-
-from django.shortcuts import render
-from django.template import RequestContext
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
+from django.shortcuts import render
+from django.template import RequestContext
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -28,12 +26,12 @@ def view_teams(request):
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
-        request, 'common/list_data.html', {
-            'item_type': 'team',
-            'title': "Viewing All Teams",
-            'item_list': c_teams,
-            'filters': filters,
-            'symbol_text': symbol_text
+        request, "common/list_data.html", {
+            "item_type": "team",
+            "title": "Viewing All Teams",
+            "item_list": c_teams,
+            "filters": filters,
+            "symbol_text": symbol_text
         })
 
 
@@ -51,7 +49,7 @@ def view_team(request, team_id):
         stats.append(("Hit Pullup", tab_logic.hit_pull_up(team)))
     except Team.DoesNotExist:
         return redirect_and_flash_error(request, "Team not found")
-    if request.method == 'POST':
+    if request.method == "POST":
         form = TeamForm(request.POST, instance=team)
         if form.is_valid():
             try:
@@ -65,25 +63,25 @@ def view_team(request, team_id):
                     form.cleaned_data["name"]))
     else:
         form = TeamForm(instance=team)
-        links = [('/team/' + str(team_id) + '/scratches/view/',
-                  'Scratches for {}'.format(team.name))]
+        links = [("/team/" + str(team_id) + "/scratches/view/",
+                  "Scratches for {}".format(team.name))]
         for deb in team.debaters.all():
             links.append(
-                ('/debater/' + str(deb.id) + '/', "View %s" % deb.name))
+                ("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
         return render(
-            request, 'common/data_entry.html', {
-                'title': "Viewing Team: %s" % (team.name),
-                'form': form,
-                'links': links,
-                'team_obj': team,
-                'team_stats': stats
+            request, "common/data_entry.html", {
+                "title": "Viewing Team: %s" % (team.name),
+                "form": form,
+                "links": links,
+                "team_obj": team,
+                "team_stats": stats
             })
 
-    return render(request, 'common/data_entry.html', {'form': form})
+    return render(request, "common/data_entry.html", {"form": form})
 
 
 def enter_team(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = TeamEntryForm(request.POST)
         if form.is_valid():
             try:
@@ -93,10 +91,10 @@ def enter_team(request):
                     request,
                     "Team name cannot be validated, most likely a duplicate school"
                 )
-            num_forms = form.cleaned_data['number_scratches']
+            num_forms = form.cleaned_data["number_scratches"]
             if num_forms > 0:
-                return HttpResponseRedirect('/team/' + str(team.pk) +
-                                            '/scratches/add/' + str(num_forms))
+                return HttpResponseRedirect("/team/" + str(team.pk) +
+                                            "/scratches/add/" + str(num_forms))
             else:
                 return redirect_and_flash_success(
                     request,
@@ -104,9 +102,9 @@ def enter_team(request):
                     path="/")
     else:
         form = TeamEntryForm()
-    return render(request, 'common/data_entry.html', {
-        'form': form,
-        'title': "Create Team"
+    return render(request, "common/data_entry.html", {
+        "form": form,
+        "title": "Create Team"
     })
 
 
@@ -120,7 +118,7 @@ def add_scratches(request, team_id, number_scratches):
     except Team.DoesNotExist:
         return redirect_and_flash_error(request,
                                         "The selected team does not exist")
-    if request.method == 'POST':
+    if request.method == "POST":
         forms = [
             ScratchForm(request.POST, prefix=str(i))
             for i in range(1, number_scratches + 1)
@@ -137,15 +135,15 @@ def add_scratches(request, team_id, number_scratches):
         forms = [
             ScratchForm(prefix=str(i),
                         initial={
-                            'team': team_id,
-                            'scratch_type': 0
+                            "team": team_id,
+                            "scratch_type": 0
                         }) for i in range(1, number_scratches + 1)
         ]
     return render(
-        request, 'common/data_entry_multiple.html', {
-            'forms': list(zip(forms, [None] * len(forms))),
-            'data_type': 'Scratch',
-            'title': "Adding Scratch(es) for %s" % (team.name)
+        request, "common/data_entry_multiple.html", {
+            "forms": list(zip(forms, [None] * len(forms))),
+            "data_type": "Scratch",
+            "title": "Adding Scratch(es) for %s" % (team.name)
         })
 
 
@@ -157,7 +155,7 @@ def view_scratches(request, team_id):
     scratches = Scratch.objects.filter(team=team_id)
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
-    if request.method == 'POST':
+    if request.method == "POST":
         forms = [
             ScratchForm(request.POST, prefix=str(i), instance=scratches[i - 1])
             for i in range(1, number_scratches + 1)
@@ -180,20 +178,20 @@ def view_scratches(request, team_id):
         "/team/" + str(team_id) + "/scratches/delete/" + str(scratches[i].id)
         for i in range(len(scratches))
     ]
-    links = [('/team/' + str(team_id) + '/scratches/add/1/', 'Add Scratch')]
+    links = [("/team/" + str(team_id) + "/scratches/add/1/", "Add Scratch")]
     return render(
-        request, 'common/data_entry_multiple.html', {
-            'forms': list(zip(forms, delete_links)),
-            'data_type': 'Scratch',
-            'links': links,
-            'title': "Viewing Scratch Information for %s" % (team.name)
+        request, "common/data_entry_multiple.html", {
+            "forms": list(zip(forms, delete_links)),
+            "data_type": "Scratch",
+            "links": links,
+            "title": "Viewing Scratch Information for %s" % (team.name)
         })
 
 
-@permission_required('tab.tab_settings.can_change', login_url="/403/")
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
-    return render(request, 'tab/all_tab_cards.html', locals())
+    return render(request, "tab/all_tab_cards.html", locals())
 
 
 def pretty_tab_card(request, team_id):
@@ -202,7 +200,7 @@ def pretty_tab_card(request, team_id):
     except:
         return redirect_and_flash_error(request, "Invalid team id")
     team = Team.objects.get(pk=team_id)
-    return render(request, 'tab/pretty_tab_card.html', {'team': team})
+    return render(request, "tab/pretty_tab_card.html", {"team": team})
 
 
 def tab_card(request, team_id):
