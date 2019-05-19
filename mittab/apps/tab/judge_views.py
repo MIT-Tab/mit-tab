@@ -1,13 +1,11 @@
-from django.shortcuts import render, get_object_or_404
-from django.template import RequestContext
-from django.http import Http404,HttpResponse,HttpResponseRedirect, \
-        JsonResponse
 from django.contrib.auth.decorators import permission_required
-from mittab.apps.tab.forms import JudgeForm, ScratchForm
-from mittab.apps.tab.helpers import redirect_and_flash_error, \
-        redirect_and_flash_success
-from mittab.apps.tab.models import *
 from django.db import models
+from django.http import Http404, JsonResponse
+from django.shortcuts import render, get_object_or_404
+
+from mittab.apps.tab.forms import JudgeForm, ScratchForm
+from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
+from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.libs.tab_logic import TabFlags
 
@@ -50,7 +48,7 @@ def view_judges(request):
                      TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE,
                      TabFlags.HIGH_RANKED_JUDGE
                  ]]
-    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
+    filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
             "item_type": "judge",
@@ -61,7 +59,7 @@ def view_judges(request):
 
 
 def view_judge(request, judge_id):
-    judge_id = int(judge_id)
+    judge_id (judge_id)
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
@@ -81,7 +79,6 @@ def view_judge(request, judge_id):
         form = JudgeForm(instance=judge)
     base_url = "/judge/" + str(judge_id) + "/"
     scratch_url = base_url + "scratches/view/"
-    delete_url = base_url + "delete/"
     links = [(scratch_url, "Scratches for {}".format(judge.name))]
     return render(
         request, "common/data_entry.html", {
@@ -98,9 +95,7 @@ def enter_judge(request):
             try:
                 form.save()
             except ValueError:
-                cd = form.cleaned_data
-                return redirect_and_flash_error(request,
-                                                "Judge cannot be validated")
+                return redirect_and_flash_error(request, "Judge cannot be validated")
             return redirect_and_flash_success(
                 request,
                 "Judge {} created successfully".format(
