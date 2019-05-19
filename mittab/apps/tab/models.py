@@ -110,7 +110,10 @@ class Judge(models.Model):
                                    null=True,
                                    unique=True)
 
-    def save(self, force_insert=False, force_update=False, using=None,
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
              update_fields=None):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
@@ -122,7 +125,8 @@ class Judge(models.Model):
 
             self.ballot_code = code
 
-        super(Judge, self).save(force_insert, force_update, using, update_fields)
+        super(Judge, self).save(force_insert, force_update, using,
+                                update_fields)
 
     def is_checked_in_for_round(self, round_number):
         return CheckIn.objects.filter(judge=self,
@@ -167,7 +171,8 @@ class Room(models.Model):
     def delete(self, using=None, keep_parents=False):
         rounds = Round.objects.filter(room=self)
         if rounds.exists():
-            raise Exception("Room is in round: %s" % ([str(r) for r in rounds]))
+            raise Exception("Room is in round: %s" % ([str(r)
+                                                       for r in rounds]))
         else:
             super(Room, self).delete(using, keep_parents)
 
@@ -216,7 +221,10 @@ class Round(models.Model):
                                                    self.gov_team,
                                                    self.opp_team)
 
-    def save(self, force_insert=False, force_update=False, using=None,
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
              update_fields=None):
         no_shows = NoShow.objects.filter(
             round_number=self.round_number,
@@ -225,7 +233,8 @@ class Round(models.Model):
         if no_shows:
             no_shows.delete()
 
-        super(Round, self).save(force_insert, force_update, using, update_fields)
+        super(Round, self).save(force_insert, force_update, using,
+                                update_fields)
 
     def delete(self, using=None, keep_parents=False):
         rounds = RoundStats.objects.filter(round=self)
@@ -242,6 +251,7 @@ class Bye(models.Model):
         return "Bye in round " + str(self.round_number) + " for " + str(
             self.bye_team)
 
+
 class NoShow(models.Model):
     no_show_team = models.ForeignKey(Team)
     round_number = models.IntegerField()
@@ -250,6 +260,7 @@ class NoShow(models.Model):
     def __str__(self):
         return str(self.no_show_team) + " was no-show for round " + str(
             self.round_number)
+
 
 class RoundStats(models.Model):
     debater = models.ForeignKey(Debater)
@@ -265,6 +276,7 @@ class RoundStats(models.Model):
     def __str__(self):
         return "Results for %s in round %s" % (self.debater,
                                                self.round.round_number)
+
 
 class CheckIn(models.Model):
     judge = models.ForeignKey(Judge)
