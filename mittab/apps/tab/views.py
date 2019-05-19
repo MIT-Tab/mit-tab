@@ -1,11 +1,7 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
 from django.contrib.auth import logout
-from django.contrib import messages
-from django.db import models
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
-from django.shortcuts import render, redirect
-from django.template import RequestContext, loader
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -70,12 +66,9 @@ def render_500(request, *args, **kwargs):
 def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
-        if (form.is_valid()):
+        if form.is_valid():
             form.save()
-        judge = form.cleaned_data["judge"].name
-        team = form.cleaned_data["team"].name
-        return redirect_and_flash_success(request,
-                                          "Scratch created successfully")
+        return redirect_and_flash_success(request, "Scratch created successfully")
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
