@@ -1,7 +1,4 @@
 from django.shortcuts import render
-from django.template import RequestContext
-from django.http import Http404, HttpResponse, HttpResponseRedirect
-from django.contrib.auth.decorators import permission_required
 
 from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -37,7 +34,7 @@ def view_debater(request, debater_id):
             except ValueError:
                 return redirect_and_flash_error(
                     request,
-                    "Debater name cannot be validated, most likely a non-existent debater"
+                    "Debater name can't be validated. Probably a non-existent debater"
                 )
             return redirect_and_flash_success(
                 request, "Debater {} updated successfully".format(
