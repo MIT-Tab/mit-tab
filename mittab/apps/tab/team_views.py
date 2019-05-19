@@ -1,7 +1,6 @@
-from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
-from django.template import RequestContext
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -9,20 +8,21 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
 import mittab.libs.tab_logic as tab_logic
-from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
+        tot_ranks_deb, tot_speaks, tot_ranks
 
 
 def view_teams(request):
-    def flags(t):
+    def flags(team):
         result = 0
-        if t.checked_in:
+        if team.checked_in:
             result |= TabFlags.TEAM_CHECKED_IN
         else:
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
 
-    c_teams = [(t.pk, t.name, flags(t), TabFlags.flags_to_symbols(flags(t)))
-               for t in Team.objects.all().order_by("name")]
+    c_teams = [(team.id, team.name, flags(team), TabFlags.flags_to_symbols(flags(team)))
+               for team in Team.objects.all().order_by("name")]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
@@ -197,7 +197,7 @@ def all_tab_cards(request):
 def pretty_tab_card(request, team_id):
     try:
         team_id = int(team_id)
-    except:
+    except Exception:
         return redirect_and_flash_error(request, "Invalid team id")
     team = Team.objects.get(pk=team_id)
     return render(request, "tab/pretty_tab_card.html", {"team": team})
@@ -212,14 +212,13 @@ def tab_card(request, team_id):
     rounds = ([r for r in Round.objects.filter(gov_team=team)] +
               [r for r in Round.objects.filter(opp_team=team)])
     rounds.sort(key=lambda x: x.round_number)
-    roundstats = [RoundStats.objects.filter(round=r) for r in rounds]
     debaters = [d for d in team.debaters.all()]
     iron_man = False
-    if (len(debaters) == 1):
+    if len(debaters) == 1:
         iron_man = True
-    d1 = debaters[0]
-    if (not iron_man):
-        d2 = debaters[1]
+    deb1 = debaters[0]
+    if not iron_man:
+        deb2 = debaters[1]
     round_stats = []
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
     cur_round = TabSettings.objects.get(key="cur_round").value
@@ -227,18 +226,18 @@ def tab_card(request, team_id):
     for i in range(num_rounds):
         round_stats.append([blank] * 7)
 
-    for r in rounds:
+    for round_obj in rounds:
         dstat1 = [
-            k for k in RoundStats.objects.filter(debater=d1).filter(
-                round=r).all()
+            k for k in RoundStats.objects.filter(debater=deb1).filter(
+                round=round_obj).all()
         ]
         dstat2 = []
-        if (not iron_man):
+        if not iron_man:
             dstat2 = [
-                k for k in RoundStats.objects.filter(debater=d2).filter(
-                    round=r).all()
+                k for k in RoundStats.objects.filter(debater=deb2).filter(
+                    round=round_obj).all()
             ]
-        blank_rs = RoundStats(debater=d1, round=r, speaks=0, ranks=0)
+        blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
         while len(dstat1) + len(dstat2) < 2:
             # Something is wrong with our data, but we don't want to crash
             dstat1.append(blank_rs)
@@ -250,15 +249,15 @@ def tab_card(request, team_id):
             dstat1, dstat2 = dstat2[0], dstat2[1]
         else:
             dstat1, dstat2 = dstat1[0], dstat2[0]
-        index = r.round_number - 1
-        round_stats[index][3] = " - ".join([j.name for j in r.judges.all()])
+        index = round_obj.round_number - 1
+        round_stats[index][3] = " - ".join([j.name for j in round_obj.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
         round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))
         round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks),
                                  float(dstat1.ranks + dstat2.ranks))
 
-        if r.gov_team == team:
-            round_stats[index][2] = r.opp_team
+        if round_obj.gov_team == team:
+            round_stats[index][2] = round_obj.opp_team
             round_stats[index][0] = "G"
             if r.victor == 1:
                 round_stats[index][1] = "W"
@@ -272,20 +271,20 @@ def tab_card(request, team_id):
                 round_stats[index][1] = "AD"
             elif r.victor == 6:
                 round_stats[index][1] = "AW"
-        elif r.opp_team == team:
-            round_stats[index][2] = r.gov_team
+        elif round_obj.opp_team == team:
+            round_stats[index][2] = round_obj.gov_team
             round_stats[index][0] = "O"
-            if r.victor == 1:
+            if round_obj.victor == 1:
                 round_stats[index][1] = "L"
-            elif r.victor == 2:
+            elif round_obj.victor == 2:
                 round_stats[index][1] = "W"
-            elif r.victor == 3:
+            elif round_obj.victor == 3:
                 round_stats[index][1] = "LF"
-            elif r.victor == 4:
+            elif round_obj.victor == 4:
                 round_stats[index][1] = "WF"
-            elif r.victor == 5:
+            elif round_obj.victor == 5:
                 round_stats[index][1] = "AD"
-            elif r.victor == 6:
+            elif round_obj.victor == 6:
                 round_stats[index][1] = "AW"
 
     for i in range(cur_round - 1):
@@ -297,25 +296,25 @@ def tab_card(request, team_id):
     #Error out if we don't have a bye
     try:
         bye_round = Bye.objects.get(bye_team=team).round_number
-    except:
+    except Exception:
         bye_round = None
 
     #Duplicates Debater 1 for display if Ironman team
-    if (iron_man):
-        d2 = d1
+    if iron_man:
+        deb2 = deb1
     return render(
         request, "tab/tab_card.html", {
             "team_name": team.name,
             "team_school": team.school,
-            "debater_1": d1.name,
-            "debater_1_status": Debater.NOVICE_CHOICES[d1.novice_status][1],
-            "debater_2": d2.name,
-            "debater_2_status": Debater.NOVICE_CHOICES[d2.novice_status][1],
+            "debater_1": deb1.name,
+            "debater_1_status": Debater.NOVICE_CHOICES[deb1.novice_status][1],
+            "debater_2": deb2.name,
+            "debater_2_status": Debater.NOVICE_CHOICES[deb2.novice_status][1],
             "round_stats": round_stats,
-            "d1st": tot_speaks_deb(d1),
-            "d1rt": tot_ranks_deb(d1),
-            "d2st": tot_speaks_deb(d2),
-            "d2rt": tot_ranks_deb(d2),
+            "d1st": tot_speaks_deb(deb1),
+            "d1rt": tot_ranks_deb(deb1),
+            "d2st": tot_speaks_deb(deb2),
+            "d2rt": tot_ranks_deb(deb2),
             "ts": tot_speaks(team),
             "tr": tot_ranks(team),
             "bye_round": bye_round

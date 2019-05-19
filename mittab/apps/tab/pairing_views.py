@@ -3,7 +3,6 @@ import time
 import datetime
 
 from django.shortcuts import render
-from django.template import RequestContext
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required

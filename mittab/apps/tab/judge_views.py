@@ -1,5 +1,4 @@
 from django.contrib.auth.decorators import permission_required
-from django.db import models
 from django.http import Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 
@@ -59,7 +58,7 @@ def view_judges(request):
 
 
 def view_judge(request, judge_id):
-    judge_id (judge_id)
+    judge_id = int(judge_id)
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
