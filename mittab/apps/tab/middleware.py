@@ -1,23 +1,22 @@
 import re
 
 from django.contrib.auth.views import login
-from django.core.cache import cache
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
 
-login_white_list = ('/accounts/login/', '/pairings/pairinglist/',
-                    '/pairings/missing_ballots/', '/e_ballots/', '/404/',
-                    '/403/', '/500/')
+LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
+                   "/pairings/missing_ballots/", "/e_ballots/", "/404/",
+                   "/403/", "/500/")
 
-e_ballot_regex = re.compile("/e_ballots/\S+")
+EBALLOT_REGEX = re.compile(r"/e_ballots/\S+")
 
 
 class Login:
     """This middleware requires a login for every view"""
 
     def process_request(self, request):
-        whitelisted = (request.path in login_white_list) or \
-                e_ballot_regex.match(request.path)
+        whitelisted = (request.path in LOGIN_WHITELIST) or \
+                EBALLOT_REGEX.match(request.path)
 
         if not whitelisted and request.user.is_anonymous():
             if request.POST:
