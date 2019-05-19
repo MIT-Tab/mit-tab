@@ -259,17 +259,17 @@ def tab_card(request, team_id):
         if round_obj.gov_team == team:
             round_stats[index][2] = round_obj.opp_team
             round_stats[index][0] = "G"
-            if r.victor == 1:
+            if round_obj.victor == 1:
                 round_stats[index][1] = "W"
-            elif r.victor == 2:
+            elif round_obj.victor == 2:
                 round_stats[index][1] = "L"
-            elif r.victor == 3:
+            elif round_obj.victor == 3:
                 round_stats[index][1] = "WF"
-            elif r.victor == 4:
+            elif round_obj.victor == 4:
                 round_stats[index][1] = "LF"
-            elif r.victor == 5:
+            elif round_obj.victor == 5:
                 round_stats[index][1] = "AD"
-            elif r.victor == 6:
+            elif round_obj.victor == 6:
                 round_stats[index][1] = "AW"
         elif round_obj.opp_team == team:
             round_stats[index][2] = round_obj.gov_team
