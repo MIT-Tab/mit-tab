@@ -304,26 +304,26 @@ def tab_card(request, team_id):
     if (iron_man):
         d2 = d1
     return render(
-        request, 'tab/tab_card.html', {
-            'team_name': team.name,
-            'team_school': team.school,
-            'debater_1': d1.name,
-            'debater_1_status': Debater.NOVICE_CHOICES[d1.novice_status][1],
-            'debater_2': d2.name,
-            'debater_2_status': Debater.NOVICE_CHOICES[d2.novice_status][1],
-            'round_stats': round_stats,
-            'd1st': tot_speaks_deb(d1),
-            'd1rt': tot_ranks_deb(d1),
-            'd2st': tot_speaks_deb(d2),
-            'd2rt': tot_ranks_deb(d2),
-            'ts': tot_speaks(team),
-            'tr': tot_ranks(team),
-            'bye_round': bye_round
+        request, "tab/tab_card.html", {
+            "team_name": team.name,
+            "team_school": team.school,
+            "debater_1": d1.name,
+            "debater_1_status": Debater.NOVICE_CHOICES[d1.novice_status][1],
+            "debater_2": d2.name,
+            "debater_2_status": Debater.NOVICE_CHOICES[d2.novice_status][1],
+            "round_stats": round_stats,
+            "d1st": tot_speaks_deb(d1),
+            "d1rt": tot_ranks_deb(d1),
+            "d2st": tot_speaks_deb(d2),
+            "d2rt": tot_ranks_deb(d2),
+            "ts": tot_speaks(team),
+            "tr": tot_ranks(team),
+            "bye_round": bye_round
         })
 
 
 def rank_teams_ajax(request):
-    return render(request, 'tab/rank_teams.html', {'title': "Team Rankings"})
+    return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
 
 def rank_teams(request):
@@ -334,10 +334,10 @@ def rank_teams(request):
         lambda ts: all(
             map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
                 all())), teams)
-    return render(request, 'tab/rank_teams_component.html', {
-        'varsity': teams,
-        'novice': nov_teams,
-        'title': "Team Rankings"
+    return render(request, "tab/rank_teams_component.html", {
+        "varsity": teams,
+        "novice": nov_teams,
+        "title": "Team Rankings"
     })
 
 
@@ -351,7 +351,7 @@ def team_stats(request, team_id):
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)
         stats["opps"] = tab_logic.num_opps(team)
-        data = {'success': True, 'result': stats}
+        data = {"success": True, "result": stats}
     except Team.DoesNotExist:
-        data = {'success': False}
+        data = {"success": False}
     return JsonResponse(data)
