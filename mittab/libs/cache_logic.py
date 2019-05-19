@@ -4,8 +4,8 @@ import random
 
 from django.core.cache import cache as _djcache
 
-
 CACHE_TIMEOUT = 20
+
 
 def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
     """
@@ -39,6 +39,7 @@ def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
         return wrapper
 
     return do_cache
+
 
 def clear_cache():
     _djcache.clear()

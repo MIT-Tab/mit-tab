@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/1.6/ref/settings/
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
 
@@ -24,21 +23,13 @@ DEBUG = os.environ.get('DEBUG')
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
-INSTALLED_APPS = (
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'mittab.apps.tab',
-    'raven.contrib.django.raven_compat',
-    'webpack_loader',
-    'bootstrap4'
-)
+INSTALLED_APPS = ('django.contrib.admin', 'django.contrib.auth',
+                  'django.contrib.contenttypes', 'django.contrib.sessions',
+                  'django.contrib.messages', 'django.contrib.staticfiles',
+                  'mittab.apps.tab', 'raven.contrib.django.raven_compat',
+                  'webpack_loader', 'bootstrap4')
 
 MIDDLEWARE_CLASSES = (
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -56,7 +47,6 @@ ROOT_URLCONF = 'mittab.urls'
 
 WSGI_APPLICATION = 'mittab.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/1.6/ref/settings/#databases
 
@@ -71,9 +61,7 @@ DATABASES = {
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
 if os.environ.get('SENTRY_DSN'):
-    RAVEN_CONFIG = {
-        'dsn': os.environ['SENTRY_DSN']
-    }
+    RAVEN_CONFIG = {'dsn': os.environ['SENTRY_DSN']}
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/
@@ -88,13 +76,10 @@ USE_L10N = True
 
 USE_TZ = True
 
-
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'assets'),
-)
+STATICFILES_DIRS = (os.path.join(BASE_DIR, 'assets'), )
 
 WEBPACK_LOADER = {
     'DEFAULT': {
@@ -111,7 +96,8 @@ TEMPLATES = [
         ],
         'APP_DIRS': True,
         'OPTIONS': {
-            'debug': True,
+            'debug':
+            True,
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
                 'django.template.context_processors.debug',

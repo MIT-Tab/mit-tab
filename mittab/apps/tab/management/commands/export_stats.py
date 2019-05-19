@@ -61,17 +61,22 @@ class Command(BaseCommand):
             os.makedirs(kwargs["root"])
 
         print("Calculating ranks")
-        teams = [self.make_team_row(team) for team in tab_logic.rankings.rank_teams()]
+        teams = [
+            self.make_team_row(team)
+            for team in tab_logic.rankings.rank_teams()
+        ]
 
         def is_novice_team(team):
             return team.debaters.filter(novice_status=Debater.NOVICE).count() == \
                     team.debaters.count()
+
         nov_teams = [
-            self.make_team_row(team) for team in tab_logic.rankings.rank_teams()
-            if is_novice_team(team)
+            self.make_team_row(team)
+            for team in tab_logic.rankings.rank_teams() if is_novice_team(team)
         ]
         debaters = [
-            self.make_debater_row(deb) for deb in tab_logic.rankings.rank_speakers()
+            self.make_debater_row(deb)
+            for deb in tab_logic.rankings.rank_speakers()
         ]
         nov_debaters = [
             self.make_debater_row(deb)

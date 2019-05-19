@@ -190,11 +190,14 @@ class ResultEntryForm(forms.Form):
 
         for deb in self.DEBATERS:
             debater_choices = gov_debaters if deb in self.GOV else opp_debaters
-            self.fields[self.deb_attr_name(deb, "debater")] = forms.ChoiceField(
-                label="Who was %s?" % (self.NAMES[deb]), choices=debater_choices)
-            self.fields[self.deb_attr_name(deb, "speaks")] = forms.DecimalField(
-                label="%s Speaks" % (self.NAMES[deb]),
-                validators=[validate_speaks])
+            self.fields[self.deb_attr_name(
+                deb, "debater")] = forms.ChoiceField(label="Who was %s?" %
+                                                     (self.NAMES[deb]),
+                                                     choices=debater_choices)
+            self.fields[self.deb_attr_name(
+                deb, "speaks")] = forms.DecimalField(
+                    label="%s Speaks" % (self.NAMES[deb]),
+                    validators=[validate_speaks])
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label="%s Rank" % (self.NAMES[deb]), choices=self.RANKS)
 
@@ -465,7 +468,8 @@ def score_panel(result, discard_minority):
             avg = sum(tied_ranks) / float(len(tied_ranks))
             for i, _rank in val:
                 final_score = ranked[i]
-                ranked[i] = (final_score[0], final_score[1], final_score[2], avg)
+                ranked[i] = (final_score[0], final_score[1], final_score[2],
+                             avg)
     print("Final scores")
     pprint.pprint(ranked)
 

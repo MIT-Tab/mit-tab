@@ -69,13 +69,7 @@ jobs:
           name: Lint -- Python
           command: |
             . venv/bin/activate
-            pylint mittab/libs
-            pylint mittab/apps/tab/management
-            pylint mittab/apps/tab/templatetags
-            pylint mittab/apps/tab/models.py
-            pylint mittab/apps/tab/admin.py
-            pylint mittab/apps/tab/forms.py
-            pylint mittab/apps/tab/middleware.py
+            pylint mittab
       - run:
           name: Lint -- JS
           command: npm run lint

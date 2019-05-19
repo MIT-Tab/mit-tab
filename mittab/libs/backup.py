@@ -9,7 +9,6 @@ from mittab.apps.tab.models import TabSettings
 from mittab.libs import errors
 from mittab.settings import BASE_DIR
 
-
 BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
 DATABASE_PATH = settings.DATABASES["default"]["NAME"]
