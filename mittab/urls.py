@@ -1,8 +1,6 @@
 from django.views import i18n
-from django.conf import settings
 from django.conf.urls import include, url
 from django.contrib import admin
-from django.contrib.auth.views import logout
 
 import mittab.apps.tab.views as views
 import mittab.apps.tab.judge_views as judge_views
