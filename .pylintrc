@@ -144,6 +144,7 @@ disable=print-statement,
         exception-escape,
         comprehension-escape,
         missing-docstring,
+        possibly-unused-variable, # because some views use locals(), should also change
         broad-except,
         R,
         wildcard-import,       # should add back eventually, after everything else is good
