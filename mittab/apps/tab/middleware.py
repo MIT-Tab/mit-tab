@@ -24,5 +24,5 @@ class Login:
             else:
                 return redirect_and_flash_info(
                     request,
-                    'You must be logged in to view that page',
-                    path='/accounts/login/?next=%s' % request.path)
+                    "You must be logged in to view that page",
+                    path="/accounts/login/?next=%s" % request.path)
