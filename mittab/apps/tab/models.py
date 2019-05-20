@@ -9,17 +9,12 @@ from polymorphic.models import PolymorphicModel
 class ModelWithTiebreaker(PolymorphicModel):
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
-    def save(self,
-             force_insert=False,
-             force_update=False,
-             using=None,
-             update_fields=None):
+    def save(self, *args, **kwargs):
         while not self.tiebreaker or \
                 self.__class__.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2 ** 16))
 
-        super(ModelWithTiebreaker, self).save(force_insert, force_update, using,
-                                              update_fields)
+        super(ModelWithTiebreaker, self).save(*args, **kwargs)
 
     class Meta:
         abstract = True
