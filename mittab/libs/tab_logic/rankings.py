@@ -40,7 +40,7 @@ class DebaterScore(object):
     def scoring_tuple(self):
         return (-self.speaks, self.ranks, -self.single_adjusted_speaks,
                 self.single_adjusted_ranks, -self.double_adjusted_speaks,
-                self.double_adjusted_ranks)
+                self.double_adjusted_ranks, self.debater.tiebreaker)
 
 
 @total_ordering
@@ -69,4 +69,4 @@ class TeamScore(object):
         return (-self.wins, -self.speaks, self.ranks,
                 -self.single_adjusted_speaks, self.single_adjusted_ranks,
                 -self.double_adjusted_speaks, self.double_adjusted_ranks,
-                -self.opp_strength)
+                -self.opp_strength, self.team.tiebreaker)

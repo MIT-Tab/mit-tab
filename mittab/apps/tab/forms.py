@@ -90,6 +90,7 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
+    tiebreaker = forms.IntegerField(widget=forms.HiddenInput())
     debaters = forms.ModelMultipleChoiceField(
         queryset=Debater.objects.order_by("name"), required=False)
 
@@ -131,6 +132,8 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
+    tiebreaker = forms.IntegerField(widget=forms.HiddenInput())
+
     class Meta:
         model = Debater
         fields = "__all__"
