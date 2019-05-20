@@ -24,7 +24,7 @@ def find_content_type(content_type_name):
 
 def fix_type(type_name, ctype_id):
     for model in filter(lambda obj: obj.get("model", None) == type_name, DATA):
-        model["fields"]["polymorphic_ctype"] = ctype_id
+        model["fields"]["polymorphic_ctype_id"] = ctype_id
         model["fields"]["tiebreaker"] = random.choice(range(0, 2**16))
         while model["fields"]["tiebreaker"] in USED_TIEBREAKERS:
             model["fields"]["tiebreaker"] = random.choice(range(0, 2**16))

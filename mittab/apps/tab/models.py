@@ -12,7 +12,7 @@ class ModelWithTiebreaker(PolymorphicModel):
     def save(self, *args, **kwargs):
         while not self.tiebreaker or \
                 self.__class__.objects.filter(tiebreaker=self.tiebreaker).exists():
-            self.tiebreaker = random.choice(range(0, 2 ** 16))
+            self.tiebreaker = random.choice(range(0, 2**16))
 
         super(ModelWithTiebreaker, self).save(*args, **kwargs)
 
