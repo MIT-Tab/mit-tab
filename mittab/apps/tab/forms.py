@@ -101,7 +101,7 @@ class TeamForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        fields = "__all__"
+        exclude = ["tiebreaker"]
 
     class Media:
         css = {
@@ -117,7 +117,7 @@ class TeamEntryForm(TeamForm):
 
     class Meta:
         model = Team
-        fields = "__all__"
+        exclude = ["tiebreaker"]
 
 
 class ScratchForm(forms.ModelForm):
@@ -131,9 +131,10 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
+
     class Meta:
         model = Debater
-        fields = "__all__"
+        exclude = ["tiebreaker"]
 
 
 def validate_speaks(value):
