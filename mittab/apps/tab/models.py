@@ -1,6 +1,28 @@
+import random
+
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
+from polymorphic.models import PolymorphicModel
+
+
+class ModelWithTiebreaker(PolymorphicModel):
+    tiebreaker = models.IntegerField(unique=True)
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        while not self.tiebreaker or \
+                self.__class__.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2 ** 16))
+
+        super(ModelWithTiebreaker, self).save(force_insert, force_update, using,
+                                              update_fields)
+
+    class Meta:
+        abstract = True
 
 
 class TabSettings(models.Model):
@@ -49,7 +71,7 @@ class School(models.Model):
             super(School, self).delete(using, keep_parents)
 
 
-class Debater(models.Model):
+class Debater(ModelWithTiebreaker):
     name = models.CharField(max_length=30, unique=True)
     VARSITY = 0
     NOVICE = 1
@@ -70,7 +92,7 @@ class Debater(models.Model):
             super(Debater, self).delete(using, keep_parents)
 
 
-class Team(models.Model):
+class Team(ModelWithTiebreaker):
     name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey("School")
     hybrid_school = models.ForeignKey("School",
