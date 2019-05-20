@@ -462,4 +462,6 @@ def tot_ranks_deb(debater, average_ironmen=True):
 
 
 def deb_team(debater):
-    return debater.team_set.first()
+    # this makes the test pass, but we should really find a better way to do stats in
+    # the face of debaters on multiple teams. We should probably just disallow it.
+    return debater.team_set.order_by("pk").first()
