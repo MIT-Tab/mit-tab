@@ -21,36 +21,35 @@ class TestRankingLogic(TestCase):
         data that has real world problems (e.g. teams not paired in, ironmen,
         etc ...)
         """
-        debaters = Debater.objects.all()
-        scores = [(debater.name, DebaterScore(debater).scoring_tuple()[:6])
-                  for debater in debaters]
-        expected_scores = load_debater_rankings()
-        dict_scores, dict_expected_scores = list(
-            map(dict, (scores, expected_scores)))
-
-        assert len(dict_scores) == len(dict_expected_scores)
-        for k in dict_scores:
-            left, right = dict_scores[k], dict_expected_scores[k]
-            msg = "{} - {}, {}".format(k, left, right)
+        debaters = Debater.objects.order_by("pk")
+        actual_scores = [(debater.name,
+                          DebaterScore(debater).scoring_tuple()[:6])
+                         for debater in debaters]
+        actual_scores = dict(actual_scores)
+        expected_scores = dict(load_debater_rankings())
+        assert len(expected_scores) == len(actual_scores)
+        for name, actual_score in actual_scores.items():
+            left, right = actual_score, expected_scores[name]
+            msg = "{} - actual: {}, expected {}".format(name, left, right)
             [
                 assert_nearly_equal(*pair, message=msg)
-                for pair in zip(set(left), set(right))
+                for pair in zip(left, right)
             ]
 
     def test_team_score(self):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
-        teams = Team.objects.all()
-        scores = [(team.name, TeamScore(team).scoring_tuple()[:8])
-                  for team in teams]
-        expected_scores = load_team_rankings()
-        dict_scores, dict_expected_scores = list(
-            map(dict, (scores, expected_scores)))
-        assert len(dict_scores) == len(dict_expected_scores)
-        for k in dict_scores:
-            left, right = dict_scores[k], dict_expected_scores[k]
-            msg = "{} - {}, {}".format(k, left, right)
+        teams = Team.objects.order_by("pk")
+        actual_scores = [(team.name, TeamScore(team).scoring_tuple()[:8])
+                         for team in teams]
+        actual_scores = dict(actual_scores)
+        expected_scores = dict(load_team_rankings())
+        assert len(actual_scores) == len(expected_scores)
+        for team_name, actual_score in actual_scores.items():
+            left, right = actual_score, expected_scores[team_name]
+            msg = "{} - actual: {}, expected: {}".format(
+                team_name, left, right)
             [
                 assert_nearly_equal(*pair, message=msg)
-                for pair in zip(set(left), set(right))
+                for pair in zip(left, right)
             ]

@@ -1,19 +1,19 @@
-<link rel="stylesheet" type="text/css" href="/static/css/tab_cards.css" />
-<table id="pairing_list">
-<tr>
+<table id="pairing_list" class="table-bordered table">
+<thead>
     <td colspan=5>Team: {{team_name}} ({{team_school}})</td>
-    <th class="center" rowspan=2>
+    <th class="text-center">
         <p>{{debater_1}} ({{debater_1_status|slice:":1" }})</p></th>
-    <th class="center" rowspan=2>
+    <th class="text-center">
         <p>{{debater_2}} ({{debater_2_status|slice:":1" }})</p></th>
     <td></td>
-</tr>
+</thead>
 <tr>
     <th>R</th>
     <th>G/O</th>
     <th>W/L</th>
     <th>Opponent</th>
     <th>Judge</th>
+    <th colspan="2"></th>
     <th>Total</th>
 </tr>
 {% for round_stat in round_stats %}

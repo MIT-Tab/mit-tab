@@ -19,9 +19,9 @@ function quickSearchInit(elem) {
   if (!searchElem) {
     searchElem = $("#quick-search");
   }
-  $(searchElem).keyup(() => {
-    if ($(this).val()) {
-      filter($(this).val());
+  $(searchElem).keyup(e => {
+    if ($(e.target).val()) {
+      filter($(e.target).val());
     } else {
       $(".searchable").show();
     }
