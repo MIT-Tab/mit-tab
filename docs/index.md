@@ -1,4 +1,4 @@
-Welcome to the MIT-Tab Wiki!
+Welcome to the MIT-Tab Docs!
 ============================
 
 Looking to learn how to run a tournament? Check out the sidebar for a structured guide to using mit-tab
