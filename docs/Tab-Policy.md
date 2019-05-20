@@ -114,8 +114,6 @@ Judge Assignment
 Rankings
 --------
 
-**NOTE: Coin flips must be done manually when there are ties**
-
 ### Speaker Ranking
 
 1. Speaks [Who has higher average speaks]
