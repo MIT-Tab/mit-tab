@@ -7,7 +7,7 @@ from polymorphic.models import PolymorphicModel
 
 
 class ModelWithTiebreaker(PolymorphicModel):
-    tiebreaker = models.IntegerField(unique=True)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
     def save(self,
              force_insert=False,
