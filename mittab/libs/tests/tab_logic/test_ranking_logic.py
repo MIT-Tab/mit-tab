@@ -22,7 +22,7 @@ class TestRankingLogic(TestCase):
         etc ...)
         """
         debaters = Debater.objects.all()
-        scores = [(debater.name, DebaterScore(debater).scoring_tuple())
+        scores = [(debater.name, DebaterScore(debater).scoring_tuple()[:6])
                   for debater in debaters]
         expected_scores = load_debater_rankings()
         dict_scores, dict_expected_scores = list(
@@ -41,7 +41,7 @@ class TestRankingLogic(TestCase):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
         teams = Team.objects.all()
-        scores = [(team.name, TeamScore(team).scoring_tuple())
+        scores = [(team.name, TeamScore(team).scoring_tuple()[:7])
                   for team in teams]
         expected_scores = load_team_rankings()
         dict_scores, dict_expected_scores = list(
