@@ -36,8 +36,8 @@ class RoomForm(forms.ModelForm):
 
 
 class JudgeForm(forms.ModelForm):
-    schools = forms.ModelMultipleChoiceField(
-        queryset=School.objects.order_by("name"), required=False)
+    schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
+                                             required=False)
 
     def __init__(self, *args, **kwargs):
         entry = "first_entry" in kwargs
@@ -90,8 +90,8 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(
-        queryset=Debater.objects.order_by("name"), required=False)
+    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
+                                              required=False)
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -121,8 +121,8 @@ class TeamEntryForm(TeamForm):
 
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.order_by("name"))
-    judge = forms.ModelChoiceField(queryset=Judge.objects.order_by("name"))
+    team = forms.ModelChoiceField(queryset=Team.objects.all())
+    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
 
     class Meta:
@@ -131,7 +131,6 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
-
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]

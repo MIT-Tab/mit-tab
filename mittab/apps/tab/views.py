@@ -19,16 +19,12 @@ def index(request):
     number_debaters = Debater.objects.count()
     number_rooms = Room.objects.count()
 
-    school_list = [(school.pk, school.name)
-                   for school in School.objects.order_by("name")]
-    judge_list = [(judge.pk, judge.name)
-                  for judge in Judge.objects.order_by("name")]
-    team_list = [(team.pk, team.name)
-                 for team in Team.objects.order_by("name")]
+    school_list = [(school.pk, school.name) for school in School.objects.all()]
+    judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
+    team_list = [(team.pk, team.name) for team in Team.objects.all()]
     debater_list = [(debater.pk, debater.name)
-                    for debater in Debater.objects.order_by("name")]
-    room_list = [(room.pk, room.name)
-                 for room in Room.objects.order_by("name")]
+                    for debater in Debater.objects.all()]
+    room_list = [(room.pk, room.name) for room in Room.objects.all()]
 
     return render(request, "common/index.html", locals())
 
@@ -68,7 +64,8 @@ def add_scratch(request):
         form = ScratchForm(request.POST)
         if form.is_valid():
             form.save()
-        return redirect_and_flash_success(request, "Scratch created successfully")
+        return redirect_and_flash_success(request,
+                                          "Scratch created successfully")
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
@@ -81,8 +78,7 @@ def add_scratch(request):
 #Three views for entering, viewing, and editing schools
 def view_schools(request):
     #Get a list of (id,school_name) tuples
-    c_schools = [(s.pk, s.name, 0, "")
-                 for s in School.objects.all().order_by("name")]
+    c_schools = [(s.pk, s.name, 0, "") for s in School.objects.all()]
     return render(
         request, "common/list_data.html", {
             "item_type": "school",
@@ -179,7 +175,7 @@ def view_rooms(request):
     all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
     all_rooms = [(room.pk, room.name, flags(room),
                   TabFlags.flags_to_symbols(flags(room)))
-                 for room in Room.objects.all().order_by("name")]
+                 for room in Room.objects.all()]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {

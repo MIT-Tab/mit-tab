@@ -21,8 +21,9 @@ def view_teams(request):
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
 
-    c_teams = [(team.id, team.name, flags(team), TabFlags.flags_to_symbols(flags(team)))
-               for team in Team.objects.all().order_by("name")]
+    c_teams = [(team.id, team.name, flags(team),
+                TabFlags.flags_to_symbols(flags(team)))
+               for team in Team.objects.all()]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
@@ -250,7 +251,8 @@ def tab_card(request, team_id):
         else:
             dstat1, dstat2 = dstat1[0], dstat2[0]
         index = round_obj.round_number - 1
-        round_stats[index][3] = " - ".join([j.name for j in round_obj.judges.all()])
+        round_stats[index][3] = " - ".join(
+            [j.name for j in round_obj.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
         round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))
         round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks),

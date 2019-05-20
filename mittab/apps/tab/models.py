@@ -65,6 +65,9 @@ class School(models.Model):
         else:
             super(School, self).delete(using, keep_parents)
 
+    class Meta:
+        ordering = ["name"]
+
 
 class Debater(ModelWithTiebreaker):
     name = models.CharField(max_length=30, unique=True)
@@ -85,6 +88,9 @@ class Debater(ModelWithTiebreaker):
             raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
         else:
             super(Debater, self).delete(using, keep_parents)
+
+    class Meta:
+        ordering = ["name"]
 
 
 class Team(ModelWithTiebreaker):
@@ -116,6 +122,9 @@ class Team(ModelWithTiebreaker):
         for scratch in scratches:
             scratch.delete()
         super(Team, self).delete(using, keep_parents)
+
+    class Meta:
+        ordering = ["name"]
 
 
 class Judge(models.Model):
@@ -158,6 +167,9 @@ class Judge(models.Model):
             checkin.delete()
         super(Judge, self).delete(using, keep_parents)
 
+    class Meta:
+        ordering = ["name"]
+
 
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge)
@@ -192,6 +204,9 @@ class Room(models.Model):
                                                        for r in rounds]))
         else:
             super(Room, self).delete(using, keep_parents)
+
+    class Meta:
+        ordering = ["name"]
 
 
 class Round(models.Model):

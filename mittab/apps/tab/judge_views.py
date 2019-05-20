@@ -37,7 +37,7 @@ def view_judges(request):
         return result
 
     c_judge = [(judge.pk, judge.name, flags(judge), "(%s)" % judge.ballot_code)
-               for judge in Judge.objects.order_by("name")]
+               for judge in Judge.objects.all()]
 
     all_flags = [[
         TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
@@ -94,7 +94,8 @@ def enter_judge(request):
             try:
                 form.save()
             except ValueError:
-                return redirect_and_flash_error(request, "Judge cannot be validated")
+                return redirect_and_flash_error(request,
+                                                "Judge cannot be validated")
             return redirect_and_flash_success(
                 request,
                 "Judge {} created successfully".format(
@@ -193,7 +194,7 @@ def batch_checkin(request):
     judges_and_checkins = []
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    for judge in Judge.objects.order_by("name"):
+    for judge in Judge.objects.all():
         checkins = []
         for round_number in round_numbers:
             checkins.append(judge.is_checked_in_for_round(round_number))
