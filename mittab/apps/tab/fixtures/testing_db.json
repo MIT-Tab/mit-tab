@@ -386,6 +386,11 @@
     "model": "tab.debater",
     "pk": 1,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alfreda Harvey",
         "novice_status": 0
     }
@@ -394,6 +399,11 @@
     "model": "tab.debater",
     "pk": 2,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sylvia Mcclure",
         "novice_status": 0
     }
@@ -402,6 +412,11 @@
     "model": "tab.debater",
     "pk": 3,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Judy Tanner",
         "novice_status": 0
     }
@@ -410,6 +425,11 @@
     "model": "tab.debater",
     "pk": 4,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Janet Morris",
         "novice_status": 0
     }
@@ -418,6 +438,11 @@
     "model": "tab.debater",
     "pk": 5,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gloria Floyd",
         "novice_status": 1
     }
@@ -426,6 +451,11 @@
     "model": "tab.debater",
     "pk": 7,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kellie Taylor",
         "novice_status": 1
     }
@@ -434,6 +464,11 @@
     "model": "tab.debater",
     "pk": 8,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Fay White",
         "novice_status": 1
     }
@@ -442,6 +477,11 @@
     "model": "tab.debater",
     "pk": 9,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Juliana Sanford",
         "novice_status": 1
     }
@@ -450,6 +490,11 @@
     "model": "tab.debater",
     "pk": 11,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Elizabeth Underwood",
         "novice_status": 1
     }
@@ -458,6 +503,11 @@
     "model": "tab.debater",
     "pk": 12,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Leanne Yates",
         "novice_status": 0
     }
@@ -466,6 +516,11 @@
     "model": "tab.debater",
     "pk": 13,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Minnie Cantrell",
         "novice_status": 1
     }
@@ -474,6 +529,11 @@
     "model": "tab.debater",
     "pk": 14,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lisa Brown",
         "novice_status": 1
     }
@@ -482,6 +542,11 @@
     "model": "tab.debater",
     "pk": 15,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Whitney Crosby",
         "novice_status": 1
     }
@@ -490,6 +555,11 @@
     "model": "tab.debater",
     "pk": 16,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rae Little",
         "novice_status": 0
     }
@@ -498,6 +568,11 @@
     "model": "tab.debater",
     "pk": 17,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Andrea Arnold",
         "novice_status": 1
     }
@@ -506,6 +581,11 @@
     "model": "tab.debater",
     "pk": 18,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Simone Hampton",
         "novice_status": 0
     }
@@ -514,6 +594,11 @@
     "model": "tab.debater",
     "pk": 19,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Erna Wiley",
         "novice_status": 0
     }
@@ -522,6 +607,11 @@
     "model": "tab.debater",
     "pk": 20,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ursula Perez",
         "novice_status": 1
     }
@@ -530,6 +620,11 @@
     "model": "tab.debater",
     "pk": 21,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Josefa Moore",
         "novice_status": 0
     }
@@ -538,6 +633,11 @@
     "model": "tab.debater",
     "pk": 22,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Hattie Bray",
         "novice_status": 1
     }
@@ -546,6 +646,11 @@
     "model": "tab.debater",
     "pk": 23,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lea Weaver",
         "novice_status": 0
     }
@@ -554,6 +659,11 @@
     "model": "tab.debater",
     "pk": 24,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Monica Harmon",
         "novice_status": 1
     }
@@ -562,6 +672,11 @@
     "model": "tab.debater",
     "pk": 25,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Brooke Hood",
         "novice_status": 0
     }
@@ -570,6 +685,11 @@
     "model": "tab.debater",
     "pk": 26,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lora Melendez",
         "novice_status": 0
     }
@@ -578,6 +698,11 @@
     "model": "tab.debater",
     "pk": 27,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lourdes Allen",
         "novice_status": 0
     }
@@ -586,6 +711,11 @@
     "model": "tab.debater",
     "pk": 28,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Angelita Blake",
         "novice_status": 1
     }
@@ -594,6 +724,11 @@
     "model": "tab.debater",
     "pk": 29,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jordan Huffman",
         "novice_status": 1
     }
@@ -602,6 +737,11 @@
     "model": "tab.debater",
     "pk": 30,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kathy Beard",
         "novice_status": 1
     }
@@ -610,6 +750,11 @@
     "model": "tab.debater",
     "pk": 31,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Laurie Barrett",
         "novice_status": 1
     }
@@ -618,6 +763,11 @@
     "model": "tab.debater",
     "pk": 32,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Catalina Mack",
         "novice_status": 1
     }
@@ -626,6 +776,11 @@
     "model": "tab.debater",
     "pk": 33,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Patricia Waters",
         "novice_status": 1
     }
@@ -634,6 +789,11 @@
     "model": "tab.debater",
     "pk": 34,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Caroline Franco",
         "novice_status": 1
     }
@@ -642,6 +802,11 @@
     "model": "tab.debater",
     "pk": 35,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tracy Jackson",
         "novice_status": 1
     }
@@ -650,6 +815,11 @@
     "model": "tab.debater",
     "pk": 36,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Antoinette Mercer",
         "novice_status": 1
     }
@@ -658,6 +828,11 @@
     "model": "tab.debater",
     "pk": 37,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rosalyn Leon",
         "novice_status": 1
     }
@@ -666,6 +841,11 @@
     "model": "tab.debater",
     "pk": 38,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Catherine Burris",
         "novice_status": 1
     }
@@ -674,6 +854,11 @@
     "model": "tab.debater",
     "pk": 39,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Petra Solis",
         "novice_status": 1
     }
@@ -682,6 +867,11 @@
     "model": "tab.debater",
     "pk": 40,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marisa Hodges",
         "novice_status": 1
     }
@@ -690,6 +880,11 @@
     "model": "tab.debater",
     "pk": 41,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Aline Lott",
         "novice_status": 1
     }
@@ -698,6 +893,11 @@
     "model": "tab.debater",
     "pk": 42,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kristin Romero",
         "novice_status": 1
     }
@@ -706,6 +906,11 @@
     "model": "tab.debater",
     "pk": 43,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Fern Abbott",
         "novice_status": 1
     }
@@ -714,6 +919,11 @@
     "model": "tab.debater",
     "pk": 44,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Essie Wilkerson",
         "novice_status": 1
     }
@@ -722,6 +932,11 @@
     "model": "tab.debater",
     "pk": 45,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Wilma Montgomery",
         "novice_status": 0
     }
@@ -730,6 +945,11 @@
     "model": "tab.debater",
     "pk": 46,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jeannine Burton",
         "novice_status": 1
     }
@@ -738,6 +958,11 @@
     "model": "tab.debater",
     "pk": 47,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Angie Adams",
         "novice_status": 0
     }
@@ -746,6 +971,11 @@
     "model": "tab.debater",
     "pk": 48,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Selma Roberson",
         "novice_status": 1
     }
@@ -754,6 +984,11 @@
     "model": "tab.debater",
     "pk": 49,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Anita Mendez",
         "novice_status": 0
     }
@@ -762,6 +997,11 @@
     "model": "tab.debater",
     "pk": 50,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Evelyn Kelly",
         "novice_status": 1
     }
@@ -770,6 +1010,11 @@
     "model": "tab.debater",
     "pk": 51,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marylou Ellis",
         "novice_status": 0
     }
@@ -778,6 +1023,11 @@
     "model": "tab.debater",
     "pk": 52,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marianne Tate",
         "novice_status": 1
     }
@@ -786,6 +1036,11 @@
     "model": "tab.debater",
     "pk": 53,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Hester Adkins",
         "novice_status": 1
     }
@@ -794,6 +1049,11 @@
     "model": "tab.debater",
     "pk": 54,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Charlotte Singleton",
         "novice_status": 0
     }
@@ -802,6 +1062,11 @@
     "model": "tab.debater",
     "pk": 55,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tammy Hendrix",
         "novice_status": 0
     }
@@ -810,6 +1075,11 @@
     "model": "tab.debater",
     "pk": 56,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mara Carlson",
         "novice_status": 0
     }
@@ -818,6 +1088,11 @@
     "model": "tab.debater",
     "pk": 58,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alexandria Barnett",
         "novice_status": 0
     }
@@ -826,6 +1101,11 @@
     "model": "tab.debater",
     "pk": 59,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Staci Russell",
         "novice_status": 0
     }
@@ -834,6 +1114,11 @@
     "model": "tab.debater",
     "pk": 60,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kay Kemp",
         "novice_status": 0
     }
@@ -842,6 +1127,11 @@
     "model": "tab.debater",
     "pk": 61,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Valarie Curry",
         "novice_status": 0
     }
@@ -850,6 +1140,11 @@
     "model": "tab.debater",
     "pk": 62,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gracie Blackwell",
         "novice_status": 0
     }
@@ -858,6 +1153,11 @@
     "model": "tab.debater",
     "pk": 63,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Graciela Riley",
         "novice_status": 0
     }
@@ -866,6 +1166,11 @@
     "model": "tab.debater",
     "pk": 64,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tracey Irwin",
         "novice_status": 0
     }
@@ -874,6 +1179,11 @@
     "model": "tab.debater",
     "pk": 65,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Neva Ware",
         "novice_status": 0
     }
@@ -882,6 +1192,11 @@
     "model": "tab.debater",
     "pk": 66,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kimberly Rodriquez",
         "novice_status": 0
     }
@@ -890,6 +1205,11 @@
     "model": "tab.debater",
     "pk": 67,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Melinda Sellers",
         "novice_status": 1
     }
@@ -898,6 +1218,11 @@
     "model": "tab.debater",
     "pk": 68,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Charity Garza",
         "novice_status": 0
     }
@@ -906,6 +1231,11 @@
     "model": "tab.debater",
     "pk": 69,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Clarice Nolan",
         "novice_status": 0
     }
@@ -914,6 +1244,11 @@
     "model": "tab.debater",
     "pk": 70,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Erin Greer",
         "novice_status": 1
     }
@@ -922,6 +1257,11 @@
     "model": "tab.debater",
     "pk": 71,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Candice Charles",
         "novice_status": 1
     }
@@ -930,6 +1270,11 @@
     "model": "tab.debater",
     "pk": 72,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rowena Garrett",
         "novice_status": 1
     }
@@ -938,6 +1283,11 @@
     "model": "tab.debater",
     "pk": 73,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Roxie Sanchez",
         "novice_status": 1
     }
@@ -946,6 +1296,11 @@
     "model": "tab.debater",
     "pk": 74,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Margery Cotton",
         "novice_status": 1
     }
@@ -954,6 +1309,11 @@
     "model": "tab.debater",
     "pk": 75,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Angelique Wall",
         "novice_status": 1
     }
@@ -962,6 +1322,11 @@
     "model": "tab.debater",
     "pk": 76,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Helen Hensley",
         "novice_status": 1
     }
@@ -970,6 +1335,11 @@
     "model": "tab.debater",
     "pk": 77,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lindsay Osborne",
         "novice_status": 1
     }
@@ -978,6 +1348,11 @@
     "model": "tab.debater",
     "pk": 78,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Cheryl Terry",
         "novice_status": 1
     }
@@ -986,6 +1361,11 @@
     "model": "tab.debater",
     "pk": 79,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marlene Drake",
         "novice_status": 0
     }
@@ -994,6 +1374,11 @@
     "model": "tab.debater",
     "pk": 80,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kim Chaney",
         "novice_status": 1
     }
@@ -1002,6 +1387,11 @@
     "model": "tab.debater",
     "pk": 81,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kelly Knapp",
         "novice_status": 1
     }
@@ -1010,6 +1400,11 @@
     "model": "tab.debater",
     "pk": 82,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gretchen Goff",
         "novice_status": 1
     }
@@ -1018,6 +1413,11 @@
     "model": "tab.debater",
     "pk": 83,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Magdalena Tucker",
         "novice_status": 0
     }
@@ -1026,6 +1426,11 @@
     "model": "tab.debater",
     "pk": 84,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Beatriz Whitney",
         "novice_status": 0
     }
@@ -1034,6 +1439,11 @@
     "model": "tab.debater",
     "pk": 85,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lelia Shelton",
         "novice_status": 0
     }
@@ -1042,6 +1452,11 @@
     "model": "tab.debater",
     "pk": 86,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Susanne Bryant",
         "novice_status": 1
     }
@@ -1050,6 +1465,11 @@
     "model": "tab.debater",
     "pk": 87,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jenny Whitfield",
         "novice_status": 0
     }
@@ -1058,6 +1478,11 @@
     "model": "tab.debater",
     "pk": 88,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Bernadine Boyle",
         "novice_status": 1
     }
@@ -1066,6 +1491,11 @@
     "model": "tab.debater",
     "pk": 90,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Margo Hopkins",
         "novice_status": 1
     }
@@ -1074,6 +1504,11 @@
     "model": "tab.debater",
     "pk": 93,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Maryellen Guthrie",
         "novice_status": 0
     }
@@ -1082,6 +1517,11 @@
     "model": "tab.debater",
     "pk": 94,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Clarissa Castaneda",
         "novice_status": 0
     }
@@ -1090,6 +1530,11 @@
     "model": "tab.debater",
     "pk": 95,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Paige Ramsey",
         "novice_status": 1
     }
@@ -1098,6 +1543,11 @@
     "model": "tab.debater",
     "pk": 96,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sheila Velazquez",
         "novice_status": 0
     }
@@ -1106,6 +1556,11 @@
     "model": "tab.debater",
     "pk": 97,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alejandra Meyers",
         "novice_status": 0
     }
@@ -1114,6 +1569,11 @@
     "model": "tab.debater",
     "pk": 98,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Christian Bell",
         "novice_status": 1
     }
@@ -1122,6 +1582,11 @@
     "model": "tab.debater",
     "pk": 99,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Bonnie Skinner",
         "novice_status": 1
     }
@@ -1130,6 +1595,11 @@
     "model": "tab.debater",
     "pk": 100,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marissa Sexton",
         "novice_status": 1
     }
@@ -1138,6 +1608,11 @@
     "model": "tab.debater",
     "pk": 101,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Flossie Welch",
         "novice_status": 1
     }
@@ -1146,6 +1621,11 @@
     "model": "tab.debater",
     "pk": 102,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Christie Copeland",
         "novice_status": 0
     }
@@ -1154,6 +1634,11 @@
     "model": "tab.debater",
     "pk": 103,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rosario Hebert",
         "novice_status": 1
     }
@@ -1162,6 +1647,11 @@
     "model": "tab.debater",
     "pk": 104,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kris Vaughn",
         "novice_status": 0
     }
@@ -1170,6 +1660,11 @@
     "model": "tab.debater",
     "pk": 105,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Christa Kent",
         "novice_status": 0
     }
@@ -1178,6 +1673,11 @@
     "model": "tab.debater",
     "pk": 106,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ashlee Fitzgerald",
         "novice_status": 0
     }
@@ -1186,6 +1686,11 @@
     "model": "tab.debater",
     "pk": 107,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Beverley Knight",
         "novice_status": 1
     }
@@ -1194,6 +1699,11 @@
     "model": "tab.debater",
     "pk": 108,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Francisca Browning",
         "novice_status": 1
     }
@@ -1202,6 +1712,11 @@
     "model": "tab.debater",
     "pk": 109,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lawanda Bates",
         "novice_status": 0
     }
@@ -1210,6 +1725,11 @@
     "model": "tab.debater",
     "pk": 110,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jacklyn Hanson",
         "novice_status": 0
     }
@@ -1218,6 +1738,11 @@
     "model": "tab.debater",
     "pk": 111,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Katherine Riggs",
         "novice_status": 1
     }
@@ -1226,6 +1751,11 @@
     "model": "tab.debater",
     "pk": 112,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Pansy Alexander",
         "novice_status": 0
     }
@@ -1234,6 +1764,11 @@
     "model": "tab.debater",
     "pk": 113,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Elise Russo",
         "novice_status": 0
     }
@@ -1242,6 +1777,11 @@
     "model": "tab.debater",
     "pk": 114,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Josephine Griffin",
         "novice_status": 0
     }
@@ -1250,6 +1790,11 @@
     "model": "tab.debater",
     "pk": 115,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Nanette Hickman",
         "novice_status": 0
     }
@@ -1258,6 +1803,11 @@
     "model": "tab.debater",
     "pk": 116,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Luz Eaton",
         "novice_status": 0
     }
@@ -1266,6 +1816,11 @@
     "model": "tab.debater",
     "pk": 117,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lacey Yang",
         "novice_status": 0
     }
@@ -1274,6 +1829,11 @@
     "model": "tab.debater",
     "pk": 118,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Katina Mcintyre",
         "novice_status": 0
     }
@@ -1282,6 +1842,11 @@
     "model": "tab.debater",
     "pk": 119,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Leslie Vasquez",
         "novice_status": 0
     }
@@ -1290,6 +1855,11 @@
     "model": "tab.debater",
     "pk": 120,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Socorro Lindsey",
         "novice_status": 0
     }
@@ -1298,6 +1868,11 @@
     "model": "tab.debater",
     "pk": 121,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shelly Kane",
         "novice_status": 1
     }
@@ -1306,6 +1881,11 @@
     "model": "tab.debater",
     "pk": 122,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rosie Frazier",
         "novice_status": 1
     }
@@ -1314,6 +1894,11 @@
     "model": "tab.debater",
     "pk": 123,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mamie Foster",
         "novice_status": 1
     }
@@ -1322,6 +1907,11 @@
     "model": "tab.debater",
     "pk": 124,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Leonor Lopez",
         "novice_status": 1
     }
@@ -1330,6 +1920,11 @@
     "model": "tab.debater",
     "pk": 125,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Claudette Kline",
         "novice_status": 1
     }
@@ -1338,6 +1933,11 @@
     "model": "tab.debater",
     "pk": 126,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rosanne Obrien",
         "novice_status": 0
     }
@@ -1346,6 +1946,11 @@
     "model": "tab.debater",
     "pk": 129,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jan Hale",
         "novice_status": 1
     }
@@ -1354,6 +1959,11 @@
     "model": "tab.debater",
     "pk": 131,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Brigitte Mayo",
         "novice_status": 1
     }
@@ -1362,6 +1972,11 @@
     "model": "tab.debater",
     "pk": 132,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Winifred Ross",
         "novice_status": 1
     }
@@ -1370,6 +1985,11 @@
     "model": "tab.debater",
     "pk": 133,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Yvonne Boone",
         "novice_status": 0
     }
@@ -1378,6 +1998,11 @@
     "model": "tab.debater",
     "pk": 134,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Caitlin Evans",
         "novice_status": 0
     }
@@ -1386,6 +2011,11 @@
     "model": "tab.debater",
     "pk": 135,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Joann Larson",
         "novice_status": 1
     }
@@ -1394,6 +2024,11 @@
     "model": "tab.debater",
     "pk": 136,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Allyson Stevens",
         "novice_status": 1
     }
@@ -1402,6 +2037,11 @@
     "model": "tab.debater",
     "pk": 137,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ernestine Mccormick",
         "novice_status": 0
     }
@@ -1410,6 +2050,11 @@
     "model": "tab.debater",
     "pk": 138,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Velma Munoz",
         "novice_status": 1
     }
@@ -1418,6 +2063,11 @@
     "model": "tab.debater",
     "pk": 139,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Traci James",
         "novice_status": 0
     }
@@ -1426,6 +2076,11 @@
     "model": "tab.debater",
     "pk": 140,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Maribel Hubbard",
         "novice_status": 1
     }
@@ -1434,6 +2089,11 @@
     "model": "tab.debater",
     "pk": 141,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lynette Fuller",
         "novice_status": 1
     }
@@ -1442,6 +2102,11 @@
     "model": "tab.debater",
     "pk": 142,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "June Pacheco",
         "novice_status": 0
     }
@@ -1450,6 +2115,11 @@
     "model": "tab.debater",
     "pk": 143,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shanna Brennan",
         "novice_status": 1
     }
@@ -1458,6 +2128,11 @@
     "model": "tab.debater",
     "pk": 144,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Hallie Schroeder",
         "novice_status": 0
     }
@@ -1466,6 +2141,11 @@
     "model": "tab.debater",
     "pk": 145,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alyce Mooney",
         "novice_status": 0
     }
@@ -1474,6 +2154,11 @@
     "model": "tab.debater",
     "pk": 146,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jill Vincent",
         "novice_status": 1
     }
@@ -1482,6 +2167,11 @@
     "model": "tab.debater",
     "pk": 147,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gayle Hatfield",
         "novice_status": 0
     }
@@ -1490,6 +2180,11 @@
     "model": "tab.debater",
     "pk": 148,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jerri Chandler",
         "novice_status": 0
     }
@@ -1498,6 +2193,11 @@
     "model": "tab.debater",
     "pk": 149,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Myrtle Ellison",
         "novice_status": 1
     }
@@ -1506,6 +2206,11 @@
     "model": "tab.debater",
     "pk": 150,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jacqueline Jordan",
         "novice_status": 0
     }
@@ -1514,6 +2219,11 @@
     "model": "tab.debater",
     "pk": 151,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Saundra Clarke",
         "novice_status": 0
     }
@@ -1522,6 +2232,11 @@
     "model": "tab.debater",
     "pk": 152,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Isabella Daugherty",
         "novice_status": 0
     }
@@ -1530,6 +2245,11 @@
     "model": "tab.debater",
     "pk": 153,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Beverly Morales",
         "novice_status": 0
     }
@@ -1538,6 +2258,11 @@
     "model": "tab.debater",
     "pk": 154,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jamie Holder",
         "novice_status": 0
     }
@@ -1546,6 +2271,11 @@
     "model": "tab.debater",
     "pk": 155,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tammi Jimenez",
         "novice_status": 0
     }
@@ -1554,6 +2284,11 @@
     "model": "tab.debater",
     "pk": 156,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Amalia Kinney",
         "novice_status": 0
     }
@@ -1562,6 +2297,11 @@
     "model": "tab.debater",
     "pk": 157,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Priscilla Everett",
         "novice_status": 0
     }
@@ -1570,6 +2310,11 @@
     "model": "tab.debater",
     "pk": 158,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Corina Calhoun",
         "novice_status": 0
     }
@@ -1578,6 +2323,11 @@
     "model": "tab.debater",
     "pk": 160,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Katelyn Key",
         "novice_status": 1
     }
@@ -1586,6 +2336,11 @@
     "model": "tab.debater",
     "pk": 161,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Vanessa Hernandez",
         "novice_status": 1
     }
@@ -1594,6 +2349,11 @@
     "model": "tab.debater",
     "pk": 163,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gail Cooper",
         "novice_status": 1
     }
@@ -1602,6 +2362,11 @@
     "model": "tab.debater",
     "pk": 164,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Florine Ferrell",
         "novice_status": 0
     }
@@ -1610,6 +2375,11 @@
     "model": "tab.debater",
     "pk": 165,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sophie Mcguire",
         "novice_status": 1
     }
@@ -1618,6 +2388,11 @@
     "model": "tab.debater",
     "pk": 166,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Krystal Rodriguez",
         "novice_status": 0
     }
@@ -1626,6 +2401,11 @@
     "model": "tab.debater",
     "pk": 167,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Imelda Avery",
         "novice_status": 0
     }
@@ -1634,6 +2414,11 @@
     "model": "tab.debater",
     "pk": 168,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Leta Saunders",
         "novice_status": 1
     }
@@ -1642,6 +2427,11 @@
     "model": "tab.debater",
     "pk": 169,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Melisa Combs",
         "novice_status": 0
     }
@@ -1650,6 +2440,11 @@
     "model": "tab.debater",
     "pk": 170,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Robyn Calderon",
         "novice_status": 1
     }
@@ -1658,6 +2453,11 @@
     "model": "tab.debater",
     "pk": 171,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Nannie Wright",
         "novice_status": 1
     }
@@ -1666,6 +2466,11 @@
     "model": "tab.debater",
     "pk": 172,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "April Bowen",
         "novice_status": 1
     }
@@ -1674,6 +2479,11 @@
     "model": "tab.debater",
     "pk": 173,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lizzie Parsons",
         "novice_status": 1
     }
@@ -1682,6 +2492,11 @@
     "model": "tab.debater",
     "pk": 174,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Elinor Bradley",
         "novice_status": 1
     }
@@ -1690,6 +2505,11 @@
     "model": "tab.debater",
     "pk": 175,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rosalind Soto",
         "novice_status": 0
     }
@@ -1698,6 +2518,11 @@
     "model": "tab.debater",
     "pk": 176,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lara Valentine",
         "novice_status": 1
     }
@@ -1706,6 +2531,11 @@
     "model": "tab.debater",
     "pk": 177,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Pat Strong",
         "novice_status": 1
     }
@@ -1714,6 +2544,11 @@
     "model": "tab.debater",
     "pk": 178,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jenna Doyle",
         "novice_status": 1
     }
@@ -1722,6 +2557,11 @@
     "model": "tab.debater",
     "pk": 179,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Terry Dyer",
         "novice_status": 1
     }
@@ -1730,6 +2570,11 @@
     "model": "tab.debater",
     "pk": 180,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Cindy Newman",
         "novice_status": 1
     }
@@ -1738,6 +2583,11 @@
     "model": "tab.debater",
     "pk": 181,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lindsey Cohen",
         "novice_status": 1
     }
@@ -1746,6 +2596,11 @@
     "model": "tab.debater",
     "pk": 182,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kathie Rivas",
         "novice_status": 1
     }
@@ -1754,6 +2609,11 @@
     "model": "tab.debater",
     "pk": 183,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sheena Branch",
         "novice_status": 1
     }
@@ -1762,6 +2622,11 @@
     "model": "tab.debater",
     "pk": 186,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lynnette Hunt",
         "novice_status": 1
     }
@@ -1770,6 +2635,11 @@
     "model": "tab.debater",
     "pk": 188,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lauri Giles",
         "novice_status": 1
     }
@@ -1778,6 +2648,11 @@
     "model": "tab.debater",
     "pk": 189,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mona Gould",
         "novice_status": 1
     }
@@ -1786,6 +2661,11 @@
     "model": "tab.debater",
     "pk": 190,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gay Blair",
         "novice_status": 1
     }
@@ -1794,6 +2674,11 @@
     "model": "tab.debater",
     "pk": 191,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Deann Fernandez",
         "novice_status": 1
     }
@@ -1802,6 +2687,11 @@
     "model": "tab.debater",
     "pk": 192,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Holly Buckley",
         "novice_status": 1
     }
@@ -1810,6 +2700,11 @@
     "model": "tab.debater",
     "pk": 193,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gladys Kelley",
         "novice_status": 0
     }
@@ -1818,6 +2713,11 @@
     "model": "tab.debater",
     "pk": 194,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lila Sandoval",
         "novice_status": 1
     }
@@ -1826,6 +2726,11 @@
     "model": "tab.debater",
     "pk": 195,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sherry David",
         "novice_status": 1
     }
@@ -1834,6 +2739,11 @@
     "model": "tab.debater",
     "pk": 196,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Miriam Hester",
         "novice_status": 0
     }
@@ -1842,6 +2752,11 @@
     "model": "tab.debater",
     "pk": 197,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Georgia Lindsay",
         "novice_status": 0
     }
@@ -1850,6 +2765,11 @@
     "model": "tab.debater",
     "pk": 198,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Fanny Gentry",
         "novice_status": 0
     }
@@ -1858,6 +2778,11 @@
     "model": "tab.debater",
     "pk": 199,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Louella Sampson",
         "novice_status": 1
     }
@@ -1866,6 +2791,11 @@
     "model": "tab.debater",
     "pk": 200,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Briana Watson",
         "novice_status": 0
     }
@@ -1874,6 +2804,11 @@
     "model": "tab.debater",
     "pk": 201,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jessie Olsen",
         "novice_status": 0
     }
@@ -1882,6 +2817,11 @@
     "model": "tab.debater",
     "pk": 202,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Johanna Burt",
         "novice_status": 0
     }
@@ -1890,6 +2830,11 @@
     "model": "tab.debater",
     "pk": 204,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tanya Manning",
         "novice_status": 0
     }
@@ -1898,6 +2843,11 @@
     "model": "tab.debater",
     "pk": 205,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Grace Armstrong",
         "novice_status": 0
     }
@@ -1906,6 +2856,11 @@
     "model": "tab.debater",
     "pk": 206,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mildred Robbins",
         "novice_status": 0
     }
@@ -1914,6 +2869,11 @@
     "model": "tab.debater",
     "pk": 207,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Evangeline Lowe",
         "novice_status": 0
     }
@@ -1922,6 +2882,11 @@
     "model": "tab.debater",
     "pk": 208,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Misty Reilly",
         "novice_status": 0
     }
@@ -1930,6 +2895,11 @@
     "model": "tab.debater",
     "pk": 209,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tricia Haley",
         "novice_status": 0
     }
@@ -1938,6 +2908,11 @@
     "model": "tab.debater",
     "pk": 210,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Madelyn Ball",
         "novice_status": 0
     }
@@ -1946,6 +2921,11 @@
     "model": "tab.debater",
     "pk": 211,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Millie Guzman",
         "novice_status": 1
     }
@@ -1954,6 +2934,11 @@
     "model": "tab.debater",
     "pk": 212,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Reyna Gray",
         "novice_status": 1
     }
@@ -1962,6 +2947,11 @@
     "model": "tab.debater",
     "pk": 213,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tracie Chase",
         "novice_status": 1
     }
@@ -1970,6 +2960,11 @@
     "model": "tab.debater",
     "pk": 214,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Beulah Stewart",
         "novice_status": 1
     }
@@ -1978,6 +2973,11 @@
     "model": "tab.debater",
     "pk": 215,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Judith Tyler",
         "novice_status": 0
     }
@@ -1986,6 +2986,11 @@
     "model": "tab.debater",
     "pk": 216,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Brandie Walsh",
         "novice_status": 1
     }
@@ -1994,6 +2999,11 @@
     "model": "tab.debater",
     "pk": 217,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Yesenia Wilkinson",
         "novice_status": 1
     }
@@ -2002,6 +3012,11 @@
     "model": "tab.debater",
     "pk": 218,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Willa Garner",
         "novice_status": 1
     }
@@ -2010,6 +3025,11 @@
     "model": "tab.debater",
     "pk": 219,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Taylor Johns",
         "novice_status": 0
     }
@@ -2018,6 +3038,11 @@
     "model": "tab.debater",
     "pk": 220,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Cecilia Mccoy",
         "novice_status": 0
     }
@@ -2026,6 +3051,11 @@
     "model": "tab.debater",
     "pk": 221,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Cara Parker",
         "novice_status": 1
     }
@@ -2034,6 +3064,11 @@
     "model": "tab.debater",
     "pk": 222,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Margret Marks",
         "novice_status": 0
     }
@@ -2042,6 +3077,11 @@
     "model": "tab.debater",
     "pk": 223,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Benita Bradshaw",
         "novice_status": 0
     }
@@ -2050,6 +3090,11 @@
     "model": "tab.debater",
     "pk": 224,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Hazel Patton",
         "novice_status": 1
     }
@@ -2058,6 +3103,11 @@
     "model": "tab.debater",
     "pk": 225,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Candy Massey",
         "novice_status": 1
     }
@@ -2066,6 +3116,11 @@
     "model": "tab.debater",
     "pk": 227,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Phoebe Livingston",
         "novice_status": 1
     }
@@ -2074,6 +3129,11 @@
     "model": "tab.debater",
     "pk": 228,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Minerva Pearson",
         "novice_status": 1
     }
@@ -2082,6 +3142,11 @@
     "model": "tab.debater",
     "pk": 229,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Luann Moon",
         "novice_status": 0
     }
@@ -2090,6 +3155,11 @@
     "model": "tab.debater",
     "pk": 230,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Trina Kirby",
         "novice_status": 1
     }
@@ -2098,6 +3168,11 @@
     "model": "tab.debater",
     "pk": 231,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Crystal Simpson",
         "novice_status": 1
     }
@@ -2106,6 +3181,11 @@
     "model": "tab.debater",
     "pk": 232,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Melissa Grimes",
         "novice_status": 1
     }
@@ -2114,6 +3194,11 @@
     "model": "tab.debater",
     "pk": 233,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "May Houston",
         "novice_status": 1
     }
@@ -2122,6 +3207,11 @@
     "model": "tab.debater",
     "pk": 234,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Isabelle Joyce",
         "novice_status": 1
     }
@@ -2130,6 +3220,11 @@
     "model": "tab.debater",
     "pk": 235,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Aimee Levine",
         "novice_status": 0
     }
@@ -2138,6 +3233,11 @@
     "model": "tab.debater",
     "pk": 236,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mary Crawford",
         "novice_status": 1
     }
@@ -2146,6 +3246,11 @@
     "model": "tab.debater",
     "pk": 237,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Meredith Reynolds",
         "novice_status": 1
     }
@@ -2154,6 +3259,11 @@
     "model": "tab.debater",
     "pk": 238,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lidia Trevino",
         "novice_status": 0
     }
@@ -2162,6 +3272,11 @@
     "model": "tab.debater",
     "pk": 239,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sophia Bruce",
         "novice_status": 1
     }
@@ -2170,6 +3285,11 @@
     "model": "tab.debater",
     "pk": 240,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shawn Greene",
         "novice_status": 0
     }
@@ -2178,6 +3298,11 @@
     "model": "tab.debater",
     "pk": 242,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shawna Cochran",
         "novice_status": 0
     }
@@ -2186,6 +3311,11 @@
     "model": "tab.debater",
     "pk": 243,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jody Jacobs",
         "novice_status": 0
     }
@@ -2194,6 +3324,11 @@
     "model": "tab.debater",
     "pk": 244,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lorna Todd",
         "novice_status": 1
     }
@@ -2202,6 +3337,11 @@
     "model": "tab.debater",
     "pk": 245,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ericka Petersen",
         "novice_status": 0
     }
@@ -2210,6 +3350,11 @@
     "model": "tab.debater",
     "pk": 246,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sharon Lee",
         "novice_status": 0
     }
@@ -2218,6 +3363,11 @@
     "model": "tab.debater",
     "pk": 247,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Nichole Gillespie",
         "novice_status": 1
     }
@@ -2226,6 +3376,11 @@
     "model": "tab.debater",
     "pk": 248,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Christina Cline",
         "novice_status": 0
     }
@@ -2234,6 +3389,11 @@
     "model": "tab.debater",
     "pk": 249,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Flora Mclean",
         "novice_status": 1
     }
@@ -2242,6 +3402,11 @@
     "model": "tab.debater",
     "pk": 250,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Iva Sharpe",
         "novice_status": 0
     }
@@ -2250,6 +3415,11 @@
     "model": "tab.debater",
     "pk": 251,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Coleen Conley",
         "novice_status": 1
     }
@@ -2258,6 +3428,11 @@
     "model": "tab.debater",
     "pk": 253,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Nancy Garrison",
         "novice_status": 1
     }
@@ -2266,6 +3441,11 @@
     "model": "tab.debater",
     "pk": 254,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jayne Sherman",
         "novice_status": 0
     }
@@ -2274,6 +3454,11 @@
     "model": "tab.debater",
     "pk": 255,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Vonda Duke",
         "novice_status": 1
     }
@@ -2282,6 +3467,11 @@
     "model": "tab.debater",
     "pk": 256,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Addie Joseph",
         "novice_status": 1
     }
@@ -2290,6 +3480,11 @@
     "model": "tab.debater",
     "pk": 257,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Paulette Newton",
         "novice_status": 0
     }
@@ -2298,6 +3493,11 @@
     "model": "tab.debater",
     "pk": 258,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Noemi Stuart",
         "novice_status": 0
     }
@@ -2306,6 +3506,11 @@
     "model": "tab.debater",
     "pk": 259,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Molly Carver",
         "novice_status": 1
     }
@@ -2314,6 +3519,11 @@
     "model": "tab.debater",
     "pk": 260,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Teresa Merrill",
         "novice_status": 1
     }
@@ -2322,6 +3532,11 @@
     "model": "tab.debater",
     "pk": 262,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lakeisha Richard",
         "novice_status": 0
     }
@@ -2330,6 +3545,11 @@
     "model": "tab.debater",
     "pk": 263,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Concepcion Booker",
         "novice_status": 1
     }
@@ -2338,6 +3558,11 @@
     "model": "tab.debater",
     "pk": 264,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Mae Fisher",
         "novice_status": 1
     }
@@ -2346,6 +3571,11 @@
     "model": "tab.debater",
     "pk": 265,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Beatrice Potter",
         "novice_status": 1
     }
@@ -2354,6 +3584,11 @@
     "model": "tab.debater",
     "pk": 266,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Deanna Dalton",
         "novice_status": 1
     }
@@ -2362,6 +3597,11 @@
     "model": "tab.debater",
     "pk": 267,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Nelda Santiago",
         "novice_status": 1
     }
@@ -2370,6 +3610,11 @@
     "model": "tab.debater",
     "pk": 268,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Casandra Holden",
         "novice_status": 0
     }
@@ -2378,6 +3623,11 @@
     "model": "tab.debater",
     "pk": 269,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Janine Brooks",
         "novice_status": 0
     }
@@ -2386,6 +3636,11 @@
     "model": "tab.debater",
     "pk": 270,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Stacey Bond",
         "novice_status": 0
     }
@@ -2394,6 +3649,11 @@
     "model": "tab.debater",
     "pk": 271,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Stacy Bailey",
         "novice_status": 0
     }
@@ -2402,6 +3662,11 @@
     "model": "tab.debater",
     "pk": 272,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Casey Sanders",
         "novice_status": 0
     }
@@ -2410,6 +3675,11 @@
     "model": "tab.debater",
     "pk": 273,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sandra Casey",
         "novice_status": 1
     }
@@ -2418,6 +3688,11 @@
     "model": "tab.debater",
     "pk": 274,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Johnnie Valenzuela",
         "novice_status": 0
     }
@@ -2426,6 +3701,11 @@
     "model": "tab.debater",
     "pk": 275,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kelley Pope",
         "novice_status": 0
     }
@@ -2434,6 +3714,11 @@
     "model": "tab.debater",
     "pk": 276,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lillie Mcleod",
         "novice_status": 1
     }
@@ -2442,6 +3727,11 @@
     "model": "tab.debater",
     "pk": 277,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Violet Rowland",
         "novice_status": 0
     }
@@ -2450,6 +3740,11 @@
     "model": "tab.debater",
     "pk": 278,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Guadalupe Roach",
         "novice_status": 1
     }
@@ -2458,6 +3753,11 @@
     "model": "tab.debater",
     "pk": 279,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Elisabeth Fry",
         "novice_status": 1
     }
@@ -2466,6 +3766,11 @@
     "model": "tab.debater",
     "pk": 280,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lavonne Oconnor",
         "novice_status": 0
     }
@@ -2474,6 +3779,11 @@
     "model": "tab.debater",
     "pk": 282,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lillian Bonner",
         "novice_status": 1
     }
@@ -2482,6 +3792,11 @@
     "model": "tab.debater",
     "pk": 283,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Lucinda Strickland",
         "novice_status": 0
     }
@@ -2490,6 +3805,11 @@
     "model": "tab.debater",
     "pk": 284,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Clare Flowers",
         "novice_status": 0
     }
@@ -2498,6 +3818,11 @@
     "model": "tab.debater",
     "pk": 285,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tiffany Lynn",
         "novice_status": 1
     }
@@ -2506,6 +3831,11 @@
     "model": "tab.debater",
     "pk": 286,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shauna Stone",
         "novice_status": 1
     }
@@ -2514,6 +3844,11 @@
     "model": "tab.debater",
     "pk": 287,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sandy Odonnell",
         "novice_status": 1
     }
@@ -2522,6 +3857,11 @@
     "model": "tab.debater",
     "pk": 288,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Abigail Whitley",
         "novice_status": 1
     }
@@ -2530,6 +3870,11 @@
     "model": "tab.debater",
     "pk": 289,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sherri Blevins",
         "novice_status": 1
     }
@@ -2538,6 +3883,11 @@
     "model": "tab.debater",
     "pk": 290,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Robert Leonard",
         "novice_status": 1
     }
@@ -2546,6 +3896,11 @@
     "model": "tab.debater",
     "pk": 291,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tami Larsen",
         "novice_status": 1
     }
@@ -2554,6 +3909,11 @@
     "model": "tab.debater",
     "pk": 292,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Irene Hewitt",
         "novice_status": 1
     }
@@ -2562,6 +3922,11 @@
     "model": "tab.debater",
     "pk": 293,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ruthie Gilbert",
         "novice_status": 1
     }
@@ -2570,6 +3935,11 @@
     "model": "tab.debater",
     "pk": 294,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Corrine Cherry",
         "novice_status": 1
     }
@@ -2578,6 +3948,11 @@
     "model": "tab.debater",
     "pk": 295,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Daisy Mcdowell",
         "novice_status": 1
     }
@@ -2586,6 +3961,11 @@
     "model": "tab.debater",
     "pk": 297,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Edna Bennett",
         "novice_status": 1
     }
@@ -2594,6 +3974,11 @@
     "model": "tab.debater",
     "pk": 299,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "James Mcbride",
         "novice_status": 1
     }
@@ -2602,6 +3987,11 @@
     "model": "tab.debater",
     "pk": 300,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Earnestine Pitts",
         "novice_status": 0
     }
@@ -2610,6 +4000,11 @@
     "model": "tab.debater",
     "pk": 301,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Karina Cardenas",
         "novice_status": 0
     }
@@ -2618,6 +4013,11 @@
     "model": "tab.debater",
     "pk": 302,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Marsha Zamora",
         "novice_status": 1
     }
@@ -2626,6 +4026,11 @@
     "model": "tab.debater",
     "pk": 303,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Rachel Cleveland",
         "novice_status": 0
     }
@@ -2634,6 +4039,11 @@
     "model": "tab.debater",
     "pk": 304,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ladonna Murphy",
         "novice_status": 1
     }
@@ -2642,6 +4052,11 @@
     "model": "tab.debater",
     "pk": 305,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Serena Mcgee",
         "novice_status": 0
     }
@@ -2650,6 +4065,11 @@
     "model": "tab.debater",
     "pk": 306,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jeannie Foley",
         "novice_status": 1
     }
@@ -2658,6 +4078,11 @@
     "model": "tab.debater",
     "pk": 307,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ellen Conway",
         "novice_status": 0
     }
@@ -2666,6 +4091,11 @@
     "model": "tab.debater",
     "pk": 308,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ada Day",
         "novice_status": 0
     }
@@ -2674,6 +4104,11 @@
     "model": "tab.debater",
     "pk": 309,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Melanie Hammond",
         "novice_status": 0
     }
@@ -2682,6 +4117,11 @@
     "model": "tab.debater",
     "pk": 310,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Roseann Crane",
         "novice_status": 0
     }
@@ -2690,6 +4130,11 @@
     "model": "tab.debater",
     "pk": 311,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kitty Reyes",
         "novice_status": 0
     }
@@ -2698,6 +4143,11 @@
     "model": "tab.debater",
     "pk": 312,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Margaret Madden",
         "novice_status": 0
     }
@@ -2706,6 +4156,11 @@
     "model": "tab.debater",
     "pk": 313,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gabrielle Valencia",
         "novice_status": 0
     }
@@ -2714,6 +4169,11 @@
     "model": "tab.debater",
     "pk": 314,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Faye Shaw",
         "novice_status": 0
     }
@@ -2722,6 +4182,11 @@
     "model": "tab.debater",
     "pk": 315,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Dorothea Frederick",
         "novice_status": 0
     }
@@ -2730,6 +4195,11 @@
     "model": "tab.debater",
     "pk": 316,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Terra Mcdonald",
         "novice_status": 0
     }
@@ -2738,6 +4208,11 @@
     "model": "tab.debater",
     "pk": 317,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sheri Vega",
         "novice_status": 1
     }
@@ -2746,6 +4221,11 @@
     "model": "tab.debater",
     "pk": 318,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Daphne Owen",
         "novice_status": 1
     }
@@ -2754,6 +4234,11 @@
     "model": "tab.debater",
     "pk": 319,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sheryl Klein",
         "novice_status": 1
     }
@@ -2762,6 +4247,11 @@
     "model": "tab.debater",
     "pk": 320,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jami Kidd",
         "novice_status": 1
     }
@@ -2770,6 +4260,11 @@
     "model": "tab.debater",
     "pk": 323,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Leona Callahan",
         "novice_status": 1
     }
@@ -2778,6 +4273,11 @@
     "model": "tab.debater",
     "pk": 324,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Penny York",
         "novice_status": 1
     }
@@ -2786,6 +4286,11 @@
     "model": "tab.debater",
     "pk": 325,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Carey Estes",
         "novice_status": 1
     }
@@ -2794,6 +4299,11 @@
     "model": "tab.debater",
     "pk": 326,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Linda Silva",
         "novice_status": 1
     }
@@ -2802,6 +4312,11 @@
     "model": "tab.debater",
     "pk": 327,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Tina Barr",
         "novice_status": 0
     }
@@ -2810,6 +4325,11 @@
     "model": "tab.debater",
     "pk": 328,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ilene Frost",
         "novice_status": 0
     }
@@ -2818,6 +4338,11 @@
     "model": "tab.debater",
     "pk": 329,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Deena Reid",
         "novice_status": 0
     }
@@ -2826,6 +4351,11 @@
     "model": "tab.debater",
     "pk": 330,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Penelope Haynes",
         "novice_status": 0
     }
@@ -2834,6 +4364,11 @@
     "model": "tab.debater",
     "pk": 331,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jasmine Robertson",
         "novice_status": 0
     }
@@ -2842,6 +4377,11 @@
     "model": "tab.debater",
     "pk": 332,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Stephanie Grant",
         "novice_status": 0
     }
@@ -2850,6 +4390,11 @@
     "model": "tab.debater",
     "pk": 333,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Olive Gilliam",
         "novice_status": 1
     }
@@ -2858,6 +4403,11 @@
     "model": "tab.debater",
     "pk": 334,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Maggie Long",
         "novice_status": 0
     }
@@ -2866,6 +4416,11 @@
     "model": "tab.debater",
     "pk": 335,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Roxanne King",
         "novice_status": 0
     }
@@ -2874,6 +4429,11 @@
     "model": "tab.debater",
     "pk": 336,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Justine Malone",
         "novice_status": 0
     }
@@ -2882,6 +4442,11 @@
     "model": "tab.debater",
     "pk": 337,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Diann Prince",
         "novice_status": 0
     }
@@ -2890,6 +4455,11 @@
     "model": "tab.debater",
     "pk": 338,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alba Randall",
         "novice_status": 0
     }
@@ -2898,6 +4468,11 @@
     "model": "tab.debater",
     "pk": 339,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Martina Hunter",
         "novice_status": 0
     }
@@ -2906,6 +4481,11 @@
     "model": "tab.debater",
     "pk": 340,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Valerie Chapman",
         "novice_status": 1
     }
@@ -2914,6 +4494,11 @@
     "model": "tab.debater",
     "pk": 341,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Angelina Lambert",
         "novice_status": 1
     }
@@ -2922,6 +4507,11 @@
     "model": "tab.debater",
     "pk": 342,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Vivian Holt",
         "novice_status": 1
     }
@@ -2930,6 +4520,11 @@
     "model": "tab.debater",
     "pk": 343,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Alma Dodson",
         "novice_status": 1
     }
@@ -2938,6 +4533,11 @@
     "model": "tab.debater",
     "pk": 344,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Edith Ayala",
         "novice_status": 1
     }
@@ -2946,6 +4546,11 @@
     "model": "tab.debater",
     "pk": 345,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Melody Steele",
         "novice_status": 1
     }
@@ -2954,6 +4559,11 @@
     "model": "tab.debater",
     "pk": 346,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gertrude Cote",
         "novice_status": 0
     }
@@ -2962,6 +4572,11 @@
     "model": "tab.debater",
     "pk": 347,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Barbara Wyatt",
         "novice_status": 0
     }
@@ -2970,6 +4585,11 @@
     "model": "tab.debater",
     "pk": 348,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Berta Galloway",
         "novice_status": 0
     }
@@ -2978,6 +4598,11 @@
     "model": "tab.debater",
     "pk": 349,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Cathy Gallegos",
         "novice_status": 0
     }
@@ -2986,6 +4611,11 @@
     "model": "tab.debater",
     "pk": 350,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Jaclyn Mcmahon",
         "novice_status": 1
     }
@@ -2994,6 +4624,11 @@
     "model": "tab.debater",
     "pk": 351,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Angeline Garcia",
         "novice_status": 1
     }
@@ -3002,6 +4637,11 @@
     "model": "tab.debater",
     "pk": 352,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Latoya Dickerson",
         "novice_status": 1
     }
@@ -3010,6 +4650,11 @@
     "model": "tab.debater",
     "pk": 353,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Ingrid Durham",
         "novice_status": 1
     }
@@ -3018,6 +4663,11 @@
     "model": "tab.debater",
     "pk": 355,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Sally Ray",
         "novice_status": 0
     }
@@ -3026,6 +4676,11 @@
     "model": "tab.debater",
     "pk": 356,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Kari Hardin",
         "novice_status": 1
     }
@@ -3034,6 +4689,11 @@
     "model": "tab.debater",
     "pk": 358,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Bianca Bridges",
         "novice_status": 1
     }
@@ -3042,6 +4702,11 @@
     "model": "tab.debater",
     "pk": 359,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Janette Hays",
         "novice_status": 1
     }
@@ -3050,6 +4715,11 @@
     "model": "tab.debater",
     "pk": 360,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Gena Mejia",
         "novice_status": 1
     }
@@ -3058,6 +4728,11 @@
     "model": "tab.debater",
     "pk": 361,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Shelby Holloway",
         "novice_status": 1
     }
@@ -3066,6 +4741,11 @@
     "model": "tab.debater",
     "pk": 362,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "John Love",
         "novice_status": 1
     }
@@ -3074,6 +4754,11 @@
     "model": "tab.debater",
     "pk": 363,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "debater"
+        ],
+        "tiebreaker": null,
         "name": "Althea Sullivan",
         "novice_status": 1
     }
@@ -3082,6 +4767,11 @@
     "model": "tab.team",
     "pk": 1,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Chicago LM",
         "school": 2,
         "hybrid_school": null,
@@ -3097,6 +4787,11 @@
     "model": "tab.team",
     "pk": 2,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Syracuse Coriolanus",
         "school": 3,
         "hybrid_school": null,
@@ -3112,6 +4807,11 @@
     "model": "tab.team",
     "pk": 4,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Syracuse Cymbeline",
         "school": 3,
         "hybrid_school": null,
@@ -3127,6 +4827,11 @@
     "model": "tab.team",
     "pk": 6,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Syracuse Timon",
         "school": 3,
         "hybrid_school": null,
@@ -3142,6 +4847,11 @@
     "model": "tab.team",
     "pk": 7,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley Chairman Meow",
         "school": 4,
         "hybrid_school": null,
@@ -3157,6 +4867,11 @@
     "model": "tab.team",
     "pk": 8,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NU CF",
         "school": 6,
         "hybrid_school": null,
@@ -3172,6 +4887,11 @@
     "model": "tab.team",
     "pk": 9,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley Birkenstock A",
         "school": 4,
         "hybrid_school": null,
@@ -3187,6 +4907,11 @@
     "model": "tab.team",
     "pk": 10,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NU Powerpuff Girls A",
         "school": 6,
         "hybrid_school": null,
@@ -3202,6 +4927,11 @@
     "model": "tab.team",
     "pk": 11,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Fordham LCD Catsystem",
         "school": 33,
         "hybrid_school": null,
@@ -3217,6 +4947,11 @@
     "model": "tab.team",
     "pk": 12,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NU Return of the Pups",
         "school": 6,
         "hybrid_school": null,
@@ -3232,6 +4967,11 @@
     "model": "tab.team",
     "pk": 13,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley Failed System",
         "school": 4,
         "hybrid_school": null,
@@ -3247,6 +4987,11 @@
     "model": "tab.team",
     "pk": 14,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Fordham GZ",
         "school": 33,
         "hybrid_school": null,
@@ -3262,6 +5007,11 @@
     "model": "tab.team",
     "pk": 15,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley Elle Me Dit",
         "school": 4,
         "hybrid_school": null,
@@ -3277,6 +5027,11 @@
     "model": "tab.team",
     "pk": 16,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point MP",
         "school": 9,
         "hybrid_school": null,
@@ -3292,6 +5047,11 @@
     "model": "tab.team",
     "pk": 17,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Duke PS",
         "school": 34,
         "hybrid_school": null,
@@ -3307,6 +5067,11 @@
     "model": "tab.team",
     "pk": 18,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley Bob Dylan",
         "school": 4,
         "hybrid_school": null,
@@ -3322,6 +5087,11 @@
     "model": "tab.team",
     "pk": 19,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Duke SA",
         "school": 34,
         "hybrid_school": null,
@@ -3337,6 +5107,11 @@
     "model": "tab.team",
     "pk": 21,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Amherst PL",
         "school": 28,
         "hybrid_school": null,
@@ -3352,6 +5127,11 @@
     "model": "tab.team",
     "pk": 22,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wellesley/F&M Hybrid",
         "school": 4,
         "hybrid_school": null,
@@ -3367,6 +5147,11 @@
     "model": "tab.team",
     "pk": 23,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Maryland KS",
         "school": 35,
         "hybrid_school": null,
@@ -3382,6 +5167,11 @@
     "model": "tab.team",
     "pk": 24,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point Medical",
         "school": 9,
         "hybrid_school": null,
@@ -3397,6 +5187,11 @@
     "model": "tab.team",
     "pk": 25,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Hopkins IS",
         "school": 5,
         "hybrid_school": null,
@@ -3412,6 +5207,11 @@
     "model": "tab.team",
     "pk": 26,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point QM",
         "school": 9,
         "hybrid_school": null,
@@ -3427,6 +5227,11 @@
     "model": "tab.team",
     "pk": 27,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Amherst RJ",
         "school": 28,
         "hybrid_school": null,
@@ -3442,6 +5247,11 @@
     "model": "tab.team",
     "pk": 28,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Hopkins Church of Chirt",
         "school": 5,
         "hybrid_school": null,
@@ -3457,6 +5267,11 @@
     "model": "tab.team",
     "pk": 29,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point Armor",
         "school": 9,
         "hybrid_school": null,
@@ -3472,6 +5287,11 @@
     "model": "tab.team",
     "pk": 30,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia A, Why Not A+",
         "school": 7,
         "hybrid_school": null,
@@ -3487,6 +5307,11 @@
     "model": "tab.team",
     "pk": 31,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Pitt Disposable Dignity",
         "school": 30,
         "hybrid_school": null,
@@ -3502,6 +5327,11 @@
     "model": "tab.team",
     "pk": 32,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point Infantry",
         "school": 9,
         "hybrid_school": null,
@@ -3517,6 +5347,11 @@
     "model": "tab.team",
     "pk": 33,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia Blue Ivy (Carter)",
         "school": 7,
         "hybrid_school": null,
@@ -3532,6 +5367,11 @@
     "model": "tab.team",
     "pk": 34,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Pitt Magnanimous Sultans",
         "school": 30,
         "hybrid_school": null,
@@ -3547,6 +5387,11 @@
     "model": "tab.team",
     "pk": 35,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "West Point EOD",
         "school": 9,
         "hybrid_school": null,
@@ -3562,6 +5407,11 @@
     "model": "tab.team",
     "pk": 36,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia North West",
         "school": 7,
         "hybrid_school": null,
@@ -3577,6 +5427,11 @@
     "model": "tab.team",
     "pk": 37,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Berkeley 3",
         "school": 10,
         "hybrid_school": null,
@@ -3592,6 +5447,11 @@
     "model": "tab.team",
     "pk": 38,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia Moon Unit Zappa: You'",
         "school": 7,
         "hybrid_school": null,
@@ -3607,6 +5467,11 @@
     "model": "tab.team",
     "pk": 39,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Berkeley 2",
         "school": 10,
         "hybrid_school": null,
@@ -3622,6 +5487,11 @@
     "model": "tab.team",
     "pk": 40,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia Blanket Jackson",
         "school": 7,
         "hybrid_school": null,
@@ -3637,6 +5507,11 @@
     "model": "tab.team",
     "pk": 41,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Berkeley 1",
         "school": 10,
         "hybrid_school": null,
@@ -3652,6 +5527,11 @@
     "model": "tab.team",
     "pk": 42,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis EN",
         "school": 31,
         "hybrid_school": null,
@@ -3667,6 +5547,11 @@
     "model": "tab.team",
     "pk": 43,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Columbia/Stanford Sr8bros",
         "school": 11,
         "hybrid_school": null,
@@ -3682,6 +5567,11 @@
     "model": "tab.team",
     "pk": 44,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "GW MM",
         "school": 13,
         "hybrid_school": null,
@@ -3697,6 +5587,11 @@
     "model": "tab.team",
     "pk": 47,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NYU A",
         "school": 8,
         "hybrid_school": null,
@@ -3712,6 +5607,11 @@
     "model": "tab.team",
     "pk": 48,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "AU/GW Hybrid",
         "school": 13,
         "hybrid_school": null,
@@ -3727,6 +5627,11 @@
     "model": "tab.team",
     "pk": 49,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NYU B",
         "school": 8,
         "hybrid_school": null,
@@ -3742,6 +5647,11 @@
     "model": "tab.team",
     "pk": 50,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "GW Roundup",
         "school": 13,
         "hybrid_school": null,
@@ -3757,6 +5667,11 @@
     "model": "tab.team",
     "pk": 51,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NYU C",
         "school": 8,
         "hybrid_school": null,
@@ -3772,6 +5687,11 @@
     "model": "tab.team",
     "pk": 52,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "AU Patrick Bateman",
         "school": 27,
         "hybrid_school": null,
@@ -3787,6 +5707,11 @@
     "model": "tab.team",
     "pk": 54,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "NYU D",
         "school": 8,
         "hybrid_school": null,
@@ -3802,6 +5727,11 @@
     "model": "tab.team",
     "pk": 55,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "GW B",
         "school": 13,
         "hybrid_school": null,
@@ -3817,6 +5747,11 @@
     "model": "tab.team",
     "pk": 56,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "AU Elle Woods",
         "school": 27,
         "hybrid_school": null,
@@ -3832,6 +5767,11 @@
     "model": "tab.team",
     "pk": 57,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Stanford Rall Bad Bitchezzz",
         "school": 11,
         "hybrid_school": null,
@@ -3847,6 +5787,11 @@
     "model": "tab.team",
     "pk": 58,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "AU Frasier Crane",
         "school": 27,
         "hybrid_school": null,
@@ -3862,6 +5807,11 @@
     "model": "tab.team",
     "pk": 59,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "GW Last SOTY/Penultimate SOTY",
         "school": 13,
         "hybrid_school": null,
@@ -3877,6 +5827,11 @@
     "model": "tab.team",
     "pk": 60,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Penn JT",
         "school": 12,
         "hybrid_school": null,
@@ -3892,6 +5847,11 @@
     "model": "tab.team",
     "pk": 61,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "AU Harvey Specter",
         "school": 27,
         "hybrid_school": null,
@@ -3907,6 +5867,11 @@
     "model": "tab.team",
     "pk": 62,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Smith Gryffindor",
         "school": 15,
         "hybrid_school": null,
@@ -3922,6 +5887,11 @@
     "model": "tab.team",
     "pk": 63,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Penn MW",
         "school": 12,
         "hybrid_school": null,
@@ -3937,6 +5907,11 @@
     "model": "tab.team",
     "pk": 65,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Penn DS",
         "school": 12,
         "hybrid_school": null,
@@ -3952,6 +5927,11 @@
     "model": "tab.team",
     "pk": 66,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Smith Ravenclaw",
         "school": 15,
         "hybrid_school": null,
@@ -3967,6 +5947,11 @@
     "model": "tab.team",
     "pk": 67,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Smith Slytherin",
         "school": 15,
         "hybrid_school": null,
@@ -3982,6 +5967,11 @@
     "model": "tab.team",
     "pk": 68,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Tufts EK",
         "school": 14,
         "hybrid_school": null,
@@ -3997,6 +5987,11 @@
     "model": "tab.team",
     "pk": 69,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Georgetown Bend and Snap",
         "school": 23,
         "hybrid_school": null,
@@ -4012,6 +6007,11 @@
     "model": "tab.team",
     "pk": 70,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Tufts ES",
         "school": 14,
         "hybrid_school": null,
@@ -4027,6 +6027,11 @@
     "model": "tab.team",
     "pk": 71,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "W&M Django's Novices",
         "school": 16,
         "hybrid_school": null,
@@ -4042,6 +6047,11 @@
     "model": "tab.team",
     "pk": 72,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Tufts Bendrew Husick",
         "school": 14,
         "hybrid_school": null,
@@ -4057,6 +6067,11 @@
     "model": "tab.team",
     "pk": 73,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "W&M/UAlbany Hybrid",
         "school": 42,
         "hybrid_school": null,
@@ -4072,6 +6087,11 @@
     "model": "tab.team",
     "pk": 74,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Tufts DR",
         "school": 14,
         "hybrid_school": null,
@@ -4087,6 +6107,11 @@
     "model": "tab.team",
     "pk": 75,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "W&M A",
         "school": 16,
         "hybrid_school": null,
@@ -4102,6 +6127,11 @@
     "model": "tab.team",
     "pk": 76,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Tufts TC",
         "school": 14,
         "hybrid_school": null,
@@ -4117,6 +6147,11 @@
     "model": "tab.team",
     "pk": 77,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan Amy Gardner",
         "school": 21,
         "hybrid_school": null,
@@ -4132,6 +6167,11 @@
     "model": "tab.team",
     "pk": 78,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Swat MR",
         "school": 36,
         "hybrid_school": null,
@@ -4147,6 +6187,11 @@
     "model": "tab.team",
     "pk": 79,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU BP",
         "school": 17,
         "hybrid_school": null,
@@ -4162,6 +6207,11 @@
     "model": "tab.team",
     "pk": 81,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown GP",
         "school": 18,
         "hybrid_school": null,
@@ -4177,6 +6227,11 @@
     "model": "tab.team",
     "pk": 82,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU Cargo Shorts",
         "school": 17,
         "hybrid_school": null,
@@ -4192,6 +6247,11 @@
     "model": "tab.team",
     "pk": 83,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Swat ND",
         "school": 36,
         "hybrid_school": null,
@@ -4207,6 +6267,11 @@
     "model": "tab.team",
     "pk": 84,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan Donna Moss",
         "school": 21,
         "hybrid_school": null,
@@ -4222,6 +6287,11 @@
     "model": "tab.team",
     "pk": 85,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown Veal of Ignorance",
         "school": 18,
         "hybrid_school": null,
@@ -4237,6 +6307,11 @@
     "model": "tab.team",
     "pk": 86,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU NN",
         "school": 17,
         "hybrid_school": null,
@@ -4252,6 +6327,11 @@
     "model": "tab.team",
     "pk": 87,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown MN",
         "school": 18,
         "hybrid_school": null,
@@ -4267,6 +6347,11 @@
     "model": "tab.team",
     "pk": 89,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan Toby Ziegler",
         "school": 21,
         "hybrid_school": null,
@@ -4282,6 +6367,11 @@
     "model": "tab.team",
     "pk": 90,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU VJ",
         "school": 17,
         "hybrid_school": null,
@@ -4297,6 +6387,11 @@
     "model": "tab.team",
     "pk": 92,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan Leo McGarry",
         "school": 21,
         "hybrid_school": null,
@@ -4312,6 +6407,11 @@
     "model": "tab.team",
     "pk": 93,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU RA",
         "school": 17,
         "hybrid_school": null,
@@ -4327,6 +6427,11 @@
     "model": "tab.team",
     "pk": 94,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown CY",
         "school": 18,
         "hybrid_school": null,
@@ -4342,6 +6447,11 @@
     "model": "tab.team",
     "pk": 95,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "BU Batman",
         "school": 17,
         "hybrid_school": null,
@@ -4357,6 +6467,11 @@
     "model": "tab.team",
     "pk": 97,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown Final Machination",
         "school": 18,
         "hybrid_school": null,
@@ -4372,6 +6487,11 @@
     "model": "tab.team",
     "pk": 98,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Princeton A",
         "school": 19,
         "hybrid_school": null,
@@ -4387,6 +6507,11 @@
     "model": "tab.team",
     "pk": 99,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brown Amish Sex",
         "school": 18,
         "hybrid_school": null,
@@ -4402,6 +6527,11 @@
     "model": "tab.team",
     "pk": 100,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Princeton Legal Liability",
         "school": 19,
         "hybrid_school": null,
@@ -4417,6 +6547,11 @@
     "model": "tab.team",
     "pk": 101,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan CJ Cregg",
         "school": 21,
         "hybrid_school": null,
@@ -4432,6 +6567,11 @@
     "model": "tab.team",
     "pk": 102,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Princeton SJ",
         "school": 19,
         "hybrid_school": null,
@@ -4447,6 +6587,11 @@
     "model": "tab.team",
     "pk": 103,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Swat BH",
         "school": 36,
         "hybrid_school": null,
@@ -4462,6 +6607,11 @@
     "model": "tab.team",
     "pk": 104,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Wesleyan Josh Lyman",
         "school": 21,
         "hybrid_school": null,
@@ -4477,6 +6627,11 @@
     "model": "tab.team",
     "pk": 105,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Princeton RT",
         "school": 19,
         "hybrid_school": null,
@@ -4492,6 +6647,11 @@
     "model": "tab.team",
     "pk": 106,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Princeton MC",
         "school": 19,
         "hybrid_school": null,
@@ -4507,6 +6667,11 @@
     "model": "tab.team",
     "pk": 107,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MHC Firebreathing Rubberduckie",
         "school": 26,
         "hybrid_school": null,
@@ -4522,6 +6687,11 @@
     "model": "tab.team",
     "pk": 108,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Maryland DZ",
         "school": 35,
         "hybrid_school": null,
@@ -4537,6 +6707,11 @@
     "model": "tab.team",
     "pk": 109,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MHC Whose Lines",
         "school": 26,
         "hybrid_school": null,
@@ -4552,6 +6727,11 @@
     "model": "tab.team",
     "pk": 110,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Maryland Sailor Scouts",
         "school": 35,
         "hybrid_school": null,
@@ -4567,6 +6747,11 @@
     "model": "tab.team",
     "pk": 111,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Binghamton TH",
         "school": 32,
         "hybrid_school": null,
@@ -4582,6 +6767,11 @@
     "model": "tab.team",
     "pk": 112,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MHC Defined Lines",
         "school": 26,
         "hybrid_school": null,
@@ -4597,6 +6787,11 @@
     "model": "tab.team",
     "pk": 113,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "F&M Lennonists",
         "school": 20,
         "hybrid_school": null,
@@ -4612,6 +6807,11 @@
     "model": "tab.team",
     "pk": 114,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Maybach Keys",
         "school": 25,
         "hybrid_school": null,
@@ -4627,6 +6827,11 @@
     "model": "tab.team",
     "pk": 115,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Maryland FK",
         "school": 35,
         "hybrid_school": null,
@@ -4642,6 +6847,11 @@
     "model": "tab.team",
     "pk": 116,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Binghamton PC",
         "school": 32,
         "hybrid_school": null,
@@ -4657,6 +6867,11 @@
     "model": "tab.team",
     "pk": 117,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "F&M B",
         "school": 20,
         "hybrid_school": null,
@@ -4672,6 +6887,11 @@
     "model": "tab.team",
     "pk": 118,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Menage",
         "school": 25,
         "hybrid_school": null,
@@ -4687,6 +6907,11 @@
     "model": "tab.team",
     "pk": 119,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Swahili",
         "school": 25,
         "hybrid_school": null,
@@ -4702,6 +6927,11 @@
     "model": "tab.team",
     "pk": 120,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Maryland/Yale B^2 + 2BS + S^2",
         "school": 1,
         "hybrid_school": null,
@@ -4717,6 +6947,11 @@
     "model": "tab.team",
     "pk": 121,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Binghamton LW",
         "school": 32,
         "hybrid_school": null,
@@ -4732,6 +6967,11 @@
     "model": "tab.team",
     "pk": 122,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers War Bears",
         "school": 22,
         "hybrid_school": null,
@@ -4747,6 +6987,11 @@
     "model": "tab.team",
     "pk": 123,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "PC HB",
         "school": 38,
         "hybrid_school": null,
@@ -4762,6 +7007,11 @@
     "model": "tab.team",
     "pk": 124,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Blouse",
         "school": 25,
         "hybrid_school": null,
@@ -4777,6 +7027,11 @@
     "model": "tab.team",
     "pk": 126,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Binghamton DS",
         "school": 32,
         "hybrid_school": null,
@@ -4792,6 +7047,11 @@
     "model": "tab.team",
     "pk": 127,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "PC OP",
         "school": 38,
         "hybrid_school": null,
@@ -4807,6 +7067,11 @@
     "model": "tab.team",
     "pk": 128,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Spouse",
         "school": 25,
         "hybrid_school": null,
@@ -4822,6 +7087,11 @@
     "model": "tab.team",
     "pk": 129,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "PC AP",
         "school": 38,
         "hybrid_school": null,
@@ -4837,6 +7107,11 @@
     "model": "tab.team",
     "pk": 131,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates House",
         "school": 25,
         "hybrid_school": null,
@@ -4852,6 +7127,11 @@
     "model": "tab.team",
     "pk": 132,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "PC LL",
         "school": 38,
         "hybrid_school": null,
@@ -4867,6 +7147,11 @@
     "model": "tab.team",
     "pk": 133,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Bates Merchants of Yeezus",
         "school": 25,
         "hybrid_school": null,
@@ -4882,6 +7167,11 @@
     "model": "tab.team",
     "pk": 134,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers LP",
         "school": 22,
         "hybrid_school": null,
@@ -4897,6 +7187,11 @@
     "model": "tab.team",
     "pk": 135,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MIT We Can't Stop",
         "school": 37,
         "hybrid_school": null,
@@ -4912,6 +7207,11 @@
     "model": "tab.team",
     "pk": 137,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Williams Sorry We Can't Think ",
         "school": 39,
         "hybrid_school": null,
@@ -4927,6 +7227,11 @@
     "model": "tab.team",
     "pk": 138,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MIT Wrecking Ball",
         "school": 37,
         "hybrid_school": null,
@@ -4942,6 +7247,11 @@
     "model": "tab.team",
     "pk": 139,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers HP",
         "school": 22,
         "hybrid_school": null,
@@ -4957,6 +7267,11 @@
     "model": "tab.team",
     "pk": 140,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Stony Brook Muliminal Messages",
         "school": 29,
         "hybrid_school": null,
@@ -4972,6 +7287,11 @@
     "model": "tab.team",
     "pk": 141,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Middlebury Fuck, The Novices U",
         "school": 24,
         "hybrid_school": null,
@@ -4987,6 +7307,11 @@
     "model": "tab.team",
     "pk": 142,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Stony Brook Brown Out",
         "school": 29,
         "hybrid_school": null,
@@ -5002,6 +7327,11 @@
     "model": "tab.team",
     "pk": 143,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers Linsanity Sosa",
         "school": 22,
         "hybrid_school": null,
@@ -5017,6 +7347,11 @@
     "model": "tab.team",
     "pk": 145,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Stony Brook Malay Fighters",
         "school": 29,
         "hybrid_school": null,
@@ -5032,6 +7367,11 @@
     "model": "tab.team",
     "pk": 146,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MIT Party in the  USA",
         "school": 37,
         "hybrid_school": null,
@@ -5047,6 +7387,11 @@
     "model": "tab.team",
     "pk": 147,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Middlebury pB and j",
         "school": 24,
         "hybrid_school": null,
@@ -5062,6 +7407,11 @@
     "model": "tab.team",
     "pk": 148,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Stony Brook NN",
         "school": 29,
         "hybrid_school": null,
@@ -5077,6 +7427,11 @@
     "model": "tab.team",
     "pk": 150,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Middlebury Midd Kid A",
         "school": 24,
         "hybrid_school": null,
@@ -5092,6 +7447,11 @@
     "model": "tab.team",
     "pk": 151,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MIT Best of Both Worlds",
         "school": 37,
         "hybrid_school": null,
@@ -5107,6 +7467,11 @@
     "model": "tab.team",
     "pk": 152,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "MIT CSB",
         "school": 37,
         "hybrid_school": null,
@@ -5122,6 +7487,11 @@
     "model": "tab.team",
     "pk": 153,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale LR",
         "school": 1,
         "hybrid_school": null,
@@ -5137,6 +7507,11 @@
     "model": "tab.team",
     "pk": 154,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale Deezy",
         "school": 1,
         "hybrid_school": null,
@@ -5152,6 +7527,11 @@
     "model": "tab.team",
     "pk": 155,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale SZ",
         "school": 1,
         "hybrid_school": null,
@@ -5167,6 +7547,11 @@
     "model": "tab.team",
     "pk": 156,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale BB",
         "school": 1,
         "hybrid_school": null,
@@ -5182,6 +7567,11 @@
     "model": "tab.team",
     "pk": 157,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale HJ",
         "school": 1,
         "hybrid_school": null,
@@ -5197,6 +7587,11 @@
     "model": "tab.team",
     "pk": 158,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale HR",
         "school": 1,
         "hybrid_school": null,
@@ -5212,6 +7607,11 @@
     "model": "tab.team",
     "pk": 160,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale CaliBoys",
         "school": 1,
         "hybrid_school": null,
@@ -5227,6 +7627,11 @@
     "model": "tab.team",
     "pk": 162,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale BP",
         "school": 1,
         "hybrid_school": null,
@@ -5242,6 +7647,11 @@
     "model": "tab.team",
     "pk": 163,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale SWP",
         "school": 1,
         "hybrid_school": null,
@@ -5257,6 +7667,11 @@
     "model": "tab.team",
     "pk": 164,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Yale/CCSF Swahili A",
         "school": 43,
         "hybrid_school": null,
@@ -5272,6 +7687,11 @@
     "model": "tab.team",
     "pk": 165,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Middlebury Snark A",
         "school": 24,
         "hybrid_school": null,
@@ -5287,6 +7707,11 @@
     "model": "tab.team",
     "pk": 166,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis AL",
         "school": 31,
         "hybrid_school": null,
@@ -5302,6 +7727,11 @@
     "model": "tab.team",
     "pk": 167,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis GW",
         "school": 31,
         "hybrid_school": null,
@@ -5317,6 +7747,11 @@
     "model": "tab.team",
     "pk": 168,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis Yaas Gaga",
         "school": 31,
         "hybrid_school": null,
@@ -5332,6 +7767,11 @@
     "model": "tab.team",
     "pk": 169,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis C'Mon",
         "school": 31,
         "hybrid_school": null,
@@ -5347,6 +7787,11 @@
     "model": "tab.team",
     "pk": 170,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis Crazy Kids",
         "school": 31,
         "hybrid_school": null,
@@ -5362,6 +7807,11 @@
     "model": "tab.team",
     "pk": 171,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis Tik Tok",
         "school": 31,
         "hybrid_school": null,
@@ -5377,6 +7827,11 @@
     "model": "tab.team",
     "pk": 172,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers/Brown Power & Control",
         "school": 18,
         "hybrid_school": null,
@@ -5392,6 +7847,11 @@
     "model": "tab.team",
     "pk": 173,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Rutgers Swirl",
         "school": 22,
         "hybrid_school": null,
@@ -5407,6 +7867,11 @@
     "model": "tab.team",
     "pk": 174,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis JS",
         "school": 31,
         "hybrid_school": null,
@@ -5422,6 +7887,11 @@
     "model": "tab.team",
     "pk": 175,
     "fields": {
+        "polymorphic_ctype": [
+            "tab",
+            "team"
+        ],
+        "tiebreaker": null,
         "name": "Brandeis LA",
         "school": 31,
         "hybrid_school": null,
