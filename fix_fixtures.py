@@ -28,6 +28,7 @@ def fix_type(type_name, ctype_id):
         model["fields"]["tiebreaker"] = random.choice(range(0, 2**16))
         while model["fields"]["tiebreaker"] in USED_TIEBREAKERS:
             model["fields"]["tiebreaker"] = random.choice(range(0, 2**16))
+        USED_TIEBREAKERS.add(model["fields"]["tiebreaker"])
 
 
 fix_type("tab.team", find_content_type("team"))
