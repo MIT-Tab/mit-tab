@@ -2,15 +2,21 @@
   <h5 class="text-center">Varsity Ranking</h5>
   <table class="table table-striped table-sm table-bordered">
     <thead>
-      <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th>
+      <th>#</th>
+      <th>Team Name</th>
+      <th>Wins</th>
+      <th>Speaks</th>
+      <th>Ranks</th>
+      <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
     </thead>
-    {% for team,wins,speaks,ranks in varsity %}
+    {% for team, wins, speaks, ranks, tiebreaker in varsity %}
     <tr>
-        <td> {{forloop.counter}} </td>
-        <td> <a href="/team/{{team.id}}">{{team.name}}</a></td>
-        <td> {{wins}}</td>
-        <td> {{speaks|floatformat:2}}</td>
-        <td> {{ranks|floatformat:2}}</td>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td>{{ wins }}</td>
+        <td>{{ speaks|floatformat:2 }}</td>
+        <td>{{ ranks|floatformat:2 }}</td>
+        <td>{{ tiebreaker }}</td>
     </tr>
     {% endfor %}
   </table>
@@ -19,15 +25,21 @@
   <h5 class="text-center">Novice Ranking</h5>
   <table class="table table-striped table-sm table-bordered">
     <thead>
-      <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th>
+      <th>#</th>
+      <th>Team Name</th>
+      <th>Wins</th>
+      <th>Speaks</th>
+      <th>Ranks</th>
+      <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
     </thead>
-    {% for team,wins,speaks,ranks in novice %}
+    {% for team, wins, speaks, ranks, tiebreaker in novice %}
     <tr>
-        <td> {{forloop.counter}} </td>
-        <td> <a href="/team/{{team.id}}">{{team.name}}</a></td>
-        <td> {{wins}}</td>
-        <td> {{speaks|floatformat:2}}</td>
-        <td> {{ranks|floatformat:2}}</td>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td>{{ wins }}</td>
+        <td>{{ speaks|floatformat:2 }}</td>
+        <td>{{ ranks|floatformat:2 }}</td>
+        <td>{{ tiebreaker }}</td>
     </tr>
     {% endfor %}
   </table>

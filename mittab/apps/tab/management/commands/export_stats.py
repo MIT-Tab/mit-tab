@@ -45,8 +45,7 @@ class Command(BaseCommand):
                 tab_logic.tot_ranks(team))
 
     def make_debater_row(self, debater):
-        return (debater.name, tab_logic.deb_team(debater).name
-                if tab_logic.deb_team(debater) else "",
+        return (debater.name, debater.team().name if debater.team() else "",
                 tab_logic.tot_speaks_deb(debater),
                 tab_logic.tot_ranks_deb(debater))
 
