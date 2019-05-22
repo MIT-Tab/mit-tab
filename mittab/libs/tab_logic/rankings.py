@@ -18,25 +18,30 @@ def rank_teams():
     ])
 
 
-class __stat:
+class Stat:
     def __init__(self, name, sort_coefficient=1):
         self.name = name
         self.sort_coefficient = sort_coefficient
 
 
-WINS = __stat("Wins", -1)
-SPEAKS = __stat("Speaks", -1)
-RANKS = __stat("Ranks")
-SINGLE_ADJUSTED_SPEAKS = __stat("Single adjusted speaks", -1)
-SINGLE_ADJUSTED_RANKS = __stat("Single adjusted ranks")
-DOUBLE_ADJUSTED_SPEAKS = __stat("Double adjusted speaks", -1)
-DOUBLE_ADJUSTED_RANKS = __stat("Double adjusted ranks")
-OPP_STRENGTH = __stat("Opp strength", -1)
-COIN_FLIP = __stat("Coin flip")
+WINS = Stat("Wins", -1)
+SPEAKS = Stat("Speaks", -1)
+RANKS = Stat("Ranks")
+SINGLE_ADJUSTED_SPEAKS = Stat("Single adjusted speaks", -1)
+SINGLE_ADJUSTED_RANKS = Stat("Single adjusted ranks")
+DOUBLE_ADJUSTED_SPEAKS = Stat("Double adjusted speaks", -1)
+DOUBLE_ADJUSTED_RANKS = Stat("Double adjusted ranks")
+OPP_STRENGTH = Stat("Opp strength", -1)
+COIN_FLIP = Stat("Coin flip")
 
 
 @total_ordering
 class Score(ABC):
+    stat_priority = (,)
+
+    def __init__(self):
+        self.stats = {}
+
     def __eq__(self, other):
         return self.scoring_tuple() == other.scoring_tuple()
 
@@ -48,7 +53,7 @@ class Score(ABC):
 
     def scoring_tuple(self):
         return tuple(
-            map(lambda stat: stat.sort_coefficient * self.stats[stat],
+            map(lambda stat: stat.sort_coefficient * self[stat],
                 self.stat_priority))
 
     def get_tiebreaker(self, other):
@@ -68,8 +73,8 @@ class DebaterScore(Score):
                      DOUBLE_ADJUSTED_RANKS, COIN_FLIP)
 
     def __init__(self, debater):
+        super(DebaterScore, self).__init__()
         self.debater = debater
-        self.stats = {}
         self.stats[SPEAKS] = tot_speaks_deb(debater)
         self.stats[RANKS] = tot_ranks_deb(debater)
         self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks_deb(
@@ -88,8 +93,8 @@ class TeamScore(Score):
                      DOUBLE_ADJUSTED_RANKS, OPP_STRENGTH, COIN_FLIP)
 
     def __init__(self, team):
+        super(TeamScore, self).__init__()
         self.team = team
-        self.stats = {}
         self.stats[WINS] = tot_wins(team)
         self.stats[SPEAKS] = tot_speaks(team)
         self.stats[RANKS] = tot_ranks(team)

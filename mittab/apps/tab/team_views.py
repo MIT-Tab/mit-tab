@@ -331,17 +331,17 @@ def rank_teams_ajax(request):
 def rank_teams(request):
     ranked_teams = tab_logic.rankings.rank_teams()
     teams = []
-    for i, team_stats in enumerate(ranked_teams):
+    for i, team_stat in enumerate(ranked_teams):
         tiebreaker = "N/A"
         if i != len(ranked_teams) - 1:
-            next_team_stats = ranked_teams[i + 1]
-            tiebreaker_stat = team_stats.get_tiebreaker(next_team_stats)
+            next_team_stat = ranked_teams[i + 1]
+            tiebreaker_stat = team_stat.get_tiebreaker(next_team_stat)
             if tiebreaker_stat is not None:
                 tiebreaker = tiebreaker_stat.name
             else:
                 tiebreaker = "Tie not broken"
-        teams.append((team_stats.team, team_stats[rankings.WINS],
-                      team_stats[rankings.SPEAKS], team_stats[rankings.RANKS],
+        teams.append((team_stat.team, team_stat[rankings.WINS],
+                      team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
                       tiebreaker))
 
     nov_teams = filter(
