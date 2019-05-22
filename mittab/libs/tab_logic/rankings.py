@@ -53,7 +53,7 @@ class Score(ABC):
 
     def scoring_tuple(self):
         return tuple(
-            map(lambda stat: stat.sort_coefficient * self[stat],
+            map(lambda stat: stat.sort_coefficient * self.stats[stat],
                 self.stat_priority))
 
     def get_tiebreaker(self, other):
@@ -65,7 +65,7 @@ class Score(ABC):
         return None
 
     def __getitem__(self, key):
-        return self.stats[key]
+        return self.stats[key] or 0
 
 
 class DebaterScore(Score):
