@@ -7,9 +7,10 @@ from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
-import mittab.libs.tab_logic as tab_logic
+from mittab.libs import tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
         tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.libs.tab_logic import rankings
 
 
 def view_teams(request):
@@ -329,7 +330,19 @@ def rank_teams_ajax(request):
 
 def rank_teams(request):
     ranked_teams = tab_logic.rankings.rank_teams()
-    teams = [(ts.team, ts.wins, ts.speaks, ts.ranks) for ts in ranked_teams]
+    teams = []
+    for i, team_stats in enumerate(ranked_teams):
+        tiebreaker = "N/A"
+        if i != len(ranked_teams) - 1:
+            next_team_stats = ranked_teams[i + 1]
+            tiebreaker_stat = team_stats.get_tiebreaker(next_team_stats)
+            if tiebreaker_stat is not None:
+                tiebreaker = tiebreaker_stat.name
+            else:
+                tiebreaker = "Tie not broken"
+        teams.append((team_stats.team, team_stats[rankings.WINS],
+                      team_stats[rankings.SPEAKS], team_stats[rankings.RANKS],
+                      tiebreaker))
 
     nov_teams = filter(
         lambda ts: all(

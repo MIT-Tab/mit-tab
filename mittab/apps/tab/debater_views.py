@@ -5,6 +5,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import tab_logic
+from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
 
 
@@ -91,8 +92,19 @@ def rank_debaters_ajax(request):
 
 def rank_debaters(request):
     speakers = tab_logic.rank_speakers()
-    debaters = [(s.debater, s.speaks, s.ranks, s.debater.team_set.first())
-                for s in speakers]
+    debaters = []
+    for i, debater_stats in enumerate(speakers):
+        tiebreaker = "N/A"
+        if i != len(speakers) - 1:
+            next_debater_stats = speakers[i + 1]
+            tiebreaker_stat = debater_stats.get_tiebreaker(next_debater_stats)
+            if tiebreaker_stat is not None:
+                tiebreaker = tiebreaker_stat.name
+            else:
+                tiebreaker = "Tie not broken"
+        debaters.append((debater_stats.debater, debater_stats[rankings.SPEAKS],
+                         debater_stats[rankings.RANKS],
+                         debater_stats.debater.team(), tiebreaker))
 
     nov_debaters = filter(lambda s: s[0].novice_status == Debater.NOVICE,
                           debaters)
