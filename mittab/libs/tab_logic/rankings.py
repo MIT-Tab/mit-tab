@@ -37,7 +37,7 @@ COIN_FLIP = Stat("Coin flip")
 
 @total_ordering
 class Score(ABC):
-    stat_priority = (,)
+    stat_priority = ()
 
     def __init__(self):
         self.stats = {}
