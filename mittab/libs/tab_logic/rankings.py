@@ -60,7 +60,8 @@ class Score(ABC):
         for stat, self_val, other_val in zip(self.stat_priority,
                                              self.scoring_tuple(),
                                              other.scoring_tuple()):
-            if self_val != other_val: return stat
+            if self_val != other_val:
+                return stat
         return None
 
     def __getitem__(self, key):
