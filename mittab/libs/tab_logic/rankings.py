@@ -53,7 +53,7 @@ class Score(ABC):
 
     def scoring_tuple(self):
         return tuple(
-            map(lambda stat: stat.sort_coefficient * self.stats[stat],
+            map(lambda stat: stat.sort_coefficient * self[stat],
                 self.stat_priority))
 
     def get_tiebreaker(self, other):
