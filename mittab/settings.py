@@ -92,7 +92,7 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            os.path.join(BASE_DIR, "mittab", "apps", "tab", "templates"),
+            os.path.join(BASE_DIR, "mittab", "templates"),
         ],
         "APP_DIRS": True,
         "OPTIONS": {
