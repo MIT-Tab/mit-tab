@@ -10,7 +10,7 @@
 
 MIT-Tab is a web application to manage APDA debate tournaments.
 
-Looking to learn how to use mit-tab? [Check out the docs!](mit-tab.readthedocs.io)
+Looking to learn how to use mit-tab? [Check out the docs!](https://mit-tab.readthedocs.io/en/latest/)
 It has articles on everything you need to know to run tournaments efficiently.
 This README is for people who intend to develop features for the software,
 **refer to the documentation linked above for non-development-related
