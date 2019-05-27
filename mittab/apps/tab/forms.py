@@ -30,6 +30,8 @@ class SchoolForm(forms.ModelForm):
 
 
 class FormWithCheckIns(forms.ModelForm):
+    checkin_default = False
+
     class Meta:
         abstract = True
 
@@ -37,9 +39,13 @@ class FormWithCheckIns(forms.ModelForm):
         super(FormWithCheckIns, self).__init__(*args, **kwargs)
         num_rounds = TabSettings.get("tot_rounds")
         for i in range(num_rounds):
+            if self.instance.pk is not None:
+                initial = self.instance.is_checked_in_for_round(i + 1)
+            else:
+                initial = self.checkin_default
             self.fields["checkin_%s" % i] = forms.BooleanField(
                 label="Checked in for round %s?" % (i + 1),
-                initial=self.instance.is_checked_in_for_round(i + 1),
+                initial=initial,
                 required=False)
 
     def save(self, commit=True):
@@ -54,10 +60,12 @@ class FormWithCheckIns(forms.ModelForm):
                 elif checked_in and not should_be_checked_in:
                     self.instance.check_out_for_round(i + 1)
 
-        return judge
+        return self.instance
 
 
-class RoomForm(forms.ModelForm):
+class RoomForm(FormWithCheckIns):
+    checkin_default = True
+
     class Meta:
         model = Room
         fields = "__all__"

@@ -168,7 +168,7 @@ class Judge(models.Model):
     def checked_out(cls, round_number):
         return cls.objects.exclude(judgecheckin__round_number=round_number)
 
-    def check_ins():
+    def check_ins(self):
         return self.judgecheckin_set
 
     def check_in_for_round(self, round_number):
@@ -226,6 +226,27 @@ class Room(models.Model):
                                                        for r in rounds]))
         else:
             super(Room, self).delete(using, keep_parents)
+
+    @classmethod
+    def checked_in(cls, round_number):
+        return cls.objects.filter(roomcheckin__round_number=round_number)
+
+    @classmethod
+    def checked_out(cls, round_number):
+        return cls.objects.exclude(roomcheckin__round_number=round_number)
+
+    def check_ins(self):
+        return self.roomcheckin_set
+
+    def check_in_for_round(self, round_number):
+        check_in = RoomCheckIn(room=self, round_number=round_number)
+        return check_in.save()
+
+    def check_out_for_round(self, round_number):
+        return self.check_ins().filter(round_number=round_number).delete()
+
+    def is_checked_in_for_round(self, round_number):
+        return self.check_ins().filter(round_number=round_number).exists()
 
     class Meta:
         ordering = ["name"]
