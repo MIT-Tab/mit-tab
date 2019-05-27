@@ -3,7 +3,7 @@ import random
 from django.test import TestCase
 import pytest
 
-from mittab.apps.tab.models import CheckIn, Judge, TabSettings, Round
+from mittab.apps.tab.models import JudgeCheckIn, Judge, TabSettings, Round
 from mittab.libs import assign_judges
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
@@ -28,7 +28,8 @@ class TestPairingLogic(TestCase):
         cur_round = self.round_number()
         round_count = Round.objects.filter(round_number=cur_round).count()
         desired_judges = int(round(round_count * 1.2))
-        checkin_count = CheckIn.objects.filter(round_number=cur_round).count()
+        checkin_count = JudgeCheckIn.objects.filter(
+            round_number=cur_round).count()
 
         available = Judge.objects.exclude(judges__round_number=cur_round)
         available = available.filter(checkin__round_number=cur_round)
@@ -38,7 +39,7 @@ class TestPairingLogic(TestCase):
             num_to_checkin = desired_judges - checkin_count
             judges_to_checkin = available[:num_to_checkin]
             checkins = [
-                CheckIn(judge=judge, round_number=cur_round)
+                JudgeCheckIn(judge=judge, round_number=cur_round)
                 for judge in judges_to_checkin
             ]
             for checkin in checkins:
@@ -50,7 +51,8 @@ class TestPairingLogic(TestCase):
         rounds = list(Round.objects.filter(round_number=cur_round))
         self.generate_checkins()
         judges = [
-            ci.judge for ci in CheckIn.objects.filter(round_number=cur_round)
+            ci.judge
+            for ci in JudgeCheckIn.objects.filter(round_number=cur_round)
         ]
         assign_judges.add_judges(rounds, judges, panel_points)
 

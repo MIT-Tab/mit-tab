@@ -49,7 +49,8 @@ class JudgeForm(forms.ModelForm):
             try:
                 judge = kwargs["instance"]
                 checkins = [
-                    c.round_number for c in CheckIn.objects.filter(judge=judge)
+                    c.round_number
+                    for c in JudgeCheckIn.objects.filter(judge=judge)
                 ]
                 for i in range(num_rounds):
                     self.fields["checkin_%s" % i] = forms.BooleanField(
@@ -65,12 +66,12 @@ class JudgeForm(forms.ModelForm):
         for i in range(num_rounds):
             if "checkin_%s" % (i) in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
-                checked_in = CheckIn.objects.filter(judge=judge,
-                                                    round_number=i + 1)
+                checked_in = JudgeCheckIn.objects.filter(judge=judge,
+                                                         round_number=i + 1)
                 # Two cases, either the judge is not checked in and the user says he is,
                 # or the judge is checked in and the user says he is not
                 if not checked_in and should_be_checked_in:
-                    checked_in = CheckIn(judge=judge, round_number=i + 1)
+                    checked_in = JudgeCheckIn(judge=judge, round_number=i + 1)
                     checked_in.save()
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()

@@ -161,15 +161,14 @@ class Judge(models.Model):
                                 update_fields)
 
     def is_checked_in_for_round(self, round_number):
-        return CheckIn.objects.filter(judge=self,
-                                      round_number=round_number).exists()
+        return self.judge_check_in_set.filter(
+            round_number=round_number).exists()
 
     def __str__(self):
         return self.name
 
     def delete(self, using=None, keep_parents=False):
-        checkins = CheckIn.objects.filter(judge=self)
-        for checkin in checkins:
+        for checkin in self.judge_check_in_set:
             checkin.delete()
         super(Judge, self).delete(using, keep_parents)
 
@@ -316,10 +315,24 @@ class RoundStats(models.Model):
                                                self.round.round_number)
 
 
-class CheckIn(models.Model):
-    judge = models.ForeignKey(Judge)
+class CheckIn(PolymorphicModel):
     round_number = models.IntegerField()
+
+    class Meta:
+        abstract = True
+
+
+class JudgeCheckIn(CheckIn):
+    judge = models.ForeignKey(Judge)
 
     def __str__(self):
         return "Judge %s is checked in for round %s" % (self.judge,
                                                         self.round_number)
+
+
+class RoomCheckIn(CheckIn):
+    room = models.ForeignKey(Room)
+
+    def __str__(self):
+        return "Room %s is checked in for round %s" % (self.room,
+                                                       self.round_number)

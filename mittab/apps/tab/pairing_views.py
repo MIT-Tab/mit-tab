@@ -112,8 +112,8 @@ def assign_judges_to_pairing(request):
         panel_points.reverse()
         rounds = list(Round.objects.filter(round_number=current_round_number))
         judges = [
-            ci.judge
-            for ci in CheckIn.objects.filter(round_number=current_round_number)
+            ci.judge for ci in JudgeCheckIn.objects.filter(
+                round_number=current_round_number)
         ]
         try:
             backup.backup_round("round_%s_before_judge_assignment" %

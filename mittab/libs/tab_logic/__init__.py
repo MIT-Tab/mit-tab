@@ -230,7 +230,8 @@ def pair_round():
 
 def have_enough_judges(round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
-    num_judges = CheckIn.objects.filter(round_number=round_to_check).count()
+    num_judges = JudgeCheckIn.objects.filter(
+        round_number=round_to_check).count()
     if num_judges < future_rounds:
         return False, (num_judges, future_rounds)
     return True, (num_judges, future_rounds)

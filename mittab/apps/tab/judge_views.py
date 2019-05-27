@@ -12,8 +12,9 @@ from mittab.libs.tab_logic import TabFlags
 def view_judges(request):
     #Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
-    checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
+    checkins = JudgeCheckIn.objects.filter(round_number=current_round)
+    checkins_next = JudgeCheckIn.objects.filter(round_number=(current_round +
+                                                              1))
     checked_in_judges = set([c.judge for c in checkins])
     checked_in_judges_next = set([c.judge for c in checkins_next])
 
@@ -216,12 +217,12 @@ def judge_check_in(request, judge_id, round_number):
     judge = get_object_or_404(Judge, pk=judge_id)
     if request.method == "POST":
         if not judge.is_checked_in_for_round(round_number):
-            check_in = CheckIn(judge=judge, round_number=round_number)
+            check_in = JudgeCheckIn(judge=judge, round_number=round_number)
             check_in.save()
     elif request.method == "DELETE":
         if judge.is_checked_in_for_round(round_number):
-            check_ins = CheckIn.objects.filter(judge=judge,
-                                               round_number=round_number)
+            check_ins = JudgeCheckIn.objects.filter(judge=judge,
+                                                    round_number=round_number)
             check_ins.delete()
     else:
         raise Http404("Must be POST or DELETE")
