@@ -31,8 +31,8 @@ class TestPairingLogic(TestCase):
         checkin_count = JudgeCheckIn.objects.filter(
             round_number=cur_round).count()
 
-        available = Judge.objects.exclude(judges__round_number=cur_round)
-        available = available.filter(checkin__round_number=cur_round)
+        available = Judge.checked_in(round_number).exclude(
+            judges__round_number=cur_round)
         available = list(available)
         random.shuffle(available)
         if checkin_count < desired_judges:

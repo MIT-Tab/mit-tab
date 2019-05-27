@@ -236,12 +236,10 @@ def view_round(request, round_number):
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
-    excluded_judges = Judge.objects.exclude(
-        judges__round_number=round_number).filter(
-            checkin__round_number=round_number)
-    non_checkins = Judge.objects.exclude(
-        judges__round_number=round_number).exclude(
-            checkin__round_number=round_number)
+    excluded_judges = Judge.checked_in(round_number).exclude(
+        judges__round_number=round_number)
+    non_checkins = Judge.checked_out(round_number).exclude(
+        judges__round_number=round_number)
     available_rooms = Room.objects.exclude(
         round__round_number=round_number).exclude(rank=0)
     size = max(list(map(len, [excluded_judges, non_checkins, excluded_teams])))
@@ -282,10 +280,10 @@ def alternative_judges(request, round_id, judge_id=None):
     except TypeError:
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
-    excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
-                                   .filter(checkin__round_number=round_number)
-    included_judges = Judge.objects.filter(judges__round_number=round_number) \
-                                   .filter(checkin__round_number=round_number)
+    excluded_judges = Judge.checked_in(round_number) \
+                                    .exclude(judges__round_number=round_number)
+    included_judges = Judge.checked_in(round_number) \
+                                   .filter(judges__round_number=round_number)
     excluded_judges = [(j.name, j.id, float(j.rank))
                        for j in assign_judges.can_judge_teams(
                            excluded_judges, round_gov, round_opp)]

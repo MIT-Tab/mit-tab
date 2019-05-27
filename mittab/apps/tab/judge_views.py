@@ -103,7 +103,7 @@ def enter_judge(request):
                     form.cleaned_data["name"]),
                 path="/")
     else:
-        form = JudgeForm(first_entry=True)
+        form = JudgeForm()
     return render(request, "common/data_entry.html", {
         "form": form,
         "title": "Create Judge"

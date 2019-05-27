@@ -29,65 +29,47 @@ class SchoolForm(forms.ModelForm):
         fields = "__all__"
 
 
+class FormWithCheckIns(forms.ModelForm):
+    class Meta:
+        abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super(FormWithCheckIns, self).__init__(*args, **kwargs)
+        num_rounds = TabSettings.get("tot_rounds")
+        for i in range(num_rounds):
+            self.fields["checkin_%s" % i] = forms.BooleanField(
+                label="Checked in for round %s?" % (i + 1),
+                initial=self.instance.is_checked_in_for_round(i + 1),
+                required=False)
+
+    def save(self, commit=True):
+        num_rounds = TabSettings.get("tot_rounds")
+        for i in range(num_rounds):
+            if "checkin_%s" % (i) in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
+                checked_in = self.instance.check_ins().filter(round_number=i +
+                                                              1)
+                if not checked_in and should_be_checked_in:
+                    self.instance.check_in_for_round(i + 1)
+                elif checked_in and not should_be_checked_in:
+                    self.instance.check_out_for_round(i + 1)
+
+        return judge
+
+
 class RoomForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = "__all__"
 
 
-class JudgeForm(forms.ModelForm):
+class JudgeForm(FormWithCheckIns):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
                                              required=False)
-
-    def __init__(self, *args, **kwargs):
-        entry = "first_entry" in kwargs
-        if entry:
-            kwargs.pop("first_entry")
-        super(JudgeForm, self).__init__(*args, **kwargs)
-        if not entry:
-            num_rounds = TabSettings.objects.get(key="tot_rounds").value
-            try:
-                judge = kwargs["instance"]
-                checkins = [
-                    c.round_number
-                    for c in JudgeCheckIn.objects.filter(judge=judge)
-                ]
-                for i in range(num_rounds):
-                    self.fields["checkin_%s" % i] = forms.BooleanField(
-                        label="Checked in for round %s?" % (i + 1),
-                        initial=i + 1 in checkins,
-                        required=False)
-            except Exception:
-                pass
-
-    def save(self, commit=True):
-        judge = super(JudgeForm, self).save(commit)
-        num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        for i in range(num_rounds):
-            if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
-                checked_in = JudgeCheckIn.objects.filter(judge=judge,
-                                                         round_number=i + 1)
-                # Two cases, either the judge is not checked in and the user says he is,
-                # or the judge is checked in and the user says he is not
-                if not checked_in and should_be_checked_in:
-                    checked_in = JudgeCheckIn(judge=judge, round_number=i + 1)
-                    checked_in.save()
-                elif checked_in and not should_be_checked_in:
-                    checked_in.delete()
-
-        return judge
 
     class Meta:
         model = Judge
         fields = "__all__"
-
-    class Media:
-        css = {
-            "all": (os.path.join(settings.BASE_DIR,
-                                 "/static/admin/css/widgets.css"), ),
-        }
-        js = ("/admin/jsi18n"),
 
 
 class TeamForm(forms.ModelForm):

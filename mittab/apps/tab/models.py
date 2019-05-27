@@ -160,9 +160,26 @@ class Judge(models.Model):
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
 
+    @classmethod
+    def checked_in(cls, round_number):
+        return cls.objects.filter(judgecheckin__round_number=round_number)
+
+    @classmethod
+    def checked_out(cls, round_number):
+        return cls.objects.exclude(judgecheckin__round_number=round_number)
+
+    def check_ins():
+        return self.judgecheckin_set
+
+    def check_in_for_round(self, round_number):
+        check_in = JudgeCheckIn(judge=self, round_number=round_number)
+        return check_in.save()
+
+    def check_out_for_round(self, round_number):
+        return self.check_ins().filter(round_number=round_number).delete()
+
     def is_checked_in_for_round(self, round_number):
-        return self.judge_check_in_set.filter(
-            round_number=round_number).exists()
+        return self.check_ins().filter(round_number=round_number).exists()
 
     def __str__(self):
         return self.name
