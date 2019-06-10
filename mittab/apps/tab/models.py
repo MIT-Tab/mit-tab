@@ -183,7 +183,7 @@ class Scratch(models.Model):
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
-        (TEAM_SCRATCH, "Team Scratch"),
+        (TEAM_SCRATCH, "Discretionary Scratch"),
         (TAB_SCRATCH, "Tab Scratch"),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)

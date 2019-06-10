@@ -15,7 +15,7 @@ Whenever you pair a round the scratches will be automatically generated and you
 will be able to view them from the scratch view. Do not worry if they don't
 show up in the scratches view prior to pairing.
 
-Team Scratch: Navigate to either the judge page or team page,
+Discrtionary Scratch: Navigate to either the judge page or team page,
 click on the "Scratches for <Name>" button at the bottom of the page.
 Then click the "Add Scratch" button.  This workflow for judges is shown below:
 
