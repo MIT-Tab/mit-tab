@@ -1,8 +1,10 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.views import login
 from django.contrib.auth import logout
+from django.http import HttpResponse
 from django.shortcuts import render
 
+from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
@@ -306,3 +308,16 @@ def upload_data(request):
             "room_info": room_info,
             "scratch_info": scratch_info
         })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def generate_archive(request):
+    tournament_name = request.META["SERVER_NAME"].split(".")[0]
+    filename = tournament_name + ".xml"
+
+    xml = ArchiveExporter(tournament_name).export_tournament()
+
+    response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
+    response["Content-Length"] = len(xml)
+    response["Content-Disposition"] = "attachment; filename=%s" % filename
+    return response
