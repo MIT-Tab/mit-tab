@@ -18,7 +18,7 @@ class ArchiveExporter:
         self.root = None
 
     def export_tournament(self):
-        self.root = Element("tournament", {"name": self.name})
+        self.root = Element("tournament", {"name": self.name, "style": "apda"})
 
         self.add_rounds()
         self.add_participants()
@@ -60,10 +60,10 @@ class ArchiveExporter:
 
             if debate.victor == Round.GOV_VIA_FORFEIT or \
                     debate.victor == Round.ALL_DROP:
-                opp_tag.set("forfeit", "True")
+                opp_tag.set("forfeit", "true")
             elif debate.victor == Round.OPP_VIA_FORFEIT or \
                     debate.victor == Round.ALL_DROP:
-                gov_tag.set("forfeit", "True")
+                gov_tag.set("forfeit", "true")
 
             team_points = [0, 0] # Gov, Opp
             stats = sorted(list(debate.roundstats_set.all().values()),
@@ -75,26 +75,28 @@ class ArchiveExporter:
                     team_points[i % 2] += speech["speaks"]
                     speech_tag = SubElement(side_tag, "speech", {
                         "speaker": SPEAKER_ID_PREFIX + str(speech["debater_id"]),
-                        "reply": "False"
+                        "reply": "false"
                     })
                     ballot = SubElement(speech_tag, "ballot", {
                         "adjudicators": adjs,
-                        "rank": str(speech["ranks"]),
-                        "ignored": "False"
+                        "rank": str(int(speech["ranks"])),
+                        "ignored": "false"
                     })
                     ballot.text = str(speech["speaks"])
 
             gov_win = [Round.GOV, Round.GOV_VIA_FORFEIT, Round.ALL_WIN]
             gov_rank = "1" if debate.victor in gov_win else "2"
-            gov_ballot = SubElement(gov_tag, "ballot", {
+            gov_ballot = Element("ballot", {
                 "adjudicators": adjs, "rank": gov_rank})
             gov_ballot.text = str(team_points[0])
+            gov_tag.insert(0, gov_ballot) # Ballot must be first in sequence
 
             opp_win = [Round.OPP, Round.OPP_VIA_FORFEIT, Round.ALL_WIN]
             opp_rank = "1" if debate.victor in opp_win else "2"
-            opp_ballot = SubElement(opp_tag, "ballot", {
+            opp_ballot = Element("ballot", {
                 "adjudicators": adjs, "rank": opp_rank})
             opp_ballot.text = str(team_points[1])
+            opp_tag.insert(0, opp_ballot)
 
     def add_participants(self):
         participants_tag = SubElement(self.root, "participants")
