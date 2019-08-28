@@ -101,10 +101,11 @@ class Debater(ModelWithTiebreaker):
 
 class Team(ModelWithTiebreaker):
     name = models.CharField(max_length=30, unique=True)
-    school = models.ForeignKey("School")
+    school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
                                       blank=True,
                                       null=True,
+                                      on_delete=models.SET_NULL,
                                       related_name="hybrid_school")
     debaters = models.ManyToManyField(Debater)
     UNSEEDED = 0
@@ -178,8 +179,8 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
-    judge = models.ForeignKey(Judge)
-    team = models.ForeignKey(Team)
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
@@ -217,11 +218,14 @@ class Room(models.Model):
 
 class Round(models.Model):
     round_number = models.IntegerField()
-    gov_team = models.ForeignKey(Team, related_name="gov_team")
-    opp_team = models.ForeignKey(Team, related_name="opp_team")
+    gov_team = models.ForeignKey(Team, related_name="gov_team",
+            on_delete=models.CASCADE)
+    opp_team = models.ForeignKey(Team, related_name="opp_team",
+            on_delete=models.CASCADE)
     chair = models.ForeignKey(Judge,
                               null=True,
                               blank=True,
+                              on_delete=models.CASCADE,
                               related_name="chair")
     judges = models.ManyToManyField(Judge, blank=True, related_name="judges")
     NONE = 0
@@ -247,7 +251,7 @@ class Round(models.Model):
         (ALL_DROP, "ALL DROP"),
         (ALL_WIN, "ALL WIN"),
     )
-    room = models.ForeignKey(Room)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
@@ -282,7 +286,7 @@ class Round(models.Model):
 
 
 class Bye(models.Model):
-    bye_team = models.ForeignKey(Team)
+    bye_team = models.ForeignKey(Team, on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):
@@ -291,7 +295,7 @@ class Bye(models.Model):
 
 
 class NoShow(models.Model):
-    no_show_team = models.ForeignKey(Team)
+    no_show_team = models.ForeignKey(Team, on_delete=models.CASCADE)
     round_number = models.IntegerField()
     lenient_late = models.BooleanField(default=False)
 
@@ -301,8 +305,8 @@ class NoShow(models.Model):
 
 
 class RoundStats(models.Model):
-    debater = models.ForeignKey(Debater)
-    round = models.ForeignKey(Round)
+    debater = models.ForeignKey(Debater, on_delete=models.CASCADE)
+    round = models.ForeignKey(Round, on_delete=models.CASCADE)
     # fewer digits?
     speaks = models.DecimalField(max_digits=6, decimal_places=4)
     ranks = models.DecimalField(max_digits=6, decimal_places=4)
@@ -317,7 +321,7 @@ class RoundStats(models.Model):
 
 
 class CheckIn(models.Model):
-    judge = models.ForeignKey(Judge)
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):
