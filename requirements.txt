@@ -15,6 +15,6 @@ pytest==4.4.1
 pytest-circleci-parallelized==0.0.4
 pytest-cov==2.7.1
 pytest-django==3.4.8
-raven==6.1.0
+raven==6.4.0
 selenium==3.141.0
 splinter==0.10.0
