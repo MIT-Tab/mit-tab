@@ -219,9 +219,9 @@ class Room(models.Model):
 class Round(models.Model):
     round_number = models.IntegerField()
     gov_team = models.ForeignKey(Team, related_name="gov_team",
-            on_delete=models.CASCADE)
+                                 on_delete=models.CASCADE)
     opp_team = models.ForeignKey(Team, related_name="opp_team",
-            on_delete=models.CASCADE)
+                                 on_delete=models.CASCADE)
     chair = models.ForeignKey(Judge,
                               null=True,
                               blank=True,
