@@ -1,5 +1,5 @@
 from django.views import i18n
-from django.conf.urls import include, url
+from django.conf.urls import url
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -22,7 +22,8 @@ urlpatterns = [
     url(r"^500/", views.render_500, name="500"),
 
     # Account related
-    url(r"^accounts/login/$", LoginView.as_view(template_name="registration/login.html"),
+    url(r"^accounts/login/$",
+        LoginView.as_view(template_name="registration/login.html"),
         name="tab_login"),
 
     # Judge related

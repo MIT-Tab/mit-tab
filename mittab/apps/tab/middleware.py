@@ -22,7 +22,7 @@ class Login:
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                return LoginView(request)
+                return LoginView.as_view("registration/login.html")(request)
             else:
                 return redirect_and_flash_info(
                     request,
