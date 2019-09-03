@@ -76,6 +76,7 @@ function populateAlternativeTeams() {
         .find(".team-assign")
         .click(assignTeam);
       quickSearchInit($parent.find("#quick-search"));
+      $parent.find("#quick-search").focus();
     }
   });
 }
@@ -127,6 +128,7 @@ function populateAlternativeJudges() {
         .find(".judge-assign")
         .click(assignJudge);
       quickSearchInit($parent.find("#quick-search"));
+      $parent.find("#quick-search").focus();
     }
   });
 }
