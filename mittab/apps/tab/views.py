@@ -1,5 +1,4 @@
 from django.contrib.auth.decorators import permission_required
-from django.contrib.auth.views import login
 from django.contrib.auth import logout
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -29,10 +28,6 @@ def index(request):
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
 
     return render(request, "common/index.html", locals())
-
-
-def tab_login(request):
-    return login(request)
 
 
 def tab_logout(request, *args):

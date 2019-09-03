@@ -1,6 +1,6 @@
 import re
 
-from django.contrib.auth.views import login
+from django.contrib.auth.views import LoginView
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
 
@@ -13,16 +13,21 @@ EBALLOT_REGEX = re.compile(r"/e_ballots/\S+")
 
 class Login:
     """This middleware requires a login for every view"""
+    def __init__(self, get_response):
+        self.get_response = get_response
 
-    def process_request(self, request):
+    def __call__(self, request):
         whitelisted = (request.path in LOGIN_WHITELIST) or \
                 EBALLOT_REGEX.match(request.path)
 
-        if not whitelisted and request.user.is_anonymous():
+        if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                return login(request)
+                view = LoginView.as_view(template_name="registration/login.html")
+                return view(request)
             else:
                 return redirect_and_flash_info(
                     request,
                     "You must be logged in to view that page",
                     path="/accounts/login/?next=%s" % request.path)
+        else:
+            return self.get_response(request)

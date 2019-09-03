@@ -1,13 +1,3 @@
-"""
-Django settings for mittab project.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/1.6/topics/settings/
-
-For the full list of settings and their values, see
-https://docs.djangoproject.com/en/1.6/ref/settings/
-"""
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -31,7 +21,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
                   "webpack_loader", "bootstrap4", "polymorphic")
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE = (
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -46,9 +36,6 @@ ATOMIC_REQUESTS = True
 ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
-
-# Database
-# https://docs.djangoproject.com/en/1.6/ref/settings/#databases
 
 DATABASES = {
     "default": {

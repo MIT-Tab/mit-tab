@@ -1,6 +1,7 @@
 from django.views import i18n
-from django.conf.urls import include, url
+from django.conf.urls import url
 from django.contrib import admin
+from django.contrib.auth.views import LoginView
 
 import mittab.apps.tab.views as views
 import mittab.apps.tab.judge_views as judge_views
@@ -13,15 +14,17 @@ admin.autodiscover()
 
 urlpatterns = [
     url(r"^(admin|accounts)/logout/$", views.tab_logout, name="logout"),
-    url(r"^admin/", include(admin.site.urls), name="admin"),
-    url(r"^dynamic-media/jsi18n/$", i18n.javascript_catalog, name="js18"),
+    url(r"^admin/", admin.site.urls, name="admin"),
+    url(r"^dynamic-media/jsi18n/$", i18n.JavaScriptCatalog.as_view(), name="js18"),
     url(r"^$", views.index, name="index"),
     url(r"^403/", views.render_403, name="403"),
     url(r"^404/", views.render_404, name="404"),
     url(r"^500/", views.render_500, name="500"),
 
     # Account related
-    url(r"^accounts/login/$", views.tab_login, name="tab_login"),
+    url(r"^accounts/login/$",
+        LoginView.as_view(template_name="registration/login.html"),
+        name="tab_login"),
 
     # Judge related
     url(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
