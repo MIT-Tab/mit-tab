@@ -61,8 +61,8 @@ class Command(BaseCommand):
 
         print("Calculating ranks")
         teams = [
-            self.make_team_row(team)
-            for team in tab_logic.rankings.rank_teams()
+            self.make_team_row(team_score.team)
+            for team_score in tab_logic.rankings.rank_teams()
         ]
 
         def is_novice_team(team):
@@ -70,17 +70,18 @@ class Command(BaseCommand):
                     team.debaters.count()
 
         nov_teams = [
-            self.make_team_row(team)
-            for team in tab_logic.rankings.rank_teams() if is_novice_team(team)
+            self.make_team_row(team_score.team)
+            for team_score in tab_logic.rankings.rank_teams()
+            if is_novice_team(team_score.team)
         ]
         debaters = [
-            self.make_debater_row(deb)
-            for deb in tab_logic.rankings.rank_speakers()
+            self.make_debater_row(deb_score.debater)
+            for deb_score in tab_logic.rankings.rank_speakers()
         ]
         nov_debaters = [
-            self.make_debater_row(deb)
-            for deb in tab_logic.rankings.rank_speakers()
-            if deb.novice_status == Debater.NOVICE
+            self.make_debater_row(deb_score.debater)
+            for deb_score in tab_logic.rankings.rank_speakers()
+            if deb_score.debater.novice_status == Debater.NOVICE
         ]
 
         print("Writing to csv")
