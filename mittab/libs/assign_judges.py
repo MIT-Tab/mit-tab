@@ -40,12 +40,8 @@ def add_judges(pairings, judges, panel_points):
             for (pairing_i, pairing) in enumerate(group):
                 if not judge_conflict(judge, pairing.gov_team,
                                       pairing.opp_team):
-                    print("Adding edge %s <> %s - %d" % (judge.name, pairing_i,
-                            calc_weight(judge_i, pairing_i)))
                     graph_edges.append((pairing_i, judge_i + len(group),
                                         calc_weight(judge_i, pairing_i)))
-                else:
-                    print("Conflict %s" % judge.name)
         judge_assignments = mwmatching.maxWeightMatching(graph_edges,
                                                          maxcardinality=True)
         # If there is no possible assignment of chairs, raise an error
