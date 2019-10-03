@@ -13,12 +13,6 @@
             {% if not errors %} Valid {% else %} Invalid {% endif %} pairing
           </small>
         </h3>
-
-        {% if errors %}
-          {% for error in errors %}
-          <div class="alert alert-danger">{{ error }}</div>
-          {% endfor %}
-        {% endif %}
       </div>
     </div> <!-- end heading row -->
 
@@ -69,6 +63,16 @@
         </div>
       </div>
     </div> <!-- end control row -->
+
+    <div class="row">
+      <div class="col-12">
+        {% if errors %}
+          {% for error in errors %}
+          <div class="alert alert-danger">{{ error }}</div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
 
     <div class="row">
       {% for pairing in round_info %}
