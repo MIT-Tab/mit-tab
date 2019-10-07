@@ -13,7 +13,8 @@ import mittab.apps.tab.pairing_views as pairing_views
 admin.autodiscover()
 
 urlpatterns = [
-    url(r"^(admin|accounts)/logout/$", views.tab_logout, name="logout"),
+    url(r"^admin/logout/$", views.tab_logout, name="admin_logout"),    
+    url(r"^accounts/logout/$", views.tab_logout, name="logout"),
     url(r"^admin/", admin.site.urls, name="admin"),
     url(r"^dynamic-media/jsi18n/$", i18n.JavaScriptCatalog.as_view(), name="js18"),
     url(r"^$", views.index, name="index"),

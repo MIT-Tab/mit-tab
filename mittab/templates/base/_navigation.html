@@ -1,6 +1,7 @@
 {% load tags %}
 
 {% url "index" as home %}
+{% url "logout" as logout %}
 
 {% url "enter_school" as enter_school %}
 {% url "view_schools" as view_schools %}
@@ -42,7 +43,7 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav mr-auto">
+      <ul class="navbar-nav mr-auto order-0">
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
             Pairings
@@ -97,6 +98,9 @@
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>
         </li>
+	<li class="nav-item">
+            <a class="nav-link" href="{{ logout }}">Logout</a>
+	</li>
       </ul>
     </div>
     {% endif %}
