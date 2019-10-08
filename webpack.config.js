@@ -8,8 +8,9 @@ const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 module.exports = {
   context: __dirname,
   entry: {
-    main: './assets/js/index',
-    pairingDisplay: './assets/js/pairingDisplay'
+      main: './assets/js/index',
+      pairingDisplay: './assets/js/pairingDisplay',
+      publicDisplay: './assets/js/publicDisplay'
   },
   optimization: {
     minimizer: [

@@ -9,6 +9,22 @@ from mittab.libs.errors import *
 from mittab.libs.tab_logic import TabFlags
 
 
+def public_view_judges(request):
+    display_judges = TabSettings.get("judges_public", 0)
+
+    if not request.user.is_authenticated and not display_judges:
+        return redirect_and_flash_error(request, "This view is not public", path="/")
+
+    num_rounds = TabSettings.get('tot_rounds', 5)
+    rounds = [num for num in range(1, num_rounds + 1)]
+
+    return render(
+        request, "public/judges.html", {
+            "judges": Judge.objects.order_by('name').all(),
+            "rounds": rounds
+        })
+
+
 def view_judges(request):
     #Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
