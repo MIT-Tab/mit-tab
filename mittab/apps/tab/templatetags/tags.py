@@ -29,5 +29,5 @@ def is_file_field(field):
 
 
 @register.filter("is_checked_in")
-def is_checked_in(judge, r):
-    return judge.is_checked_in_for_round(r)
+def is_checked_in(judge, round_value):
+    return judge.is_checked_in_for_round(round_value)

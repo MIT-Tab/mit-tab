@@ -15,12 +15,12 @@ def public_view_judges(request):
     if not request.user.is_authenticated and not display_judges:
         return redirect_and_flash_error(request, "This view is not public", path="/")
 
-    num_rounds = TabSettings.get('tot_rounds', 5)
+    num_rounds = TabSettings.get("tot_rounds", 5)
     rounds = [num for num in range(1, num_rounds + 1)]
 
     return render(
         request, "public/judges.html", {
-            "judges": Judge.objects.order_by('name').all(),
+            "judges": Judge.objects.order_by("name").all(),
             "rounds": rounds
         })
 

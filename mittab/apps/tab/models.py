@@ -131,7 +131,7 @@ class Team(ModelWithTiebreaker):
         super(Team, self).delete(using, keep_parents)
 
     def debaters_display(self):
-        return ', '.join([debater.name for debater in self.debaters.all()])
+        return ", ".join([debater.name for debater in self.debaters.all()])
 
     class Meta:
         ordering = ["name"]
@@ -172,7 +172,7 @@ class Judge(models.Model):
         return self.name
 
     def affiliations_display(self):
-        return ', '.join([school.name for school in self.schools.all()])
+        return ", ".join([school.name for school in self.schools.all()])
 
     def delete(self, using=None, keep_parents=False):
         checkins = CheckIn.objects.filter(judge=self)
