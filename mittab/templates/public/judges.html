@@ -10,6 +10,7 @@
 	<title>Judge List</title>
     </head>
     <body>
+        <div id="scrollPage" class="hidden"></div>	
 	<div class="public_header">
 	    <h1>Judge List</h1>
 	    <table class="public_table">
@@ -34,5 +35,14 @@
 		</tr>
 	    {% endfor %}
 	</table>
+        <div class="pairings_footer_spacer"></div>
+	<div class="public_footer">
+            <span class="right">
+		<label for="autoscroll">
+                    Autoscroll:
+                    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+		</label>
+            </span>
+	</div>	
     </body>
 </html>
