@@ -120,6 +120,37 @@ class Team(ModelWithTiebreaker):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
+    team_code = models.CharField(max_length=256,
+                                 blank=True,
+                                 null=True,
+                                 unique=True)
+
+    def set_unique_team_code(self):
+        haikunator = Haikunator()
+        code = haikunator.haikunate(token_length=0)
+
+        while Team.objects.filter(team_code=code).first():
+            code = haikunator.haikunate(token_length=0)
+
+        self.team_code = code
+
+    def save(self, *args, **kwargs):
+        # Generate a team code for teams that don't have one
+        if not self.team_code:
+            self.set_unique_team_code()
+
+        super(Team, self).save(*args, **kwargs)
+
+    @property
+    def display(self):
+        use_team_codes = TabSettings.get("use_team_codes", 0)
+
+        if use_team_codes:
+            if not self.team_code:
+                self.set_unique_team_code()
+                self.save()
+            return self.team_code
+        return self.name
 
     def __str__(self):
         return self.name
@@ -143,6 +174,15 @@ class Judge(models.Model):
                                    null=True,
                                    unique=True)
 
+    def set_unique_ballot_code(self):
+        haikunator = Haikunator()
+        code = haikunator.haikunate(token_length=0)
+
+        while Judge.objects.filter(ballot_code=code).first():
+            code = haikunator.haikunate(token_length=0)
+
+        self.ballot_code = code
+
     def save(self,
              force_insert=False,
              force_update=False,
@@ -150,13 +190,7 @@ class Judge(models.Model):
              update_fields=None):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
-            haikunator = Haikunator()
-            code = haikunator.haikunate(token_length=0)
-
-            while Judge.objects.filter(ballot_code=code).first():
-                code = haikunator.haikunate(token_length=0)
-
-            self.ballot_code = code
+            self.set_unique_ballot_code()
 
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
