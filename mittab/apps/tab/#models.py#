@@ -130,7 +130,7 @@ class Team(ModelWithTiebreaker):
         code = haikunator.haikunate(token_length=0)
 
         while Team.objects.filter(team_code=code).first():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").upper()
+            code = haikunator.haikunate(token_length=0).replace(-', ' ').upper()
 
         self.team_code = code
 
