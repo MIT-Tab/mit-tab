@@ -1,3 +1,5 @@
+import $ from "jquery";
+
 const increment = 50;
 const pause = 5000;
 
