@@ -4,7 +4,8 @@ from django.http import HttpResponse
 from django.shortcuts import render
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
+from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
+    SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -261,6 +262,39 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
+
+def get_settings_from_yaml():
+    default_settings = [
+        {
+            "name": "teams_public",
+            "description": "1 if the teams list should be public, 0 if not",
+            "value": 1
+        }
+    ]
+
+    for setting in default_settings:
+        t = TabSettings.objects.filter(key=setting["name"]).first()
+
+        if t:
+            # MAKE INITIAL VALUE WHAT'S IN THE DB
+            pass
+
+### SETTINGS VIEWS ###
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def settings_form(request):
+    settings = get_settings_from_yaml()
+    if request.method == "POST":
+        settings_form = SettingsForm(request.POST, settings=settings)
+
+        if settings_form.is_valid():
+            settings_form.save()
+    
+    settings_form = SettingsForm(settings=settings)
+
+    return render(
+        request, "tab/settings_form.html", {
+            "form": settings_form,
+        })
 
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}

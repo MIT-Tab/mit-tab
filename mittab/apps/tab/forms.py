@@ -390,6 +390,27 @@ class EBallotForm(ResultEntryForm):
         return super(EBallotForm, self).clean()
 
 
+class SettingsForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        settings = kwargs.pop("settings")
+        super(SettingsForm, self).__init__(*args, **kwargs)
+
+        for setting in settings:
+            self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(label=setting["name"],
+                                                                                help_text=setting["description"],
+                                                                                initial=setting["value"])
+
+    def save(self, commit=True):
+        for field in self.cleaned_data:
+            tab_setting = TabSettings.objects.filter(key=self.fields[field].label).first()
+            if not tab_setting:
+                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
+                                                         value=self.cleaned_data[field])
+            else:
+                tab_setting.value = self.cleaned_data[field]
+                tab_setting.save()
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*list(result.values())))

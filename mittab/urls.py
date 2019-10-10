@@ -157,6 +157,11 @@ urlpatterns = [
         pairing_views.enter_e_ballot,
         name="enter_e_ballot"),
 
+    # Settings related
+    url(r"^settings_form",
+        views.settings_form,
+        name="settings_form"),
+
     # Backups
     url(r"^backup/restore/(.+)/$",
         pairing_views.restore_backup,
