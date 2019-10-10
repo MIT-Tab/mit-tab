@@ -65,6 +65,14 @@ class School(models.Model):
         else:
             super(School, self).delete(using, keep_parents)
 
+    @property
+    def display(self):
+        schools_public = TabSettings.get("schools_public", 1)
+
+        if schools_public:
+            return self.name
+        return ""
+
     class Meta:
         ordering = ["name"]
 
@@ -168,7 +176,11 @@ class Team(ModelWithTiebreaker):
         super(Team, self).delete(using, keep_parents)
 
     def debaters_display(self):
-        return ", ".join([debater.name for debater in self.debaters.all()])
+        debaters_public = TabSettings.get("debaters_public", 1)
+
+        if debaters_public:
+            return ", ".join([debater.name for debater in self.debaters.all()])
+        return ""
 
     class Meta:
         ordering = ["name"]
