@@ -13,6 +13,20 @@ from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
 from mittab.libs.tab_logic import rankings
 
 
+def public_view_teams(request):
+    display_teams = TabSettings.get("teams_public", 0)
+
+    if not request.user.is_authenticated and not display_teams:
+        return redirect_and_flash_error(request, "This view is not public", path="/")
+
+    return render(
+        request, "public/teams.html", {
+            "teams": Team.objects.order_by("-checked_in",
+                                           "school__name").all(),
+            "num_checked_in": Team.objects.filter(checked_in=True).count()
+        })
+
+
 def view_teams(request):
     def flags(team):
         result = 0
