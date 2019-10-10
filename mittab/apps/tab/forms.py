@@ -98,9 +98,13 @@ class TeamForm(forms.ModelForm):
         if len(data) not in [1, 2]:
             raise forms.ValidationError("You must select 1 or 2 debaters!")
         for debater in data:
-            if debater.team_set.count() > 0:
+            if debater.team_set.count() > 1 or \
+               (debater.team_set.count() == 1 and \
+                debater.team_set.first().id != self.instance.id):
                 raise forms.ValidationError(
-                    "A debater cannot already be on a different team!"
+                    """A debater cannot already be on a different team!
+                    Consider editing the debaters' existing team,
+                     or removing them from it before creating this one."""
                 )
         return data
 
@@ -125,7 +129,9 @@ class TeamEntryForm(TeamForm):
         for debater in data:
             if debater.team_set.count() > 0:
                 raise forms.ValidationError(
-                    "A debater cannot already be on a different team!"
+                    """A debater cannot already be on a different team!
+                    Consider editing the debaters' existing team,
+                     or removing them from it before creating this one."""
                 )
         return data
 
