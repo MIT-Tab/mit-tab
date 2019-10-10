@@ -98,6 +98,12 @@ jobs:
             . venv/bin/activate
             cd docs
             make html
+      - run:
+          name: Check links
+          command: |
+            . venv/bin/activate
+            cd docs
+            make linkcheck
 workflows:
   version: 2
   build_and_lint:

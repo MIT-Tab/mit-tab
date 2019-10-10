@@ -7,7 +7,7 @@ your competitors on the internet. The
 process.
 
 To set up a tournament, visit
-[nu-tab.com/tournaments/new](http://nu-tab.com/tournaments/new). The form is
+[nu-tab.com/tournaments/new](https://nu-tab.com/tournaments/new). The form is
 pretty self-explanatory. You'll receive an email once the initialization
 process is completed.
 
