@@ -393,22 +393,41 @@ class EBallotForm(ResultEntryForm):
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings = kwargs.pop("settings")
+        self.settings = settings
+
         super(SettingsForm, self).__init__(*args, **kwargs)
 
         for setting in settings:
-            self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(label=setting["name"],
-                                                                                help_text=setting["description"],
-                                                                                initial=setting["value"])
+            if "type" in setting and setting["type"] == "boolean":
+                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(label=setting["name"],
+                                                                                    help_text=setting["description"],
+                                                                                    initial=setting["value"],
+                                                                                    required=False)
+            else:
+                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(label=setting["name"],
+                                                                                    help_text=setting["description"],
+                                                                                    initial=setting["value"])
 
     def save(self, commit=True):
-        for field in self.cleaned_data:
+        for setting in self.settings:
+            field = "setting_%s" % (setting["name"],)
             tab_setting = TabSettings.objects.filter(key=self.fields[field].label).first()
+
+            value_to_set = setting["value"]
+
+            if "type" in setting and setting["type"] == "boolean":
+                if not self.cleaned_data[field]:
+                    value_to_set = 0
+                else:
+                    value_to_set = 1
+            else:
+                value_to_set = self.cleaned_data[field]
 
             if not tab_setting:
                 tab_setting = TabSettings.objects.create(key=self.fields[field].label,
-                                                         value=self.cleaned_data[field])
+                                                         value=value_to_set)
             else:
-                tab_setting.value = self.cleaned_data[field]
+                tab_setting.value = value_to_set
                 tab_setting.save()
 
 

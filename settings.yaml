@@ -1,11 +1,13 @@
-- public_teams:
+- teams_public:
   name: public_teams
   description: "1 if the teams list should be public, 0 if not"
-  value: 0
-- public_judges:
+  value: false
+  type: boolean
+- judges_public:
   name: public_judges
   description: "1 if the judges list should be public, 0 if not"
-  value: 0
+  value: false
+  type: boolean
 - lenient_late:
   name: lenient_late
   description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."

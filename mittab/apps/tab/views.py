@@ -277,7 +277,10 @@ def get_settings_from_yaml():
         t = TabSettings.objects.filter(key=setting["name"]).first()
 
         if t:
-            setting["value"] = t.value
+            if "type" in setting and setting["type"] == "boolean":
+                setting["value"] = t.value == 1
+            else:
+                setting["value"] = t.value
 
         to_return.append(setting)
 
