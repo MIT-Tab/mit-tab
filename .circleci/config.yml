@@ -86,7 +86,7 @@ jobs:
           name: install dependencies
           command: |
             python3 -m venv venv
-            apt-get install python3-sphinx
+            sudo apt-get install python3-sphinx
             . venv/bin/activate
             pip install -r docs/requirements.txt
       - run:
