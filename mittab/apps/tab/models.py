@@ -190,6 +190,7 @@ class Scratch(models.Model):
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
 
     class Meta:
+        unique_together = ("judge", "team")
         verbose_name_plural = "scratches"
 
     def __str__(self):
