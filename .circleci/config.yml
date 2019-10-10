@@ -86,12 +86,16 @@ jobs:
           name: install dependencies
           command: |
             python3 -m venv venv
-            sudo apt-get install python3-sphinx
             . venv/bin/activate
             pip install -r docs/requirements.txt
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
       - run:
           name: Build docs
           command: |
+            . venv/bin/activate
             cd docs
             make html
 workflows:
