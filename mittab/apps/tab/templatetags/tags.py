@@ -26,3 +26,8 @@ def is_file_field(field):
     if not hasattr(field, "field"):
         return False
     return isinstance(field.field, FileField)
+
+
+@register.filter("is_checked_in")
+def is_checked_in(judge, round_value):
+    return judge.is_checked_in_for_round(round_value)

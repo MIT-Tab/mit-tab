@@ -1,0 +1,117 @@
+body
+{
+    font-family:            Helvetica, sans-serif;
+    font-size:              20px;
+    margin:                 0em;
+    height:                 100%;
+    width:                  100%;
+}
+
+.public_header
+{
+    position:               fixed;
+    top:                    0em;
+    left:                   0em;
+    right:                  0em;
+
+    height:                 4.5em;
+    width:                  100%;
+    padding:                .5em;
+    margin:                 0em;
+
+    background:             #9CF;
+    border-bottom:          .1em solid #000;
+}
+
+.public_header h1
+{
+    margin:                 0em;
+    padding:                .25em;
+    display:                inline-block;
+    float:                  left;
+}
+
+.public_header h3
+{
+    margin:                 0em;
+    padding:                .5em;
+    display:                inline-block;
+    float:                  left;
+}
+
+.public_header_spacer
+{
+    height:                 5.5em;
+}
+
+.public_table
+{
+    width:                  100%;
+    min-width:              100%;
+
+    border-collapse:        collapse;
+}
+
+.public_table tr:nth-child(even)
+{
+    background:             #DEF;
+}
+
+.public_table th
+{
+    text-align:             left;
+}
+
+.public_table td
+{
+    text-overflow:          ellipsis;
+    border:                 1px solid #DDD;
+    padding:                .5em;
+}
+
+.public_footer
+{
+    position:               fixed;
+    bottom:                 0em;
+    left:                   0em;
+    right:                  0em;
+
+    height:                 1.5em;
+    padding:                .5em;
+    margin:                 0em;
+
+    background:             #BDF;
+    border-top:             .15em solid #000;
+}
+.public_footer_printable
+{
+    white-space: nowrap;
+    height:                 1.5em;
+    width:                  100%;
+    padding:                .5em;
+    margin:                 0em;
+
+    background:             #BDF;
+    border:                 .15em solid #000;
+}
+
+.public_footer_spacer
+{
+    height:                 2.5em;
+}
+
+.printable
+{
+    width: 7in;
+    white-space: nowrap;
+}
+
+.right-margin
+{
+    margin-right: 1em;
+}
+
+.right
+{
+    float: right;
+}

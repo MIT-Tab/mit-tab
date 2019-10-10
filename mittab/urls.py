@@ -13,7 +13,8 @@ import mittab.apps.tab.pairing_views as pairing_views
 admin.autodiscover()
 
 urlpatterns = [
-    url(r"^(admin|accounts)/logout/$", views.tab_logout, name="logout"),
+    url(r"^admin/logout/$", views.tab_logout, name="admin_logout"),
+    url(r"^accounts/logout/$", views.tab_logout, name="logout"),
     url(r"^admin/", admin.site.urls, name="admin"),
     url(r"^dynamic-media/jsi18n/$", i18n.JavaScriptCatalog.as_view(), name="js18"),
     url(r"^$", views.index, name="index"),
@@ -27,6 +28,7 @@ urlpatterns = [
         name="tab_login"),
 
     # Judge related
+    url(r"^judges/", judge_views.public_view_judges, name="public_judges"),
     url(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
     url(r"^judge/(\d+)/scratches/add/(\d+)/",
         judge_views.add_scratches,
@@ -63,6 +65,7 @@ urlpatterns = [
     url(r"^enter_scratch/", views.add_scratch, name="add_scratch"),
 
     # Team related
+    url(r"^teams/", team_views.public_view_teams, name="public_teams"),
     url(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
     url(r"^team/(\d+)/scratches/add/(\d+)/",
         team_views.add_scratches,

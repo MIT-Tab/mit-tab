@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+	{% load render_bundle from webpack_loader %}
+	{% render_bundle 'publicDisplay' %}
+
+	<title>Team List</title>
+    </head>
+    <body>
+        <div id="scrollPage" class="hidden"></div>
+	<div class="public_header">
+	    <h1>Team List</h1>
+	    <h3>({{ num_checked_in }} checked in)</h3>
+	    <table class="public_table">
+		<tr>
+		    <th style="width: 25%;">Team Name</th>
+		    <th style="width: 15%;">School</th>
+		    <th style="width: 15%;">Hybrid School</th>
+		    <th style="width: 30%;">Debaters</th>
+		    <th style="width: 15%;">Checked In</th>
+		</tr>
+	    </table>
+	</div>
+	<div class="public_header_spacer"></div>
+	<table class="public_table">
+	    {% for team in teams %}
+		<tr>
+		    <td style="width: 25%;">{{ team.name }}</td>
+		    <td style="width: 15%;">{{ team.school.name }}</td>
+		    <td style="width: 15%;">{{ team.hybrid_school.name }}</td>
+		    <td style="width: 30%;">{{ team.debaters_display }}</td>
+		    <td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
+		</tr>
+	    {% endfor %}
+	</table>
+        <div class="pairings_footer_spacer"></div>
+	<div class="public_footer">
+            <span class="right">
+		<label for="autoscroll">
+                    Autoscroll:
+                    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+		</label>
+            </span>
+	</div>
+    </body>
+</html>

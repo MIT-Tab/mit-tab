@@ -45,6 +45,16 @@
     Submit an E-Ballot
   </a>
 
+  <a class="btn btn-info btn-large btn-block"
+     href="{% url 'public_judges' %}">
+      Judge List
+  </a>
+
+  <a class="btn btn-info btn-large btn-block"
+     href="{% url 'public_teams' %}">
+      Team List
+  </a>  
+
   <form action="/e_ballots/" class="hidden mt-2" method="post" class="form-inline"
     id="e-ballot-search" enctyp="multipate/form-data">
     {% csrf_token %}
