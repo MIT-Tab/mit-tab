@@ -270,17 +270,17 @@ def get_settings_from_yaml():
     default_settings = []
     with open(settings.SETTING_YAML_PATH, "r") as stream:
         default_settings = yaml.safe_load(stream)
-    
-    to_return = []
-    
-    for setting in default_settings:
-        t = TabSettings.objects.filter(key=setting["name"]).first()
 
-        if t:
+    to_return = []
+
+    for setting in default_settings:
+        tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+
+        if tab_setting:
             if "type" in setting and setting["type"] == "boolean":
-                setting["value"] = t.value == 1
+                setting["value"] = tab_setting.value == 1
             else:
-                setting["value"] = t.value
+                setting["value"] = tab_setting.value
 
         to_return.append(setting)
 
@@ -289,12 +289,12 @@ def get_settings_from_yaml():
 ### SETTINGS VIEWS ###
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    settings = get_settings_from_yaml()
+    yaml_settings = get_settings_from_yaml()
     if request.method == "POST":
-        settings_form = SettingsForm(request.POST, settings=settings)
+        _settings_form = SettingsForm(request.POST, settings=yaml_settings)
 
-        if settings_form.is_valid():
-            settings_form.save()
+        if _settings_form.is_valid():
+            _settings_form.save()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",
@@ -303,13 +303,13 @@ def settings_form(request):
         return render( # Allows for proper validation checking
             request, "tab/settings_form.html", {
                 "form": settings_form,
-            })      
-    
-    settings_form = SettingsForm(settings=settings)
+            })
+
+    _settings_form = SettingsForm(settings=settings)
 
     return render(
         request, "tab/settings_form.html", {
-            "form": settings_form,
+            "form": _settings_form,
         })
 
 def upload_data(request):

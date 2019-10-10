@@ -392,26 +392,32 @@ class EBallotForm(ResultEntryForm):
 
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
-        settings = kwargs.pop("settings")
-        self.settings = settings
+        settings_to_import = kwargs.pop("settings")
+        self.settings = settings_to_import
 
         super(SettingsForm, self).__init__(*args, **kwargs)
 
-        for setting in settings:
+        for setting in self.settings:
             if "type" in setting and setting["type"] == "boolean":
-                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(label=setting["name"],
-                                                                                    help_text=setting["description"],
-                                                                                    initial=setting["value"],
-                                                                                    required=False)
+                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"],
+                    required=False
+                )
             else:
-                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(label=setting["name"],
-                                                                                    help_text=setting["description"],
-                                                                                    initial=setting["value"])
+                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"]
+                )
 
-    def save(self, commit=True):
+    def save(self):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
-            tab_setting = TabSettings.objects.filter(key=self.fields[field].label).first()
+            tab_setting = TabSettings.objects.filter(
+                key=self.fields[field].label
+            ).first()
 
             value_to_set = setting["value"]
 
