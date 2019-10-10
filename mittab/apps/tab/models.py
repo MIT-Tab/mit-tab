@@ -127,10 +127,16 @@ class Team(ModelWithTiebreaker):
 
     def set_unique_team_code(self):
         haikunator = Haikunator()
-        code = haikunator.haikunate(token_length=0)
+
+        def gen_haiku_and_clean():
+            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
+
+            return code
+
+        code = gen_haiku_and_clean()
 
         while Team.objects.filter(team_code=code).first():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").upper()
+            code = gen_haiku_and_clean()
 
         self.team_code = code
 
