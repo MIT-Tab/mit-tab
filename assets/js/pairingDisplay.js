@@ -1,2 +1,2 @@
 import "../css/pairing-display.scss";
-import "./scroller.js"
+import "./scroller";
