@@ -97,6 +97,7 @@ jobs:
           command: |
             . venv/bin/activate
             cd docs
+            mkdir _static
             make html
       - run:
           name: Check links
