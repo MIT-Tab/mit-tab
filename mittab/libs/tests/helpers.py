@@ -131,4 +131,4 @@ def generate_results(round_number,
                                             prob_forfeit=prob_forfeit,
                                             prob_ironman=prob_ironman)
         for result in results:
-            result.save()
+            result.save() # pylint: disable=E1101
