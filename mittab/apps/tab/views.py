@@ -305,7 +305,7 @@ def settings_form(request):
                 "form": settings_form,
             })
 
-    _settings_form = SettingsForm(settings=settings)
+    _settings_form = SettingsForm(settings=yaml_settings)
 
     return render(
         request, "tab/settings_form.html", {
