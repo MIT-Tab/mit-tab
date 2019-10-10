@@ -403,6 +403,7 @@ class SettingsForm(forms.Form):
     def save(self, commit=True):
         for field in self.cleaned_data:
             tab_setting = TabSettings.objects.filter(key=self.fields[field].label).first()
+
             if not tab_setting:
                 tab_setting = TabSettings.objects.create(key=self.fields[field].label,
                                                          value=self.cleaned_data[field])

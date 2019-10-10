@@ -1,7 +1,10 @@
+import yaml
+
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
+from django.conf import settings
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, reverse
 
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
@@ -264,20 +267,21 @@ def view_scratches(request):
 
 
 def get_settings_from_yaml():
-    default_settings = [
-        {
-            "name": "teams_public",
-            "description": "1 if the teams list should be public, 0 if not",
-            "value": 1
-        }
-    ]
-
+    default_settings = []
+    with open(settings.SETTING_YAML_PATH, "r") as stream:
+        default_settings = yaml.safe_load(stream)
+    
+    to_return = []
+    
     for setting in default_settings:
         t = TabSettings.objects.filter(key=setting["name"]).first()
 
         if t:
-            # MAKE INITIAL VALUE WHAT'S IN THE DB
-            pass
+            setting["value"] = t.value
+
+        to_return.append(setting)
+
+    return to_return
 
 ### SETTINGS VIEWS ###
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -288,6 +292,15 @@ def settings_form(request):
 
         if settings_form.is_valid():
             settings_form.save()
+            return redirect_and_flash_success(
+                request,
+                "Tab settings updated!",
+                path=reverse("settings_form")
+            )
+        return render( # Allows for proper validation checking
+            request, "tab/settings_form.html", {
+                "form": settings_form,
+            })      
     
     settings_form = SettingsForm(settings=settings)
 

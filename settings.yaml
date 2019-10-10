@@ -1,0 +1,20 @@
+- public_teams:
+  name: public_teams
+  description: "1 if the teams list should be public, 0 if not"
+  value: 0
+- public_judges:
+  name: public_judges
+  description: "1 if the judges list should be public, 0 if not"
+  value: 0
+- lenient_late:
+  name: lenient_late
+  description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
+  value: 0
+- max_eballot_speak:
+  name: max_eballot_speak
+  description: "The maximum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 35, a 35 does not have to be justified to tab staff but a 36 does"
+  value: 35
+- min_eballot_speak:
+  name: min_eballot_speak
+  description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
+  value: 15
