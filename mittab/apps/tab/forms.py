@@ -97,6 +97,11 @@ class TeamForm(forms.ModelForm):
         data = self.cleaned_data["debaters"]
         if len(data) not in [1, 2]:
             raise forms.ValidationError("You must select 1 or 2 debaters!")
+        for debater in data:
+            if debater.team_set.count() > 0:
+                raise forms.ValidationError(
+                    "A debater cannot already be on a different team!"
+                )
         return data
 
     class Meta:
@@ -114,6 +119,15 @@ class TeamForm(forms.ModelForm):
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?",
                                           initial=0)
+
+    def clean_debaters(self):
+        data = self.cleaned_data["debaters"]
+        for debater in data:
+            if debater.team_set.count() > 0:
+                raise forms.ValidationError(
+                    "A debater cannot already be on a different team!"
+                )
+        return data
 
     class Meta:
         model = Team
