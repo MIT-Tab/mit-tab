@@ -73,9 +73,42 @@ jobs:
       - run:
           name: Lint -- JS
           command: npm run lint
+  docs:
+    docker:
+      - image: circleci/python:3.7.3-node
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "docs/requirements.txt" }}
+            - v1-dependencies-
+      - run:
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r docs/requirements.txt
+      - save_cache:
+          paths:
+            - ./venv
+          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
+      - run:
+          name: Build docs
+          command: |
+            . venv/bin/activate
+            cd docs
+            mkdir _static
+            make html
+      - run:
+          name: Check links
+          command: |
+            . venv/bin/activate
+            cd docs
+            make linkcheck
 workflows:
   version: 2
-  test_and_lint:
+  build_and_lint:
     jobs:
       - lint
       - build
+      - docs
