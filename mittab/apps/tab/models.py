@@ -156,6 +156,17 @@ class Team(ModelWithTiebreaker):
         super(Team, self).save(*args, **kwargs)
 
     @property
+    def display_backend(self):
+        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
+
+        if use_team_codes_backend:
+            if not self.team_code:
+                self.set_unique_team_code()
+                self.save()
+            return self.team_code
+        return self.name
+
+    @property
     def display(self):
         use_team_codes = TabSettings.get("use_team_codes", 0)
 
@@ -167,7 +178,7 @@ class Team(ModelWithTiebreaker):
         return self.name
 
     def __str__(self):
-        return self.name
+        return self.display_backend
 
     def delete(self, using=None, keep_parents=False):
         scratches = Scratch.objects.filter(team=self)

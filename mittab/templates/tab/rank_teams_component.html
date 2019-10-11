@@ -12,7 +12,7 @@
     {% for team, wins, speaks, ranks, tiebreaker in varsity %}
     <tr>
         <td>{{ forloop.counter }}</td>
-        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td><a href="/team/{{ team.id }}">{{ team.display_backend }}</a></td>
         <td>{{ wins }}</td>
         <td>{{ speaks|floatformat:2 }}</td>
         <td>{{ ranks|floatformat:2 }}</td>
@@ -35,7 +35,7 @@
     {% for team, wins, speaks, ranks, tiebreaker in novice %}
     <tr>
         <td>{{ forloop.counter }}</td>
-        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td><a href="/team/{{ team.id }}">{{ team.display_backend }}</a></td>
         <td>{{ wins }}</td>
         <td>{{ speaks|floatformat:2 }}</td>
         <td>{{ ranks|floatformat:2 }}</td>
