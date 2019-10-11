@@ -10,7 +10,7 @@
         <h3>
           Round Status for Round {{round_number}}:
           <small class="{% if not errors %}text-success{% else %}text-danger{% endif %}">
-            {% if not errors %} Valid {% else %} Invalid {% endif %} pairing
+            {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
           </small>
         </h3>
       </div>
