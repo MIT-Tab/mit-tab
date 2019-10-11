@@ -23,7 +23,7 @@ def index(request):
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
     team_list = [(team.pk, team.name) for team in Team.objects.all()]
-    debater_list = [(debater.pk, debater.name)
+    debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
 
