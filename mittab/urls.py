@@ -175,7 +175,10 @@ urlpatterns = [
     url(r"^import_data/$", views.upload_data, name="upload_data"),
 
     # Tournament Archive
-    url(r"^archive/download/$", views.generate_archive, name="download_archive")
+    url(r"^archive/download/$", views.generate_archive, name="download_archive"),
+
+    # Cache related
+    url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh")
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

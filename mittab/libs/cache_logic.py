@@ -7,6 +7,19 @@ from django.core.cache import cache as _djcache
 CACHE_TIMEOUT = 20
 
 
+def cache_fxn_key(fxn, key, *args, **kwargs):
+    result = _djcache.get(key)
+
+    if not result:
+        result = fxn(*args, **kwargs)
+        _djcache.set(key, result)
+    return result
+
+
+def invalidate_cache(key):
+    _djcache.delete(key)
+
+
 def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
     """
     Cache the result of a function call for the specified number of seconds,
