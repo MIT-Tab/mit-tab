@@ -67,7 +67,7 @@ class School(models.Model):
 
     @property
     def display(self):
-        schools_public = TabSettings.get("schools_public", 1)
+        schools_public = TabSettings.get("use_team_codes", 0)
 
         if schools_public:
             return self.name
