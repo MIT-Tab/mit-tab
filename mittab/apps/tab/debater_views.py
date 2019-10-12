@@ -4,7 +4,7 @@ from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import tab_logic
+from mittab.libs import tab_logic, cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
 
@@ -90,7 +90,7 @@ def rank_debaters_ajax(request):
                   {"title": "Debater Rankings"})
 
 
-def rank_debaters(request):
+def get_speaker_rankings(request):
     speakers = tab_logic.rank_speakers()
     debaters = []
     for i, debater_stats in enumerate(speakers):
@@ -106,8 +106,19 @@ def rank_debaters(request):
                          debater_stats[rankings.RANKS],
                          debater_stats.debater.team(), tiebreaker))
 
-    nov_debaters = filter(lambda s: s[0].novice_status == Debater.NOVICE,
-                          debaters)
+    nov_debaters = list(filter(lambda s: s[0].novice_status == Debater.NOVICE,
+                               debaters))
+
+    return debaters, nov_debaters
+
+
+def rank_debaters(request):
+    debaters, nov_debaters = cache_logic.cache_fxn_key(
+        get_speaker_rankings,
+        "speaker_rankings",
+        request
+    )
+
     return render(
         request, "tab/rank_debaters_component.html", {
             "debaters": debaters,

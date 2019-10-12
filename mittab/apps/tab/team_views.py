@@ -7,7 +7,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import tab_logic
+from mittab.libs import tab_logic, cache_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
         tot_ranks_deb, tot_speaks, tot_ranks
 from mittab.libs.tab_logic import rankings
@@ -342,7 +342,7 @@ def rank_teams_ajax(request):
     return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
 
-def rank_teams(request):
+def get_team_rankings(request):
     ranked_teams = tab_logic.rankings.rank_teams()
     teams = []
     for i, team_stat in enumerate(ranked_teams):
@@ -358,10 +358,21 @@ def rank_teams(request):
                       team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
                       tiebreaker))
 
-    nov_teams = filter(
+    nov_teams = list(filter(
         lambda ts: all(
             map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
-                all())), teams)
+                all())), teams))
+
+    return teams, nov_teams
+
+
+def rank_teams(request):
+    teams, nov_teams = cache_logic.cache_fxn_key(
+        get_team_rankings,
+        "team_rankings",
+        request
+    )
+
     return render(request, "tab/rank_teams_component.html", {
         "varsity": teams,
         "novice": nov_teams,

@@ -8,7 +8,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors
+from mittab.libs import errors, cache_logic
 from mittab import settings
 
 
@@ -309,15 +309,17 @@ class ResultEntryForm(forms.Form):
     def save(self, _commit=True):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+
+        if not round_obj.victor == cleaned_data["winner"]:
+            cache_logic.invalidate_cache("team_rankings")
+            cache_logic.invalidate_cache("speaker_rankings")
+
         round_obj.victor = cleaned_data["winner"]
 
         with transaction.atomic():
             for debater in self.DEBATERS:
                 old_stats = RoundStats.objects.filter(round=round_obj,
                                                       debater_role=debater)
-                if old_stats.exists():
-                    old_stats.delete()
-
                 debater_obj = Debater.objects.get(
                     pk=self.deb_attr_val(debater, "debater"))
                 stats = RoundStats(
@@ -326,6 +328,17 @@ class ResultEntryForm(forms.Form):
                     speaks=self.deb_attr_val(debater, "speaks", float),
                     ranks=self.deb_attr_val(debater, "ranks", int),
                     debater_role=debater)
+
+                if old_stats.exists():
+                    for old_stat in old_stats:
+                        if (old_stat.debater != stats.debater) or \
+                           (old_stat.speaks != stats.speaks) or \
+                           (old_stat.ranks != stats.ranks) or \
+                           (old_stat.debater_role != stats.debater_role) or \
+                           (old_stat.round != stats.round):
+                            cache_logic.invalidate_cache("team_rankings")
+                            cache_logic.invalidate_cache("speaker_rankings")
+                    old_stats.delete()
                 stats.save()
             round_obj.save()
         return round_obj

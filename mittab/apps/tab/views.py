@@ -11,6 +11,7 @@ from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchF
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
         import_scratches
@@ -352,6 +353,17 @@ def upload_data(request):
             "room_info": room_info,
             "scratch_info": scratch_info
         })
+
+def force_cache_refresh(request):
+    key = request.GET.get("key", "")
+
+    cache_logic.invalidate_cache(key)
+
+    redirect_to = request.GET.get("next", "/")
+
+    return redirect_and_flash_success(request,
+                                      "Refreshed!",
+                                      path=redirect_to)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
