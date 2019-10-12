@@ -79,6 +79,16 @@ class Debater(ModelWithTiebreaker):
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
 
+    @property
+    def num_teams(self):
+        return self.team_set.count()
+
+    @property
+    def display(self):
+        if self.num_teams:
+            return self.name
+        return "{} (NO TEAM)".format(self.name)
+
     def __str__(self):
         return self.name
 
