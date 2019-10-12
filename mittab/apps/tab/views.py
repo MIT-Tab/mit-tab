@@ -1,10 +1,9 @@
-import yaml
-
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import render, reverse
+import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \

@@ -1,11 +1,11 @@
 - teams_public:
   name: public_teams
-  description: "1 if the teams list should be public, 0 if not"
+  description: "Check this box to make the team list publicly visible"
   value: false
   type: boolean
 - judges_public:
   name: public_judges
-  description: "1 if the judges list should be public, 0 if not"
+  description: "Check this box to make the judges list publicly visible"
   value: false
   type: boolean
 - lenient_late:
