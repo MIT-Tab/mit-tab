@@ -410,6 +410,53 @@ class EBallotForm(ResultEntryForm):
         return super(EBallotForm, self).clean()
 
 
+class SettingsForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        settings_to_import = kwargs.pop("settings")
+        self.settings = settings_to_import
+
+        super(SettingsForm, self).__init__(*args, **kwargs)
+
+        for setting in self.settings:
+            if "type" in setting and setting["type"] == "boolean":
+                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"],
+                    required=False
+                )
+            else:
+                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"]
+                )
+
+    def save(self):
+        for setting in self.settings:
+            field = "setting_%s" % (setting["name"],)
+            tab_setting = TabSettings.objects.filter(
+                key=self.fields[field].label
+            ).first()
+
+            value_to_set = setting["value"]
+
+            if "type" in setting and setting["type"] == "boolean":
+                if not self.cleaned_data[field]:
+                    value_to_set = 0
+                else:
+                    value_to_set = 1
+            else:
+                value_to_set = self.cleaned_data[field]
+
+            if not tab_setting:
+                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
+                                                         value=value_to_set)
+            else:
+                tab_setting.value = value_to_set
+                tab_setting.save()
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*list(result.values())))

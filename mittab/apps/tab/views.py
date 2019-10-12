@@ -1,10 +1,13 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
+from django.conf import settings
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, reverse
+import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
+from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
+    SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -261,6 +264,52 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
+
+def get_settings_from_yaml():
+    default_settings = []
+    with open(settings.SETTING_YAML_PATH, "r") as stream:
+        default_settings = yaml.safe_load(stream)
+
+    to_return = []
+
+    for setting in default_settings:
+        tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+
+        if tab_setting:
+            if "type" in setting and setting["type"] == "boolean":
+                setting["value"] = tab_setting.value == 1
+            else:
+                setting["value"] = tab_setting.value
+
+        to_return.append(setting)
+
+    return to_return
+
+### SETTINGS VIEWS ###
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def settings_form(request):
+    yaml_settings = get_settings_from_yaml()
+    if request.method == "POST":
+        _settings_form = SettingsForm(request.POST, settings=yaml_settings)
+
+        if _settings_form.is_valid():
+            _settings_form.save()
+            return redirect_and_flash_success(
+                request,
+                "Tab settings updated!",
+                path=reverse("settings_form")
+            )
+        return render( # Allows for proper validation checking
+            request, "tab/settings_form.html", {
+                "form": settings_form,
+            })
+
+    _settings_form = SettingsForm(settings=yaml_settings)
+
+    return render(
+        request, "tab/settings_form.html", {
+            "form": _settings_form,
+        })
 
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
