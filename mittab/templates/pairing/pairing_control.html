@@ -9,7 +9,7 @@
       <div class="col">
         <h3>
           Round Status for Round {{round_number}}:
-          <small class="{% if not errors %}text-success{% else %}text-danger{% endif %}">
+          <small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
             {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
           </small>
         </h3>
