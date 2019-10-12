@@ -36,7 +36,7 @@ def view_teams(request):
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
 
-    c_teams = [(team.id, team.name, flags(team),
+    c_teams = [(team.id, team.display_backend, flags(team),
                 TabFlags.flags_to_symbols(flags(team)))
                for team in Team.objects.all()]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
@@ -80,13 +80,13 @@ def view_team(request, team_id):
     else:
         form = TeamForm(instance=team)
         links = [("/team/" + str(team_id) + "/scratches/view/",
-                  "Scratches for {}".format(team.name))]
+                  "Scratches for {}".format(team.display_backend))]
         for deb in team.debaters.all():
             links.append(
                 ("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
         return render(
             request, "common/data_entry.html", {
-                "title": "Viewing Team: %s" % (team.name),
+                "title": "Viewing Team: %s" % (team.display_backend),
                 "form": form,
                 "links": links,
                 "team_obj": team,
@@ -114,7 +114,7 @@ def enter_team(request):
             else:
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(team.name),
+                    "Team {} created successfully".format(team.display_backend),
                     path="/")
     else:
         form = TeamEntryForm()
@@ -159,7 +159,7 @@ def add_scratches(request, team_id, number_scratches):
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, [None] * len(forms))),
             "data_type": "Scratch",
-            "title": "Adding Scratch(es) for %s" % (team.name)
+            "title": "Adding Scratch(es) for %s" % (team.display_backend)
         })
 
 
@@ -200,7 +200,7 @@ def view_scratches(request, team_id):
             "forms": list(zip(forms, delete_links)),
             "data_type": "Scratch",
             "links": links,
-            "title": "Viewing Scratch Information for %s" % (team.name)
+            "title": "Viewing Scratch Information for %s" % (team.display_backend)
         })
 
 
@@ -321,7 +321,7 @@ def tab_card(request, team_id):
         deb2 = deb1
     return render(
         request, "tab/tab_card.html", {
-            "team_name": team.name,
+            "team_name": team.display_backend,
             "team_school": team.school,
             "debater_1": deb1.name,
             "debater_1_status": Debater.NOVICE_CHOICES[deb1.novice_status][1],

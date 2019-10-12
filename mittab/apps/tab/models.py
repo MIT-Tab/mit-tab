@@ -65,6 +65,14 @@ class School(models.Model):
         else:
             super(School, self).delete(using, keep_parents)
 
+    @property
+    def display(self):
+        schools_public = not TabSettings.get("use_team_codes", 0)
+
+        if schools_public:
+            return self.name
+        return ""
+
     class Meta:
         ordering = ["name"]
 
@@ -158,6 +166,17 @@ class Team(ModelWithTiebreaker):
         super(Team, self).save(*args, **kwargs)
 
     @property
+    def display_backend(self):
+        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
+
+        if use_team_codes_backend:
+            if not self.team_code:
+                self.set_unique_team_code()
+                self.save()
+            return self.team_code
+        return self.name
+
+    @property
     def display(self):
         use_team_codes = TabSettings.get("use_team_codes", 0)
 
@@ -169,7 +188,7 @@ class Team(ModelWithTiebreaker):
         return self.name
 
     def __str__(self):
-        return self.name
+        return self.display_backend
 
     def delete(self, using=None, keep_parents=False):
         scratches = Scratch.objects.filter(team=self)
@@ -178,7 +197,11 @@ class Team(ModelWithTiebreaker):
         super(Team, self).delete(using, keep_parents)
 
     def debaters_display(self):
-        return ", ".join([debater.name for debater in self.debaters.all()])
+        debaters_public = TabSettings.get("debaters_public", 1)
+
+        if debaters_public:
+            return ", ".join([debater.name for debater in self.debaters.all()])
+        return ""
 
     class Meta:
         ordering = ["name"]

@@ -37,7 +37,7 @@ table#pairing_list td{
 </head>
 
 {% for team in all_teams %}
-<h3>Team: {{ team.name }}</h3>
+<h3>Team: {{ team.display_backend }}</h3>
 <div class="printable tab_card_item {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}" data-team-id={{team.id}}>
   <small>Loading...</small>
 </div>

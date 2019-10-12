@@ -26,8 +26,8 @@
 	<table class="public_table">
 	    {% for team in teams %}
 		<tr>
-		    <td style="width: 25%;">{{ team.name }}</td>
-		    <td style="width: 15%;">{{ team.school.name }}</td>
+		    <td style="width: 25%;">{{ team.display }}</td>
+		    <td style="width: 15%;">{{ team.school.display }}</td>
 		    <td style="width: 15%;">{{ team.hybrid_school.name }}</td>
 		    <td style="width: 30%;">{{ team.debaters_display }}</td>
 		    <td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>

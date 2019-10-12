@@ -6,7 +6,7 @@
 <h6 class="text-center dropdown-header">Team</h6>
 
 <a class="dropdown-item searchable" href="/team/{{current_team_id}}">
-  {{ current_team.name }}
+  {{ current_team.display_backend }}
 </a>
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">
@@ -15,7 +15,7 @@
 {% for team in excluded_teams %}
 <a href="#" class="dropdown-item team-assign searchable" position="{{position}}"
             src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
-  {{ team.name }}
+  {{ team.display_backend }}
 </a>
 {% empty %}
 <a class="dropdown-item">No teams</a>
@@ -26,7 +26,7 @@
 {% for team in included_teams%}
 <a href="#" class="dropdown-item team-assign searchable" position="{{position}}"
             src-team-id="{{current_team_id}}" team-id="{{team.id}}" round-id="{{round_id}}">
-  {{ team.name }}
+  {{ team.display_backend }}
 </a>
 {% empty %}
 <a class="dropdown-item">No teams</a>
