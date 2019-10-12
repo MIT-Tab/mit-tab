@@ -11,7 +11,7 @@ from mittab.libs.errors import *
 
 def view_debaters(request):
     #Get a list of (id,debater_name) tuples
-    c_debaters = [(debater.pk, debater.name, 0, "")
+    c_debaters = [(debater.pk, debater.display, 0, "")
                   for debater in Debater.objects.all()]
     return render(
         request, "common/list_data.html", {

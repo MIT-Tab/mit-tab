@@ -227,11 +227,10 @@ def view_round(request, round_number):
         if present_team not in paired_teams:
             excluded_teams.append(present_team)
 
-    for team in excluded_teams:
-        if not Bye.objects.filter(round_number=round_number,
-                                  bye_team=team).exists():
-            errors.append(
-                "{} is checked-in but has no round or bye".format(team))
+    excluded_teams_no_bye = [team for team in excluded_teams
+                             if not Bye.objects.filter(round_number=round_number,
+                                                       bye_team=team).exists()]
+    num_excluded = len(excluded_teams_no_bye)
 
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
