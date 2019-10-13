@@ -259,6 +259,10 @@ class Room(models.Model):
         else:
             super(Room, self).delete(using, keep_parents)
 
+    def is_checked_in_for_round(self, round_number):
+        return RoomCheckIn.objects.filter(room=self,
+                                          round_number=round_number).exists()
+
     class Meta:
         ordering = ["name"]
 
@@ -374,3 +378,12 @@ class CheckIn(models.Model):
     def __str__(self):
         return "Judge %s is checked in for round %s" % (self.judge,
                                                         self.round_number)
+
+
+class RoomCheckIn(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    round_number = models.IntegerField()
+
+    def __str__(self):
+        return "Room %s is checked in for round %s" % (self.room,
+                                                       self.round_number)
