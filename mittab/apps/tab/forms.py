@@ -8,7 +8,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors
+from mittab.libs import errors, cache_logic
 from mittab import settings
 
 
@@ -136,6 +136,15 @@ class TeamForm(forms.ModelForm):
         data = self.cleaned_data["debaters"]
         if len(data) not in [1, 2]:
             raise forms.ValidationError("You must select 1 or 2 debaters!")
+        for debater in data:
+            if debater.team_set.count() > 1 or \
+               (debater.team_set.count() == 1 and \
+                debater.team_set.first().id != self.instance.id):
+                raise forms.ValidationError(
+                    """A debater cannot already be on a different team!
+                    Consider editing the debaters' existing team,
+                     or removing them from it before creating this one."""
+                )
         return data
 
     class Meta:
@@ -153,6 +162,17 @@ class TeamForm(forms.ModelForm):
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?",
                                           initial=0)
+
+    def clean_debaters(self):
+        data = self.cleaned_data["debaters"]
+        for debater in data:
+            if debater.team_set.count() > 0:
+                raise forms.ValidationError(
+                    """A debater cannot already be on a different team!
+                    Consider editing the debaters' existing team,
+                     or removing them from it before creating this one."""
+                )
+        return data
 
     class Meta:
         model = Team
@@ -328,15 +348,17 @@ class ResultEntryForm(forms.Form):
     def save(self, _commit=True):
         cleaned_data = self.cleaned_data
         round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+
+        if not round_obj.victor == cleaned_data["winner"]:
+            cache_logic.invalidate_cache("team_rankings")
+            cache_logic.invalidate_cache("speaker_rankings")
+
         round_obj.victor = cleaned_data["winner"]
 
         with transaction.atomic():
             for debater in self.DEBATERS:
                 old_stats = RoundStats.objects.filter(round=round_obj,
                                                       debater_role=debater)
-                if old_stats.exists():
-                    old_stats.delete()
-
                 debater_obj = Debater.objects.get(
                     pk=self.deb_attr_val(debater, "debater"))
                 stats = RoundStats(
@@ -345,6 +367,17 @@ class ResultEntryForm(forms.Form):
                     speaks=self.deb_attr_val(debater, "speaks", float),
                     ranks=self.deb_attr_val(debater, "ranks", int),
                     debater_role=debater)
+
+                if old_stats.exists():
+                    for old_stat in old_stats:
+                        if (old_stat.debater != stats.debater) or \
+                           (old_stat.speaks != stats.speaks) or \
+                           (old_stat.ranks != stats.ranks) or \
+                           (old_stat.debater_role != stats.debater_role) or \
+                           (old_stat.round != stats.round):
+                            cache_logic.invalidate_cache("team_rankings")
+                            cache_logic.invalidate_cache("speaker_rankings")
+                    old_stats.delete()
                 stats.save()
             round_obj.save()
         return round_obj
@@ -427,6 +460,53 @@ class EBallotForm(ResultEntryForm):
                 ["Non handled error, preventing data contamination"])
 
         return super(EBallotForm, self).clean()
+
+
+class SettingsForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        settings_to_import = kwargs.pop("settings")
+        self.settings = settings_to_import
+
+        super(SettingsForm, self).__init__(*args, **kwargs)
+
+        for setting in self.settings:
+            if "type" in setting and setting["type"] == "boolean":
+                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"],
+                    required=False
+                )
+            else:
+                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    initial=setting["value"]
+                )
+
+    def save(self):
+        for setting in self.settings:
+            field = "setting_%s" % (setting["name"],)
+            tab_setting = TabSettings.objects.filter(
+                key=self.fields[field].label
+            ).first()
+
+            value_to_set = setting["value"]
+
+            if "type" in setting and setting["type"] == "boolean":
+                if not self.cleaned_data[field]:
+                    value_to_set = 0
+                else:
+                    value_to_set = 1
+            else:
+                value_to_set = self.cleaned_data[field]
+
+            if not tab_setting:
+                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
+                                                         value=value_to_set)
+            else:
+                tab_setting.value = value_to_set
+                tab_setting.save()
 
 
 def validate_panel(result):

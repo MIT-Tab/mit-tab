@@ -33,6 +33,7 @@
 {% url "view_backups" as view_backups %}
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
+{% url "settings_form" as settings_form %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container {% if not smaller_width %} w-95{% endif %}">
@@ -96,6 +97,7 @@
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Judge Checkin</a>
             <a class=" dropdown-item {% active request batch_room_checkin %}" href="{{ batch_room_checkin }}">Batch Room Checkin</a>
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
+            <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>

@@ -1,3 +1,8 @@
+<div class="col-12">
+    <a href="{% url 'cache_refresh' %}?key=team_rankings&next={% url 'rank_teams_ajax' %}">
+	Force Refresh
+    </a>
+</div>
 <div class="col-6">
   <h5 class="text-center">Varsity Ranking</h5>
   <table class="table table-striped table-sm table-bordered">
@@ -12,7 +17,7 @@
     {% for team, wins, speaks, ranks, tiebreaker in varsity %}
     <tr>
         <td>{{ forloop.counter }}</td>
-        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td><a href="/team/{{ team.id }}">{{ team.display_backend }}</a></td>
         <td>{{ wins }}</td>
         <td>{{ speaks|floatformat:2 }}</td>
         <td>{{ ranks|floatformat:2 }}</td>
@@ -35,7 +40,7 @@
     {% for team, wins, speaks, ranks, tiebreaker in novice %}
     <tr>
         <td>{{ forloop.counter }}</td>
-        <td><a href="/team/{{ team.id }}">{{ team.name }}</a></td>
+        <td><a href="/team/{{ team.id }}">{{ team.display_backend }}</a></td>
         <td>{{ wins }}</td>
         <td>{{ speaks|floatformat:2 }}</td>
         <td>{{ ranks|floatformat:2 }}</td>

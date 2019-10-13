@@ -1,13 +1,17 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, reverse, get_object_or_404
+import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm
+from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
+    SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
         import_scratches
@@ -22,8 +26,8 @@ def index(request):
 
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
-    team_list = [(team.pk, team.name) for team in Team.objects.all()]
-    debater_list = [(debater.pk, debater.name)
+    team_list = [(team.pk, team.display_backend) for team in Team.objects.all()]
+    debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
 
@@ -300,6 +304,52 @@ def view_scratches(request):
         })
 
 
+def get_settings_from_yaml():
+    default_settings = []
+    with open(settings.SETTING_YAML_PATH, "r") as stream:
+        default_settings = yaml.safe_load(stream)
+
+    to_return = []
+
+    for setting in default_settings:
+        tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+
+        if tab_setting:
+            if "type" in setting and setting["type"] == "boolean":
+                setting["value"] = tab_setting.value == 1
+            else:
+                setting["value"] = tab_setting.value
+
+        to_return.append(setting)
+
+    return to_return
+
+### SETTINGS VIEWS ###
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def settings_form(request):
+    yaml_settings = get_settings_from_yaml()
+    if request.method == "POST":
+        _settings_form = SettingsForm(request.POST, settings=yaml_settings)
+
+        if _settings_form.is_valid():
+            _settings_form.save()
+            return redirect_and_flash_success(
+                request,
+                "Tab settings updated!",
+                path=reverse("settings_form")
+            )
+        return render( # Allows for proper validation checking
+            request, "tab/settings_form.html", {
+                "form": settings_form,
+            })
+
+    _settings_form = SettingsForm(settings=yaml_settings)
+
+    return render(
+        request, "tab/settings_form.html", {
+            "form": _settings_form,
+        })
+
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
     judge_info = {"errors": [], "uploaded": False}
@@ -341,6 +391,17 @@ def upload_data(request):
             "room_info": room_info,
             "scratch_info": scratch_info
         })
+
+def force_cache_refresh(request):
+    key = request.GET.get("key", "")
+
+    cache_logic.invalidate_cache(key)
+
+    redirect_to = request.GET.get("next", "/")
+
+    return redirect_and_flash_success(request,
+                                      "Refreshed!",
+                                      path=redirect_to)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
