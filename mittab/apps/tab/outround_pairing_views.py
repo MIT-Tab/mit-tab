@@ -46,6 +46,7 @@ def break_teams(request):
 
             BreakingTeam.objects.create(team=team[0],
                                         seed=current_seed,
+                                        effective_seed=current_seed,
                                         type_of_team=BreakingTeam.VARSITY)
             current_seed += 1
 
@@ -58,10 +59,14 @@ def break_teams(request):
                 continue
             
             BreakingTeam.objects.create(team=nov_team[0],
-                                    seed=current_seed,
+                                        seed=current_seed,
+                                        effective_seed=current_seed,
                                         type_of_team=BreakingTeam.NOVICE)
 
             current_seed += 1
+
+        outround_tab_logic.pair(BreakingTeam.VARSITY)
+        outround_tab_logic.pair(BreakingTeam.NOVICE)        
 
         return redirect_and_flash_success(
             request, "Success!", path="/"

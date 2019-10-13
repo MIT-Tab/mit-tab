@@ -208,8 +208,8 @@ class Team(ModelWithTiebreaker):
 
 
 class BreakingTeam(models.Model):
-    VARSITY = 1
-    NOVICE = 0
+    VARSITY = 0
+    NOVICE = 1
     TYPE_CHOICES = (
         (VARSITY, "Varsity"),
         (NOVICE, "Novice")
@@ -218,10 +218,11 @@ class BreakingTeam(models.Model):
     team = models.ForeignKey("Team",
                              on_delete=models.CASCADE)
     seed = models.IntegerField(default=-1)
+    effective_seed = models.IntegerField(default=-1)
 
     type_of_team = models.IntegerField(default=VARSITY,
                                        choices=TYPE_CHOICES)
-    
+
 
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
@@ -310,6 +311,52 @@ class Room(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+
+class Outround(models.Model):
+    VARSITY = 0
+    NOVICE = 1
+    TYPE_OF_ROUND_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+    
+    num_teams = models.IntegerField()
+    type_of_round = models.IntegerField(default=VARSITY,
+                                        choices=TYPE_OF_ROUND_CHOICES)
+    gov_team = models.ForeignKey(Team, related_name="gov_team_outround",
+                                 on_delete=models.CASCADE)
+    opp_team = models.ForeignKey(Team, related_name="opp_team_outround",
+                                 on_delete=models.CASCADE)
+    chair = models.ForeignKey(Judge,
+                              null=True,
+                              blank=True,
+                              on_delete=models.CASCADE,
+                              related_name="chair_outround")
+    judges = models.ManyToManyField(Judge, blank=True, related_name="judges_outrounds")
+    UNKNOWN = 0
+    GOV = 1
+    OPP = 2
+    GOV_VIA_FORFEIT = 3
+    OPP_VIA_FORFEIT = 4
+    VICTOR_CHOICES = (
+        (UNKNOWN, "UNKNOWN"),
+        (GOV, "GOV"),
+        (OPP, "OPP"),
+        (GOV_VIA_FORFEIT, "GOV via Forfeit"),
+        (OPP_VIA_FORFEIT, "OPP via Forfeit"),
+    )
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+
+    def clean(self):
+        if self.pk and self.chair not in self.judges.all():
+            raise ValidationError("Chair must be a judge in the round")
+
+    def __str__(self):
+        return "Outround {} between {} and {}".format(self.num_teams,
+                                                      self.gov_team,
+                                                      self.opp_team)
 
 
 class Round(models.Model):
