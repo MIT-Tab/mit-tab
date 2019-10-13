@@ -20,3 +20,11 @@
   name: min_eballot_speak
   description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
   value: 15
+- nov_teams_to_break:
+  name: nov_teams_to_break
+  description: "The number of novice teams to be included in the break (exclusive of novice teams who are varsity breaking)"
+  value: 4
+- var_teams_to_break:
+  name: var_teams_to_break
+  description: "The number of varsity teams to be included in the break."
+  value: 8

@@ -8,6 +8,7 @@ import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
 import mittab.apps.tab.pairing_views as pairing_views
+import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()
@@ -159,6 +160,11 @@ urlpatterns = [
     url(r"e_ballots/(\S+)/$",
         pairing_views.enter_e_ballot,
         name="enter_e_ballot"),
+
+    # Outround related
+    url(r"break/",
+        outround_pairing_views.break_teams,
+        name="break"),
 
     # Settings related
     url(r"^settings_form",

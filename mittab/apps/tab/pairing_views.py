@@ -211,6 +211,8 @@ def view_round(request, round_number):
     errors, excluded_teams = [], []
     round_pairing = list(Round.objects.filter(round_number=round_number))
 
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+
     random.seed(1337)
     random.shuffle(round_pairing)
     round_pairing.sort(key=lambda x: tab_logic.team_comp(x, round_number),

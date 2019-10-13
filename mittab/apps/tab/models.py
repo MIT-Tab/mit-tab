@@ -207,6 +207,22 @@ class Team(ModelWithTiebreaker):
         ordering = ["name"]
 
 
+class BreakingTeam(models.Model):
+    VARSITY = 1
+    NOVICE = 0
+    TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+    
+    team = models.ForeignKey("Team",
+                             on_delete=models.CASCADE)
+    seed = models.IntegerField(default=-1)
+
+    type_of_team = models.IntegerField(default=VARSITY,
+                                       choices=TYPE_CHOICES)
+    
+
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
