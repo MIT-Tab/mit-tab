@@ -14,4 +14,3 @@ def branch(seed, level, limit):
 
 def gen_bracket(num_teams):
     return branch(1, 1, math.log(num_teams, 2) + 1)
-    

@@ -61,7 +61,13 @@ def whos_gov(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
-    base_queryset = BreakingTeam.objects.filter(type_of_team=type_of_break)
+    lost_outround = [t.id for t.loser in Outround.objects.all()]
+    
+    base_queryset = BreakingTeam.objects.filter(
+        type_of_team=type_of_break
+    ).exclude(
+        team__id__in=lost_outround
+    )
 
     num_teams = base_queryset.count()
 

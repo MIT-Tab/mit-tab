@@ -33,6 +33,7 @@
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
 {% url "settings_form" as settings_form %}
+{% url "outround_pairing_view_default" as outround_pairings %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container {% if not smaller_width %} w-95{% endif %}">
@@ -52,6 +53,7 @@
           <div class="dropdown-menu">
             <a class="dropdown-item {%active request view_status %}" href="{{ view_status }}">Current Round</a>
             <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
+	    <a class="dropdown-item {%active request outround_pairings %}" href="{{ outround_pairings }}">Outround Pairings</a>
           </div>
         </li>
 

@@ -165,6 +165,12 @@ urlpatterns = [
     url(r"break/",
         outround_pairing_views.break_teams,
         name="break"),
+    url("outround_pairing/<int:type_of_round>/<int:num_teams>",
+        outround_pairing_views.outround_pairing_view,
+        name="outround_pairing_view"),
+    url("outround_pairing",
+        outround_pairing_views.outround_pairing_view,
+        name="outround_pairing_view_default"),
 
     # Settings related
     url(r"^settings_form",

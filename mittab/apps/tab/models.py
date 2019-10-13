@@ -358,6 +358,33 @@ class Outround(models.Model):
                                                       self.gov_team,
                                                       self.opp_team)
 
+    winning_team = models.ForeignKey(Team,
+                                     related_name="won_outrounds",
+                                     on_delete=models.CASCADE,
+                                     null=True)
+
+    losing_team = models.ForeignKey(Team,
+                                    related_name="lost_outrounds",
+                                    on_delete=models.CASCADE,
+                                    null=True)
+
+    @property
+    def winner(self):
+        if self.victor in [1, 3]:
+            return self.gov_team
+        elif self.victor in [2, 4]:
+            return self.opp_team
+        return None
+    
+    @property
+    def loser(self):
+        if not self.winner:
+            return None
+
+        if self.winner == self.gov_team:
+            return self.opp_team
+        return self.gov_team
+
 
 class Round(models.Model):
     round_number = models.IntegerField()

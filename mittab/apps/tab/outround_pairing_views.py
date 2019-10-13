@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
-from django.shortcuts import redirect
+from django.shortcuts import redirect, reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
@@ -121,3 +121,16 @@ def break_teams(request):
             (msg, "No", "You have a noshow and results. %s" % str(e)))
         
     return render(request, "pairing/pair_round.html", locals())
+
+
+def outround_pairing_view(request,
+                          type_of_round=BreakingTeam.VARSITY,
+                          num_teams=TabSettings.get("var_teams_to_break", 8)):
+    outround_options = []
+    
+    outrounds = Outround.objects.filter(type_of_round=type_of_round,
+                                        num_teams=num_teams).all()
+    
+    return render(request,
+                  "outrounds/pairing_base.html",
+                  locals())
