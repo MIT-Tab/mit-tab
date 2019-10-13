@@ -241,7 +241,7 @@ def have_enough_rooms(_round_to_check):
     num_rooms = RoomCheckIn.objects.filter(round_number=_round_to_check).count()
     if num_rooms < future_rounds:
         return False, (num_rooms, future_rounds)
-    return True, (num_rooms, future_rounds)    
+    return True, (num_rooms, future_rounds)
 
 
 def have_properly_entered_data(round_to_check):

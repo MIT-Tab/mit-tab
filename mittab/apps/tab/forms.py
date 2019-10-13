@@ -57,7 +57,7 @@ class RoomForm(forms.ModelForm):
             if "checkin_%s" % (i) in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
                 checked_in = RoomCheckIn.objects.filter(room=room,
-                                                    round_number=i + 1)
+                                                        round_number=i + 1)
                 # Two cases, either the room is not checked in and the user says he is,
                 # or the room is checked in and the user says he is not
                 if not checked_in and should_be_checked_in:
@@ -68,7 +68,7 @@ class RoomForm(forms.ModelForm):
 
         return room
 
-    
+
     class Meta:
         model = Room
         fields = "__all__"

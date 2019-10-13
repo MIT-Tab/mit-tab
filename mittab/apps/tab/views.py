@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404
 
 from mittab.apps.tab.archive import ArchiveExporter
@@ -254,7 +254,6 @@ def batch_checkin(request):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403")
 def room_check_in(request, room_id, round_number):
-    print ("HI")
     room_id, round_number = int(room_id), int(round_number)
 
     if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
@@ -268,7 +267,7 @@ def room_check_in(request, room_id, round_number):
     elif request.method == "DELETE":
         if room.is_checked_in_for_round(round_number):
             check_ins = RoomCheckIn.objects.filter(room=room,
-                                               round_number=round_number)
+                                                   round_number=round_number)
             check_ins.delete()
     else:
         raise Http404("Must be POST or DELETE")
