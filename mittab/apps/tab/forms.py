@@ -51,9 +51,12 @@ class JudgeForm(forms.ModelForm):
                 checkins = [
                     c.round_number for c in CheckIn.objects.filter(judge=judge)
                 ]
-                for i in range(num_rounds):
+                for i in range(-1, num_rounds):
+                    label = "Checked in for round %s?" % (i + 1)
+                    if i == -1:
+                        label = "Checked in for outrounds?"
                     self.fields["checkin_%s" % i] = forms.BooleanField(
-                        label="Checked in for round %s?" % (i + 1),
+                        label=label,
                         initial=i + 1 in checkins,
                         required=False)
             except Exception:
@@ -62,7 +65,7 @@ class JudgeForm(forms.ModelForm):
     def save(self, commit=True):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        for i in range(num_rounds):
+        for i in range(-1, num_rounds):
             if "checkin_%s" % (i) in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
                 checked_in = CheckIn.objects.filter(judge=judge,

@@ -212,7 +212,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for judge in Judge.objects.all():
         checkins = []
-        for round_number in round_numbers:
+        for round_number in [0] + round_numbers:
             checkins.append(judge.is_checked_in_for_round(round_number))
         judges_and_checkins.append((judge, checkins))
 
@@ -226,7 +226,7 @@ def batch_checkin(request):
 def judge_check_in(request, judge_id, round_number):
     judge_id, round_number = int(judge_id), int(round_number)
 
-    if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
+    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
         raise Http404("Round does not exist")
 
     judge = get_object_or_404(Judge, pk=judge_id)

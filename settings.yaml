@@ -28,3 +28,11 @@
   name: var_teams_to_break
   description: "The number of varsity teams to be included in the break."
   value: 8
+- nov_panel_size:
+  name: nov_panel_size
+  description: "The number of judges on a novice outs panel"
+  value: 3
+- var_panel_size:
+  name: var_panel_size
+  description: "The number of judges on a varsity outs panel"
+  value: 3
