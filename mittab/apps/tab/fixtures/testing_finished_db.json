@@ -9579,15 +9579,6 @@
 },
 {
     "model": "tab.scratch",
-    "pk": 10,
-    "fields": {
-        "judge": 77,
-        "team": 25,
-        "scratch_type": 0
-    }
-},
-{
-    "model": "tab.scratch",
     "pk": 11,
     "fields": {
         "judge": 55,
