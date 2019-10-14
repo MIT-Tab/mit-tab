@@ -364,7 +364,7 @@ class Outround(models.Model):
 
     @property
     def winner(self):
-        if self.victor in [1, 3]:
+        if self.victor in [self.GOV, self.GOV_VIA_FORFEIT]:
             return self.gov_team
         elif self.victor in [2, 4]:
             return self.opp_team
