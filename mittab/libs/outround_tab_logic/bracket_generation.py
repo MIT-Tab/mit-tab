@@ -5,11 +5,14 @@ import math
 
 def branch(seed, level, limit):
     # Level is how deep in the recursion basically
-    # Limit is the depth of the recursion to get to 1, ie, for 8 teams, this value would be 4 (dividing by 2)
+
+    # Limit is the depth of the recursion to get to 1, ie, for 8 teams
+    # this value would be 4 (dividing by 2)
     level_sum = (2 ** level) + 1
 
     # How many teams there are at the current spot
-    # Seed is where you are currently, think of it as a branch, you could be at the 1 seed, or the 5th branch, it's a tree.
+    # Seed is where you are currently, think of it as a branch, you
+    # could be at the 1 seed, or the 5th branch, it's a tree.
 
     if limit == level + 1:
         return ((seed, level_sum - seed),)

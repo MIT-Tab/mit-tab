@@ -2,8 +2,7 @@ import math
 
 from mittab.apps.tab.models import *
 
-from mittab.libs.outround_tab_logic.checks import have_enough_judges, \
-    have_enough_rooms
+from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 
 from mittab.libs.tab_logic import have_properly_entered_data
