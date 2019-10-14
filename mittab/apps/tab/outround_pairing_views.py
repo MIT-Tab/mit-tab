@@ -16,11 +16,15 @@ import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 import mittab.libs.assign_judges as assign_judges
+import mittab.libs.backup as backup
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
+        backup.backup_round("before_pairing_%s_%s" %
+                            (num_teams / 2, type_of_round))
+
         Outround.objects.filter(num_teams__lt=num_teams,
                                 type_of_round=type_of_round).delete()
 
@@ -44,7 +48,7 @@ def pair_next_outround(request, num_teams, type_of_round):
     judges = outround_tab_logic.have_enough_judges_type(type_of_round)
     rooms = outround_tab_logic.have_enough_rooms_type(type_of_round)
 
-    msg = "Enough judges checked in for Out-rounds? Need {1}, have {2}".format(
+    msg = "Enough judges checked in for Out-rounds? Need {0}, have {1}".format(
         judges[1][1], judges[1][0])
 
     if num_teams <= 2:
@@ -57,7 +61,7 @@ def pair_next_outround(request, num_teams, type_of_round):
     else:
         check_status.append((msg, "No", "Not enough judges"))
 
-    msg = "N/2 Rooms available Round Out-rounds? Need {1}, have {2}".format(
+    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
         rooms[1][1], rooms[1][0])
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
@@ -86,6 +90,8 @@ def pair_next_outround(request, num_teams, type_of_round):
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
+        backup.backup_round("before_the_break")
+        
         teams, nov_teams = cache_logic.cache_fxn_key(
             get_team_rankings,
             "team_rankings",
@@ -143,14 +149,14 @@ def break_teams(request):
     judges = outround_tab_logic.have_enough_judges()
     rooms = outround_tab_logic.have_enough_rooms()
 
-    msg = "Enough judges checked in for Out-rounds? Need {1}, have {2}".format(
+    msg = "Enough judges checked in for Out-rounds? Need {0}, have {1}".format(
         judges[1][1], judges[1][0])
     if judges[0]:
         check_status.append((msg, "Yes", "Judges are checked in"))
     else:
         check_status.append((msg, "No", "Not enough judges"))
 
-    msg = "N/2 Rooms available Round Out-rounds? Need {1}, have {2}".format(
+    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
         rooms[1][1], rooms[1][0])
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
