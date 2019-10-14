@@ -55,7 +55,7 @@ def get_next_available_room(num_teams, type_of_break):
     return None
 
 
-def whos_gov(team_one, team_two):
+def gov_team(team_one, team_two):
     print(team_two)
     # PLACEHOLDER
     return team_one
@@ -96,7 +96,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
         if not team_one or not team_two:
             raise errors.BadBreak()
 
-        gov = whos_gov(team_one, team_two)
+        gov = gov_team(team_one, team_two)
         opp = team_one if gov == team_two else team_two
 
         Outround.objects.create(
