@@ -588,4 +588,3 @@ def forum_view(request, type_of_round):
     return render(request,
                   "outrounds/forum_result.html",
                   locals())
-    
