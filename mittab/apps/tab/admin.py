@@ -12,8 +12,21 @@ class RoundAdminForm(forms.ModelForm):
         fields = "__all__"
 
 
+class OutroundAdminForm(forms.ModelForm):
+    chair = forms.ModelChoiceField(queryset=models.Judge.objects.all())
+
+    class Meta:
+        model = models.Outround
+        fields = "__all__"
+
+
 class RoundAdmin(admin.ModelAdmin):
     form = RoundAdminForm
+    filter_horizontal = ("judges", )
+
+
+class OutroundAdmin(admin.ModelAdmin):
+    form = OutroundAdminForm
     filter_horizontal = ("judges", )
 
 
@@ -34,4 +47,4 @@ admin.site.register(models.Room)
 admin.site.register(models.Bye)
 admin.site.register(models.NoShow)
 admin.site.register(models.BreakingTeam)
-admin.site.register(models.Outround)
+admin.site.register(models.Outround, OutroundAdmin)

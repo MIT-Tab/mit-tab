@@ -360,16 +360,6 @@ class Outround(models.Model):
                                                       self.gov_team,
                                                       self.opp_team)
 
-    winning_team = models.ForeignKey(Team,
-                                     related_name="won_outrounds",
-                                     on_delete=models.CASCADE,
-                                     blank=True)
-
-    losing_team = models.ForeignKey(Team,
-                                    related_name="lost_outrounds",
-                                    on_delete=models.CASCADE,
-                                    blank=True)
-
     @property
     def winner(self):
         if self.victor in [1, 3]:
