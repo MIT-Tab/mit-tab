@@ -1,5 +1,6 @@
 import "../css/app.scss";
 import "./pairing";
+import "./outround";
 
 import $ from "jquery";
 

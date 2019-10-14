@@ -1,5 +1,6 @@
 from django.views import i18n
 from django.conf.urls import url
+from django.urls import path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -165,12 +166,30 @@ urlpatterns = [
     url(r"break/",
         outround_pairing_views.break_teams,
         name="break"),
-    url("outround_pairing/<int:type_of_round>/<int:num_teams>",
-        outround_pairing_views.outround_pairing_view,
-        name="outround_pairing_view"),
-    url("outround_pairing",
-        outround_pairing_views.outround_pairing_view,
-        name="outround_pairing_view_default"),
+    path("outround_pairing/<int:type_of_round>/<int:num_teams>",
+         outround_pairing_views.outround_pairing_view,
+         name="outround_pairing_view"),
+    path("outround_pairing",
+         outround_pairing_views.outround_pairing_view,
+         name="outround_pairing_view_default"),
+    url(r"^outround/(\d+)/alternative_judges/(\d+)/$",
+        outround_pairing_views.alternative_judges,
+        name="outround_alternative_judges"),
+    url(r"^outround/(\d+)/(\d+)/alternative_teams/(gov|opp)/$",
+        outround_pairing_views.alternative_teams,
+        name="outround_alternative_teams"),
+    url(r"^outround/(\d+)/alternative_judges/$",
+        outround_pairing_views.alternative_judges,
+        name="outround_alternative_judges"),
+    url(r"^outround/(\d+)/assign_judge/(\d+)/$",
+        outround_pairing_views.assign_judge,
+        name="outround_assign_judge"),
+    url(r"^outround/pairings/assign_team/(\d+)/(gov|opp)/(\d+)/$",
+        outround_pairing_views.assign_team,
+        name="outround_assign_team"),
+    url(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
+        outround_pairing_views.assign_judge,
+        name="outround_swap_judge"),
 
     # Settings related
     url(r"^settings_form",

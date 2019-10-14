@@ -45,7 +45,7 @@ def get_next_available_room(num_teams, type_of_break):
     else:
         other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
 
-    rooms = Room.objects.filter(rank__gt=0).order_by('-rank')
+    rooms = Room.objects.filter(rank__gt=0).order_by("-rank")
 
     for room in rooms:
         # THIS IS TODO
@@ -56,12 +56,13 @@ def get_next_available_room(num_teams, type_of_break):
 
 
 def whos_gov(team_one, team_two):
+    print(team_two)
     # PLACEHOLDER
     return team_one
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
-    lost_outround = [t.id for t.loser in Outround.objects.all()]
+    lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
     
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
@@ -86,7 +87,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
         team_one = base_queryset.filter(effective_seed=pairing[0]).first()
         team_two = base_queryset.filter(effective_seed=pairing[1]).first()
 
-        print (pairing)
+        print(pairing)
 
         if not team_one or not team_two:
             raise errors.BadBreak()
@@ -94,7 +95,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
         gov = whos_gov(team_one, team_two)
         opp = team_one if gov == team_two else team_two
 
-        outround = Outround.objects.create(
+        Outround.objects.create(
             num_teams=num_teams,
             type_of_round=type_of_break,
             gov_team=gov.team,
@@ -102,9 +103,3 @@ def pair(type_of_break=BreakingTeam.VARSITY):
             room=get_next_available_room(num_teams,
                                          type_of_break=type_of_break)
         )
-    
-    print (bracket)
-
-    
-
-

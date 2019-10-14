@@ -7,6 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import redirect, reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -126,11 +127,246 @@ def break_teams(request):
 def outround_pairing_view(request,
                           type_of_round=BreakingTeam.VARSITY,
                           num_teams=TabSettings.get("var_teams_to_break", 8)):
+
+    label = "[%s] Ro%s" % ("V" if type_of_round == BreakingTeam.VARSITY else "N",
+                           num_teams)
     outround_options = []
+
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 4)
+    while var_teams_to_break > 1:
+        if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
+                                   num_teams=var_teams_to_break).exists():
+            outround_options.append(
+                (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.VARSITY,
+                                                          "num_teams": var_teams_to_break}),
+                 "[V] Ro%s" % (var_teams_to_break,))
+            )
+        var_teams_to_break /= 2
+
+    while nov_teams_to_break > 1:
+        if Outround.objects.filter(type_of_round=BreakingTeam.NOVICE,
+                                   num_teams=nov_teams_to_break).exists():
+            outround_options.append(
+                (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.NOVICE,
+                                                          "num_teams": nov_teams_to_break}),
+                 "[N] Ro%s" % (nov_teams_to_break,))
+            )
+        nov_teams_to_break /= 2
     
     outrounds = Outround.objects.filter(type_of_round=type_of_round,
                                         num_teams=num_teams).all()
+
+    judges_per_panel = TabSettings.get("var_panel_size", 3) if type_of_round == BreakingTeam.VARSITY else TabSettings.get("nov_panel_size", 3)
+    judge_slots = [i for i in range(1, judges_per_panel + 1)]
+
+    var_to_nov = TabSettings.get("var_to_nov", 2)
+    other_round_num = num_teams / var_to_nov
+    if type_of_round == BreakingTeam.NOVICE:
+        other_round_num = num_teams * var_to_nov
+
+    other_round_type = not type_of_round
+
+    pairing_exists = len(outrounds) > 0
+
+    lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
+    
+    excluded_teams = BreakingTeam.objects.filter(
+        type_of_team=type_of_round
+    ).exclude(
+        team__id__in=lost_outrounds
+    )
+
+    excluded_teams = [t.team for t in excluded_teams]
+
+    excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
+        type_of_round=type_of_round,
+        num_teams=num_teams,
+        gov_team=t
+    ).exists()]
+
+    excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
+        type_of_round=type_of_round,
+        num_teams=num_teams,
+        opp_team=t
+    ).exists()]    
+        
+    #pairing_released = TabSettings.get("pairing_released", 0) == 1
+    
+    excluded_judges = Judge.objects.exclude(
+        judges_outrounds__num_teams=num_teams,
+        judges_outrounds__type_of_round=type_of_round,
+    ).exclude(
+        judges_outrounds__type_of_round=other_round_type,
+        judges_outrounds__num_teams=other_round_num
+    ).filter(
+        checkin__round_number=0
+    )
+    
+    non_checkins = Judge.objects.exclude(
+        judges_outrounds__num_teams=num_teams,
+        judges_outrounds__type_of_round=type_of_round
+    ).exclude(
+        judges_outrounds__type_of_round=other_round_type,
+        judges_outrounds__num_teams=other_round_num
+    ).exclude(
+        checkin__round_number=0
+    )
+
+    available_rooms = Room.objects.exclude(
+        rooms_outrounds__num_teams=num_teams,
+        rooms_outrounds__type_of_round=type_of_round
+    ).exclude(
+        rooms_outrounds__num_teams=other_round_num,
+        rooms_outrounds__type_of_round=other_round_type
+    ).exclude(rank=0)
+    
+    size = max(list(map(len, [excluded_teams, excluded_judges, non_checkins, available_rooms])))
+    # The minimum rank you want to warn on
+    warning = 5
+    excluded_people = list(
+        zip(*[
+            x + [""] * (size - len(x)) for x in [
+                list(excluded_teams),
+                list(excluded_judges),
+                list(non_checkins),
+                list(available_rooms)
+            ]
+        ]))
+    
     
     return render(request,
                   "outrounds/pairing_base.html",
                   locals())
+
+
+def alternative_judges(request, round_id, judge_id=None):
+    round_obj = Outround.objects.get(id=int(round_id))
+    round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
+    # All of these variables are for the convenience of the template
+    try:
+        current_judge_id = int(judge_id)
+        current_judge_obj = Judge.objects.get(id=current_judge_id)
+        current_judge_name = current_judge_obj.name
+        current_judge_rank = current_judge_obj.rank
+    except TypeError:
+        current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
+        current_judge_name = "No judge"
+
+    var_to_nov = TabSettings.get("var_to_nov", 2)
+    other_round_num = round_obj.num_teams / var_to_nov
+    if round_obj.type_of_round == BreakingTeam.NOVICE:
+        other_round_num = round_obj.num_teams * var_to_nov
+
+    other_round_type = BreakingTeam.NOVICE if round_obj.type_of_round == BreakingTeam.VARSITY else BreakingTeam.VARSITY
+
+    excluded_judges = Judge.objects.exclude(judges_outrounds__num_teams=round_obj.num_teams,
+                                            judges_outrounds__type_of_round=round_obj.type_of_round) \
+                                   .exclude(judges_outrounds__num_teams=other_round_num,
+                                            judges_outrounds__type_of_round=other_round_type) \
+                                   .filter(checkin__round_number=0)
+
+    query = Q(
+        judges_outrounds__num_teams=round_obj.num_teams,
+        judges_outrounds__type_of_round=round_obj.type_of_round
+    )
+    query = query | Q(
+        judges_outrounds__num_teams=other_round_num,
+        judges_outrounds__type_of_round=other_round_type
+    )
+
+    included_judges = Judge.objects.filter(query) \
+                                   .filter(checkin__round_number=0) \
+                                   .distinct()
+
+    excluded_judges = [(j.name, j.id, float(j.rank))
+                       for j in assign_judges.can_judge_teams(
+                           excluded_judges, round_gov, round_opp)]
+    included_judges = [(j.name, j.id, float(j.rank))
+                       for j in assign_judges.can_judge_teams(
+                           included_judges, round_gov, round_opp)]
+    included_judges = sorted(included_judges, key=lambda x: -x[2])
+    excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+
+    return render(request, "pairing/judge_dropdown.html", locals())
+
+
+def alternative_teams(request, round_id, current_team_id, position):
+    round_obj = Outround.objects.get(pk=round_id)
+    current_team = Team.objects.get(pk=current_team_id)
+
+    breaking_teams_by_type = [t.team.id for t in BreakingTeam.objects.filter(type_of_team=current_team.breaking_team.type_of_team)]
+
+    excluded_teams = Team.objects.filter(
+        id__in=breaking_teams_by_type
+    ).exclude(
+        gov_team_outround__num_teams=round_obj.num_teams
+    ).exclude(
+        opp_team_outround__num_teams=round_obj.num_teams
+    ).exclude(pk=current_team_id)
+
+    included_teams = Team.objects.filter(
+        id__in=breaking_teams_by_type
+    ).exclude(
+        pk__in=excluded_teams
+    )
+                      
+    return render(request, "pairing/team_dropdown.html", locals())
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_team(request, round_id, position, team_id):
+    try:
+        round_obj = Outround.objects.get(id=int(round_id))
+        team_obj = Team.objects.get(id=int(team_id))
+
+        if position.lower() == "gov":
+            round_obj.gov_team = team_obj
+        elif position.lower() == "opp":
+            round_obj.opp_team = team_obj
+        else:
+            raise ValueError("Got invalid position: " + position)
+        round_obj.save()
+
+        data = {
+            "success": True,
+            "team": {
+                "id": team_obj.id,
+                "name": team_obj.name
+            },
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_judge(request, round_id, judge_id, remove_id=None):
+    try:
+        round_obj = Outround.objects.get(id=int(round_id))
+        judge_obj = Judge.objects.get(id=int(judge_id))
+        round_obj.judges.add(judge_obj)
+
+        if remove_id is not None:
+            remove_obj = Judge.objects.get(id=int(remove_id))
+            round_obj.judges.remove(remove_obj)
+
+            if remove_obj == round_obj.chair:
+                round_obj.chair = round_obj.judges.order_by("-rank").first()
+        elif not round_obj.chair:
+            round_obj.chair = judge_obj
+
+        round_obj.save()
+        data = {
+            "success": True,
+            "chair_id": round_obj.chair.id,
+            "round_id": round_obj.id,
+            "judge_name": judge_obj.name,
+            "judge_rank": float(judge_obj.rank),
+            "judge_id": judge_obj.id
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)

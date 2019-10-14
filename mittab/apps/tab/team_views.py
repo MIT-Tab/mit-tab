@@ -390,6 +390,10 @@ def team_stats(request, team_id):
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)
         stats["opps"] = tab_logic.num_opps(team)
+
+        if hasattr(team, "breaking_team"):
+            stats["outround_seed"] = team.breaking_team.seed
+
         data = {"success": True, "result": stats}
     except Team.DoesNotExist:
         data = {"success": False}

@@ -17,7 +17,7 @@
                     round-id={{pairing.id}}
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
-                    <a class="dropdown-toggle outround-team-toggle text-dark"
+                    <a class="dropdown-toggle team-toggle text-dark"
                         data-toggle="dropdown"
                         href="#"
                         title="Swap teams">
@@ -26,7 +26,7 @@
                     <ul class="dropdown-menu"></ul>
                   </span>
                   <br/>
-                  <a class="text-muted team outround-tabcard pt-1" team-id={{pairing.gov_team.id}}>
+                  <a class="text-muted team tabcard pt-1" team-id={{pairing.gov_team.id}}>
                     Loading results...
                   </a>
                 </small>
@@ -46,7 +46,7 @@
                     round-id={{pairing.id}}
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
-                    <a class="dropdown-toggle outround-team-toggle text-dark"
+                    <a class="dropdown-toggle team-toggle text-dark"
                         data-toggle="dropdown"
                         href="#"
                         title="Swap teams">
@@ -56,7 +56,7 @@
                   </span>
 
                   <br/>
-                  <a class="text-muted team outround-tabcard pt-1"
+                  <a class="text-muted team tabcard pt-1"
                       team-id={{pairing.opp_team.id}}>
                     Loading results...
                   </a>
@@ -71,7 +71,7 @@
       <div class="col-4 judges">
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
              data-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
           </a>
@@ -82,7 +82,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
@@ -114,7 +114,7 @@
         <a class="btn-sm btn-block btn-light" href="/room/{{pairing.room.id}}" >
           <i class="far fa-building"></i> {{pairing.room.name}}
         </a>
-        <a class="btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
+        <a class="btn-sm btn-block btn-light" href="/admin/tab/round/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>
       </div>
