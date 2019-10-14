@@ -91,7 +91,7 @@ def break_teams(request):
     if request.method == "POST":
         # Perform the break
         backup.backup_round("before_the_break")
-        
+
         teams, nov_teams = cache_logic.cache_fxn_key(
             get_team_rankings,
             "team_rankings",
