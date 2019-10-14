@@ -146,23 +146,6 @@ def break_teams(request):
 
     check_status = []
 
-    judges = outround_tab_logic.have_enough_judges()
-    rooms = outround_tab_logic.have_enough_rooms()
-
-    msg = "Enough judges checked in for Out-rounds? Need {0}, have {1}".format(
-        judges[1][1], judges[1][0])
-    if judges[0]:
-        check_status.append((msg, "Yes", "Judges are checked in"))
-    else:
-        check_status.append((msg, "No", "Not enough judges"))
-
-    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
-        rooms[1][1], rooms[1][0])
-    if rooms[0]:
-        check_status.append((msg, "Yes", "Rooms are checked in"))
-    else:
-        check_status.append((msg, "No", "Not enough rooms"))
-
     msg = "All Rounds properly entered for Round %s" % (
         previous_round_number)
     ready_to_pair = "Yes"
