@@ -3,11 +3,9 @@ from mittab.libs.errors import PrevRoundNotEnteredError
 
 
 def lost_teams():
-    losers = [outround.loser.id
-              for outround in Outround.objects.all()
-              if outround.loser]
-
-    return losers
+    return [outround.loser.id
+            for outround in Outround.objects.all()
+            if outround.loser]
 
 
 def have_enough_judges_type(type_of_round):
