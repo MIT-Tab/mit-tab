@@ -35,8 +35,8 @@ function roomCheckInOrOut(target, isCheckIn) {
 }
 
 function roomCheckinInit() {
-    $(".room-checkin-toggle").click(e => {
-	roomCheckInOrOut(e.target, $(e.target).prop("checked"));
+  $(".room-checkin-toggle").click(e => {
+    roomCheckInOrOut(e.target, $(e.target).prop("checked"));
   });
 }
 
