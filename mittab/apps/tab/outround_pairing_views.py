@@ -1,12 +1,8 @@
 import random
-import time
-import datetime
 
 from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
-from django.contrib.auth import logout
+from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import redirect, reverse
 
@@ -15,13 +11,11 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from mittab.apps.tab.team_views import get_team_rankings
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
-from mittab.apps.tab.forms import OutroundResultEntryForm, UploadBackupForm, score_panel, \
-        validate_panel, EBallotForm
+from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 import mittab.libs.assign_judges as assign_judges
-import mittab.libs.backup as backup
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -29,7 +23,7 @@ def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
         Outround.objects.filter(num_teams__lt=num_teams,
                                 type_of_round=type_of_round).delete()
-        
+
         outround_tab_logic.pair(type_of_round)
 
         return redirect_and_flash_success(
@@ -46,25 +40,25 @@ def pair_next_outround(request, num_teams, type_of_round):
     previous_round_number = TabSettings.get("tot_rounds", 5)
 
     check_status = []
-    
+
     judges = outround_tab_logic.have_enough_judges_type(type_of_round)
     rooms = outround_tab_logic.have_enough_rooms_type(type_of_round)
-    
+
     msg = "Enough judges checked in for Out-rounds? Need {1}, have {2}".format(
-        current_round_number, judges[1][1], judges[1][0])
+        judges[1][1], judges[1][0])
 
     if num_teams <= 2:
         check_status.append(("Have more rounds?", "No", "Not enough teams"))
     else:
         check_status.append(("Have more rounds?", "Yes", "Have enough teams!"))
-        
+
     if judges[0]:
         check_status.append((msg, "Yes", "Judges are checked in"))
     else:
         check_status.append((msg, "No", "Not enough judges"))
-        
+
     msg = "N/2 Rooms available Round Out-rounds? Need {1}, have {2}".format(
-        current_round_number, rooms[1][1], rooms[1][0])
+        rooms[1][1], rooms[1][0])
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
     else:
@@ -84,7 +78,7 @@ def pair_next_outround(request, num_teams, type_of_round):
         ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "Not all rounds are entered. %s" % str(e)))
-        
+
     return render(request, "pairing/pair_round.html", locals())
 
 
@@ -97,14 +91,14 @@ def break_teams(request):
             "team_rankings",
             request
         )
-        
+
         nov_teams_to_break = TabSettings.get("nov_teams_to_break", 4)
         var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
-        
+
         # This forces a refresh of the breaking teams
         Outround.objects.all().delete()
         BreakingTeam.objects.all().delete()
-    
+
         current_seed = 1
         for team in teams:
             if current_seed > var_teams_to_break:
@@ -120,10 +114,10 @@ def break_teams(request):
         for nov_team in nov_teams:
             if current_seed > nov_teams_to_break:
                 break
-            
+
             if BreakingTeam.objects.filter(team=nov_team[0]).exists():
                 continue
-            
+
             BreakingTeam.objects.create(team=nov_team[0],
                                         seed=current_seed,
                                         effective_seed=current_seed,
@@ -132,7 +126,7 @@ def break_teams(request):
             current_seed += 1
 
         outround_tab_logic.pair(BreakingTeam.VARSITY)
-        outround_tab_logic.pair(BreakingTeam.NOVICE)        
+        outround_tab_logic.pair(BreakingTeam.NOVICE)
 
         return redirect_and_flash_success(
             request, "Success!", path="/outround_pairing"
@@ -145,19 +139,19 @@ def break_teams(request):
     previous_round_number = TabSettings.get("tot_rounds", 5)
 
     check_status = []
-    
+
     judges = outround_tab_logic.have_enough_judges()
     rooms = outround_tab_logic.have_enough_rooms()
-    
+
     msg = "Enough judges checked in for Out-rounds? Need {1}, have {2}".format(
-        current_round_number, judges[1][1], judges[1][0])
+        judges[1][1], judges[1][0])
     if judges[0]:
         check_status.append((msg, "Yes", "Judges are checked in"))
     else:
         check_status.append((msg, "No", "Not enough judges"))
-        
+
     msg = "N/2 Rooms available Round Out-rounds? Need {1}, have {2}".format(
-        current_round_number, rooms[1][1], rooms[1][0])
+        rooms[1][1], rooms[1][0])
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
     else:
@@ -185,7 +179,7 @@ def break_teams(request):
         ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "You have a noshow and results. %s" % str(e)))
-        
+
     return render(request, "pairing/pair_round.html", locals())
 
 
@@ -194,7 +188,16 @@ def outround_pairing_view(request,
                           num_teams=None):
 
     if num_teams is None:
-        return redirect("outround_pairing_view", type_of_round=BreakingTeam.VARSITY, num_teams=TabSettings.get("var_teams_to_break", 8))
+        return redirect("outround_pairing_view",
+                        type_of_round=BreakingTeam.VARSITY,
+                        num_teams=TabSettings.get("var_teams_to_break", 8))
+
+    pairing_released = False
+
+    if type_of_round == BreakingTeam.VARSITY:
+        pairing_released = TabSettings.get("var_teams_visible", 256) <= num_teams
+    elif type_of_round == BreakingTeam.NOVICE:
+        pairing_released = TabSettings.get("nov_teams_visible", 256) <= num_teams
 
     label = "[%s] Ro%s" % ("V" if type_of_round == BreakingTeam.VARSITY else "N",
                            num_teams)
@@ -206,8 +209,9 @@ def outround_pairing_view(request,
         if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
                                    num_teams=var_teams_to_break).exists():
             outround_options.append(
-                (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.VARSITY,
-                                                          "num_teams": int(var_teams_to_break)}),
+                (reverse("outround_pairing_view", kwargs={
+                    "type_of_round": BreakingTeam.VARSITY,
+                    "num_teams": int(var_teams_to_break)}),
                  "[V] Ro%s" % (int(var_teams_to_break),))
             )
         var_teams_to_break /= 2
@@ -216,16 +220,19 @@ def outround_pairing_view(request,
         if Outround.objects.filter(type_of_round=BreakingTeam.NOVICE,
                                    num_teams=nov_teams_to_break).exists():
             outround_options.append(
-                (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.NOVICE,
-                                                          "num_teams": int(nov_teams_to_break)}),
+                (reverse("outround_pairing_view", kwargs={
+                    "type_of_round": BreakingTeam.NOVICE,
+                    "num_teams": int(nov_teams_to_break)}),
                  "[N] Ro%s" % (nov_teams_to_break,))
             )
         nov_teams_to_break /= 2
-    
+
     outrounds = Outround.objects.filter(type_of_round=type_of_round,
                                         num_teams=num_teams).all()
 
-    judges_per_panel = TabSettings.get("var_panel_size", 3) if type_of_round == BreakingTeam.VARSITY else TabSettings.get("nov_panel_size", 3)
+    judges_per_panel = TabSettings.get("var_panel_size", 3) \
+                       if type_of_round == BreakingTeam.VARSITY \
+                          else TabSettings.get("nov_panel_size", 3)
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
@@ -238,7 +245,7 @@ def outround_pairing_view(request,
     pairing_exists = len(outrounds) > 0
 
     lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
-    
+
     excluded_teams = BreakingTeam.objects.filter(
         type_of_team=type_of_round
     ).exclude(
@@ -257,10 +264,8 @@ def outround_pairing_view(request,
         type_of_round=type_of_round,
         num_teams=num_teams,
         opp_team=t
-    ).exists()]    
-        
-    #pairing_released = TabSettings.get("pairing_released", 0) == 1
-    
+    ).exists()]
+
     excluded_judges = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round,
@@ -270,7 +275,7 @@ def outround_pairing_view(request,
     ).filter(
         checkin__round_number=0
     )
-    
+
     non_checkins = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round
@@ -288,8 +293,12 @@ def outround_pairing_view(request,
         rooms_outrounds__num_teams=other_round_num,
         rooms_outrounds__type_of_round=other_round_type
     ).exclude(rank=0)
-    
-    size = max(list(map(len, [excluded_teams, excluded_judges, non_checkins, available_rooms])))
+
+    size = max(list(
+        map(
+            len,
+            [excluded_teams, excluded_judges, non_checkins, available_rooms]
+        )))
     # The minimum rank you want to warn on
     warning = 5
     excluded_people = list(
@@ -301,8 +310,7 @@ def outround_pairing_view(request,
                 list(available_rooms)
             ]
         ]))
-    
-    
+
     return render(request,
                   "outrounds/pairing_base.html",
                   locals())
@@ -326,13 +334,19 @@ def alternative_judges(request, round_id, judge_id=None):
     if round_obj.type_of_round == BreakingTeam.NOVICE:
         other_round_num = round_obj.num_teams * var_to_nov
 
-    other_round_type = BreakingTeam.NOVICE if round_obj.type_of_round == BreakingTeam.VARSITY else BreakingTeam.VARSITY
+    other_round_type = BreakingTeam.NOVICE \
+                       if round_obj.type_of_round == BreakingTeam.VARSITY \
+                          else BreakingTeam.VARSITY
 
-    excluded_judges = Judge.objects.exclude(judges_outrounds__num_teams=round_obj.num_teams,
-                                            judges_outrounds__type_of_round=round_obj.type_of_round) \
-                                   .exclude(judges_outrounds__num_teams=other_round_num,
-                                            judges_outrounds__type_of_round=other_round_type) \
-                                   .filter(checkin__round_number=0)
+    excluded_judges = Judge.objects.exclude(
+        judges_outrounds__num_teams=round_obj.num_teams,
+        judges_outrounds__type_of_round=round_obj.type_of_round
+    ).exclude(
+        judges_outrounds__num_teams=other_round_num,
+        judges_outrounds__type_of_round=other_round_type
+    ).filter(
+        checkin__round_number=0
+    )
 
     query = Q(
         judges_outrounds__num_teams=round_obj.num_teams,
@@ -363,7 +377,10 @@ def alternative_teams(request, round_id, current_team_id, position):
     round_obj = Outround.objects.get(pk=round_id)
     current_team = Team.objects.get(pk=current_team_id)
 
-    breaking_teams_by_type = [t.team.id for t in BreakingTeam.objects.filter(type_of_team=current_team.breaking_team.type_of_team)]
+    breaking_teams_by_type = [t.team.id
+                              for t in BreakingTeam.objects.filter(
+                                  type_of_team=current_team.breaking_team.type_of_team
+                              )]
 
     excluded_teams = Team.objects.filter(
         id__in=breaking_teams_by_type
@@ -378,7 +395,7 @@ def alternative_teams(request, round_id, current_team_id, position):
     ).exclude(
         pk__in=excluded_teams
     )
-                      
+
     return render(request, "pairing/team_dropdown.html", locals())
 
 
@@ -450,10 +467,7 @@ def enter_result(request,
                           kwargs={
                               "num_teams": round_obj.num_teams,
                               "type_of_round": round_obj.type_of_round
-                          }
-    )
-
-    
+                          })
 
     if request.method == "POST":
         form = form_class(request.POST, round_instance=round_obj)
@@ -478,3 +492,72 @@ def enter_result(request,
             "opp_team": round_obj.opp_team,
         })
 
+
+def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
+    round_number = 256
+
+    if type_of_round == BreakingTeam.VARSITY:
+        round_number = TabSettings.get("var_teams_visible", 256)
+    else:
+        round_number = TabSettings.get("nov_teams_visible", 256)
+
+    round_pairing = Outround.objects.filter(
+        num_teams__gte=round_number,
+        type_of_round=type_of_round
+    )
+
+    unique_values = round_pairing.values_list("num_teams")
+    unique_values = list(set([value[0] for value in unique_values]))
+    unique_values.sort(key=lambda v: v, reverse=True)
+
+    outround_pairings = [
+        {
+            "label": "[%s] Ro%s" % ("N" if type_of_round else "V", value),
+            "rounds": Outround.objects.filter(num_teams=value,
+                                              type_of_round=type_of_round)
+        } for value in unique_values
+    ]
+
+    label = "%s Outrounds Pairings" % ("Novice" if type_of_round else "Varsity",)
+
+    round_pairing = list(round_pairing)
+
+    #We want a random looking, but constant ordering of the rounds
+    random.seed(0xBEEF)
+    random.shuffle(round_pairing)
+    round_pairing.sort(key=lambda r: r.gov_team.name)
+    paired_teams = [team.gov_team for team in round_pairing
+                    ] + [team.opp_team for team in round_pairing]
+
+    team_count = len(paired_teams)
+
+    pairing_exists = True
+    #pairing_exists = TabSettings.get("pairing_released", 0) == 1
+    printable = printable
+    return render(request, "outrounds/pretty_pairing.html", locals())
+
+
+def pretty_pair_print(request, type_of_round=BreakingTeam.VARSITY):
+    return pretty_pair(request, type_of_round, True)
+
+
+def toggle_pairing_released(request, type_of_round, num_teams):
+    old = 256
+
+    if type_of_round == BreakingTeam.VARSITY:
+        old = TabSettings.get("var_teams_visible", 256)
+
+        if old == num_teams:
+            TabSettings.set("var_teams_visible", num_teams * 2)
+        else:
+            TabSettings.set("var_teams_visible", num_teams)
+    else:
+        old = TabSettings.get("nov_teams_visible", 256)
+
+        if old == num_teams:
+            TabSettings.set("nov_teams_visible", num_teams * 2)
+        else:
+            TabSettings.set("nov_teams_visible", num_teams)
+
+    data = {"success": True, "pairing_released": not old == num_teams}
+    return JsonResponse(data)

@@ -137,9 +137,13 @@ function populateAlternativeJudges() {
 }
 
 function togglePairingRelease(event) {
+    var button = $(".outround-release")
+    var num_teams = button.data("num_teams")
+    var type_of_round = button.data("type_of_round")
+
     event.preventDefault();
     $.ajax({
-	url: "/pairing/release",
+	url: "/outround_pairing/release/" + num_teams + "/" + type_of_round,
 	success(result) {
 	    if (result.pairing_released) {
 		$("#close-pairings").removeClass("d-none");

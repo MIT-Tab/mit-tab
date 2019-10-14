@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'pairingDisplay' %}
+
+    <title>{{ label }}</title>
+
+    <style type="text/css">
+    </style>
+</head>
+
+<body>
+    {% if printable %}
+        <!-- Center pairings table -->
+	{% for outround in outround_pairings %}
+	    <div style="padding: 20px;">
+		<center>{{ outround.label }}</center>
+		<table class="pairings_table printable">
+		    <tr>
+			<th>
+			    Government
+			</th> <th>
+			    Opposition
+			</th> <th>
+			    Judge
+			</th> <th>
+			    Room
+			</th>
+		    </tr>
+		    {% for pairing in outround.rounds %}
+			<tr>
+			    <td>{{pairing.gov_team.display}}</td>
+			    <td>{{pairing.opp_team.display}}</td>
+			    <td>
+				{% for judge in pairing.judges.all %}
+				    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+					<b>{{judge.name}}</b><br>
+				    {% else %}
+					{{judge.name}}<br>
+				    {% endif %}
+				{% endfor %}
+			    </td>
+			    <td>{{pairing.room.name}}</td>
+			</tr>
+		    {% endfor %}
+		</table>
+	    </div>
+	{% empty %}
+	    Nothing is visible.
+	{% endfor %}
+    {% else %}
+        <div id="scrollPage" class="hidden"></div>
+        <!-- Floating top header -->
+        <div class="pairings_header">
+          <h1>{{ label }}</h1>
+          <!--<h3>({{team_count}} teams)</h3>-->
+
+          <table class="pairings_table">
+              <tr>
+              <th>
+                  Government
+              </th> <th>
+                  Opposition
+              </th> <th>
+                  Judge
+              </th> <th>
+                  Room
+              </th>
+              </tr>
+          </table>
+        </div>
+	
+        <div class="pairings_header_spacer"></div>
+	
+        <!-- Center pairings table -->
+	{% for outround in outround_pairings %}
+	    <center><h4><b>{{ outround.label }}</b></h4></center>
+	    <table class="pairings_table">		    
+		{% for pairing in outround.rounds %}
+		    
+		    <tr>
+			<td>{{pairing.gov_team.display}}</td>
+			<td>{{pairing.opp_team.display}}</td>
+			<td>
+			    {% for judge in pairing.judges.all %}
+				{% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+				    <b>{{judge.name}}</b><br>
+				{% else %}
+				    {{judge.name}}<br>
+				{% endif %}
+			    {% endfor %}
+			</td>
+			<td>{{pairing.room.name}}</td>
+		    </tr>
+		{% endfor %}
+	    </table>
+	{% empty %}
+	    <div style="padding: 20px;">Nothing is visible.</div>
+	{% endfor %}
+        <div class="pairings_footer_spacer"></div>
+        <!-- Floating bottom header -->
+        <div class="pairings_footer">
+	    <span class="right">
+		<label for="autoscroll">
+		    Autoscroll:
+		    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+		</label>
+	    </span>
+        </div>
+    {% endif %}
+
+</body>
+
+</html>
+

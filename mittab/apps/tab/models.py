@@ -214,7 +214,7 @@ class BreakingTeam(models.Model):
         (VARSITY, "Varsity"),
         (NOVICE, "Novice")
     )
-    
+
     team = models.OneToOneField("Team",
                                 on_delete=models.CASCADE,
                                 related_name="breaking_team")
@@ -322,7 +322,7 @@ class Outround(models.Model):
         (VARSITY, "Varsity"),
         (NOVICE, "Novice")
     )
-    
+
     num_teams = models.IntegerField()
     type_of_round = models.IntegerField(default=VARSITY,
                                         choices=TYPE_OF_ROUND_CHOICES)
@@ -348,7 +348,9 @@ class Outround(models.Model):
         (GOV_VIA_FORFEIT, "GOV via Forfeit"),
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="rooms_outrounds")
+    room = models.ForeignKey(Room,
+                             on_delete=models.CASCADE,
+                             related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
@@ -367,7 +369,7 @@ class Outround(models.Model):
         elif self.victor in [2, 4]:
             return self.opp_team
         return None
-    
+
     @property
     def loser(self):
         if not self.winner:

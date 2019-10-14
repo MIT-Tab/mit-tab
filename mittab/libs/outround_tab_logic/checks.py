@@ -3,14 +3,17 @@ from mittab.libs.errors import PrevRoundNotEnteredError
 
 
 def lost_teams():
-    losers = [outround.loser.id for outround in Outround.objects.all() if outround.loser]
-    print (losers)
+    losers = [outround.loser.id
+              for outround in Outround.objects.all()
+              if outround.loser]
 
     return losers
 
 
 def have_enough_judges_type(type_of_round):
-    lost_ids = [outround.loser.id for outround in Outround.objects.all() if outround.loser]
+    lost_ids = [outround.loser.id
+                for outround in Outround.objects.all()
+                if outround.loser]
 
     panel_size = 3
 
@@ -18,10 +21,10 @@ def have_enough_judges_type(type_of_round):
         panel_size = TabSettings.get("var_panel_size", 3)
     else:
         panel_size = TabSettings.get("nov_panel_size", 3)
-        
+
     teams_count = BreakingTeam.objects.filter(
-            type_of_team=type_of_round
-        ).exclude(team__id__in=lost_ids).count()
+        type_of_team=type_of_round
+    ).exclude(team__id__in=lost_ids).count()
 
     judges_needed = (
         teams_count // 2
@@ -30,7 +33,7 @@ def have_enough_judges_type(type_of_round):
     var_to_nov = TabSettings.get("var_to_nov", 2)
 
     num_teams = teams_count
-    
+
     other_round_num = num_teams / var_to_nov
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * var_to_nov
@@ -41,7 +44,7 @@ def have_enough_judges_type(type_of_round):
         judges_outrounds__num_teams=other_round_num,
         judges_outrounds__type_of_round=other_round_type
     ).count()
-    
+
     num_judges = CheckIn.objects.filter(round_number=0).count() - num_in_use
 
     if num_judges < judges_needed:
@@ -60,7 +63,9 @@ def have_enough_judges():
 
 
 def have_enough_rooms_type(type_of_round):
-    lost_ids = [outround.loser.id for outround in Outround.objects.all() if outround.loser]
+    lost_ids = [outround.loser.id
+                for outround in Outround.objects.all()
+                if outround.loser]
 
     num_teams = BreakingTeam.objects.filter(
         type_of_team=type_of_round
@@ -70,7 +75,7 @@ def have_enough_rooms_type(type_of_round):
         num_teams // 2
     )
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)    
+    var_to_nov = TabSettings.get("var_to_nov", 2)
 
     other_round_num = num_teams / var_to_nov
     if type_of_round == BreakingTeam.NOVICE:

@@ -47,18 +47,24 @@
 			    {% endif %}-->
 			    <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
 			       id="close-pairings"
+			       data-num_teams="{{ num_teams }}"
+			       data-type_of_round="{{ type_of_round }}"
 			       title="Release the pairings to the participants">
 				<i class="fas fa-door-closed"></i> Close Pairings
 			    </a>
 			    <a class="btn btn-warning outround-release {% if pairing_released %}d-none{% endif %}" href="#"
 			       id="release-pairings"
+			       data-num_teams="{{ num_teams }}"
+			       data-type_of_round="{{ type_of_round }}"
 			       title="Release the pairings to the participants">
 				<i class="fas fa-door-open"></i> Release Pairings
 			    </a>
-			    <a class="btn btn-info" href="/outround_pairing/pair/{{ type_of_round }}/{{ num_teams }}"
-			       title="Pair the next round of debate">
-				<i class="fas fa-arrow-right"></i> Prepare Next Round
-			    </a>
+			    {% if num_teams > 2 %}
+				<a class="btn btn-info" href="/outround_pairing/pair/{{ type_of_round }}/{{ num_teams }}"
+				   title="Pair the next round of debate">
+				    <i class="fas fa-arrow-right"></i> Prepare Next Round
+				</a>
+			    {% endif %}
 			</div>
 		    </form>
 		</div>
@@ -66,10 +72,10 @@
 		<div class="col-4">
 		    <h6>Display Options</h6>
 		    <div class="btn-group btn-group-sm">
-			<a class="btn btn-secondary" href="/pairings/pairinglist/" title="To display in GA">
+			<a class="btn btn-secondary" href="/outround_pairings/pairinglist/{{ type_of_round }}/" title="To display in GA">
 			    <i class="fas fa-tv"></i> Announcement View
 			</a>
-			<a class="btn btn-secondary" href="/pairings/pairinglist/printable" title="Printable version of the GA view">
+			<a class="btn btn-secondary" href="/outround_pairings/pairinglist/printable/{{ type_of_round }}/" title="Printable version of the GA view">
 			    <i class="fas fa-print"></i> Printable View
 			</a>
 		    </div>

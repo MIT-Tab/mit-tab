@@ -577,7 +577,7 @@ class OutroundResultEntryForm(forms.Form):
 
         self.fields["round_instance"] = forms.IntegerField(
             initial=round_object.pk, widget=forms.HiddenInput())
-    
+
         if round_object.victor == 0 or no_fill:
             return
 
@@ -606,7 +606,7 @@ class OutroundResultEntryForm(forms.Form):
         round_obj.victor = cleaned_data["winner"]
         round_obj.save()
 
-        round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])        
+        round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])
         if round_obj.victor > 0:
             winning_team_seed = round_obj.winner.breaking_team.effective_seed
             losing_team_seed = round_obj.loser.breaking_team.effective_seed
@@ -615,7 +615,8 @@ class OutroundResultEntryForm(forms.Form):
                 round_obj.winner.breaking_team.effective_seed = losing_team_seed
                 round_obj.winner.breaking_team.save()
 
-                round_obj.loser.breaking_team.effective_seed = round_obj.loser.breaking_team.seed
-                round_obj.loser.breaking_team.save()
-        
+                breaking_team = round_obj.loser.breaking_team
+                breaking_team.effective_seed = breaking_team.seed
+                breaking_team.save()
+
         return round_obj

@@ -63,7 +63,7 @@ def whos_gov(team_one, team_two):
 
 def pair(type_of_break=BreakingTeam.VARSITY):
     lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
-    
+
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
     ).exclude(
@@ -74,7 +74,11 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
     good_to_go(num_teams)
 
-    Outround.objects.filter(num_teams=num_teams).filter(type_of_round=type_of_break).all().delete()
+    Outround.objects.filter(
+        num_teams=num_teams
+    ).filter(
+        type_of_round=type_of_break
+    ).all().delete()
 
     if type_of_break == BreakingTeam.VARSITY:
         TabSettings.set("var_outrounds_public", 0)

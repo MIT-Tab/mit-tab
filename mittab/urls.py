@@ -196,6 +196,15 @@ urlpatterns = [
     path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
          outround_pairing_views.pair_next_outround,
          name="next_outround"),
+    path("outround_pairings/pairinglist/<int:type_of_round>/",
+         outround_pairing_views.pretty_pair,
+         name="outround_pretty_pair"),
+    path("outround_pairings/pairinglist/printable/<int:type_of_round>/",
+         outround_pairing_views.pretty_pair_print,
+         name="outround_pretty_pair_print"),
+    path("outround_pairing/release/<int:num_teams>/<int:type_of_round>/",
+         outround_pairing_views.toggle_pairing_released,
+         name="toggle_outround_pairing_released"),
 
     # Settings related
     url(r"^settings_form",
