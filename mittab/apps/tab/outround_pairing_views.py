@@ -550,3 +550,42 @@ def toggle_pairing_released(request, type_of_round, num_teams):
 
     data = {"success": True, "pairing_released": not old == num_teams}
     return JsonResponse(data)
+
+
+def forum_view(request, type_of_round):
+    outrounds = Outround.objects.exclude(
+        victor=Outround.UNKNOWN
+    ).filter(
+        type_of_round=type_of_round
+    )
+
+    rounds = outrounds.values_list("num_teams")
+    rounds = [r[0] for r in rounds]
+    rounds = list(set(rounds))
+    rounds.sort(key=lambda r: r, reverse=True)
+
+    results = []
+
+    for _round in rounds:
+        to_add = {}
+        to_display = outrounds.filter(num_teams=_round)
+
+        to_add["label"] = "[%s] Ro%s" % ("N" if type_of_round else "V", _round)
+        to_add["results"] = []
+
+        for outround in to_display:
+            to_add["results"] += [
+                "%s (%s) drops to %s (%s)" % (
+                    outround.winner.display,
+                    "GOV" if outround.winner == outround.gov_team else "OPP",
+                    outround.loser.display,
+                    "GOV" if outround.loser == outround.gov_team else "OPP",
+                )
+            ]
+
+        results.append(to_add)
+
+    return render(request,
+                  "outrounds/forum_result.html",
+                  locals())
+    

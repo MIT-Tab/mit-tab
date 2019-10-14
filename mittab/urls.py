@@ -205,6 +205,9 @@ urlpatterns = [
     path("outround_pairing/release/<int:num_teams>/<int:type_of_round>/",
          outround_pairing_views.toggle_pairing_released,
          name="toggle_outround_pairing_released"),
+    path("outround_result/<int:type_of_round>",
+         outround_pairing_views.forum_view,
+         name="forum_view"),
 
     # Settings related
     url(r"^settings_form",
