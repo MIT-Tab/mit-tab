@@ -10,6 +10,7 @@ function populateTabCard(tabCardElement) {
 	success(result) {
 	    const stats = result.result;
 	    const text = [
+		stats.effective_outround_seed,
 		stats.outround_seed,
 		stats.wins,
 		stats.total_speaks.toFixed(2),
@@ -17,7 +18,7 @@ function populateTabCard(tabCardElement) {
 		stats.opps,
 		stats.seed
 	    ].join(" / ");
-	    tabCardElement.attr("title", "Outround Seed / Wins / Speaks / Govs / Opps / Seed");
+	    tabCardElement.attr("title", "Effective Outround Seed / Outround Seed / Wins / Speaks / Govs / Opps / Seed");
 	    tabCardElement.attr("href", `/team/card/${teamId}`);
 	    tabCardElement.text(text);
 	}

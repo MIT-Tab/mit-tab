@@ -190,6 +190,12 @@ urlpatterns = [
     url(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
         outround_pairing_views.assign_judge,
         name="outround_swap_judge"),
+    url(r"^outround/(\d+)/result/$",
+        outround_pairing_views.enter_result,
+        name="enter_result"),
+    path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
+         outround_pairing_views.pair_next_outround,
+         name="next_outround"),
 
     # Settings related
     url(r"^settings_form",

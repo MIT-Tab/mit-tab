@@ -8,7 +8,7 @@
             <td>
               <h6 class="gov-team">
                 <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
-                  {{pairing.gov_team.display_backend}}
+		    {{pairing.gov_team.display_backend}}
                 </a>
                 <small>
                   <abbr title="Gov Team" class="attribute">GOV</abbr>
@@ -94,23 +94,16 @@
 
       <div class="col-3 text-center">
         {% if pairing.victor == 1 %}
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV win</a>
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV win</a>
         {% elif pairing.victor == 2 %} 
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP win</a>
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP win</a>
         {% elif pairing.victor == 3 %}
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a>
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV via Forfeit</a>
         {% elif pairing.victor == 4 %}
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a>
-        {% elif pairing.victor == 5 %}
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Drop</a>
-        {% elif pairing.victor == 6 %}
-        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Win</a>
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP via Forfeit</a>
         {% else %}
-        <a class="btn-sm btn-block btn-warning" href="/round/{{pairing.id}}/result/">Enter Ballot</a>
+        <a class="btn-sm btn-block btn-warning" href="/outround/{{pairing.id}}/result/">Enter Ballot</a>
         {%endif%}
-        {% if pairing.judges.all|length > 1 %}
-        <a class="btn-sm btn-block btn-warning" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a>
-        {% endif %}
         <a class="btn-sm btn-block btn-light" href="/room/{{pairing.room.id}}" >
           <i class="far fa-building"></i> {{pairing.room.name}}
         </a>

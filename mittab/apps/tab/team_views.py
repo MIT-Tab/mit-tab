@@ -393,6 +393,7 @@ def team_stats(request, team_id):
 
         if hasattr(team, "breaking_team"):
             stats["outround_seed"] = team.breaking_team.seed
+            stats["effective_outround_seed"] = team.breaking_team.effective_seed
 
         data = {"success": True, "result": stats}
     except Team.DoesNotExist:

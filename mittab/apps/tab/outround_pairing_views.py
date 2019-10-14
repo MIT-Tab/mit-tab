@@ -15,13 +15,77 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from mittab.apps.tab.team_views import get_team_rankings
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
-from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
+from mittab.apps.tab.forms import OutroundResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def pair_next_outround(request, num_teams, type_of_round):
+    if request.method == "POST":
+        Outround.objects.filter(num_teams__lt=num_teams,
+                                type_of_round=type_of_round).delete()
+        
+        outround_tab_logic.pair(type_of_round)
+
+        return redirect_and_flash_success(
+            request, "Success!", path=reverse("outround_pairing_view",
+                                              kwargs={
+                                                  "num_teams": int(num_teams / 2),
+                                                  "type_of_round": type_of_round
+                                              }))
+
+    # See if we can pair the round
+    title = "Pairing Outrounds"
+    current_round_number = 0
+
+    previous_round_number = TabSettings.get("tot_rounds", 5)
+
+    check_status = []
+    
+    judges = outround_tab_logic.have_enough_judges_type(type_of_round)
+    rooms = outround_tab_logic.have_enough_rooms_type(type_of_round)
+    
+    msg = "Enough judges checked in for Out-rounds? Need {1}, have {2}".format(
+        current_round_number, judges[1][1], judges[1][0])
+
+    if num_teams <= 2:
+        check_status.append(("Have more rounds?", "No", "Not enough teams"))
+    else:
+        check_status.append(("Have more rounds?", "Yes", "Have enough teams!"))
+        
+    if judges[0]:
+        check_status.append((msg, "Yes", "Judges are checked in"))
+    else:
+        check_status.append((msg, "No", "Not enough judges"))
+        
+    msg = "N/2 Rooms available Round Out-rounds? Need {1}, have {2}".format(
+        current_round_number, rooms[1][1], rooms[1][0])
+    if rooms[0]:
+        check_status.append((msg, "Yes", "Rooms are checked in"))
+    else:
+        check_status.append((msg, "No", "Not enough rooms"))
+
+    round_label = "[%s] Ro%s" % ("N" if type_of_round else "V",
+                                 num_teams)
+    msg = "All Rounds properly entered for Round %s" % (
+        round_label)
+    ready_to_pair = "Yes"
+    ready_to_pair_alt = "Checks passed!"
+    try:
+        outround_tab_logic.have_properly_entered_data(num_teams, type_of_round)
+        check_status.append((msg, "Yes", "All rounds look good"))
+    except PrevRoundNotEnteredError as e:
+        ready_to_pair = "No"
+        ready_to_pair_alt = str(e)
+        check_status.append(
+            (msg, "No", "Not all rounds are entered. %s" % str(e)))
+        
+    return render(request, "pairing/pair_round.html", locals())
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -38,6 +102,7 @@ def break_teams(request):
         var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
         
         # This forces a refresh of the breaking teams
+        Outround.objects.all().delete()
         BreakingTeam.objects.all().delete()
     
         current_seed = 1
@@ -70,7 +135,7 @@ def break_teams(request):
         outround_tab_logic.pair(BreakingTeam.NOVICE)        
 
         return redirect_and_flash_success(
-            request, "Success!", path="/"
+            request, "Success!", path="/outround_pairing"
         )
 
     # See if we can pair the round
@@ -126,7 +191,10 @@ def break_teams(request):
 
 def outround_pairing_view(request,
                           type_of_round=BreakingTeam.VARSITY,
-                          num_teams=TabSettings.get("var_teams_to_break", 8)):
+                          num_teams=None):
+
+    if num_teams is None:
+        return redirect("outround_pairing_view", type_of_round=BreakingTeam.VARSITY, num_teams=TabSettings.get("var_teams_to_break", 8))
 
     label = "[%s] Ro%s" % ("V" if type_of_round == BreakingTeam.VARSITY else "N",
                            num_teams)
@@ -139,8 +207,8 @@ def outround_pairing_view(request,
                                    num_teams=var_teams_to_break).exists():
             outround_options.append(
                 (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.VARSITY,
-                                                          "num_teams": var_teams_to_break}),
-                 "[V] Ro%s" % (var_teams_to_break,))
+                                                          "num_teams": int(var_teams_to_break)}),
+                 "[V] Ro%s" % (int(var_teams_to_break),))
             )
         var_teams_to_break /= 2
 
@@ -149,7 +217,7 @@ def outround_pairing_view(request,
                                    num_teams=nov_teams_to_break).exists():
             outround_options.append(
                 (reverse("outround_pairing_view", kwargs={"type_of_round": BreakingTeam.NOVICE,
-                                                          "num_teams": nov_teams_to_break}),
+                                                          "num_teams": int(nov_teams_to_break)}),
                  "[N] Ro%s" % (nov_teams_to_break,))
             )
         nov_teams_to_break /= 2
@@ -370,3 +438,43 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         emit_current_exception()
         data = {"success": False}
     return JsonResponse(data)
+
+
+def enter_result(request,
+                 round_id,
+                 form_class=OutroundResultEntryForm):
+
+    round_obj = Outround.objects.get(id=round_id)
+
+    redirect_to = reverse("outround_pairing_view",
+                          kwargs={
+                              "num_teams": round_obj.num_teams,
+                              "type_of_round": round_obj.type_of_round
+                          }
+    )
+
+    
+
+    if request.method == "POST":
+        form = form_class(request.POST, round_instance=round_obj)
+        if form.is_valid():
+            try:
+                form.save()
+            except ValueError:
+                return redirect_and_flash_error(
+                    request, "Invalid round result, could not remedy.")
+            return redirect_and_flash_success(request,
+                                              "Result entered successfully",
+                                              path=redirect_to)
+    else:
+        form_kwargs = {"round_instance": round_obj}
+        form = form_class(**form_kwargs)
+
+    return render(
+        request, "outrounds/ballot.html", {
+            "form": form,
+            "title": "Entering Ballot for {}".format(round_obj),
+            "gov_team": round_obj.gov_team,
+            "opp_team": round_obj.opp_team,
+        })
+

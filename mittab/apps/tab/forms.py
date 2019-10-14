@@ -557,3 +557,65 @@ def score_panel(result, discard_minority):
     pprint.pprint(ranked)
 
     return ranked, final_winner
+
+
+class OutroundResultEntryForm(forms.Form):
+    winner = forms.ChoiceField(label="Which team won the round?",
+                               choices=Outround.VICTOR_CHOICES)
+
+    def __init__(self, *args, **kwargs):
+        # Have to pop these off before sending to the super constructor
+        round_object = kwargs.pop("round_instance")
+        no_fill = False
+        if "no_fill" in kwargs:
+            kwargs.pop("no_fill")
+            no_fill = True
+        super(OutroundResultEntryForm, self).__init__(*args, **kwargs)
+        # If we already have information, fill that into the form
+        if round_object.victor != 0 and not no_fill:
+            self.fields["winner"].initial = round_object.victor
+
+        self.fields["round_instance"] = forms.IntegerField(
+            initial=round_object.pk, widget=forms.HiddenInput())
+    
+        if round_object.victor == 0 or no_fill:
+            return
+
+    def clean(self):
+        cleaned_data = self.cleaned_data
+        try:
+            if cleaned_data["winner"] == Round.NONE:
+                self.add_error("winner",
+                               self.error_class(["Someone has to win!"]))
+
+            if self.errors:
+                return
+
+        except Exception:
+            errors.emit_current_exception()
+            self.add_error(
+                "winner",
+                self.error_class(
+                    ["Non handled error, preventing data contamination"]))
+        return cleaned_data
+
+    def save(self, _commit=True):
+        cleaned_data = self.cleaned_data
+        round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])
+
+        round_obj.victor = cleaned_data["winner"]
+        round_obj.save()
+
+        round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])        
+        if round_obj.victor > 0:
+            winning_team_seed = round_obj.winner.breaking_team.effective_seed
+            losing_team_seed = round_obj.loser.breaking_team.effective_seed
+
+            if losing_team_seed < winning_team_seed:
+                round_obj.winner.breaking_team.effective_seed = losing_team_seed
+                round_obj.winner.breaking_team.save()
+
+                round_obj.loser.breaking_team.effective_seed = round_obj.loser.breaking_team.seed
+                round_obj.loser.breaking_team.save()
+        
+        return round_obj
