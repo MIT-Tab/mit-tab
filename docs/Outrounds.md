@@ -10,7 +10,7 @@ When you reach the final in-round of your tournamet, the button that is normally
 
 This will then break the appropriate number of teams as determined by the `nov_teams_to_break` and `var_teams_to_break` TabSetting.
 
-It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_setting` for more information.
+It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_setting` for more information.  It will let you pair if you don't have enough judges, but it will warn you.
 
 The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `var_to_nov` variable.  If you would like varsity octafinals to happen at the same time as novice quarterfinals, this value should be `2` as the quotient of number of teams in varsity break rounds to the simultaneous novice break round is 2.  If they are happening at the same time, the value should be `1`, if they are octafinals at the same time as semifinals, then it should be 4, etc.
 
