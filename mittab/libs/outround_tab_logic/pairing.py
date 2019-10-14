@@ -19,9 +19,6 @@ def good_to_go(num_teams):
     if num_teams < 2:
         raise errors.NotEnoughTeamsError()
 
-    if not have_enough_judges()[0]:
-        raise errors.NotEnoughJudgesError()
-
     # Check there are enough rooms
     if not have_enough_rooms()[0]:
         raise errors.NotEnoughRoomsError()
