@@ -177,7 +177,7 @@ def break_teams(request):
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
     else:
-        check_status.append((msg, "No", "Not enough rooms"))    
+        check_status.append((msg, "No", "Not enough rooms"))
 
     return render(request, "pairing/pair_round.html", locals())
 
@@ -215,7 +215,7 @@ def outround_pairing_view(request,
 
     while not math.log(nov_teams_to_break, 2) % 1 == 0:
         nov_teams_to_break += 1
-    
+
     while var_teams_to_break > 1:
         if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
                                    num_teams=var_teams_to_break).exists():
@@ -528,28 +528,26 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
 
     for value in unique_values:
         lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
-    
+
         excluded_teams = BreakingTeam.objects.filter(
             type_of_team=type_of_round
         ).exclude(
             team__id__in=lost_outrounds
         )
-        
+
         excluded_teams = [t.team for t in excluded_teams]
-        
+
         excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
             type_of_round=type_of_round,
             num_teams=value,
             gov_team=t
         ).exists()]
-        
+
         excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
             type_of_round=type_of_round,
             num_teams=value,
             opp_team=t
         ).exists()]
-
-        print (excluded_teams)
 
         outround_pairings.append({
             "label": "[%s] Ro%s" % ("N" if type_of_round else "V", value),
