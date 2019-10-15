@@ -209,7 +209,7 @@ def pair_round():
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = [r.room for r in RoomCheckIn.objects.filter(round=current_round).all()]
+    rooms = [r.room for r in RoomCheckIn.objects.filter(round_number=current_round).all()]
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
     for i, pairing in enumerate(pairings):
