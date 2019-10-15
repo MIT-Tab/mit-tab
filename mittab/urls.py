@@ -55,6 +55,11 @@ urlpatterns = [
     url(r"^room/(\d+)/$", views.view_room, name="view_room"),
     url(r"^view_rooms/$", views.view_rooms, name="view_rooms"),
     url(r"^enter_room/$", views.enter_room, name="enter_room"),
+    url(r"^room/(\d+)/check_ins/round/(\d+)/$",
+        views.room_check_in,
+        name="room_check_in"),
+    url(r"^batch_room_checkin/$", views.batch_checkin, name="batch_room_checkin"),
+
 
     # Scratch related
     url(r"^judge/(\d+)/scratches/delete/(\d+)/",
