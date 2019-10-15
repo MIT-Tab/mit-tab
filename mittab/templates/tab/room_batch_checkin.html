@@ -1,0 +1,41 @@
+{% extends "base/__normal.html" %}
+{% load tags %}
+
+{% block title %}Room Check-In{% endblock %}
+{% block banner %}Batch Room Check-In{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="col">
+  {% quick_search %}
+
+  <table class="table table-striped table-bordered table-sm">
+    <thead>
+      <th>Room</th>
+      {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
+    </thead>
+    {% for room, checkins in rooms_and_checkins %}
+    <tr class="searchable">
+      <td>
+        <a href="/room/{{room.id}}">{{ room.name }}</a>
+      </td>
+      {% for is_checked_in in checkins %}
+      <td>
+        <div class="custom-control custom-switch">
+          <input type="checkbox" class="custom-control-input room-checkin-toggle"
+                 data-room-id="{{room.id}}"
+                 data-round-number="{{forloop.counter}}"
+                 id="toggle-{{ room.id }}-{{ forloop.counter }}"
+                 {% if is_checked_in %}checked{% endif %}>
+          <label class="custom-control-label" for="toggle-{{ room.id }}-{{ forloop.counter }}">
+            Checked {% if is_checked_in %}In{% else %}Out{% endif %}
+          </label>
+        </div>
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

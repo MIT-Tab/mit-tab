@@ -1,6 +1,7 @@
 [
 {
     "model": "auth.user",
+    "pk": 3,
     "fields": {
         "password": "pbkdf2_sha256$12000$Ww8rkjQKrEon$MC9bnYVW2DTp7MAWSLcRBCactZ2Yu13oqzCi+FgfpcI=",
         "last_login": "2017-12-21T18:31:42.535Z",
@@ -18,6 +19,7 @@
 },
 {
     "model": "auth.user",
+    "pk": 4,
     "fields": {
         "password": "pbkdf2_sha256$10000$cBvknDUYtDG5$egG9UfkQUx91a/7zNYlaFKMdhPNFX0z3qpI1/YWX0DM=",
         "last_login": "2013-10-14T14:33:34.055Z",
@@ -31,14 +33,6 @@
         "date_joined": "2013-04-02T19:20:28Z",
         "groups": [],
         "user_permissions": []
-    }
-},
-{
-    "model": "sessions.session",
-    "pk": "wom16r3doq58sws26opko0fuhg5hr1p0",
-    "fields": {
-        "session_data": "NGRkZmZmNzUzZWM0YTFhYmRmYTdkNmE4OThmMWE3ZDBhOWJlNGY0NTp7Il9hdXRoX3VzZXJfaGFzaCI6ImQ2NTFjYTgwYWUwN2M0YWU1MjdhNDlkYjMxMTIxOTE3NDJlMTBlNGMiLCJfYXV0aF91c2VyX2JhY2tlbmQiOiJkamFuZ28uY29udHJpYi5hdXRoLmJhY2tlbmRzLk1vZGVsQmFja2VuZCIsIl9hdXRoX3VzZXJfaWQiOjF9",
-        "expire_date": "2018-01-04T18:31:42.538Z"
     }
 },
 {
@@ -4769,6 +4763,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             1,
             2
@@ -4789,9 +4784,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            3,
-            4
+            4,
+            3
         ]
     }
 },
@@ -4809,6 +4805,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             5,
             7
@@ -4829,6 +4826,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             9,
             12
@@ -4849,9 +4847,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            13,
-            14
+            14,
+            13
         ]
     }
 },
@@ -4869,9 +4868,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            15,
-            17
+            17,
+            15
         ]
     }
 },
@@ -4889,6 +4889,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             16,
             18
@@ -4909,9 +4910,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            20,
-            22
+            22,
+            20
         ]
     }
 },
@@ -4929,6 +4931,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             19,
             21
@@ -4949,6 +4952,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             25,
             26
@@ -4969,6 +4973,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             23,
             24
@@ -4989,9 +4994,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            27,
-            28
+            28,
+            27
         ]
     }
 },
@@ -5009,6 +5015,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             29,
             30
@@ -5029,6 +5036,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": false,
+        "team_code": null,
         "debaters": [
             31,
             33
@@ -5049,6 +5057,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             34,
             35
@@ -5069,9 +5078,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            32,
-            36
+            36,
+            32
         ]
     }
 },
@@ -5089,9 +5099,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            37,
-            38
+            38,
+            37
         ]
     }
 },
@@ -5109,9 +5120,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            42,
-            44
+            44,
+            42
         ]
     }
 },
@@ -5129,6 +5141,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             41,
             43
@@ -5149,9 +5162,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            45,
-            47
+            47,
+            45
         ]
     }
 },
@@ -5169,6 +5183,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             46,
             48
@@ -5189,6 +5204,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             49,
             51
@@ -5209,9 +5225,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            33,
-            52
+            52,
+            33
         ]
     }
 },
@@ -5229,9 +5246,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            53,
-            54
+            54,
+            53
         ]
     }
 },
@@ -5249,9 +5267,10 @@
         "hybrid_school": null,
         "seed": 3,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            55,
-            58
+            58,
+            55
         ]
     }
 },
@@ -5269,6 +5288,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             31,
             40
@@ -5289,9 +5309,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            59,
-            60
+            60,
+            59
         ]
     }
 },
@@ -5309,9 +5330,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            61,
-            63
+            63,
+            61
         ]
     }
 },
@@ -5329,6 +5351,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             62,
             64
@@ -5349,9 +5372,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            65,
-            66
+            66,
+            65
         ]
     }
 },
@@ -5369,9 +5393,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            67,
-            70
+            70,
+            67
         ]
     }
 },
@@ -5389,6 +5414,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             68,
             69
@@ -5409,6 +5435,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             71,
             72
@@ -5429,9 +5456,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            73,
-            74
+            74,
+            73
         ]
     }
 },
@@ -5449,6 +5477,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             75,
             76
@@ -5469,9 +5498,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            77,
-            78
+            78,
+            77
         ]
     }
 },
@@ -5489,9 +5519,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            79,
-            81
+            81,
+            79
         ]
     }
 },
@@ -5509,9 +5540,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            80,
-            82
+            82,
+            80
         ]
     }
 },
@@ -5529,9 +5561,10 @@
         "hybrid_school": null,
         "seed": 3,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            83,
-            85
+            85,
+            83
         ]
     }
 },
@@ -5549,6 +5582,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             84,
             87
@@ -5569,9 +5603,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            86,
-            88
+            88,
+            86
         ]
     }
 },
@@ -5589,9 +5624,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            93,
-            94
+            94,
+            93
         ]
     }
 },
@@ -5609,9 +5645,10 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            96,
-            98
+            98,
+            96
         ]
     }
 },
@@ -5629,6 +5666,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             99,
             100
@@ -5649,9 +5687,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            95,
-            97
+            97,
+            95
         ]
     }
 },
@@ -5669,6 +5708,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": false,
+        "team_code": null,
         "debaters": [
             101,
             103
@@ -5689,6 +5729,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             102,
             104
@@ -5709,6 +5750,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": false,
+        "team_code": null,
         "debaters": [
             107,
             108
@@ -5729,9 +5771,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            109,
-            110
+            110,
+            109
         ]
     }
 },
@@ -5749,9 +5792,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            112,
-            114
+            114,
+            112
         ]
     }
 },
@@ -5769,9 +5813,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            111,
-            113
+            113,
+            111
         ]
     }
 },
@@ -5789,6 +5834,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             117,
             119
@@ -5809,9 +5855,10 @@
         "hybrid_school": null,
         "seed": 3,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            115,
-            116
+            116,
+            115
         ]
     }
 },
@@ -5829,6 +5876,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             118,
             126
@@ -5849,9 +5897,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            122,
-            124
+            124,
+            122
         ]
     }
 },
@@ -5869,9 +5918,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            121,
-            123
+            123,
+            121
         ]
     }
 },
@@ -5889,6 +5939,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             125,
             333
@@ -5909,6 +5960,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             131,
             132
@@ -5929,9 +5981,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            129,
-            360
+            360,
+            129
         ]
     }
 },
@@ -5949,9 +6002,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            133,
-            134
+            134,
+            133
         ]
     }
 },
@@ -5969,9 +6023,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            135,
-            136
+            136,
+            135
         ]
     }
 },
@@ -5989,6 +6044,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             137,
             138
@@ -6009,9 +6065,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            139,
-            142
+            142,
+            139
         ]
     }
 },
@@ -6029,9 +6086,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            140,
-            141
+            141,
+            140
         ]
     }
 },
@@ -6049,9 +6107,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": false,
+        "team_code": null,
         "debaters": [
-            143,
-            146
+            146,
+            143
         ]
     }
 },
@@ -6069,9 +6128,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            144,
-            145
+            145,
+            144
         ]
     }
 },
@@ -6089,6 +6149,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": false,
+        "team_code": null,
         "debaters": [
             147,
             149
@@ -6109,9 +6170,10 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            148,
-            150
+            150,
+            148
         ]
     }
 },
@@ -6129,9 +6191,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            151,
-            152
+            152,
+            151
         ]
     }
 },
@@ -6149,9 +6212,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            154,
-            156
+            156,
+            154
         ]
     }
 },
@@ -6169,9 +6233,10 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            155,
-            175
+            175,
+            155
         ]
     }
 },
@@ -6189,9 +6254,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            157,
-            158
+            158,
+            157
         ]
     }
 },
@@ -6209,9 +6275,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            160,
-            163
+            163,
+            160
         ]
     }
 },
@@ -6229,6 +6296,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             164,
             166
@@ -6249,9 +6317,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            168,
-            349
+            349,
+            168
         ]
     }
 },
@@ -6269,9 +6338,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            171,
-            173
+            173,
+            171
         ]
     }
 },
@@ -6289,6 +6359,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             169,
             170
@@ -6309,6 +6380,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             172,
             174
@@ -6329,6 +6401,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             176,
             177
@@ -6349,9 +6422,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            165,
-            180
+            180,
+            165
         ]
     }
 },
@@ -6369,6 +6443,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             181,
             183
@@ -6389,9 +6464,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            186,
-            188
+            188,
+            186
         ]
     }
 },
@@ -6409,9 +6485,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            189,
-            190
+            190,
+            189
         ]
     }
 },
@@ -6429,6 +6506,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             191,
             192
@@ -6449,6 +6527,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             194,
             195
@@ -6469,9 +6548,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            196,
-            197
+            197,
+            196
         ]
     }
 },
@@ -6489,9 +6569,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            198,
-            200
+            200,
+            198
         ]
     }
 },
@@ -6509,6 +6590,7 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             201,
             202
@@ -6529,9 +6611,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            204,
-            205
+            205,
+            204
         ]
     }
 },
@@ -6549,6 +6632,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             193,
             206
@@ -6569,6 +6653,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             207,
             208
@@ -6589,9 +6674,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            199,
-            350
+            350,
+            199
         ]
     }
 },
@@ -6609,9 +6695,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            209,
-            210
+            210,
+            209
         ]
     }
 },
@@ -6629,6 +6716,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             211,
             213
@@ -6649,9 +6737,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            215,
-            216
+            216,
+            215
         ]
     }
 },
@@ -6669,9 +6758,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            217,
-            361
+            361,
+            217
         ]
     }
 },
@@ -6689,9 +6779,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            219,
-            220
+            220,
+            219
         ]
     }
 },
@@ -6709,6 +6800,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             225,
             362
@@ -6729,9 +6821,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            222,
-            223
+            223,
+            222
         ]
     }
 },
@@ -6749,9 +6842,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            212,
-            214
+            214,
+            212
         ]
     }
 },
@@ -6769,6 +6863,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             221,
             224
@@ -6789,6 +6884,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             229,
             230
@@ -6809,6 +6905,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             231,
             232
@@ -6829,9 +6926,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            227,
-            228
+            228,
+            227
         ]
     }
 },
@@ -6849,9 +6947,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            233,
-            234
+            234,
+            233
         ]
     }
 },
@@ -6869,6 +6968,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             235,
             236
@@ -6889,6 +6989,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             237,
             239
@@ -6909,9 +7010,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            243,
-            245
+            245,
+            243
         ]
     }
 },
@@ -6929,6 +7031,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             238,
             240
@@ -6949,9 +7052,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            244,
-            358
+            358,
+            244
         ]
     }
 },
@@ -6969,9 +7073,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            242,
-            246
+            246,
+            242
         ]
     }
 },
@@ -6989,9 +7094,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            247,
-            248
+            248,
+            247
         ]
     }
 },
@@ -7009,6 +7115,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             249,
             253
@@ -7029,9 +7136,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            255,
-            256
+            256,
+            255
         ]
     }
 },
@@ -7049,9 +7157,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            251,
-            363
+            363,
+            251
         ]
     }
 },
@@ -7069,9 +7178,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            257,
-            258
+            258,
+            257
         ]
     }
 },
@@ -7089,6 +7199,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             259,
             260
@@ -7109,6 +7220,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             263,
             266
@@ -7129,6 +7241,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             265,
             267
@@ -7149,6 +7262,7 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             269,
             270
@@ -7169,6 +7283,7 @@
         "hybrid_school": null,
         "seed": 2,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             268,
             271
@@ -7189,6 +7304,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             264,
             273
@@ -7209,6 +7325,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             272,
             277
@@ -7229,6 +7346,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             279,
             282
@@ -7249,9 +7367,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            280,
-            346
+            346,
+            280
         ]
     }
 },
@@ -7269,9 +7388,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            283,
-            284
+            284,
+            283
         ]
     }
 },
@@ -7289,9 +7409,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            285,
-            287
+            287,
+            285
         ]
     }
 },
@@ -7309,6 +7430,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             288,
             289
@@ -7329,9 +7451,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            290,
-            292
+            292,
+            290
         ]
     }
 },
@@ -7349,6 +7472,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             294,
             295
@@ -7369,6 +7493,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             286,
             291
@@ -7389,6 +7514,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             300,
             301
@@ -7409,6 +7535,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             297,
             359
@@ -7429,6 +7556,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             303,
             305
@@ -7449,9 +7577,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            304,
-            306
+            306,
+            304
         ]
     }
 },
@@ -7469,9 +7598,10 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            307,
-            308
+            308,
+            307
         ]
     }
 },
@@ -7489,6 +7619,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             309,
             310
@@ -7509,6 +7640,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             311,
             312
@@ -7529,9 +7661,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            313,
-            314
+            314,
+            313
         ]
     }
 },
@@ -7549,6 +7682,7 @@
         "hybrid_school": null,
         "seed": 3,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             315,
             316
@@ -7569,9 +7703,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            317,
-            318
+            318,
+            317
         ]
     }
 },
@@ -7589,9 +7724,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            319,
-            320
+            320,
+            319
         ]
     }
 },
@@ -7609,6 +7745,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             323,
             324
@@ -7629,9 +7766,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            327,
-            328
+            328,
+            327
         ]
     }
 },
@@ -7649,6 +7787,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             329,
             330
@@ -7669,6 +7808,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             331,
             332
@@ -7689,6 +7829,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             276,
             293
@@ -7709,6 +7850,7 @@
         "hybrid_school": null,
         "seed": 1,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             334,
             335
@@ -7729,9 +7871,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            336,
-            337
+            337,
+            336
         ]
     }
 },
@@ -7749,6 +7892,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             338,
             339
@@ -7769,6 +7913,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             341,
             356
@@ -7789,9 +7934,10 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
-            342,
-            343
+            343,
+            342
         ]
     }
 },
@@ -7809,6 +7955,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             344,
             345
@@ -7829,6 +7976,7 @@
         "hybrid_school": null,
         "seed": 3,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             274,
             275
@@ -7849,6 +7997,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             347,
             348
@@ -7869,6 +8018,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             351,
             352
@@ -7889,6 +8039,7 @@
         "hybrid_school": null,
         "seed": 0,
         "checked_in": true,
+        "team_code": null,
         "debaters": [
             353,
             355
@@ -8035,10 +8186,10 @@
         "rank": "10.00",
         "ballot_code": null,
         "schools": [
+            18,
             2,
             7,
-            8,
-            18
+            8
         ]
     }
 },
@@ -8062,8 +8213,8 @@
         "rank": "7.00",
         "ballot_code": null,
         "schools": [
-            7,
-            31
+            31,
+            7
         ]
     }
 },
@@ -8112,8 +8263,8 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            11,
-            18
+            18,
+            11
         ]
     }
 },
@@ -8125,9 +8276,9 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            8,
             25,
-            37
+            37,
+            8
         ]
     }
 },
@@ -8139,8 +8290,8 @@
         "rank": "10.00",
         "ballot_code": null,
         "schools": [
-            1,
-            11
+            11,
+            1
         ]
     }
 },
@@ -8152,9 +8303,9 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            8,
             13,
-            40
+            40,
+            8
         ]
     }
 },
@@ -8226,17 +8377,17 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            5,
-            11,
-            17,
-            18,
-            22,
-            25,
             27,
-            30,
+            25,
+            17,
             31,
+            18,
+            43,
+            5,
             35,
-            43
+            30,
+            22,
+            11
         ]
     }
 },
@@ -8260,8 +8411,8 @@
         "rank": "7.00",
         "ballot_code": null,
         "schools": [
-            6,
-            18
+            18,
+            6
         ]
     }
 },
@@ -8441,9 +8592,9 @@
         "rank": "8.00",
         "ballot_code": null,
         "schools": [
-            1,
             13,
-            35
+            35,
+            1
         ]
     }
 },
@@ -8467,9 +8618,9 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            19,
+            35,
             24,
-            35
+            19
         ]
     }
 },
@@ -8517,14 +8668,14 @@
         "rank": "8.00",
         "ballot_code": null,
         "schools": [
-            1,
-            5,
-            13,
-            15,
-            17,
-            19,
             27,
-            38
+            17,
+            13,
+            5,
+            19,
+            38,
+            15,
+            1
         ]
     }
 },
@@ -8704,8 +8855,8 @@
         "rank": "10.00",
         "ballot_code": null,
         "schools": [
-            5,
-            40
+            40,
+            5
         ]
     }
 },
@@ -8789,17 +8940,17 @@
         "rank": "7.00",
         "ballot_code": null,
         "schools": [
-            1,
-            4,
-            6,
-            7,
             10,
-            11,
-            21,
-            24,
+            7,
             35,
+            24,
+            6,
+            38,
+            11,
             36,
-            38
+            4,
+            21,
+            1
         ]
     }
 },
@@ -8835,10 +8986,10 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            1,
-            16,
             17,
-            40
+            40,
+            16,
+            1
         ]
     }
 },
@@ -8898,10 +9049,10 @@
         "rank": "9.00",
         "ballot_code": null,
         "schools": [
-            13,
-            15,
             17,
-            22
+            13,
+            22,
+            15
         ]
     }
 },
@@ -42751,6 +42902,1486 @@
     "pk": 434,
     "fields": {
         "judge": 65,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 701,
+    "fields": {
+        "room": 95,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 702,
+    "fields": {
+        "room": 95,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 703,
+    "fields": {
+        "room": 95,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 704,
+    "fields": {
+        "room": 95,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 705,
+    "fields": {
+        "room": 95,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 706,
+    "fields": {
+        "room": 87,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 707,
+    "fields": {
+        "room": 87,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 708,
+    "fields": {
+        "room": 87,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 709,
+    "fields": {
+        "room": 87,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 710,
+    "fields": {
+        "room": 87,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 711,
+    "fields": {
+        "room": 83,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 712,
+    "fields": {
+        "room": 83,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 713,
+    "fields": {
+        "room": 83,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 714,
+    "fields": {
+        "room": 83,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 715,
+    "fields": {
+        "room": 83,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 716,
+    "fields": {
+        "room": 86,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 717,
+    "fields": {
+        "room": 86,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 718,
+    "fields": {
+        "room": 86,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 719,
+    "fields": {
+        "room": 86,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 720,
+    "fields": {
+        "room": 86,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 721,
+    "fields": {
+        "room": 11,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 722,
+    "fields": {
+        "room": 11,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 723,
+    "fields": {
+        "room": 11,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 724,
+    "fields": {
+        "room": 11,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 725,
+    "fields": {
+        "room": 11,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 726,
+    "fields": {
+        "room": 12,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 727,
+    "fields": {
+        "room": 12,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 728,
+    "fields": {
+        "room": 12,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 729,
+    "fields": {
+        "room": 12,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 730,
+    "fields": {
+        "room": 12,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 731,
+    "fields": {
+        "room": 13,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 732,
+    "fields": {
+        "room": 13,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 733,
+    "fields": {
+        "room": 13,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 734,
+    "fields": {
+        "room": 13,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 735,
+    "fields": {
+        "room": 13,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 736,
+    "fields": {
+        "room": 14,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 737,
+    "fields": {
+        "room": 14,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 738,
+    "fields": {
+        "room": 14,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 739,
+    "fields": {
+        "room": 14,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 740,
+    "fields": {
+        "room": 14,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 741,
+    "fields": {
+        "room": 15,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 742,
+    "fields": {
+        "room": 15,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 743,
+    "fields": {
+        "room": 15,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 744,
+    "fields": {
+        "room": 15,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 745,
+    "fields": {
+        "room": 15,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 746,
+    "fields": {
+        "room": 16,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 747,
+    "fields": {
+        "room": 16,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 748,
+    "fields": {
+        "room": 16,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 749,
+    "fields": {
+        "room": 16,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 750,
+    "fields": {
+        "room": 16,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 751,
+    "fields": {
+        "room": 17,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 752,
+    "fields": {
+        "room": 17,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 753,
+    "fields": {
+        "room": 17,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 754,
+    "fields": {
+        "room": 17,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 755,
+    "fields": {
+        "room": 17,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 756,
+    "fields": {
+        "room": 18,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 757,
+    "fields": {
+        "room": 18,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 758,
+    "fields": {
+        "room": 18,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 759,
+    "fields": {
+        "room": 18,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 760,
+    "fields": {
+        "room": 18,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 761,
+    "fields": {
+        "room": 19,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 762,
+    "fields": {
+        "room": 19,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 763,
+    "fields": {
+        "room": 19,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 764,
+    "fields": {
+        "room": 19,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 765,
+    "fields": {
+        "room": 19,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 766,
+    "fields": {
+        "room": 20,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 767,
+    "fields": {
+        "room": 20,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 768,
+    "fields": {
+        "room": 20,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 769,
+    "fields": {
+        "room": 20,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 770,
+    "fields": {
+        "room": 20,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 771,
+    "fields": {
+        "room": 21,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 772,
+    "fields": {
+        "room": 21,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 773,
+    "fields": {
+        "room": 21,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 774,
+    "fields": {
+        "room": 21,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 775,
+    "fields": {
+        "room": 21,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 776,
+    "fields": {
+        "room": 22,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 777,
+    "fields": {
+        "room": 22,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 778,
+    "fields": {
+        "room": 22,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 779,
+    "fields": {
+        "room": 22,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 780,
+    "fields": {
+        "room": 22,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 781,
+    "fields": {
+        "room": 23,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 782,
+    "fields": {
+        "room": 23,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 783,
+    "fields": {
+        "room": 23,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 784,
+    "fields": {
+        "room": 23,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 785,
+    "fields": {
+        "room": 23,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 786,
+    "fields": {
+        "room": 24,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 787,
+    "fields": {
+        "room": 24,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 788,
+    "fields": {
+        "room": 24,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 789,
+    "fields": {
+        "room": 24,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 790,
+    "fields": {
+        "room": 24,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 791,
+    "fields": {
+        "room": 25,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 792,
+    "fields": {
+        "room": 25,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 793,
+    "fields": {
+        "room": 25,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 794,
+    "fields": {
+        "room": 25,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 795,
+    "fields": {
+        "room": 25,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 796,
+    "fields": {
+        "room": 27,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 797,
+    "fields": {
+        "room": 27,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 798,
+    "fields": {
+        "room": 27,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 799,
+    "fields": {
+        "room": 27,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 800,
+    "fields": {
+        "room": 27,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 801,
+    "fields": {
+        "room": 28,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 802,
+    "fields": {
+        "room": 28,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 803,
+    "fields": {
+        "room": 28,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 804,
+    "fields": {
+        "room": 28,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 805,
+    "fields": {
+        "room": 28,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 806,
+    "fields": {
+        "room": 29,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 807,
+    "fields": {
+        "room": 29,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 808,
+    "fields": {
+        "room": 29,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 809,
+    "fields": {
+        "room": 29,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 810,
+    "fields": {
+        "room": 29,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 811,
+    "fields": {
+        "room": 30,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 812,
+    "fields": {
+        "room": 30,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 813,
+    "fields": {
+        "room": 30,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 814,
+    "fields": {
+        "room": 30,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 815,
+    "fields": {
+        "room": 30,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 816,
+    "fields": {
+        "room": 31,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 817,
+    "fields": {
+        "room": 31,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 818,
+    "fields": {
+        "room": 31,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 819,
+    "fields": {
+        "room": 31,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 820,
+    "fields": {
+        "room": 31,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 821,
+    "fields": {
+        "room": 32,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 822,
+    "fields": {
+        "room": 32,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 823,
+    "fields": {
+        "room": 32,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 824,
+    "fields": {
+        "room": 32,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 825,
+    "fields": {
+        "room": 32,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 826,
+    "fields": {
+        "room": 33,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 827,
+    "fields": {
+        "room": 33,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 828,
+    "fields": {
+        "room": 33,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 829,
+    "fields": {
+        "room": 33,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 830,
+    "fields": {
+        "room": 33,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 831,
+    "fields": {
+        "room": 34,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 832,
+    "fields": {
+        "room": 34,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 833,
+    "fields": {
+        "room": 34,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 834,
+    "fields": {
+        "room": 34,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 835,
+    "fields": {
+        "room": 34,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 836,
+    "fields": {
+        "room": 35,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 837,
+    "fields": {
+        "room": 35,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 838,
+    "fields": {
+        "room": 35,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 839,
+    "fields": {
+        "room": 35,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 840,
+    "fields": {
+        "room": 35,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 841,
+    "fields": {
+        "room": 36,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 842,
+    "fields": {
+        "room": 36,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 843,
+    "fields": {
+        "room": 36,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 844,
+    "fields": {
+        "room": 36,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 845,
+    "fields": {
+        "room": 36,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 846,
+    "fields": {
+        "room": 37,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 847,
+    "fields": {
+        "room": 37,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 848,
+    "fields": {
+        "room": 37,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 849,
+    "fields": {
+        "room": 37,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 850,
+    "fields": {
+        "room": 37,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 851,
+    "fields": {
+        "room": 38,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 852,
+    "fields": {
+        "room": 38,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 853,
+    "fields": {
+        "room": 38,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 854,
+    "fields": {
+        "room": 38,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 855,
+    "fields": {
+        "room": 38,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 856,
+    "fields": {
+        "room": 39,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 857,
+    "fields": {
+        "room": 39,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 858,
+    "fields": {
+        "room": 39,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 859,
+    "fields": {
+        "room": 39,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 860,
+    "fields": {
+        "room": 39,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 861,
+    "fields": {
+        "room": 40,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 862,
+    "fields": {
+        "room": 40,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 863,
+    "fields": {
+        "room": 40,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 864,
+    "fields": {
+        "room": 40,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 865,
+    "fields": {
+        "room": 40,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 866,
+    "fields": {
+        "room": 55,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 867,
+    "fields": {
+        "room": 55,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 868,
+    "fields": {
+        "room": 55,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 869,
+    "fields": {
+        "room": 55,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 870,
+    "fields": {
+        "room": 55,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 871,
+    "fields": {
+        "room": 58,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 872,
+    "fields": {
+        "room": 58,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 873,
+    "fields": {
+        "room": 58,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 874,
+    "fields": {
+        "room": 58,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 875,
+    "fields": {
+        "room": 58,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 876,
+    "fields": {
+        "room": 56,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 877,
+    "fields": {
+        "room": 56,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 878,
+    "fields": {
+        "room": 56,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 879,
+    "fields": {
+        "room": 56,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 880,
+    "fields": {
+        "room": 56,
+        "round_number": 5
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 881,
+    "fields": {
+        "room": 57,
+        "round_number": 1
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 882,
+    "fields": {
+        "room": 57,
+        "round_number": 2
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 883,
+    "fields": {
+        "room": 57,
+        "round_number": 3
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 884,
+    "fields": {
+        "room": 57,
+        "round_number": 4
+    }
+},
+{
+    "model": "tab.roomcheckin",
+    "pk": 885,
+    "fields": {
+        "room": 57,
         "round_number": 5
     }
 }

@@ -129,5 +129,4 @@ team/debater rankings.
 1. Name - Name of the room.
 2. Rank -  A number from 0.0 - 99.99 that represents the relative ranking of
 this room.  Higher is a "better" room, and higher ranked rooms will be paired
-in before other rooms.  **You can use ranks to "check out" a room by changing
-rooms that you don't want to use to 0**
+in before other rooms.

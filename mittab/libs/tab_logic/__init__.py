@@ -209,7 +209,8 @@ def pair_round():
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = Room.objects.all()
+    rooms = RoomCheckIn.objects.filter(round_number=current_round)
+    rooms = map(lambda r: r.room, rooms)
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
     for i, pairing in enumerate(pairings):
@@ -238,7 +239,7 @@ def have_enough_judges(round_to_check):
 
 def have_enough_rooms(_round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
-    num_rooms = Room.objects.filter(rank__gt=0).count()
+    num_rooms = RoomCheckIn.objects.filter(round_number=_round_to_check).count()
     if num_rooms < future_rounds:
         return False, (num_rooms, future_rounds)
     return True, (num_rooms, future_rounds)
