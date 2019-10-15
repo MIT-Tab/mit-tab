@@ -148,6 +148,7 @@ def break_teams(request):
 
     msg = "All Rounds properly entered for Round %s" % (
         previous_round_number)
+
     ready_to_pair = "Yes"
     ready_to_pair_alt = "Checks passed!"
     try:
@@ -168,6 +169,14 @@ def break_teams(request):
         ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "You have a noshow and results. %s" % str(e)))
+
+    rooms = outround_tab_logic.have_enough_rooms_before_break()
+    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
+        rooms[1][1], rooms[1][0])
+    if rooms[0]:
+        check_status.append((msg, "Yes", "Rooms are checked in"))
+    else:
+        check_status.append((msg, "No", "Not enough rooms"))    
 
     return render(request, "pairing/pair_round.html", locals())
 
@@ -212,7 +221,7 @@ def outround_pairing_view(request,
                 (reverse("outround_pairing_view", kwargs={
                     "type_of_round": BreakingTeam.NOVICE,
                     "num_teams": int(nov_teams_to_break)}),
-                 "[N] Ro%s" % (nov_teams_to_break,))
+                 "[N] Ro%s" % (int(nov_teams_to_break),))
             )
         nov_teams_to_break /= 2
 
@@ -281,7 +290,10 @@ def outround_pairing_view(request,
     ).exclude(
         rooms_outrounds__num_teams=other_round_num,
         rooms_outrounds__type_of_round=other_round_type
-    ).exclude(rank=0)
+    )
+
+    checked_in_rooms = [r.room for r in RoomCheckIn.objects.filter(round_number=0)]
+    available_rooms = [r for r in available_rooms if r in checked_in_rooms]
 
     size = max(list(
         map(

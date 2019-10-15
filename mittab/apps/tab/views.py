@@ -246,7 +246,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for room in Room.objects.all():
         checkins = []
-        for round_number in round_numbers:
+        for round_number in [0] + round_numbers:
             checkins.append(room.is_checked_in_for_round(round_number))
         rooms_and_checkins.append((room, checkins))
 
@@ -260,7 +260,7 @@ def batch_checkin(request):
 def room_check_in(request, room_id, round_number):
     room_id, round_number = int(room_id), int(round_number)
 
-    if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
+    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
         raise Http404("Round does not exist")
 
     room = get_object_or_404(Room, pk=room_id)

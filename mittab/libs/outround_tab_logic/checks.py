@@ -86,7 +86,7 @@ def have_enough_rooms_type(type_of_round):
         rooms_outrounds__type_of_round=other_round_type
     ).count()
 
-    num_rooms = Room.objects.filter(rank__gt=0).count() - num_in_use
+    num_rooms = RoomCheckIn.objects.filter(round_number=0).count() - num_in_use
 
     if num_rooms < rooms_needed:
         return False, (num_rooms, rooms_needed)
@@ -100,6 +100,20 @@ def have_enough_rooms():
     return (
         var[0] and nov[0],
         (var[1][0], var[1][1] + nov[1][1])
+    )
+
+
+def have_enough_rooms_before_break():
+    var_breaking = TabSettings.get("var_teams_to_break", 8)
+    nov_breaking = TabSettings.get("nov_teams_to_break", 4)
+
+    rooms_needed = var_breaking // 2
+    rooms_needed += nov_breaking // 2
+
+    num_rooms = RoomCheckIn.objects.filter(round_number=0).count()
+
+    return (
+        rooms_needed <= num_rooms, (num_rooms, rooms_needed)
     )
 
 
