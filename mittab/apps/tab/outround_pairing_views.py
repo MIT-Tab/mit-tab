@@ -1,4 +1,5 @@
 import random
+import math
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -186,9 +187,14 @@ def outround_pairing_view(request,
                           num_teams=None):
 
     if num_teams is None:
+        num_teams = TabSettings.get("var_teams_to_break", 8)
+
+        while not math.log(num_teams, 2) % 1 == 0:
+            num_teams += 1
+
         return redirect("outround_pairing_view",
                         type_of_round=BreakingTeam.VARSITY,
-                        num_teams=TabSettings.get("var_teams_to_break", 8))
+                        num_teams=num_teams)
 
     pairing_released = False
 
@@ -203,6 +209,13 @@ def outround_pairing_view(request,
 
     var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
     nov_teams_to_break = TabSettings.get("nov_teams_to_break", 4)
+
+    while not math.log(var_teams_to_break, 2) % 1 == 0:
+        var_teams_to_break += 1
+
+    while not math.log(nov_teams_to_break, 2) % 1 == 0:
+        nov_teams_to_break += 1
+    
     while var_teams_to_break > 1:
         if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
                                    num_teams=var_teams_to_break).exists():
@@ -511,13 +524,39 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     unique_values = list(set([value[0] for value in unique_values]))
     unique_values.sort(key=lambda v: v, reverse=True)
 
-    outround_pairings = [
-        {
+    outround_pairings = []
+
+    for value in unique_values:
+        lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
+    
+        excluded_teams = BreakingTeam.objects.filter(
+            type_of_team=type_of_round
+        ).exclude(
+            team__id__in=lost_outrounds
+        )
+        
+        excluded_teams = [t.team for t in excluded_teams]
+        
+        excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
+            type_of_round=type_of_round,
+            num_teams=value,
+            gov_team=t
+        ).exists()]
+        
+        excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
+            type_of_round=type_of_round,
+            num_teams=value,
+            opp_team=t
+        ).exists()]
+
+        print (excluded_teams)
+
+        outround_pairings.append({
             "label": "[%s] Ro%s" % ("N" if type_of_round else "V", value),
             "rounds": Outround.objects.filter(num_teams=value,
-                                              type_of_round=type_of_round)
-        } for value in unique_values
-    ]
+                                              type_of_round=type_of_round),
+            "excluded": excluded_teams
+        })
 
     label = "%s Outrounds Pairings" % ("Novice" if type_of_round else "Varsity",)
 

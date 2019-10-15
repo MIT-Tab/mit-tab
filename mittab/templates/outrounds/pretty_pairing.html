@@ -95,6 +95,16 @@
 			<td>{{pairing.room.name}}</td>
 		    </tr>
 		{% endfor %}
+		{% if outround.excluded|length > 0 %}
+		    <tr>
+			<td><b>Advancing Teams:</b></td>
+			<td colspan="3">
+			    {% for team in outround.excluded %}
+				{{ team.display }}{% if not forloop.last %}, {% endif %}
+			    {% endfor %}
+			</td>
+		    </tr>
+		{% endif %}
 	    </table>
 	{% empty %}
 	    <div style="padding: 20px;">Nothing is visible.</div>

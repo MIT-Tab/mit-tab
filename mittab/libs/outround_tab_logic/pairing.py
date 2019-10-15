@@ -11,9 +11,9 @@ from mittab.libs import errors
 
 def good_to_go(num_teams):
     # Check if people can math properly -- ie is it a power of two
-    if not math.log(num_teams, 2) % 1 == 0:
+    #if not math.log(num_teams, 2) % 1 == 0:
         # ERROR: Not a power of 2, someone can't math
-        raise errors.NotEnoughTeamsError()
+    #    raise errors.NotEnoughTeamsError()
 
     if num_teams < 2:
         raise errors.NotEnoughTeamsError()
@@ -68,6 +68,13 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
     num_teams = base_queryset.count()
 
+    teams_for_bracket = num_teams
+
+    while not math.log(teams_for_bracket, 2) % 1 == 0:
+        teams_for_bracket += 1
+
+    num_teams = teams_for_bracket
+
     good_to_go(num_teams)
 
     Outround.objects.filter(
@@ -90,7 +97,8 @@ def pair(type_of_break=BreakingTeam.VARSITY):
         print(pairing)
 
         if not team_one or not team_two:
-            raise errors.BadBreak()
+            continue
+            # raise errors.BadBreak()
 
         gov = gov_team(team_one, team_two)
         opp = team_one if gov == team_two else team_two
