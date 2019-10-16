@@ -42,9 +42,13 @@ class RoomForm(forms.ModelForm):
                 checkins = [
                     c.round_number for c in RoomCheckIn.objects.filter(room=room)
                 ]
-                for i in range(num_rounds):
+                for i in range(-1, num_rounds):
+                    # 0 is included as zero represents outrounds
+                    label = "Checked in for round %s?" % (i + 1)
+                    if i == -1:
+                        label = "Checked in for outrounds?"
                     self.fields["checkin_%s" % i] = forms.BooleanField(
-                        label="Checked in for round %s?" % (i + 1),
+                        label=label,
                         initial=i + 1 in checkins,
                         required=False)
             except Exception:
@@ -91,6 +95,7 @@ class JudgeForm(forms.ModelForm):
                     c.round_number for c in CheckIn.objects.filter(judge=judge)
                 ]
                 for i in range(-1, num_rounds):
+                    # 0 is included as zero represents outrounds
                     label = "Checked in for round %s?" % (i + 1)
                     if i == -1:
                         label = "Checked in for outrounds?"

@@ -251,7 +251,9 @@ def outround_pairing_view(request,
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * var_to_nov
 
-    other_round_type = not type_of_round
+    other_round_type = BreakingTeam.VARSITY \
+                       if type_of_round == BreakingTeam.NOVICE \
+                          else BreakingTeam.NOVICE
 
     pairing_exists = len(outrounds) > 0
 

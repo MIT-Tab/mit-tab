@@ -9,9 +9,9 @@ def lost_teams():
 
 
 def have_enough_judges_type(type_of_round):
-    lost_ids = [outround.loser.id
-                for outround in Outround.objects.all()
-                if outround.loser]
+    loser_ids = [outround.loser.id
+                 for outround in Outround.objects.all()
+                 if outround.loser]
 
     panel_size = 3
 
@@ -22,7 +22,7 @@ def have_enough_judges_type(type_of_round):
 
     teams_count = BreakingTeam.objects.filter(
         type_of_team=type_of_round
-    ).exclude(team__id__in=lost_ids).count()
+    ).exclude(team__id__in=loser_ids).count()
 
     judges_needed = (
         teams_count // 2
@@ -36,7 +36,9 @@ def have_enough_judges_type(type_of_round):
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * var_to_nov
 
-    other_round_type = not type_of_round
+    other_round_type = BreakingTeam.VARSITY \
+                       if type_of_round == BreakingTeam.NOVICE \
+                          else BreakingTeam.NOVICE
 
     num_in_use = Judge.objects.filter(
         judges_outrounds__num_teams=other_round_num,
@@ -61,13 +63,13 @@ def have_enough_judges():
 
 
 def have_enough_rooms_type(type_of_round):
-    lost_ids = [outround.loser.id
-                for outround in Outround.objects.all()
-                if outround.loser]
+    loser_ids = [outround.loser.id
+                 for outround in Outround.objects.all()
+                 if outround.loser]
 
     num_teams = BreakingTeam.objects.filter(
         type_of_team=type_of_round
-    ).exclude(team__id__in=lost_ids).count()
+    ).exclude(team__id__in=loser_ids).count()
 
     rooms_needed = (
         num_teams // 2
@@ -79,7 +81,9 @@ def have_enough_rooms_type(type_of_round):
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * var_to_nov
 
-    other_round_type = not type_of_round
+    other_round_type = BreakingTeam.VARSITY \
+                       if type_of_round == BreakingTeam.NOVICE \
+                          else BreakingTeam.NOVICE
 
     num_in_use = Room.objects.filter(
         rooms_outrounds__num_teams=other_round_num,

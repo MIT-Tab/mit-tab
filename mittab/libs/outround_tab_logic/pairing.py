@@ -9,7 +9,7 @@ from mittab.libs.tab_logic import have_properly_entered_data
 from mittab.libs import errors
 
 
-def good_to_go(num_teams):
+def is_pairing_possible(num_teams):
     if num_teams > Team.objects.count():
         raise errors.NotEnoughTeamsError()
 
@@ -75,7 +75,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
     num_teams = teams_for_bracket
 
-    good_to_go(num_teams)
+    is_pairing_possible(num_teams)
 
     Outround.objects.filter(
         num_teams=num_teams
