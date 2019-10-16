@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q
 from django.shortcuts import redirect, reverse
+from django.utils import timezone
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
@@ -91,7 +92,7 @@ def pair_next_outround(request, num_teams, type_of_round):
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
-        backup.backup_round("before_the_break")
+        backup.backup_round("before_the_break_%s" % (timezone.now().strftime("%H:%M"),))
 
         teams, nov_teams = cache_logic.cache_fxn_key(
             get_team_rankings,
