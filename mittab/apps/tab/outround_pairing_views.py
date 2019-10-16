@@ -487,7 +487,7 @@ def enter_result(request,
 
 def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
-    
+
     round_number = 256
 
     if type_of_round == BreakingTeam.VARSITY:
@@ -552,6 +552,9 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     pairing_exists = True
     #pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
+
+    sidelock = TabSettings.get("sidelock", 0)
+
     return render(request, "outrounds/pretty_pairing.html", locals())
 
 

@@ -106,9 +106,16 @@ def get_next_available_room(num_teams, type_of_break):
 
 
 def gov_team(team_one, team_two):
-    print(team_two)
-    # PLACEHOLDER
-    return team_one
+    sidelock = TabSettings.get("sidelock", 0)
+
+    if sidelock:
+        if Round.objects.filter(gov_team=team_one.team,
+                                opp_team=team_two.team).exists():
+            return True, team_two
+        elif Round.objects.filter(gov_team=team_two.team,
+                                  opp_team=team_one.team).exists():
+            return True, team_one
+    return False, team_one
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
@@ -153,7 +160,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
         if not team_one or not team_two:
             continue
 
-        gov = gov_team(team_one, team_two)
+        sidelock, gov = gov_team(team_one, team_two)
         opp = team_one if gov == team_two else team_two
 
         Outround.objects.create(
@@ -162,5 +169,6 @@ def pair(type_of_break=BreakingTeam.VARSITY):
             gov_team=gov.team,
             opp_team=opp.team,
             room=get_next_available_room(num_teams,
-                                         type_of_break=type_of_break)
+                                         type_of_break=type_of_break),
+            sidelock=sidelock
         )

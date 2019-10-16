@@ -81,7 +81,10 @@
 		{% for pairing in outround.rounds %}
 		    
 		    <tr>
-			<td>{{pairing.gov_team.display}}</td>
+			<td>{% if sidelock and pairing.sidelock %}<b>{% endif %}
+			    {{pairing.gov_team.display}}
+			    {% if sidelock and pairing.sidelock %}<b>{% endif %}
+			</td>
 			<td>{{pairing.opp_team.display}}</td>
 			<td>
 			    {% for judge in pairing.judges.all %}
@@ -112,6 +115,11 @@
         <div class="pairings_footer_spacer"></div>
         <!-- Floating bottom header -->
         <div class="pairings_footer">
+	    {% if sidelock %}
+		<span class="left">
+		    * Bold indicates the government team, due to sidelock.
+		</span>
+	    {% endif %}
 	    <span class="right">
 		<label for="autoscroll">
 		    Autoscroll:

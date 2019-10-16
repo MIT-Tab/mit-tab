@@ -367,6 +367,8 @@ class Outround(models.Model):
                              related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
+    sidelock = models.BooleanField(default=False)
+
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")
