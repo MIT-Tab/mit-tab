@@ -602,20 +602,23 @@ def forum_view(request, type_of_round):
 
         for outround in to_display:
             to_add["results"] += [
-                "[%s] %s (%s, %s) from %s%s (%s) drops to [%s] %s (%s, %s) from %s%s (%s)" % (
+                """[%s] %s (%s, %s) from %s%s (%s) drops to
+                [%s] %s (%s, %s) from %s%s (%s)""" % (
                     outround.loser.breaking_team.seed,
                     outround.loser.display,
                     outround.loser.debaters.first().name,
                     outround.loser.debaters.last().name,
                     outround.loser.school.name,
-                    " / " + outround.loser.hybrid_school.name if outround.loser.hybrid_school else "",
+                    " / " + outround.loser.hybrid_school.name \
+                    if outround.loser.hybrid_school else "",
                     "GOV" if outround.loser == outround.gov_team else "OPP",
                     outround.winner.breaking_team.seed,
                     outround.winner.display,
                     outround.winner.debaters.first().name,
                     outround.winner.debaters.last().name,
                     outround.winner.school.name,
-                    " / " + outround.winner.hybrid_school.name if outround.winner.hybrid_school else "",                    
+                    " / " + outround.winner.hybrid_school.name \
+                    if outround.winner.hybrid_school else "",
                     "GOV" if outround.winner == outround.gov_team else "OPP",
                 )
             ]

@@ -27,7 +27,7 @@ def perform_the_break():
     # This forces a refresh of the breaking teams
     Outround.objects.all().delete()
     BreakingTeam.objects.all().delete()
-    
+
     current_seed = 1
     for team in teams:
         if not team[0].break_preference == Team.VARSITY:
@@ -46,10 +46,10 @@ def perform_the_break():
     for nov_team in nov_teams:
         if current_seed > nov_teams_to_break:
             break
-        
+
         if BreakingTeam.objects.filter(team=nov_team[0]).exists():
             continue
-        
+
         BreakingTeam.objects.create(team=nov_team[0],
                                     seed=current_seed,
                                     effective_seed=current_seed,
