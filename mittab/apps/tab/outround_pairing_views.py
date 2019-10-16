@@ -100,8 +100,13 @@ def break_teams(request):
             request
         )
 
-        nov_teams_to_break = TabSettings.get("nov_teams_to_break", 4)
-        var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
+        nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+        var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+        if not nov_teams_to_break or not var_teams_to_break:
+            return redirect_and_flash_error(request,
+                                            "Please check your break tab settings",
+                                            path="/")
 
         # This forces a refresh of the breaking teams
         Outround.objects.all().delete()
@@ -208,8 +213,13 @@ def outround_pairing_view(request,
                            num_teams)
     outround_options = []
 
-    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 4)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    if not nov_teams_to_break or not var_teams_to_break:
+        return redirect_and_flash_error(request,
+                                        "Please check your break tab settings",
+                                        path="/")
 
     while not math.log(var_teams_to_break, 2) % 1 == 0:
         var_teams_to_break += 1
