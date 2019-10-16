@@ -227,6 +227,7 @@ def judge_check_in(request, judge_id, round_number):
     judge_id, round_number = int(judge_id), int(round_number)
 
     if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
+        # This is so that outrounds don't throw an error
         raise Http404("Round does not exist")
 
     judge = get_object_or_404(Judge, pk=judge_id)

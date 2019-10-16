@@ -4,9 +4,63 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-
 from mittab.libs.tab_logic import have_properly_entered_data
 from mittab.libs import errors
+import mittab.libs.cache_logic as cache_logic
+
+from mittab.apps.tab.team_views import get_team_rankings
+
+
+def perform_the_break():
+    teams, nov_teams = cache_logic.cache_fxn_key(
+        get_team_rankings,
+        "team_rankings",
+        None
+    )
+
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    if not nov_teams_to_break or not var_teams_to_break:
+        return False, "Please check your break tab settings"
+
+    # This forces a refresh of the breaking teams
+    Outround.objects.all().delete()
+    BreakingTeam.objects.all().delete()
+    
+    current_seed = 1
+    for team in teams:
+        if not team[0].break_preference == Team.VARSITY:
+            continue
+
+        if current_seed > var_teams_to_break:
+            break
+
+        BreakingTeam.objects.create(team=team[0],
+                                    seed=current_seed,
+                                    effective_seed=current_seed,
+                                    type_of_team=BreakingTeam.VARSITY)
+        current_seed += 1
+
+    current_seed = 1
+    for nov_team in nov_teams:
+        if current_seed > nov_teams_to_break:
+            break
+        
+        if BreakingTeam.objects.filter(team=nov_team[0]).exists():
+            continue
+        
+        BreakingTeam.objects.create(team=nov_team[0],
+                                    seed=current_seed,
+                                    effective_seed=current_seed,
+                                    type_of_team=BreakingTeam.NOVICE)
+
+        current_seed += 1
+
+    pair(BreakingTeam.VARSITY)
+    pair(BreakingTeam.NOVICE)
+
+    return True, "Success!"
 
 
 def is_pairing_possible(num_teams):

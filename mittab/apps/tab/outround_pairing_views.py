@@ -10,11 +10,9 @@ from django.utils import timezone
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
-from mittab.apps.tab.team_views import get_team_rankings
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
-import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 import mittab.libs.assign_judges as assign_judges
@@ -88,61 +86,55 @@ def pair_next_outround(request, num_teams, type_of_round):
     return render(request, "pairing/pair_round.html", locals())
 
 
+def get_outround_options(var_teams_to_break,
+                         nov_teams_to_break):
+    outround_options = []
+
+    while not math.log(var_teams_to_break, 2) % 1 == 0:
+        var_teams_to_break += 1
+
+    while not math.log(nov_teams_to_break, 2) % 1 == 0:
+        nov_teams_to_break += 1
+
+    while var_teams_to_break > 1:
+        if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
+                                   num_teams=var_teams_to_break).exists():
+            outround_options.append(
+                (reverse("outround_pairing_view", kwargs={
+                    "type_of_round": BreakingTeam.VARSITY,
+                    "num_teams": int(var_teams_to_break)}),
+                 "[V] Ro%s" % (int(var_teams_to_break),))
+            )
+        var_teams_to_break /= 2
+
+    while nov_teams_to_break > 1:
+        if Outround.objects.filter(type_of_round=BreakingTeam.NOVICE,
+                                   num_teams=nov_teams_to_break).exists():
+            outround_options.append(
+                (reverse("outround_pairing_view", kwargs={
+                    "type_of_round": BreakingTeam.NOVICE,
+                    "num_teams": int(nov_teams_to_break)}),
+                 "[N] Ro%s" % (int(nov_teams_to_break),))
+            )
+        nov_teams_to_break /= 2
+
+    return outround_options
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
         backup.backup_round("before_the_break_%s" % (timezone.now().strftime("%H:%M"),))
 
-        teams, nov_teams = cache_logic.cache_fxn_key(
-            get_team_rankings,
-            "team_rankings",
-            request
-        )
+        success, msg = outround_tab_logic.perform_the_break()
 
-        nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-        var_teams_to_break = TabSettings.get("var_teams_to_break")
-
-        if not nov_teams_to_break or not var_teams_to_break:
-            return redirect_and_flash_error(request,
-                                            "Please check your break tab settings",
-                                            path="/")
-
-        # This forces a refresh of the breaking teams
-        Outround.objects.all().delete()
-        BreakingTeam.objects.all().delete()
-
-        current_seed = 1
-        for team in teams:
-            if current_seed > var_teams_to_break:
-                break
-
-            BreakingTeam.objects.create(team=team[0],
-                                        seed=current_seed,
-                                        effective_seed=current_seed,
-                                        type_of_team=BreakingTeam.VARSITY)
-            current_seed += 1
-
-        current_seed = 1
-        for nov_team in nov_teams:
-            if current_seed > nov_teams_to_break:
-                break
-
-            if BreakingTeam.objects.filter(team=nov_team[0]).exists():
-                continue
-
-            BreakingTeam.objects.create(team=nov_team[0],
-                                        seed=current_seed,
-                                        effective_seed=current_seed,
-                                        type_of_team=BreakingTeam.NOVICE)
-
-            current_seed += 1
-
-        outround_tab_logic.pair(BreakingTeam.VARSITY)
-        outround_tab_logic.pair(BreakingTeam.NOVICE)
-
-        return redirect_and_flash_success(
-            request, "Success!", path="/outround_pairing"
+        if success:
+            return redirect_and_flash_success(
+                request, msg, path="/outround_pairing"
+            )
+        return redirect_and_flash_error(
+            request, msg, path="/"
         )
 
     # See if we can pair the round
@@ -211,8 +203,6 @@ def outround_pairing_view(request,
 
     label = "[%s] Ro%s" % ("V" if type_of_round == BreakingTeam.VARSITY else "N",
                            num_teams)
-    outround_options = []
-
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
@@ -221,33 +211,8 @@ def outround_pairing_view(request,
                                         "Please check your break tab settings",
                                         path="/")
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
-        var_teams_to_break += 1
-
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
-        nov_teams_to_break += 1
-
-    while var_teams_to_break > 1:
-        if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
-                                   num_teams=var_teams_to_break).exists():
-            outround_options.append(
-                (reverse("outround_pairing_view", kwargs={
-                    "type_of_round": BreakingTeam.VARSITY,
-                    "num_teams": int(var_teams_to_break)}),
-                 "[V] Ro%s" % (int(var_teams_to_break),))
-            )
-        var_teams_to_break /= 2
-
-    while nov_teams_to_break > 1:
-        if Outround.objects.filter(type_of_round=BreakingTeam.NOVICE,
-                                   num_teams=nov_teams_to_break).exists():
-            outround_options.append(
-                (reverse("outround_pairing_view", kwargs={
-                    "type_of_round": BreakingTeam.NOVICE,
-                    "num_teams": int(nov_teams_to_break)}),
-                 "[N] Ro%s" % (int(nov_teams_to_break),))
-            )
-        nov_teams_to_break /= 2
+    outround_options = get_outround_options(var_teams_to_break,
+                                            nov_teams_to_break)
 
     outrounds = Outround.objects.filter(type_of_round=type_of_round,
                                         num_teams=num_teams).all()

@@ -261,6 +261,7 @@ def room_check_in(request, room_id, round_number):
     room_id, round_number = int(room_id), int(round_number)
 
     if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
+        # 0 is so that outrounds don't throw an error
         raise Http404("Round does not exist")
 
     room = get_object_or_404(Room, pk=room_id)

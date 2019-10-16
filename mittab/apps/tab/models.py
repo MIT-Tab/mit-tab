@@ -143,6 +143,16 @@ class Team(ModelWithTiebreaker):
                                  null=True,
                                  unique=True)
 
+    VARSITY = 0
+    NOVICE = 1
+    BREAK_PREFERENCE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+
+    break_preference = models.IntegerField(default=0,
+                                           choices=BREAK_PREFERENCE_CHOICES)
+
     def set_unique_team_code(self):
         haikunator = Haikunator()
 
