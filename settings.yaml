@@ -40,3 +40,7 @@
   name: var_to_nov
   description: "The quotient of the number of teams in the varsity outround and the number of teams in the novice outround that are happening concurrently.  ie, if varsity octofinals (16 teams) were happening at the same time as novice semifinals (4 teams), this value would be 4.  This is to prevent judges / rooms from being paired in to outrounds occuring at the same time"
   value: 2
+- gov_opp_display:
+  name: gov_opp_display
+  description: "A toggle to switch the outrounds view from displaying Gov and Opp (when value is 1) and Team 1 and Team 2 (when value is 2)"
+  value: 0

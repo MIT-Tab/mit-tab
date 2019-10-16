@@ -486,6 +486,8 @@ def enter_result(request,
 
 
 def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
+    gov_opp_display = TabSettings.get("gov_opp_display", 0)
+    
     round_number = 256
 
     if type_of_round == BreakingTeam.VARSITY:

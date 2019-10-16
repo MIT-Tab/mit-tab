@@ -60,9 +60,9 @@
           <table class="pairings_table">
               <tr>
               <th>
-                  Government
+                  {% if gov_opp_display %}Government{% else %}Team 1{% endif %}
               </th> <th>
-                  Opposition
+                  {% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}
               </th> <th>
                   Judge
               </th> <th>
