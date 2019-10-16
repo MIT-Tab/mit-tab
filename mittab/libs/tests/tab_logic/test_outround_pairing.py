@@ -22,7 +22,7 @@ class TestOutroundPairingLogic(TestCase):
 
         outround_tab_logic.perform_the_break()
 
-    def test_pairing(self, round_number, last):
+    def test_pairing(self):
         self.generate_checkins()
 
         outround_tab_logic.perform_the_break()
