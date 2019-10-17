@@ -1,7 +1,7 @@
 from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
-from . import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 
 
 def lost_teams():

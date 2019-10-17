@@ -4,13 +4,12 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
+from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 from mittab.libs.tab_logic import have_properly_entered_data
 from mittab.libs import errors
 import mittab.libs.cache_logic as cache_logic
 
 from mittab.apps.tab.team_views import get_team_rankings
-
-from . import offset_to_quotient
 
 
 def perform_the_break():
