@@ -15,6 +15,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
+from outround_tab_logic import offset_to_quotient
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
 
@@ -223,6 +224,9 @@ def outround_pairing_view(request,
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
+
+    var_to_nov = offset_to_quotient(var_to_nov)
+
     other_round_num = num_teams / var_to_nov
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * var_to_nov
@@ -322,6 +326,9 @@ def alternative_judges(request, round_id, judge_id=None):
         current_judge_name = "No judge"
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
+
+    var_to_nov = offset_to_quotient(var_to_nov)
+
     other_round_num = round_obj.num_teams / var_to_nov
     if round_obj.type_of_round == BreakingTeam.NOVICE:
         other_round_num = round_obj.num_teams * var_to_nov

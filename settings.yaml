@@ -38,7 +38,7 @@
   value: 3
 - var_to_nov:
   name: var_to_nov
-  description: "The quotient of the number of teams in the varsity outround and the number of teams in the novice outround that are happening concurrently.  ie, if varsity octofinals (16 teams) were happening at the same time as novice semifinals (4 teams), this value would be 4.  This is to prevent judges / rooms from being paired in to outrounds occuring at the same time"
+  description: "The offset of the novice break to the varsity break.  If novice semis happen when varsity quarters happen, the offset should be 1.  If novice semis happen when varsity octofinals happen, the offset should be 2."
   value: 2
 - gov_opp_display:
   name: gov_opp_display

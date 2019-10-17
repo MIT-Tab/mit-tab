@@ -10,6 +10,8 @@ import mittab.libs.cache_logic as cache_logic
 
 from mittab.apps.tab.team_views import get_team_rankings
 
+from . import offset_to_quotient
+
 
 def perform_the_break():
     teams, nov_teams = cache_logic.cache_fxn_key(
@@ -85,6 +87,8 @@ def get_next_available_room(num_teams, type_of_break):
                                             type_of_round=type_of_break)
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
+
+    var_to_nov = offset_to_quotient(var_to_nov)    
 
     other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
 
