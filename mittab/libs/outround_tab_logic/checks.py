@@ -32,7 +32,7 @@ def have_enough_judges_type(type_of_round):
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
 
-    var_to_nov = offset_to_quotient(var_to_nov)    
+    var_to_nov = offset_to_quotient(var_to_nov)
 
     num_teams = teams_count
 
@@ -81,7 +81,7 @@ def have_enough_rooms_type(type_of_round):
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
 
-    var_to_nov = offset_to_quotient(var_to_nov)    
+    var_to_nov = offset_to_quotient(var_to_nov)
 
     other_round_num = num_teams / var_to_nov
     if type_of_round == BreakingTeam.NOVICE:
