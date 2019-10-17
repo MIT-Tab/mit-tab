@@ -274,7 +274,8 @@ class Judge(models.Model):
         return self.name
 
     def affiliations_display(self):
-        return ", ".join([school.name for school in self.schools.all() if not school.name == ""])
+        return ", ".join([school.name for school in self.schools.all() \
+                          if not school.name == ""])
 
     def delete(self, using=None, keep_parents=False):
         checkins = CheckIn.objects.filter(judge=self)
