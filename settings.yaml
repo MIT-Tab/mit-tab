@@ -1,9 +1,9 @@
-- teams_public:
+- public_teams:
   name: public_teams
   description: "Check this box to make the team list publicly visible"
   value: false
   type: boolean
-- judges_public:
+- public_judges:
   name: public_judges
   description: "Check this box to make the judges list publicly visible"
   value: false

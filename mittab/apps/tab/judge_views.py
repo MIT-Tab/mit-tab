@@ -12,7 +12,7 @@ from mittab.libs.tab_logic import TabFlags
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
-    if not display_judges:
+    if not request.user.is_authenticated and not display_judges:
         return redirect_and_flash_error(request, "This view is not public", path="/")
 
     num_rounds = TabSettings.get("tot_rounds", 5)

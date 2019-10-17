@@ -16,7 +16,7 @@ from mittab.libs.tab_logic import rankings
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
-    if not display_teams:
+    if not request.user.is_authenticated and not display_teams:
         return redirect_and_flash_error(request, "This view is not public", path="/")
 
     return render(
