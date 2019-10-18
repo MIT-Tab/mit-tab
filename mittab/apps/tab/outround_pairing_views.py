@@ -1,7 +1,7 @@
 import random
 import math
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q
@@ -184,6 +184,8 @@ def break_teams(request):
 def outround_pairing_view(request,
                           type_of_round=BreakingTeam.VARSITY,
                           num_teams=None):
+
+    choice = TabSettings.get("choice", 0)
 
     if num_teams is None:
         num_teams = TabSettings.get("var_teams_to_break", 8)
@@ -561,6 +563,7 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     printable = printable
 
     sidelock = TabSettings.get("sidelock", 0)
+    choice = TabSettings.get("choice", 0)
 
     return render(request, "outrounds/pretty_pairing.html", locals())
 
@@ -590,6 +593,22 @@ def toggle_pairing_released(request, type_of_round, num_teams):
     data = {"success": True, "pairing_released": not old == num_teams}
     return JsonResponse(data)
 
+
+def update_choice(request, outround_id):
+    outround = get_object_or_404(Outround, pk=outround_id)
+
+    outround.choice += 1
+
+    if outround.choice == 3:
+        outround.choice = 0
+
+    outround.save()
+    data = {"success": True,
+            "data": "%s choice" % (
+                outround.get_choice_display(),
+            )}
+
+    return JsonResponse(data)
 
 def forum_view(request, type_of_round):
     outrounds = Outround.objects.exclude(

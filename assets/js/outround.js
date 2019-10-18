@@ -2,6 +2,20 @@ import $ from "jquery";
 
 import quickSearchInit from "./quickSearch";
 
+function cycleChoice(event) {
+  event.preventDefault();
+  var button = $(this);
+  console.log(button);
+  
+  const outroundId = button.data("outround-id");
+  $.ajax({
+    url: `/outround_choice/${outroundId}`,
+    success(result) {
+      button.html(result.data);
+    },
+  });
+}
+
 function populateTabCard(tabCardElement) {
   const teamId = tabCardElement.attr("team-id");
   $.ajax({
@@ -162,6 +176,9 @@ function togglePairingRelease(event) {
 $(document).ready(() => {
   $(".team.outround-tabcard").each((_, element) => {
     populateTabCard($(element));
+  });
+  $(".choice-update").each((_, element) => {
+    $(element).click(cycleChoice);
   });
   $(".outround-judge-toggle").click(populateAlternativeJudges);
   $(".outround-team-toggle").click(populateAlternativeTeams);

@@ -48,3 +48,7 @@
   name: sidelock
   description: "A toggle to indicate whether you are side-locking outrounds.  If 1, then the gov opps for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card, and bolded on the front-facing pairing display."
   value: 0
+- choice:
+  name: choice
+  description: "A toggle to indicate whether you would like to display who has choice, whether you would like this to be  be indicated on the pairing card, and bolded on the front-facing pairing display"
+  value: 0

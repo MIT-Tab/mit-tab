@@ -370,6 +370,14 @@ class Outround(models.Model):
 
     sidelock = models.BooleanField(default=False)
 
+    CHOICES = (
+        (UNKNOWN, "No"),
+        (GOV, "Gov"),
+        (OPP, "Opp")
+    )
+    choice = models.IntegerField(default=UNKNOWN,
+                                 choices=CHOICES)
+
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")

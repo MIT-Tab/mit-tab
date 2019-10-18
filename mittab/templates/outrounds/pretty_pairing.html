@@ -81,11 +81,18 @@
 		{% for pairing in outround.rounds %}
 		    
 		    <tr>
-			<td>{% if sidelock and pairing.sidelock %}<b>{% endif %}
-			    {{pairing.gov_team.display}}
+			<td>
 			    {% if sidelock and pairing.sidelock %}<b>{% endif %}
+			    {% if choice and pairing.choice == 1 %}<b>{% endif %}
+			    {{pairing.gov_team.display}}
+			    {% if choice and pairing.choice == 1 %}</b>{% endif %}
+			    {% if sidelock and pairing.sidelock %}</b>{% endif %}
 			</td>
-			<td>{{pairing.opp_team.display}}</td>
+			<td>
+			    {% if choice and pairing.choice == 2 %}<b>{% endif %}
+				{{pairing.opp_team.display}}
+			    {% if choice and pairing.choice == 2 %}</b>{% endif %}
+			</td>
 			<td>
 			    {% for judge in pairing.judges.all %}
 				{% if pairing.judges.all|length > 1 and judge == pairing.chair %}
@@ -117,8 +124,12 @@
         <div class="pairings_footer">
 	    {% if sidelock %}
 		<span class="left">
-		    * Bold indicates the government team, due to sidelock.
+		    * Bold indicates sidelock.
 		</span>
+	    {% endif %}
+	    {% if choice %}
+		<span class="left">
+		    * Bold indicates choice.
 	    {% endif %}
 	    <span class="right">
 		<label for="autoscroll">

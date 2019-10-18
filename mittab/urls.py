@@ -213,6 +213,9 @@ urlpatterns = [
     path("outround_result/<int:type_of_round>",
          outround_pairing_views.forum_view,
          name="forum_view"),
+    path("outround_choice/<int:outround_id>",
+         outround_pairing_views.update_choice,
+         name="update_choice"),
 
     # Settings related
     url(r"^settings_form",
