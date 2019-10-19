@@ -5,7 +5,10 @@ from mittab.apps.tab.models import *
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
-from mittab.libs.tab_logic import have_properly_entered_data
+from mittab.libs.tab_logic import (
+    have_properly_entered_data,
+    add_scratches_for_school_affil
+)
 from mittab.libs import errors
 import mittab.libs.cache_logic as cache_logic
 
@@ -122,6 +125,8 @@ def gov_team(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
+    add_scratches_for_school_affil()
+
     lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
 
     base_queryset = BreakingTeam.objects.filter(
