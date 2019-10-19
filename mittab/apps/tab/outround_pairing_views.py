@@ -16,7 +16,6 @@ from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 from mittab.libs.outround_tab_logic import offset_to_quotient
-import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
 
 

@@ -3,16 +3,15 @@ import $ from "jquery";
 import quickSearchInit from "./quickSearch";
 
 function cycleChoice(event) {
+  const button = $(this);
   event.preventDefault();
-  var button = $(this);
-  console.log(button);
-  
+
   const outroundId = button.data("outround-id");
   $.ajax({
     url: `/outround_choice/${outroundId}`,
     success(result) {
       button.html(result.data);
-    },
+    }
   });
 }
 
