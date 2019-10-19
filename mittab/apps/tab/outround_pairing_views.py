@@ -362,12 +362,15 @@ def alternative_judges(request, round_id, judge_id=None):
                                    .filter(checkin__round_number=0) \
                                    .distinct()
 
+    def can_judge(judge, team1, team2):
+        query = Q(judge=judge, team=team1) | Q(judge=judge, team=team2)
+        return not Scratch.objects.filter(query).exists()
+
     excluded_judges = [(j.name, j.id, float(j.rank))
-                       for j in assign_judges.can_judge_teams(
-                           excluded_judges, round_gov, round_opp)]
+                       for j in excluded_judges if can_judge(j, round_gov, round_opp)]
     included_judges = [(j.name, j.id, float(j.rank))
-                       for j in assign_judges.can_judge_teams(
-                           included_judges, round_gov, round_opp)]
+                       for j in included_judges if can_judge(j, round_gov, round_opp)]
+
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
