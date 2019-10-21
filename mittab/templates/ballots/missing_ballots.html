@@ -11,6 +11,7 @@
     <h2 class="text-center">Missing Ballots</h2>
     <p class="lead text-center">This list will refresh every 30 seconds</p>
     <ul class="missing-rounds list-group list-group-flush">
+    <h3 class="text-center">Missing: {{ rounds|length }}</h1>
     {% for r in rounds %}
     <li class="missing-round-item list-group-item text-lg">
       <h5>
