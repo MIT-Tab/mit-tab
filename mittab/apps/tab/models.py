@@ -237,6 +237,8 @@ class Judge(models.Model):
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
 
+        self.update_scratches()
+
     def is_checked_in_for_round(self, round_number):
         return CheckIn.objects.filter(judge=self,
                                       round_number=round_number).exists()
@@ -256,15 +258,33 @@ class Judge(models.Model):
     class Meta:
         ordering = ["name"]
 
+    def update_scratches(self):
+        all_teams = Team.objects.all()
+
+        Scratch.objects.filter(scratch_type=Scratch.SCHOOL_SCRATCH,
+                               judge=self).all().delete()
+
+        for team in all_teams:
+            judge_schools = self.schools.all()
+
+            if team.school in judge_schools or \
+               team.hybrid_school in judge_schools:
+                if not Scratch.objects.filter(judge=self, team=team).exists():
+                    Scratch.objects.create(judge=self,
+                                           team=team,
+                                           scratch_type=Scratch.SCHOOL_SCRATCH)
+
 
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
     team = models.ForeignKey(Team, on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
+    SCHOOL_SCRATCH = 2
     TYPE_CHOICES = (
         (TEAM_SCRATCH, "Discretionary Scratch"),
         (TAB_SCRATCH, "Tab Scratch"),
+        (SCHOOL_SCRATCH, "School Scratch"),
     )
     scratch_type = models.IntegerField(choices=TYPE_CHOICES)
 
@@ -273,7 +293,7 @@ class Scratch(models.Model):
         verbose_name_plural = "scratches"
 
     def __str__(self):
-        s_type = ("Team", "Tab")[self.scratch_type]
+        s_type = ("Team", "Tab", "School")[self.scratch_type]
         return "{} <={}=> {}".format(self.team, s_type, self.judge)
 
 
