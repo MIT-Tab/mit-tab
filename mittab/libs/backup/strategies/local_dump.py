@@ -1,6 +1,7 @@
 import os
 from io import StringIO
 from shutil import copyfileobj
+from wsgiref.util import FileWrapper
 
 from django.core.management import call_command
 
@@ -24,6 +25,11 @@ class LocalDump:
         def key_from_filename(name):
             return name[:-len(SUFFIX)]
         return [ cls(key_from_filename(name)) for name in all_names ]
+
+    def downloadable(self):
+        # TODO: Implement
+        src_filename = get_backup_filename(self._get_backup_filename())
+        return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 
     def backup(self):
         out = StringIO()
