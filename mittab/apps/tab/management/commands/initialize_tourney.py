@@ -47,6 +47,7 @@ class Command(BaseCommand):
             "Copying current tournament state to backup tournament directory: %s"
             % tournament_dir)
         try:
+            # TODO: Fix
             shutil.copy(path + "/pairing_db.sqlite3", tournament_dir)
             shutil.rmtree(tournament_dir + "/backups", ignore_errors=True)
             shutil.copytree(path + "/backups", tournament_dir + "/backups")
