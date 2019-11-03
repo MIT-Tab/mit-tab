@@ -9,6 +9,7 @@ jobs:
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
+          MYSQL_HOST: localhost
 
     parallelism: 4
 
