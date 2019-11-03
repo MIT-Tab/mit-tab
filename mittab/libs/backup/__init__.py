@@ -13,7 +13,7 @@ from mittab.libs.backup.strategies.local_dump import LocalDump
 
 def backup_round(dst_filename=None, round_number=None, btime=None):
     if round_number is None:
-        round_number = TabSettings.get("cur_round")
+        round_number = TabSettings.get("cur_round", "no-round-number")
 
     if btime is None:
         btime = int(time.time())
