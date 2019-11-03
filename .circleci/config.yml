@@ -5,7 +5,7 @@ jobs:
   build:
     docker:
       - image: circleci/python:3.7.3-node-browsers
-      - image: circleci/mysql:5.7
+      - image: circleci/mysql:5.7.27
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
