@@ -117,6 +117,7 @@ class GetCsrfThread(Thread):
         self.host = host
         self.ballot_code = ballot_code
         self.round_obj = round_obj
+        self.result = (None, None)
 
     def run(self):
         resp = self.get_resp()
