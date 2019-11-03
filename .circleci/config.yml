@@ -5,12 +5,13 @@ jobs:
   build:
     docker:
       - image: circleci/python:3.7.3-node-browsers
-      - image: circleci/mysql:5.7.27
+      - image: circleci/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
           MYSQL_USER: root
           MYSQL_PASSWORD: secret
+          MYSQL_HOST: localhost
 
     parallelism: 4
 
