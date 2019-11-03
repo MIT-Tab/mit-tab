@@ -27,8 +27,7 @@ class LocalDump:
         return [ cls(key_from_filename(name)) for name in all_names ]
 
     def downloadable(self):
-        # TODO: Implement
-        src_filename = get_backup_filename(self._get_backup_filename())
+        src_filename = self._get_backup_filename()
         return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 
     def backup(self):
