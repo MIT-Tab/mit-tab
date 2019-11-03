@@ -9,7 +9,6 @@ jobs:
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
-          MYSQL_USER: root
           MYSQL_PASSWORD: secret
           MYSQL_ROOT_HOST: '%'
 
