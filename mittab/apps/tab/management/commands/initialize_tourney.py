@@ -7,8 +7,9 @@ from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from mittab.libs.backup import BACKUP_PREFIX
 from mittab.apps.tab.models import TabSettings
+from mittab.libs.backup import backup_round
+from mittab.libs.backup.strategies.local_dump import BACKUP_PREFIX
 
 
 class Command(BaseCommand):
@@ -46,9 +47,8 @@ class Command(BaseCommand):
         self.stdout.write(
             "Copying current tournament state to backup tournament directory: %s"
             % tournament_dir)
+        backup_round("before_new_tournament")
         try:
-            # TODO: Fix
-            shutil.copy(path + "/pairing_db.sqlite3", tournament_dir)
             shutil.rmtree(tournament_dir + "/backups", ignore_errors=True)
             shutil.copytree(path + "/backups", tournament_dir + "/backups")
         except (IOError, os.error) as why:
