@@ -24,7 +24,15 @@ class LocalDump:
         all_names = os.listdir(BACKUP_PATH)
         def key_from_filename(name):
             return name[:-len(SUFFIX)]
-        return [ cls(key_from_filename(name)) for name in all_names ]
+        return [cls(key_from_filename(name)) for name in all_names]
+
+    @classmethod
+    def from_upload(cls, key, upload):
+        dst_filename = os.path.join(BACKUP_PATH, key + SUFFIX)
+        with open(dst_filename, "wb+") as destination:
+            for chunk in upload.chunks():
+                destination.write(chunk)
+        return cls(key)
 
     def downloadable(self):
         src_filename = self._get_backup_filename()
@@ -33,7 +41,7 @@ class LocalDump:
     def backup(self):
         out = StringIO()
         call_command("dumpdata", stdout=out)
-        with open(self._get_backup_filename(), 'w') as f:
+        with open(self._get_backup_filename(), "w") as f:
             out.seek(0)
             copyfileobj(out, f)
 
