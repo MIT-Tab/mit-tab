@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo 'HELLLOOOOOO THIS PART RUNS'
 python manage.py migrate --noinput
 npm install
 ./node_modules/.bin/webpack --config webpack.config.js --mode production
