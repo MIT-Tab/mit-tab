@@ -10,7 +10,6 @@ jobs:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
           MYSQL_PASSWORD: secret
-          MYSQL_ROOT_HOST: '%'
 
     parallelism: 4
 
