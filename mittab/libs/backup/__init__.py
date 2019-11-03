@@ -11,11 +11,11 @@ from mittab.settings import BASE_DIR
 from mittab.libs.backup.strategies.local_dump import LocalDump
 
 
-def _generate_unique_key(s):
-    if LocalDump(s).exists():
-        return "%s_%s" % (s, int(time.time()))
+def _generate_unique_key(base):
+    if LocalDump(base).exists():
+        return "%s_%s" % (base, int(time.time()))
     else:
-        return s
+        return base
 
 def backup_round(dst_filename=None, round_number=None, btime=None):
     if round_number is None:
