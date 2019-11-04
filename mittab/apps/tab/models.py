@@ -138,7 +138,7 @@ class Team(ModelWithTiebreaker):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
-    team_code = models.CharField(max_length=256,
+    team_code = models.CharField(max_length=255,
                                  blank=True,
                                  null=True,
                                  unique=True)
@@ -211,7 +211,7 @@ class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
-    ballot_code = models.CharField(max_length=256,
+    ballot_code = models.CharField(max_length=255,
                                    blank=True,
                                    null=True,
                                    unique=True)
