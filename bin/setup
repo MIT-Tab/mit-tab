@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-mysqladmin ping -h $MITTAB_DB_HOST -u $MYSQL_USER --password=$MYSQL_PASSWORD --wait=30
+if [ -x "$(command -v mysqladmin)" ]; then
+  mysqladmin ping -h $MITTAB_DB_HOST -u $MYSQL_USER --password=$MYSQL_PASSWORD --wait=30
+fi
 python manage.py migrate --noinput
 npm install
 ./node_modules/.bin/webpack --config webpack.config.js --mode production
