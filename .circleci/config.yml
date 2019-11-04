@@ -31,7 +31,7 @@ jobs:
             python3 -m venv venv
             . venv/bin/activate
             pip install -r requirements.txt
-            sudo apt-get install mysqladmin
+            sudo apt-get install default-mysql-client
             npm install
 
       - save_cache:
