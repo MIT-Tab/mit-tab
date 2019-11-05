@@ -6,7 +6,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 
 LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
                    "/pairings/missing_ballots/", "/e_ballots/", "/404/",
-                   "/403/", "/500/", "/teams/", "/judges/")
+                   "/403/", "/500/", "/teams/", "/judges/", "/json")
 
 EBALLOT_REGEX = re.compile(r"/e_ballots/\S+")
 

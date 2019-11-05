@@ -4,6 +4,24 @@ from mittab.apps.tab.models import *
 from mittab.libs import tab_logic
 
 
+def get_num_rounds_debated(team):
+    num_rounds = team.gov_team.exclude(
+        victor=Round.OPP_VIA_FORFEIT
+    ).exclude(
+        victor=Round.ALL_DROP
+    ).count()
+
+    num_rounds += team.opp_team.exclude(
+        victor=Round.GOV_VIA_FORFEIT
+    ).exclude(
+        victor=Round.ALL_DROP
+    ).count()
+
+    num_rounds += Bye.objects.filter(bye_team=team).count()
+
+    return num_rounds
+
+
 def generate_json_dump():
     schools = [{
         'id': school.id,
@@ -14,10 +32,12 @@ def generate_json_dump():
         'id': team.id,
         'debaters': [{
             'id': debater.id,
-            'name': debater.name
+            'name': debater.name,
+            'status': debater.novice_status,
         } for debater in team.debaters.all()],
         'school_id': team.school.id,
         'hybrid_school_id': team.hybrid_school.id if team.hybrid_school else '',
+        'num_rounds': get_num_rounds_debated(team),
     } for team in Team.objects.all()]
 
     judges = [{
@@ -120,5 +140,7 @@ def generate_json_dump():
     to_return['novice_speaker_results'] = novice_speaker_rankings
     to_return['team_results'] = team_rankings
     to_return['novice_team_results'] = novice_team_rankings
+
+    to_return['num_rounds'] = TabSettings.get('tot_rounds')
 
     return to_return
