@@ -21,6 +21,24 @@ information**
 Currently the installation consists of downloading the code, installing
 requirements and then manually running the server.
 
+### Pre-Requisite: Install MySQL
+
+Instructions for this will vary by platform. On Mac OS X, it comes
+pre-installed.
+
+Otherwise, check [here](https://dev.mysql.com/doc/mysql/en/windows-installation.html) for Windows
+and [here](https://dev.mysql.com/doc/refman/8.0/en/linux-installation.html) for Linux
+
+Before running, you need to install MySQL and create a database called `mittab`
+
+The database login credentials can be configured through the following env vars:
+ * `MYSQL_USER` (default `root`)
+ * `MYSQL_PASSWORD` (default `""`, if you use the default make sure you allow empty root passwords in your mysql settings)
+ * `MITTAB_DB_HOST` (default `127.0.0.1`, you probably have no need to change this)
+ * `MITTAB_PORT` (default `3306`, the default mysql port)
+
+### Running the server
+
 ```
 git clone <mit-tab repo>
 cd mit-tab

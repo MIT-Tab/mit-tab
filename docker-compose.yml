@@ -12,11 +12,24 @@ services:
     volumes:
       - ./:/var/www/tab
     links:
-      - memcached:memcached
+      - mysql:mysql
     env_file:
       - .env
       - .env.secret
     command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000 -t 300
+
+  mysql:
+    image: mysql:5.7
+    restart: always
+    ports:
+      - "3306:3306"
+    expose:
+      - "3306"
+    volumes:
+      - my-db:/var/lib/mysql
+    env_file:
+      - .env
+      - .env.secret
 
   nginx:
     restart: always
@@ -31,8 +44,5 @@ services:
       - web
     links:
       - web:web
-
-  memcached:
-    image: memcached
-    ports:
-      - "11211:11211"
+volumes:
+  my-db:
