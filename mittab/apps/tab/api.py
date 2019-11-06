@@ -36,7 +36,7 @@ def generate_json_dump():
             'status': debater.novice_status,
         } for debater in team.debaters.all()],
         'school_id': team.school.id,
-        'hybrid_school_id': team.hybrid_school.id if team.hybrid_school else '',
+        'hybrid_school_id': team.hybrid_school.id if team.hybrid_school else -1,
         'num_rounds': get_num_rounds_debated(team),
     } for team in Team.objects.all()]
 
