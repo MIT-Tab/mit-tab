@@ -106,6 +106,8 @@ class ArchiveExporter:
                 "id": TEAM_ID_PREFIX + str(team.id),
                 "name": team.name
             })
+            if team.team_code is not None:
+                team_tag.set("code", team.team_code)
 
             institutions = SCHOOL_ID_PREFIX + str(team.school_id)
             if team.hybrid_school_id is not None:
