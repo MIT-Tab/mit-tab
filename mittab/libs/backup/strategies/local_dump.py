@@ -40,12 +40,14 @@ class LocalDump:
 
     def backup(self):
         out = StringIO()
-        call_command("dumpdata", stdout=out)
+        exclude = ["contenttypes", "auth.permission", "sessions.session"]
+        call_command("dumpdata", stdout=out, exclude=exclude, natural_foreign=True)
         with open(self._get_backup_filename(), "w") as f:
             out.seek(0)
             copyfileobj(out, f)
 
     def restore(self):
+        call_command("flush", interactive=False)
         return call_command("loaddata", self._get_backup_filename())
 
     def exists(self):
