@@ -7,6 +7,7 @@ import sys
 
 server_env = os.environ.copy()
 server_env["DEBUG"] = "1"
+server_env["MITTAB_DB_HOST"] = "127.0.0.1"
 
 webpack_args = ["./node_modules/.bin/webpack", "--config", "webpack.config.js", "--watch"]
 server_args = ["python", "manage.py", "runserver", "0.0.0.0:8001"]
