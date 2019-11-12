@@ -8,7 +8,8 @@ LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
                    "/pairings/missing_ballots/", "/e_ballots/", "/404/",
                    "/403/", "/500/", "/teams/", "/judges/",
                    "/outround_pairings/pairinglist/0/",
-                   "/outround_pairings/pairinglist/1/")
+                   "/outround_pairings/pairinglist/1/",
+                   "/json")
 
 EBALLOT_REGEX = re.compile(r"/e_ballots/\S+")
 

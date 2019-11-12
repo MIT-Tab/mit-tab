@@ -6,6 +6,7 @@ from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.api import generate_json_dump
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -403,6 +404,10 @@ def force_cache_refresh(request):
     return redirect_and_flash_success(request,
                                       "Refreshed!",
                                       path=redirect_to)
+
+
+def generate_dump(request):
+    return JsonResponse(generate_json_dump())
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
