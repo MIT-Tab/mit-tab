@@ -76,6 +76,8 @@ def generate_json_dump():
     ranked_teams = tab_logic.rankings.rank_teams()
     ranked_speakers = tab_logic.rank_speakers()
 
+    lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
+
     speaker_rankings = []
     team_rankings = []
 
@@ -104,26 +106,49 @@ def generate_json_dump():
 
         place += 1
 
+        
+    breaking_teams = [t.gov.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.gov]
+    breaking_teams += [t.opp.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.opp]
+
     place = 1
     for ranking in ranked_teams:
         team_rankings += [{
             'team': ranking.team.id,
-            'place': place
+            'place': place,
+            'lost_outrounds': lost_outrounds.count(ranking.team.id) if ranking.team.id in breaking_teams else 32
         }]
 
+        place += 1
+
+    team_rankings.sort(key=lambda ranking: (ranking['lost_outrounds'], ranking['place']))
+
+    place = 1
+    for r in team_rankings:
+        r['place'] = place
         place += 1
 
     ranked_teams = list(filter(
         lambda ts: all(
             map(lambda debater: debater.novice_status == Debater.NOVICE, ts.team.debaters.all())), ranked_teams))
 
+    breaking_teams = [t.gov.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.gov]
+    breaking_teams += [t.opp.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.opp]
+    
     place = 1
     for ranking in ranked_teams:
         novice_team_rankings += [{
             'team': ranking.team.id,
-            'place': place
+            'place': place,
+            'lost_outrounds': lost_outrounds.count(ranking.team.id) if ranking.team.id in breaking_teams else 32            
         }]
 
+        place += 1
+
+    novice_team_rankings.sort(key=lambda ranking: (ranking['lost_outrounds'], ranking['place']))
+
+    place = 1
+    for r in novice_team_rankings:
+        r['place'] = place
         place += 1
 
     to_return = {}
