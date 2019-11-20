@@ -76,7 +76,7 @@ def generate_json_dump():
     ranked_teams = tab_logic.rankings.rank_teams()
     ranked_speakers = tab_logic.rank_speakers()
 
-    lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
+    lost_outrounds = [t.winner.id for t in Outround.objects.all() if t.winner]
 
     speaker_rankings = []
     team_rankings = []
@@ -106,16 +106,12 @@ def generate_json_dump():
 
         place += 1
 
-        
-    breaking_teams = [t.gov_team.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.gov_team]
-    breaking_teams += [t.opp_team.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.opp_team]
-
     place = 1
     for ranking in ranked_teams:
         team_rankings += [{
             'team': ranking.team.id,
             'place': place,
-            'lost_outrounds': lost_outrounds.count(ranking.team.id) if ranking.team.id in breaking_teams else 32
+            'won_outrounds': won_outrounds.count(ranking.team.id)
         }]
 
         place += 1
@@ -131,15 +127,12 @@ def generate_json_dump():
         lambda ts: all(
             map(lambda debater: debater.novice_status == Debater.NOVICE, ts.team.debaters.all())), ranked_teams))
 
-    breaking_teams = [t.gov_team.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.gov_team]
-    breaking_teams += [t.opp_team.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.opp_team]
-    
     place = 1
     for ranking in ranked_teams:
         novice_team_rankings += [{
             'team': ranking.team.id,
             'place': place,
-            'lost_outrounds': lost_outrounds.count(ranking.team.id) if ranking.team.id in breaking_teams else 32            
+            'won_outrounds': won_outrounds.count(ranking.team.id)
         }]
 
         place += 1
