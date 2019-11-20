@@ -107,8 +107,8 @@ def generate_json_dump():
         place += 1
 
         
-    breaking_teams = [t.gov.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.gov]
-    breaking_teams += [t.opp.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.opp]
+    breaking_teams = [t.gov_team.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.gov_team]
+    breaking_teams += [t.opp_team.id for t in Outround.objects.filter(type_of_round=Debater.VARSITY).all() if t.opp_team]
 
     place = 1
     for ranking in ranked_teams:
@@ -131,8 +131,8 @@ def generate_json_dump():
         lambda ts: all(
             map(lambda debater: debater.novice_status == Debater.NOVICE, ts.team.debaters.all())), ranked_teams))
 
-    breaking_teams = [t.gov.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.gov]
-    breaking_teams += [t.opp.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.opp]
+    breaking_teams = [t.gov_team.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.gov_team]
+    breaking_teams += [t.opp_team.id for t in Outround.objects.filter(type_of_round=Debater.NOVICE).all() if t.opp_team]
     
     place = 1
     for ranking in ranked_teams:
