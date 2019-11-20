@@ -39,13 +39,12 @@ WSGI_APPLICATION = "mittab.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, 'mittab', 'pairing_db.sqlite3'),
-        #"NAME": "mittab",
-        #"USER": os.environ.get("MYSQL_USER", "root"),
-        #"PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        #"HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
-        #"PORT": os.environ.get("MYSQL_PORT", "3306"),
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "mittab",
+        "USER": os.environ.get("MYSQL_USER", "root"),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("MYSQL_PORT", "3306"),
         "ATOMIC_REQUESTS": True,
     }
 }
