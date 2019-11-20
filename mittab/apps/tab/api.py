@@ -111,7 +111,7 @@ def generate_json_dump():
         team_rankings += [{
             'team': ranking.team.id,
             'place': place,
-            'won_outrounds': won_outrounds.count(ranking.team.id)
+            'won_outrounds': 32 - won_outrounds.count(ranking.team.id)
         }]
 
         place += 1
@@ -132,7 +132,7 @@ def generate_json_dump():
         novice_team_rankings += [{
             'team': ranking.team.id,
             'place': place,
-            'won_outrounds': won_outrounds.count(ranking.team.id)
+            'won_outrounds': 32 - won_outrounds.count(ranking.team.id)
         }]
 
         place += 1
