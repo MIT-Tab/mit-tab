@@ -76,7 +76,7 @@ def generate_json_dump():
     ranked_teams = tab_logic.rankings.rank_teams()
     ranked_speakers = tab_logic.rank_speakers()
 
-    lost_outrounds = [t.winner.id for t in Outround.objects.all() if t.winner]
+    won_outrounds = [t.winner.id for t in Outround.objects.all() if t.winner]
 
     speaker_rankings = []
     team_rankings = []
@@ -116,7 +116,7 @@ def generate_json_dump():
 
         place += 1
 
-    team_rankings.sort(key=lambda ranking: (ranking['lost_outrounds'], ranking['place']))
+    team_rankings.sort(key=lambda ranking: (ranking['won_outrounds'], ranking['place']))
 
     place = 1
     for r in team_rankings:
@@ -137,7 +137,7 @@ def generate_json_dump():
 
         place += 1
 
-    novice_team_rankings.sort(key=lambda ranking: (ranking['lost_outrounds'], ranking['place']))
+    novice_team_rankings.sort(key=lambda ranking: (ranking['won_outrounds'], ranking['place']))
 
     place = 1
     for r in novice_team_rankings:
