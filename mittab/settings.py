@@ -41,6 +41,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "mittab",
+        "OPTIONS": {"charset": "utf8mb4"},
         "USER": os.environ.get("MYSQL_USER", "root"),
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
         "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
