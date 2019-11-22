@@ -31,8 +31,6 @@ MIDDLEWARE = (
     "mittab.apps.tab.middleware.Login",
 )
 
-ATOMIC_REQUESTS = True
-
 ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
@@ -46,7 +44,6 @@ DATABASES = {
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
         "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
         "PORT": os.environ.get("MYSQL_PORT", "3306"),
-        "ATOMIC_REQUESTS": True,
     }
 }
 
