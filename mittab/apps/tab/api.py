@@ -156,8 +156,8 @@ def generate_json_dump():
 
     to_return['speaker_results'] = speaker_rankings
     to_return['novice_speaker_results'] = novice_speaker_rankings
-    to_return['team_results'] = team_rankings
-    to_return['novice_team_results'] = novice_team_rankings
+    to_return['team_results'] = team_rankings if Outround.objects.count() > 0 else []
+    to_return['novice_team_results'] = novice_team_rankings if Outround.objects.count() > 0 else []
 
     to_return['num_rounds'] = TabSettings.get('tot_rounds')
 
