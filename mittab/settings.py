@@ -22,6 +22,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "webpack_loader", "bootstrap4", "polymorphic")
 
 MIDDLEWARE = (
+    "mittab.apps.tab.middleware.FailoverDuringBackup",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
