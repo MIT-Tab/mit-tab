@@ -1,19 +1,25 @@
 import os
-from io import StringIO
-from shutil import copyfileobj
+import subprocess
 from wsgiref.util import FileWrapper
 
 from django.core.management import call_command
 
-from mittab.settings import BASE_DIR
+from mittab import settings
 
 
-BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
+BACKUP_PREFIX = os.path.join(settings.BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
-SUFFIX = ".dump.json"
+SUFFIX = ".dump.sql"
 
 if not os.path.exists(BACKUP_PATH):
     os.makedirs(BACKUP_PATH)
+
+DB_SETTINGS = settings.DATABASES["default"]
+DB_HOST = DB_SETTINGS["HOST"]
+DB_NAME = DB_SETTINGS["NAME"]
+DB_USER = DB_SETTINGS["USER"]
+DB_PASS = DB_SETTINGS["PASSWORD"]
+DB_PORT = DB_SETTINGS["PORT"]
 
 class LocalDump:
     def __init__(self, key):
@@ -39,16 +45,11 @@ class LocalDump:
         return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 
     def backup(self):
-        out = StringIO()
-        exclude = ["contenttypes", "auth.permission", "sessions.session"]
-        call_command("dumpdata", stdout=out, exclude=exclude, natural_foreign=True)
-        with open(self._get_backup_filename(), "w") as f:
-            out.seek(0)
-            copyfileobj(out, f)
+        subprocess.check_call(self._dump_cmd())
 
     def restore(self):
-        call_command("flush", interactive=False)
-        return call_command("loaddata", self._get_backup_filename())
+        # TODO
+        pass
 
     def exists(self):
         return os.path.exists(self._get_backup_filename())
@@ -56,5 +57,23 @@ class LocalDump:
     def _get_backup_filename(self):
         key = self.key
         if len(key) < len(SUFFIX) or not key.endswith(SUFFIX):
-            key += ".dump.json"
+            key += SUFFIX
         return os.path.join(BACKUP_PATH, key)
+
+    def _dump_cmd(self):
+        cmd = [
+            "mysqldump",
+            DB_NAME,
+            "--quick",
+            "--lock-all-tables",
+            "--port={}".format(DB_PORT),
+            "--host={}".format(DB_HOST),
+            "--user={}".format(DB_USER),
+            "--result-file={}".format(self._get_backup_filename()),
+        ]
+
+        if DB_PASS:
+            cmd.append("--password={}".format(DB_PASS))
+
+        print("CMD: {}".format(" ".join(cmd)))
+        return cmd
