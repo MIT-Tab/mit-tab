@@ -1,19 +1,25 @@
 import os
-from io import StringIO
-from shutil import copyfileobj
+import time
+import subprocess
 from wsgiref.util import FileWrapper
 
-from django.core.management import call_command
-
-from mittab.settings import BASE_DIR
+from mittab import settings
 
 
-BACKUP_PREFIX = os.path.join(BASE_DIR, "mittab")
+BACKUP_PREFIX = os.path.join(settings.BASE_DIR, "mittab")
 BACKUP_PATH = os.path.join(BACKUP_PREFIX, "backups")
-SUFFIX = ".dump.json"
+SUFFIX = ".dump.sql"
 
 if not os.path.exists(BACKUP_PATH):
     os.makedirs(BACKUP_PATH)
+
+DB_SETTINGS = settings.DATABASES["default"]
+DB_HOST = DB_SETTINGS["HOST"]
+DB_NAME = DB_SETTINGS["NAME"]
+DB_USER = DB_SETTINGS["USER"]
+DB_PASS = DB_SETTINGS["PASSWORD"]
+DB_PORT = DB_SETTINGS["PORT"]
+
 
 class LocalDump:
     def __init__(self, key):
@@ -39,16 +45,25 @@ class LocalDump:
         return FileWrapper(open(src_filename, "rb")), os.path.getsize(src_filename)
 
     def backup(self):
-        out = StringIO()
-        exclude = ["contenttypes", "auth.permission", "sessions.session"]
-        call_command("dumpdata", stdout=out, exclude=exclude, natural_foreign=True)
-        with open(self._get_backup_filename(), "w") as f:
-            out.seek(0)
-            copyfileobj(out, f)
+        subprocess.check_call(self._dump_cmd(self._get_backup_filename()))
 
     def restore(self):
-        call_command("flush", interactive=False)
-        return call_command("loaddata", self._get_backup_filename())
+        tmp_filename = "backup_before_restore_%s%s" % (int(time.time()), SUFFIX)
+        tmp_full_path = os.path.join(BACKUP_PATH, tmp_filename)
+        try:
+            subprocess.check_call(self._dump_cmd(tmp_full_path))
+        except Exception as e:
+            os.remove(tmp_full_path)
+            raise e
+
+        try:
+            with open(self._get_backup_filename()) as stdin:
+                subprocess.check_call(self._restore_cmd(), stdin=stdin)
+            os.remove(tmp_full_path)
+        except Exception as e:
+            with open(tmp_full_path) as stdin:
+                subprocess.check_call(self._restore_cmd(), stdin=stdin)
+            raise e
 
     def exists(self):
         return os.path.exists(self._get_backup_filename())
@@ -56,5 +71,37 @@ class LocalDump:
     def _get_backup_filename(self):
         key = self.key
         if len(key) < len(SUFFIX) or not key.endswith(SUFFIX):
-            key += ".dump.json"
+            key += SUFFIX
         return os.path.join(BACKUP_PATH, key)
+
+    def _restore_cmd(self):
+        cmd = [
+            "mysql",
+            DB_NAME,
+            "--port={}".format(DB_PORT),
+            "--host={}".format(DB_HOST),
+            "--user={}".format(DB_USER),
+        ]
+
+        if DB_PASS:
+            cmd.append("--password={}".format(DB_PASS))
+
+        return cmd
+
+
+    def _dump_cmd(self, dst):
+        cmd = [
+            "mysqldump",
+            DB_NAME,
+            "--quick",
+            "--lock-all-tables",
+            "--port={}".format(DB_PORT),
+            "--host={}".format(DB_HOST),
+            "--user={}".format(DB_USER),
+            "--result-file={}".format(dst),
+        ]
+
+        if DB_PASS:
+            cmd.append("--password={}".format(DB_PASS))
+
+        return cmd
