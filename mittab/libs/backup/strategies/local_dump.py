@@ -48,12 +48,13 @@ class LocalDump:
         subprocess.check_call(self._dump_cmd(self._get_backup_filename()))
 
     def restore(self):
-        tmp_filename = "backup_before_restore_%s_%s" % (int(time.time()), SUFFIX)
+        tmp_filename = "backup_before_restore_%s%s" % (int(time.time()), SUFFIX)
         tmp_full_path = os.path.join(BACKUP_PATH, tmp_filename)
         try:
             subprocess.check_call(self._dump_cmd(tmp_full_path))
-        finally:
+        except Exception as e:
             os.remove(tmp_full_path)
+            raise e
 
         try:
             with open(self._get_backup_filename()) as stdin:
