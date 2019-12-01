@@ -4,9 +4,10 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/python:3.7.3-node-browsers
+      - image: benmusch/mittab-test:0.0.1
         environment:
           MYSQL_PASSWORD: secret
+          MITTAB_DB_HOST: 127.0.0.1
       - image: circleci/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
