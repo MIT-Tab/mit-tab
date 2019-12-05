@@ -22,6 +22,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "webpack_loader", "bootstrap4", "polymorphic")
 
 MIDDLEWARE = (
+    "mittab.apps.tab.middleware.FailoverDuringBackup",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -31,8 +32,6 @@ MIDDLEWARE = (
     "mittab.apps.tab.middleware.Login",
 )
 
-ATOMIC_REQUESTS = True
-
 ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
@@ -41,11 +40,11 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
         "NAME": "mittab",
+        "OPTIONS": {"charset": "utf8mb4"},
         "USER": os.environ.get("MYSQL_USER", "root"),
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
         "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
         "PORT": os.environ.get("MYSQL_PORT", "3306"),
-        "ATOMIC_REQUESTS": True,
     }
 }
 
