@@ -19,7 +19,8 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
-                  "webpack_loader", "bootstrap4", "polymorphic")
+                  "webpack_loader", "bootstrap4", "polymorphic", "rest_framework",
+                  "django_filters")
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",
@@ -36,6 +37,12 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': 'mydatabase',
+#    }
+#}
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
@@ -103,3 +110,7 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+}

@@ -1,0 +1,3 @@
+def clear_channels(guild):
+    for channel in guild.channels:
+        await channel.delete()

@@ -86,6 +86,10 @@ class Debater(ModelWithTiebreaker):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    discord_id = models.CharField(
+        max_length=128,
+        blank=True
+    )
 
     @property
     def num_teams(self):
@@ -215,6 +219,11 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+
+    discord_id = models.CharField(
+        max_length=128,
+        blank=True
+    )    
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()

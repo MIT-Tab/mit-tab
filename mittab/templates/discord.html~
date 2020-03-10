@@ -1,0 +1,7 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+    HI
+
+{% endblock %}

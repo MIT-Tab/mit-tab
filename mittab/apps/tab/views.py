@@ -5,6 +5,8 @@ from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
+from django.core import management
+
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
@@ -15,6 +17,10 @@ from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
         import_scratches
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, wait
+import importlib
 
 
 def index(request):
