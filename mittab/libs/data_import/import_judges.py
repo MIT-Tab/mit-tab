@@ -15,6 +15,7 @@ class JudgeImporter(WorkbookImporter):
     def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]
+        discord_id = row[2]
 
         try:
             judge_rank = round(float(judge_rank), 2)
@@ -22,7 +23,7 @@ class JudgeImporter(WorkbookImporter):
             self.error("Judge rank is not a number", row)
 
         schools = []
-        for school_name in row[2:]:
+        for school_name in row[3:]:
             school_query = School.objects.filter(name__iexact=school_name)
             if school_query.exists():
                 school = school_query.first()
@@ -34,7 +35,12 @@ class JudgeImporter(WorkbookImporter):
                     self.error("Invalid school '%s'" % school_name, row_number)
             schools.append(school.id)
 
-        data = {"name": judge_name, "rank": judge_rank, "schools": schools}
+        data = {
+            "name": judge_name,
+            "rank": judge_rank,
+            "schools": schools,
+            "discord_id": discord_id.replace(' ', '')
+        }
         form = JudgeForm(data=data)
         if form.is_valid():
             self.create(form)

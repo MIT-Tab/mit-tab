@@ -23,7 +23,14 @@ class RoomImporter(WorkbookImporter):
                 row_number)
             return
 
-        form = RoomForm(data={"name": room_name, "rank": room_rank})
+        form = RoomForm(
+            data={
+                "name": room_name,
+                "rank": room_rank,
+                "voice_channel_id": '',
+                "text_channel_id": '',
+            }
+        )
         if form.is_valid():
             self.create(form)
         else:
