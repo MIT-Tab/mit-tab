@@ -35,6 +35,8 @@
 {% url "add_scratch" as add_scratch %}
 {% url "settings_form" as settings_form %}
 
+{% url "discord" as discord %}
+
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container {% if not smaller_width %} w-95{% endif %}">
     <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{{ home }}">MIT-TAB</a>
@@ -100,6 +102,7 @@
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
+            <a class="dropdown-item {% active request discord %}" href="{{ discord }}">Discord Dashboard</a>
           </div>
         </li>
 	<li class="nav-item">

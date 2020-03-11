@@ -1,3 +1,5 @@
+import os
+
 from django.core.management.base import BaseCommand
 
 from django.conf import settings
@@ -103,6 +105,8 @@ class MyClient(discord.Client):
             overwrite=announcement_overwrite
         )
 
+        await announcement_channel.send('If any information looks wrong, please contact any user who is an ADMIN ASAP')
+
         staff_category = await guild.create_category('[TOURNAMENT ADMINISTRATION]')
 
         main_tab = await guild.create_voice_channel(
@@ -134,7 +138,12 @@ class MyClient(discord.Client):
                                                 max_uses=0)
     
     async def on_ready(self):
-        guild = await self.create_guild('testing_tournament')
+        guild = await self.create_guild(
+            os.environ.get("TOURNAMENT_NAME", 'testing-tournament'),
+            region=discord.VoiceRegion.us_east
+        )
+
+        TabSettings.set("guild_id", guild.id)
 
         for channel in guild.channels:
             await channel.delete()

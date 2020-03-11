@@ -2,13 +2,17 @@ from django.core.management.base import BaseCommand
 
 from django.conf import settings
 
+from mittab.apps.tab.models import TabSettings
+
 import discord
+
+import asyncio
 
 
 class MyClient(discord.Client):
     async def on_ready(self):
-        for guild in self.guilds:
-            await guild.delete()
+        guild = self.get_guild(TabSettings.get("guild_id"))
+        await guild.delete()
 
         await self.close()
 

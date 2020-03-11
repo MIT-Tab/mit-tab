@@ -188,7 +188,10 @@ urlpatterns = [
     url(r"^archive/download/$", views.generate_archive, name="download_archive"),
 
     # Cache related
-    url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh")
+    url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # Discord
+    url(r"^discord", views.discord, name="discord")
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

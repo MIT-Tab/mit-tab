@@ -13,7 +13,8 @@ from mittab.apps.tab.models import (
 
 
 ADMIN_USERS = [
-#    'Talos#5956'
+    'Talos#5956',
+    'pdvt#0397'
 ]
 
 
@@ -40,13 +41,17 @@ class MyClient(discord.Client):
                 print ('Found as JUDGE')
                 await member.add_roles(await self.get_role(guild, 'judges'))
 
+                await member.edit(nick=judge.name.upper())
+
             debater = Debater.objects.filter(discord_id=str(member)).first()
             if debater:
                 print ('Found as DEBATER')
                 await member.add_roles(await self.get_role(guild, 'debaters'))
 
+                await member.edit(nick=debater.name.upper())
+
     async def on_ready(self):
-        guild = self.guilds[0]
+        guild = self.get_guild(TabSettings.get("guild_id"))
 
         await self.configure_users(guild)
 
