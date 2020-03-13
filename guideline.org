@@ -1,0 +1,96 @@
+REMEMBER TO SET AUDIO BITRATES PLACES
+
+Have text channels for each role (maybe not debaters / judges) as well as voice channels
+Maybe voice channels for talking as well, multiple rooms for staff, etc
+
+* Roles
+** Super Admin
+   The administrator with super user power (should be restricted to 1-2 people)
+*** Permissions
+**** All
+*** Commands
+**** (Assume upper includes the lower unless otherwise noted)
+** Tournament Admin
+   TDs (Tab and Tournament) -- distinction exists because this is an assignable role
+*** Permissions
+**** All
+*** Commands
+**** !blastpairings
+***** If round id is provided will blast those, otherwise will blast current pairings
+**** !missingballots
+***** If round id is provided will blast those, otherwise will blast current pairings
+**** !assignround
+***** If round id is provided will assign according to that, otherwise will assign current pairings
+**** !recallround
+***** Recalls people (judges / debaters / observers) from rooms
+**** !blastcodes
+***** Will blast every judge their judge codes
+**** !assemblestaff
+***** Assembles staff in a single meeting room
+** Tournament Staff
+*** Equity Officer
+    However many equity officers there are
+**** Permissions
+***** Power to move people to a specific equity room(s) to have equity conversations
+      Also where discussions with tournament administrators can occur
+***** Ability to make equity announcements in #announcements
+*** General Tournament Staff
+**** Permissions
+***** Enter / speak in / see the tournament administration rooms including tab, general chat rooms, etc
+***** Can moderate GA and any other general channels
+***** Summonable through the @admin group -- includes TAs and SAs
+**** Commands
+***** !observer add <round_id> <discord_id>
+****** Adds an observer to a specific round
+****** Removes other observations for the observer
+***** !observer delete <discord_id>
+****** Removes an observer from a round they are observing
+***** !observer
+****** Lists all active observers currently
+***** !blastcodes <discord_id>
+****** Will blast judge codes to an individual person
+***** !assignround <discord_id>
+****** Will assign an individual to a round
+***** !assignround <round_id>
+****** Will assign an individual to a round
+***** !recallround <discord_id>
+****** Will recall a specific individual from their round
+***** !recallround <round_id>
+****** Figure out how to differentiate this, but have this recall a specific room
+*** Technical Support Staff
+**** Permissions
+***** Have a private channel (text and voice) to discuss tournament support
+***** Get support pings -- summonable through a bot command
+***** Can enter any competitive room (has ability to redo permissions if need be in those rooms)
+**** Commands
+***** !support
+****** Gives pending list of support requests
+****** !support clear <id>
+******* CLears a specific support request
+****** !support contact <id>
+******* Sends the name of the individual who made the report in order to DM them
+** Competitors
+*** Judges
+**** Permissions
+***** Has control over muting / unmuting individuals in a debate room in which they are judging
+**** Commands
+***** !start <length>
+****** Starts a timer with <length> in minutes (will actually be for 30 seconds longer) -- can only have 1 running at a time
+***** !stop
+****** Stops any active timer
+***** !pause
+****** Pauses any active timer
+*** Debaters
+**** Permissions
+***** Lol nothing -- chatting in GA / other reasonable "relaxation" rooms
+**** Commands
+***** !roundinfo
+****** Gives general information regarding their current round (teams, people, round ID, etc)
+***** !poo
+****** Stops the timer in the room, unmutes the person who did it, sends general message to room indicating what's happening
+***** !poi
+****** Pings the channel indicating you wish to ask a poi
+***** !support <brief nature of the problem goes here>
+****** Adds an issue to the support queue (pings the support people), provides them a ticket number
+***** !support
+****** Shows a list of your current pending support issues
