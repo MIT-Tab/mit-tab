@@ -289,15 +289,6 @@ class Scratch(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
-    voice_channel_id = models.CharField(
-        max_length=128,
-        blank=True
-    )
-
-    text_channel_id = models.CharField(
-        max_length=128,
-        blank=True
-    )
 
     def __str__(self):
         return self.name

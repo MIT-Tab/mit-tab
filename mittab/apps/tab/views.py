@@ -421,28 +421,3 @@ def generate_archive(request):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
-
-
-executor = ThreadPoolExecutor(max_workers=2)
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
-def discord(request):
-    def main(action):
-        client = importlib.import_module('mittab.apps.tab.management.commands.' + action).MyClient
-        client = client()
-
-        print (client)
-
-        client.run(settings.BOT_TOKEN)
-
-    if 'action' in request.GET:
-        action = request.GET.get('action')
-
-        client = importlib.import_module('mittab.apps.tab.management.commands.' + action).MyClient
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        task1 = loop.create_task(client)
-        loop.run_until_complete(asyncio.gather(task1,))
-
-
-    return render(request, "discord.html", {})

@@ -1,0 +1,5 @@
+async def delete_roles(self, guild):
+    roles = await guild.fetch_roles()
+    for role in roles:
+        if not role.name == '@everyone':
+            await role.delete()

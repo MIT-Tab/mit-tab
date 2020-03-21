@@ -1,5 +1,5 @@
 from django.views import i18n
-from django.conf.urls import url
+from django.conf.urls import url, include
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -8,6 +8,7 @@ import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
 import mittab.apps.tab.pairing_views as pairing_views
+import mittab.apps.tab.discord_views as discord_views
 
 
 admin.autodiscover()
@@ -191,7 +192,7 @@ urlpatterns = [
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 
     # Discord
-    url(r"^discord", views.discord, name="discord")
+    url(r"^discord/", include(discord_views.router.urls)),
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

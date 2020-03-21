@@ -1,0 +1,5 @@
+import discord
+from mit_tab_bot import MITTabClient
+
+client = MITTabClient()
+client.run(os.environ.get('DISCORD_BOT_TOKEN'))
