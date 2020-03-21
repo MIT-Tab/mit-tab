@@ -28,6 +28,9 @@ CHANNELS = [
                         connect=True,
                         view_channel=True
                     ),
+                    'eos': discord.PermissionOverwrite(
+                        speak=True,
+                    )
                 }
             },
             {
@@ -52,7 +55,7 @@ And now for @judges:
 !code: this will DM you your ballot code.
 
 @debaters:
-----------
+Erm -- in progress I suppose!
                     """
                 ]
             },
@@ -64,6 +67,9 @@ And now for @judges:
                         view_channel=True,
                         read_message_history=True
                     ),
+                    'eos': discord.PermissionOverwrite(
+                        send_messages=True
+                    )
                 },
                 'initial': 'If any information here looks wrong, please contact any user who is an ADMIN ASAP'
             }
@@ -86,11 +92,50 @@ And now for @judges:
                 'initial': """
 !update @user: updates the mentioned user's roles
 !rooms: deletes and/or creates the rooms for rounds to happen in
+
+!round <round number> blast|send|end [ these can take a while ]
                 """
             }
         ]
+    },
+    {
+        'name': '[EQUITY]',
+        'channels': [
+            {
+                'name': 'equity_and_staff',
+                'type': 'text',
+                'permissions': {
+                    'eos': discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        read_message_history=True
+                    )
+                }
+            },
+            {
+                'name': 'Room 1',
+                'type': 'voice',
+                'permissions': {
+                    'eos': discord.PermissionOverwrite(
+                        view_channel=True,
+                        connect=True,
+                        speak=True
+                    )
+                }                
+            },
+            {
+                'name': 'Room 2',
+                'type': 'voice',
+                'permissions': {
+                    'eos': discord.PermissionOverwrite(
+                        view_channel=True,
+                        connect=True,
+                        speak=True
+                    )
+                }                
+            }
+        ]
     }
-
 ]
 
 

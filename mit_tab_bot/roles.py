@@ -27,6 +27,16 @@ ROLES = [
         'mentionable': True
     },
     {
+        'name': 'eos',
+        'permissions': discord.Permissions(
+            move_members=True,
+            use_voice_activation=True,
+        ),
+        'colour': discord.Colour.red(),
+        'hoist': True,
+        'mentionable': True
+    },
+    {
         'name': 'judges',
         'permissions': discord.Permissions(
             add_reactions=True
@@ -43,7 +53,7 @@ ROLES = [
         'colour': discord.Colour.blue(),
         'hoist': True,
         'mentionable': True
-    }
+    },
 ]
 
 async def delete_roles(guild):
