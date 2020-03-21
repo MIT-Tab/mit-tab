@@ -37,23 +37,23 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'mydatabase',
-    }
-}
 #DATABASES = {
-#    "default": {
-#        "ENGINE": "django.db.backends.mysql",
-#        "NAME": "mittab",
-#        "OPTIONS": {"charset": "utf8mb4"},
-#        "USER": os.environ.get("MYSQL_USER", "root"),
-#        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-#        "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
-#        "PORT": os.environ.get("MYSQL_PORT", "3306"),
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': 'mydatabase',
 #    }
 #}
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "mittab",
+        "OPTIONS": {"charset": "utf8mb4"},
+        "USER": os.environ.get("MYSQL_USER", "root"),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("MYSQL_PORT", "3306"),
+    }
+}
 
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
