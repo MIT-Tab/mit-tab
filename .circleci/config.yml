@@ -22,7 +22,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps-{{ checksum "Pipfile.lock" }}
+          key: deps-v2-{{ checksum "Pipfile.lock" }}
 
       - run:
           name: install dependencies
@@ -34,7 +34,7 @@ jobs:
       - save_cache:
           paths:
             - .venv
-          key: deps-{{ checksum "Pipfile.lock" }}
+          key: deps-v2-{{ checksum "Pipfile.lock" }}
 
       - run:
           # Our primary container isn't MYSQL so run a sleep command until it's ready.
@@ -76,7 +76,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps-{{ checksum "Pipfile.lock" }}
+          key: deps-v2-{{ checksum "Pipfile.lock" }}
       - run:
           name: install dependencies
           command: |
@@ -86,7 +86,7 @@ jobs:
       - save_cache:
           paths:
             - .venv
-          key: deps-{{ checksum "Pipfile.lock" }}
+          key: deps-v2-{{ checksum "Pipfile.lock" }}
       - run:
           name: Lint -- Python
           command: |
