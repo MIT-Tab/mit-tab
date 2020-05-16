@@ -16,7 +16,6 @@ webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stde
 server_proc = subprocess.Popen(server_args, stdout=sys.stdout, stderr=sys.stderr, env=server_env)
 
 def on_interrupt(*args):
-  print("Exiting webpack and python...", flush=True)
   webpack_proc.terminate()
   server_proc.terminate()
   sys.exit(0)
