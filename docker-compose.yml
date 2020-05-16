@@ -15,7 +15,6 @@ services:
       - mysql:mysql
     env_file:
       - .env
-      - .env.secret
     command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000 -t 300
 
   mysql:
@@ -30,7 +29,6 @@ services:
     command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
     env_file:
       - .env
-      - .env.secret
 
   nginx:
     restart: always
