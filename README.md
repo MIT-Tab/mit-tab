@@ -44,18 +44,17 @@ git clone <mit-tab repo>
 cd mit-tab
 
 # make sure to use python3 for the virtualenv
-virtualenv venv
-source venv/bin/activate
-pip install -r requirements.txt
+pip install pipenv
+pipenv install
 
 # set-up webpack assets
 npm install
 
 # load test data. username: tab password: password
-python manage.py loaddata testing_db
+pipenv run python manage.py loaddata testing_db
 
 # Simultaneously runs webpack and the python server
-./bin/dev-server
+pipenv run ./bin/dev-server
 ```
 
 **Note**: the `bin/dev-server` script is new and not tested on many set-ups. If you
@@ -70,7 +69,7 @@ have any issues, you can accomplish the same thing by running:
 /node_modules/.bin/webpack --config webpack.config.js --watch
 
 # run the Django server:
-DEBUG=1 python manage.py runserver
+pipenv run python manage.py runserver
 ```
 
 ### Testing
