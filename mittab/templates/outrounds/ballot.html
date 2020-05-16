@@ -1,0 +1,24 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Data Entry{% endblock %}
+
+{% block banner %} {{title}} {% endblock %}
+
+{% block content %}
+
+<div class="col">
+  <div class="container-fluid">
+    <form action="{{ action }}" method="post" class="ballot-form single" enctype="multipart/form-data">{% csrf_token %}
+    {% outround_form form %}
+
+    <div class="row">
+      <div class="col mt-2">
+        <input class="btn btn-primary" type="submit" value="Save"/>
+      </div>
+    </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -143,6 +143,16 @@ class Team(ModelWithTiebreaker):
                                  null=True,
                                  unique=True)
 
+    VARSITY = 0
+    NOVICE = 1
+    BREAK_PREFERENCE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+
+    break_preference = models.IntegerField(default=0,
+                                           choices=BREAK_PREFERENCE_CHOICES)
+
     def set_unique_team_code(self):
         haikunator = Haikunator()
 
@@ -207,6 +217,25 @@ class Team(ModelWithTiebreaker):
         ordering = ["name"]
 
 
+class BreakingTeam(models.Model):
+    VARSITY = 0
+    NOVICE = 1
+    TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+
+    team = models.OneToOneField("Team",
+                                on_delete=models.CASCADE,
+                                related_name="breaking_team")
+
+    seed = models.IntegerField(default=-1)
+    effective_seed = models.IntegerField(default=-1)
+
+    type_of_team = models.IntegerField(default=VARSITY,
+                                       choices=TYPE_CHOICES)
+
+
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
@@ -245,7 +274,8 @@ class Judge(models.Model):
         return self.name
 
     def affiliations_display(self):
-        return ", ".join([school.name for school in self.schools.all()])
+        return ", ".join([school.name for school in self.schools.all() \
+                          if not school.name == ""])
 
     def delete(self, using=None, keep_parents=False):
         checkins = CheckIn.objects.filter(judge=self)
@@ -298,6 +328,81 @@ class Room(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+
+class Outround(models.Model):
+    VARSITY = 0
+    NOVICE = 1
+    TYPE_OF_ROUND_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice")
+    )
+
+    num_teams = models.IntegerField()
+    type_of_round = models.IntegerField(default=VARSITY,
+                                        choices=TYPE_OF_ROUND_CHOICES)
+    gov_team = models.ForeignKey(Team, related_name="gov_team_outround",
+                                 on_delete=models.CASCADE)
+    opp_team = models.ForeignKey(Team, related_name="opp_team_outround",
+                                 on_delete=models.CASCADE)
+    chair = models.ForeignKey(Judge,
+                              null=True,
+                              blank=True,
+                              on_delete=models.CASCADE,
+                              related_name="chair_outround")
+    judges = models.ManyToManyField(Judge, blank=True, related_name="judges_outrounds")
+    UNKNOWN = 0
+    GOV = 1
+    OPP = 2
+    GOV_VIA_FORFEIT = 3
+    OPP_VIA_FORFEIT = 4
+    VICTOR_CHOICES = (
+        (UNKNOWN, "UNKNOWN"),
+        (GOV, "GOV"),
+        (OPP, "OPP"),
+        (GOV_VIA_FORFEIT, "GOV via Forfeit"),
+        (OPP_VIA_FORFEIT, "OPP via Forfeit"),
+    )
+    room = models.ForeignKey(Room,
+                             on_delete=models.CASCADE,
+                             related_name="rooms_outrounds")
+    victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+
+    sidelock = models.BooleanField(default=False)
+
+    CHOICES = (
+        (UNKNOWN, "No"),
+        (GOV, "Gov"),
+        (OPP, "Opp")
+    )
+    choice = models.IntegerField(default=UNKNOWN,
+                                 choices=CHOICES)
+
+    def clean(self):
+        if self.pk and self.chair not in self.judges.all():
+            raise ValidationError("Chair must be a judge in the round")
+
+    def __str__(self):
+        return "Outround {} between {} and {}".format(self.num_teams,
+                                                      self.gov_team,
+                                                      self.opp_team)
+
+    @property
+    def winner(self):
+        if self.victor in [self.GOV, self.GOV_VIA_FORFEIT]:
+            return self.gov_team
+        elif self.victor in [2, 4]:
+            return self.opp_team
+        return None
+
+    @property
+    def loser(self):
+        if not self.winner:
+            return None
+
+        if self.winner == self.gov_team:
+            return self.opp_team
+        return self.gov_team
 
 
 class Round(models.Model):
