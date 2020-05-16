@@ -32,6 +32,10 @@ class NotEnoughRoomsError(Exception):
     pass
 
 
+class BadBreak(Exception):
+    pass
+
+
 class JudgeAssignmentError(Exception):
     def __init__(self, reason=None):
         super(JudgeAssignmentError, self).__init__()
