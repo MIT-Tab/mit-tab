@@ -1,10 +1,10 @@
 - teams_public:
-  name: public_teams
+  name: teams_public
   description: "Check this box to make the team list publicly visible"
   value: false
   type: boolean
 - judges_public:
-  name: public_judges
+  name: judges_public
   description: "Check this box to make the judges list publicly visible"
   value: false
   type: boolean
@@ -20,3 +20,35 @@
   name: min_eballot_speak
   description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
   value: 15
+- nov_teams_to_break:
+  name: nov_teams_to_break
+  description: "The number of novice teams to be included in the break (exclusive of novice teams who are varsity breaking)"
+  value: 4
+- var_teams_to_break:
+  name: var_teams_to_break
+  description: "The number of varsity teams to be included in the break."
+  value: 8
+- nov_panel_size:
+  name: nov_panel_size
+  description: "The number of judges on a novice outs panel"
+  value: 3
+- var_panel_size:
+  name: var_panel_size
+  description: "The number of judges on a varsity outs panel"
+  value: 3
+- var_to_nov:
+  name: var_to_nov
+  description: "The offset of the novice break to the varsity break.  If novice semis happen when varsity quarters happen, the offset should be 1.  If novice semis happen when varsity octofinals happen, the offset should be 2."
+  value: 2
+- gov_opp_display:
+  name: gov_opp_display
+  description: "A toggle to switch the outrounds view from displaying Gov and Opp (when value is 1) and Team 1 and Team 2 (when value is 2)"
+  value: 0
+- sidelock:
+  name: sidelock
+  description: "A toggle to indicate whether you are side-locking outrounds.  If 1, then the gov opps for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card, and bolded on the front-facing pairing display."
+  value: 0
+- choice:
+  name: choice
+  description: "A toggle to indicate whether you would like to display who has choice, whether you would like this to be  be indicated on the pairing card, and bolded on the front-facing pairing display"
+  value: 0

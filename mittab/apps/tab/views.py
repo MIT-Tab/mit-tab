@@ -6,6 +6,7 @@ from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.api import generate_json_dump
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -246,7 +247,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for room in Room.objects.all():
         checkins = []
-        for round_number in round_numbers:
+        for round_number in [0] + round_numbers: # 0 is for outrounds
             checkins.append(room.is_checked_in_for_round(round_number))
         rooms_and_checkins.append((room, checkins))
 
@@ -260,7 +261,8 @@ def batch_checkin(request):
 def room_check_in(request, room_id, round_number):
     room_id, round_number = int(room_id), int(round_number)
 
-    if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
+    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
+        # 0 is so that outrounds don't throw an error
         raise Http404("Round does not exist")
 
     room = get_object_or_404(Room, pk=room_id)
@@ -402,6 +404,10 @@ def force_cache_refresh(request):
     return redirect_and_flash_success(request,
                                       "Refreshed!",
                                       path=redirect_to)
+
+
+def generate_dump(request):
+    return JsonResponse(generate_json_dump())
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")

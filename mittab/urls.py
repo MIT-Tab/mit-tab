@@ -1,5 +1,6 @@
 from django.views import i18n
 from django.conf.urls import url
+from django.urls import path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -8,6 +9,7 @@ import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
 import mittab.apps.tab.pairing_views as pairing_views
+import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()
@@ -165,6 +167,56 @@ urlpatterns = [
         pairing_views.enter_e_ballot,
         name="enter_e_ballot"),
 
+    # Outround related
+    url(r"break/",
+        outround_pairing_views.break_teams,
+        name="break"),
+    path("outround_pairing/<int:type_of_round>/<int:num_teams>",
+         outround_pairing_views.outround_pairing_view,
+         name="outround_pairing_view"),
+    path("outround_pairing",
+         outround_pairing_views.outround_pairing_view,
+         name="outround_pairing_view_default"),
+    url(r"^outround/(\d+)/alternative_judges/(\d+)/$",
+        outround_pairing_views.alternative_judges,
+        name="outround_alternative_judges"),
+    url(r"^outround/(\d+)/(\d+)/alternative_teams/(gov|opp)/$",
+        outround_pairing_views.alternative_teams,
+        name="outround_alternative_teams"),
+    url(r"^outround/(\d+)/alternative_judges/$",
+        outround_pairing_views.alternative_judges,
+        name="outround_alternative_judges"),
+    url(r"^outround/(\d+)/assign_judge/(\d+)/$",
+        outround_pairing_views.assign_judge,
+        name="outround_assign_judge"),
+    url(r"^outround/pairings/assign_team/(\d+)/(gov|opp)/(\d+)/$",
+        outround_pairing_views.assign_team,
+        name="outround_assign_team"),
+    url(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
+        outround_pairing_views.assign_judge,
+        name="outround_swap_judge"),
+    url(r"^outround/(\d+)/result/$",
+        outround_pairing_views.enter_result,
+        name="enter_result"),
+    path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
+         outround_pairing_views.pair_next_outround,
+         name="next_outround"),
+    path("outround_pairings/pairinglist/<int:type_of_round>/",
+         outround_pairing_views.pretty_pair,
+         name="outround_pretty_pair"),
+    path("outround_pairings/pairinglist/printable/<int:type_of_round>/",
+         outround_pairing_views.pretty_pair_print,
+         name="outround_pretty_pair_print"),
+    path("outround_pairing/release/<int:num_teams>/<int:type_of_round>/",
+         outround_pairing_views.toggle_pairing_released,
+         name="toggle_outround_pairing_released"),
+    path("outround_result/<int:type_of_round>",
+         outround_pairing_views.forum_view,
+         name="forum_view"),
+    path("outround_choice/<int:outround_id>",
+         outround_pairing_views.update_choice,
+         name="update_choice"),
+
     # Settings related
     url(r"^settings_form",
         views.settings_form,
@@ -188,7 +240,10 @@ urlpatterns = [
     url(r"^archive/download/$", views.generate_archive, name="download_archive"),
 
     # Cache related
-    url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh")
+    url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # API Related
+    url(r"^json", views.generate_dump, name='json_dump'),
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

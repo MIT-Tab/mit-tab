@@ -1,0 +1,122 @@
+<div class="card bg-light pairing-card mb-3">
+  <div class="card-body container-fluid">
+    <div class="row" round-id="{{pairing.id}}">
+
+      <div class="col-5">
+        <table class="table table-borderless table-sm mb-0 team-table">
+          <tr>
+            <td>
+              <h6 class="gov-team">
+                <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
+		    {{pairing.gov_team.display_backend}}
+                </a>
+                <small>
+                  <abbr title="Gov Team" class="attribute">GOV</abbr>
+
+                  <span class="team-assign-button"
+                    round-id={{pairing.id}}
+                    position="gov"
+                    team-id={{pairing.gov_team.id}}>
+                    <a class="dropdown-toggle outround-team-toggle text-dark"
+                        data-toggle="dropdown"
+                        href="#"
+                        title="Swap teams">
+                      <span class="caret"></span>
+                    </a>
+                    <ul class="dropdown-menu"></ul>
+                  </span>
+                  <br/>
+                  <a class="text-muted team outround-tabcard pt-1" team-id={{pairing.gov_team.id}}>
+                    Loading results...
+                  </a>
+                </small>
+              </h6>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <h6 class="opp-team">
+                <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark">
+                  {{pairing.opp_team.display_backend}}
+                </a>
+                <small>
+                  <abbr title="Opp Team" class="attribute">OPP</abbr>
+
+                  <span class="team-assign-button"
+                    round-id={{pairing.id}}
+                    position="opp"
+                    team-id={{pairing.opp_team.id}}>
+                    <a class="dropdown-toggle outround-team-toggle text-dark"
+                        data-toggle="dropdown"
+                        href="#"
+                        title="Swap teams">
+                      <span class="caret"></span>
+                    </a>
+                    <ul class="dropdown-menu"></ul>
+                  </span>
+
+                  <br/>
+                  <a class="text-muted team outround-tabcard pt-1"
+                      team-id={{pairing.opp_team.id}}>
+                    Loading results...
+                  </a>
+                </small>
+              </h6>
+
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="col-4 judges">
+        {% for judge in pairing.judges.all %}
+        <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
+          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+             data-toggle="dropdown" href="#">
+            {{judge.name}} <small>({{judge.rank}})</small>
+          </a>
+          <ul class="dropdown-menu"></ul>
+        </span>
+        <br>
+        {% endfor %}
+        {% for slot in judge_slots %}
+        {% if pairing.judges.all|length < slot %}
+        <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
+          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+              N/A
+          </a>
+          <ul class="dropdown-menu"></ul>
+        </span>
+        <br>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      <div class="col-3 text-center">
+        {% if pairing.victor == 1 %}
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV win</a>
+        {% elif pairing.victor == 2 %} 
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP win</a>
+        {% elif pairing.victor == 3 %}
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV via Forfeit</a>
+        {% elif pairing.victor == 4 %}
+        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP via Forfeit</a>
+        {% else %}
+        <a class="btn-sm btn-block btn-warning" href="/outround/{{pairing.id}}/result/">Enter Ballot</a>
+        {%endif%}
+        <a class="btn-sm btn-block btn-light" href="/room/{{pairing.room.id}}" >
+          <i class="far fa-building"></i> {{pairing.room.name}}
+        </a>
+        <a class="btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
+          <i class="fas fa-unlock-alt"></i> Edit in Admin
+        </a>
+	{{ choice }}
+	{% if choice %}
+            <a class="btn-sm btn-block btn-success choice-update" href="" data-outround-id="{{ pairing.id }}">
+		{{ pairing.get_choice_display }} choice
+        </a>
+	{% endif %}
+      </div>
+    </div>
+    </div>
+  </div>
