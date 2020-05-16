@@ -6,123 +6,109 @@
 
 {% block content %}
     <div class="col">
-	<div class="containter">
-	    <div class="row">
-		<div class="col">
-		    <h3>
-			Round Status for {{ label }}
-			<small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
-			    {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
-			</small>
-		    </h3>
-		</div>
-		<div class="col">
-		    <ul class="nav nav-tabs">
-			{% for outround in outround_options %}
-			    <li class="nav-item">
-				<a class="nav-link {% active request outround.0 %}" href="{{ outround.0 }}">{{ outround.1 }}</a>
-			    </li>
-			{% endfor %}
-		    </ul>
-		</div>
-	    </div> <!-- end heading row -->
-	    
-	    <hr />
-	    
-	    <div class="row mb-3">
-		<div class="col-8">
-		    <h6>Pairing Controls</h6>
-		    <form action="/pairing/assign_judges/"
-			  method="post"
-			  onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
-			<div class="btn-group btn-group-sm">
-			    <!--{% if judges_assigned %}
-				<button id="assign-judges" type="submit" class="mid btn btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
-				    <i class="fas fa-gavel"></i> Assign Judges Again
-				</button>
-			    {% else %}
-				<button id="assign-judges" type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
-				    <i class="fas fa-gavel"></i> Assign Judges
-				</button>
-			    {% endif %}-->
-			    <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
-			       id="close-pairings"
-			       data-num_teams="{{ num_teams }}"
-			       data-type_of_round="{{ type_of_round }}"
-			       title="Release the pairings to the participants">
-				<i class="fas fa-door-closed"></i> Close Pairings
-			    </a>
-			    <a class="btn btn-warning outround-release {% if pairing_released %}d-none{% endif %}" href="#"
-			       id="release-pairings"
-			       data-num_teams="{{ num_teams }}"
-			       data-type_of_round="{{ type_of_round }}"
-			       title="Release the pairings to the participants">
-				<i class="fas fa-door-open"></i> Release Pairings
-			    </a>
-			    {% if num_teams > 2 %}
-				<a class="btn btn-info" href="/outround_pairing/pair/{{ type_of_round }}/{{ num_teams }}"
-				   title="Pair the next round of debate">
-				    <i class="fas fa-arrow-right"></i> Prepare Next Round
-				</a>
-			    {% endif %}
-			</div>
-		    </form>
-		</div>
-		
-		<div class="col-4">
-		    <h6>Display Options</h6>
-		    <div class="btn-group btn-group-sm">
-			<a class="btn btn-secondary" href="/outround_pairings/pairinglist/{{ type_of_round }}/" title="To display in GA">
-			    <i class="fas fa-tv"></i> Announcement View
-			</a>
-			<a class="btn btn-secondary" href="/outround_pairings/pairinglist/printable/{{ type_of_round }}/" title="Printable version of the GA view">
-			    <i class="fas fa-print"></i> Printable View
-			</a>
-			<a class="btn btn-secondary" href="/outround_result/{{ type_of_round }}">
-			    Forum View
-			</a>			
-		    </div>
-		</div>
-	    </div> <!-- end control row -->
-	    
-	    <div class="row">
-		{% for pairing in outrounds %}
-		    <div class="col-xl-6">
-			{% include "outrounds/pairing_card.html" %}
-		    </div>
-		{% endfor %}
-	    </div> <!-- end pairings row -->
-	    
-	    <div class="row mt-2 mb-2">
-		<div class="col not-paired-in overflow-auto border-bottom">
-		    <h5>People Not Paired In</h5>
-		    <table class="table table-striped table-sm">
-			<thead>
-			    <th>Unpaired in Teams ({{ excluded_teams|length }})</th>
-			    <th>Checked in Judges ({{ excluded_judges|length }})</th>
-			    <th>Non Checked in Judges ({{ non_checkins|length }})</th>
-			    <th>Available Rooms ({{ available_rooms|length }})</th>
-			</thead>
-			{% for team, cjudge, judge, room in excluded_people %}
-			    <tr>
-				<td>
-				    {% if team %} <a href="/team/{{team.id}}" >{{team.name}}</a> {% endif %}
-				</td>
-				<td>
-				    {% if cjudge %} <a href="/judge/{{cjudge.id}}" >{{cjudge.name}}</a> {% endif %}
-				</td>
-				<td>
-				    {% if judge %} <a class="{% if judge.rank > warning %}text-danger{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
-				</td>
-				<td>
-				    {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a> {% endif %}
-				</td>
-			    </tr>
-			{% endfor %}
-		    </table>
-		</div>
-	    </div><!-- end not-paired-in row -->
-	    
-	</div>
+  <div class="containter">
+      <div class="row">
+    <div class="col">
+        <h3>
+      Round Status for {{ label }}
+      <small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
+          {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
+      </small>
+        </h3>
+    </div>
+    <div class="col">
+        <ul class="nav nav-tabs">
+      {% for outround in outround_options %}
+          <li class="nav-item">
+        <a class="nav-link {% active request outround.0 %}" href="{{ outround.0 }}">{{ outround.1 }}</a>
+          </li>
+      {% endfor %}
+        </ul>
+    </div>
+      </div> <!-- end heading row -->
+      <hr />
+      <div class="row mb-3">
+    <div class="col-8">
+        <h6>Pairing Controls</h6>
+        <form action="/pairing/assign_judges/"
+        method="post"
+        onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
+      <div class="btn-group btn-group-sm">
+          <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
+             id="close-pairings"
+             data-num_teams="{{ num_teams }}"
+             data-type_of_round="{{ type_of_round }}"
+             title="Release the pairings to the participants">
+        <i class="fas fa-door-closed"></i> Close Pairings
+          </a>
+          <a class="btn btn-warning outround-release {% if pairing_released %}d-none{% endif %}" href="#"
+             id="release-pairings"
+             data-num_teams="{{ num_teams }}"
+             data-type_of_round="{{ type_of_round }}"
+             title="Release the pairings to the participants">
+        <i class="fas fa-door-open"></i> Release Pairings
+          </a>
+          {% if num_teams > 2 %}
+        <a class="btn btn-info" href="/outround_pairing/pair/{{ type_of_round }}/{{ num_teams }}"
+           title="Pair the next round of debate">
+            <i class="fas fa-arrow-right"></i> Prepare Next Round
+        </a>
+          {% endif %}
+      </div>
+        </form>
+    </div>
+
+    <div class="col-4">
+        <h6>Display Options</h6>
+        <div class="btn-group btn-group-sm">
+      <a class="btn btn-secondary" href="/outround_pairings/pairinglist/{{ type_of_round }}/" title="To display in GA">
+          <i class="fas fa-tv"></i> Announcement View
+      </a>
+      <a class="btn btn-secondary" href="/outround_pairings/pairinglist/printable/{{ type_of_round }}/" title="Printable version of the GA view">
+          <i class="fas fa-print"></i> Printable View
+      </a>
+      <a class="btn btn-secondary" href="/outround_result/{{ type_of_round }}">
+          Forum View
+      </a>
+        </div>
+    </div>
+      </div> <!-- end control row -->
+      <div class="row">
+    {% for pairing in outrounds %}
+        <div class="col-xl-6">
+      {% include "outrounds/pairing_card.html" %}
+        </div>
+    {% endfor %}
+      </div> <!-- end pairings row -->
+      <div class="row mt-2 mb-2">
+    <div class="col not-paired-in overflow-auto border-bottom">
+        <h5>People Not Paired In</h5>
+        <table class="table table-striped table-sm">
+      <thead>
+          <th>Unpaired in Teams ({{ excluded_teams|length }})</th>
+          <th>Checked in Judges ({{ excluded_judges|length }})</th>
+          <th>Non Checked in Judges ({{ non_checkins|length }})</th>
+          <th>Available Rooms ({{ available_rooms|length }})</th>
+      </thead>
+      {% for team, cjudge, judge, room in excluded_people %}
+          <tr>
+        <td>
+            {% if team %} <a href="/team/{{team.id}}" >{{team.name}}</a> {% endif %}
+        </td>
+        <td>
+            {% if cjudge %} <a href="/judge/{{cjudge.id}}" >{{cjudge.name}}</a> {% endif %}
+        </td>
+        <td>
+            {% if judge %} <a class="{% if judge.rank > warning %}text-danger{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
+        </td>
+        <td>
+            {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a> {% endif %}
+        </td>
+          </tr>
+      {% endfor %}
+        </table>
+    </div>
+      </div><!-- end not-paired-in row -->
+  </div>
     </div>
 {% endblock %}

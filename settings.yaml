@@ -43,12 +43,15 @@
 - gov_opp_display:
   name: gov_opp_display
   description: "A toggle to switch the outrounds view from displaying Gov and Opp (when value is 1) and Team 1 and Team 2 (when value is 2)"
-  value: 0
+  value: false
+  type: boolean
 - sidelock:
   name: sidelock
   description: "A toggle to indicate whether you are side-locking outrounds.  If 1, then the gov opps for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card, and bolded on the front-facing pairing display."
-  value: 0
+  value: false
+  type: boolean
 - choice:
   name: choice
   description: "A toggle to indicate whether you would like to display who has choice, whether you would like this to be  be indicated on the pairing card, and bolded on the front-facing pairing display"
-  value: 0
+  value: false
+  type: boolean

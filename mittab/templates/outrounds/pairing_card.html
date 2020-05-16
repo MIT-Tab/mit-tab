@@ -95,7 +95,7 @@
       <div class="col-3 text-center">
         {% if pairing.victor == 1 %}
         <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV win</a>
-        {% elif pairing.victor == 2 %} 
+        {% elif pairing.victor == 2 %}
         <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP win</a>
         {% elif pairing.victor == 3 %}
         <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV via Forfeit</a>
@@ -110,11 +110,10 @@
         <a class="btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>
-	{{ choice }}
 	{% if choice %}
-            <a class="btn-sm btn-block btn-success choice-update" href="" data-outround-id="{{ pairing.id }}">
-		{{ pairing.get_choice_display }} choice
-        </a>
+    <a class="btn-sm btn-block btn-success choice-update" href="" data-outround-id="{{ pairing.id }}">
+      {{ pairing.get_choice_display }} choice
+    </a>
 	{% endif %}
       </div>
     </div>
