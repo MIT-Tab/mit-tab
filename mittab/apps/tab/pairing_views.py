@@ -12,6 +12,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tasks.models import Task
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
@@ -194,11 +195,17 @@ def restore_backup(request, filename):
 
 
 def view_status(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
     return view_round(request, current_round_number)
 
 
 def view_round(request, round_number):
+    current_round_number = TabSettings.get("cur_round") - 1
+    if round_number == current_round_number:
+        pairing_task = Task.most_recent_run()
+    else:
+        pairing_task = None
+
     errors, excluded_teams = [], []
     round_pairing = list(Round.objects.filter(round_number=round_number))
 

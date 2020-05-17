@@ -2,7 +2,7 @@ import time
 
 from django.core.management.base import BaseCommand
 
-from mittab.apps.models import Task
+from mittab.apps.tasks.models import Task
 
 class Command(BaseCommand):
     help = "Process any queued tasks"

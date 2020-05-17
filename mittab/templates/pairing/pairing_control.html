@@ -17,6 +17,7 @@
     </div> <!-- end heading row -->
 
 
+    {% if pairing_task is None or pairing_task.status == 2 %}
     <div class="row mb-3">
       <div class="col-8">
         <h6>Pairing Controls</h6>
