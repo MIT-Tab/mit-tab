@@ -6,10 +6,21 @@ import random
 from django.db.models import *
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors, mwmatching
+from mittab.libs import errors, mwmatching, cache_logic, backup
 from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 
+
+def do_pairing():
+    """
+    Wrapper around pair_round which also handles tab setting changes and backups
+    """
+    cache_logic.clear_cache()
+    current_round_number = TabSettings.get("cur_round", 0)
+    backup.backup_round("round_%i_before_pairing" % (current_round_number))
+    with transaction.atomic():
+        tab_logic.pair_round()
+        TabSettings.set("cur_round", current_round_number + 1)
 
 def pair_round():
     """

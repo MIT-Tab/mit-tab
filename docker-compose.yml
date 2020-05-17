@@ -1,12 +1,23 @@
 version: "2.0"
 services:
+  tasks:
+    restart: always
+    build:
+      dockerfile: Dockerfile.web
+      context: .
+    volumes:
+      - ./:/var/www/tab
+    links:
+      - mysql:mysql
+    env_file:
+      - .env
+    command: python manage.py process_tasks
+
   web:
     restart: always
     build:
       dockerfile: Dockerfile.web
       context: .
-      args:
-        - "password"
     expose:
       - "8000"
     volumes:
