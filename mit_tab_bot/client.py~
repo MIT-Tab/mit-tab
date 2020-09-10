@@ -1,6 +1,0 @@
-import discord
-
-
-class MITTabClient(discord.Client):
-    async def on_ready(self):
-        print ('logged in')
