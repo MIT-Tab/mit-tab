@@ -5,8 +5,6 @@ from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
-from django.core import management
-
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
