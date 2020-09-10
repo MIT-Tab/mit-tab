@@ -2,7 +2,7 @@ from simple_rest_client.api import API
 
 def construct_api():
     api = API(
-        api_root_url='http://localhost:8000/discord/',
+        api_root_url='http://benders.nu-tab.com/discord/',
         json_encode_body=True
     )
 
