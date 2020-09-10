@@ -18,10 +18,6 @@ from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
         import_scratches
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor, wait
-import importlib
-
 
 def index(request):
     number_teams = Team.objects.count()
