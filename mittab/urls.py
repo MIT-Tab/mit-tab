@@ -241,12 +241,9 @@ urlpatterns = [
 
     # Cache related
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
-<<<<<<< HEAD
 
     # Discord
     url(r"^discord/", include(discord_views.router.urls)),
-=======
->>>>>>> master
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"
