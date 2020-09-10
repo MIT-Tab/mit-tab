@@ -80,7 +80,7 @@ class TeamImporter(WorkbookImporter):
         deb1_form = DebaterForm(data={
             "name": deb1_name,
             "novice_status": deb1_status,
-            "discord_id": row[8].replace(" ", "")
+            "discord_id": row[8].replace(" ", "") if len(row) > 8 else ''
         })
         if deb1_form.is_valid():
             self.create(deb1_form)

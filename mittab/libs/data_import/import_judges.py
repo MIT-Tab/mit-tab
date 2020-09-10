@@ -15,7 +15,7 @@ class JudgeImporter(WorkbookImporter):
     def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]
-        discord_id = row[2]
+        discord_id = row[2] if len(row) > 2 else ''
 
         try:
             judge_rank = round(float(judge_rank), 2)
