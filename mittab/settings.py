@@ -37,12 +37,6 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.sqlite3',
-#        'NAME': 'mydatabase',
-#    }
-#}
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",

@@ -5,8 +5,6 @@ from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
-from django.core import management
-
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
@@ -17,10 +15,6 @@ from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
         import_scratches
-
-import asyncio
-from concurrent.futures import ThreadPoolExecutor, wait
-import importlib
 
 
 def index(request):
@@ -252,7 +246,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for room in Room.objects.all():
         checkins = []
-        for round_number in round_numbers:
+        for round_number in [0] + round_numbers: # 0 is for outrounds
             checkins.append(room.is_checked_in_for_round(round_number))
         rooms_and_checkins.append((room, checkins))
 
@@ -266,7 +260,8 @@ def batch_checkin(request):
 def room_check_in(request, room_id, round_number):
     room_id, round_number = int(room_id), int(round_number)
 
-    if round_number < 1 or round_number > TabSettings.get("tot_rounds"):
+    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
+        # 0 is so that outrounds don't throw an error
         raise Http404("Round does not exist")
 
     room = get_object_or_404(Room, pk=room_id)

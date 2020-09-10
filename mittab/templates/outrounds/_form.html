@@ -1,0 +1,24 @@
+{% load bootstrap4 %}
+
+{% if form.errors %}
+  <div class="alert alert-danger">
+    Please correct the error{{ form.errors|pluralize }} below.
+
+    {% bootstrap_form_errors form type='non_fields' %}
+  </div>
+{% endif %}
+
+{{ form.media }}
+
+{% for hidden in form.hidden_fields %}
+  {{ hidden }}
+{% endfor %}
+
+<div class="row">
+  <div class="form-group col-md-6">
+    {% bootstrap_field form.winner %}
+    <div class="mt-2">
+      <div class="hidden winner" data-option=0>Please select a winner</div>
+    </div>
+  </div>
+</div>

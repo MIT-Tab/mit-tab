@@ -21,6 +21,11 @@ def round_form(form, gov_team, opp_team):
     return {"form": form, "gov_team": gov_team, "opp_team": opp_team}
 
 
+@register.inclusion_tag("outrounds/_form.html")
+def outround_form(form):
+    return {"form": form}
+
+
 @register.filter("is_file_field")
 def is_file_field(field):
     if not hasattr(field, "field"):

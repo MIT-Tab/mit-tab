@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from mittab.apps.tab.models import Round, TabSettings, RoundStats
+from mittab.apps.tab.models import Round, TabSettings, RoundStats, Debater
 from mittab.apps.tab.management.commands import utils
 
 
@@ -19,7 +19,8 @@ class Command(BaseCommand):
         results = utils.generate_random_results(round_obj)
 
         for position in ["pm", "mg", "lo", "mo"]:
-            stat = RoundStats(debater=results[position + "_debater"],
+            debater = Debater.objects.get(pk=results[position + "_debater"])
+            stat = RoundStats(debater=debater,
                               round=round_obj,
                               speaks=results[position + "_speaks"],
                               ranks=results[position + "_ranks"],
