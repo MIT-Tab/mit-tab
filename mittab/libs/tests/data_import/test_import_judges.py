@@ -15,9 +15,9 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "9.5", "Harvard"],
-                ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern"],
-                ["Judge 3", "20"]]
+        data = [["Judge 1", "9.5", "", "Harvard"],
+                ["Judge 2", "10.5555", "", "Yale", "Harvard", "Northeastern"],
+                ["Judge 3", "20", ""]]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
