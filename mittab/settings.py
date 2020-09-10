@@ -106,5 +106,5 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
 REST_FRAMEWORK = {
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend']
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"]
 }

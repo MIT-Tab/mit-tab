@@ -252,7 +252,7 @@ class Judge(models.Model):
     discord_id = models.CharField(
         max_length=128,
         blank=True
-    )    
+    )
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()

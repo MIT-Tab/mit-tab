@@ -39,7 +39,7 @@ class JudgeImporter(WorkbookImporter):
             "name": judge_name,
             "rank": judge_rank,
             "schools": schools,
-            "discord_id": discord_id.replace(' ', '')
+            "discord_id": discord_id.replace(" ", "")
         }
         form = JudgeForm(data=data)
         if form.is_valid():

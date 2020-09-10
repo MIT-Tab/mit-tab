@@ -11,7 +11,6 @@ import mittab.apps.tab.debater_views as debater_views
 import mittab.apps.tab.pairing_views as pairing_views
 import mittab.apps.tab.discord_views as discord_views
 import mittab.apps.tab.outround_pairing_views as outround_pairing_views
-import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()
@@ -245,7 +244,7 @@ urlpatterns = [
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 
     # Discord
-    url(r"^discord/", include(discord_views.router.urls)),
+    url(r"^discord/", include(discord_views.ROUTER.urls)),
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

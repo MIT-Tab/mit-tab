@@ -27,8 +27,8 @@ class RoomImporter(WorkbookImporter):
             data={
                 "name": room_name,
                 "rank": room_rank,
-                "voice_channel_id": '',
-                "text_channel_id": '',
+                "voice_channel_id": "",
+                "text_channel_id": "",
             }
         )
         if form.is_valid():
