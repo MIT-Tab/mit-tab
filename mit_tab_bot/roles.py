@@ -2,7 +2,9 @@ import discord
 
 from .api import (
     is_judge,
-    is_debater
+    is_debater,
+    get_judge,
+    get_debater
 )
 
 ADMIN = [
@@ -105,7 +107,11 @@ async def update_member_role(guild, member_str):
         await member.add_roles(await get_role(guild, 'superadmin'))
         
     if is_judge(str(member)):
+        judge = get_judge(member_str)
         await member.add_roles(await get_role(guild, 'judges'))
+        await member.edit(nick=judge['name'].upper())
         
     if is_debater(str(member)):
+        debater = get_debater(member_str)
         await member.add_roles(await get_role(guild, 'debaters'))
+        await member.edit(nick=debater['name'])

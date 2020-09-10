@@ -50,7 +50,7 @@ END_OF_ROUND_PERMISSIONS = discord.PermissionOverwrite(
 
 VIDEO_LINK = 'https://discordapp.com/channels/'
 
-async def get_or_create_guild(client, tournament_name='testing-tournament'):
+async def get_or_create_guild(client, tournament_name='defaulttournament'):
     to_return = None
     if client.guild_id:
         to_return = client.get_guild(client.guild_id)
@@ -62,6 +62,8 @@ async def get_or_create_guild(client, tournament_name='testing-tournament'):
                     await guild.delete()
                 to_return = guild
 
+    created = False
+
     if not to_return:
         guild = await client.create_guild(
             tournament_name,
@@ -69,17 +71,19 @@ async def get_or_create_guild(client, tournament_name='testing-tournament'):
         )
 
         to_return = guild
+        created = True
 
     guild = to_return
 
-    await clear_channels(guild)
-    await delete_roles(guild)
-
-    await create_roles(guild)
-    await create_channels(guild)
-
-    await clear_invites(await get_channel(guild, 'GA'))
-    print (await create_invite(await get_channel(guild, 'GA')))
+    if created:
+        await clear_channels(guild)
+        await delete_roles(guild)
+        
+        await create_roles(guild)
+        await create_channels(guild)
+        
+        await clear_invites(await get_channel(guild, 'GA'))
+        print (await create_invite(await get_channel(guild, 'GA')))
 
     return guild
 

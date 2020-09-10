@@ -1,8 +1,12 @@
+import os
+
 from simple_rest_client.api import API
 
 def construct_api():
     api = API(
-        api_root_url='http://localhost:8000/discord/',
+        api_root_url='http://%(tournament_name)s.nu-tab.com/discord/' % (
+            os.environ.get('TOURNAMENT_NAME', 'NONAME')
+        ),
         json_encode_body=True
     )
 
