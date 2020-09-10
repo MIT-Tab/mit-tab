@@ -30,6 +30,7 @@ splinter = "==0.10.0"
 Django = "==2.1.5"
 PyYAML = "==5.1.2"
 discord = "==1.0.1"
+simple-rest-client = "*"
 
 [requires]
 python_version = "3.7"
