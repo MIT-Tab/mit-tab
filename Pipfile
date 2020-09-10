@@ -33,6 +33,7 @@ discord = "==1.0.1"
 simple-rest-client = "==1.0.7"
 django-filter = "==2.3.0"
 djangorestframework = "==3.11.0"
+importlib-metadata = "*"
 
 [requires]
 python_version = "3.7"
