@@ -12,7 +12,9 @@
 
   <table class="table table-striped table-bordered table-sm">
     <thead>
-      <th>Room</th>
+	<th>Room</th>
+	<th>Outrounds</th>
+	
       {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
     </thead>
     {% for room, checkins in rooms_and_checkins %}
@@ -25,10 +27,10 @@
         <div class="custom-control custom-switch">
           <input type="checkbox" class="custom-control-input room-checkin-toggle"
                  data-room-id="{{room.id}}"
-                 data-round-number="{{forloop.counter}}"
-                 id="toggle-{{ room.id }}-{{ forloop.counter }}"
+                 data-round-number="{{forloop.counter0}}"
+                 id="toggle-{{ room.id }}-{{ forloop.counter0 }}"
                  {% if is_checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-{{ room.id }}-{{ forloop.counter }}">
+          <label class="custom-control-label" for="toggle-{{ room.id }}-{{ forloop.counter0 }}">
             Checked {% if is_checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>

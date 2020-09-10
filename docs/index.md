@@ -13,4 +13,5 @@ Contents
 * [Adding Teams, Rooms, Judges, and Debaters](Adding-Teams,-Judges,-Rooms-and-Debaters.md)
 * [Before Round 1](Before-Round-1.md)
 * [During the Tournament](Running-a-Tournament.md)
+* [Outrounds](Outrounds.md)
 * [Advanced topics](Advanced-Topics.md)

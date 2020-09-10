@@ -109,7 +109,8 @@ class TeamImporter(WorkbookImporter):
                 "school": school.id,
                 "hybrid_school": hybrid_school and hybrid_school.id,
                 "debaters": [deb1_form.instance.id, deb2_form.instance.id],
-                "seed": team_seed
+                "seed": team_seed,
+                "break_preference": Team.VARSITY
             })
 
         if team_form.is_valid():
