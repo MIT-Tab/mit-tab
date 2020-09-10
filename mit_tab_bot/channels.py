@@ -67,7 +67,7 @@ And now for @judges:
 !code: this will DM you your ballot code.
 
 @debaters:
-Erm -- in progress I suppose!
+!spectate <room>: this will allow you to spectate a debate room
                     """
                 ]
             },
