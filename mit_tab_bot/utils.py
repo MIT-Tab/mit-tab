@@ -108,6 +108,32 @@ async def handle_message(guild, message):
                 await room_category.create_text_channel(room['name'])
                 await room_category.create_voice_channel(room['name'])
 
+        if message.content.startswith('!send'):
+            PERMISSIONS = ROUND_PERMISSIONS            
+            for member in message.mentions:
+                room = ' '.join(message.content.split('|')[1:]).strip()
+                room_text_channel = await get_channel(guild, room.replace(' ', '-').lower())
+                room_voice_channel = await get_channel(guild, room)
+                
+                await room_text_channel.set_permissions(
+                    member,
+                    overwrite=PERMISSIONS
+                )
+                
+                await room_voice_channel.set_permissions(
+                    member,
+                    overwrite=PERMISSIONS
+                )
+                
+                try:
+                    await member.edit(
+                        mute=False,
+                        voice_channel=room_voice_channel
+                    )
+                except:
+                    pass
+                
+
         if message.content.startswith('!round'):
             round_number = message.content.split(' ')[1]
             rounds = get_rounds(round_number)
@@ -195,6 +221,29 @@ async def handle_message(guild, message):
                         await room_text_channel.send('If the link does not work, please ensure you are in the voice channel whose name matches this text channel')
                 await message.channel.send('Done!')
 
+    if message.content.startswith('!spectate'):
+        PERMISSIONS = ROUND_PERMISSIONS
+        room = ' '.join(message.content.split(' ')[1:]).strip()
+        room_text_channel = await get_channel(guild, room.replace(' ', '-').lower())
+        room_voice_channel = await get_channel(guild, room)
+
+        await room_text_channel.set_permissions(
+            member,
+            overwrite=PERMISSIONS
+        )
+        
+        await room_voice_channel.set_permissions(
+            member,
+            overwrite=PERMISSIONS
+        )
+        
+        try:
+            await member.edit(
+                mute=False,
+                voice_channel=room_voice_channel
+            )
+        except:
+            pass
 
     if message.content.startswith('!invite'):
         await message.channel.send(
