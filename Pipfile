@@ -32,6 +32,7 @@ PyYAML = "==5.1.2"
 discord = "==1.0.1"
 simple-rest-client = "*"
 django-rest-framework = "*"
+django-filter = "*"
 
 [requires]
 python_version = "3.7"
