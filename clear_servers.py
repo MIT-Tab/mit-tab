@@ -5,6 +5,7 @@ class Client(discord.Client):
     async def on_ready(self):
         for guild in self.guilds:
             await guild.delete()
+        await self.close()
 
 
 client = Client()
