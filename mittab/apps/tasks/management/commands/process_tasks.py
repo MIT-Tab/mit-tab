@@ -10,6 +10,7 @@ class Command(BaseCommand):
     while True:
         cur_task = Task.dequeue()
         if cur_task:
+            print("Executing " + str(cur_task.id) + "...")
             cur_task.execute()
         else:
             print("No task ready to execute, sleeping")

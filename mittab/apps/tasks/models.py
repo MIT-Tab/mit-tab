@@ -3,18 +3,20 @@ from django.db import models, transaction
 from mittab.libs.errors import emit_current_exception
 
 
-__functions = {}
+functions = {}
 
 class Task(models.Model):
     QUEUED = 0
     RUNNING = 1
     COMPLETED = 2
     FAILED = 3
+    DEQUEUED = 4
     STATUS_CHOICES = (
         (QUEUED, "Queued"),
         (RUNNING, "Running"),
         (COMPLETED, "Completed"),
         (FAILED, "Failed"),
+        (DEQUEUED, "Dequeued"),
     )
 
     key = models.CharField(max_length=20, unique=True)
@@ -24,19 +26,18 @@ class Task(models.Model):
 
     @classmethod
     def register(cls, key, function):
-        if key not in __functions:
-            __functions[key] = function
+        if key not in functions:
+            functions[key] = function
         else:
             raise ValueError("Key {} already registered!".format(key))
 
     @classmethod
     def enqueue(cls, key):
-        if key not in __functions:
+        if key not in functions:
             raise ValueError("Key {} not registered!".format(key))
         with transaction.atomic():
-            queued = cls.objects.exists(key=key, status=cls.QUEUED)
-            running = cls.objects.exists(key=key, status=cls.RUNNING)
-            if queued or running:
+            statuses = [cls.QUEUED, cls.RUNNING]
+            if cls.objects.filter(key=key, status__in=statuses).exists():
                 return None
             else:
                 return cls.objects.create(key=key, status=cls.QUEUED)
@@ -44,27 +45,32 @@ class Task(models.Model):
     @classmethod
     def dequeue(cls):
         with transaction.atomic():
-            to_dequeue = cls.objects.filter(status=cls.QUEUED).first()
+            return cls.objects.filter(status__in=[cls.QUEUED, cls.FAILED]).first()
             if to_dequeue:
-                to_dequeue.status = cls.RUNNING
+                to_dequeue.status = cls.DEQUEUED
                 to_dequeue.save()
             return to_dequeue
 
     @classmethod
     def most_recent_run(cls, key):
-        if key not in __functions:
+        if key not in functions:
             raise ValueError("Key {} not registered!".format(key))
-        cls.objects.filter(key=key).latest('created_at')
+        cls.objects.filter(key=key).order_by('created_at').last()
+
+    def is_terminated(self):
+        return self.status in [Task.COMPLETED, Task.FAILED]
 
     def execute(self):
         try:
-            self.task.status = Task.RUNNING
-            self.task.save()
-            if self.key not in __functions:
+            self.status = Task.RUNNING
+            self.save()
+            if self.key not in functions:
                 raise ValueError("Key {} not registed!".format(key))
             else:
-                __functions[self.key]()
+                functions[self.key]()
         except Exception as e:
+            import pdb; pdb.set_trace()
             emit_current_exception()
             self.error_message = str(e)
             self.status = Task.FAILED
+            self.save()

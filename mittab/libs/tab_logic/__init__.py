@@ -3,6 +3,7 @@ from decimal import *
 import itertools
 import random
 
+from django.db import transaction
 from django.db.models import *
 
 from mittab.apps.tab.models import *
@@ -16,10 +17,11 @@ def do_pairing():
     Wrapper around pair_round which also handles tab setting changes and backups
     """
     cache_logic.clear_cache()
-    current_round_number = TabSettings.get("cur_round", 0)
+    current_round_number = TabSettings.get("cur_round")
+    TabSettings.set("pairing_released", 0)
     backup.backup_round("round_%i_before_pairing" % (current_round_number))
     with transaction.atomic():
-        tab_logic.pair_round()
+        pair_round()
         TabSettings.set("cur_round", current_round_number + 1)
 
 def pair_round():

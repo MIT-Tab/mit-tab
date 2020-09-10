@@ -16,8 +16,6 @@
       </div>
     </div> <!-- end heading row -->
 
-
-    {% if pairing_task is None or pairing_task.status == 2 %}
     <div class="row mb-3">
       <div class="col-8">
         <h6>Pairing Controls</h6>
@@ -74,24 +72,29 @@
 
     <div class="row">
       <div class="col-12">
+        {% if pairing_in_progress %}
+          <div class="alert alert-warning">
+            A pairing is in progress. Please do not modify the pairings.
+          </div>
+        {% endif %}
         {% if errors %}
           {% for error in errors %}
           <div class="alert alert-danger">{{ error }}</div>
           {% endfor %}
         {% endif %}
-	{% if num_excluded > 0 %}
-	    <div class="alert alert-danger">{{ num_excluded }} teams are checked-in but have no round or bye. <button class="btn btn-small btn-link" data-toggle="collapse" data-target="#excluded_teams_no_bye">Show/Hide</button>
-		<div id="excluded_teams_no_bye" class="collapse">
-		    {% for team in excluded_teams_no_bye %}
-			{{ team.name }}<br>
-		    {% endfor %}
-		</div>
-	    </div>
-	{% endif %}
+        {% if num_excluded > 0 %}
+          <div class="alert alert-danger">{{ num_excluded }} teams are checked-in but have no round or bye. <button class="btn btn-small btn-link" data-toggle="collapse" data-target="#excluded_teams_no_bye">Show/Hide</button>
+            <div id="excluded_teams_no_bye" class="collapse">
+              {% for team in excluded_teams_no_bye %}
+                {{ team.name }}<br>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
       </div>
     </div>
 
-    <div class="row">
+    <div class="row{% if pairing_in_progress %} disabled{% endif %}">
       {% for pairing in round_info %}
         <div class="col-xl-6">
           {% include "pairing/_pairing_card.html" %}

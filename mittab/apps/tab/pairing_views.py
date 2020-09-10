@@ -201,10 +201,10 @@ def view_status(request):
 
 def view_round(request, round_number):
     current_round_number = TabSettings.get("cur_round") - 1
+    pairing_in_progress = False
     if round_number == current_round_number:
-        pairing_task = Task.most_recent_run()
-    else:
-        pairing_task = None
+        pairing_task = Task.most_recent_run("pair_round")
+        pairing_in_progress = not (pairing_task is None or pairing_task.is_terminated())
 
     errors, excluded_teams = [], []
     round_pairing = list(Round.objects.filter(round_number=round_number))
