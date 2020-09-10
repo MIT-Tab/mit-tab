@@ -159,3 +159,37 @@ To remove a room, un check it in for the given round. You must have enough check
 
 ![](img/removing_a_room.png)
 
+Discord Integration
+-------------------
+MIT-Tab now supports a complete Discord integration. This integration syncs users on Discord with debaters and judges on MIT-Tab. It requires including Discord ID in file imports (see the import documentation). On tournament create, you will be asked to provide a valid Discord ID for your superuser -- this should be a member of your tournament staff. The starting email will also provide an invite to your discord server -- feel free to distribute this to participants, or generate a new one once you have accessed the Discord.
+
+### Roles
+The created roles are as follows:
+- Staff
+- EOs
+- Judge
+- Debater
+
+These roles should be self-explanatory. EOs and staff have the ability to speak / write in protected channels whereas judges and debaters do not.
+
+### Start of a Tournament
+The check-in procedure is unchanged on MIT-Tab. We suggest you use the #checkins channel for the purpose. If a debater / judge is not linked properly to the Discord role (their name hasn't changed, and/or their color is listed incorrectly), please update their Discord ID to be correct on MIT-Tab, and then @mention them on Discord.  This will fix the problem.
+
+### Discord Commands
+There are a number of Discord commands that are supported:
+
+- !rooms
+  This will create the debate rooms (and clear existing rooms). This should be run before each round. Please run this AFTER all RFDs are concluded as it will kick debaters and judges out of their rooms.
+- !send <user> |<room name>
+  This will send the <user> to the <room name>, this is useful if a user's Discord ID is incorrect and you wish for them to be a debate room.
+- !round <round number> blast
+  This will blast the round's pairings to the #announcements channel on Discord
+- !round <round number> send
+  This will send the debaters and judges to their rooms. This takes maybe 3-5 seconds per room, so can become time consuming for large tournaments -- probably less than what it takes them to walk to a room on a physical campus.
+- !spectate <room name>
+  This can be used by debaters, judges, and users with no role, and will allow them to spectate a round.
+- !invite
+  This generates a public invite and will send the link in the channel the command was issued in.
+- !code
+  This will DM the sender their ballot code (if they are a judge)
+

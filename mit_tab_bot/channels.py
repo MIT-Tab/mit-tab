@@ -21,6 +21,18 @@ CHANNELS = [
                 }
             },
             {
+                'name': 'checkins',
+                'type': 'text',
+                'permissions': {
+                    '@everyone': discord.PermissionOverwrite(
+                        view_channel=True,
+                        read_message_history=True,
+                        send_messages=True,
+                        add_reactions=True
+                    ),
+                }
+            },            
+            {
                 'name': 'GA',
                 'type': 'voice',
                 'permissions': {
