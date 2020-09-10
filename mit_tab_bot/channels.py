@@ -106,6 +106,8 @@ And now for @judges:
 !rooms: deletes and/or creates the rooms for rounds to happen in
 
 !round <round number> blast|send|end [ these can take a while ]
+
+!send <user> |<room name>
                 """
             }
         ]
