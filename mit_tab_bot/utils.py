@@ -84,7 +84,6 @@ async def get_or_create_guild(client, tournament_name='defaulttournament'):
         
         await clear_invites(await get_channel(guild, 'GA'))
         print (await create_invite(await get_channel(guild, 'GA')))
-        await client.close()
 
     return guild
 

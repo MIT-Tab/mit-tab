@@ -17,6 +17,15 @@ services:
       - .env
     command: /usr/local/bin/gunicorn mittab.wsgi:application -w 2 -b :8000 -t 300
 
+  discord:
+    restart: always
+    build:
+      dockerfile: Dockerfile.discord
+      context: .
+    env_file:
+      - .env
+    command: pipenv run python start_discord.py $DISCORD_SERVER_NAME
+
   mysql:
     image: mysql:5.7
     restart: always
