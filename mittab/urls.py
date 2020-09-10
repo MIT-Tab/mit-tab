@@ -1,10 +1,6 @@
 from django.views import i18n
-<<<<<<< HEAD
 from django.conf.urls import url, include
-=======
-from django.conf.urls import url
 from django.urls import path
->>>>>>> 0f9c2e0... Finalizing outrounds implementation (#292)
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -13,11 +9,9 @@ import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
 import mittab.apps.tab.pairing_views as pairing_views
-<<<<<<< HEAD
 import mittab.apps.tab.discord_views as discord_views
-=======
 import mittab.apps.tab.outround_pairing_views as outround_pairing_views
->>>>>>> 0f9c2e0... Finalizing outrounds implementation (#292)
+import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()

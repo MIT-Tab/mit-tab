@@ -75,7 +75,6 @@ async def get_or_create_guild(client, tournament_name='defaulttournament'):
 
     guild = to_return
 
-<<<<<<< HEAD
     if created:
         await clear_channels(guild)
         await delete_roles(guild)
@@ -85,16 +84,6 @@ async def get_or_create_guild(client, tournament_name='defaulttournament'):
         
         await clear_invites(await get_channel(guild, 'GA'))
         print (await create_invite(await get_channel(guild, 'GA')))
-=======
-    #await clear_channels(guild)
-    #await delete_roles(guild)
-
-    #await create_roles(guild)
-    #await create_channels(guild)
-
-    #await clear_invites(await get_channel(guild, 'GA'))
-    #print (await create_invite(await get_channel(guild, 'GA')))
->>>>>>> b6665cb... added a useful discord command
 
     return guild
 
