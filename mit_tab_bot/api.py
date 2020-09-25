@@ -4,7 +4,7 @@ from simple_rest_client.api import API
 
 def construct_api():
     api = API(
-        api_root_url='http://%(tournament_name)s.nu-tab.com/discord/' % {
+        api_root_url='http://novice-north.nu-tab.com/discord' % {
             'tournament_name': os.environ.get('TOURNAMENT_NAME', 'NONAME')
         },
         json_encode_body=True

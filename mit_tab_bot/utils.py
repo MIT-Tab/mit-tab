@@ -94,19 +94,30 @@ async def handle_message(guild, message):
         for member in message.mentions:
             await update_member_role(guild, str(member))
 
+        room_category = await get_channel(guild, '[ROOMS]')
+        
+        if room_category:
+            for channel in room_category.channels:
+                await channel.delete()            
+
         if message.content.startswith('!rooms'):
             rooms = get_rooms()
-            room_category = await get_channel(guild, '[ROOMS]')
 
-            if room_category:
-                for channel in room_category.channels:
-                    await channel.delete()
-            else:
-                room_category = await guild.create_category('[ROOMS]')
+            for i in range(3):
+                room_category = await get_channel(guild, '[ROOMS-%s]' % (i,))
+                
+                if room_category:
+                    for channel in room_category.channels:
+                        await channel.delete()
+                else:
+                    room_category = await guild.create_category('[ROOMS-%s]' % (i,))
 
+            j = 0
             for room in rooms:
+                room_category = await get_channel(guild, '[ROOMS-%s]' % (j % 3,))
                 await room_category.create_text_channel(room['name'])
                 await room_category.create_voice_channel(room['name'])
+                j += 1
 
         if message.content.startswith('!send'):
             PERMISSIONS = ROUND_PERMISSIONS            
@@ -169,10 +180,6 @@ async def handle_message(guild, message):
 
                     room_text_channel = await get_channel(guild, round['room']['name'].replace(' ', '-').lower())
                     room_voice_channel = await get_channel(guild, round['room']['name'])
-
-                    messages = await room_text_channel.history().flatten()
-                    for _message in messages:
-                        await _message.delete()
 
                     members = [member for member in members if member]
 
