@@ -51,9 +51,10 @@ END_OF_ROUND_PERMISSIONS = discord.PermissionOverwrite(
 VIDEO_LINK = 'https://discordapp.com/channels/'
 
 async def get_or_create_guild(client, tournament_name='defaulttournament'):
+    print (client.guild_id)
     to_return = None
     if client.guild_id:
-        to_return = client.get_guild(client.guild_id)
+        to_return = client.get_guild(int(client.guild_id))
 
     if not to_return:
         for guild in client.guilds:
@@ -75,19 +76,19 @@ async def get_or_create_guild(client, tournament_name='defaulttournament'):
 
     guild = to_return
 
-    if created:
-        await clear_channels(guild)
-        await delete_roles(guild)
-        
+    r = await get_role(guild, 'debaters')
+    if not r:
         await create_roles(guild)
-        await create_channels(guild)
-        
-        await clear_invites(await get_channel(guild, 'GA'))
-        print (await create_invite(await get_channel(guild, 'GA')))
 
     return guild
 
 async def handle_message(guild, message):
+    if hasattr(message.channel, 'name') and (message.channel.name.startswith('Room') or message.channel.name.startswith('room')):
+        return
+
+    if not message.content.startswith('!'):
+        return
+
     member = await get_member(guild, str(message.author))
 
     if has_role(member, 'staff') or has_role(member, 'superadmin'):
@@ -118,6 +119,16 @@ async def handle_message(guild, message):
                 await room_category.create_text_channel(room['name'])
                 await room_category.create_voice_channel(room['name'])
                 j += 1
+
+        if message.content.startswith('!setup'):
+            await clear_channels(guild)
+            #await delete_roles(guild)
+            
+            await create_roles(guild)
+            await create_channels(guild)
+            
+            await clear_invites(await get_channel(guild, 'GA'))
+            print (await create_invite(await get_channel(guild, 'GA')))
 
         if message.content.startswith('!send'):
             PERMISSIONS = ROUND_PERMISSIONS            
@@ -260,17 +271,12 @@ async def handle_message(guild, message):
         )
     elif message.content.startswith('!code'):
         if not has_role(member, 'judges'):
-            await member.send(
-                'You do not have permission!'
-            )
             return
 
         judge = get_judge(str(message.author))
         
         if not judge:
-            await member.send(
-                'Something went wrong!'
-            )
+            return
         else:
             await member.send(
                 'Your ballot code is: %s' % (

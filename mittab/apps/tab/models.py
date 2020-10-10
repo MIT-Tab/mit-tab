@@ -452,6 +452,8 @@ class Round(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
+    rfd = models.TextField(blank=True)
+
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
             raise ValidationError("Chair must be a judge in the round")

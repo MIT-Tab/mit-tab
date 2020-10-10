@@ -235,6 +235,8 @@ class ResultEntryForm(forms.Form):
     winner = forms.ChoiceField(label="Which team won the round?",
                                choices=Round.VICTOR_CHOICES)
 
+    rfd = forms.CharField(widget=forms.Textarea)
+
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
         round_object = kwargs.pop("round_instance")
@@ -362,6 +364,7 @@ class ResultEntryForm(forms.Form):
             cache_logic.invalidate_cache("speaker_rankings")
 
         round_obj.victor = cleaned_data["winner"]
+        round_obj.rfd = cleaned_data["rfd"]
 
         with transaction.atomic():
             for debater in self.DEBATERS:
@@ -454,8 +457,8 @@ class EBallotForm(ResultEntryForm):
                 speaks = self.deb_attr_val(deb, "speaks", float)
                 _, decimal_val = str(speaks).split(".")
                 key = self.deb_attr_name(deb, "speaks")
-                if int(decimal_val) != 0:
-                    msg = "Speaks must be whole numbers"
+                if int(decimal_val) != 0 and int(decimal_val) != 5:
+                    msg = "Speaks must be either .0 or .5"
                     self._errors[key] = self.error_class([msg])
                 if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
                         speaks < float(TabSettings.get("min_eballot_speak", 15)):

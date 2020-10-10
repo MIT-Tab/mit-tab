@@ -13,8 +13,9 @@ class MITTabClient(discord.Client):
     guild_id = None
     guild = None
 
-    def __init__(self, tournament_name='defaulttournament', *args, **kwargs):
+    def __init__(self, tournament_name='defaulttournament', guild_id=None, *args, **kwargs):
         self.tournament_name = tournament_name
+        self.guild_id = guild_id
         super().__init__(*args, **kwargs)
     
     async def on_ready(self):

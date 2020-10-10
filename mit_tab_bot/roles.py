@@ -94,6 +94,7 @@ async def get_member(guild, member_str):
 
 
 def has_role(member, role):
+    print (member)
     return role in [role.name for role in member.roles]
 
 
