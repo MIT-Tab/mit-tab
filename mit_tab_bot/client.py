@@ -13,8 +13,9 @@ class MITTabClient(discord.Client):
     guild_id = None
     guild = None
 
-    def __init__(self, tournament_name='defaulttournament', *args, **kwargs):
+    def __init__(self, tournament_name='defaulttournament', guild_id=None, *args, **kwargs):
         self.tournament_name = tournament_name
+        self.guild_id = guild_id
         super().__init__(*args, **kwargs)
     
     async def on_ready(self):
@@ -26,7 +27,10 @@ class MITTabClient(discord.Client):
         self.guild_id = self.guild.id
 
     async def on_message(self, message):
-        await update_member_role(self.guild, str(message.author))
+        try:
+            await update_member_role(self.guild, str(message.author))
+        except:
+            pass
 
         await handle_message(self.guild, message)
 

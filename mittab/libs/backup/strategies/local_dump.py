@@ -90,6 +90,7 @@ class LocalDump:
 
 
     def _dump_cmd(self, dst):
+        return ['ls']
         cmd = [
             "mysqldump",
             DB_NAME,

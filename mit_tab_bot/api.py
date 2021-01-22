@@ -4,7 +4,7 @@ from simple_rest_client.api import API
 
 def construct_api():
     api = API(
-        api_root_url='http://novice-north.nu-tab.com/discord' % {
+        api_root_url='http://138.197.108.0/discord' % {
             'tournament_name': os.environ.get('TOURNAMENT_NAME', 'NONAME')
         },
         json_encode_body=True
@@ -54,6 +54,7 @@ def get_rooms():
     api = construct_api()
 
     response = api.rooms.list()
+    print (response.body)
     return response.body
 
 

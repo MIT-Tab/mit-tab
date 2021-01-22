@@ -71,6 +71,7 @@ async def get_role(guild, role_name):
         if role.name == role_name:
             return role
 
+    print ('returning none')
     return None
 
 
@@ -94,6 +95,7 @@ async def get_member(guild, member_str):
 
 
 def has_role(member, role):
+    print (member)
     return role in [role.name for role in member.roles]
 
 
