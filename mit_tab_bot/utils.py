@@ -272,17 +272,12 @@ async def handle_message(guild, message):
         )
     elif message.content.startswith('!code'):
         if not has_role(member, 'judges'):
-            await member.send(
-                'You do not have permission!'
-            )
             return
 
         judge = get_judge(str(message.author))
         
         if not judge:
-            await member.send(
-                'Something went wrong!'
-            )
+            return
         else:
             await member.send(
                 'Your ballot code is: %s' % (
