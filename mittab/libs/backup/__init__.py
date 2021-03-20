@@ -14,7 +14,7 @@ from mittab.libs.backup.strategies.local_dump import LocalDump
 ACTIVE_BACKUP_KEY = "MITTAB_ACTIVE_BACKUP"
 ACTIVE_BACKUP_VAL = "1"
 
-
+# TODO: Improve this to be.... something better and more lock-y
 class ActiveBackupContextManager:
     def __enter__(self):
         os.environ[ACTIVE_BACKUP_KEY] = ACTIVE_BACKUP_VAL
