@@ -139,13 +139,12 @@ def view_backup(request, filename):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def download_backup(request, filename):
-    print("Trying to download {}".format(filename))
-    wrapper, size = backup.get_wrapped_file(filename)
-    response = HttpResponse(wrapper, content_type="text/plain")
-    response["Content-Length"] = size
-    response["Content-Disposition"] = "attachment; filename=%s" % filename
-    return response
+def download_backup(request, key):
+    print("Trying to download {}".format(key))
+    with backup.get_backup_fileobj(key) as f:
+        response = HttpResponse(f.read(), content_type="text/plain")
+        response["Content-Disposition"] = "attachment; filename=%s" % key
+        return response
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -153,7 +152,7 @@ def upload_backup(request):
     if request.method == "POST":
         form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
-            backup.handle_backup(request.FILES["file"])
+            backup.upload_backup(request.FILES["file"])
             return redirect_and_flash_success(
                 request, "Backup {} uploaded successfully".format(
                     request.FILES["file"].name))

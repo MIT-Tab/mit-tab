@@ -48,6 +48,12 @@ DATABASES = {
     }
 }
 
+BACKUPS = {
+    "use_s3": os.environ.get("BACKUP_STORAGE", "") == "S3",
+    "prefix": os.environ.get("BACKUP_PREFIX",  os.path.join(BASE_DIR, "mittab", "backups")),
+    "bucket_name": os.environ.get("BACKUP_BUCKET"),
+}
+
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
 if os.environ.get("SENTRY_DSN"):
@@ -103,3 +109,5 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
+
+BACKUP_STORAGE = "mittab.libs.backup.storage.LocalFilesystem"

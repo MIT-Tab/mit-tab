@@ -16,7 +16,7 @@ class MysqlDumpRestorer:
         subprocess.check_call(self._dump_cmd(fname))
 
     @classmethod
-    def restore_from_file(self, fname):
+    def restore_from_fileobj(self, f):
         """
         This is a multi-stage restore to avoid the worst-case scenario
         where you dump the existing db, but the restore from the new db fails,
@@ -28,21 +28,22 @@ class MysqlDumpRestorer:
             3. If error for #2, restore from the dumped file again
 
         Can be improved by using rename database, just need to test that out first
+
+        TODO: TEST FAILURE CASE BEFORE MERGING
         """
         with tempfile.NamedTemporaryFile() as fp:
             tmp_full_path = fp.name
             subprocess.check_call(self._dump_cmd(tmp_full_path))
 
             try:
-                with open(fname) as stdin:
+                with f as stdin:
                     subprocess.check_call(self._restore_cmd(), stdin=stdin)
             except Exception as e:
-                with open(tmp_full_path) as stdin:
-                    subprocess.check_call(self._restore_cmd(), stdin=stdin)
+                subprocess.check_call(self._restore_cmd(), stdin=fp)
                 raise e
 
 
-    def _restore_cmd(self):
+    def _restore_cmd(self): # TODO: This should just be a mysql client...
         cmd = [
             "mysql",
             DB_NAME,
