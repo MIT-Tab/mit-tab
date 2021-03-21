@@ -15,20 +15,19 @@ SUFFIX        = ".dump.sql"
 def with_backup_dir(func):
     def wrapper(*args, **kwargs):
         if not os.path.exists(BACKUP_PREFIX): os.makedirs(BACKUP_PREFIX)
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     return wrapper
 
 class LocalFilesystem:
     @with_backup_dir
     def all(self):
-        return map(lambda name: name[:-len(SUFFIX)], os.listdir(BACKUP_PREFIX))
+        return [ name[:-len(SUFFIX)] for name in os.listdir(BACKUP_PREFIX) ]
 
     @with_backup_dir
     def store_fileobj(self, key, f):
         dst_filename = os.path.join(BACKUP_PREFIX, key + SUFFIX)
         with open(dst_filename, "wb+") as destination:
-            for chunk in f.chunks():
-                destination.write(chunk)
+            destination.write(f.read())
 
     def get_fileobj(self, key):
         return open(self._get_backup_filename(key), "rb")

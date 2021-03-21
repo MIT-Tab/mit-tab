@@ -13,11 +13,9 @@ DB_PORT = DB_SETTINGS["PORT"]
 
 class MysqlDumpRestorer:
 
-    @classmethod
     def dump_to_file(self, fname):
         subprocess.check_call(self._dump_cmd(fname))
 
-    @classmethod
     def restore_from_fileobj(self, f):
         """
         This is a multi-stage restore to avoid the worst-case scenario
@@ -30,8 +28,6 @@ class MysqlDumpRestorer:
             3. If error for #2, restore from the dumped file again
 
         Can be improved by using rename database, just need to test that out first
-
-        TODO: TEST FAILURE CASE BEFORE MERGING
         """
         with tempfile.NamedTemporaryFile() as fp:
             tmp_full_path = fp.name
