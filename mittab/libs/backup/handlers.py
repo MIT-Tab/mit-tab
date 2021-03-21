@@ -1,4 +1,3 @@
-import io
 import subprocess
 import os
 import tempfile
@@ -15,9 +14,7 @@ DB_PORT = DB_SETTINGS["PORT"]
 class MysqlDumpRestorer:
 
     def dump(self):
-        stdout = io.StringIO()
-        subprocess.check_call(self._dump_cmd(), stdout=stdout)
-        return stdout.getvalue()
+        return subprocess.check_output(self._dump_cmd())
 
     def restore(self, content):
         """
@@ -34,9 +31,9 @@ class MysqlDumpRestorer:
         """
         before = self.dump()
         try:
-            subprocess.check_call(self._restore_cmd(), stdin=io.StringIO(content))
+            subprocess.check_output(self._restore_cmd(), input=content)
         except Exception as e:
-            subprocess.check_call(self._restore_cmd(), stdin=io.StringIO(before))
+            subprocess.check_output(self._restore_cmd(), input=before)
             raise e
 
 

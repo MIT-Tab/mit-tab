@@ -49,7 +49,7 @@ def backup_round(key=None, round_number=None, btime=None):
         if key is None:
             key = "site_round_%i_%i" % (round_number, btime)
         key = _generate_unique_key(key)
-        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump(f)
+        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump()
 
 def upload_backup(f):
     key = _generate_unique_key(f.name)
@@ -59,7 +59,7 @@ def upload_backup(f):
     except Exception:
         errors.emit_current_exception()
 
-def get_backup_fileobj(key):
+def get_backup_content(key):
     return BACKUP_STORAGE[key]
 
 def list_backups():
