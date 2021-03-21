@@ -141,10 +141,10 @@ def view_backup(request, filename):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def download_backup(request, key):
     print("Trying to download {}".format(key))
-    with backup.get_backup_fileobj(key) as f:
-        response = HttpResponse(f.read(), content_type="text/plain")
-        response["Content-Disposition"] = "attachment; filename=%s" % key
-        return response
+    data = backup.get_backup_data(key)
+    response = HttpResponse(data, content_type="text/plain")
+    response["Content-Disposition"] = "attachment; filename=%s" % key
+    return response
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")

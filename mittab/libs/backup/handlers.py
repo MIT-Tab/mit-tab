@@ -1,3 +1,4 @@
+import io
 import subprocess
 import os
 import tempfile
@@ -13,10 +14,12 @@ DB_PORT = DB_SETTINGS["PORT"]
 
 class MysqlDumpRestorer:
 
-    def dump_to_file(self, fname):
-        subprocess.check_call(self._dump_cmd(fname))
+    def dump(self):
+        stdout = io.StringIO()
+        subprocess.check_call(self._dump_cmd(), stdout=stdout)
+        return stdout.getvalue()
 
-    def restore_from_fileobj(self, f):
+    def restore(self, content):
         """
         This is a multi-stage restore to avoid the worst-case scenario
         where you dump the existing db, but the restore from the new db fails,
@@ -29,16 +32,12 @@ class MysqlDumpRestorer:
 
         Can be improved by using rename database, just need to test that out first
         """
-        with tempfile.NamedTemporaryFile() as fp:
-            tmp_full_path = fp.name
-            subprocess.check_call(self._dump_cmd(tmp_full_path))
-
-            try:
-                with f as stdin:
-                    subprocess.check_call(self._restore_cmd(), stdin=stdin)
-            except Exception as e:
-                subprocess.check_call(self._restore_cmd(), stdin=fp)
-                raise e
+        before = self.dump()
+        try:
+            subprocess.check_call(self._restore_cmd(), stdin=io.StringIO(content))
+        except Exception as e:
+            subprocess.check_call(self._restore_cmd(), stdin=io.StringIO(before))
+            raise e
 
 
     def _restore_cmd(self): # TODO: This should just be a mysql client...
@@ -55,7 +54,7 @@ class MysqlDumpRestorer:
 
         return cmd
 
-    def _dump_cmd(self, dst):
+    def _dump_cmd(self):
         cmd = [
             "mysqldump",
             DB_NAME,
@@ -64,7 +63,6 @@ class MysqlDumpRestorer:
             "--port={}".format(DB_PORT),
             "--host={}".format(DB_HOST),
             "--user={}".format(DB_USER),
-            "--result-file={}".format(dst),
         ]
 
         if DB_PASS:

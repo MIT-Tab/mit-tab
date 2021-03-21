@@ -1,3 +1,4 @@
+import io
 import os
 import tempfile
 import time
@@ -31,7 +32,7 @@ class ActiveBackupContextManager:
         os.environ[ACTIVE_BACKUP_KEY] = "0"
 
 def _generate_unique_key(base):
-    if BACKUP_STORAGE.exists(base):
+    if base in BACKUP_STORAGE:
         return "%s_%s" % (base, int(time.time()))
     else:
         return base
@@ -48,31 +49,27 @@ def backup_round(key=None, round_number=None, btime=None):
         if key is None:
             key = "site_round_%i_%i" % (round_number, btime)
         key = _generate_unique_key(key)
-
-        with tempfile.NamedTemporaryFile() as fp:
-            BACKUP_HANDLER.dump_to_file(fp.name)
-            BACKUP_STORAGE.store_fileobj(key, fp)
+        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump(f)
 
 def upload_backup(f):
     key = _generate_unique_key(f.name)
     print(("Tried to write {}".format(key)))
     try:
-        BACKUP_STORAGE.store_fileobj(key, f)
+        BACKUP_STORAGE[key] = f.read()
     except Exception:
         errors.emit_current_exception()
 
 def get_backup_fileobj(key):
-    return BACKUP_STORAGE.get_fileobj(key)
+    return BACKUP_STORAGE[key]
 
 def list_backups():
     print("Checking backups directory")
-    return BACKUP_STORAGE.all()
+    return BACKUP_STORAGE.keys()
 
 def restore_from_backup(key):
     with ActiveBackupContextManager() as _:
         print("Restoring from backups directory")
-        backup_fileobj = BACKUP_STORAGE.get_fileobj(key)
-        BACKUP_HANDLER.restore_from_fileobj(backup_fileobj)
+        BACKUP_HANDLER.restore(BACKUP_STORAGE[key])
 
 def is_backup_active():
     return str(os.environ.get(ACTIVE_BACKUP_KEY, "0")) == ACTIVE_BACKUP_VAL
