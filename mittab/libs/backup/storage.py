@@ -1,3 +1,4 @@
+import io
 import os
 import time
 import tempfile
@@ -72,6 +73,7 @@ class ObjectStorage:
     def __setitem__(self, key, content):
         with tempfile.TemporaryFile(mode='w+b') as f:
             f.write(content)
+            f.seek(0)
             self.s3_client.upload_fileobj(f, BUCKET_NAME, self._object_path(key))
 
     def __getitem__(self, key):
@@ -86,6 +88,7 @@ class ObjectStorage:
                     return KeyError(key)
                 else:
                     raise e
+            fp.seek(0)
             return fp.read()
 
     def _object_path(self, key):
