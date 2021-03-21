@@ -2,6 +2,8 @@ import subprocess
 import os
 import tempfile
 
+from mittab import settings
+
 DB_SETTINGS = settings.DATABASES["default"]
 DB_HOST = DB_SETTINGS["HOST"]
 DB_NAME = DB_SETTINGS["NAME"]
