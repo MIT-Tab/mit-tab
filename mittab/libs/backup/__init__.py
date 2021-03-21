@@ -4,7 +4,6 @@ import tempfile
 import time
 from wsgiref.util import FileWrapper
 
-from django.conf import settings
 
 from mittab.apps.tab.models import TabSettings
 from mittab.libs import errors
@@ -22,7 +21,7 @@ else:
 BACKUP_HANDLER = MysqlDumpRestorer()
 
 
-# TODO: Improve this to be.... something better and more lock-y
+# Note: Improve this to be.... something better and more lock-y
 class ActiveBackupContextManager:
     def __enter__(self):
         os.environ[ACTIVE_BACKUP_KEY] = ACTIVE_BACKUP_VAL

@@ -1,6 +1,4 @@
 import subprocess
-import os
-import tempfile
 
 from mittab import settings
 
@@ -37,7 +35,7 @@ class MysqlDumpRestorer:
             raise e
 
 
-    def _restore_cmd(self): # TODO: This should just be a mysql client...
+    def _restore_cmd(self): # Note: refactor to just use a python mysql client
         cmd = [
             "mysql",
             DB_NAME,

@@ -1,13 +1,10 @@
 import os
-import shutil
 import sys
-import time
 
 from django.core.management import call_command
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from mittab import settings
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import backup_round
 
