@@ -27,7 +27,7 @@ pip install -r requirements.txt
 echo -e "${BLUE}STEP 2: Set up the tournament${NC}"
 printf "Please enter a password for the 'tab' user: "
 read tab_password
-python manage.py initialize_tourney --tab-password $tab_password $USER .
+python manage.py initialize_tourney --tab-password $tab_password $USER
 
 echo -e "${BLUE}STEP 3: Collecting HTML, CSS and JS files${NC}"
 python manage.py collectstatic

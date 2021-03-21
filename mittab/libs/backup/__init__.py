@@ -1,20 +1,27 @@
-import shutil
-import time
+import io
 import os
+import tempfile
+import time
 from wsgiref.util import FileWrapper
 
-from django.conf import settings
 
 from mittab.apps.tab.models import TabSettings
 from mittab.libs import errors
-from mittab.settings import BASE_DIR
-from mittab.libs.backup.strategies.local_dump import LocalDump
-
+from mittab.libs.backup.handlers import MysqlDumpRestorer
+from mittab.libs.backup.storage import LocalFilesystem, ObjectStorage
+from mittab import settings
 
 ACTIVE_BACKUP_KEY = "MITTAB_ACTIVE_BACKUP"
 ACTIVE_BACKUP_VAL = "1"
 
+if settings.BACKUPS["use_s3"]:
+    BACKUP_STORAGE = ObjectStorage()
+else:
+    BACKUP_STORAGE = LocalFilesystem()
+BACKUP_HANDLER = MysqlDumpRestorer()
 
+
+# Note: Improve this to be.... something better and more lock-y
 class ActiveBackupContextManager:
     def __enter__(self):
         os.environ[ACTIVE_BACKUP_KEY] = ACTIVE_BACKUP_VAL
@@ -24,12 +31,12 @@ class ActiveBackupContextManager:
         os.environ[ACTIVE_BACKUP_KEY] = "0"
 
 def _generate_unique_key(base):
-    if LocalDump(base).exists():
+    if base in BACKUP_STORAGE:
         return "%s_%s" % (base, int(time.time()))
     else:
         return base
 
-def backup_round(dst_filename=None, round_number=None, btime=None):
+def backup_round(key=None, round_number=None, btime=None):
     with ActiveBackupContextManager() as _:
         if round_number is None:
             round_number = TabSettings.get("cur_round", "no-round-number")
@@ -38,35 +45,30 @@ def backup_round(dst_filename=None, round_number=None, btime=None):
             btime = int(time.time())
 
         print("Trying to backup to backups directory")
-        if dst_filename is None:
-            dst_filename = "site_round_%i_%i" % (round_number, btime)
+        if key is None:
+            key = "site_round_%i_%i" % (round_number, btime)
+        key = _generate_unique_key(key)
+        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump()
 
-        dst_filename = _generate_unique_key(dst_filename)
-        return LocalDump(dst_filename).backup()
-
-
-def handle_backup(f):
-    dst_key = _generate_unique_key(f.name)
-    print(("Tried to write {}".format(dst_key)))
+def upload_backup(f):
+    key = _generate_unique_key(f.name)
+    print(("Tried to write {}".format(key)))
     try:
-        return LocalDump.from_upload(dst_key, f)
+        BACKUP_STORAGE[key] = f.read()
     except Exception:
         errors.emit_current_exception()
 
+def get_backup_content(key):
+    return BACKUP_STORAGE[key]
 
 def list_backups():
     print("Checking backups directory")
-    return [dump.key for dump in LocalDump.all()]
+    return BACKUP_STORAGE.keys()
 
-
-def restore_from_backup(src_key):
+def restore_from_backup(key):
     with ActiveBackupContextManager() as _:
         print("Restoring from backups directory")
-        return LocalDump(src_key).restore()
-
-
-def get_wrapped_file(src_key):
-    return LocalDump(src_key).downloadable()
+        BACKUP_HANDLER.restore(BACKUP_STORAGE[key])
 
 def is_backup_active():
     return str(os.environ.get(ACTIVE_BACKUP_KEY, "0")) == ACTIVE_BACKUP_VAL

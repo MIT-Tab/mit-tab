@@ -48,6 +48,15 @@ DATABASES = {
     }
 }
 
+BACKUPS = {
+    "use_s3": os.environ.get("BACKUP_STORAGE", "") == "S3",
+    "prefix": os.environ.get(
+        "BACKUP_PREFIX",
+        os.path.join(BASE_DIR, "mittab", "backups")),
+    "bucket_name": os.environ.get("BACKUP_BUCKET"),
+    "s3_endpoint": os.environ.get("BACKUP_S3_ENDPOINT"),
+}
+
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
 if os.environ.get("SENTRY_DSN"):
