@@ -110,5 +110,3 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
-
-BACKUP_STORAGE = "mittab.libs.backup.storage.LocalFilesystem"
