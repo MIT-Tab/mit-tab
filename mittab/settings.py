@@ -41,10 +41,10 @@ DATABASES = {
         "ENGINE":   "django.db.backends.mysql",
         "OPTIONS":  {"charset": "utf8mb4"},
         "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
-        "USER":     os.environ.get("MYSQL_USER",     "root"),
+        "USER":     os.environ.get("MYSQL_USER", "root"),
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "HOST":     os.environ.get("MYSQL_HOST",     "127.0.0.1"),
-        "PORT":     os.environ.get("MYSQL_PORT",     "3306"),
+        "HOST":     os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "PORT":     os.environ.get("MYSQL_PORT", "3306"),
     }
 }
 
