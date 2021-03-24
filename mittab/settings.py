@@ -42,7 +42,7 @@ DATABASES = {
         "NAME": "mittab",
         "OPTIONS": {"charset": "utf8mb4"},
         "USER": os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "PASSWORD": os.environ.get("MYSQL_ROOT_PASSWORD", ""),
         "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
         "PORT": os.environ.get("MYSQL_PORT", "3306"),
     }
