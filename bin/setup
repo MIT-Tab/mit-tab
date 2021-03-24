@@ -2,7 +2,7 @@
 set -e
 
 if [ -x "$(command -v mysqladmin)" ]; then
-  mysqladmin ping -h $MITTAB_DB_HOST -u $MYSQL_USER --password=$MYSQL_PASSWORD --wait=30
+  mysqladmin ping -h $MITTAB_DB_HOST -u root --password=$MYSQL_ROOT_PASSWORD --wait=30
 fi
 python manage.py migrate --noinput
 npm install
