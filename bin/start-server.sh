@@ -3,4 +3,26 @@ set -e
 set +x
 
 cd /var/www/tab
+
+function execute-mysql() {
+  mysql -u $MYSQL_USER \
+    -h $MYSQL_HOST \
+    -D $MYSQL_DATABASE \
+    -P $MYSQL_PORT \
+    --password="$MYSQL_PASSWORD" \
+    -e "$1"
+}
+
+python manage.py migrate --noinput
+
+# Create a table tournament_intialized to use as a flag indicating the
+# tournament has been initialzed
+if [[ $(execute-mysql "show tables like 'tournament_initialized'") ]]; then
+  echo "Tournament already initialized, skipping init phase";
+else
+  echo "Initializing tournament";
+  python manage.py initialize_tourney --tab-password $TAB_PASSWORD;
+  execute-mysql "CREATE TABLE tournament_initialized(id int not null);"
+fi
+
 /usr/local/bin/gunicorn mittab.wsgi:application -w 2 --bind 0.0.0.0:8000 -t 300
