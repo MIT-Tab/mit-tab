@@ -3,14 +3,11 @@ FROM python:3.7
 # install dependenices
 RUN apt-get update && \
   apt-get upgrade -y && \
-  apt-get install -y vim default-mysql-client nginx
+  apt-get install -y vim default-mysql-client
 
 # sets up nodejs to install npm
 RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
 RUN apt-get install -y nodejs
-
-RUN ln -sf /dev/stdout /var/log/nginx/access.log
-RUN ln -sf /dev/stderr /var/log/nginx/error.log
 
 WORKDIR /var/www/tab
 
@@ -24,7 +21,6 @@ COPY webpack.config.js ./
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets
-COPY nginx.conf /etc/nginx/sites-available/default
 
 RUN pip install pipenv
 RUN pipenv install --deploy --system
