@@ -8,6 +8,8 @@
 
 </div>
 
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/mit-tab/mit-tab/tree/do-apps)
+
 MIT-Tab is a web application to manage APDA debate tournaments.
 
 Looking to learn how to use mit-tab? [Check out the docs!](https://mit-tab.readthedocs.io/en/latest/)
