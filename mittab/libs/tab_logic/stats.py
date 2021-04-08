@@ -179,7 +179,7 @@ def avg_deb_speaks(debater):
     real_speaks = []
     num_speaks = TabSettings.get("cur_round") - 1
     debater_roundstats = debater.roundstats_set.all()
-    team = debater.team()
+    team = debater.team
 
     speaks_per_round = defaultdict(list)
     # We might have multiple roundstats per round if we have iron men, so first
@@ -233,7 +233,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     If a debater wins in a bye, they get their average speaks
     If a debater was late to a lenient round, they get average speaks
     """
-    team = debater.team()
+    team = debater.team
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
     num_speaks = TabSettings.get("cur_round") - 1
@@ -288,7 +288,7 @@ def debater_abnormal_round_speaks(debater, round_number):
     Byes:
     Uses average speaks
     """
-    team = debater.team()
+    team = debater.team
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
     if had_bye(team, round_number) or (had_noshow
@@ -336,7 +336,7 @@ def avg_deb_ranks(debater):
     real_ranks = []
     num_ranks = TabSettings.get("cur_round") - 1
     debater_roundstats = debater.roundstats_set.all()
-    team = debater.team()
+    team = debater.team
 
     ranks_per_round = defaultdict(list)
     # We might have multiple roundstats per round if we have iron men, so first
@@ -381,7 +381,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     If a debater wins in a bye, they get their average ranks
     If a debater was late to a lenient round, they get average ranks
     """
-    team = debater.team()
+    team = debater.team
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 ranks
     num_ranks = TabSettings.get("cur_round") - 1
@@ -431,7 +431,7 @@ def debater_abnormal_round_ranks(debater, round_number):
     Byes:
     Uses average ranks
     """
-    team = debater.team()
+    team = debater.team
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
     if had_bye(team, round_number) or (had_noshow

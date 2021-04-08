@@ -100,13 +100,12 @@ class Debater(ModelWithTiebreaker):
     def __str__(self):
         return self.name
 
+    @property
     def team(self):
         # this ordering is just a work-around to say consistent with imperfect test data
         # Ideally, we will enforce only 1 team membership via validation
         # https://github.com/MIT-Tab/mit-tab/issues/218
-        if self._team is None:
-            self._team = self.team_set.order_by("pk").first()
-        return self._team
+        return self.team_set.order_by("pk").first()
 
     def delete(self, using=None, keep_parents=False):
         teams = Team.objects.filter(debaters=self)
