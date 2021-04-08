@@ -25,7 +25,7 @@ def num_forfeit_wins(team):
 
 
 def won_by_forfeit(round_obj, team):
-    if round_obj.opp_team != team and round_obj.gov_team != team:
+    if round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -37,7 +37,7 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if round_obj.opp_team != team and round_obj.gov_team != team:
+    if round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -178,7 +178,7 @@ def avg_deb_speaks(debater):
     """
     real_speaks = []
     num_speaks = TabSettings.get("cur_round") - 1
-    debater_roundstats = debater.roundstats_set.all()
+    debater_roundstats = debater.roundstats_set.all().prefetch_related("round")
     team = debater.team
 
     speaks_per_round = defaultdict(list)
@@ -238,7 +238,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 speaks
     num_speaks = TabSettings.get("cur_round") - 1
 
-    debater_roundstats = debater.roundstats_set.all()
+    debater_roundstats = debater.roundstats_set.all().prefetch_related("round")
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)

@@ -93,9 +93,8 @@ class Debater(ModelWithTiebreaker):
 
     @property
     def display(self):
-        if self.num_teams:
-            return self.name
-        return "{} (NO TEAM)".format(self.name)
+        # TODO: Fix no name
+        return self.name
 
     def __str__(self):
         return self.name

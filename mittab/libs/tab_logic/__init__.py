@@ -192,7 +192,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams)
         else:
             temp = perfect_pairing(list_of_teams[bracket])
-            print("Pairing round %i of size %i" % (bracket, len(temp)))
+            print("Pairing bracket %i of size %i" % (bracket, len(temp)))
         for pair in temp:
             pairings.append([pair[0], pair[1], None])
 
