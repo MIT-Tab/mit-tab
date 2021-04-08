@@ -104,7 +104,9 @@ class Debater(ModelWithTiebreaker):
         # this ordering is just a work-around to say consistent with imperfect test data
         # Ideally, we will enforce only 1 team membership via validation
         # https://github.com/MIT-Tab/mit-tab/issues/218
-        return self.team_set.order_by("pk").first()
+        if self._team is None:
+            self._team = self.team_set.order_by("pk").first()
+        return self._team
 
     def delete(self, using=None, keep_parents=False):
         teams = Team.objects.filter(debaters=self)
@@ -177,24 +179,12 @@ class Team(ModelWithTiebreaker):
 
     @property
     def display_backend(self):
-        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
-
-        if use_team_codes_backend:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
+        # TODO: un-break teamcodes
         return self.name
 
     @property
     def display(self):
-        use_team_codes = TabSettings.get("use_team_codes", 0)
-
-        if use_team_codes:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
+        # TODO: un-break teamcodes
         return self.name
 
     def __str__(self):
