@@ -19,7 +19,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
-                  "webpack_loader", "bootstrap4", "polymorphic")
+                  "webpack_loader", "bootstrap4", "polymorphic", "django_q",)
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",
@@ -112,3 +112,10 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
+
+Q_CLUSTER = {
+    "name": "mittab-pairings",
+    "orm": "default",
+    "workers": 2,
+    "timeout": (10 * 60), # 10 minutes
+}

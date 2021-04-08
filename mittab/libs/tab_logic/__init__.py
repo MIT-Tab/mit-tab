@@ -10,7 +10,6 @@ from mittab.libs import errors, mwmatching
 from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 
-
 def pair_round():
     """
     Pair the next round of debate.
