@@ -112,6 +112,7 @@ def pair_round():
         #  2) If we are in 1-up bracket and there are no all down
         #     teams, give someone a bye
         #  3) Otherwise, find a pull up from the next bracket
+
         for bracket in reversed(list(range(current_round))):
             if len(list_of_teams[bracket]) % 2 != 0:
                 # If there are no teams all down, give the bye to a one down team.
@@ -191,7 +192,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams)
         else:
             temp = perfect_pairing(list_of_teams[bracket])
-            print("Pairing round %i of size %i" % (bracket, len(temp)))
+            print("Pairing bracket %i of size %i" % (bracket, len(temp)))
         for pair in temp:
             pairings.append([pair[0], pair[1], None])
 
@@ -246,8 +247,12 @@ def have_enough_rooms(_round_to_check):
 
 
 def have_properly_entered_data(round_to_check):
-    last_round = round_to_check - 1
-    prev_rounds = Round.objects.filter(round_number=last_round)
+    last_round         = round_to_check - 1
+
+    prev_rounds        = Round.objects.filter(round_number=last_round).prefetch_related("gov_team", "opp_team")
+    prev_round_noshows = set(NoShow.objects.filter(round_number=last_round).values_list('no_show_team_id', flat=True))
+    prev_round_byes    = set(Bye.objects.filter(round_number=last_round).values_list('bye_team', flat=True))
+
     for prev_round in prev_rounds:
         # There should be a result
         if prev_round.victor == Round.NONE:
@@ -255,12 +260,10 @@ def have_properly_entered_data(round_to_check):
         # Both teams should not have byes or noshows
         gov_team, opp_team = prev_round.gov_team, prev_round.opp_team
         for team in gov_team, opp_team:
-            had_noshow = NoShow.objects.filter(no_show_team=team,
-                                               round_number=last_round)
-            if had_bye(team, last_round):
+            if team.id in prev_round_byes:
                 raise errors.ByeAssignmentError(
                     "{} both had a bye and debated last round".format(team))
-            if had_noshow:
+            if team.id in prev_round_noshows:
                 raise errors.NoShowAssignmentError(
                     "{} both debated and had a no show".format(team))
 

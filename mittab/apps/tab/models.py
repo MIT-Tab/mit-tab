@@ -93,13 +93,13 @@ class Debater(ModelWithTiebreaker):
 
     @property
     def display(self):
-        if self.num_teams:
-            return self.name
-        return "{} (NO TEAM)".format(self.name)
+        # TODO: Fix no name
+        return self.name
 
     def __str__(self):
         return self.name
 
+    @property
     def team(self):
         # this ordering is just a work-around to say consistent with imperfect test data
         # Ideally, we will enforce only 1 team membership via validation
@@ -177,24 +177,12 @@ class Team(ModelWithTiebreaker):
 
     @property
     def display_backend(self):
-        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
-
-        if use_team_codes_backend:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
+        # TODO: un-break teamcodes
         return self.name
 
     @property
     def display(self):
-        use_team_codes = TabSettings.get("use_team_codes", 0)
-
-        if use_team_codes:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
+        # TODO: un-break teamcodes
         return self.name
 
     def __str__(self):

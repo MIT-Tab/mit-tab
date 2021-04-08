@@ -18,18 +18,18 @@ from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
 
 
 def index(request):
-    number_teams = Team.objects.count()
-    number_judges = Judge.objects.count()
-    number_schools = School.objects.count()
-    number_debaters = Debater.objects.count()
-    number_rooms = Room.objects.count()
-
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
     team_list = [(team.pk, team.display_backend) for team in Team.objects.all()]
     debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
+
+    number_teams = len(team_list)
+    number_judges = len(judge_list)
+    number_schools = len(school_list)
+    number_debaters = len(debater_list)
+    number_rooms = len(room_list)
 
     return render(request, "common/index.html", locals())
 

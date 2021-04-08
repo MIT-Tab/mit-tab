@@ -1,5 +1,5 @@
 from django.views import i18n
-from django.conf.urls import url
+from django.conf.urls import url, include
 from django.urls import path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
@@ -241,6 +241,9 @@ urlpatterns = [
 
     # Cache related
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # Profiler
+    url(r'^silk/', include('silk.urls', namespace='silk'))
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"
