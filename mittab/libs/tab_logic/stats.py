@@ -26,7 +26,7 @@ def num_forfeit_wins(team):
     return num_wins
 
 def won_by_forfeit(round_obj, team):
-    if round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
+    if team is None or round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -38,7 +38,7 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
+    if team is None or round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -305,6 +305,9 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = debater.team()
+    if team is None:
+        return MINIMUM_DEBATER_SPEAKS
+
     had_noshow = None
     for ns in team.no_shows.all():
         if ns.round_number == round_number:
@@ -453,6 +456,8 @@ def debater_abnormal_round_ranks(debater, round_number):
     """
     team = debater.team()
     had_noshow = None
+    if team is None:
+        return MINIMUM_DEBATER_SPEAKS
     for ns in team.no_shows.all():
         if ns.round_number == round_number:
             had_noshow = ns
