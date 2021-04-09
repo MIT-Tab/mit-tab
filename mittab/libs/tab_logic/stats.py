@@ -38,7 +38,7 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if team is None or round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
+    if team is None or (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -54,11 +54,11 @@ def hit_pull_up(team):
 
 def pull_up_count(team):
     count = 0
-    for r in team.gov_team:
+    for r in team.gov_team.all():
         if r.pullup == Round.GOV:
             count += 1
 
-    for r in team.opp_team:
+    for r in team.opp_team.all():
         if r.pullup == Round.OPP:
             count += 1
 
