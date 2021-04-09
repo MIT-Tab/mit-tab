@@ -301,7 +301,7 @@ def validate_round_data(round_to_check):
 
     # Check that there are enough judges
     if not have_enough_judges(round_to_check)[0]:
-        raise errors.NotEnoughJudgesError()
+        raise errors.NotEnoughJudgesError("Not enough judges for round %d" % round_to_check)
 
     # Check there are enough rooms
     if not have_enough_rooms(round_to_check)[0]:

@@ -38,13 +38,20 @@ class TabSettings(models.Model):
 
     @classmethod
     def set(cls, key, value):
-        cache_logic.invalidate_cache("tab_settings_dict")
         if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
             obj.value = value
             obj.save()
         else:
             obj = cls.objects.create(key=key, value=value)
+
+    def save(self, *args, **kwargs):
+        cache_logic.invalidate_cache("tab_settings_dict")
+        super(TabSettings, self).save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        cache_logic.invalidate_cache("tab_settings_dict")
+        super(TabSettings, self).delete(using, keep_parents)
 
 
 class School(models.Model):
