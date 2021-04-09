@@ -4,12 +4,17 @@ from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 
 
-def add_judges(pairings, judges, panel_points):
-    # First clear any existing judge assignments
-    for pairing in pairings:
-        pairing.judges.clear()
+def add_judges(panel_points):
+    current_round_number = TabSettings.get("cur_round") - 1
 
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    # First clear any existing judge assignments
+    Round.judges.through.objects.filter(round__round_number=current_round_number).delete()
+
+    judges = list(Judge.objects.filter(check_ins__round_number=4).prefetch_related(
+        "judges", # poorly named relation for the round
+        "scratches",
+    ))
+    pairings = tab_logic.sorted_pairings(current_round_number)
 
     # Try to have consistent ordering with the round display
     random.seed(1337)
@@ -185,15 +190,16 @@ def calc_weight_panel(judges):
 
 
 def judge_conflict(judge, team1, team2):
-    return Scratch.objects.filter(judge=judge, team=team1).exists() \
+    return any(s.team_id in (team1.id, team2.id,) for s in judge.scratches.all()) \
             or had_judge(judge, team1) \
-            or Scratch.objects.filter(judge=judge, team=team2).exists() \
             or had_judge(judge, team2)
 
 
 def had_judge(judge, team):
-    return Round.objects.filter(gov_team=team, judges=judge).exists() \
-            or Round.objects.filter(opp_team=team, judges=judge).exists()
+    for r in judge.judges:
+        if r.gov_team_id == team.id or r.opp_team_id == team.id:
+            return True
+    return False
 
 
 def can_judge_teams(list_of_judges, team1, team2):
