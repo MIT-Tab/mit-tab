@@ -351,12 +351,24 @@ def sorted_pairings(round_number):
     """
     round_pairing = list(
             Round.objects.filter(round_number=round_number)
-            .prefetch_related("judges", "chair", "room", "gov_team", "opp_team",
-                "gov_team__debaters", "opp_team__debaters",
-                "gov_team__debaters__team_set", "opp_team__debaters__team_set",
+            .prefetch_related("judges", 
+                "chair",
+                "room",
+                "gov_team",
+                "opp_team",
+                "gov_team__gov_team", # poorly named relation, points to rounds as gov
+                "gov_team__opp_team", # poorly named relation, points to rounds as gov
+                "gov_team__byes",
+                "gov_team__no_shows",
+                "gov_team__debaters__team_set",
                 "gov_team__debaters__roundstats_set",
-                "opp_team__debaters__roundstats_set",
                 "gov_team__debaters__roundstats_set__round",
+                "opp_team__gov_team", # poorly named relation, points to rounds as gov
+                "opp_team__opp_team", # poorly named relation, points to rounds as gov
+                "opp_team__byes",
+                "opp_team__no_shows",
+                "opp_team__debaters__team_set",
+                "opp_team__debaters__roundstats_set",
                 "opp_team__debaters__roundstats_set__round"))
     round_pairing.sort(key=lambda x: team_comp(x, round_number),
                        reverse=True)

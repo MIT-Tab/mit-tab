@@ -460,7 +460,7 @@ class Round(models.Model):
 
 
 class Bye(models.Model):
-    bye_team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):
@@ -469,7 +469,7 @@ class Bye(models.Model):
 
 
 class NoShow(models.Model):
-    no_show_team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    no_show_team = models.ForeignKey(Team, related_name="no_shows", on_delete=models.CASCADE)
     round_number = models.IntegerField()
     lenient_late = models.BooleanField(default=False)
 

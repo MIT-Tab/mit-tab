@@ -13,16 +13,17 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 
 
 def num_byes(team):
-    return Bye.objects.filter(bye_team=team).count()
-
+    return team.byes.count()
 
 def num_forfeit_wins(team):
-    return Round.objects.filter(
-        Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)
-        | Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)
-        | Q(gov_team=team, victor=Round.ALL_WIN)
-        | Q(opp_team=team, victor=Round.ALL_WIN)).count()
-
+    num_wins = 0
+    for r in team.gov_team.all():
+        if r.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
+            num_wins += 1
+    for r in team.opp_team.all():
+        if r.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
+            num_wins += 1
+    return num_wins
 
 def won_by_forfeit(round_obj, team):
     if team is None or (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
@@ -79,9 +80,17 @@ def had_bye(team, round_number=None):
 
 @cache()
 def tot_wins(team):
-    normal_wins = Round.objects.filter(
-        Q(gov_team=team, victor=Round.GOV)
-        | Q(opp_team=team, victor=Round.OPP)).count()
+    """
+    Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
+    problems
+    """
+    normal_wins = 0
+    for r in team.opp_team.all():
+        if r.victor == Round.OPP:
+            normal_wins += 1
+    for r in team.gov_team.all():
+        if r.victor == Round.GOV:
+            normal_wins += 1
     return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
 
