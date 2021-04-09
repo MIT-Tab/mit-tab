@@ -309,9 +309,6 @@ def debater_abnormal_round_speaks(debater, round_number):
     """
     team = debater.team()
     had_noshow = None
-    print(debater)
-    if team is None:
-        import pdb; pdb.set_trace()
     for ns in team.no_shows.all():
         if ns.round_number == round_number:
             had_noshow = ns

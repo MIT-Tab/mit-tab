@@ -105,7 +105,7 @@ class Debater(models.Model):
         ordering = ["name"]
 
 
-class Team(ModelWithTiebreaker):
+class Team(models.Model):
     name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
