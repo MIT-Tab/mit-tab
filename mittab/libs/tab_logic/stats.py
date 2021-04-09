@@ -25,7 +25,7 @@ def num_forfeit_wins(team):
 
 
 def won_by_forfeit(round_obj, team):
-    if round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
+    if team is None or (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -37,7 +37,7 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
+    if team is None or (round_obj.opp_team_id != team and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -91,8 +91,10 @@ def tot_wins(team):
 
 
 @cache()
-def tot_speaks(team):
-    return sum([tot_speaks_deb(deb, False) for deb in team.debaters.all()])
+def tot_speaks(team, num_speaks=None):
+    if num_speaks is None:
+        num_speaks = TabSettings.get("cur_round") - 1
+    return sum([tot_speaks_deb(deb, False, num_speaks) for deb in team.debaters.all()])
 
 
 @cache()
@@ -178,7 +180,7 @@ def avg_deb_speaks(debater):
     """
     real_speaks = []
     num_speaks = TabSettings.get("cur_round") - 1
-    debater_roundstats = debater.roundstats_set.all().prefetch_related("round")
+    debater_roundstats = debater.roundstats_set.all()
     team = debater.team
 
     speaks_per_round = defaultdict(list)
@@ -214,7 +216,7 @@ def debater_forfeit_speaks(_debater):
 
 
 @cache()
-def speaks_for_debater(debater, average_ironmen=True):
+def speaks_for_debater(debater, average_ironmen=True, num_speaks=None):
     """Returns a list of speaks for the provided debater
 
     In most normal rounds the speaks of the debater are the speaks the judge
@@ -236,9 +238,10 @@ def speaks_for_debater(debater, average_ironmen=True):
     team = debater.team
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
-    num_speaks = TabSettings.get("cur_round") - 1
+    if num_speaks is None:
+        num_speaks = TabSettings.get("cur_round") - 1
 
-    debater_roundstats = debater.roundstats_set.all().prefetch_related("round")
+    debater_roundstats = debater.roundstats_set.all()
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -311,9 +314,11 @@ def double_adjusted_speaks_deb(debater):
 
 
 @cache()
-def tot_speaks_deb(debater, average_ironmen=True):
+def tot_speaks_deb(debater, average_ironmen=True, num_speaks=None):
     """Return the total of all speaks for a debater"""
-    debater_speaks = speaks_for_debater(debater, average_ironmen)
+    if num_speaks is None:
+        num_speaks = TabSettings.get("cur_round") - 1
+    debater_speaks = speaks_for_debater(debater, average_ironmen, num_speaks)
     return sum(debater_speaks)
 
 

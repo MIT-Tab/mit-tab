@@ -344,14 +344,35 @@ def middle_of_bracket_teams():
     return teams
 
 
+def sorted_pairings(round_number):
+    """
+    Helper function to get the sorted pairings for a round while minimizing the
+    number of DB queries required to calculate it
+    """
+    round_pairing = list(
+            Round.objects.filter(round_number=round_number)
+            .prefetch_related("judges", "chair", "room", "gov_team", "opp_team",
+                "gov_team__debaters", "opp_team__debaters",
+                "gov_team__debaters__team_set", "opp_team__debaters__team_set",
+                "gov_team__debaters__roundstats_set",
+                "opp_team__debaters__roundstats_set",
+                "gov_team__debaters__roundstats_set__round",
+                "opp_team__debaters__roundstats_set__round"))
+    round_pairing.sort(key=lambda x: team_comp(x, round_number),
+                       reverse=True)
+
+    return round_pairing
+
+
 def team_comp(pairing, round_number):
     gov, opp = pairing.gov_team, pairing.opp_team
     if round_number == 1:
         return (max(gov.seed, opp.seed), min(gov.seed, opp.seed))
     else:
         return (max(tot_wins(gov),
-                    tot_wins(opp)), max(tot_speaks(gov), tot_speaks(opp)),
-                min(tot_speaks(gov), tot_speaks(opp)))
+                    tot_wins(opp)), max(tot_speaks(gov, round_number - 1),
+                        tot_speaks(opp, round_number - 1)),
+                min(tot_speaks(gov, round_number - 1), tot_speaks(opp, round_number - 1)))
 
 
 def team_score_except_record(team):

@@ -209,15 +209,10 @@ def view_status(request):
 
 def view_round(request, round_number):
     errors, excluded_teams = [], []
-    round_pairing = list(
-            Round.objects.filter(round_number=round_number)
-            .prefetch_related("judges", "chair", "room", "gov_team", "opp_team"))
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    round_pairing.sort(key=lambda x: tab_logic.team_comp(x, round_number),
-                       reverse=True)
-
+    round_pairing = tab_logic.sorted_pairings(round_number)
     #For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 

@@ -104,3 +104,25 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
+
+LOGGING = {
+    'version': 1,
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        }
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+        }
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+        }
+    }
+}
