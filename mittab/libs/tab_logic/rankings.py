@@ -32,7 +32,7 @@ def rank_teams():
         "debaters__team_set",
         "debaters__team_set__no_shows",
     )
-    return sorted([ TeamScore(d) for d in all_teams ])
+    return sorted(TeamScore(d) for d in all_teams)
 
 
 class Stat:
@@ -110,7 +110,7 @@ class TeamScore(Score):
                      SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
                      DOUBLE_ADJUSTED_RANKS, OPP_STRENGTH, COIN_FLIP)
 
-    def __init__(self, team, num_rounds=None):
+    def __init__(self, team):
         super(TeamScore, self).__init__()
         self.team = team
         self.stats[WINS] = tot_wins(team)

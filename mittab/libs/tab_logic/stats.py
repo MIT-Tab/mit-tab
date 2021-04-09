@@ -1,7 +1,6 @@
 from collections import defaultdict
-from django.db.models import Q
 
-from mittab.apps.tab.models import Round, Bye, NoShow, TabSettings
+from mittab.apps.tab.models import Round, TabSettings
 from mittab.libs.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
@@ -17,16 +16,17 @@ def num_byes(team):
 
 def num_forfeit_wins(team):
     num_wins = 0
-    for r in team.gov_team.all():
-        if r.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
+    for round_obj in team.gov_team.all():
+        if round_obj.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
             num_wins += 1
-    for r in team.opp_team.all():
-        if r.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
+    for round_obj in team.opp_team.all():
+        if round_obj.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
             num_wins += 1
     return num_wins
 
 def won_by_forfeit(round_obj, team):
-    if team is None or round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
+    if team is None or \
+            (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -38,7 +38,8 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if team is None or (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
+    if team is None or \
+            (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -54,12 +55,12 @@ def hit_pull_up(team):
 
 def pull_up_count(team):
     count = 0
-    for r in team.gov_team.all():
-        if r.pullup == Round.GOV:
+    for round_obj in team.gov_team.all():
+        if round_obj.pullup == Round.GOV:
             count += 1
 
-    for r in team.opp_team.all():
-        if r.pullup == Round.OPP:
+    for round_obj in team.opp_team.all():
+        if round_obj.pullup == Round.OPP:
             count += 1
 
     return count
@@ -92,11 +93,11 @@ def tot_wins(team):
     problems
     """
     normal_wins = 0
-    for r in team.opp_team.all():
-        if r.victor == Round.OPP:
+    for round_obj in team.opp_team.all():
+        if round_obj.victor == Round.OPP:
             normal_wins += 1
-    for r in team.gov_team.all():
-        if r.victor == Round.GOV:
+    for round_obj in team.gov_team.all():
+        if round_obj.victor == Round.GOV:
             normal_wins += 1
     return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
@@ -309,9 +310,9 @@ def debater_abnormal_round_speaks(debater, round_number):
         return MINIMUM_DEBATER_SPEAKS
 
     had_noshow = None
-    for ns in team.no_shows.all():
-        if ns.round_number == round_number:
-            had_noshow = ns
+    for no_show in team.no_shows.all():
+        if no_show.round_number == round_number:
+            had_noshow = no_show
             break
 
     if had_bye(team, round_number) or (had_noshow
@@ -458,9 +459,9 @@ def debater_abnormal_round_ranks(debater, round_number):
     had_noshow = None
     if team is None:
         return MINIMUM_DEBATER_SPEAKS
-    for ns in team.no_shows.all():
-        if ns.round_number == round_number:
-            had_noshow = ns
+    for no_show in team.no_shows.all():
+        if no_show.round_number == round_number:
+            had_noshow = no_show
             break
     if had_bye(team, round_number) or (had_noshow
                                        and had_noshow.lenient_late):

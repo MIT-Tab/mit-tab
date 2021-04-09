@@ -243,7 +243,7 @@ urlpatterns = [
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 
     # Profiler
-    url(r'^silk/', include('silk.urls', namespace='silk'))
+    url(r"^silk/", include("silk.urls", namespace="silk"))
 ]
 
 handler403 = "mittab.apps.tab.views.render_403"

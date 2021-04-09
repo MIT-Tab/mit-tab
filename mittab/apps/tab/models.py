@@ -45,9 +45,13 @@ class TabSettings(models.Model):
         else:
             obj = cls.objects.create(key=key, value=value)
 
-    def save(self, *args, **kwargs):
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
         cache_logic.invalidate_cache("tab_settings_dict")
-        super(TabSettings, self).save(*args, **kwargs)
+        super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache("tab_settings_dict")
@@ -93,11 +97,15 @@ class Debater(models.Model):
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
-    def save(self, *args, **kwargs):
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
         while not self.tiebreaker or \
                 Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
-        super(Debater, self).save(*args, **kwargs)
+        super(Debater, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def num_teams(self):
@@ -105,7 +113,6 @@ class Debater(models.Model):
 
     @property
     def display(self):
-        # TODO: Fix no name
         return self.name
 
     def __str__(self):
@@ -177,7 +184,11 @@ class Team(models.Model):
 
         self.team_code = code
 
-    def save(self, *args, **kwargs):
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
         # Generate a team code for teams that don't have one
         if not self.team_code:
             self.set_unique_team_code()
@@ -186,7 +197,7 @@ class Team(models.Model):
                 Team.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
 
-        super(Team, self).save(*args, **kwargs)
+        super(Team, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def display_backend(self):
@@ -497,7 +508,9 @@ class Bye(models.Model):
 
 
 class NoShow(models.Model):
-    no_show_team = models.ForeignKey(Team, related_name="no_shows", on_delete=models.CASCADE)
+    no_show_team = models.ForeignKey(Team,
+                                     related_name="no_shows",
+                                     on_delete=models.CASCADE)
     round_number = models.IntegerField()
     lenient_late = models.BooleanField(default=False)
 

@@ -105,7 +105,8 @@ def pair_round():
             "debaters__team_set",
             "debaters__team_set__no_shows",
         )
-        middle_of_bracket, normal_pairing_teams = get_middle_and_non_middle_teams(all_checked_in_teams)
+        middle_of_bracket, normal_pairing_teams = \
+                get_middle_and_non_middle_teams(all_checked_in_teams)
 
         team_buckets = [(tot_wins(team), team)
                         for team in normal_pairing_teams]
@@ -226,7 +227,10 @@ def pair_round():
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related("room")
+    rooms = RoomCheckIn \
+            .objects \
+            .filter(round_number=current_round) \
+            .prefetch_related("room")
     rooms = map(lambda r: r.room, rooms)
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
@@ -265,11 +269,17 @@ def have_enough_rooms(_round_to_check):
 
 
 def have_properly_entered_data(round_to_check):
-    last_round         = round_to_check - 1
-
-    prev_rounds        = Round.objects.filter(round_number=last_round).prefetch_related("gov_team", "opp_team")
-    prev_round_noshows = set(NoShow.objects.filter(round_number=last_round).values_list('no_show_team_id', flat=True))
-    prev_round_byes    = set(Bye.objects.filter(round_number=last_round).values_list('bye_team', flat=True))
+    last_round = round_to_check - 1
+    prev_rounds = Round.objects \
+            .filter(round_number=last_round) \
+            .prefetch_related("gov_team", "opp_team")
+    prev_round_noshows = set(
+        NoShow.objects.filter(round_number=last_round) \
+                .values_list("no_show_team_id", flat=True)
+    )
+    prev_round_byes = set(
+        Bye.objects.filter(round_number=last_round).values_list("bye_team", flat=True)
+    )
 
     for prev_round in prev_rounds:
         # There should be a result
@@ -301,7 +311,7 @@ def validate_round_data(round_to_check):
 
     # Check that there are enough judges
     if not have_enough_judges(round_to_check)[0]:
-        raise errors.NotEnoughJudgesError("Not enough judges for round %d" % round_to_check)
+        raise errors.NotEnoughJudgesError()
 
     # Check there are enough rooms
     if not have_enough_rooms(round_to_check)[0]:
@@ -337,11 +347,11 @@ def highest_seed(team1, team2):
 
 # Check if two teams have hit before
 def hit_before(team1, team2):
-    for r in team1.gov_team.all():
-        if r.opp_team == team2:
+    for round_obj in team1.gov_team.all():
+        if round_obj.opp_team == team2:
             return True
-    for r in team1.opp_team.all():
-        if r.opp_team == team2:
+    for round_obj in team1.opp_team.all():
+        if round_obj.opp_team == team2:
             return True
     return False
 
@@ -368,8 +378,8 @@ def get_middle_and_non_middle_teams(all_teams):
 
     for team in all_teams:
         avg_speaks_rounds = team.byes.count()
-        for ns in team.no_shows.all():
-            if ns.lenient_late:
+        for no_show in team.no_shows.all():
+            if no_show.lenient_late:
                 avg_speaks_rounds += 1
         avg_speaks_rounds += num_forfeit_wins(team)
 
@@ -387,30 +397,33 @@ def sorted_pairings(round_number):
     number of DB queries required to calculate it
     """
     round_pairing = list(
-            Round.objects.filter(round_number=round_number)
-            .prefetch_related("judges", 
-                "chair",
-                "room",
-                "gov_team",
-                "opp_team",
-                "gov_team__gov_team", # poorly named relation, points to rounds as gov
-                "gov_team__opp_team", # poorly named relation, points to rounds as gov
-                "gov_team__byes",
-                "gov_team__no_shows",
-                "gov_team__debaters__team_set",
-                "gov_team__debaters__team_set__byes",
-                "gov_team__debaters__team_set__no_shows",
-                "gov_team__debaters__roundstats_set",
-                "gov_team__debaters__roundstats_set__round",
-                "opp_team__gov_team", # poorly named relation, points to rounds as gov
-                "opp_team__opp_team", # poorly named relation, points to rounds as gov
-                "opp_team__byes",
-                "opp_team__no_shows",
-                "opp_team__debaters__team_set",
-                "opp_team__debaters__team_set__byes",
-                "opp_team__debaters__team_set__no_shows",
-                "opp_team__debaters__roundstats_set",
-                "opp_team__debaters__roundstats_set__round"))
+        Round.objects.filter(round_number=round_number)
+        .prefetch_related(
+            "judges",
+            "chair",
+            "room",
+            "gov_team",
+            "opp_team",
+            "gov_team__gov_team", # poorly named relation, points to rounds as gov
+            "gov_team__opp_team", # poorly named relation, points to rounds as gov
+            "gov_team__byes",
+            "gov_team__no_shows",
+            "gov_team__debaters__team_set",
+            "gov_team__debaters__team_set__byes",
+            "gov_team__debaters__team_set__no_shows",
+            "gov_team__debaters__roundstats_set",
+            "gov_team__debaters__roundstats_set__round",
+            "opp_team__gov_team", # poorly named relation, points to rounds as gov
+            "opp_team__opp_team", # poorly named relation, points to rounds as gov
+            "opp_team__byes",
+            "opp_team__no_shows",
+            "opp_team__debaters__team_set",
+            "opp_team__debaters__team_set__byes",
+            "opp_team__debaters__team_set__no_shows",
+            "opp_team__debaters__roundstats_set",
+            "opp_team__debaters__roundstats_set__round"
+        )
+    )
     round_pairing.sort(key=lambda x: team_comp(x, round_number),
                        reverse=True)
 
@@ -422,14 +435,15 @@ def team_comp(pairing, round_number):
     if round_number == 1:
         return (max(gov.seed, opp.seed), min(gov.seed, opp.seed))
     else:
-        return (max(tot_wins(gov),
-                    tot_wins(opp)), max(tot_speaks(gov),
-                        tot_speaks(opp)),
-                min(tot_speaks(gov), tot_speaks(opp)))
+        return (
+            max(tot_wins(gov), tot_wins(opp)),
+            max(tot_speaks(gov), tot_speaks(opp)),
+            min(tot_speaks(gov), tot_speaks(opp)),
+        )
 
 
-def team_score_except_record(team, num_rounds=None):
-    team_score = TeamScore(team, num_rounds)
+def team_score_except_record(team):
+    team_score = TeamScore(team)
     team_score.wins = 0
     return team_score.scoring_tuple()
 

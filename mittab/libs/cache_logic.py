@@ -28,7 +28,7 @@ def invalidate_cache(key):
     _djcache.delete(key)
 
 
-def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT, key_base=None):
+def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
     """
     Cache the result of a function call for the specified number of seconds,
     using Django's caching mechanism.
@@ -47,10 +47,8 @@ def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT, key_base=None):
 
     def do_cache(f):
         def wrapper(*args, **kwargs):
-            local_key_base = key_base
-            if local_key_base is None:
-                local_key_base = "%s%s" % (f.__module__, f.__name__)
-            key = sha1(("%s%s%s" % (local_key_base, args, kwargs)).encode("utf-8")).hexdigest()
+            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)) \
+                    .encode("utf-8")).hexdigest()
             result = _djcache.get(key)
             if result is None:
                 result = f(*args, **kwargs)

@@ -8,7 +8,9 @@ def add_judges(panel_points):
     current_round_number = TabSettings.get("cur_round") - 1
 
     # First clear any existing judge assignments
-    Round.judges.through.objects.filter(round__round_number=current_round_number).delete()
+    Round.judges.through.objects \
+        .filter(round__round_number=current_round_number) \
+        .delete()
 
     judges = list(Judge.objects.filter(checkin__round_number=4).prefetch_related(
         "judges", # poorly named relation for the round
@@ -196,8 +198,8 @@ def judge_conflict(judge, team1, team2):
 
 
 def had_judge(judge, team):
-    for r in judge.judges.all():
-        if r.gov_team_id == team.id or r.opp_team_id == team.id:
+    for round_obj in judge.judges.all():
+        if round_obj.gov_team_id == team.id or round_obj.opp_team_id == team.id:
             return True
     return False
 
