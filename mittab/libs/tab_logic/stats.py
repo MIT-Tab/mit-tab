@@ -48,8 +48,8 @@ def forfeited_round(round_obj, team):
 
 
 def hit_pull_up(team):
-    return any(r.pullup == Round.OPP for r in team.gov_team) or \
-            any(r.pullup == Round.GOV for r in team.opp_team)
+    return any(r.pullup == Round.OPP for r in team.gov_team.all()) or \
+            any(r.pullup == Round.GOV for r in team.opp_team.all())
 
 
 def pull_up_count(team):
@@ -91,6 +91,7 @@ def tot_wins(team):
     Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
     problems
     """
+    print("start tot_wins==========================")
     normal_wins = 0
     for r in team.opp_team.all():
         if r.victor == Round.OPP:
@@ -98,6 +99,7 @@ def tot_wins(team):
     for r in team.gov_team.all():
         if r.victor == Round.GOV:
             normal_wins += 1
+    print("end tot_wins===============")
     return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
 
@@ -165,10 +167,10 @@ def opp_strength(team):
     gov_rounds = team.gov_team
     opp_rounds = team.opp_team
 
-    for round_obj in gov_rounds:
+    for round_obj in gov_rounds.all():
         opponent_wins += tot_wins(round_obj.opp_team)
         opponent_count += 1
-    for round_obj in opp_rounds:
+    for round_obj in opp_rounds.all():
         opponent_wins += tot_wins(round_obj.gov_team)
         opponent_count += 1
 
@@ -257,7 +259,9 @@ def speaks_for_debater(debater, average_ironmen=True, num_speaks=None):
     if num_speaks is None:
         num_speaks = TabSettings.get("cur_round") - 1
 
+    print("roundstats set")
     debater_roundstats = debater.roundstats_set.all()
+    print("end roundstats set")
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -457,10 +461,13 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = debater.team()
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                       no_show_team=team)
+    had_noshow = None
+    for ns in team.no_shows.all():
+        if ns.round_number == round_number:
+            had_noshow = ns
+            break
     if had_bye(team, round_number) or (had_noshow
-                                       and had_noshow.first().lenient_late):
+                                       and had_noshow.lenient_late):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS

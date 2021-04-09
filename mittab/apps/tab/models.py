@@ -4,6 +4,16 @@ from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
+from mittab.libs import cache_logic
+
+
+def all_tab_settings_as_dict():
+    all_settings = TabSettings.objects.all()
+    result = {}
+    for setting in all_settings:
+        result[setting.key] = setting.value
+    return result
+
 
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
@@ -17,15 +27,18 @@ class TabSettings(models.Model):
 
     @classmethod
     def get(cls, key, default=None):
-        if cls.objects.filter(key=key).exists():
-            return cls.objects.get(key=key).value
+        as_dict = cache_logic.cache_fxn_key(
+            all_tab_settings_as_dict,
+            "tab_settings_dict"
+        )
+        if key in as_dict or default is not None:
+            return as_dict.get(key, default)
         else:
-            if default is None:
-                raise ValueError("Invalid key '%s'" % key)
-            return default
+            raise ValueError("Invalid key '%s'" % key)
 
     @classmethod
     def set(cls, key, value):
+        cache_logic.invalidate_cache("tab_settings_dict")
         if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
             obj.value = value
@@ -269,8 +282,8 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
-    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, related_name="scratchs", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (

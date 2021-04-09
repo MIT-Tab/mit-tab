@@ -87,10 +87,23 @@ def pair_round():
         # NOTE: We do not bucket teams that have only won by
         #       forfeit/bye/lenient_late in every round because they have no speaks
         all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
-            "gov_team", # rounds as gov team
-            "opp_team", # rounds as opp team
+            "gov_team", # poorly named relation, gets rounds as gov team
+            "opp_team", # poorly named relation, rounds as opp team
+            # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
+            "gov_team__opp_team__gov_team",
+            "gov_team__opp_team__opp_team",
+            "gov_team__opp_team__byes",
+            # for all opp rounds, load the gov team's gov+opp rounds (opp-strength)
+            "opp_team__gov_team__gov_team",
+            "opp_team__gov_team__opp_team",
+            "opp_team__gov_team__byes",
             "byes",
             "no_shows",
+            "debaters",
+            "debaters__roundstats_set",
+            "debaters__roundstats_set__round",
+            "debaters__team_set",
+            "debaters__team_set__no_shows",
         )
         middle_of_bracket, normal_pairing_teams = get_middle_and_non_middle_teams(all_checked_in_teams)
 
@@ -221,6 +234,7 @@ def pair_round():
         pairing[2] = rooms[i]
 
     # Enter into database
+    all_rounds = []
     for gov, opp, room in pairings:
         round_obj = Round(round_number=current_round,
                           gov_team=gov,
@@ -230,7 +244,8 @@ def pair_round():
             round_obj.pullup = Round.GOV
         elif opp in all_pull_ups:
             round_obj.pullup = Round.OPP
-        round_obj.save()
+        all_rounds.append(round_obj)
+    Round.objects.bulk_create(all_around)
 
 
 def have_enough_judges(round_to_check):
@@ -302,16 +317,18 @@ def add_scratches_for_school_affil():
     Add scratches for teams/judges from the same school
     Only do this if they haven't already been added
     """
-    all_judges = Judge.objects.all()
-    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all().prefetch_related("schools", "scratches__team")
+    all_teams = Team.objects.all().prefetch_related("school", "hybrid_school")
+
+    to_create = []
+
     for judge in all_judges:
         for team in all_teams:
             judge_schools = judge.schools.all()
             if team.school in judge_schools or team.hybrid_school in judge_schools:
-                if not Scratch.objects.filter(judge=judge, team=team).exists():
-                    Scratch.objects.create(judge=judge,
-                                           team=team,
-                                           scratch_type=1)
+                if not any(s.team == team for s in judge.scratches.all()):
+                    to_create.append(Scratch(judge=judge, team=team, scratch_type=1))
+    Scratch.objects.bulk_create(to_create)
 
 
 def highest_seed(team1, team2):
@@ -339,13 +356,14 @@ def get_middle_and_non_middle_teams(all_teams):
 
     The second list will be all of the teams not in the original list
     """
-    middle_of_bracket, non_middle_of_bracket = []
+    middle_of_bracket, non_middle_of_bracket = [], []
+    all_teams = list(all_teams)
     random.shuffle(all_teams)
     round_count = TabSettings.get("cur_round") - 1
 
     for team in all_teams:
         avg_speaks_rounds = team.byes.count()
-        for ns in team.no_shows:
+        for ns in team.no_shows.all():
             if ns.lenient_late:
                 avg_speaks_rounds += 1
         avg_speaks_rounds += num_forfeit_wins(team)
@@ -401,8 +419,8 @@ def team_comp(pairing, round_number):
                 min(tot_speaks(gov, round_number - 1), tot_speaks(opp, round_number - 1)))
 
 
-def team_score_except_record(team):
-    team_score = TeamScore(team)
+def team_score_except_record(team, num_rounds=None):
+    team_score = TeamScore(team, num_rounds)
     team_score.wins = 0
     return team_score.scoring_tuple()
 
