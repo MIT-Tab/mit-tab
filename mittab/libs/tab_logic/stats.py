@@ -109,10 +109,8 @@ def tot_wins(team):
 
 
 @cache()
-def tot_speaks(team, num_speaks=None):
-    if num_speaks is None:
-        num_speaks = TabSettings.get("cur_round") - 1
-    return sum([tot_speaks_deb(deb, False, num_speaks) for deb in team.debaters.all()])
+def tot_speaks(team):
+    return sum([tot_speaks_deb(deb, False) for deb in team.debaters.all()])
 
 
 @cache()
@@ -234,7 +232,7 @@ def debater_forfeit_speaks(_debater):
 
 
 @cache()
-def speaks_for_debater(debater, average_ironmen=True, num_speaks=None):
+def speaks_for_debater(debater, average_ironmen=True):
     """Returns a list of speaks for the provided debater
 
     In most normal rounds the speaks of the debater are the speaks the judge
@@ -256,8 +254,6 @@ def speaks_for_debater(debater, average_ironmen=True, num_speaks=None):
     team = debater.team()
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
-    if num_speaks is None:
-        num_speaks = TabSettings.get("cur_round") - 1
 
     print("roundstats set")
     debater_roundstats = debater.roundstats_set.all()
@@ -338,11 +334,9 @@ def double_adjusted_speaks_deb(debater):
 
 
 @cache()
-def tot_speaks_deb(debater, average_ironmen=True, num_speaks=None):
+def tot_speaks_deb(debater, average_ironmen=True):
     """Return the total of all speaks for a debater"""
-    if num_speaks is None:
-        num_speaks = TabSettings.get("cur_round") - 1
-    debater_speaks = speaks_for_debater(debater, average_ironmen, num_speaks)
+    debater_speaks = speaks_for_debater(debater, average_ironmen)
     return sum(debater_speaks)
 
 
