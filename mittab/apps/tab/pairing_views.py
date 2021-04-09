@@ -110,7 +110,7 @@ def assign_judges_to_pairing(request):
                 errors.append(e)
 
         panel_points.reverse()
-        rounds = list(Round.objects.filter(round_number=current_round_number))
+        rounds = tab_logic.sorted_pairings(current_round_number)
         judges = [
             ci.judge
             for ci in CheckIn.objects.filter(round_number=current_round_number)
