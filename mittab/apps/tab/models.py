@@ -3,21 +3,6 @@ import random
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
-from polymorphic.models import PolymorphicModel
-
-
-class ModelWithTiebreaker(PolymorphicModel):
-    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        while not self.tiebreaker or \
-                self.__class__.objects.filter(tiebreaker=self.tiebreaker).exists():
-            self.tiebreaker = random.choice(range(0, 2**16))
-
-        super(ModelWithTiebreaker, self).save(*args, **kwargs)
-
-    class Meta:
-        abstract = True
 
 
 class TabSettings(models.Model):
@@ -77,7 +62,7 @@ class School(models.Model):
         ordering = ["name"]
 
 
-class Debater(ModelWithTiebreaker):
+class Debater(models.Model):
     name = models.CharField(max_length=30, unique=True)
     VARSITY = 0
     NOVICE = 1
@@ -86,6 +71,13 @@ class Debater(ModelWithTiebreaker):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        while not self.tiebreaker or \
+                Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2**16))
+        super(Debater, self).save(*args, **kwargs)
 
     @property
     def num_teams(self):
@@ -148,6 +140,7 @@ class Team(ModelWithTiebreaker):
 
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
     def set_unique_team_code(self):
         haikunator = Haikunator()
@@ -168,6 +161,10 @@ class Team(ModelWithTiebreaker):
         # Generate a team code for teams that don't have one
         if not self.team_code:
             self.set_unique_team_code()
+
+        while not self.tiebreaker or \
+                Team.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2**16))
 
         super(Team, self).save(*args, **kwargs)
 
