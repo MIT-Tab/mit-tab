@@ -190,12 +190,24 @@ class Team(models.Model):
 
     @property
     def display_backend(self):
-        # TODO: un-break teamcodes
+        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
+
+        if use_team_codes_backend:
+            if not self.team_code:
+                self.set_unique_team_code()
+                self.save()
+            return self.team_code
         return self.name
 
     @property
     def display(self):
-        # TODO: un-break teamcodes
+        use_team_codes = TabSettings.get("use_team_codes", 0)
+
+        if use_team_codes:
+            if not self.team_code:
+                self.set_unique_team_code()
+                self.save()
+            return self.team_code
         return self.name
 
     def __str__(self):
@@ -290,7 +302,7 @@ class Judge(models.Model):
 
 class Scratch(models.Model):
     judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, related_name="scratchs", on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
