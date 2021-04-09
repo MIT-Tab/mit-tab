@@ -110,16 +110,10 @@ def assign_judges_to_pairing(request):
                 errors.append(e)
 
         panel_points.reverse()
-        rounds = tab_logic.sorted_pairings(current_round_number)
-        judges = [
-            ci.judge
-            for ci in
-            CheckIn.objects.filter(round_number=current_round_number).prefetch_related("judge")
-        ]
         try:
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
-            assign_judges.add_judges(rounds, judges, panel_points)
+            assign_judges.add_judges(panel_points)
         except Exception as e:
             emit_current_exception()
             return redirect_and_flash_error(

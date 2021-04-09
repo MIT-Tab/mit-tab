@@ -504,7 +504,7 @@ class RoundStats(models.Model):
 
 
 class CheckIn(models.Model):
-    judge = models.ForeignKey(Judge, related_name="check_ins", on_delete=models.CASCADE)
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):

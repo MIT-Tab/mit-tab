@@ -105,6 +105,7 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
+"""
 LOGGING = {
     'version': 1,
     'handlers': {
@@ -121,3 +122,4 @@ LOGGING = {
         'handlers': ['console'],
     }
 }
+"""
