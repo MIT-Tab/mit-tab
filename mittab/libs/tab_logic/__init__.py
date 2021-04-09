@@ -398,6 +398,8 @@ def sorted_pairings(round_number):
                 "gov_team__byes",
                 "gov_team__no_shows",
                 "gov_team__debaters__team_set",
+                "gov_team__debaters__team_set__byes",
+                "gov_team__debaters__team_set__no_shows",
                 "gov_team__debaters__roundstats_set",
                 "gov_team__debaters__roundstats_set__round",
                 "opp_team__gov_team", # poorly named relation, points to rounds as gov
@@ -405,6 +407,8 @@ def sorted_pairings(round_number):
                 "opp_team__byes",
                 "opp_team__no_shows",
                 "opp_team__debaters__team_set",
+                "opp_team__debaters__team_set__byes",
+                "opp_team__debaters__team_set__no_shows",
                 "opp_team__debaters__roundstats_set",
                 "opp_team__debaters__roundstats_set__round"))
     round_pairing.sort(key=lambda x: team_comp(x, round_number),
