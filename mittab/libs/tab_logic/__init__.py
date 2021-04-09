@@ -226,7 +226,7 @@ def pair_round():
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round)
+    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related("room")
     rooms = map(lambda r: r.room, rooms)
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
@@ -245,7 +245,7 @@ def pair_round():
         elif opp in all_pull_ups:
             round_obj.pullup = Round.OPP
         all_rounds.append(round_obj)
-    Round.objects.bulk_create(all_around)
+    Round.objects.bulk_create(all_rounds)
 
 
 def have_enough_judges(round_to_check):
@@ -337,8 +337,13 @@ def highest_seed(team1, team2):
 
 # Check if two teams have hit before
 def hit_before(team1, team2):
-    return Round.objects.filter(gov_team=team1, opp_team=team2).exists() or \
-            Round.objects.filter(gov_team=team2, opp_team=team1).exists()
+    for r in team1.gov_team.all():
+        if r.opp_team == team2:
+            return True
+    for r in team1.opp_team.all():
+        if r.opp_team == team2:
+            return True
+    return False
 
 
 def get_middle_and_non_middle_teams(all_teams):
@@ -414,9 +419,9 @@ def team_comp(pairing, round_number):
         return (max(gov.seed, opp.seed), min(gov.seed, opp.seed))
     else:
         return (max(tot_wins(gov),
-                    tot_wins(opp)), max(tot_speaks(gov, round_number - 1),
-                        tot_speaks(opp, round_number - 1)),
-                min(tot_speaks(gov, round_number - 1), tot_speaks(opp, round_number - 1)))
+                    tot_wins(opp)), max(tot_speaks(gov),
+                        tot_speaks(opp)),
+                min(tot_speaks(gov), tot_speaks(opp)))
 
 
 def team_score_except_record(team, num_rounds=None):

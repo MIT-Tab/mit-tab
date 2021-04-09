@@ -91,7 +91,6 @@ def tot_wins(team):
     Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
     problems
     """
-    print("start tot_wins==========================")
     normal_wins = 0
     for r in team.opp_team.all():
         if r.victor == Round.OPP:
@@ -99,7 +98,6 @@ def tot_wins(team):
     for r in team.gov_team.all():
         if r.victor == Round.GOV:
             normal_wins += 1
-    print("end tot_wins===============")
     return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
 
@@ -255,9 +253,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
 
-    print("roundstats set")
     debater_roundstats = debater.roundstats_set.all()
-    print("end roundstats set")
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -266,6 +262,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     for roundstat in debater_roundstats:
         speaks_per_round[roundstat.round.round_number].append(roundstat)
 
+    num_speaks = TabSettings.get("cur_round") - 1
     for round_number in range(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
