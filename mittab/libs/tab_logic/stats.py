@@ -26,7 +26,7 @@ def num_forfeit_wins(team):
     return num_wins
 
 def won_by_forfeit(round_obj, team):
-    if team is None or (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
+    if round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -38,7 +38,7 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if team is None or (round_obj.opp_team_id != team and round_obj.gov_team_id != team.id):
+    if round_obj.opp_team_id != team and round_obj.gov_team_id != team.id:
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -48,29 +48,36 @@ def forfeited_round(round_obj, team):
 
 
 def hit_pull_up(team):
-    return Round.objects.filter(gov_team=team, pullup=Round.OPP).exists() or \
-            Round.objects.filter(opp_team=team, pullup=Round.GOV).exists()
+    return any(r.pullup == Round.OPP for r in team.gov_team) or \
+            any(r.pullup == Round.GOV for r in team.opp_team)
 
 
 def pull_up_count(team):
-    return Round.objects.filter(gov_team=team, pullup=Round.GOV).exists() + \
-            Round.objects.filter(opp_team=team, pullup=Round.OPP).exists()
+    count = 0
+    for r in team.gov_team:
+        if r.pullup == Round.GOV:
+            count += 1
+
+    for r in team.opp_team:
+        if r.pullup == Round.OPP:
+            count += 1
+
+    return count
 
 
 def num_opps(team):
-    return Round.objects.filter(opp_team=team).count()
+    return len(team.opp_team.all())
 
 
 def num_govs(team):
-    return Round.objects.filter(gov_team=team).count()
+    return len(team.gov_team.all())
 
 
 def had_bye(team, round_number=None):
     if round_number is None:
-        return Bye.objects.filter(bye_team=team).exists()
+        return team.byes.exists()
     else:
-        return Bye.objects.filter(bye_team=team,
-                                  round_number=round_number).exists()
+        any(b.round_number == round_number for b in team.byes.all())
 
 
 ##############
@@ -155,8 +162,8 @@ def opp_strength(team):
     opponent_count = 0
     opponent_wins = 0
 
-    gov_rounds = Round.objects.filter(gov_team=team)
-    opp_rounds = Round.objects.filter(opp_team=team)
+    gov_rounds = team.gov_team
+    opp_rounds = team.opp_team
 
     for round_obj in gov_rounds:
         opponent_wins += tot_wins(round_obj.opp_team)
@@ -190,7 +197,7 @@ def avg_deb_speaks(debater):
     real_speaks = []
     num_speaks = TabSettings.get("cur_round") - 1
     debater_roundstats = debater.roundstats_set.all()
-    team = debater.team
+    team = debater.team()
 
     speaks_per_round = defaultdict(list)
     # We might have multiple roundstats per round if we have iron men, so first
@@ -244,7 +251,7 @@ def speaks_for_debater(debater, average_ironmen=True, num_speaks=None):
     If a debater wins in a bye, they get their average speaks
     If a debater was late to a lenient round, they get average speaks
     """
-    team = debater.team
+    team = debater.team()
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
     if num_speaks is None:
@@ -300,11 +307,18 @@ def debater_abnormal_round_speaks(debater, round_number):
     Byes:
     Uses average speaks
     """
-    team = debater.team
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                       no_show_team=team)
+    team = debater.team()
+    had_noshow = None
+    print(debater)
+    if team is None:
+        import pdb; pdb.set_trace()
+    for ns in team.no_shows.all():
+        if ns.round_number == round_number:
+            had_noshow = ns
+            break
+
     if had_bye(team, round_number) or (had_noshow
-                                       and had_noshow.first().lenient_late):
+                                       and had_noshow.lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
@@ -350,7 +364,7 @@ def avg_deb_ranks(debater):
     real_ranks = []
     num_ranks = TabSettings.get("cur_round") - 1
     debater_roundstats = debater.roundstats_set.all()
-    team = debater.team
+    team = debater.team()
 
     ranks_per_round = defaultdict(list)
     # We might have multiple roundstats per round if we have iron men, so first
@@ -395,7 +409,7 @@ def ranks_for_debater(debater, average_ironmen=True):
     If a debater wins in a bye, they get their average ranks
     If a debater was late to a lenient round, they get average ranks
     """
-    team = debater.team
+    team = debater.team()
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 ranks
     num_ranks = TabSettings.get("cur_round") - 1
@@ -445,7 +459,7 @@ def debater_abnormal_round_ranks(debater, round_number):
     Byes:
     Uses average ranks
     """
-    team = debater.team
+    team = debater.team()
     had_noshow = NoShow.objects.filter(round_number=round_number,
                                        no_show_team=team)
     if had_bye(team, round_number) or (had_noshow

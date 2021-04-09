@@ -96,12 +96,20 @@ class TeamScore(Score):
     def __init__(self, team):
         super(TeamScore, self).__init__()
         self.team = team
+        print("WINS")
         self.stats[WINS] = tot_wins(team)
+        print("SPEAKS")
         self.stats[SPEAKS] = tot_speaks(team)
+        print("RANKS")
         self.stats[RANKS] = tot_ranks(team)
+        print("SINGLE_ADJUSTED_SPEAKS")
         self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks(team)
+        print("SINGLE_ADJUSTED_RANKS")
         self.stats[SINGLE_ADJUSTED_RANKS] = single_adjusted_ranks(team)
+        print("DOUBLE_ADJUSTED_SPEAKS")
         self.stats[DOUBLE_ADJUSTED_SPEAKS] = double_adjusted_speaks(team)
+        print("DOUBLE_ADJUSTED_RANKS")
         self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(team)
+        print("OPP_STRENGTH")
         self.stats[OPP_STRENGTH] = opp_strength(team)
         self.stats[COIN_FLIP] = team.tiebreaker

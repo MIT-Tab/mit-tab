@@ -86,10 +86,13 @@ def pair_round():
         # Bucket all the teams into brackets
         # NOTE: We do not bucket teams that have only won by
         #       forfeit/bye/lenient_late in every round because they have no speaks
-        middle_of_bracket = middle_of_bracket_teams()
-        all_checked_in_teams = Team.objects.filter(checked_in=True)
-        normal_pairing_teams = all_checked_in_teams.exclude(
-            pk__in=[t.id for t in middle_of_bracket])
+        all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
+            "gov_team", # rounds as gov team
+            "opp_team", # rounds as opp team
+            "byes",
+            "no_shows",
+        )
+        middle_of_bracket, normal_pairing_teams = get_middle_and_non_middle_teams(all_checked_in_teams)
 
         team_buckets = [(tot_wins(team), team)
                         for team in normal_pairing_teams]
@@ -321,9 +324,11 @@ def hit_before(team1, team2):
             Round.objects.filter(gov_team=team2, opp_team=team1).exists()
 
 
-def middle_of_bracket_teams():
+def get_middle_and_non_middle_teams(all_teams):
     """
-    Finds teams whose only rounds have been one of the following results:
+    Given a list of teams, splits the list into two. The first value will be
+    a list of teams who should be in the middle of the bracket because all of their
+    rounds have been one of the following:
 
     1 - win by forfeit
     2 - lenient_late rounds
@@ -331,17 +336,26 @@ def middle_of_bracket_teams():
 
     These teams have speaks of zero but _should_ have average speaks, so they
     should be paired into the middle of their bracket. Randomized for fairness
+
+    The second list will be all of the teams not in the original list
     """
-    teams = []
-    for team in Team.objects.filter(checked_in=True):
-        avg_speaks_rounds = Bye.objects.filter(bye_team=team).count()
-        avg_speaks_rounds += NoShow.objects.filter(no_show_team=team,
-                                                   lenient_late=True).count()
+    middle_of_bracket, non_middle_of_bracket = []
+    random.shuffle(all_teams)
+    round_count = TabSettings.get("cur_round") - 1
+
+    for team in all_teams:
+        avg_speaks_rounds = team.byes.count()
+        for ns in team.no_shows:
+            if ns.lenient_late:
+                avg_speaks_rounds += 1
         avg_speaks_rounds += num_forfeit_wins(team)
-        if TabSettings.get("cur_round") - 1 == avg_speaks_rounds:
-            teams.append(team)
-    random.shuffle(teams)
-    return teams
+
+        if round_count == avg_speaks_rounds:
+            middle_of_bracket.append(team)
+        else:
+            non_middle_of_bracket.append(team)
+
+    return middle_of_bracket, non_middle_of_bracket
 
 
 def sorted_pairings(round_number):

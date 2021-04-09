@@ -99,7 +99,6 @@ class Debater(ModelWithTiebreaker):
     def __str__(self):
         return self.name
 
-    @property
     def team(self):
         return self.team_set.first()
 

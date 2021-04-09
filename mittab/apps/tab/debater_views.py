@@ -104,7 +104,7 @@ def get_speaker_rankings(request):
                 tiebreaker = "Tie not broken"
         debaters.append((debater_stats.debater, debater_stats[rankings.SPEAKS],
                          debater_stats[rankings.RANKS],
-                         debater_stats.debater.team, tiebreaker))
+                         debater_stats.debater.team(), tiebreaker))
 
     nov_debaters = list(filter(lambda s: s[0].novice_status == Debater.NOVICE,
                                debaters))
