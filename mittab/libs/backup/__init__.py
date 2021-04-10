@@ -6,7 +6,7 @@ from wsgiref.util import FileWrapper
 from django.conf import settings
 
 from mittab.apps.tab.models import TabSettings
-from mittab.libs import errors
+from mittab.libs import errors, cache_logic
 from mittab.settings import BASE_DIR
 from mittab.libs.backup.strategies.local_dump import LocalDump
 
@@ -22,6 +22,7 @@ class ActiveBackupContextManager:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         os.environ[ACTIVE_BACKUP_KEY] = "0"
+        cache_logic.clear_cache()
 
 def _generate_unique_key(base):
     if LocalDump(base).exists():

@@ -370,6 +370,7 @@ def rank_teams(request):
     teams, nov_teams = cache_logic.cache_fxn_key(
         get_team_rankings,
         "team_rankings",
+        cache_logic.DEFAULT,
         request
     )
 

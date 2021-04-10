@@ -7,14 +7,6 @@ from django.core.exceptions import ValidationError
 from mittab.libs import cache_logic
 
 
-def all_tab_settings_as_dict():
-    all_settings = TabSettings.objects.all()
-    result = {}
-    for setting in all_settings:
-        result[setting.key] = setting.value
-    return result
-
-
 class TabSettings(models.Model):
     key = models.CharField(max_length=20)
     value = models.IntegerField()
@@ -27,14 +19,24 @@ class TabSettings(models.Model):
 
     @classmethod
     def get(cls, key, default=None):
-        as_dict = cache_logic.cache_fxn_key(
-            all_tab_settings_as_dict,
-            "tab_settings_dict"
+        def safe_get():
+            ts = cls.objects.filter(key=key).first()
+            if ts is not None:
+                return ts.value
+            else:
+                return None
+
+        result = cache_logic.cache_fxn_key(
+            safe_get,
+            "tab_settings_%s" % key,
+            cache_logic.PERSISTENT,
         )
-        if key in as_dict or default is not None:
-            return as_dict.get(key, default)
+        if result is None and default is None:
+            raise ValueError("No TabSetting with key '%s'" % key)
+        elif result is None:
+            return default
         else:
-            raise ValueError("Invalid key '%s'" % key)
+            return result
 
     @classmethod
     def set(cls, key, value):
@@ -45,18 +47,19 @@ class TabSettings(models.Model):
         else:
             obj = cls.objects.create(key=key, value=value)
 
+    def delete(self, using=None, keep_parents=False):
+        cache_logic.invalidate_cache("tab_settings_%s" % self.key.
+                                     cache_logic.PERSISTENT)
+        super(TabSettings, self).delete(using, keep_parents)
+
     def save(self,
              force_insert=False,
              force_update=False,
              using=None,
              update_fields=None):
-        cache_logic.invalidate_cache("tab_settings_dict")
+        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
+                                     cache_logic.PERSISTENT)
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
-
-    def delete(self, using=None, keep_parents=False):
-        cache_logic.invalidate_cache("tab_settings_dict")
-        super(TabSettings, self).delete(using, keep_parents)
-
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)

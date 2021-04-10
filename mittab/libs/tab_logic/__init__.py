@@ -580,7 +580,7 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
     if num_govs(team_a) >= half and num_govs(team_b) >= half:
         weight += high_gov_penalty
 
-    if team_a.school == team_b.school:
+    if team_a.school_id == team_b.school_id:
         weight += same_school_penalty
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
