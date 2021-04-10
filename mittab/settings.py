@@ -121,21 +121,20 @@ CACHES = {
     }
 }
 
-"""
-LOGGING = {
-    'version': 1,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+if os.environ.get("MITTAB_LOG_QUERIES"):
+    LOGGING = {
+        'version': 1,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
         },
-    },
-    'loggers': {
-        'django.db.backends': {
-            'level': 'DEBUG',
+        'loggers': {
+            'django.db.backends': {
+                'level': 'DEBUG',
+            },
         },
-    },
-    'root': {
-        'handlers': ['console'],
+        'root': {
+            'handlers': ['console'],
+        }
     }
-}
-"""

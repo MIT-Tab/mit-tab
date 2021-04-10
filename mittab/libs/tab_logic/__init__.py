@@ -512,6 +512,7 @@ class TabFlags:
 def perfect_pairing(list_of_teams):
     """ Uses the mwmatching library to assign teams in a pairing """
     graph_edges = []
+    weights = get_weights()
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
@@ -519,7 +520,10 @@ def perfect_pairing(list_of_teams):
                                      list_of_teams[len(list_of_teams) - i - 1],
                                      list_of_teams[len(list_of_teams) - j - 1],
                                      len(list_of_teams) - i - 1,
-                                     len(list_of_teams) - j - 1)
+                                     len(list_of_teams) - j - 1,
+                                     weights,
+                                     TabSettings.get("cur_round", 1),
+                                     TabSettings.get("tot_rounds", 5))
                 graph_edges += [(i, j, weight)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges,
                                                 maxcardinality=True)
@@ -534,9 +538,25 @@ def perfect_pairing(list_of_teams):
                 all_pairs.append(pairing)
     return determine_gov_opp(all_pairs)
 
+def get_weights():
+    """
+    Returns a map of all the weight-related tab settings to use without querying for
+    calculations
+    """
+    return {
+        "power_pairing_multiple": TabSettings.get("power_pairing_multiple", -1),
+        "high_opp_penalty": TabSettings.get("high_opp_penalty", 0),
+        "high_gov_penalty": TabSettings.get("high_gov_penalty", -100),
+        "high_high_opp_penalty": TabSettings.get("higher_opp_penalty", -10),
+        "same_school_penalty": TabSettings.get("same_school_penalty", -1000),
+        "hit_pull_up_before": TabSettings.get("hit_pull_up_before", -10000),
+        "hit_team_before": TabSettings.get("hit_team_before", -100000),
+    }
+
+
 
 def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
-                team_a_opt_ind, team_b_opt_ind):
+                team_a_opt_ind, team_b_opt_ind, weights, current_round, tot_rounds):
     """
     Calculate the penalty for a given pairing
 
@@ -550,45 +570,34 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
         team_a_opt_ind - the position in the pairing of team_a_opt
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
-
-    current_round = TabSettings.get("cur_round", 1)
-    tot_rounds = TabSettings.get("tot_rounds", 5)
-    power_pairing_multiple = TabSettings.get("power_pairing_multiple", -1)
-    high_opp_penalty = TabSettings.get("high_opp_penalty", 0)
-    high_gov_penalty = TabSettings.get("high_gov_penalty", -100)
-    high_high_opp_penalty = TabSettings.get("higher_opp_penalty", -10)
-    same_school_penalty = TabSettings.get("same_school_penalty", -1000)
-    hit_pull_up_before = TabSettings.get("hit_pull_up_before", -10000)
-    hit_team_before = TabSettings.get("hit_team_before", -100000)
-
     if current_round == 1:
-        weight = power_pairing_multiple * (
+        weight = weights["power_pairing_multiple"] * (
             abs(team_a_opt.seed - team_b.seed) +
             abs(team_b_opt.seed - team_a.seed)) / 2.0
     else:
-        weight = power_pairing_multiple * (
+        weight = weights["power_pairing_multiple"] * (
             abs(team_a_opt_ind - team_b_ind) +
             abs(team_b_opt_ind - team_a_ind)) / 2.0
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
-        weight += high_opp_penalty
+        weight += weights["high_opp_penalty"]
 
     if num_opps(team_a) >= half + 1 and num_opps(team_b) >= half + 1:
-        weight += high_high_opp_penalty
+        weight += weights["high_high_opp_penalty"]
 
     if num_govs(team_a) >= half and num_govs(team_b) >= half:
-        weight += high_gov_penalty
+        weight += weights["high_gov_penalty"]
 
     if team_a.school_id == team_b.school_id:
-        weight += same_school_penalty
+        weight += weights["same_school_penalty"]
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
             hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
-        weight += hit_pull_up_before
+        weight += weights["hit_pullup_before"]
 
     if hit_before(team_a, team_b):
-        weight += hit_team_before
+        weight += weights["hit_team_before"]
 
     return weight
 

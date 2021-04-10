@@ -75,6 +75,7 @@ def add_judges(panel_points):
         # Remove any assigned judges from the judging pool
         for pairing in group:
             for judge in pairing.judges.all():
+                print("Removing judge %s from pairing %s" % (judge, pairing))
                 judges.remove(judge)
 
         # Function that tries to panel num_to_panel rounds of the potential_pairings

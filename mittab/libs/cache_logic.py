@@ -19,12 +19,12 @@ def cache_fxn_key(fxn, key, cache_name, *args, **kwargs):
     would square `1` and store the result under the key 'squared'
     all subsequent function calls would read from the cache until it's cleared
     """
-    result = caches[cache_name].get(key)
-
-    if not result:
+    if key not in caches[cache_name]:
         result = fxn(*args, **kwargs)
         caches[cache_name].set(key, result)
-    return result
+        return result
+    else:
+        return caches[cache_name].get(key)
 
 
 def invalidate_cache(key, cache_name):
