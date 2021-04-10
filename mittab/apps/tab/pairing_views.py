@@ -95,25 +95,11 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
-        panel_points, errors = [], []
-        potential_panel_points = [
-            k for k in list(request.POST.keys()) if k.startswith("panel_")
-        ]
-        for point in potential_panel_points:
-            try:
-                point = int(point.split("_")[1])
-                num = float(request.POST["panel_{0}".format(point)])
-                if num > 0.0:
-                    panel_points.append((Round.objects.get(id=point), num))
-            except Exception as e:
-                emit_current_exception()
-                errors.append(e)
-
-        panel_points.reverse()
+        errors = []
         try:
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
-            assign_judges.add_judges(panel_points)
+            assign_judges.add_judges()
         except Exception as e:
             emit_current_exception()
             return redirect_and_flash_error(

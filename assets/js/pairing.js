@@ -4,6 +4,7 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCard(tabCardElement) {
   const teamId = tabCardElement.attr("team-id");
+  return
   $.ajax({
     url: `/team/${teamId}/stats`,
     success(result) {

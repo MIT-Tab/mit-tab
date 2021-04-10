@@ -46,7 +46,7 @@ class TestPairingLogic(TestCase):
 
     def assign_judges(self):
         self.generate_checkins()
-        assign_judges.add_judges([])
+        assign_judges.add_judges()
 
     def round_number(self):
         return TabSettings.get("cur_round") - 1
