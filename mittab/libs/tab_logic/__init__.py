@@ -43,8 +43,6 @@ def pair_round():
     # add scratches for teams/judges from the same school
     # NOTE that this only happens if they haven't already been added
     add_scratches_for_school_affil()
-
-    list_of_teams = [None] * current_round
     all_pull_ups = []
 
     # Record no-shows
@@ -57,8 +55,28 @@ def pair_round():
         no_show.save()
 
     # If it is the first round, pair by *seed*
+    all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
+        "gov_team", # poorly named relation, gets rounds as gov team
+        "opp_team", # poorly named relation, rounds as opp team
+        # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
+        "gov_team__opp_team__gov_team",
+        "gov_team__opp_team__opp_team",
+        "gov_team__opp_team__byes",
+        # for all opp rounds, load the gov team's gov+opp rounds (opp-strength)
+        "opp_team__gov_team__gov_team",
+        "opp_team__gov_team__opp_team",
+        "opp_team__gov_team__byes",
+        "byes",
+        "no_shows",
+        "debaters",
+        "debaters__roundstats_set",
+        "debaters__roundstats_set__round",
+        "debaters__team_set",
+        "debaters__team_set__no_shows",
+    )
+
     if current_round == 1:
-        list_of_teams = list(Team.objects.filter(checked_in=True))
+        list_of_teams = list(all_checked_in_teams)
 
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
@@ -86,25 +104,6 @@ def pair_round():
         # Bucket all the teams into brackets
         # NOTE: We do not bucket teams that have only won by
         #       forfeit/bye/lenient_late in every round because they have no speaks
-        all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
-            "gov_team", # poorly named relation, gets rounds as gov team
-            "opp_team", # poorly named relation, rounds as opp team
-            # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
-            "gov_team__opp_team__gov_team",
-            "gov_team__opp_team__opp_team",
-            "gov_team__opp_team__byes",
-            # for all opp rounds, load the gov team's gov+opp rounds (opp-strength)
-            "opp_team__gov_team__gov_team",
-            "opp_team__gov_team__opp_team",
-            "opp_team__gov_team__byes",
-            "byes",
-            "no_shows",
-            "debaters",
-            "debaters__roundstats_set",
-            "debaters__roundstats_set__round",
-            "debaters__team_set",
-            "debaters__team_set__no_shows",
-        )
         middle_of_bracket, normal_pairing_teams = \
                 get_middle_and_non_middle_teams(all_checked_in_teams)
 
