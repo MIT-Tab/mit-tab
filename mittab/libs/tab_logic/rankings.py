@@ -6,9 +6,15 @@ from mittab.libs.tab_logic.stats import *
 
 
 def rank_speakers():
+    debaters = Debater.objects.prefetch_related(
+        "team_set",
+        "team_set__byes",
+        "team_set__no_shows",
+        "roundstats_set",
+    ).all()
     return sorted([
         DebaterScore(d)
-        for d in Debater.objects.prefetch_related("team_set").all()
+        for d in debaters
     ])
 
 
@@ -31,6 +37,7 @@ def rank_teams():
         "debaters__roundstats_set__round",
         "debaters__team_set",
         "debaters__team_set__no_shows",
+        "debaters__team_set__byes",
     )
     return sorted(TeamScore(d) for d in all_teams)
 
