@@ -11,6 +11,7 @@ jobs:
           PIPENV_VENV_IN_PROJECT: true
       - image: circleci/mysql:5.7
         environment:
+          TEST_BROWSER: chrome
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
           MYSQL_ROOT_HOST: 127.0.0.1

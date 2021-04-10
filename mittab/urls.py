@@ -4,6 +4,7 @@ from django.urls import path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
+import mittab.settings as settings
 import mittab.apps.tab.views as views
 import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
@@ -241,10 +242,13 @@ urlpatterns = [
 
     # Cache related
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
-
-    # Profiler
-    url(r"^silk/", include("silk.urls", namespace="silk"))
 ]
+
+if settings.SILK_ENABLED:
+    urlpatterns += [
+        # Profiler
+        url(r"^silk/", include("silk.urls", namespace="silk"))
+    ]
 
 handler403 = "mittab.apps.tab.views.render_403"
 handler404 = "mittab.apps.tab.views.render_404"

@@ -19,7 +19,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
-                  "webpack_loader", "bootstrap4", "silk")
+                  "webpack_loader", "bootstrap4",)
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",
@@ -30,8 +30,14 @@ MIDDLEWARE = (
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "mittab.apps.tab.middleware.Login",
-    "silk.middleware.SilkyMiddleware"
 )
+
+if os.environ.get("SILK_ENABLED"):
+    INSTALLED_APPS = INSTALLED_APPS + ("silk",)
+    MIDDLEWARE = MIDDLEWARE + ("silk.middleware.SilkyMiddleware",)
+    SILK_ENABLED = True
+else:
+    SILK_ENABLED = False
 
 ROOT_URLCONF = "mittab.urls"
 

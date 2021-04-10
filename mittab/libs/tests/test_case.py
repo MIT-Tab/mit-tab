@@ -1,3 +1,4 @@
+import os
 import time
 
 from django.test import LiveServerTestCase
@@ -15,14 +16,19 @@ class BaseWebTestCase(LiveServerTestCase):
     wait_seconds = 3.0
 
     def setUp(self):
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--no-sandbox")
-        self.browser = Browser("chrome",
-                               headless=False,
-                               wait_time=30,
-                               options=chrome_options)
+        if os.environ.get("TEST_BROWSER", "chrome") == "chrome":
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--start-maximized")
+            chrome_options.add_argument("--no-sandbox")
+            self.browser = Browser("chrome",
+                                headless=False,
+                                wait_time=30,
+                                options=chrome_options)
+        else:
+            self.browser = Browser("firefox",
+                                headless=False,
+                                wait_time=30)
         self.browser.driver.set_page_load_timeout(240)
         super(BaseWebTestCase, self).setUp()
 
