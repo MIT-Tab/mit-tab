@@ -3,13 +3,13 @@ import $ from "jquery";
 import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
-  const roundNumber = $('#round-number').data('round-number')
+  const roundNumber = $("#round-number").data("round-number");
   $.ajax({
     url: `/round/${roundNumber}/stats`,
     success(result) {
-      Object.entries(result).forEach(([teamId, stats]) =>  {
-        let tabCardElement = $(`.tabcard[team-id=${teamId}]`)
-        let text = [
+      Object.entries(result).forEach(([teamId, stats]) => {
+        const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
+        const text = [
           stats.wins,
           stats.total_speaks.toFixed(2),
           stats.govs,
@@ -19,7 +19,7 @@ function populateTabCards() {
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
         tabCardElement.attr("href", `/team/card/${teamId}`);
         tabCardElement.text(text);
-      })
+      });
     }
   });
 }
@@ -27,7 +27,6 @@ function populateTabCards() {
 function assignTeam(e) {
   e.preventDefault();
   const teamId = $(e.target).attr("team-id");
-  const oldTeamId = $(e.target).attr("src-team-id");
   const roundId = $(e.target).attr("round-id");
   const position = $(e.target).attr("position");
   const url = `/pairings/assign_team/${roundId}/${position}/${teamId}`;
