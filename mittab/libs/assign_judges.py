@@ -36,7 +36,11 @@ def add_judges():
     for (judge_i, judge) in enumerate(judges):
         for (pairing_i, pairing) in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
-                edge = (pairing_i, num_rounds + judge_i, calc_weight(judge_i, pairing_i),)
+                edge = (
+                    pairing_i,
+                    num_rounds + judge_i,
+                    calc_weight(judge_i, pairing_i),
+                )
                 graph_edges.append(edge)
 
     judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
@@ -68,7 +72,7 @@ def add_judges():
         judge_round_joins.append(Round.judges.through(judge=judge, round=round_obj))
 
     # Save the judges to the pairings
-    Round.objects.bulk_update(pairings, ['chair'])
+    Round.objects.bulk_update(pairings, ["chair"])
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
 def calc_weight(judge_i, pairing_i):

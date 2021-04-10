@@ -112,29 +112,29 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
-    'filesystem': {
-        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/var/tmp/django_cache',
+    "filesystem": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": "/var/tmp/django_cache",
     }
 }
 
 if os.environ.get("MITTAB_LOG_QUERIES"):
     LOGGING = {
-        'version': 1,
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
+        "version": 1,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
             },
         },
-        'loggers': {
-            'django.db.backends': {
-                'level': 'DEBUG',
+        "loggers": {
+            "django.db.backends": {
+                "level": "DEBUG",
             },
         },
-        'root': {
-            'handlers': ['console'],
+        "root": {
+            "handlers": ["console"],
         }
     }

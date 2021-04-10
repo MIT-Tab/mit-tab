@@ -14,7 +14,8 @@ def cache_fxn_key(fxn, key, cache_name, *args, **kwargs):
     """
     Cache the result of a function call under the specified key
 
-    For example, the calling this with cache_fxn_key(lambda a: a ** 2, 'squared', DEFAULT, 1)
+    For example, the calling this like:
+    cache_fxn_key(lambda a: a ** 2, 'squared', DEFAULT, 1)
 
     would square `1` and store the result under the key 'squared'
     all subsequent function calls would read from the cache until it's cleared
@@ -27,7 +28,7 @@ def cache_fxn_key(fxn, key, cache_name, *args, **kwargs):
         return caches[cache_name].get(key)
 
 
-def invalidate_cache(key, cache_name):
+def invalidate_cache(key, cache_name=DEFAULT):
     caches[cache_name].delete(key)
 
 

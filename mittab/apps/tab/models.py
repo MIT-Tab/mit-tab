@@ -20,11 +20,8 @@ class TabSettings(models.Model):
     @classmethod
     def get(cls, key, default=None):
         def safe_get():
-            ts = cls.objects.filter(key=key).first()
-            if ts is not None:
-                return ts.value
-            else:
-                return None
+            setting = cls.objects.filter(key=key).first()
+            return setting.value if setting is not None else None
 
         result = cache_logic.cache_fxn_key(
             safe_get,
@@ -48,7 +45,7 @@ class TabSettings(models.Model):
             obj = cls.objects.create(key=key, value=value)
 
     def delete(self, using=None, keep_parents=False):
-        cache_logic.invalidate_cache("tab_settings_%s" % self.key.
+        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
                                      cache_logic.PERSISTENT)
         super(TabSettings, self).delete(using, keep_parents)
 

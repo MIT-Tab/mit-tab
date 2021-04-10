@@ -95,15 +95,14 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
-        errors = []
         try:
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
             assign_judges.add_judges()
-        except Exception as e:
+        except Exception:
             emit_current_exception()
-            return redirect_and_flash_error(
-                request, "Got error during judge assignment")
+            return redirect_and_flash_error(request,
+                                            "Got error during judge assignment")
     return redirect("/pairings/status/")
 
 
