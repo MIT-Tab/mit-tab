@@ -23,6 +23,7 @@ class PairingARoundTestCase(BaseWebTestCase):
 
         self._setup_confirm()
         time.sleep(30)
+        import pdb; pdb.set_trace()
         self.browser.find_by_id("assign-judges").first.click()
         self._accept_confirm()
 

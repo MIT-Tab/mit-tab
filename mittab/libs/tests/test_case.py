@@ -5,6 +5,8 @@ from django.test import LiveServerTestCase
 from selenium import webdriver
 from splinter import Browser
 
+from mittab.apps.tab.models import TabSettings
+
 
 class BaseWebTestCase(LiveServerTestCase):
     """
@@ -30,6 +32,7 @@ class BaseWebTestCase(LiveServerTestCase):
                                 headless=False,
                                 wait_time=30)
         self.browser.driver.set_page_load_timeout(240)
+        TabSettings.set("cur_round", 1)
         super(BaseWebTestCase, self).setUp()
 
     def tearDown(self):

@@ -198,7 +198,7 @@ def restore_backup(request, filename):
 
 
 def view_status(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
     return view_round(request, current_round_number)
 
 
