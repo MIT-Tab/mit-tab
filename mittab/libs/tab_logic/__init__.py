@@ -596,7 +596,7 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
             hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
-        weight += weights["hit_pullup_before"]
+        weight += weights["hit_pull_up_before"]
 
     if hit_before(team_a, team_b):
         weight += weights["hit_team_before"]
