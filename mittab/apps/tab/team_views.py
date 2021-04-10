@@ -379,24 +379,3 @@ def rank_teams(request):
         "novice": nov_teams,
         "title": "Team Rankings"
     })
-
-
-def team_stats(request, team_id):
-    team_id = int(team_id)
-    try:
-        team = Team.objects.get(pk=team_id)
-        stats = {}
-        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
-        stats["wins"] = tab_logic.tot_wins(team)
-        stats["total_speaks"] = tab_logic.tot_speaks(team)
-        stats["govs"] = tab_logic.num_govs(team)
-        stats["opps"] = tab_logic.num_opps(team)
-
-        if hasattr(team, "breaking_team"):
-            stats["outround_seed"] = team.breaking_team.seed
-            stats["effective_outround_seed"] = team.breaking_team.effective_seed
-
-        data = {"success": True, "result": stats}
-    except Team.DoesNotExist:
-        data = {"success": False}
-    return JsonResponse(data)

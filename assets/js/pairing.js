@@ -2,23 +2,24 @@ import $ from "jquery";
 
 import quickSearchInit from "./quickSearch";
 
-function populateTabCard(tabCardElement) {
-  const teamId = tabCardElement.attr("team-id");
-  return
+function populateTabCards() {
+  const roundNumber = $('#round-number').data('round-number')
   $.ajax({
-    url: `/team/${teamId}/stats`,
+    url: `/round/${roundNumber}/stats`,
     success(result) {
-      const stats = result.result;
-      const text = [
-        stats.wins,
-        stats.total_speaks.toFixed(2),
-        stats.govs,
-        stats.opps,
-        stats.seed
-      ].join(" / ");
-      tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
-      tabCardElement.attr("href", `/team/card/${teamId}`);
-      tabCardElement.text(text);
+      Object.entries(result).forEach(([teamId, stats]) =>  {
+        let tabCardElement = $(`.tabcard[team-id=${teamId}]`)
+        let text = [
+          stats.wins,
+          stats.total_speaks.toFixed(2),
+          stats.govs,
+          stats.opps,
+          stats.seed
+        ].join(" / ");
+        tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
+        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.text(text);
+      })
     }
   });
 }
@@ -45,12 +46,7 @@ function assignTeam(e) {
         $container.find(".team-link").attr("href", `/team/${result.team.id}`);
         $container.find(".tabcard").attr("team-id", result.team.id);
 
-        populateTabCard($(`.tabcard[team-id=${result.team.id}]`));
-
-        const $oldTeamTabCard = $(`.tabcard[team-id=${oldTeamId}]`);
-        if ($oldTeamTabCard) {
-          populateTabCard($oldTeamTabCard);
-        }
+        populateTabCards();
       } else {
         window.alert(alertMsg);
       }
@@ -171,9 +167,7 @@ function togglePairingRelease(event) {
 }
 
 $(document).ready(() => {
-  $(".team.tabcard").each((_, element) => {
-    populateTabCard($(element));
-  });
+  populateTabCards();
   $("#team_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/team/rank/");
   });

@@ -287,6 +287,36 @@ def alternative_teams(request, round_id, current_team_id, position):
     return render(request, "pairing/team_dropdown.html", locals())
 
 
+def team_stats(request, round_number):
+    """
+    Returns the tab card data for all teams in the pairings of this given round number
+    """
+    pairings = tab_logic.sorted_pairings(round_number)
+    stats_by_team_id = {}
+
+    def stats_for_team(team):
+        stats = {}
+        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
+        stats["wins"] = tab_logic.tot_wins(team)
+        stats["total_speaks"] = tab_logic.tot_speaks(team)
+        stats["govs"] = tab_logic.num_govs(team)
+        stats["opps"] = tab_logic.num_opps(team)
+
+        if hasattr(team, "breaking_team"):
+            stats["outround_seed"] = team.breaking_team.seed
+            stats["effective_outround_seed"] = team.breaking_team.effective_seed
+
+        return stats
+
+    for round_obj in pairings:
+        if round_obj.gov_team:
+            stats_by_team_id[round_obj.gov_team_id] = stats_for_team(round_obj.gov_team)
+        if round_obj.opp_team:
+            stats_by_team_id[round_obj.opp_team_id] = stats_for_team(round_obj.gov_team)
+
+    return JsonResponse(stats_by_team_id)
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_team(request, round_id, position, team_id):
     try:
