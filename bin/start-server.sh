@@ -22,7 +22,7 @@ if [[ $(execute-mysql "show tables like 'tournament_initialized'") ]]; then
 else
   echo "Initializing tournament";
   python manage.py initialize_tourney --tab-password $TAB_PASSWORD;
-  execute-mysql "CREATE TABLE tournament_initialized(id int not null);"
+  execute-mysql "CREATE TABLE tournament_initialized(id int not null, PRIMARY KEY (id));"
 fi
 
 /usr/local/bin/gunicorn mittab.wsgi:application -w 2 --bind 0.0.0.0:8000 -t 300
