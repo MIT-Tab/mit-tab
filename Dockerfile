@@ -25,6 +25,8 @@ COPY ./assets ./assets
 RUN pip install pipenv
 RUN pipenv install --deploy --system
 
+RUN mkdir /var/tmp/django_cache
+
 RUN npm install
 RUN ./node_modules/.bin/webpack --config webpack.config.js --mode production
 RUN python manage.py collectstatic --noinput
