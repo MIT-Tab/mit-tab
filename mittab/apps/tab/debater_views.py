@@ -116,6 +116,7 @@ def rank_debaters(request):
     debaters, nov_debaters = cache_logic.cache_fxn_key(
         get_speaker_rankings,
         "speaker_rankings",
+        cache_logic.DEFAULT,
         request
     )
 

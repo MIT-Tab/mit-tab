@@ -6,7 +6,7 @@ from wsgiref.util import FileWrapper
 
 
 from mittab.apps.tab.models import TabSettings
-from mittab.libs import errors
+from mittab.libs import errors, cache_logic
 from mittab.libs.backup.handlers import MysqlDumpRestorer
 from mittab.libs.backup.storage import LocalFilesystem, ObjectStorage
 from mittab import settings
@@ -29,6 +29,7 @@ class ActiveBackupContextManager:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         os.environ[ACTIVE_BACKUP_KEY] = "0"
+        cache_logic.clear_cache()
 
 def _generate_unique_key(base):
     if base in BACKUP_STORAGE:

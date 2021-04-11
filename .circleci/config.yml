@@ -6,11 +6,12 @@ jobs:
     docker:
       - image: benmusch/mittab-test:0.0.1
         environment:
-          MYSQL_PASSWORD: secret
+          MYSQL_ROOT_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
       - image: circleci/mysql:5.7
         environment:
+          TEST_BROWSER: chrome
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
           MYSQL_ROOT_HOST: 127.0.0.1

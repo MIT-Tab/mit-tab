@@ -19,7 +19,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
-                  "webpack_loader", "bootstrap4", "polymorphic")
+                  "webpack_loader", "bootstrap4",)
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",
@@ -31,6 +31,13 @@ MIDDLEWARE = (
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "mittab.apps.tab.middleware.Login",
 )
+
+if os.environ.get("SILK_ENABLED"):
+    INSTALLED_APPS = INSTALLED_APPS + ("silk",)
+    MIDDLEWARE = MIDDLEWARE + ("silk.middleware.SilkyMiddleware",)
+    SILK_ENABLED = True
+else:
+    SILK_ENABLED = False
 
 ROOT_URLCONF = "mittab.urls"
 
@@ -112,3 +119,31 @@ TEMPLATES = [
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
+    "filesystem": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": "/var/tmp/django_cache",
+    }
+}
+
+if os.environ.get("MITTAB_LOG_QUERIES"):
+    LOGGING = {
+        "version": 1,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+            },
+        },
+        "loggers": {
+            "django.db.backends": {
+                "level": "DEBUG",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+        }
+    }

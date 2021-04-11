@@ -3,21 +3,8 @@ import random
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
-from polymorphic.models import PolymorphicModel
 
-
-class ModelWithTiebreaker(PolymorphicModel):
-    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        while not self.tiebreaker or \
-                self.__class__.objects.filter(tiebreaker=self.tiebreaker).exists():
-            self.tiebreaker = random.choice(range(0, 2**16))
-
-        super(ModelWithTiebreaker, self).save(*args, **kwargs)
-
-    class Meta:
-        abstract = True
+from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
@@ -32,12 +19,21 @@ class TabSettings(models.Model):
 
     @classmethod
     def get(cls, key, default=None):
-        if cls.objects.filter(key=key).exists():
-            return cls.objects.get(key=key).value
-        else:
-            if default is None:
-                raise ValueError("Invalid key '%s'" % key)
+        def safe_get():
+            setting = cls.objects.filter(key=key).first()
+            return setting.value if setting is not None else None
+
+        result = cache_logic.cache_fxn_key(
+            safe_get,
+            "tab_settings_%s" % key,
+            cache_logic.PERSISTENT,
+        )
+        if result is None and default is None:
+            raise ValueError("No TabSetting with key '%s'" % key)
+        elif result is None:
             return default
+        else:
+            return result
 
     @classmethod
     def set(cls, key, value):
@@ -48,6 +44,19 @@ class TabSettings(models.Model):
         else:
             obj = cls.objects.create(key=key, value=value)
 
+    def delete(self, using=None, keep_parents=False):
+        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
+                                     cache_logic.PERSISTENT)
+        super(TabSettings, self).delete(using, keep_parents)
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
+                                     cache_logic.PERSISTENT)
+        super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -77,7 +86,7 @@ class School(models.Model):
         ordering = ["name"]
 
 
-class Debater(ModelWithTiebreaker):
+class Debater(models.Model):
     name = models.CharField(max_length=30, unique=True)
     VARSITY = 0
     NOVICE = 1
@@ -86,6 +95,17 @@ class Debater(ModelWithTiebreaker):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        while not self.tiebreaker or \
+                Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2**16))
+        super(Debater, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def num_teams(self):
@@ -93,18 +113,13 @@ class Debater(ModelWithTiebreaker):
 
     @property
     def display(self):
-        if self.num_teams:
-            return self.name
-        return "{} (NO TEAM)".format(self.name)
+        return self.name
 
     def __str__(self):
         return self.name
 
     def team(self):
-        # this ordering is just a work-around to say consistent with imperfect test data
-        # Ideally, we will enforce only 1 team membership via validation
-        # https://github.com/MIT-Tab/mit-tab/issues/218
-        return self.team_set.order_by("pk").first()
+        return self.team_set.first()
 
     def delete(self, using=None, keep_parents=False):
         teams = Team.objects.filter(debaters=self)
@@ -117,7 +132,7 @@ class Debater(ModelWithTiebreaker):
         ordering = ["name"]
 
 
-class Team(ModelWithTiebreaker):
+class Team(models.Model):
     name = models.CharField(max_length=30, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
@@ -152,6 +167,7 @@ class Team(ModelWithTiebreaker):
 
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
     def set_unique_team_code(self):
         haikunator = Haikunator()
@@ -168,12 +184,20 @@ class Team(ModelWithTiebreaker):
 
         self.team_code = code
 
-    def save(self, *args, **kwargs):
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
         # Generate a team code for teams that don't have one
         if not self.team_code:
             self.set_unique_team_code()
 
-        super(Team, self).save(*args, **kwargs)
+        while not self.tiebreaker or \
+                Team.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2**16))
+
+        super(Team, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def display_backend(self):
@@ -214,7 +238,7 @@ class Team(ModelWithTiebreaker):
         return ""
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["pk"]
 
 
 class BreakingTeam(models.Model):
@@ -288,8 +312,8 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
-    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
@@ -475,7 +499,7 @@ class Round(models.Model):
 
 
 class Bye(models.Model):
-    bye_team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):
@@ -484,7 +508,9 @@ class Bye(models.Model):
 
 
 class NoShow(models.Model):
-    no_show_team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    no_show_team = models.ForeignKey(Team,
+                                     related_name="no_shows",
+                                     on_delete=models.CASCADE)
     round_number = models.IntegerField()
     lenient_late = models.BooleanField(default=False)
 

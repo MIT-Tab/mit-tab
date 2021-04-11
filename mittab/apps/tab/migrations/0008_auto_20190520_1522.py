@@ -6,29 +6,6 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
-def forwards_func_team(apps, schema_editor):
-    MyModel = apps.get_model("tab", "Team")
-    ContentType = apps.get_model("contenttypes", "ContentType")
-
-    new_ct = ContentType.objects.get_for_model(MyModel)
-    MyModel.objects.filter(polymorphic_ctype__isnull=True).update(
-        polymorphic_ctype=new_ct)
-
-
-def forwards_func_deb(apps, schema_editor):
-    MyModel = apps.get_model("tab", "Debater")
-    ContentType = apps.get_model("contenttypes", "ContentType")
-
-    new_ct = ContentType.objects.get_for_model(MyModel)
-    MyModel.objects.filter(polymorphic_ctype__isnull=True).update(
-        polymorphic_ctype=new_ct)
-
-
-def forwards_func(apps, schema_editor):
-    forwards_func_deb(apps, schema_editor)
-    forwards_func_team(apps, schema_editor)
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -67,5 +44,4 @@ class Migration(migrations.Migration):
             name='tiebreaker',
             field=models.IntegerField(blank=True, null=True, unique=True),
         ),
-        migrations.RunPython(forwards_func, migrations.RunPython.noop),
     ]

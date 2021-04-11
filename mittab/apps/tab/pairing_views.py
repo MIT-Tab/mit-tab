@@ -95,34 +95,14 @@ def pair_round(request):
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
-        panel_points, errors = [], []
-        potential_panel_points = [
-            k for k in list(request.POST.keys()) if k.startswith("panel_")
-        ]
-        for point in potential_panel_points:
-            try:
-                point = int(point.split("_")[1])
-                num = float(request.POST["panel_{0}".format(point)])
-                if num > 0.0:
-                    panel_points.append((Round.objects.get(id=point), num))
-            except Exception as e:
-                emit_current_exception()
-                errors.append(e)
-
-        panel_points.reverse()
-        rounds = list(Round.objects.filter(round_number=current_round_number))
-        judges = [
-            ci.judge
-            for ci in CheckIn.objects.filter(round_number=current_round_number)
-        ]
         try:
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
-            assign_judges.add_judges(rounds, judges, panel_points)
-        except Exception as e:
+            assign_judges.add_judges()
+        except Exception:
             emit_current_exception()
-            return redirect_and_flash_error(
-                request, "Got error during judge assignment")
+            return redirect_and_flash_error(request,
+                                            "Got error during judge assignment")
     return redirect("/pairings/status/")
 
 
@@ -202,21 +182,16 @@ def restore_backup(request, filename):
 
 
 def view_status(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
     return view_round(request, current_round_number)
 
 
 def view_round(request, round_number):
     errors, excluded_teams = [], []
-    round_pairing = list(Round.objects.filter(round_number=round_number))
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    random.seed(1337)
-    random.shuffle(round_pairing)
-    round_pairing.sort(key=lambda x: tab_logic.team_comp(x, round_number),
-                       reverse=True)
-
+    round_pairing = tab_logic.sorted_pairings(round_number)
     #For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 
@@ -308,6 +283,36 @@ def alternative_teams(request, round_id, current_team_id, position):
     included_teams = Team.objects.exclude(pk__in=excluded_teams) \
         .exclude(pk=current_team_id)
     return render(request, "pairing/team_dropdown.html", locals())
+
+
+def team_stats(request, round_number):
+    """
+    Returns the tab card data for all teams in the pairings of this given round number
+    """
+    pairings = tab_logic.sorted_pairings(round_number)
+    stats_by_team_id = {}
+
+    def stats_for_team(team):
+        stats = {}
+        stats["seed"] = Team.get_seed_display(team).split(" ")[0]
+        stats["wins"] = tab_logic.tot_wins(team)
+        stats["total_speaks"] = tab_logic.tot_speaks(team)
+        stats["govs"] = tab_logic.num_govs(team)
+        stats["opps"] = tab_logic.num_opps(team)
+
+        if hasattr(team, "breaking_team"):
+            stats["outround_seed"] = team.breaking_team.seed
+            stats["effective_outround_seed"] = team.breaking_team.effective_seed
+
+        return stats
+
+    for round_obj in pairings:
+        if round_obj.gov_team:
+            stats_by_team_id[round_obj.gov_team_id] = stats_for_team(round_obj.gov_team)
+        if round_obj.opp_team:
+            stats_by_team_id[round_obj.opp_team_id] = stats_for_team(round_obj.gov_team)
+
+    return JsonResponse(stats_by_team_id)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
