@@ -27,7 +27,7 @@ raven = "==6.4.0"
 requests = "==2.22.0"
 selenium = "==3.141.0"
 splinter = "==0.10.0"
-Django = "==2.1.5"
+Django = "==2.2.24"
 PyYAML = "==5.1.2"
 
 [requires]
