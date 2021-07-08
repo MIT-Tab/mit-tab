@@ -12,10 +12,10 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
         redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tasks.models import Task
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
         validate_panel, EBallotForm
-import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
@@ -23,20 +23,12 @@ import mittab.libs.backup as backup
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_round(request):
-    cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
     current_round_number = current_round.value
     if request.method == "POST":
         # We should pair the round
         try:
-            TabSettings.set("pairing_released", 0)
-            backup.backup_round("round_%i_before_pairing" %
-                                (current_round_number))
-
-            with transaction.atomic():
-                tab_logic.pair_round()
-                current_round.value = current_round.value + 1
-                current_round.save()
+            Task.enqueue("pair_round")
         except Exception as exp:
             emit_current_exception()
             return redirect_and_flash_error(
@@ -203,11 +195,17 @@ def restore_backup(request, filename):
 
 
 def view_status(request):
-    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    current_round_number = TabSettings.get("cur_round") - 1
     return view_round(request, current_round_number)
 
 
 def view_round(request, round_number):
+    current_round_number = TabSettings.get("cur_round") - 1
+    pairing_in_progress = False
+    if round_number == current_round_number:
+        pairing_task = Task.most_recent_run("pair_round")
+        pairing_in_progress = not (pairing_task is None or pairing_task.is_terminated())
+
     errors, excluded_teams = [], []
     round_pairing = list(Round.objects.filter(round_number=round_number))
 

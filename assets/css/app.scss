@@ -30,6 +30,7 @@ $font-size-base: 0.95rem !default;
 
 .data-list {
   column-count: 4;
+
   ul {
     list-style-type: none;
   }
@@ -93,4 +94,9 @@ $font-size-base: 0.95rem !default;
 
 .form-inline .input-group {
   width: 100%;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
