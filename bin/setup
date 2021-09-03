@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
+set +x
 
+printenv
 if [ -x "$(command -v mysqladmin)" ]; then
   mysqladmin ping -h $MITTAB_DB_HOST -u root --password=$MYSQL_ROOT_PASSWORD --wait=30
 fi
