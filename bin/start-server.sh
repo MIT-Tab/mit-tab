@@ -25,5 +25,9 @@ else
   execute-mysql "CREATE TABLE tournament_initialized(id int not null, PRIMARY KEY (id));"
 fi
 
+if [[ $TOURNAMENT_NAME == *-test ]]; then
+  python manage.py loaddata testing_db;
+fi
+
 /usr/local/bin/gunicorn --worker-tmp-dir /dev/shm \
   mittab.wsgi:application -w 2 --bind 0.0.0.0:8000 -t 300
