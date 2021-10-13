@@ -23,5 +23,4 @@ RUN pipenv install --deploy --system
 RUN mkdir /var/tmp/django_cache
 
 EXPOSE 8010
-STOPSIGNAL SIGTERM
 CMD ["/var/www/tab/bin/start-server.sh"]
