@@ -61,7 +61,7 @@ round.
 If a bye is needed to make the lowest bracket whole, a bye will be selected as
 follows:
 * In the first round the bye is selected randomly.
-* In all preceding rounds the bye is selected as the lowest speaking team of
+* In all succeeding rounds the bye is selected as the lowest speaking team of
   the all down bracket.
 * No team will get the bye more than once.
 * Byes are tabbed as a win with debaters receiving average speaks.
