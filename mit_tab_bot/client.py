@@ -17,6 +17,11 @@ class MITTabClient(discord.Client):
         self.guild_id = guild_id
         kwargs['chunk_guilds_at_startup'] = False
 
+        intents = discord.Intents.default()
+        intents.members = True
+
+        kwargs['intents'] = intents
+
         print ('initializing client')
 
         super().__init__(*args, **kwargs)
