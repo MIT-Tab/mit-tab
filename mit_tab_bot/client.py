@@ -16,12 +16,19 @@ class MITTabClient(discord.Client):
     def __init__(self, guild_id=None, *args, **kwargs):
         self.guild_id = guild_id
         kwargs['chunk_guilds_at_startup'] = False
+
+        print ('initializing client')
+
         super().__init__(*args, **kwargs)
     
     async def on_ready(self):
+        print ('in on ready')
+
         self.guild = await get_or_create_guild(
             self,
         )
+
+        print ('built guild' + str(self.guild))
 
     async def on_message(self, message):
         try:
