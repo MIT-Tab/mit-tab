@@ -2,22 +2,34 @@
 from hashlib import sha1
 import random
 
-from django.core.cache import cache as _djcache
+from django.core.cache import caches
 
 CACHE_TIMEOUT = 20
 
+DEFAULT = "default"
+PERSISTENT = "filesystem"
 
-def cache_fxn_key(fxn, key, *args, **kwargs):
-    result = _djcache.get(key)
 
-    if not result:
+def cache_fxn_key(fxn, key, cache_name, *args, **kwargs):
+    """
+    Cache the result of a function call under the specified key
+
+    For example, the calling this like:
+    cache_fxn_key(lambda a: a ** 2, 'squared', DEFAULT, 1)
+
+    would square `1` and store the result under the key 'squared'
+    all subsequent function calls would read from the cache until it's cleared
+    """
+    if key not in caches[cache_name]:
         result = fxn(*args, **kwargs)
-        _djcache.set(key, result)
-    return result
+        caches[cache_name].set(key, result)
+        return result
+    else:
+        return caches[cache_name].get(key)
 
 
-def invalidate_cache(key):
-    _djcache.delete(key)
+def invalidate_cache(key, cache_name=DEFAULT):
+    caches[cache_name].delete(key)
 
 
 def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
@@ -39,14 +51,13 @@ def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
 
     def do_cache(f):
         def wrapper(*args, **kwargs):
-            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args,
-                                      kwargs)).encode("utf-8")).hexdigest()
-            result = _djcache.get(key)
+            key = sha1(("%s%s%s%s" % (f.__module__, f.__name__, args, kwargs)) \
+                    .encode("utf-8")).hexdigest()
+            result = caches[DEFAULT].get(key)
             if result is None:
-                #print "busting cache"
                 result = f(*args, **kwargs)
-                _djcache.set(key, result,
-                             random.randint(seconds, seconds + stampede))
+                caches[DEFAULT].set(key, result,
+                                    random.randint(seconds, seconds + stampede))
             return result
 
         return wrapper
@@ -55,4 +66,5 @@ def cache(seconds=CACHE_TIMEOUT, stampede=CACHE_TIMEOUT):
 
 
 def clear_cache():
-    _djcache.clear()
+    caches[DEFAULT].clear()
+    caches[PERSISTENT].clear()

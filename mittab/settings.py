@@ -33,6 +33,13 @@ MIDDLEWARE = (
     "mittab.apps.tab.middleware.Login",
 )
 
+if os.environ.get("SILK_ENABLED"):
+    INSTALLED_APPS = INSTALLED_APPS + ("silk",)
+    MIDDLEWARE = MIDDLEWARE + ("silk.middleware.SilkyMiddleware",)
+    SILK_ENABLED = True
+else:
+    SILK_ENABLED = False
+
 ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
@@ -46,14 +53,23 @@ WSGI_APPLICATION = "mittab.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "mittab",
-        "OPTIONS": {"charset": "utf8mb4"},
-        "USER": os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_ROOT_PASSWORD", ""),
-        "HOST": os.environ.get("MITTAB_DB_HOST", "127.0.0.1"),
-        "PORT": os.environ.get("MYSQL_PORT", "3306"),
+        "ENGINE":   "django.db.backends.mysql",
+        "OPTIONS":  {"charset": "utf8mb4"},
+        "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
+        "USER":     os.environ.get("MYSQL_USER", "root"),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "HOST":     os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "PORT":     os.environ.get("MYSQL_PORT", "3306"),
     }
+}
+
+BACKUPS = {
+    "use_s3": os.environ.get("BACKUP_STORAGE", "") == "S3",
+    "prefix": os.environ.get(
+        "BACKUP_PREFIX",
+        os.path.join(BASE_DIR, "mittab", "backups")),
+    "bucket_name": os.environ.get("BACKUP_BUCKET"),
+    "s3_endpoint": os.environ.get("BACKUP_S3_ENDPOINT"),
 }
 
 # Error monitoring
@@ -112,6 +128,35 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
+
 REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"]
 }
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    },
+    "filesystem": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": "/var/tmp/django_cache",
+    }
+}
+
+if os.environ.get("MITTAB_LOG_QUERIES"):
+    LOGGING = {
+        "version": 1,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+            },
+        },
+        "loggers": {
+            "django.db.backends": {
+                "level": "DEBUG",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+        }
+    }
