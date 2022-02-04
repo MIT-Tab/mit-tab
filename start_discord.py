@@ -2,11 +2,9 @@ import discord, os, sys
 from mit_tab_bot import MITTabClient
 
 kwargs = {}
-tournament_name = sys.argv[1] if len(sys.argv) > 1 else None
-guild_id = sys.argv[2] if len(sys.argv) > 2 else None
+guild_id = sys.argv[1] if len(sys.argv) > 1 else None
 
 if tournament_name:
-    kwargs['tournament_name'] = tournament_name
     kwargs['guild_id'] = guild_id
 
 client = MITTabClient(**kwargs)
