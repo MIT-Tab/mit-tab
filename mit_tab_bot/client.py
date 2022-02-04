@@ -21,10 +21,7 @@ class MITTabClient(discord.Client):
     async def on_ready(self):
         self.guild = await get_or_create_guild(
             self,
-            self.tournament_name
         )
-
-        self.guild_id = self.guild.id
 
     async def on_message(self, message):
         try:

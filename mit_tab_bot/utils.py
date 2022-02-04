@@ -50,40 +50,19 @@ END_OF_ROUND_PERMISSIONS = discord.PermissionOverwrite(
 
 VIDEO_LINK = 'https://discordapp.com/channels/'
 
-async def get_or_create_guild(client, tournament_name='defaulttournament'):
-    print (client.guild_id)
-    to_return = None
-    if client.guild_id:
-        to_return = client.get_guild(int(client.guild_id))
+async def get_or_create_guild(client):
+    to_return = client.get_guild(int(client.guild_id))
 
-    if not to_return:
-        for guild in client.guilds:
-            if guild.name == tournament_name:
-                if to_return is not None:
-                    await guild.delete()
-                to_return = guild
-
-    created = False
-
-    if not to_return:
-        guild = await client.create_guild(
-            tournament_name,
-            region=discord.VoiceRegion.us_east
-        )
-
-        to_return = guild
-        created = True
-
-    guild = to_return
-
-    r = await get_role(guild, 'debaters')
+    r = await get_role(to_return, 'debaters')
     if not r:
-        await create_roles(guild)
+        await create_roles(to_return)
 
     return guild
 
 async def handle_message(guild, message):
-    if hasattr(message.channel, 'name') and (message.channel.name.startswith('Room') or message.channel.name.startswith('room')):
+    if hasattr(message.channel, 'name') and \
+       (message.channel.name.startswith('Room') or \
+        message.channel.name.startswith('room')):
         return
 
     if not message.content.startswith('!'):
@@ -102,7 +81,6 @@ async def handle_message(guild, message):
                 await channel.delete()            
 
         if message.content.startswith('!rooms'):
-            print ('HANDLING COMMAND')
             rooms = get_rooms()
 
             for i in range(3):
@@ -129,7 +107,6 @@ async def handle_message(guild, message):
             await create_channels(guild)
             
             await clear_invites(await get_channel(guild, 'GA'))
-            print (await create_invite(await get_channel(guild, 'GA')))
 
         if message.content.startswith('!send'):
             PERMISSIONS = ROUND_PERMISSIONS            
