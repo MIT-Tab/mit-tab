@@ -4,8 +4,8 @@ from simple_rest_client.api import API
 
 def construct_api():
     api = API(
-        api_root_url='http://138.197.108.0/discord' % {
-            'tournament_name': os.environ.get('TOURNAMENT_NAME', 'NONAME')
+        api_root_url='http://{tournmament_ip}/discord' % {
+            'tournament_ip': os.environ.get('TOURNAMENT_IP', 'NONAME')
         },
         json_encode_body=True
     )
