@@ -31,6 +31,9 @@ class MITTabClient(discord.Client):
         print ('built guild' + str(self.guild))
 
     async def on_message(self, message):
+        if not self.guild:
+            return
+
         try:
             await update_member_role(self.guild, str(message.author))
         except:
