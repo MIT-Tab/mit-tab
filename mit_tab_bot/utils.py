@@ -57,7 +57,7 @@ async def get_or_create_guild(client):
     if not r:
         await create_roles(to_return)
 
-    return guild
+    return to_return
 
 async def handle_message(guild, message):
     if hasattr(message.channel, 'name') and \
