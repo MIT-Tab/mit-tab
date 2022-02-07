@@ -45,17 +45,11 @@ class TestPairingLogic(TestCase):
                 checkin.save()
 
     def assign_judges(self):
-        cur_round = self.round_number()
-        panel_points = []
-        rounds = list(Round.objects.filter(round_number=cur_round))
         self.generate_checkins()
-        judges = [
-            ci.judge for ci in CheckIn.objects.filter(round_number=cur_round)
-        ]
-        assign_judges.add_judges(rounds, judges, panel_points)
+        assign_judges.add_judges()
 
     def round_number(self):
-        return TabSettings.objects.get(key="cur_round").value - 1
+        return TabSettings.get("cur_round") - 1
 
     def check_pairing(self, round_number, last):
         assert self.round_number() == round_number

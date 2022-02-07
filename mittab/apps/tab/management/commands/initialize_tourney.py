@@ -1,7 +1,5 @@
 import os
-import shutil
 import sys
-import time
 
 from django.core.management import call_command
 from django.contrib.auth.models import User
@@ -9,7 +7,6 @@ from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import backup_round
-from mittab.libs.backup.strategies.local_dump import BACKUP_PREFIX
 
 
 class Command(BaseCommand):
@@ -28,34 +25,9 @@ class Command(BaseCommand):
             help="Password for the entry user",
             nargs="?",
             default=User.objects.make_random_password(length=8))
-        parser.add_argument("backup_directory")
 
     def handle(self, *args, **options):
-        backup_dir = options["backup_directory"]
-        path = BACKUP_PREFIX
-
-        self.stdout.write(
-            "Creating directory for current tournament in backup directory")
-        tournament_dir = os.path.join(backup_dir, str(int(time.time())))
-
-        if not os.path.exists(tournament_dir):
-            os.makedirs(tournament_dir)
-
-        if not os.path.exists(path + "/backups"):
-            os.makedirs(path + "/backups")
-
-        self.stdout.write(
-            "Copying current tournament state to backup tournament directory: %s"
-            % tournament_dir)
         backup_round("before_new_tournament")
-        try:
-            shutil.rmtree(tournament_dir + "/backups", ignore_errors=True)
-            shutil.copytree(path + "/backups", tournament_dir + "/backups")
-        except (IOError, os.error) as why:
-            self.stdout.write("Failed to backup current tournament state")
-            print(why)
-            sys.exit(1)
-
         self.stdout.write("Clearing data from database")
         try:
             call_command("flush", interactive=False)
@@ -76,16 +48,6 @@ class Command(BaseCommand):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-
-        self.stdout.write("Cleaning up old backups")
-        try:
-            shutil.rmtree(path + "/backups")
-            os.makedirs(path + "/backups")
-        except (IOError, os.error) as why:
-            self.stdout.write(
-                "Failed to copy clean database to pairing_db.sqlite3")
-            print(why)
-            sys.exit(1)
 
         self.stdout.write(
             "Done setting up tournament, after backing up old one. "

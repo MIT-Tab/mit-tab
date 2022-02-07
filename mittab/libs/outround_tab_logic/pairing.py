@@ -19,6 +19,7 @@ def perform_the_break():
     teams, nov_teams = cache_logic.cache_fxn_key(
         get_team_rankings,
         "team_rankings",
+        cache_logic.DEFAULT,
         None
     )
 
