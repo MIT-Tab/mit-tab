@@ -14,6 +14,7 @@ COPY package-lock.json ./
 COPY manage.py ./
 COPY setup.py ./
 COPY webpack.config.js ./
+COPY settings.yaml ./
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets
