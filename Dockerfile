@@ -17,6 +17,7 @@ COPY webpack.config.js ./
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets
+COPY ./settings.yaml ./settings.yaml
 
 RUN pip install pipenv
 RUN pipenv install --deploy --system
