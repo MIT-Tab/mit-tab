@@ -78,7 +78,7 @@ def had_bye(team, round_number=None):
     if round_number is None:
         return team.byes.exists()
     else:
-        any(b.round_number == round_number for b in team.byes.all())
+        return any(b.round_number == round_number for b in team.byes.all())
 
 
 ##############
