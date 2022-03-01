@@ -310,7 +310,7 @@ def team_stats(request, round_number):
         if round_obj.gov_team:
             stats_by_team_id[round_obj.gov_team_id] = stats_for_team(round_obj.gov_team)
         if round_obj.opp_team:
-            stats_by_team_id[round_obj.opp_team_id] = stats_for_team(round_obj.gov_team)
+            stats_by_team_id[round_obj.opp_team_id] = stats_for_team(round_obj.opp_team)
 
     return JsonResponse(stats_by_team_id)
 
