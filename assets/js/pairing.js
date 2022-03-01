@@ -18,7 +18,7 @@ function populateTabCards() {
         ].join(" / ");
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
         tabCardElement.attr("href", `/team/card/${teamId}`);
-        tabCardElement.text(text);
+        tabCardElement.text(`${text}`);
       });
     }
   });
