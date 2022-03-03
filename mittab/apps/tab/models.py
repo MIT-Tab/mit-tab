@@ -95,6 +95,17 @@ class Debater(models.Model):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        while not self.tiebreaker or \
+                Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
+            self.tiebreaker = random.choice(range(0, 2**16))
+        super(Debater, self).save(force_insert, force_update, using, update_fields)
 
     discord_id = models.CharField(
         max_length=128,

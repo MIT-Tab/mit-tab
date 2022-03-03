@@ -14,10 +14,10 @@ COPY package-lock.json ./
 COPY manage.py ./
 COPY setup.py ./
 COPY webpack.config.js ./
+COPY settings.yaml ./
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets
-COPY ./settings.yaml ./settings.yaml
 
 RUN pip install pipenv
 RUN pipenv install --deploy --system
