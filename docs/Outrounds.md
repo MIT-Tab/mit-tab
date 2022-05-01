@@ -21,7 +21,7 @@ Managing Pairings
 
 Currently MIT Tab does NOT support judge assignment, this must be done by hand.  However, assuming you have set `var_to_nov` correctly (see above) AND all scratches are entered, the dropdowns on the pairing view will allow you to place judges very quickly.  Furthermore, gov opp will be assigned randomly, so be sure to change that according to whichever type of system your tournament has chosen to use.
 
-Please also not the release pairings button that appears on the pairings page as normally appears.  This will toggle the visibility of that round's pairings.
+Please also note the release pairings button that appears on the pairings page as normally appears.  This will toggle the visibility of that round's pairings.
 
 Entering Results
 ----------------
