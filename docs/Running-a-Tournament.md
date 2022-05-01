@@ -118,7 +118,7 @@ If something went wrong in the pairings, you may want to pair the round again.
 In order to do this, all you have to do is restore from the before pairing
 back-up and then pair the round as described [above](#pairing-the-next-round)
 
-The find the back-up to restore from, go to "Backups" > "View Backups" and
+To find the back-up to restore from, go to "Backups" > "View Backups" and
 click on the one with the name `round_x_before_pairing.db`, where `x` is the
 round number that you want to re-pair.
 
