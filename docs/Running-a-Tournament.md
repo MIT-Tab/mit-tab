@@ -155,7 +155,7 @@ round that you want to check them out for.
 
 ### Removing a room
 
-To remove a room, un check it in for the given round. You must have enough checked in rooms for this to work.
+To remove a room, uncheck it in for the given round. You must have enough checked in rooms for this to work.
 
 ![](img/removing_a_room.png)
 
