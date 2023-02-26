@@ -226,9 +226,10 @@ def pair_round():
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related(
-        "room"
-    )
+    rooms = RoomCheckIn \
+            .objects \
+            .filter(round_number=current_round) \
+            .prefetch_related("room")
     rooms = map(lambda r: r.room, rooms)
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
@@ -418,15 +419,16 @@ def sorted_pairings(round_number):
     number of DB queries required to calculate it
     """
     round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(
+        Round.objects.filter(round_number=round_number)
+        .prefetch_related(
             "judges",
             "chair",
             "room",
             "gov_team",
             "opp_team",
             "gov_team__breaking_team",
-            "gov_team__gov_team",  # poorly named relation, points to rounds as gov
-            "gov_team__opp_team",  # poorly named relation, points to rounds as gov
+            "gov_team__gov_team", # poorly named relation, points to rounds as gov
+            "gov_team__opp_team", # poorly named relation, points to rounds as gov
             "gov_team__byes",
             "gov_team__no_shows",
             "gov_team__debaters__team_set",
@@ -435,8 +437,8 @@ def sorted_pairings(round_number):
             "gov_team__debaters__roundstats_set",
             "gov_team__debaters__roundstats_set__round",
             "opp_team__breaking_team",
-            "opp_team__gov_team",  # poorly named relation, points to rounds as gov
-            "opp_team__opp_team",  # poorly named relation, points to rounds as gov
+            "opp_team__gov_team", # poorly named relation, points to rounds as gov
+            "opp_team__opp_team", # poorly named relation, points to rounds as gov
             "opp_team__byes",
             "opp_team__no_shows",
             "opp_team__debaters__team_set",
@@ -447,6 +449,9 @@ def sorted_pairings(round_number):
         )
     )
     round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
+            "opp_team__debaters__roundstats_set__round"
+        )
+    )
 
     return round_pairing
 
@@ -579,6 +584,22 @@ def perfect_pairing(list_of_teams):
             if pairing not in all_pairs:
                 all_pairs.append(pairing)
     return determine_gov_opp(all_pairs)
+
+def get_weights():
+    """
+    Returns a map of all the weight-related tab settings to use without querying for
+    calculations
+    """
+    return {
+        "power_pairing_multiple": TabSettings.get("power_pairing_multiple", -1),
+        "high_opp_penalty": TabSettings.get("high_opp_penalty", 0),
+        "high_gov_penalty": TabSettings.get("high_gov_penalty", -100),
+        "high_high_opp_penalty": TabSettings.get("higher_opp_penalty", -10),
+        "same_school_penalty": TabSettings.get("same_school_penalty", -1000),
+        "hit_pull_up_before": TabSettings.get("hit_pull_up_before", -10000),
+        "hit_team_before": TabSettings.get("hit_team_before", -100000),
+    }
+
 
 
 def get_weights():

@@ -166,6 +166,13 @@ class Team(models.Model):
     break_preference = models.IntegerField(default=0, choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
+    VARSITY = 0
+    NOVICE = 1
+    BREAK_PREFERENCE_CHOICES = ((VARSITY, "Varsity"), (NOVICE, "Novice"))
+
+    break_preference = models.IntegerField(default=0, choices=BREAK_PREFERENCE_CHOICES)
+    tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+
     def set_unique_team_code(self):
         haikunator = Haikunator()
 
@@ -346,6 +353,7 @@ class Room(models.Model):
 class Outround(models.Model):
     VARSITY = 0
     NOVICE = 1
+
     TYPE_OF_ROUND_CHOICES = ((VARSITY, "Varsity"), (NOVICE, "Novice"))
 
     num_teams = models.IntegerField()
@@ -363,6 +371,7 @@ class Outround(models.Model):
         on_delete=models.CASCADE,
         related_name="chair_outround",
     )
+
     judges = models.ManyToManyField(Judge, blank=True, related_name="judges_outrounds")
     UNKNOWN = 0
     GOV = 1
@@ -376,6 +385,7 @@ class Outround(models.Model):
         (GOV_VIA_FORFEIT, "GOV via Forfeit"),
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
+
     room = models.ForeignKey(
         Room, on_delete=models.CASCADE, related_name="rooms_outrounds"
     )
@@ -492,6 +502,7 @@ class NoShow(models.Model):
     no_show_team = models.ForeignKey(
         Team, related_name="no_shows", on_delete=models.CASCADE
     )
+
     round_number = models.IntegerField()
     lenient_late = models.BooleanField(default=False)
 
