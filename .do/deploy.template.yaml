@@ -1,0 +1,79 @@
+databases:
+- cluster_name: mysql
+  db_name: defaultdb
+  db_user: doadmin
+  engine: MYSQL
+  name: mysql
+  production: true
+  version: "8"
+envs:
+- key: TAB_PASSWORD
+  scope: RUN_AND_BUILD_TIME
+  value: TODO
+- key: BACKUP_STORAGE
+  scope: RUN_AND_BUILD_TIME
+  value: S3
+- key: BACKUP_PREFIX
+  scope: RUN_AND_BUILD_TIME
+  value: do-app/
+- key: BACKUP_S3_ENDPOINT
+  scope: RUN_AND_BUILD_TIME
+  value: https://nyc3.digitaloceanspaces.com
+- key: BACKUP_BUCKET
+  scope: RUN_AND_BUILD_TIME
+  value: mittab-backups
+- key: AWS_SECRET_ACCESS_KEY
+  scope: RUN_AND_BUILD_TIME
+  type: SECRET
+  value: EV[1:f3hvQkTC/Cy5+Ic0VNzIUwtAyG0AUJKT:A+ST33XUgZXpv1ahOKMIh4DGUeQCr4FPTARbB3PIkWkBQLmvqdGTtJukH76B4mkBnxDR7M39NWXWCY4=]
+- key: AWS_ACCESS_KEY_ID
+  scope: RUN_AND_BUILD_TIME
+  type: SECRET
+  value: EV[1:l8UCyHKWyEmfgriuDQpgnH79+TOTnqhL:2QNnSilJIqIUs+A0XIJYJkY0o1iIkMi1fAFaLux/x+GjG/SF]
+- key: AWS_DEFAULT_REGION
+  scope: RUN_AND_BUILD_TIME
+  value: nyc3
+- key: MYSQL_PASSWORD
+  scope: RUN_AND_BUILD_TIME
+  value: ${mysql.PASSWORD}
+- key: MYSQL_DATABASE
+  scope: RUN_AND_BUILD_TIME
+  value: ${mysql.DATABASE}
+- key: MYSQL_HOST
+  scope: RUN_AND_BUILD_TIME
+  value: ${mysql.HOST}
+- key: MYSQL_PORT
+  scope: RUN_AND_BUILD_TIME
+  value: ${mysql.PORT}
+- key: MYSQL_USER
+  scope: RUN_AND_BUILD_TIME
+  value: ${mysql.USERNAME}
+- key: SENTRY_DSN
+  scope: RUN_AND_BUILD_TIME
+  value: https://ffbc8f385d2248db992f2f66ce0d7032:e6caead56a1d44c9aa09d2bcb9d9f31e@sentry.io/208171
+name: mit-tab
+region: nyc
+services:
+- dockerfile_path: Dockerfile
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${test.DATABASE_URL}
+  github:
+    branch: do-apps
+    repo: MIT-Tab/mit-tab
+  http_port: 8000
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: mit-tab
+  routes:
+  - path: /
+static_sites:
+- dockerfile_path: Dockerfile
+  github:
+    branch: do-apps
+    repo: MIT-Tab/mit-tab
+  name: static
+  output_dir: /var/www/tab/assets
+  routes:
+  - path: /static

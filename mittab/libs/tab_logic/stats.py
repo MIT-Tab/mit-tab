@@ -1,7 +1,6 @@
 from collections import defaultdict
-from django.db.models import Q
 
-from mittab.apps.tab.models import Round, Bye, NoShow, TabSettings
+from mittab.apps.tab.models import Round, TabSettings
 from mittab.libs.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
@@ -13,19 +12,21 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 
 
 def num_byes(team):
-    return Bye.objects.filter(bye_team=team).count()
-
+    return team.byes.count()
 
 def num_forfeit_wins(team):
-    return Round.objects.filter(
-        Q(gov_team=team, victor=Round.GOV_VIA_FORFEIT)
-        | Q(opp_team=team, victor=Round.OPP_VIA_FORFEIT)
-        | Q(gov_team=team, victor=Round.ALL_WIN)
-        | Q(opp_team=team, victor=Round.ALL_WIN)).count()
-
+    num_wins = 0
+    for round_obj in team.gov_team.all():
+        if round_obj.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
+            num_wins += 1
+    for round_obj in team.opp_team.all():
+        if round_obj.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
+            num_wins += 1
+    return num_wins
 
 def won_by_forfeit(round_obj, team):
-    if round_obj.opp_team != team and round_obj.gov_team != team:
+    if team is None or \
+            (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.ALL_WIN:
         return True
@@ -37,7 +38,8 @@ def won_by_forfeit(round_obj, team):
 
 
 def forfeited_round(round_obj, team):
-    if round_obj.opp_team != team and round_obj.gov_team != team:
+    if team is None or \
+            (round_obj.opp_team_id != team.id and round_obj.gov_team_id != team.id):
         return False
     elif round_obj.victor == Round.GOV_VIA_FORFEIT:
         return round_obj.opp_team == team
@@ -47,29 +49,36 @@ def forfeited_round(round_obj, team):
 
 
 def hit_pull_up(team):
-    return Round.objects.filter(gov_team=team, pullup=Round.OPP).exists() or \
-            Round.objects.filter(opp_team=team, pullup=Round.GOV).exists()
+    return any(r.pullup == Round.OPP for r in team.gov_team.all()) or \
+            any(r.pullup == Round.GOV for r in team.opp_team.all())
 
 
 def pull_up_count(team):
-    return Round.objects.filter(gov_team=team, pullup=Round.GOV).exists() + \
-            Round.objects.filter(opp_team=team, pullup=Round.OPP).exists()
+    count = 0
+    for round_obj in team.gov_team.all():
+        if round_obj.pullup == Round.GOV:
+            count += 1
+
+    for round_obj in team.opp_team.all():
+        if round_obj.pullup == Round.OPP:
+            count += 1
+
+    return count
 
 
 def num_opps(team):
-    return Round.objects.filter(opp_team=team).count()
+    return len(team.opp_team.all())
 
 
 def num_govs(team):
-    return Round.objects.filter(gov_team=team).count()
+    return len(team.gov_team.all())
 
 
 def had_bye(team, round_number=None):
     if round_number is None:
-        return Bye.objects.filter(bye_team=team).exists()
+        return team.byes.exists()
     else:
-        return Bye.objects.filter(bye_team=team,
-                                  round_number=round_number).exists()
+        any(b.round_number == round_number for b in team.byes.all())
 
 
 ##############
@@ -79,9 +88,17 @@ def had_bye(team, round_number=None):
 
 @cache()
 def tot_wins(team):
-    normal_wins = Round.objects.filter(
-        Q(gov_team=team, victor=Round.GOV)
-        | Q(opp_team=team, victor=Round.OPP)).count()
+    """
+    Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
+    problems
+    """
+    normal_wins = 0
+    for round_obj in team.opp_team.all():
+        if round_obj.victor == Round.OPP:
+            normal_wins += 1
+    for round_obj in team.gov_team.all():
+        if round_obj.victor == Round.GOV:
+            normal_wins += 1
     return normal_wins + num_byes(team) + num_forfeit_wins(team)
 
 
@@ -144,13 +161,13 @@ def opp_strength(team):
     opponent_count = 0
     opponent_wins = 0
 
-    gov_rounds = Round.objects.filter(gov_team=team)
-    opp_rounds = Round.objects.filter(opp_team=team)
+    gov_rounds = team.gov_team
+    opp_rounds = team.opp_team
 
-    for round_obj in gov_rounds:
+    for round_obj in gov_rounds.all():
         opponent_wins += tot_wins(round_obj.opp_team)
         opponent_count += 1
-    for round_obj in opp_rounds:
+    for round_obj in opp_rounds.all():
         opponent_wins += tot_wins(round_obj.gov_team)
         opponent_count += 1
 
@@ -236,7 +253,6 @@ def speaks_for_debater(debater, average_ironmen=True):
     team = debater.team()
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
-    num_speaks = TabSettings.get("cur_round") - 1
 
     debater_roundstats = debater.roundstats_set.all()
     debater_speaks = []
@@ -247,6 +263,7 @@ def speaks_for_debater(debater, average_ironmen=True):
     for roundstat in debater_roundstats:
         speaks_per_round[roundstat.round.round_number].append(roundstat)
 
+    num_speaks = TabSettings.get("cur_round") - 1
     for round_number in range(1, num_speaks + 1):
         roundstats = speaks_per_round[round_number]
         if roundstats:
@@ -289,10 +306,17 @@ def debater_abnormal_round_speaks(debater, round_number):
     Uses average speaks
     """
     team = debater.team()
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                       no_show_team=team)
+    if team is None:
+        return MINIMUM_DEBATER_SPEAKS
+
+    had_noshow = None
+    for no_show in team.no_shows.all():
+        if no_show.round_number == round_number:
+            had_noshow = no_show
+            break
+
     if had_bye(team, round_number) or (had_noshow
-                                       and had_noshow.first().lenient_late):
+                                       and had_noshow.lenient_late):
         return avg_deb_speaks(debater)
     elif had_noshow:
         return MINIMUM_DEBATER_SPEAKS
@@ -432,10 +456,15 @@ def debater_abnormal_round_ranks(debater, round_number):
     Uses average ranks
     """
     team = debater.team()
-    had_noshow = NoShow.objects.filter(round_number=round_number,
-                                       no_show_team=team)
+    had_noshow = None
+    if team is None:
+        return MINIMUM_DEBATER_SPEAKS
+    for no_show in team.no_shows.all():
+        if no_show.round_number == round_number:
+            had_noshow = no_show
+            break
     if had_bye(team, round_number) or (had_noshow
-                                       and had_noshow.first().lenient_late):
+                                       and had_noshow.lenient_late):
         return avg_deb_ranks(debater)
     elif had_noshow:
         return MAXIMUM_DEBATER_RANKS

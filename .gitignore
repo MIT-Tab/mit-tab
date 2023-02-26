@@ -120,3 +120,5 @@ typings/
 *.tgz
 
 .env
+
+*.dump.sql

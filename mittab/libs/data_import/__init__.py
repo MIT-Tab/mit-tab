@@ -17,8 +17,8 @@ class Workbook:
         self.min_rows = min_rows
         try:
             self.sheet = xlrd.open_workbook(
-                filename=None,
-                file_contents=file_to_import.read()).sheet_by_index(0)
+                filename=None, file_contents=file_to_import.read()
+            ).sheet_by_index(0)
         except:
             raise InvalidWorkbookException("Could not open workbook")
 
@@ -55,11 +55,16 @@ class WorkbookImporter(ABC):
     def import_row(self, row, row_number):
         pass
 
+    def after_import(self):
+        pass
+
     def import_data(self):
         for row_number, row in enumerate(self.workbook.rows()):
             self.import_row(row, row_number)
         if self.errors:
             self.rollback()
+        else:
+            self.after_import()
         return self.errors
 
     def create(self, obj):

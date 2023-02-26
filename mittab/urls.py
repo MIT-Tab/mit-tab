@@ -1,9 +1,10 @@
 from django.views import i18n
-from django.conf.urls import url
+from django.conf.urls import url, include
 from django.urls import path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
+import mittab.settings as settings
 import mittab.apps.tab.views as views
 import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
@@ -80,7 +81,6 @@ urlpatterns = [
     url(r"^team/(\d+)/scratches/view/",
         team_views.view_scratches,
         name="view_scratches_team"),
-    url(r"^team/(\d+)/stats/", team_views.team_stats, name="team_stats"),
     url(r"^view_teams/$", team_views.view_teams, name="view_teams"),
     url(r"^enter_team/$", team_views.enter_team, name="enter_team"),
     url(r"^all_tab_cards/$", team_views.all_tab_cards, name="all_tab_cards"),
@@ -109,6 +109,7 @@ urlpatterns = [
         pairing_views.view_rounds,
         name="view_rounds"),
     url(r"^round/(\d+)/$", pairing_views.view_round, name="view_round"),
+    url(r"^round/(\d+)/stats/$", pairing_views.team_stats, name="team_stats"),
     url(r"^round/(\d+)/result/$",
         pairing_views.enter_result,
         name="enter_result"),
@@ -242,6 +243,12 @@ urlpatterns = [
     # Cache related
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 ]
+
+if settings.SILK_ENABLED:
+    urlpatterns += [
+        # Profiler
+        url(r"^silk/", include("silk.urls", namespace="silk"))
+    ]
 
 handler403 = "mittab.apps.tab.views.render_403"
 handler404 = "mittab.apps.tab.views.render_404"
