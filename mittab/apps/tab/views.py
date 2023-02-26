@@ -9,12 +9,12 @@ from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
-        redirect_and_flash_success
+    redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
-        import_scratches
+    import_scratches
 
 
 def index(request):
@@ -59,7 +59,7 @@ def render_500(request, *args, **kwargs):
     return response
 
 
-#View for manually adding scratches
+# View for manually adding scratches
 def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
@@ -76,9 +76,9 @@ def add_scratch(request):
 
 
 #### BEGIN SCHOOL ###
-#Three views for entering, viewing, and editing schools
+# Three views for entering, viewing, and editing schools
 def view_schools(request):
-    #Get a list of (id,school_name) tuples
+    # Get a list of (id,school_name) tuples
     c_schools = [(s.pk, s.name, 0, "") for s in School.objects.all()]
     return render(
         request, "common/list_data.html", {
@@ -246,7 +246,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for room in Room.objects.all():
         checkins = []
-        for round_number in [0] + round_numbers: # 0 is for outrounds
+        for round_number in [0] + round_numbers:  # 0 is for outrounds
             checkins.append(room.is_checked_in_for_round(round_number))
         rooms_and_checkins.append((room, checkins))
 
@@ -326,6 +326,8 @@ def get_settings_from_yaml():
     return to_return
 
 ### SETTINGS VIEWS ###
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
     yaml_settings = get_settings_from_yaml()
@@ -339,7 +341,7 @@ def settings_form(request):
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
-        return render( # Allows for proper validation checking
+        return render(  # Allows for proper validation checking
             request, "tab/settings_form.html", {
                 "form": settings_form,
             })
@@ -350,6 +352,7 @@ def settings_form(request):
         request, "tab/settings_form.html", {
             "form": _settings_form,
         })
+
 
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
@@ -392,6 +395,7 @@ def upload_data(request):
             "room_info": room_info,
             "scratch_info": scratch_info
         })
+
 
 def force_cache_refresh(request):
     key = request.GET.get("key", "")

@@ -5,6 +5,7 @@ from mittab.apps.tab.models import Round
 
 SPEAKS_RANGE = list(range(15, 35))
 
+
 def generate_random_results(round_obj, ballot_code=None):
     winner = random.choice([Round.GOV, Round.OPP])
     speaks = sorted([random.choice(SPEAKS_RANGE) for _ in range(4)])

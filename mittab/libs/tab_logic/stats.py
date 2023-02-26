@@ -14,6 +14,7 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 def num_byes(team):
     return team.byes.count()
 
+
 def num_forfeit_wins(team):
     num_wins = 0
     for round_obj in team.gov_team.all():
@@ -23,6 +24,7 @@ def num_forfeit_wins(team):
         if round_obj.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
             num_wins += 1
     return num_wins
+
 
 def won_by_forfeit(round_obj, team):
     if team is None or \
@@ -50,7 +52,7 @@ def forfeited_round(round_obj, team):
 
 def hit_pull_up(team):
     return any(r.pullup == Round.OPP for r in team.gov_team.all()) or \
-            any(r.pullup == Round.GOV for r in team.opp_team.all())
+        any(r.pullup == Round.GOV for r in team.opp_team.all())
 
 
 def pull_up_count(team):

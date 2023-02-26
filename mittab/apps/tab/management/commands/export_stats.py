@@ -67,7 +67,7 @@ class Command(BaseCommand):
 
         def is_novice_team(team):
             return team.debaters.filter(novice_status=Debater.NOVICE).count() == \
-                    team.debaters.count()
+                team.debaters.count()
 
         nov_teams = [
             self.make_team_row(team_score.team)

@@ -38,4 +38,4 @@ class TestImportingJudges(TestCase):
         assert len(errors) == 2
         assert "Row 3: Room 1 - Room with this Name already exists." in errors
         assert "Row 2: Room 2 - Ensure that there are no more than" \
-                " 4 digits in total." in errors
+            " 4 digits in total." in errors

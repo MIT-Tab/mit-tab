@@ -39,7 +39,8 @@ class TestOutroundPairingLogic(TestCase):
 
     def confirm_pairing(self, outrounds, num_teams):
         for outround in outrounds:
-            assert (outround.gov_team.breaking_team.effective_seed + outround.opp_team.breaking_team.effective_seed) == (num_teams + 1)
+            assert (outround.gov_team.breaking_team.effective_seed +
+                    outround.opp_team.breaking_team.effective_seed) == (num_teams + 1)
 
     def test_all_outrounds(self):
         self.generate_checkins()
@@ -84,8 +85,7 @@ class TestOutroundPairingLogic(TestCase):
             self.confirm_pairing(
                 outrounds, var_teams_to_break
             )
-            
+
             self.enter_results(BreakingTeam.VARSITY)
 
             var_teams_to_break /= 2
-        

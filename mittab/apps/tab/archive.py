@@ -65,7 +65,7 @@ class ArchiveExporter:
                     debate.victor == Round.ALL_DROP:
                 gov_tag.set("forfeit", "true")
 
-            team_points = [0, 0] # Gov, Opp
+            team_points = [0, 0]  # Gov, Opp
             stats = sorted(list(debate.roundstats_set.all().values()),
                            key=lambda x: pos.index(x["debater_role"]))
 
@@ -89,7 +89,7 @@ class ArchiveExporter:
             gov_ballot = Element("ballot", {
                 "adjudicators": adjs, "rank": gov_rank})
             gov_ballot.text = str(team_points[0])
-            gov_tag.insert(0, gov_ballot) # Ballot must be first in sequence
+            gov_tag.insert(0, gov_ballot)  # Ballot must be first in sequence
 
             opp_win = [Round.OPP, Round.OPP_VIA_FORFEIT, Round.ALL_WIN]
             opp_rank = "1" if debate.victor in opp_win else "2"

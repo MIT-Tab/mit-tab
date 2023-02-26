@@ -24,7 +24,7 @@ class Login:
 
     def __call__(self, request):
         whitelisted = (request.path in LOGIN_WHITELIST) or \
-                EBALLOT_REGEX.match(request.path)
+            EBALLOT_REGEX.match(request.path)
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
@@ -37,6 +37,7 @@ class Login:
                     path="/accounts/login/?next=%s" % request.path)
         else:
             return self.get_response(request)
+
 
 class FailoverDuringBackup:
     """

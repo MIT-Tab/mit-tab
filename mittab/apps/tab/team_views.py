@@ -5,11 +5,11 @@ from django.shortcuts import render
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
-        redirect_and_flash_success
+    redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import tab_logic, cache_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
-        tot_ranks_deb, tot_speaks, tot_ranks
+    tot_ranks_deb, tot_speaks, tot_ranks
 from mittab.libs.tab_logic import rankings
 
 
@@ -153,7 +153,7 @@ def add_scratches(request, team_id, number_scratches):
                         initial={
                             "team": team_id,
                             "scratch_type": 0
-                        }) for i in range(1, number_scratches + 1)
+            }) for i in range(1, number_scratches + 1)
         ]
     return render(
         request, "common/data_entry_multiple.html", {
@@ -310,13 +310,13 @@ def tab_card(request, team_id):
     for i in range(1, cur_round - 1):
         round_stats[i][6] = (round_stats[i][6][0] + round_stats[i - 1][6][0],
                              round_stats[i][6][1] + round_stats[i - 1][6][1])
-    #Error out if we don't have a bye
+    # Error out if we don't have a bye
     try:
         bye_round = Bye.objects.get(bye_team=team).round_number
     except Exception:
         bye_round = None
 
-    #Duplicates Debater 1 for display if Ironman team
+    # Duplicates Debater 1 for display if Ironman team
     if iron_man:
         deb2 = deb1
     return render(

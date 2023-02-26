@@ -200,7 +200,8 @@ def maxWeightMatching(edges, maxcardinality=False):
     # and record the fact that w was reached through the edge with
     # remote endpoint p.
     def assignLabel(w, t, p):
-        if DEBUG: DEBUG('assignLabel(%d,%d,%d)' % (w, t, p))
+        if DEBUG:
+            DEBUG('assignLabel(%d,%d,%d)' % (w, t, p))
         b = inblossom[w]
         assert label[w] == 0 and label[b] == 0
         label[w] = label[b] = t
@@ -209,7 +210,8 @@ def maxWeightMatching(edges, maxcardinality=False):
         if t == 1:
             # b became an S-vertex/blossom; add it(s vertices) to the queue.
             queue.extend(blossomLeaves(b))
-            if DEBUG: DEBUG('PUSH ' + str(list(blossomLeaves(b))))
+            if DEBUG:
+                DEBUG('PUSH ' + str(list(blossomLeaves(b))))
         elif t == 2:
             # b became a T-vertex/blossom; assign label S to its mate.
             # (If b is a non-trivial blossom, its base is the only vertex
@@ -221,7 +223,8 @@ def maxWeightMatching(edges, maxcardinality=False):
     # Trace back from vertices v and w to discover either a new blossom
     # or an augmenting path. Return the base vertex of the new blossom or -1.
     def scanBlossom(v, w):
-        if DEBUG: DEBUG('scanBlossom(%d,%d)' % (v, w))
+        if DEBUG:
+            DEBUG('scanBlossom(%d,%d)' % (v, w))
         # Trace back from v and w, placing breadcrumbs as we go.
         path = []
         base = -1
@@ -346,7 +349,8 @@ def maxWeightMatching(edges, maxcardinality=False):
         for k in blossombestedges[b]:
             if bestedge[b] == -1 or slack(k) < slack(bestedge[b]):
                 bestedge[b] = k
-        if DEBUG: DEBUG('blossomchilds[%d]=' % b + repr(blossomchilds[b]))
+        if DEBUG:
+            DEBUG('blossomchilds[%d]=' % b + repr(blossomchilds[b]))
 
     # Expand the given top-level blossom.
     def expandBlossom(b, endstage):
@@ -441,7 +445,8 @@ def maxWeightMatching(edges, maxcardinality=False):
     # Swap matched/unmatched edges over an alternating path through blossom b
     # between vertex v and the base vertex. Keep blossom bookkeeping consistent.
     def augmentBlossom(b, v):
-        if DEBUG: DEBUG('augmentBlossom(%d,%d)' % (b, v))
+        if DEBUG:
+            DEBUG('augmentBlossom(%d,%d)' % (b, v))
         # Bubble up through the blossom tree from vertex v to an immediate
         # sub-blossom of b.
         t = v
@@ -491,8 +496,10 @@ def maxWeightMatching(edges, maxcardinality=False):
     # connects a pair of S vertices.
     def augmentMatching(k):
         (v, w, wt) = edges[k]
-        if DEBUG: DEBUG('augmentMatching(%d) (v=%d w=%d)' % (k, v, w))
-        if DEBUG: DEBUG('PAIR %d %d (k=%d)' % (v, w, k))
+        if DEBUG:
+            DEBUG('augmentMatching(%d) (v=%d w=%d)' % (k, v, w))
+        if DEBUG:
+            DEBUG('PAIR %d %d (k=%d)' % (v, w, k))
         for (s, p) in ((v, 2 * k + 1), (w, 2 * k)):
             # Match vertex s to remote endpoint p. Then trace back from s
             # until we find a single vertex, swapping matched and unmatched
@@ -526,7 +533,8 @@ def maxWeightMatching(edges, maxcardinality=False):
                 # Keep the opposite endpoint;
                 # it will be assigned to mate[s] in the next step.
                 p = labelend[bt] ^ 1
-                if DEBUG: DEBUG('PAIR %d %d (k=%d)' % (s, t, p // 2))
+                if DEBUG:
+                    DEBUG('PAIR %d %d (k=%d)' % (s, t, p // 2))
 
     # Verify that the optimum solution has been reached.
     def verifyOptimum():
@@ -631,7 +639,8 @@ def maxWeightMatching(edges, maxcardinality=False):
         # Each iteration of this loop is a "stage".
         # A stage finds an augmenting path and uses that to improve
         # the matching.
-        if DEBUG: DEBUG('STAGE %d' % t)
+        if DEBUG:
+            DEBUG('STAGE %d' % t)
 
         # Remove labels from top-level blossoms/vertices.
         label[:] = (2 * nvertex) * [0]
@@ -662,7 +671,8 @@ def maxWeightMatching(edges, maxcardinality=False):
             # the stage ends. If there is no augmenting path, the
             # primal-dual method is used to pump some slack out of
             # the dual variables.
-            if DEBUG: DEBUG('SUBSTAGE')
+            if DEBUG:
+                DEBUG('SUBSTAGE')
 
             # Continue labeling until all vertices which are reachable
             # through an alternating path have got a label.
@@ -670,7 +680,8 @@ def maxWeightMatching(edges, maxcardinality=False):
 
                 # Take an S vertex from the queue.
                 v = queue.pop()
-                if DEBUG: DEBUG('POP v=%d' % v)
+                if DEBUG:
+                    DEBUG('POP v=%d' % v)
                 assert label[inblossom[v]] == 1
 
                 # Scan its neighbours:
@@ -808,7 +819,8 @@ def maxWeightMatching(edges, maxcardinality=False):
                         dualvar[b] -= delta
 
             # Take action at the point where minimum delta occurred.
-            if DEBUG: DEBUG('delta%d=%f' % (deltatype, delta))
+            if DEBUG:
+                DEBUG('delta%d=%f' % (deltatype, delta))
             if deltatype == 1:
                 # No further improvement possible; optimum reached.
                 break
@@ -858,7 +870,8 @@ def maxWeightMatching(edges, maxcardinality=False):
 
 # Unit tests
 if __name__ == '__main__':
-    import unittest, math
+    import unittest
+    import math
 
     class MaxWeightMatchingTests(unittest.TestCase):
         def test10_empty(self):
@@ -1013,6 +1026,6 @@ if __name__ == '__main__':
                 [-1, 2, 1, 5, 9, 3, 7, 6, 10, 4, 8])
 
     #CHECK_DELTA = True
-    #unittest.main()
+    # unittest.main()
 
 # end

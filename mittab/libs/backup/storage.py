@@ -11,12 +11,14 @@ BUCKET_NAME = settings.BACKUPS["bucket_name"]
 S3_ENDPOINT = settings.BACKUPS["s3_endpoint"]
 SUFFIX = ".dump.sql"
 
+
 def with_backup_dir(func):
     def wrapper(*args, **kwargs):
         if not os.path.exists(BACKUP_PREFIX):
             os.makedirs(BACKUP_PREFIX)
         return func(*args, **kwargs)
     return wrapper
+
 
 class LocalFilesystem:
     @with_backup_dir

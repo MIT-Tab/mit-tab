@@ -26,21 +26,25 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='bye',
             name='bye_team',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='byes', to='tab.Team'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, related_name='byes', to='tab.Team'),
         ),
         migrations.AlterField(
             model_name='noshow',
             name='no_show_team',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='no_shows', to='tab.Team'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, related_name='no_shows', to='tab.Team'),
         ),
         migrations.AlterField(
             model_name='scratch',
             name='judge',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='scratches', to='tab.Judge'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, related_name='scratches', to='tab.Judge'),
         ),
         migrations.AlterField(
             model_name='scratch',
             name='team',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='scratchs', to='tab.Team'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, related_name='scratchs', to='tab.Team'),
         ),
     ]

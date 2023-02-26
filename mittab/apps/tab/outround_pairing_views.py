@@ -9,7 +9,7 @@ from django.shortcuts import redirect, reverse
 from django.utils import timezone
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
-        redirect_and_flash_success
+    redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -220,8 +220,8 @@ def outround_pairing_view(request,
                                         num_teams=num_teams).all()
 
     judges_per_panel = TabSettings.get("var_panel_size", 3) \
-                       if type_of_round == BreakingTeam.VARSITY \
-                          else TabSettings.get("nov_panel_size", 3)
+        if type_of_round == BreakingTeam.VARSITY \
+        else TabSettings.get("nov_panel_size", 3)
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
     var_to_nov = TabSettings.get("var_to_nov", 2)
@@ -233,8 +233,8 @@ def outround_pairing_view(request,
         other_round_num = num_teams * var_to_nov
 
     other_round_type = BreakingTeam.VARSITY \
-                       if type_of_round == BreakingTeam.NOVICE \
-                          else BreakingTeam.NOVICE
+        if type_of_round == BreakingTeam.NOVICE \
+        else BreakingTeam.NOVICE
 
     pairing_exists = len(outrounds) > 0
 
@@ -335,8 +335,8 @@ def alternative_judges(request, round_id, judge_id=None):
         other_round_num = round_obj.num_teams * var_to_nov
 
     other_round_type = BreakingTeam.NOVICE \
-                       if round_obj.type_of_round == BreakingTeam.VARSITY \
-                          else BreakingTeam.VARSITY
+        if round_obj.type_of_round == BreakingTeam.VARSITY \
+        else BreakingTeam.VARSITY
 
     excluded_judges = Judge.objects.exclude(
         judges_outrounds__num_teams=round_obj.num_teams,
@@ -551,7 +551,7 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
 
     round_pairing = list(round_pairing)
 
-    #We want a random looking, but constant ordering of the rounds
+    # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
     random.shuffle(round_pairing)
     round_pairing.sort(key=lambda r: r.gov_team.name)
@@ -612,6 +612,7 @@ def update_choice(request, outround_id):
 
     return JsonResponse(data)
 
+
 def forum_view(request, type_of_round):
     outrounds = Outround.objects.exclude(
         victor=Outround.UNKNOWN
@@ -642,7 +643,7 @@ def forum_view(request, type_of_round):
                     outround.loser.debaters.first().name,
                     outround.loser.debaters.last().name,
                     outround.loser.school.name,
-                    " / " + outround.loser.hybrid_school.name \
+                    " / " + outround.loser.hybrid_school.name
                     if outround.loser.hybrid_school else "",
                     "GOV" if outround.loser == outround.gov_team else "OPP",
                     outround.winner.breaking_team.seed,
@@ -650,7 +651,7 @@ def forum_view(request, type_of_round):
                     outround.winner.debaters.first().name,
                     outround.winner.debaters.last().name,
                     outround.winner.school.name,
-                    " / " + outround.winner.hybrid_school.name \
+                    " / " + outround.winner.hybrid_school.name
                     if outround.winner.hybrid_school else "",
                     "GOV" if outround.winner == outround.gov_team else "OPP",
                 )

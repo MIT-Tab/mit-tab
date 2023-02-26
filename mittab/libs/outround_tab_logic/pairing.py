@@ -101,7 +101,7 @@ def get_next_available_room(num_teams, type_of_break):
         other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
 
     rooms = [r.room
-             for r in RoomCheckIn.objects.filter(round_number=0) \
+             for r in RoomCheckIn.objects.filter(round_number=0)
              .prefetch_related("room")]
     rooms.sort(key=lambda r: r.rank, reverse=True)
 

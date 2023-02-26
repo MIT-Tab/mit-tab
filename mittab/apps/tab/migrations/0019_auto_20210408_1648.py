@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='outround',
             name='choice',
-            field=models.IntegerField(choices=[(0, 'No'), (1, 'Gov'), (2, 'Opp')], default=0),
+            field=models.IntegerField(
+                choices=[(0, 'No'), (1, 'Gov'), (2, 'Opp')], default=0),
         ),
     ]

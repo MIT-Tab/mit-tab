@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='team',
             name='break_preference',
-            field=models.IntegerField(choices=[(0, 'Varsity'), (1, 'Novice')], default=0),
+            field=models.IntegerField(
+                choices=[(0, 'Varsity'), (1, 'Novice')], default=0),
         ),
     ]

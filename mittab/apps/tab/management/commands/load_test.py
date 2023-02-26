@@ -130,7 +130,7 @@ class GetCsrfThread(Thread):
     def get_resp(self):
         if self.num_errors >= self.MAX_ERRORS:
             return None
-        resp = requests.get("http://%s/e_ballots/%s"  % (self.host, self.ballot_code))
+        resp = requests.get("http://%s/e_ballots/%s" % (self.host, self.ballot_code))
         if resp.status_code > 299:
             self.num_errors += 1
             return self.get_resp()

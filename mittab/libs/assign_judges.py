@@ -8,7 +8,7 @@ def add_judges():
     current_round_number = TabSettings.get("cur_round") - 1
 
     judges = list(Judge.objects.filter(checkin__round_number=4).prefetch_related(
-        "judges", # poorly named relation for the round
+        "judges",  # poorly named relation for the round
         "scratches",
     ))
     pairings = tab_logic.sorted_pairings(current_round_number)
@@ -75,6 +75,7 @@ def add_judges():
     Round.objects.bulk_update(pairings, ["chair"])
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
+
 def calc_weight(judge_i, pairing_i):
     """ Calculate the relative badness of this judge assignment
 
@@ -86,8 +87,8 @@ def calc_weight(judge_i, pairing_i):
 
 def judge_conflict(judge, team1, team2):
     return any(s.team_id in (team1.id, team2.id,) for s in judge.scratches.all()) \
-            or had_judge(judge, team1) \
-            or had_judge(judge, team2)
+        or had_judge(judge, team1) \
+        or had_judge(judge, team2)
 
 
 def had_judge(judge, team):
