@@ -7,7 +7,7 @@ from mittab.apps.tab.models import *
 def add_judges():
     current_round_number = TabSettings.get("cur_round") - 1
 
-    judges = list(Judge.objects.filter(checkin__round_number=4).prefetch_related(
+    judges = list(Judge.objects.filter(checkin__round_number=current_round_number).prefetch_related(
         "judges", # poorly named relation for the round
         "scratches",
     ))
