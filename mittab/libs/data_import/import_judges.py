@@ -1,6 +1,7 @@
-from mittab.apps.tab.models import School
+from mittab.apps.tab.models import School, Team, Scratch
 from mittab.apps.tab.forms import JudgeForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
+from mittab.libs.tab_logic import add_scratches_for_single_judge_for_school_affiliation
 
 
 def import_judges(file_to_import):
@@ -12,6 +13,11 @@ def import_judges(file_to_import):
 
 
 class JudgeImporter(WorkbookImporter):
+    def __init__(self):
+        """ """
+        self.teams = Team.objects.all().prefetch_related("school", "hybrid_school")
+        self.scratches = []
+
     def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]
@@ -37,8 +43,14 @@ class JudgeImporter(WorkbookImporter):
         data = {"name": judge_name, "rank": judge_rank, "schools": schools}
         form = JudgeForm(data=data)
         if form.is_valid():
-            self.create(form)
+            judge = self.create(form)
+            self.scratches.extend(
+                add_scratches_for_single_judge_for_school_affiliation(judge, self.teams)
+            )
         else:
             for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
                     self.error("%s - %s" % (judge_name, error_msg), row_number)
+
+        def after_import():
+            Scratch.objects.bulk_create(self.scratcehs)
