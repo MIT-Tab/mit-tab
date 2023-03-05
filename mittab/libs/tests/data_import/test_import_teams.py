@@ -21,7 +21,7 @@ class TestImportingTeams(TestCase):
                 [
                     "Team 3", "Deis", "Harvard", "Half Seed ", "Carly",
                     "Novice", "Dan", "Novice "
-                ]]
+        ]]
 
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()

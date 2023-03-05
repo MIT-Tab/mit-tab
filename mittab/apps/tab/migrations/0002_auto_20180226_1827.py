@@ -16,11 +16,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='team',
             name='hybrid_school',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='hybrid_school', to='tab.School'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE,
+                                    related_name='hybrid_school', to='tab.School'),
         ),
         migrations.AlterField(
             model_name='round',
             name='judges',
-            field=models.ManyToManyField(blank=True, related_name='judges', to='tab.Judge'),
+            field=models.ManyToManyField(
+                blank=True, related_name='judges', to='tab.Judge'),
         ),
     ]

@@ -35,7 +35,7 @@ class TestImportingJudges(TestCase):
         assert float(judge_2.rank) == 10.56
         assert judge_2.name == "Judge 2"
         assert sorted(map(lambda s: s.name, judge_2.schools.all())) == \
-                ["Harvard", "Northeastern", "Yale"]
+            ["Harvard", "Northeastern", "Yale"]
 
         judge_3 = Judge.objects.get(name="Judge 3")
         assert float(judge_3.rank) == 20.0
@@ -72,7 +72,7 @@ class TestImportingJudges(TestCase):
         assert School.objects.count() == 0
         assert len(errors) == 1
         assert errors[0] == "Row 2: Judge 2 - Ensure that there are no" \
-                " more than 2 digits before the decimal point."
+            " more than 2 digits before the decimal point."
 
     def test_schools_not_rolledback_if_existed_before(self):
         school = School(name="NU")
@@ -89,4 +89,4 @@ class TestImportingJudges(TestCase):
         assert School.objects.count() == 1
         assert len(errors) == 1
         assert errors[0] == "Row 1: Judge 1 - Ensure that there are" \
-                " no more than 4 digits in total."
+            " no more than 4 digits in total."

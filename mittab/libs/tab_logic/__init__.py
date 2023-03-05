@@ -49,15 +49,15 @@ def pair_round():
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for team in forfeit_teams:
         lenient_late = TabSettings.get("lenient_late", 0) >= current_round
-        no_show = NoShow(no_show_team=team,
-                         round_number=current_round,
-                         lenient_late=lenient_late)
+        no_show = NoShow(
+            no_show_team=team, round_number=current_round, lenient_late=lenient_late
+        )
         no_show.save()
 
     # If it is the first round, pair by *seed*
     all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
-        "gov_team", # poorly named relation, gets rounds as gov team
-        "opp_team", # poorly named relation, rounds as opp team
+        "gov_team",  # poorly named relation, gets rounds as gov team
+        "opp_team",  # poorly named relation, rounds as opp team
         # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
         "gov_team__opp_team__gov_team",
         "gov_team__opp_team__opp_team",
@@ -82,9 +82,7 @@ def pair_round():
         if len(list_of_teams) % 2 == 1:
             if TabSettings.get("fair_bye", 1) == 0:
                 print("Bye: using only unseeded teams")
-                possible_teams = [
-                    t for t in list_of_teams if t.seed < Team.HALF_SEED
-                ]
+                possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
             else:
                 print("Bye: using all teams")
                 possible_teams = list_of_teams
@@ -96,29 +94,25 @@ def pair_round():
         # Sort the teams by seed. We must randomize beforehand so that similarly
         # seeded teams are paired randomly.
         random.shuffle(list_of_teams)
-        list_of_teams = sorted(list_of_teams,
-                               key=lambda team: team.seed,
-                               reverse=True)
+        list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse=True)
     # Otherwise, pair by *speaks*
     else:
         # Bucket all the teams into brackets
         # NOTE: We do not bucket teams that have only won by
         #       forfeit/bye/lenient_late in every round because they have no speaks
-        middle_of_bracket, normal_pairing_teams = \
-                get_middle_and_non_middle_teams(all_checked_in_teams)
+        middle_of_bracket, normal_pairing_teams = get_middle_and_non_middle_teams(
+            all_checked_in_teams
+        )
 
-        team_buckets = [(tot_wins(team), team)
-                        for team in normal_pairing_teams]
+        team_buckets = [(tot_wins(team), team) for team in normal_pairing_teams]
         list_of_teams = [
-            rank_teams_except_record(
-                [team for (w, team) in team_buckets if w == i])
+            rank_teams_except_record([team for (w, team) in team_buckets if w == i])
             for i in range(current_round)
         ]
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print(("Pairing %s into the middle of the %s-win bracket" %
-                   (team, wins)))
+            print(("Pairing %s into the middle of the %s-win bracket" % (team, wins)))
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
@@ -134,11 +128,12 @@ def pair_round():
                 # If there are no teams all down, give the bye to a one down team.
                 if bracket == 0:
                     byeint = len(list_of_teams[bracket]) - 1
-                    bye = Bye(bye_team=list_of_teams[bracket][byeint],
-                              round_number=current_round)
+                    bye = Bye(
+                        bye_team=list_of_teams[bracket][byeint],
+                        round_number=current_round,
+                    )
                     bye.save()
-                    list_of_teams[bracket].remove(
-                        list_of_teams[bracket][byeint])
+                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
                 elif bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
@@ -146,8 +141,10 @@ def pair_round():
                         if had_bye(list_of_teams[1][byeint]):
                             pass
                         elif not found_bye:
-                            bye = Bye(bye_team=list_of_teams[1][byeint],
-                                      round_number=current_round)
+                            bye = Bye(
+                                bye_team=list_of_teams[1][byeint],
+                                round_number=current_round,
+                            )
                             bye.save()
                             list_of_teams[1].remove(list_of_teams[1][byeint])
                             found_bye = True
@@ -159,19 +156,18 @@ def pair_round():
                     i = len(list_of_teams[bracket - 1]) - 1
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [
-                        r.gov_team for r in pullup_rounds
-                        if r.pullup == Round.GOV
+                        r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
                     ]
-                    teams_been_pulled_up.extend([
-                        r.opp_team for r in pullup_rounds
-                        if r.pullup == Round.OPP
-                    ])
+                    teams_been_pulled_up.extend(
+                        [r.opp_team for r in pullup_rounds if r.pullup == Round.OPP]
+                    )
 
                     # try to pull-up the lowest-ranked team that hasn't been
                     # pulled-up. Fall-back to the lowest-ranked team if all have
                     # been pulled-up
                     not_pulled_up_teams = [
-                        t for t in list_of_teams[bracket - 1]
+                        t
+                        for t in list_of_teams[bracket - 1]
                         if t not in teams_been_pulled_up
                     ]
                     if not_pulled_up_teams:
@@ -190,15 +186,16 @@ def pair_round():
                     for team in list(Team.objects.filter(checked_in=True)):
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
-                        if team in middle_of_bracket and tot_wins(
-                                team) == bracket:
+                        if team in middle_of_bracket and tot_wins(team) == bracket:
                             removed_teams += [team]
                             list_of_teams[bracket].remove(team)
                     list_of_teams[bracket] = rank_teams_except_record(
-                        list_of_teams[bracket])
+                        list_of_teams[bracket]
+                    )
                     for team in removed_teams:
                         list_of_teams[bracket].insert(
-                            len(list_of_teams[bracket]) // 2, team)
+                            len(list_of_teams[bracket]) // 2, team
+                        )
 
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
@@ -214,22 +211,24 @@ def pair_round():
 
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
-        pairings = sorted(pairings,
-                          key=lambda team: highest_seed(team[0], team[1]),
-                          reverse=True)
+        pairings = sorted(
+            pairings, key=lambda team: highest_seed(team[0], team[1]), reverse=True
+        )
     # sort with pairing with highest ranked team first
     else:
         sorted_teams = [s.team for s in rank_teams()]
-        pairings = sorted(pairings,
-                          key=lambda team: min(sorted_teams.index(team[0]),
-                                               sorted_teams.index(team[1])))
+        pairings = sorted(
+            pairings,
+            key=lambda team: min(
+                sorted_teams.index(team[0]), sorted_teams.index(team[1])
+            ),
+        )
 
     # Assign rooms (does this need to be random? maybe bad to have top
     #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn \
-            .objects \
-            .filter(round_number=current_round) \
-            .prefetch_related("room")
+    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related(
+        "room"
+    )
     rooms = map(lambda r: r.room, rooms)
     rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
 
@@ -239,10 +238,9 @@ def pair_round():
     # Enter into database
     all_rounds = []
     for gov, opp, room in pairings:
-        round_obj = Round(round_number=current_round,
-                          gov_team=gov,
-                          opp_team=opp,
-                          room=room)
+        round_obj = Round(
+            round_number=current_round, gov_team=gov, opp_team=opp, room=room
+        )
         if gov in all_pull_ups:
             round_obj.pullup = Round.GOV
         elif opp in all_pull_ups:
@@ -269,12 +267,13 @@ def have_enough_rooms(_round_to_check):
 
 def have_properly_entered_data(round_to_check):
     last_round = round_to_check - 1
-    prev_rounds = Round.objects \
-            .filter(round_number=last_round) \
-            .prefetch_related("gov_team", "opp_team")
+    prev_rounds = Round.objects.filter(round_number=last_round).prefetch_related(
+        "gov_team", "opp_team"
+    )
     prev_round_noshows = set(
-        NoShow.objects.filter(round_number=last_round) \
-                .values_list("no_show_team_id", flat=True)
+        NoShow.objects.filter(round_number=last_round).values_list(
+            "no_show_team_id", flat=True
+        )
     )
     prev_round_byes = set(
         Bye.objects.filter(round_number=last_round).values_list("bye_team", flat=True)
@@ -289,10 +288,12 @@ def have_properly_entered_data(round_to_check):
         for team in gov_team, opp_team:
             if team.id in prev_round_byes:
                 raise errors.ByeAssignmentError(
-                    "{} both had a bye and debated last round".format(team))
+                    "{} both had a bye and debated last round".format(team)
+                )
             if team.id in prev_round_noshows:
                 raise errors.NoShowAssignmentError(
-                    "{} both debated and had a no show".format(team))
+                    "{} both debated and had a no show".format(team)
+                )
 
 
 def validate_round_data(round_to_check):
@@ -350,7 +351,7 @@ def hit_before(team1, team2):
         if round_obj.opp_team == team2:
             return True
     for round_obj in team1.opp_team.all():
-        if round_obj.opp_team == team2:
+        if round_obj.gov_team == team2:
             return True
     return False
 
@@ -396,16 +397,15 @@ def sorted_pairings(round_number):
     number of DB queries required to calculate it
     """
     round_pairing = list(
-        Round.objects.filter(round_number=round_number)
-        .prefetch_related(
+        Round.objects.filter(round_number=round_number).prefetch_related(
             "judges",
             "chair",
             "room",
             "gov_team",
             "opp_team",
             "gov_team__breaking_team",
-            "gov_team__gov_team", # poorly named relation, points to rounds as gov
-            "gov_team__opp_team", # poorly named relation, points to rounds as gov
+            "gov_team__gov_team",  # poorly named relation, points to rounds as gov
+            "gov_team__opp_team",  # poorly named relation, points to rounds as gov
             "gov_team__byes",
             "gov_team__no_shows",
             "gov_team__debaters__team_set",
@@ -414,19 +414,18 @@ def sorted_pairings(round_number):
             "gov_team__debaters__roundstats_set",
             "gov_team__debaters__roundstats_set__round",
             "opp_team__breaking_team",
-            "opp_team__gov_team", # poorly named relation, points to rounds as gov
-            "opp_team__opp_team", # poorly named relation, points to rounds as gov
+            "opp_team__gov_team",  # poorly named relation, points to rounds as gov
+            "opp_team__opp_team",  # poorly named relation, points to rounds as gov
             "opp_team__byes",
             "opp_team__no_shows",
             "opp_team__debaters__team_set",
             "opp_team__debaters__team_set__byes",
             "opp_team__debaters__team_set__no_shows",
             "opp_team__debaters__roundstats_set",
-            "opp_team__debaters__roundstats_set__round"
+            "opp_team__debaters__roundstats_set__round",
         )
     )
-    round_pairing.sort(key=lambda x: team_comp(x, round_number),
-                       reverse=True)
+    round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
 
     return round_pairing
 
@@ -467,10 +466,17 @@ class TabFlags:
     JUDGE_NOT_CHECKED_IN_NEXT = 1 << 10
 
     ALL_FLAGS = [
-        TEAM_CHECKED_IN, TEAM_NOT_CHECKED_IN, JUDGE_CHECKED_IN_CUR,
-        JUDGE_NOT_CHECKED_IN_CUR, LOW_RANKED_JUDGE, MID_RANKED_JUDGE,
-        HIGH_RANKED_JUDGE, ROOM_ZERO_RANK, ROOM_NON_ZERO_RANK,
-        JUDGE_CHECKED_IN_NEXT, JUDGE_NOT_CHECKED_IN_NEXT
+        TEAM_CHECKED_IN,
+        TEAM_NOT_CHECKED_IN,
+        JUDGE_CHECKED_IN_CUR,
+        JUDGE_NOT_CHECKED_IN_CUR,
+        LOW_RANKED_JUDGE,
+        MID_RANKED_JUDGE,
+        HIGH_RANKED_JUDGE,
+        ROOM_ZERO_RANK,
+        ROOM_NON_ZERO_RANK,
+        JUDGE_CHECKED_IN_NEXT,
+        JUDGE_NOT_CHECKED_IN_NEXT,
     ]
 
     @staticmethod
@@ -478,57 +484,70 @@ class TabFlags:
         return {
             TabFlags.TEAM_NOT_CHECKED_IN: ("Team NOT Checked In", "*"),
             TabFlags.TEAM_CHECKED_IN: ("Team Checked In", ""),
-            TabFlags.JUDGE_CHECKED_IN_CUR:
-            ("Judge Checked In, Current Round", ""),
-            TabFlags.JUDGE_NOT_CHECKED_IN_CUR:
-            ("Judge NOT Checked In, Current Round", "*"),
-            TabFlags.JUDGE_CHECKED_IN_NEXT:
-            ("Judge Checked In, Next Round", ""),
-            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT:
-            ("Judge NOT Checked In, Next Round", "!"),
+            TabFlags.JUDGE_CHECKED_IN_CUR: ("Judge Checked In, Current Round", ""),
+            TabFlags.JUDGE_NOT_CHECKED_IN_CUR: (
+                "Judge NOT Checked In, Current Round",
+                "*",
+            ),
+            TabFlags.JUDGE_CHECKED_IN_NEXT: ("Judge Checked In, Next Round", ""),
+            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT: (
+                "Judge NOT Checked In, Next Round",
+                "!",
+            ),
             TabFlags.LOW_RANKED_JUDGE: ("Low Ranked Judge", "L"),
             TabFlags.MID_RANKED_JUDGE: ("Mid Ranked Judge", "M"),
             TabFlags.HIGH_RANKED_JUDGE: ("High Ranked Judge", "H"),
             TabFlags.ROOM_ZERO_RANK: ("Room has rank of 0", "*"),
-            TabFlags.ROOM_NON_ZERO_RANK: ("Room has rank > 0", "")
+            TabFlags.ROOM_NON_ZERO_RANK: ("Room has rank > 0", ""),
         }.get(flag, ("Flag Not Found", "U"))[short]
 
     @staticmethod
     def flags_to_symbols(flags):
-        return "".join([
-            TabFlags.translate_flag(flag, True) for flag in TabFlags.ALL_FLAGS
-            if flags & flag == flag
-        ])
+        return "".join(
+            [
+                TabFlags.translate_flag(flag, True)
+                for flag in TabFlags.ALL_FLAGS
+                if flags & flag == flag
+            ]
+        )
 
     @staticmethod
     def get_filters_and_symbols(all_flags):
         flat_flags = list(itertools.chain(*all_flags))
-        filters = [[(flag, TabFlags.translate_flag(flag))
-                    for flag in flag_group] for flag_group in all_flags]
-        symbol_text = [(TabFlags.translate_flag(flag, True),
-                        TabFlags.translate_flag(flag)) for flag in flat_flags
-                       if TabFlags.translate_flag(flag, True)]
+        filters = [
+            [(flag, TabFlags.translate_flag(flag)) for flag in flag_group]
+            for flag_group in all_flags
+        ]
+        symbol_text = [
+            (TabFlags.translate_flag(flag, True), TabFlags.translate_flag(flag))
+            for flag in flat_flags
+            if TabFlags.translate_flag(flag, True)
+        ]
         return filters, symbol_text
 
 
 def perfect_pairing(list_of_teams):
-    """ Uses the mwmatching library to assign teams in a pairing """
+    """Uses the mwmatching library to assign teams in a pairing"""
     graph_edges = []
     weights = get_weights()
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
-                weight = calc_weight(team1, team2, i, j,
-                                     list_of_teams[len(list_of_teams) - i - 1],
-                                     list_of_teams[len(list_of_teams) - j - 1],
-                                     len(list_of_teams) - i - 1,
-                                     len(list_of_teams) - j - 1,
-                                     weights,
-                                     TabSettings.get("cur_round", 1),
-                                     TabSettings.get("tot_rounds", 5))
+                weight = calc_weight(
+                    team1,
+                    team2,
+                    i,
+                    j,
+                    list_of_teams[len(list_of_teams) - i - 1],
+                    list_of_teams[len(list_of_teams) - j - 1],
+                    len(list_of_teams) - i - 1,
+                    len(list_of_teams) - j - 1,
+                    weights,
+                    TabSettings.get("cur_round", 1),
+                    TabSettings.get("tot_rounds", 5),
+                )
                 graph_edges += [(i, j, weight)]
-    pairings_num = mwmatching.maxWeightMatching(graph_edges,
-                                                maxcardinality=True)
+    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):
@@ -539,6 +558,7 @@ def perfect_pairing(list_of_teams):
             if pairing not in all_pairs:
                 all_pairs.append(pairing)
     return determine_gov_opp(all_pairs)
+
 
 def get_weights():
     """
@@ -556,9 +576,19 @@ def get_weights():
     }
 
 
-
-def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
-                team_a_opt_ind, team_b_opt_ind, weights, current_round, tot_rounds):
+def calc_weight(
+    team_a,
+    team_b,
+    team_a_ind,
+    team_b_ind,
+    team_a_opt,
+    team_b_opt,
+    team_a_opt_ind,
+    team_b_opt_ind,
+    weights,
+    current_round,
+    tot_rounds,
+):
     """
     Calculate the penalty for a given pairing
 
@@ -573,13 +603,17 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
     if current_round == 1:
-        weight = weights["power_pairing_multiple"] * (
-            abs(team_a_opt.seed - team_b.seed) +
-            abs(team_b_opt.seed - team_a.seed)) / 2.0
+        weight = (
+            weights["power_pairing_multiple"]
+            * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))
+            / 2.0
+        )
     else:
-        weight = weights["power_pairing_multiple"] * (
-            abs(team_a_opt_ind - team_b_ind) +
-            abs(team_b_opt_ind - team_a_ind)) / 2.0
+        weight = (
+            weights["power_pairing_multiple"]
+            * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))
+            / 2.0
+        )
 
     half = int(tot_rounds // 2) + 1
     if num_opps(team_a) >= half and num_opps(team_b) >= half:
@@ -595,7 +629,8 @@ def calc_weight(team_a, team_b, team_a_ind, team_b_ind, team_a_opt, team_b_opt,
         weight += weights["same_school_penalty"]
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
-            hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)):
+        hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
+    ):
         weight += weights["hit_pull_up_before"]
 
     if hit_before(team_a, team_b):

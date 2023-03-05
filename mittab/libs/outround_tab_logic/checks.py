@@ -41,8 +41,8 @@ def have_enough_judges_type(type_of_round):
         other_round_num = num_teams * var_to_nov
 
     other_round_type = BreakingTeam.VARSITY \
-                       if type_of_round == BreakingTeam.NOVICE \
-                          else BreakingTeam.NOVICE
+        if type_of_round == BreakingTeam.NOVICE \
+        else BreakingTeam.NOVICE
 
     num_in_use = Judge.objects.filter(
         judges_outrounds__num_teams=other_round_num,
@@ -88,8 +88,8 @@ def have_enough_rooms_type(type_of_round):
         other_round_num = num_teams * var_to_nov
 
     other_round_type = BreakingTeam.VARSITY \
-                       if type_of_round == BreakingTeam.NOVICE \
-                          else BreakingTeam.NOVICE
+        if type_of_round == BreakingTeam.NOVICE \
+        else BreakingTeam.NOVICE
 
     num_in_use = Room.objects.filter(
         rooms_outrounds__num_teams=other_round_num,

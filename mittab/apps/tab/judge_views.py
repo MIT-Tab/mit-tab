@@ -26,7 +26,7 @@ def public_view_judges(request):
 
 
 def view_judges(request):
-    #Get a list of (id,school_name) tuples
+    # Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
     checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
@@ -59,10 +59,10 @@ def view_judges(request):
         TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
         TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
     ],
-                 [
-                     TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE,
-                     TabFlags.HIGH_RANKED_JUDGE
-                 ]]
+        [
+        TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE,
+        TabFlags.HIGH_RANKED_JUDGE
+    ]]
     filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
@@ -154,7 +154,7 @@ def add_scratches(request, judge_id, number_scratches):
                         initial={
                             "judge": judge_id,
                             "scratch_type": 0
-                        }) for i in range(1, number_scratches + 1)
+            }) for i in range(1, number_scratches + 1)
         ]
     return render(
         request, "common/data_entry_multiple.html", {
@@ -212,7 +212,7 @@ def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     for judge in Judge.objects.all():
         checkins = []
-        for round_number in [0] + round_numbers: # 0 is for outrounds
+        for round_number in [0] + round_numbers:  # 0 is for outrounds
             checkins.append(judge.is_checked_in_for_round(round_number))
         judges_and_checkins.append((judge, checkins))
 

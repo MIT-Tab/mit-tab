@@ -31,11 +31,13 @@ class ActiveBackupContextManager:
         os.environ[ACTIVE_BACKUP_KEY] = "0"
         cache_logic.clear_cache()
 
+
 def _generate_unique_key(base):
     if base in BACKUP_STORAGE:
         return "%s_%s" % (base, int(time.time()))
     else:
         return base
+
 
 def backup_round(key=None, round_number=None, btime=None):
     with ActiveBackupContextManager() as _:
@@ -51,6 +53,7 @@ def backup_round(key=None, round_number=None, btime=None):
         key = _generate_unique_key(key)
         BACKUP_STORAGE[key] = BACKUP_HANDLER.dump()
 
+
 def upload_backup(f):
     key = _generate_unique_key(f.name)
     print(("Tried to write {}".format(key)))
@@ -59,17 +62,21 @@ def upload_backup(f):
     except Exception:
         errors.emit_current_exception()
 
+
 def get_backup_content(key):
     return BACKUP_STORAGE[key]
+
 
 def list_backups():
     print("Checking backups directory")
     return BACKUP_STORAGE.keys()
 
+
 def restore_from_backup(key):
     with ActiveBackupContextManager() as _:
         print("Restoring from backups directory")
         BACKUP_HANDLER.restore(BACKUP_STORAGE[key])
+
 
 def is_backup_active():
     return str(os.environ.get(ACTIVE_BACKUP_KEY, "0")) == ACTIVE_BACKUP_VAL

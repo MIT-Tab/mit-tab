@@ -9,6 +9,7 @@ DB_USER = DB_SETTINGS["USER"]
 DB_PASS = DB_SETTINGS["PASSWORD"]
 DB_PORT = DB_SETTINGS["PORT"]
 
+
 class MysqlDumpRestorer:
 
     def dump(self):
@@ -34,8 +35,7 @@ class MysqlDumpRestorer:
             subprocess.check_output(self._restore_cmd(), input=before)
             raise e
 
-
-    def _restore_cmd(self): # Note: refactor to just use a python mysql client
+    def _restore_cmd(self):  # Note: refactor to just use a python mysql client
         cmd = [
             "mysql",
             DB_NAME,

@@ -72,7 +72,6 @@ class RoomForm(forms.ModelForm):
 
         return room
 
-
     class Meta:
         model = Room
         fields = "__all__"
@@ -146,8 +145,8 @@ class TeamForm(forms.ModelForm):
             raise forms.ValidationError("You must select 1 or 2 debaters!")
         for debater in data:
             if debater.team_set.count() > 1 or \
-               (debater.team_set.count() == 1 and \
-                debater.team_set.first().id != self.instance.id):
+               (debater.team_set.count() == 1 and
+                    debater.team_set.first().id != self.instance.id):
                 raise forms.ValidationError(
                     """A debater cannot already be on a different team!
                     Consider editing the debaters' existing team,
