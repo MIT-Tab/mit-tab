@@ -24,6 +24,7 @@ RUN pipenv install --deploy --system
 
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
 RUN apt-get install -y nodejs npm
+RUN npm i -g npm
 
 RUN npm install
 RUN ./node_modules/.bin/webpack --config webpack.config.js --mode production
