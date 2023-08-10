@@ -1,4 +1,5 @@
 FROM python:3.7
+ARG NODE_OPTIONS=--openssl-legacy-provider
 
 # install dependenices
 RUN apt-get update && \
