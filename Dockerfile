@@ -22,7 +22,7 @@ COPY ./assets ./assets
 RUN pip install pipenv
 RUN pipenv install --deploy --system
 
-RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
 RUN apt-get install -y nodejs npm
 
 RUN npm install
