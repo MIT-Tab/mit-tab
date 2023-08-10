@@ -4,6 +4,9 @@ FROM python:3.7
 RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
 RUN apt-get install -y nodejs npm
 
+# https://github.com/nodejs/node-gyp/issues/1977#issuecomment-558147570
+npm install -g npm
+
 WORKDIR /var/www/tab
 
 COPY Pipfile ./
