@@ -121,7 +121,7 @@ Rankings
 3. Single adjusted speaks [Who has higher average speaks sans one high and low
    outlier]
 4. Single adjusted ranks [Who has lower average ranks sans one high and low
-   outliar] 
+   outlier] 
 5. Double adjusted speaks [Who has higher median speaks]
 6. Double adjusted ranks [Who has lower median ranks]
 
@@ -132,7 +132,7 @@ Rankings
 3. Team Single adjusted speaks [Who has higher average speaks sans one high
    and low outlier]
 4. Team Single adjusted ranks [Who has lower average ranks sans one high and
-   low outliar] 
+   low outlier] 
 5. Team Double adjusted speaks [Who has higher median speaks]
 6. Team Double adjusted ranks [Who has lower median ranks] 
 7. Opposition strength. [Average number of wins of opponents]
