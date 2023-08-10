@@ -2,7 +2,7 @@ FROM python:3.7
 
 # sets up nodejs to install npm
 RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
-RUN apt-get install -y nodejs
+RUN apt-get install -y nodejs npm
 
 WORKDIR /var/www/tab
 
