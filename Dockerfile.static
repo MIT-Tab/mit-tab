@@ -3,8 +3,7 @@ ARG NODE_OPTIONS=--openssl-legacy-provider
 
 # sets up nodejs to install npm
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
-RUN apt-get install -y nodejs npm
-RUN npm i -g npm
+RUN apt-get install -y nodejs=16.20.2-deb-1nodesource1 npm
 
 WORKDIR /var/www/tab
 
