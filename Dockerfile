@@ -1,5 +1,4 @@
-FROM python:3.10
-ARG NODE_OPTIONS=--openssl-legacy-provider
+FROM python:3.7
 
 # install dependenices
 RUN apt-get update && \
@@ -23,8 +22,9 @@ COPY ./assets ./assets
 RUN pip install pipenv
 RUN pipenv install --deploy --system
 
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
-RUN apt-get install -y nodejs=16.20.2-deb-1nodesource1 npm
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+RUN apt-get install -y nodejs aptitude
+RUN aptitude install -y npm
 
 RUN npm install
 RUN ./node_modules/.bin/webpack --config webpack.config.js --mode production

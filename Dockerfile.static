@@ -1,9 +1,9 @@
-FROM python:3.10
-ARG NODE_OPTIONS=--openssl-legacy-provider
+FROM python:3.7
 
 # sets up nodejs to install npm
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
-RUN apt-get install -y nodejs=16.20.2-deb-1nodesource1 npm
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+RUN apt-get install -y nodejs aptitude
+RUN aptitude install -y npm
 
 WORKDIR /var/www/tab
 
