@@ -55,6 +55,7 @@ class MysqlDumpRestorer:
             DB_NAME,
             "--quick",
             "--lock-all-tables",
+            "--complete-insert",
             "--port={}".format(DB_PORT),
             "--host={}".format(DB_HOST),
             "--user={}".format(DB_USER),
