@@ -60,7 +60,7 @@ services:
     scope: RUN_TIME
     value: ${test.DATABASE_URL}
   github:
-    branch: do-apps
+    branch: main
     repo: MIT-Tab/mit-tab
   http_port: 8000
   instance_count: 1
@@ -71,7 +71,7 @@ services:
 static_sites:
 - dockerfile_path: Dockerfile
   github:
-    branch: do-apps
+    branch: main
     repo: MIT-Tab/mit-tab
   name: static
   output_dir: /var/www/tab/assets
