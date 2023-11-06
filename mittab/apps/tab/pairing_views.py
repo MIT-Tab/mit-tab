@@ -384,13 +384,15 @@ def pretty_pair(request, printable=False):
     errors, byes = [], []
 
     round_number = TabSettings.get("cur_round") - 1
-    round_pairing = list(Round.objects.filter(round_number=round_number).prefetch_related(
-        "gov_team",
-        "opp_team",
-        "chair",
-        "judges",
-        "room",
-    ))
+    round_pairing = list(
+        Round.objects.filter(round_number=round_number).prefetch_related(
+            "gov_team",
+            "opp_team",
+            "chair",
+            "judges",
+            "room",
+        )
+    )
 
     # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
