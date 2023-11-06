@@ -75,7 +75,7 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: benmusch/mittab-test:0.0.1
+      - image: circleci/python:3.7.10-node-browsers
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
@@ -85,6 +85,10 @@ jobs:
       - run:
           name: install dependencies
           command: |
+            sudo apt-get update
+            sudo apt-get upgrade -y
+            sudo apt-get install
+            sudo apt-get install -y default-mysql-client
             sudo pip install pipenv
             pipenv install
             npm install
