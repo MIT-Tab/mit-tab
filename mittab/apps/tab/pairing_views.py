@@ -384,7 +384,13 @@ def pretty_pair(request, printable=False):
     errors, byes = [], []
 
     round_number = TabSettings.get("cur_round") - 1
-    round_pairing = list(Round.objects.filter(round_number=round_number))
+    round_pairing = list(Round.objects.filter(round_number=round_number).prefetch_related(
+        "gov_team",
+        "opp_team",
+        "chair",
+        "judges",
+        "room",
+    ))
 
     # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
@@ -458,9 +464,13 @@ def enter_e_ballot(request, ballot_code):
                       """
 
     current_round = TabSettings.get(key="cur_round") - 1
-    rounds = Round.objects.filter(judges__ballot_code=ballot_code.lower())
-    rounds = rounds.filter(round_number=current_round)
-    judge = Judge.objects.filter(ballot_code=ballot_code).first()
+
+    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
+        # bad use of related_name in the model, this gets the rounds
+        "judges",
+    ).first()
+    # see above, judge.judges is rounds
+    rounds = list(judge.judges.prefetch_related("chair").filter(round_number=current_round).all())
 
     if not judge:
         message = """
@@ -469,17 +479,17 @@ def enter_e_ballot(request, ballot_code):
                     """ % ballot_code
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
-    elif rounds.count() > 1:
+    elif len(rounds) > 1:
         message = """
                 Found more than one ballot for you this round.
                 Go to tab to resolve this error.
                 """
-    elif rounds.count() == 0:
+    elif len(rounds) == 0:
         message = """
                 Could not find a ballot for you this round. Go to tab
                 to resolve the issue if you believe you were paired in.
                 """
-    elif rounds.first().chair != judge:
+    elif rounds[0].chair != judge:
         message = """
                 You are not the chair of this round. If you are on a panel,
                 only the chair can submit an e-ballot. If you are not on a
@@ -487,8 +497,7 @@ def enter_e_ballot(request, ballot_code):
                 the round.
                 """
     else:
-        return enter_result(request,
-                            rounds.first().id, EBallotForm, ballot_code)
+        return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
     return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
@@ -497,7 +506,16 @@ def enter_result(request,
                  form_class=ResultEntryForm,
                  ballot_code=None,
                  redirect_to="/pairings/status"):
-    round_obj = Round.objects.get(id=round_id)
+    round_obj = Round.objects.prefetch_related(
+        "judges",
+        "chair",
+        "gov_team",
+        "gov_team__debaters",
+        "opp_team",
+        "opp_team__debaters",
+        "roundstats_set",
+        "roundstats_set__debater",
+    ).get(id=round_id)
 
     if request.method == "POST":
         form = form_class(request.POST, round_instance=round_obj)
