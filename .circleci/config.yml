@@ -105,7 +105,7 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.7.3-node
+      - image: circleci/python:3.8
     steps:
       - checkout
       - restore_cache:
