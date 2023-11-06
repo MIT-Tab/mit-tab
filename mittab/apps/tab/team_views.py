@@ -149,11 +149,13 @@ def add_scratches(request, team_id, number_scratches):
                 request, "Scratches created successfully")
     else:
         forms = [
-            ScratchForm(prefix=str(i),
-                        initial={
-                            "team": team_id,
-                            "scratch_type": 0
-            }) for i in range(1, number_scratches + 1)
+            ScratchForm(
+                prefix=str(i),
+                initial={
+                    "team": team_id,
+                    "scratch_type": 0
+                }
+            ) for i in range(1, number_scratches + 1)
         ]
     return render(
         request, "common/data_entry_multiple.html", {

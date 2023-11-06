@@ -472,7 +472,8 @@ def enter_e_ballot(request, ballot_code):
         "judges",
     ).first()
     # see above, judge.judges is rounds
-    rounds = list(judge.judges.prefetch_related("chair").filter(round_number=current_round).all())
+    rounds = list(judge.judges.prefetch_related("chair") \
+            .filter(round_number=current_round).all())
 
     if not judge:
         message = """
@@ -486,7 +487,7 @@ def enter_e_ballot(request, ballot_code):
                 Found more than one ballot for you this round.
                 Go to tab to resolve this error.
                 """
-    elif len(rounds) == 0:
+    elif not rounds:
         message = """
                 Could not find a ballot for you this round. Go to tab
                 to resolve the issue if you believe you were paired in.

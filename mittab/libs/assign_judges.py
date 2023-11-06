@@ -105,7 +105,7 @@ def judge_conflict(judge, team1, team2):
         or had_judge(judge, team1)
         or had_judge(judge, team2)
     )
-    
+
 
 def had_judge(judge, team):
     for round_obj in judge.judges.all():

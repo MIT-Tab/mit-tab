@@ -55,7 +55,8 @@ def pair_round():
         no_show.save()
 
     # If it is the first round, pair by *seed*
-    all_checked_in_teams = Team.with_preloaded_relations_for_tabbing().filter(checked_in=True)
+    all_checked_in_teams = Team.with_preloaded_relations_for_tabbing() \
+            .filter(checked_in=True)
 
     if current_round == 1:
         list_of_teams = list(all_checked_in_teams)
@@ -559,17 +560,17 @@ def get_weights():
 
 
 def calc_weight(
-    team_a,
-    team_b,
-    team_a_ind,
-    team_b_ind,
-    team_a_opt,
-    team_b_opt,
-    team_a_opt_ind,
-    team_b_opt_ind,
-    weights,
-    current_round,
-    tot_rounds,
+        team_a,
+        team_b,
+        team_a_ind,
+        team_b_ind,
+        team_a_opt,
+        team_b_opt,
+        team_a_opt_ind,
+        team_b_opt_ind,
+        weights,
+        current_round,
+        tot_rounds,
 ):
     """
     Calculate the penalty for a given pairing
@@ -611,7 +612,7 @@ def calc_weight(
         weight += weights["same_school_penalty"]
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
-        hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
+            hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
     ):
         weight += weights["hit_pull_up_before"]
 
