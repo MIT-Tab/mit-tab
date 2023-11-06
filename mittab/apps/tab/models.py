@@ -170,6 +170,38 @@ class Team(models.Model):
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
+    """
+    Consolidate the knowledge of what relations need
+    to be pre-loaded to minimize queries for team stats
+    """
+    @classmethod
+    def with_preloaded_relations_for_tabbing(cls):
+        return cls.objects.prefetch_related(
+            "gov_team",  # poorly named relation, gets rounds as gov team
+            "opp_team",  # poorly named relation, rounds as opp team
+            # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
+            # and team record
+            "gov_team__opp_team__gov_team",
+            "gov_team__opp_team__opp_team",
+            "gov_team__opp_team__byes",
+            "gov_team__opp_team",
+            # for all opp rounds, load the gov team's gov+opp rounds (opp-strength)
+            # and team record
+            "opp_team__gov_team__gov_team",
+            "opp_team__gov_team__opp_team",
+            "opp_team__gov_team__byes",
+            "opp_team__gov_team",
+            # basic stats/metadata
+            "byes",
+            "no_shows",
+            "debaters",
+            # individual's stats/metadata
+            "debaters__roundstats_set",
+            "debaters__roundstats_set__round",
+            "debaters__team_set",
+            "debaters__team_set__no_shows",
+        )
+
     def set_unique_team_code(self):
         haikunator = Haikunator()
 

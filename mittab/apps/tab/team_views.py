@@ -54,7 +54,7 @@ def view_teams(request):
 def view_team(request, team_id):
     team_id = int(team_id)
     try:
-        team = Team.objects.get(pk=team_id)
+        team = Team.with_preloaded_relations_for_tabbing().get(pk=team_id)
         stats = []
         stats.append(("Wins", tab_logic.tot_wins(team)))
         stats.append(("Total Speaks", tab_logic.tot_speaks(team)))
@@ -149,11 +149,13 @@ def add_scratches(request, team_id, number_scratches):
                 request, "Scratches created successfully")
     else:
         forms = [
-            ScratchForm(prefix=str(i),
-                        initial={
-                            "team": team_id,
-                            "scratch_type": 0
-            }) for i in range(1, number_scratches + 1)
+            ScratchForm(
+                prefix=str(i),
+                initial={
+                    "team": team_id,
+                    "scratch_type": 0
+                }
+            ) for i in range(1, number_scratches + 1)
         ]
     return render(
         request, "common/data_entry_multiple.html", {

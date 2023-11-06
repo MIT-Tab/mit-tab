@@ -55,14 +55,19 @@ def view_judges(request):
     c_judge = [(judge.pk, judge.name, flags(judge), "(%s)" % judge.ballot_code)
                for judge in Judge.objects.all()]
 
-    all_flags = [[
-        TabFlags.JUDGE_CHECKED_IN_CUR, TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
-        TabFlags.JUDGE_CHECKED_IN_NEXT, TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
-    ],
+    all_flags = [
         [
-        TabFlags.LOW_RANKED_JUDGE, TabFlags.MID_RANKED_JUDGE,
-        TabFlags.HIGH_RANKED_JUDGE
-    ]]
+            TabFlags.JUDGE_CHECKED_IN_CUR,
+            TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
+            TabFlags.JUDGE_CHECKED_IN_NEXT,
+            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT,
+        ],
+        [
+            TabFlags.LOW_RANKED_JUDGE,
+            TabFlags.MID_RANKED_JUDGE,
+            TabFlags.HIGH_RANKED_JUDGE,
+        ]
+    ]
     filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
@@ -150,11 +155,14 @@ def add_scratches(request, judge_id, number_scratches):
                 request, "Scratches created successfully")
     else:
         forms = [
-            ScratchForm(prefix=str(i),
-                        initial={
-                            "judge": judge_id,
-                            "scratch_type": 0
-            }) for i in range(1, number_scratches + 1)
+            ScratchForm(
+                prefix=str(i),
+                initial={
+                    "judge": judge_id,
+                    "scratch_type": 0
+                }
+            )
+            for i in range(1, number_scratches + 1)
         ]
     return render(
         request, "common/data_entry_multiple.html", {

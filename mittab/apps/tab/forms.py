@@ -146,7 +146,7 @@ class TeamForm(forms.ModelForm):
         for debater in data:
             if debater.team_set.count() > 1 or \
                (debater.team_set.count() == 1 and
-                    debater.team_set.first().id != self.instance.id):
+                debater.team_set.first().id != self.instance.id):
                 raise forms.ValidationError(
                     """A debater cannot already be on a different team!
                     Consider editing the debaters' existing team,
@@ -270,18 +270,14 @@ class ResultEntryForm(forms.Form):
         if round_object.victor == 0 or no_fill:
             return
 
-        for deb in self.DEBATERS:
-            try:
-                stats = RoundStats.objects.get(round=round_object,
-                                               debater_role=deb)
-                self.fields[self.deb_attr_name(
-                    deb, "debater")].initial = stats.debater.id
-                self.fields[self.deb_attr_name(
-                    deb, "speaks")].initial = stats.speaks
-                self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
-                    round(stats.ranks))
-            except Exception:
-                pass
+        for stats in round_object.roundstats_set.all():
+            deb = stats.debater_role
+            self.fields[self.deb_attr_name(
+                deb, "debater")].initial = stats.debater.id
+            self.fields[self.deb_attr_name(
+                deb, "speaks")].initial = stats.speaks
+            self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
+                round(stats.ranks))
 
     def clean(self):
         cleaned_data = self.cleaned_data

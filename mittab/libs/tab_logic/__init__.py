@@ -55,25 +55,8 @@ def pair_round():
         no_show.save()
 
     # If it is the first round, pair by *seed*
-    all_checked_in_teams = Team.objects.filter(checked_in=True).prefetch_related(
-        "gov_team",  # poorly named relation, gets rounds as gov team
-        "opp_team",  # poorly named relation, rounds as opp team
-        # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
-        "gov_team__opp_team__gov_team",
-        "gov_team__opp_team__opp_team",
-        "gov_team__opp_team__byes",
-        # for all opp rounds, load the gov team's gov+opp rounds (opp-strength)
-        "opp_team__gov_team__gov_team",
-        "opp_team__gov_team__opp_team",
-        "opp_team__gov_team__byes",
-        "byes",
-        "no_shows",
-        "debaters",
-        "debaters__roundstats_set",
-        "debaters__roundstats_set__round",
-        "debaters__team_set",
-        "debaters__team_set__no_shows",
-    )
+    all_checked_in_teams = Team.with_preloaded_relations_for_tabbing() \
+            .filter(checked_in=True)
 
     if current_round == 1:
         list_of_teams = list(all_checked_in_teams)
@@ -577,17 +560,17 @@ def get_weights():
 
 
 def calc_weight(
-    team_a,
-    team_b,
-    team_a_ind,
-    team_b_ind,
-    team_a_opt,
-    team_b_opt,
-    team_a_opt_ind,
-    team_b_opt_ind,
-    weights,
-    current_round,
-    tot_rounds,
+        team_a,
+        team_b,
+        team_a_ind,
+        team_b_ind,
+        team_a_opt,
+        team_b_opt,
+        team_a_opt_ind,
+        team_b_opt_ind,
+        weights,
+        current_round,
+        tot_rounds,
 ):
     """
     Calculate the penalty for a given pairing
@@ -629,7 +612,7 @@ def calc_weight(
         weight += weights["same_school_penalty"]
 
     if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
-        hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
+            hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
     ):
         weight += weights["hit_pull_up_before"]
 
