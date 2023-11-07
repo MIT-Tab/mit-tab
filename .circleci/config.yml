@@ -4,7 +4,7 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/python:3.10-node-browsers
+      - image: circleci/python:3.10-browsers
         environment:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
@@ -75,7 +75,7 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/python:3.10-node-browsers
+      - image: circleci/python:3.10-browsers
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
