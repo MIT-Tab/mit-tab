@@ -19,9 +19,10 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "raven.contrib.django.raven_compat",
-                  "webpack_loader", "bootstrap4",)
+                  "webpack_loader", "bootstrap4", "django_prometheus",)
 
 MIDDLEWARE = (
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "mittab.apps.tab.middleware.FailoverDuringBackup",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -30,6 +31,7 @@ MIDDLEWARE = (
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "mittab.apps.tab.middleware.Login",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 )
 
 if os.environ.get("SILK_ENABLED"):
