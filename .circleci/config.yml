@@ -32,7 +32,6 @@ jobs:
             sudo apt-get upgrade -y
             sudo apt-get install
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
             pipenv install
             npm install
 
@@ -89,7 +88,6 @@ jobs:
             sudo apt-get upgrade -y
             sudo apt-get install
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
             pipenv install
             npm install
       - save_cache:
