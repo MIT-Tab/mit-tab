@@ -4,13 +4,13 @@ orbs:
 jobs:
   build:
     docker:
-      - image: circleci/python:3.10-browsers
+      - image: cimg/python:3.10-node-browsers
         environment:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
-      - image: circleci/mysql:5.7
+      - image: cimg/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
@@ -75,7 +75,7 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/python:3.10-browsers
+      - image: cimg/python:3.10-node-browsers
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
@@ -105,7 +105,7 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.10
+      - image: cimg/python:3.10
     steps:
       - checkout
       - restore_cache:
