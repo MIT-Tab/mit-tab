@@ -1,5 +1,6 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development settings - unsuitable for production
@@ -67,7 +68,21 @@ BACKUPS = {
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
 if os.environ.get("SENTRY_DSN"):
-    RAVEN_CONFIG = {"dsn": os.environ["SENTRY_DSN"]}
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=os.environ["SENTRY_DSN"],
+        enable_tracing=True,
+        integrations=[
+            DjangoIntegration(
+                transaction_style='url',
+                middleware_spans=True,
+                signals_spans=False,
+                cache_spans=False,
+            ),
+        ],
+    )
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.6/topics/i18n/

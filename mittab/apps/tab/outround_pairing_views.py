@@ -423,8 +423,8 @@ def assign_team(request, round_id, position, team_id):
                 "name": team_obj.name
             },
         }
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         data = {"success": False}
     return JsonResponse(data)
 
@@ -454,8 +454,8 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
             "judge_rank": float(judge_obj.rank),
             "judge_id": judge_obj.id
         }
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         data = {"success": False}
     return JsonResponse(data)
 

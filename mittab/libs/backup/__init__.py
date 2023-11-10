@@ -57,10 +57,7 @@ def backup_round(key=None, round_number=None, btime=None):
 def upload_backup(f):
     key = _generate_unique_key(f.name)
     print(("Tried to write {}".format(key)))
-    try:
-        BACKUP_STORAGE[key] = f.read()
-    except Exception:
-        errors.emit_current_exception()
+    BACKUP_STORAGE[key] = f.read()
 
 
 def get_backup_content(key):

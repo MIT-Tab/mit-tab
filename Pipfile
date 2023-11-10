@@ -32,7 +32,7 @@ Django = "==2.2.10"
 PyYAML = "==5.1.2"
 pip = "*"
 install = "*"
-sentry-sdk = "*"
+sentry-sdk = {extras = ["django"], version = "*"}
 
 [requires]
 python_version = "3.10"

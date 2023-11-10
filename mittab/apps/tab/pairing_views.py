@@ -38,7 +38,7 @@ def pair_round(request):
                 current_round.value = current_round.value + 1
                 current_round.save()
         except Exception as exp:
-            emit_current_exception()
+            emit_current_exception(exp)
             return redirect_and_flash_error(
                 request,
                 "Could not pair next round, got error: {}".format(exp))
@@ -99,8 +99,8 @@ def assign_judges_to_pairing(request):
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
             assign_judges.add_judges()
-        except Exception:
-            emit_current_exception()
+        except Exception as e:
+            emit_current_exception(e)
             return redirect_and_flash_error(request,
                                             "Got error during judge assignment")
     return redirect("/pairings/status/")
@@ -152,8 +152,8 @@ def manual_backup(request):
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
         backup.backup_round("manual_backup_round_{}_{}_{}".format(
             cur_round, btime, now))
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         return redirect_and_flash_error(request, "Error creating backup")
     return redirect_and_flash_success(
         request,
@@ -336,8 +336,8 @@ def assign_team(request, round_id, position, team_id):
                 "name": team_obj.name
             },
         }
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         data = {"success": False}
     return JsonResponse(data)
 
@@ -367,8 +367,8 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
             "judge_rank": float(judge_obj.rank),
             "judge_id": judge_obj.id
         }
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         data = {"success": False}
     return JsonResponse(data)
 
@@ -636,8 +636,8 @@ def start_new_tourny(request):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
-    except Exception:
-        emit_current_exception()
+    except Exception as e:
+        emit_current_exception(e)
         return redirect_and_flash_error(
             request, "Invalid tournament state, try resetting from a back-up")
     return redirect_and_flash_success(request, "New tournament started")
