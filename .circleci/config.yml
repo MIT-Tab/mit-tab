@@ -1,6 +1,7 @@
 version: 2.1
 orbs:
   codecov: codecov/codecov@1.0.4
+  browser-tools: circleci/browser-tools@x.y
 jobs:
   build:
     docker:
@@ -22,6 +23,8 @@ jobs:
 
     steps:
       - checkout
+      - browser-tools/install-chrome
+      - browser-tools/install-chromedriver
       - restore_cache:
           key: deps-v2-{{ checksum "Pipfile.lock" }}
 
