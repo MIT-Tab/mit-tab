@@ -242,9 +242,6 @@ urlpatterns = [
 
     # Cache related
     url(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
-
-    # Prometheus
-    path('', include('django_prometheus.urls')),
 ]
 
 if settings.SILK_ENABLED:
