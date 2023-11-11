@@ -29,7 +29,7 @@ requests = "==2.22.0"
 selenium = "==3.141.0"
 splinter = "==0.10.0"
 Django = "==2.2.10"
-PyYAML = "==5.1.2"
+PyYAML = "==5.4"
 
 [requires]
 python_version = "3.7"
