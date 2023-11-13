@@ -1,16 +1,17 @@
 version: 2.1
 orbs:
   codecov: codecov/codecov@1.0.4
+  browser-tools: circleci/browser-tools@1.4.2
 jobs:
   build:
     docker:
-      - image: circleci/python:3.7.10-node-browsers
+      - image: cimg/python:3.10.12-browsers
         environment:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
-      - image: circleci/mysql:5.7
+      - image: cimg/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
@@ -22,6 +23,9 @@ jobs:
 
     steps:
       - checkout
+      - run: sudo apt-get update
+      - browser-tools/install-browser-tools:
+          chrome-version: 114.0.5735.90
       - restore_cache:
           key: deps-v2-{{ checksum "Pipfile.lock" }}
 
@@ -32,7 +36,6 @@ jobs:
             sudo apt-get upgrade -y
             sudo apt-get install
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
             pipenv install
             npm install
 
@@ -75,7 +78,7 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/python:3.7.10-node-browsers
+      - image: cimg/python:3.10.12-browsers
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
@@ -89,7 +92,6 @@ jobs:
             sudo apt-get upgrade -y
             sudo apt-get install
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
             pipenv install
             npm install
       - save_cache:
@@ -105,23 +107,16 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.10.12
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "docs/requirements.txt" }}
-            - v1-dependencies-
       - run:
           name: install dependencies
           command: |
-            python3 -m venv venv
+            python -m venv venv
             . venv/bin/activate
-            pip install -r docs/requirements.txt
-      - save_cache:
-          paths:
-            - ./venv
-          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
+            python -m pip install --upgrade pip
+            python -m pip install -r docs/requirements.txt
       - run:
           name: Build docs
           command: |

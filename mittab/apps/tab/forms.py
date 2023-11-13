@@ -340,8 +340,8 @@ class ResultEntryForm(forms.Form):
                     "winner"] == Round.OPP and gov_points > opp_points:
                 self.add_error("winner", self.error_class(["Low Point Win!!"]))
 
-        except Exception:
-            errors.emit_current_exception()
+        except Exception as e:
+            errors.emit_current_exception(e)
             self.add_error(
                 "winner",
                 self.error_class(
@@ -630,8 +630,8 @@ class OutroundResultEntryForm(forms.Form):
             if self.errors:
                 return
 
-        except Exception:
-            errors.emit_current_exception()
+        except Exception as e:
+            errors.emit_current_exception(e)
             self.add_error(
                 "winner",
                 self.error_class(

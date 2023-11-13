@@ -2,14 +2,14 @@ import os
 import sys
 import traceback
 
-from raven.contrib.django.raven_compat.models import client
 
 
-def emit_current_exception():
+def emit_current_exception(e):
     if os.environ.get("DEBUG") in ["1", 1, True, "true"]:
         traceback.print_exc(file=sys.stdout)
-    else:
-        client.captureException()
+    elif os.environ.get("SENTRY_DSN"):
+        from sentry_sdk import capture_exception
+        capture_exception(e)
 
 
 class ByeAssignmentError(Exception):
