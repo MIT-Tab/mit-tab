@@ -1,16 +1,19 @@
-from django.http import HttpResponseRedirect
+import csv
+import json
+from django.http import HttpResponse, HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.apps.tab.tab_card import JSONDecimalEncoder, csv_tab_cards, get_all_json_data, get_tab_card_data
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import tab_logic, cache_logic
-from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
-    tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.libs.tab_logic import TabFlags
 from mittab.libs.tab_logic import rankings
+from django.http import HttpResponse as HTTPResponse
 
 
 def public_view_teams(request):
@@ -220,124 +223,28 @@ def pretty_tab_card(request, team_id):
     team = Team.objects.get(pk=team_id)
     return render(request, "tab/pretty_tab_card.html", {"team": team})
 
-
 def tab_card(request, team_id):
-    try:
-        team_id = int(team_id)
-    except ValueError:
-        return redirect_and_flash_error(request, "Invalid team id")
-    team = Team.objects.get(pk=team_id)
-    rounds = ([r for r in Round.objects.filter(gov_team=team)] +
-              [r for r in Round.objects.filter(opp_team=team)])
-    rounds.sort(key=lambda x: x.round_number)
-    debaters = [d for d in team.debaters.all()]
-    iron_man = False
-    if len(debaters) == 1:
-        iron_man = True
-    deb1 = debaters[0]
-    if not iron_man:
-        deb2 = debaters[1]
-    round_stats = []
-    num_rounds = TabSettings.objects.get(key="tot_rounds").value
-    cur_round = TabSettings.objects.get(key="cur_round").value
-    blank = " "
-    for i in range(num_rounds):
-        round_stats.append([blank] * 7)
-
-    for round_obj in rounds:
-        dstat1 = [
-            k for k in RoundStats.objects.filter(debater=deb1).filter(
-                round=round_obj).all()
-        ]
-        dstat2 = []
-        if not iron_man:
-            dstat2 = [
-                k for k in RoundStats.objects.filter(debater=deb2).filter(
-                    round=round_obj).all()
-            ]
-        blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
-        while len(dstat1) + len(dstat2) < 2:
-            # Something is wrong with our data, but we don't want to crash
-            dstat1.append(blank_rs)
-        if not dstat2 and not dstat1:
-            break
-        if not dstat2:
-            dstat1, dstat2 = dstat1[0], dstat1[1]
-        elif not dstat1:
-            dstat1, dstat2 = dstat2[0], dstat2[1]
-        else:
-            dstat1, dstat2 = dstat1[0], dstat2[0]
-        index = round_obj.round_number - 1
-        round_stats[index][3] = " - ".join(
-            [j.name for j in round_obj.judges.all()])
-        round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
-        round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))
-        round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks),
-                                 float(dstat1.ranks + dstat2.ranks))
-
-        if round_obj.gov_team == team:
-            round_stats[index][2] = round_obj.opp_team
-            round_stats[index][0] = "G"
-            if round_obj.victor == 1:
-                round_stats[index][1] = "W"
-            elif round_obj.victor == 2:
-                round_stats[index][1] = "L"
-            elif round_obj.victor == 3:
-                round_stats[index][1] = "WF"
-            elif round_obj.victor == 4:
-                round_stats[index][1] = "LF"
-            elif round_obj.victor == 5:
-                round_stats[index][1] = "AD"
-            elif round_obj.victor == 6:
-                round_stats[index][1] = "AW"
-        elif round_obj.opp_team == team:
-            round_stats[index][2] = round_obj.gov_team
-            round_stats[index][0] = "O"
-            if round_obj.victor == 1:
-                round_stats[index][1] = "L"
-            elif round_obj.victor == 2:
-                round_stats[index][1] = "W"
-            elif round_obj.victor == 3:
-                round_stats[index][1] = "LF"
-            elif round_obj.victor == 4:
-                round_stats[index][1] = "WF"
-            elif round_obj.victor == 5:
-                round_stats[index][1] = "AD"
-            elif round_obj.victor == 6:
-                round_stats[index][1] = "AW"
-
-    for i in range(cur_round - 1):
-        if round_stats[i][6] == blank:
-            round_stats[i][6] = (0, 0)
-    for i in range(1, cur_round - 1):
-        round_stats[i][6] = (round_stats[i][6][0] + round_stats[i - 1][6][0],
-                             round_stats[i][6][1] + round_stats[i - 1][6][1])
-    # Error out if we don't have a bye
-    try:
-        bye_round = Bye.objects.get(bye_team=team).round_number
-    except Exception:
-        bye_round = None
-
-    # Duplicates Debater 1 for display if Ironman team
-    if iron_man:
-        deb2 = deb1
     return render(
-        request, "tab/tab_card.html", {
-            "team_name": team.display_backend,
-            "team_school": team.school,
-            "debater_1": deb1.name,
-            "debater_1_status": Debater.NOVICE_CHOICES[deb1.novice_status][1],
-            "debater_2": deb2.name,
-            "debater_2_status": Debater.NOVICE_CHOICES[deb2.novice_status][1],
-            "round_stats": round_stats,
-            "d1st": tot_speaks_deb(deb1),
-            "d1rt": tot_ranks_deb(deb1),
-            "d2st": tot_speaks_deb(deb2),
-            "d2rt": tot_ranks_deb(deb2),
-            "ts": tot_speaks(team),
-            "tr": tot_ranks(team),
-            "bye_round": bye_round
-        })
+        request,
+        "tab/tab_card.html",
+        get_tab_card_data(request, team_id)
+    )
+
+def tab_cards_json(request):
+    # Serialize the data to JSON
+    json_data = json.dumps({"tab_cards": get_all_json_data()}, indent=4, cls = JSONDecimalEncoder)
+
+    # Create the HTTP response with the file download header
+    response = HTTPResponse(json_data, content_type="application/json")
+    response['Content-Disposition'] = 'attachment; filename="tab_cards.json"'
+    return response
+
+def tab_cards_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="tab_cards.csv"'
+    writer = csv.writer(response)    
+    csv_tab_cards(writer)
+    return response
 
 
 def rank_teams_ajax(request):

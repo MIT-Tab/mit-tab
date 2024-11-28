@@ -19,6 +19,9 @@
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
 {% url "download_archive" as download_archive %}
+{% url "tab_cards_json" as tab_cards_json %}
+{% url "tab_cards_csv" as tab_cards_csv %}
+
 
 {% url "enter_debater" as enter_debater %}
 {% url "view_debaters" as view_debaters %}
@@ -78,6 +81,8 @@
             <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
             <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
             <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
+            <a class="dropdown-item {%active request tab_cards_json %}" href="{{ tab_cards_json }}" title="JSON is a machine readable archive formatm used to output data while maintaining tab card structure.">Create Tab Card JSON</a>
+            <a class="dropdown-item {%active request tab_cards_csv %}" href="{{ tab_cards_csv }}" title="CSV is a human readable archive format used to output data while maintaining tab card structure.">Create Tab Card CSV</a>
           </div>
         </li>
 

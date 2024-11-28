@@ -122,3 +122,5 @@ typings/
 .env
 
 *.dump.sql
+
+.venv/

@@ -17,6 +17,8 @@
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
 {% url "download_archive" as download_archive %}
+{% url "tab_cards_json" as tab_cards_json%}
+{% url "tab_cards_csv" as tab_cards_csv%}
 
 {% url "enter_debater" as enter_debater %}
 {% url "view_debaters" as view_debaters %}
@@ -56,12 +58,15 @@
                 <li><a class="{% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Judge Checkin</a></li>
             </ul>
         </li>
-        <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}">Backups</a>
+        <li><a class="{% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}{%active request tab_cards_json %}{%active request tab_cards_csv %}">Backups</a>
             <ul id = "sublist">
                 <li><a class="{%active request view_backups %}" href="{{ view_backups }}">View Backups</a></li>
                 <li><a class="{%active request backup %}" href="{{ backup }}">Backup Current</a></li>
                 <li><a class="{%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a></li>
                 <li><a class="{%active request download_archive %}" href="{{ download_archive }}">Create DebateXML</a></li>
+                <li><a class="{%active request tab_cards_json %}" href="{{ tab_cards_json }}">Create Tab Card JSON</a></li>
+                <li><a class="{%active request tab_cards_csv %}" href="{{ tab_cards_csv }}">Create Tab Card CSV</a></li>
+
             </ul>
         </li>
         <li><a class="{% active request view_scratches %}" href="{{ view_scratches }}">Scratches</a>

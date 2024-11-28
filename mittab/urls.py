@@ -88,6 +88,8 @@ urlpatterns = [
     url(r"^team/card/(\d+)/pretty/$",
         team_views.pretty_tab_card,
         name="pretty_tab_card"),
+    url(r"^tab_cards_json/$", team_views.tab_cards_json, name="tab_cards_json"),
+    url(r"^tab_cards_csv/$", team_views.tab_cards_csv, name="tab_cards_csv"),
     url(r"^team/ranking/$", team_views.rank_teams_ajax,
         name="rank_teams_ajax"),
     url(r"^team/rank/$", team_views.rank_teams, name="rank_teams"),
