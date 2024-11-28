@@ -60,7 +60,7 @@ def json_get_round(round_obj, team, deb1, deb2):
     if opponent:
         opponent_debaters = list(opponent.debaters.all())
         jsonRound["opponent"] = {
-            "name": opponent.display_backend,
+            "name": opponent.get_team_code(),
             "school": opponent.school.name,
             "debater1": opponent_debaters[0].name if opponent_debaters else None,
             "debater2": opponent_debaters[1].name if len(opponent_debaters) > 1 else None,
@@ -104,7 +104,7 @@ def get_all_json_data():
 
     for team in teams:
         tab_card_data = {
-            "team_name": team.display_backend,
+            "team_name": team.get_team_code(),
             "team_school": team.school.name,
             "rounds": [{}] * total_rounds
         }
@@ -126,7 +126,7 @@ def get_all_json_data():
         for round_obj in rounds:
             tab_card_data["rounds"][round_obj.round_number - 1] = json_get_round(round_obj, team, deb1, deb2)
         
-        all_tab_cards_data[team.display_backend] = tab_card_data
+        all_tab_cards_data[team.get_team_code()] = tab_card_data
     return all_tab_cards_data
 
 def get_tab_card_data(request, team_id):
@@ -228,7 +228,7 @@ def csv_tab_cards(writer):
             side = "G" if round_obj.gov_team == team else "O"
             result = get_victor_label(round_obj.victor, side)
             opponent = round_obj.opp_team if round_obj.gov_team == team else round_obj.gov_team
-            opponent_name = opponent.display_backend if opponent else "BYE"
+            opponent_name = opponent.get_team_code() if opponent else "BYE"
             chair = round_obj.chair.name
             wings = " - ".join(judge.name for judge in round_obj.judges.exclude(pk=round_obj.chair.pk))
             
@@ -253,17 +253,17 @@ def csv_tab_cards(writer):
         # Write round data for this team
         for round_stat in round_data:
             if not round_stat:
-                writer.writerow([team.display_backend, 
+                writer.writerow([team.get_team_code(), 
                                  team.school.name])
             writer.writerow([
-                team.display_backend,
+                team.get_team_code(),
                 team.school.name,
                 *round_stat,  # Round, Gov/Opp, Win/Loss, Opponent, Judges, Debater 1, N/V, Debater 1 S/R, Debater 2, N/V, Debater 2 S/R, Total
             ])
         
         # Write the total stats for this team
         writer.writerow([
-            team.display_backend,
+            team.get_team_code(),
             team.school.name,
             "Total",
             "",
