@@ -7,11 +7,13 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
@@ -104,6 +106,100 @@ def assign_judges_to_pairing(request):
             return redirect_and_flash_error(request,
                                             "Got error during judge assignment")
     return redirect("/pairings/status/")
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_rooms_to_pairing(request):
+    current_round_number = TabSettings.objects.get(key="cur_round").value - 1
+    warnings = []
+    if request.method == "POST":
+        try:
+            # A bit ambivalent about including a backup. Its probably good
+            # But the backup list might start getting long
+            backup.backup_round("round_%s_before_room_assignment" %
+                                current_round_number)
+            warnings = assign_rooms.add_rooms()
+            request.session['room_warnings'] = warnings
+        except Exception:
+            emit_current_exception()
+            return redirect_and_flash_error(request,
+                                            "Got error during room assignment")
+    return redirect("/pairings/status/")
+
+def alternative_rooms(request, round_id, room_id=""):
+    round_obj = Round.objects.get(id=int(round_id))
+    round_number = round_obj.round_number
+
+    current_room_obj = None
+    if room_id.isdigit():
+        try:
+            current_room_obj = Room.objects.get(id=int(room_id))
+        except Room.DoesNotExist:
+            pass
+
+    # Fetch all rooms checked in for the given round, ordered by rank
+    # A little out of depth on the Django ORM here, but this seems like the
+    # way to get this data with the least amount of queries
+    rooms = set(Room.objects.filter(
+        roomcheckin__round_number=round_number
+    ).annotate(
+        has_round=Exists(Round.objects.filter(room_id=OuterRef('id')))
+    ).order_by("-rank"))
+
+    
+    
+    """
+    There are three relavent pieces of information tab staff may need about rooms
+    1. Is it checked in?
+    2. Is it already paired?
+    3. Is it viable (meets all the tags of the round)?
+    
+    Right now, #1 is filtered and #2 and #3 are displayed via separate lists
+    The rationale is that allowing you to select an unchecked in room either
+    a. requires you to check it in, which could accidentally check in a room that shouldn't be
+    b. not check it in, which would break the rule of paired rooms needing a room checkin
+    
+    I think displaying unchecked in rooms too might be helpful, but only if its implimented
+    with a pop-up to check in the room, which was overhead I didn't want to include in this
+    slate of features.
+    """
+
+    # For now all checked in rooms are "viable", but room tags will make having three categories nessicary
+    viable_rooms = rooms
+    
+    viable_unpaired_rooms = filter(lambda room: not room.has_round, rooms)
+    viable_paired_rooms = filter(lambda room: room.has_round, rooms)
+    other_rooms = rooms - viable_rooms
+
+    # Render the response
+    return render(request, "pairing/room_dropdown.html", {
+        "current_room": current_room_obj,
+        "round_obj": round_obj,
+        "viable_rooms": viable_rooms,
+        "viable_paired_rooms": viable_paired_rooms,
+        "other_rooms": other_rooms,
+    })
+    
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_room(request, round_id, room_id, remove_id=None):
+    try:
+        round_obj = Round.objects.get(id=int(round_id))
+        if remove_id is not None and round_obj.room.id != remove_id:
+                round_obj.room = None
+        room_obj = Room.objects.get(id=int(room_id))
+        round_obj.room = room_obj
+        round_obj.save()
+        room_color = room_obj.get_color()
+        data = {
+            "success": True,
+            "room_color": room_color if room_color else "",
+            "room_id": room_obj.id,
+            "round_id": round_obj.id,
+            "room_name": room_obj.name,
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -211,6 +307,7 @@ def view_round(request, round_number):
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
+    rooms_assigned = all((r.room is not None for r in round_info))
     excluded_judges = Judge.objects.exclude(
         judges__round_number=round_number).filter(
             checkin__round_number=round_number)

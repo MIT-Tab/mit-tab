@@ -382,6 +382,23 @@ class Room(models.Model):
     def is_checked_in_for_round(self, round_number):
         return RoomCheckIn.objects.filter(room=self,
                                           round_number=round_number).exists()
+    
+    def get_color(self):
+        """Colors are inherited from the highest priority room tag
+        
+        Not sure if the typical approach would be method or property
+        but since room color can change both from changes to any room tag,
+        or changes to which tags are associated with this room
+        this seemed like it would probably be the lighter weight approach,
+        especically because I expect num_room_tags <<<<<< num_rooms in virtually every case    
+        """
+        
+        #Since this is not implimented yet, we just return none, with a 
+        #commented out test line for using random colors to see how they're displayed
+        
+        #TODO: Comment out before merge
+        return "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
+        #return None
 
     class Meta:
         ordering = ["name"]
@@ -497,7 +514,8 @@ class Round(models.Model):
         (ALL_DROP, "ALL DROP"),
         (ALL_WIN, "ALL WIN"),
     )
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    # Rooms are set to null before "pair rooms" button is clicked
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):

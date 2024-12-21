@@ -207,22 +207,12 @@ def pair_round():
             ),
         )
 
-    # Assign rooms (does this need to be random? maybe bad to have top
-    #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related(
-        "room"
-    )
-    rooms = map(lambda r: r.room, rooms)
-    rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
-
-    for i, pairing in enumerate(pairings):
-        pairing[2] = rooms[i]
 
     # Enter into database
     all_rounds = []
     for gov, opp, room in pairings:
         round_obj = Round(
-            round_number=current_round, gov_team=gov, opp_team=opp, room=room
+            round_number=current_round, gov_team=gov, opp_team=opp
         )
         if gov in all_pull_ups:
             round_obj.pullup = Round.GOV

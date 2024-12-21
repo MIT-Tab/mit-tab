@@ -55,3 +55,8 @@
   description: "A toggle to indicate whether you would like to display who has choice, whether you would like this to be  be indicated on the pairing card, and bolded on the front-facing pairing display"
   value: false
   type: boolean
+- disable_room_seeding:
+  name: disable_room_seeding
+  description: "Toggle to disable room seeding. When enabled, rooms are assigned randomly after fulfilling room tags."
+  value: false
+  type: boolean

@@ -122,3 +122,7 @@ typings/
 .env
 
 *.dump.sql
+.venv/
+htmlcov/
+.vscode/
+google-chrome-stable_current_amd64.deb

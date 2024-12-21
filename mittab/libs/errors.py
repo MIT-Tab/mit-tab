@@ -35,6 +35,8 @@ class NotEnoughRoomsError(Exception):
 class BadBreak(Exception):
     pass
 
+class RoundZeroBackupError(Exception):
+    pass
 
 class JudgeAssignmentError(Exception):
     def __init__(self, reason=None):
@@ -52,6 +54,17 @@ class PrevRoundNotEnteredError(Exception):
     def __init__(self):
         super(PrevRoundNotEnteredError, self).__init__()
         self.msg = "You have not entered all the results from the previous round."
+
+    def __str__(self):
+        return repr(self.msg)
+    
+class RoomAssignmentError(Exception):
+    def __init__(self, reason=None):
+        super(JudgeAssignmentError, self).__init__()
+        if reason is not None:
+            self.msg = reason
+        else:
+            self.msg = "Could not assign judges"
 
     def __str__(self):
         return repr(self.msg)

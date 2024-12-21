@@ -4,6 +4,7 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
+  if (roundNumber) {
   $.ajax({
     url: `/round/${roundNumber}/stats`,
     success(result) {
@@ -19,9 +20,10 @@ function populateTabCards() {
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
         tabCardElement.attr("href", `/team/card/${teamId}`);
         tabCardElement.text(`${text}`);
-      });
-    }
-  });
+        });
+      }
+    });
+  }
 }
 
 function assignTeam(e) {
@@ -52,6 +54,54 @@ function assignTeam(e) {
     },
     failure() {
       window.alert(alertMsg);
+    }
+  });
+}
+
+function assignRoom(e) {
+  e.preventDefault();
+  const roundId = $(e.target).attr("round-id");
+  const roomId = $(e.target).attr("room-id");
+  const curRoomId = $(e.target).attr("current-room-id");
+  const url = `/round/${roundId}/assign_room/${roomId}/${curRoomId || ""}`;
+
+  let $buttonWrapper;
+  if (curRoomId) {
+    $buttonWrapper = $(`span[round-id=${roundId}][room-id=${curRoomId}]`);
+  }
+  const $button = $buttonWrapper.find(".btn-sm");
+  $button.addClass("disabled");
+
+  $.ajax({
+    url,
+    success(result) {
+      $button.removeClass("disabled");
+      $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.attr("room-id", result.room_id);
+
+      $button.html(`${result.room_name}`);
+      $(`.room span[round-id=${roundId}] .room-toggle`).css("background-color", result.room_color);
+      refreshRoomWarning(roundId);
+    }
+  });
+}
+
+function populateAlternativeRooms() {
+  const $parent = $(this).parent();
+  const roomId = $parent.attr("room-id");
+  const roundId = $parent.attr("round-id");
+  const url = `/round/${roundId}/alternative_rooms/${roomId || ""}`;
+
+  $.ajax({
+    url,
+    success(result) {
+      $parent.find(".dropdown-menu").html(result);
+      $parent
+        .find(".dropdown-menu")
+        .find(".room-assign")
+        .click(assignRoom);
+      quickSearchInit($parent.find("#quick-search"));
+      $parent.find("#quick-search").focus();
     }
   });
 }
@@ -173,9 +223,11 @@ $(document).ready(() => {
   $("#debater_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/debater/rank/");
   });
-
+  // Note: getting a warning that .click is deprecated.
+  // Sticll working but should be migrated at some point.
   $(".judge-toggle").click(populateAlternativeJudges);
   $(".team-toggle").click(populateAlternativeTeams);
+  $(".room-toggle").click(populateAlternativeRooms);
   $(".alert-link").click(alertLink);
   $(".btn.release").click(togglePairingRelease);
 });
