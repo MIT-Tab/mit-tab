@@ -33,6 +33,7 @@ pip-log.txt
 .coverage
 .tox
 nosetests.xml
+/htmlcov/
 
 # Translations
 *.mo
@@ -52,6 +53,7 @@ mittab/backups/
 
 # venv
 venv/
+.venv/
 
 # doc stuff
 docs/_static/
@@ -123,4 +125,9 @@ typings/
 
 *.dump.sql
 
-.venv/
+#webdriver
+google-chrome-stable_current_amd64.deb
+/chromedriver-linux64/
+
+#vscode
+.vscode/

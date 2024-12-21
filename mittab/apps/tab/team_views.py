@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
-from mittab.apps.tab.tab_card import JSONDecimalEncoder, csv_tab_cards, get_all_json_data, get_tab_card_data
+from mittab.libs.data_import.tab_card import JSONDecimalEncoder, csv_tab_cards, get_all_json_data, get_tab_card_data
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
