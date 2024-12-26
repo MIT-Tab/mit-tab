@@ -224,7 +224,7 @@ $(document).ready(() => {
     lazyLoad($(element).parent(), "/debater/rank/");
   });
   // Note: getting a warning that .click is deprecated.
-  // Sticll working but should be migrated at some point.
+  // Still working but should be migrated at some point.
   $(".judge-toggle").click(populateAlternativeJudges);
   $(".team-toggle").click(populateAlternativeTeams);
   $(".room-toggle").click(populateAlternativeRooms);
