@@ -1,6 +1,6 @@
 # Guide to Setting Up the Development Environment
 
-This is a guide to getting a minimum viable setup of MIT-Tab on Windows. 
+This is a guide to getting a minimum viable **software development** setup of MIT-Tab on Windows. If you're a tournament or tab director looking for help on how to use mit-tab, please reference [the docs](https://mit-tab.readthedocs.io/en/latest/) instead.
 
 
 ## Preliminary notes and Disclaimers
@@ -139,6 +139,7 @@ source venv/bin/activate
 pip install pipenv
 pipenv install --python 3.7
 ```
+> **Note:** For unknown reasons, `pipenv install --python 3.7` occasionally fails the first time it is ran, but passes if ran a second time.
 
 ---
 
@@ -169,5 +170,25 @@ pipenv run ./bin/dev-server
 
 ---
 
-Your development environment is now set up and ready to use!
+Your development environment is now set up and ready to use! 
+
+## Step 8: Development
+
+Lastly, here are some rough guidelines on development.
+
+1. Linting:
+The GitHub is configured to automatically run `PyLint` and check for errors. It is recommended that you install a code-formatter like `black` to take care of the more menial formatting details (especially whitespace and line length), and PyLint to check your code for linting errors before opening a PR. Integration with your IDE will vary, but if you'd like to use this just in terminal, you can do so with 
+
+```bash
+pip install black, pylint
+```
+
+2. Versions:
+While this may change in the coming months, at the time of writing many of the libraries and tools used in this repo are somewhere between 5-10 years behind their current version. For example, the app runs on Django version `2.2.10`. Keep this in mind when searching for documentation online, since parsing what advice applies to what version can occasionally be a headache
+
+3. Django ORM 
+Django uses a clever API to hide database operations from the developer and allow you to interact with the database through their Object Relational Mapper (ORM), which reads more like simple Object Oriented programming than database operations. While this is a major feature and convenience in many ways, it gives way to many pitfalls for rookie developers (including myself circa ~2 months ago at time of writing), since it makes it easy to accidentally write code that makes **thousands** of database calls unintentionally. Given this, make sure to read a basic guide on the Django ORM [(like this one)](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06), and pay special attention to preventing the `N+1` problem, by using methods like `prefetch_related`. Lastly, make sure to profile your code with[`silk`](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to verify you're not accidently overloading the database.
+
+4. Have fun!
+Above all else, the great benefit of an open-source tab site is it gives **you** control to add features and functionality you or your league desire! Let this be your opportunity to add features that make your league better, and if you're lucky, you might just learn some software skills along the way :)
 
