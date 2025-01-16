@@ -20,6 +20,9 @@ information**
 
 ## Local Installation + Running
 
+A more comprehensive guide to setting up your development environment can be found **[here](docs/setup.md)**
+
+
 Currently the installation consists of downloading the code, installing
 requirements and then manually running the server.
 
@@ -51,6 +54,9 @@ pipenv install
 
 # set-up webpack assets
 npm install
+
+# Apply migrations
+pipenv run python manage.py migrate
 
 # load test data. username: tab password: password
 pipenv run python manage.py loaddata testing_db
