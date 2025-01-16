@@ -125,4 +125,4 @@ typings/
 .venv/
 htmlcov/
 .vscode/
-google-chrome-stable_current_amd64.deb
+google-chrome-*.deb
