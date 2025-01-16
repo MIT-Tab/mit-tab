@@ -56,7 +56,8 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache("tab_settings_%s" % self.key,
                                      cache_logic.PERSISTENT)
-        super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+        super(TabSettings, self).save(force_insert,
+                                      force_update, using, update_fields)
 
 
 class School(models.Model):
@@ -106,7 +107,8 @@ class Debater(models.Model):
         while not self.tiebreaker or \
                 Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
-        super(Debater, self).save(force_insert, force_update, using, update_fields)
+        super(Debater, self).save(force_insert,
+                                  force_update, using, update_fields)
 
     @property
     def num_teams(self):
@@ -206,7 +208,8 @@ class Team(models.Model):
         haikunator = Haikunator()
 
         def gen_haiku_and_clean():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
+            code = haikunator.haikunate(
+                token_length=0).replace("-", " ").title()
 
             return code
 
@@ -230,7 +233,8 @@ class Team(models.Model):
                 Team.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
 
-        super(Team, self).save(force_insert, force_update, using, update_fields)
+        super(Team, self).save(force_insert,
+                               force_update, using, update_fields)
 
     @property
     def display_backend(self):
@@ -345,8 +349,10 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
-    judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
+    judge = models.ForeignKey(
+        Judge, related_name="scratches", on_delete=models.CASCADE)
+    team = models.ForeignKey(
+        Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
@@ -382,23 +388,10 @@ class Room(models.Model):
     def is_checked_in_for_round(self, round_number):
         return RoomCheckIn.objects.filter(room=self,
                                           round_number=round_number).exists()
-    
+
     def get_color(self):
-        """Colors are inherited from the highest priority room tag
-        
-        Not sure if the typical approach would be method or property
-        but since room color can change both from changes to any room tag,
-        or changes to which tags are associated with this room
-        this seemed like it would probably be the lighter weight approach,
-        especically because I expect num_room_tags <<<<<< num_rooms in virtually every case    
-        """
-        
-        #Since this is not implimented yet, we just return none, with a 
-        #commented out test line for using random colors to see how they're displayed
-        
-        #TODO: Comment out before merge
-        return "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
-        #return None
+        # TODO: Get color from tags when tags are implimented
+        return None
 
     class Meta:
         ordering = ["name"]
@@ -424,7 +417,8 @@ class Outround(models.Model):
                               blank=True,
                               on_delete=models.CASCADE,
                               related_name="chair_outround")
-    judges = models.ManyToManyField(Judge, blank=True, related_name="judges_outrounds")
+    judges = models.ManyToManyField(
+        Judge, blank=True, related_name="judges_outrounds")
     UNKNOWN = 0
     GOV = 1
     OPP = 2
@@ -515,7 +509,8 @@ class Round(models.Model):
         (ALL_WIN, "ALL WIN"),
     )
     # Rooms are set to null before "pair rooms" button is clicked
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, blank=True, null=True)
+    room = models.ForeignKey(
+        Room, on_delete=models.CASCADE, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
@@ -550,7 +545,8 @@ class Round(models.Model):
 
 
 class Bye(models.Model):
-    bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
+    bye_team = models.ForeignKey(
+        Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):

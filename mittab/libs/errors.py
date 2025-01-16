@@ -35,8 +35,10 @@ class NotEnoughRoomsError(Exception):
 class BadBreak(Exception):
     pass
 
+
 class RoundZeroBackupError(Exception):
     pass
+
 
 class JudgeAssignmentError(Exception):
     def __init__(self, reason=None):
@@ -57,7 +59,8 @@ class PrevRoundNotEnteredError(Exception):
 
     def __str__(self):
         return repr(self.msg)
-    
+
+
 class RoomAssignmentError(Exception):
     def __init__(self, reason=None):
         super(JudgeAssignmentError, self).__init__()

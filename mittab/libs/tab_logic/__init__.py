@@ -56,7 +56,7 @@ def pair_round():
 
     # If it is the first round, pair by *seed*
     all_checked_in_teams = Team.with_preloaded_relations_for_tabbing() \
-            .filter(checked_in=True)
+        .filter(checked_in=True)
 
     if current_round == 1:
         list_of_teams = list(all_checked_in_teams)
@@ -65,7 +65,8 @@ def pair_round():
         if len(list_of_teams) % 2 == 1:
             if TabSettings.get("fair_bye", 1) == 0:
                 print("Bye: using only unseeded teams")
-                possible_teams = [t for t in list_of_teams if t.seed < Team.HALF_SEED]
+                possible_teams = [
+                    t for t in list_of_teams if t.seed < Team.HALF_SEED]
             else:
                 print("Bye: using all teams")
                 possible_teams = list_of_teams
@@ -77,7 +78,8 @@ def pair_round():
         # Sort the teams by seed. We must randomize beforehand so that similarly
         # seeded teams are paired randomly.
         random.shuffle(list_of_teams)
-        list_of_teams = sorted(list_of_teams, key=lambda team: team.seed, reverse=True)
+        list_of_teams = sorted(
+            list_of_teams, key=lambda team: team.seed, reverse=True)
     # Otherwise, pair by *speaks*
     else:
         # Bucket all the teams into brackets
@@ -87,9 +89,11 @@ def pair_round():
             all_checked_in_teams
         )
 
-        team_buckets = [(tot_wins(team), team) for team in normal_pairing_teams]
+        team_buckets = [(tot_wins(team), team)
+                        for team in normal_pairing_teams]
         list_of_teams = [
-            rank_teams_except_record([team for (w, team) in team_buckets if w == i])
+            rank_teams_except_record(
+                [team for (w, team) in team_buckets if w == i])
             for i in range(current_round)
         ]
 
@@ -116,7 +120,8 @@ def pair_round():
                         round_number=current_round,
                     )
                     bye.save()
-                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
+                    list_of_teams[bracket].remove(
+                        list_of_teams[bracket][byeint])
                 elif bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
@@ -207,7 +212,6 @@ def pair_round():
             ),
         )
 
-
     # Enter into database
     all_rounds = []
     for gov, opp, room in pairings:
@@ -232,7 +236,8 @@ def have_enough_judges(round_to_check):
 
 def have_enough_rooms(_round_to_check):
     future_rounds = Team.objects.filter(checked_in=True).count() // 2
-    num_rooms = RoomCheckIn.objects.filter(round_number=_round_to_check).count()
+    num_rooms = RoomCheckIn.objects.filter(
+        round_number=_round_to_check).count()
     if num_rooms < future_rounds:
         return False, (num_rooms, future_rounds)
     return True, (num_rooms, future_rounds)
@@ -249,7 +254,8 @@ def have_properly_entered_data(round_to_check):
         )
     )
     prev_round_byes = set(
-        Bye.objects.filter(round_number=last_round).values_list("bye_team", flat=True)
+        Bye.objects.filter(round_number=last_round).values_list(
+            "bye_team", flat=True)
     )
 
     for prev_round in prev_rounds:
@@ -310,7 +316,8 @@ def add_scratches_for_school_affil():
             judge_schools = judge.schools.all()
             if team.school in judge_schools or team.hybrid_school in judge_schools:
                 if not any(s.team == team for s in judge.scratches.all()):
-                    to_create.append(Scratch(judge=judge, team=team, scratch_type=1))
+                    to_create.append(
+                        Scratch(judge=judge, team=team, scratch_type=1))
     Scratch.objects.bulk_create(to_create)
 
 
@@ -520,7 +527,8 @@ def perfect_pairing(list_of_teams):
                     TabSettings.get("tot_rounds", 5),
                 )
                 graph_edges += [(i, j, weight)]
-    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    pairings_num = mwmatching.maxWeightMatching(
+        graph_edges, maxcardinality=True)
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):
