@@ -117,7 +117,8 @@ def enter_team(request):
             else:
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(team.display_backend),
+                    "Team {} created successfully".format(
+                        team.display_backend),
                     path="/")
     else:
         form = TeamEntryForm()
@@ -223,6 +224,7 @@ def pretty_tab_card(request, team_id):
     team = Team.objects.get(pk=team_id)
     return render(request, "tab/pretty_tab_card.html", {"team": team})
 
+
 def tab_card(request, team_id):
     return render(
         request,
@@ -230,19 +232,22 @@ def tab_card(request, team_id):
         get_tab_card_data(request, team_id)
     )
 
+
 def tab_cards_json(request):
     # Serialize the data to JSON
-    json_data = json.dumps({"tab_cards": get_all_json_data()}, indent=4, cls = JSONDecimalEncoder)
+    json_data = json.dumps(
+        {"tab_cards": get_all_json_data()}, indent=4, cls=JSONDecimalEncoder)
 
     # Create the HTTP response with the file download header
     response = HTTPResponse(json_data, content_type="application/json")
     response['Content-Disposition'] = 'attachment; filename="tab_cards.json"'
     return response
 
+
 def tab_cards_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="tab_cards.csv"'
-    writer = csv.writer(response)    
+    writer = csv.writer(response)
     csv_tab_cards(writer)
     return response
 
