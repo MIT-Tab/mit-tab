@@ -184,9 +184,11 @@ pip install black, pylint
 ```
 
 2. Versions:
-Some of the libraries and tools used in this repo are somewhere between 5-10 years behind their current version. Keep this in mind when searching for documentation online since parsing what advice applies to what version can occasionally be a headache
+Some of the libraries and tools used in this repo may be somewhere between 5-10 years behind their current version. Keep this in mind when searching for documentation online since parsing what advice applies to what version can occasionally be a headache
 
 3. Django ORM 
-Django uses an API to hide database operations from the developer and allow you to interact with the database through their Object Relational Mapper (ORM), which reads more like simple Object Oriented programming than database operations. While this is a major feature and convenience in many ways, it gives way to many pitfalls for new developers since it makes it easy to accidentally write code that makes **thousands** of database calls. Given this, make sure to read a basic guide on the Django ORM [(like this one)](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06), and pay special attention to preventing the `N+1` problem, by using methods like `prefetch_related`. Lastly, make sure to profile your code with[`silk`](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to verify you're not accidently overloading the database.
+Django abstracts database operations through an API called the Object-Relational Mapper (ORM), meaning developers typically interact with the database through object-oriented programming instead of SQL queries. While this simplifies development, it makes it very easy to accidentally make thousands of database queries in relatively simple code.
+
+You can avoid this by familiarizing yourself with the Django ORM and best practices for query optimization, such as preventing the `N+1` problem using methods like `prefetch_related`. Refer to guides like [this one](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06) for further details. Additionally, enable [`Django Silk`](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to profile your code, and make sure you're only making the queries you intend to.
 
 4. Have fun! :)
