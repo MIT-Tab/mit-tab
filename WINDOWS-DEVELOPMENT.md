@@ -184,11 +184,9 @@ pip install black, pylint
 ```
 
 2. Versions:
-While this may change in the coming months, at the time of writing many of the libraries and tools used in this repo are somewhere between 5-10 years behind their current version. For example, the app runs on Django version `2.2.10`. Keep this in mind when searching for documentation online, since parsing what advice applies to what version can occasionally be a headache
+Some of the libraries and tools used in this repo are somewhere between 5-10 years behind their current version. Keep this in mind when searching for documentation online since parsing what advice applies to what version can occasionally be a headache
 
 3. Django ORM 
-Django uses a clever API to hide database operations from the developer and allow you to interact with the database through their Object Relational Mapper (ORM), which reads more like simple Object Oriented programming than database operations. While this is a major feature and convenience in many ways, it gives way to many pitfalls for rookie developers (including myself circa ~2 months ago at time of writing), since it makes it easy to accidentally write code that makes **thousands** of database calls unintentionally. Given this, make sure to read a basic guide on the Django ORM [(like this one)](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06), and pay special attention to preventing the `N+1` problem, by using methods like `prefetch_related`. Lastly, make sure to profile your code with[`silk`](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to verify you're not accidently overloading the database.
+Django uses an API to hide database operations from the developer and allow you to interact with the database through their Object Relational Mapper (ORM), which reads more like simple Object Oriented programming than database operations. While this is a major feature and convenience in many ways, it gives way to many pitfalls for new developers since it makes it easy to accidentally write code that makes **thousands** of database calls. Given this, make sure to read a basic guide on the Django ORM [(like this one)](https://medium.com/@RohitPatil18/n-1-problem-in-django-and-solution-3f5307039c06), and pay special attention to preventing the `N+1` problem, by using methods like `prefetch_related`. Lastly, make sure to profile your code with[`silk`](https://medium.com/@sharif-42/profiling-django-application-using-django-silk-62cdea83fb83) to verify you're not accidently overloading the database.
 
-4. Have fun!
-Above all else, the great benefit of an open-source tab site is it gives **you** control to add features and functionality you or your league desire! Let this be your opportunity to add features that make your league better, and if you're lucky, you might just learn some software skills along the way :)
-
+4. Have fun! :)
