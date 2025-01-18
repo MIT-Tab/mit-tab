@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
-from mittab.libs.data_import.tab_card import (
+from mittab.libs.data_export.tab_card import (
     JSONDecimalEncoder,
     csv_tab_cards,
     get_all_json_data,
@@ -93,7 +93,8 @@ def view_team(request, team_id):
                 )
             return redirect_and_flash_success(
                 request,
-                "Team {} updated successfully".format(form.cleaned_data["name"]),
+                "Team {} updated successfully".format(
+                    form.cleaned_data["name"]),
             )
     else:
         form = TeamForm(instance=team)
@@ -104,7 +105,8 @@ def view_team(request, team_id):
             )
         ]
         for deb in team.debaters.all():
-            links.append(("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
+            links.append(("/debater/" + str(deb.id) +
+                         "/", "View %s" % deb.name))
         return render(
             request,
             "common/data_entry.html",
@@ -134,18 +136,21 @@ def enter_team(request):
             num_forms = form.cleaned_data["number_scratches"]
             if num_forms > 0:
                 return HttpResponseRedirect(
-                    "/team/" + str(team.pk) + "/scratches/add/" + str(num_forms)
+                    "/team/" + str(team.pk) +
+                    "/scratches/add/" + str(num_forms)
                 )
             else:
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(team.display_backend),
+                    "Team {} created successfully".format(
+                        team.display_backend),
                     path="/",
                 )
     else:
         form = TeamEntryForm()
     return render(
-        request, "common/data_entry.html", {"form": form, "title": "Create Team"}
+        request, "common/data_entry.html", {"form": form,
+                                            "title": "Create Team"}
     )
 
 
@@ -172,7 +177,8 @@ def add_scratches(request, team_id, number_scratches):
             return redirect_and_flash_success(request, "Scratches created successfully")
     else:
         forms = [
-            ScratchForm(prefix=str(i), initial={"team": team_id, "scratch_type": 0})
+            ScratchForm(prefix=str(i), initial={
+                        "team": team_id, "scratch_type": 0})
             for i in range(1, number_scratches + 1)
         ]
     return render(
@@ -298,7 +304,8 @@ def get_team_rankings(request):
     nov_teams = list(
         filter(
             lambda ts: all(
-                map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.all())
+                map(lambda d: d.novice_status ==
+                    Debater.NOVICE, ts[0].debaters.all())
             ),
             teams,
         )

@@ -101,14 +101,14 @@ def json_get_round(round_obj, team, deb1, deb2):
     try:
         bye_round = Bye.objects.get(bye_team=team).round_number
         json_round[bye_round - 1][bye_round] = "BYE"
-    except bye_round.DoesNotExist:
+    except Bye.DoesNotExist:
         pass
 
     return json_round
 
 
 class JSONDecimalEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o):  # pylint: disable=E0202
         if isinstance(o, Decimal):
             return float(o)
         return super().default(o)
