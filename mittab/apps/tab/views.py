@@ -1,12 +1,15 @@
+import csv
+import json
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
+from mittab.libs.data_export.tab_card import JSONDecimalEncoder, csv_tab_cards, get_all_json_data
 from mittab.libs.data_export.xml_archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
+from mittab.apps.tab.forms import ExportFormatForm, SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -411,8 +414,57 @@ def force_cache_refresh(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def generate_archive(request):
-    tournament_name = request.META["SERVER_NAME"].split(".")[0]
+def export_tournament(request):
+    if request.method == "POST":
+        form = ExportFormatForm(request.POST)
+        if form.is_valid():
+            fmt = form.cleaned_data["format"]
+            tournament_name = request.META["SERVER_NAME"].split(".")[0]
+            if fmt == "json":
+                return tab_cards_json(request, tournament_name)
+            elif fmt == "csv":
+                return tab_cards_csv(request, tournament_name)
+            elif fmt == "xml":
+                return xml_archive(request, tournament_name)
+            else:
+                return HttpResponseBadRequest("Invalid format.")
+    else:
+        form = ExportFormatForm(initial={"format": "csv"})
+
+    return render(request,
+                  "common/data_entry.html",
+                  {
+                      "form": form,
+                      "title": "Export Tournament",
+                      "custom_submit": "Export"
+                      }
+                  )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def tab_cards_json(request, tournament_name):
+    # Serialize the data to JSON
+    json_data = json.dumps(
+        {"tab_cards": get_all_json_data()}, indent=4, cls=JSONDecimalEncoder
+    )
+
+    # Create the HTTP response with the file download header
+    response = HttpResponse(json_data, content_type="application/json")
+    response["Content-Disposition"] = f"attachment; filename={tournament_name}.json"
+    return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def tab_cards_csv(request, tournament_name):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f"attachment; filename={tournament_name}.csv"
+    writer = csv.writer(response)
+    csv_tab_cards(writer)
+    return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def xml_archive(request, tournament_name):
     filename = tournament_name + ".xml"
 
     xml = ArchiveExporter(tournament_name).export_tournament()
@@ -421,3 +473,4 @@ def generate_archive(request):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
+

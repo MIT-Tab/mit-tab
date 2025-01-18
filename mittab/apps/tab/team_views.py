@@ -1,16 +1,9 @@
-import csv
-import json
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
-from mittab.libs.data_export.tab_card import (
-    JSONDecimalEncoder,
-    csv_tab_cards,
-    get_all_json_data,
-    get_tab_card_data,
-)
+from mittab.libs.data_export.tab_card import get_tab_card_data
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -106,7 +99,7 @@ def view_team(request, team_id):
         ]
         for deb in team.debaters.all():
             links.append(("/debater/" + str(deb.id) +
-                         "/", "View %s" % deb.name))
+                          "/", "View %s" % deb.name))
         return render(
             request,
             "common/data_entry.html",
@@ -178,7 +171,7 @@ def add_scratches(request, team_id, number_scratches):
     else:
         forms = [
             ScratchForm(prefix=str(i), initial={
-                        "team": team_id, "scratch_type": 0})
+                "team": team_id, "scratch_type": 0})
             for i in range(1, number_scratches + 1)
         ]
     return render(
@@ -253,26 +246,6 @@ def pretty_tab_card(request, team_id):
 
 def tab_card(request, team_id):
     return render(request, "tab/tab_card.html", get_tab_card_data(request, team_id))
-
-
-def tab_cards_json(request):
-    # Serialize the data to JSON
-    json_data = json.dumps(
-        {"tab_cards": get_all_json_data()}, indent=4, cls=JSONDecimalEncoder
-    )
-
-    # Create the HTTP response with the file download header
-    response = HttpResponse(json_data, content_type="application/json")
-    response["Content-Disposition"] = "attachment; filename='tab_cards.json'"
-    return response
-
-
-def tab_cards_csv(request):
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = "attachment; filename='tab_cards.csv'"
-    writer = csv.writer(response)
-    csv_tab_cards(writer)
-    return response
 
 
 def rank_teams_ajax(request):
