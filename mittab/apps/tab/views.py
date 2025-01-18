@@ -7,10 +7,11 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http
 from django.shortcuts import render, reverse, get_object_or_404
 import yaml
 
-from mittab.libs.data_export.tab_card import JSONDecimalEncoder, csv_tab_cards, get_all_json_data
+from mittab.libs.data_export.tab_card import JSONDecimalEncoder, \
+    csv_tab_cards, get_all_json_data
 from mittab.libs.data_export.xml_archive import ArchiveExporter
-from mittab.apps.tab.forms import ExportFormatForm, SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
-    SettingsForm
+from mittab.apps.tab.forms import ExportFormatForm, SchoolForm, RoomForm, \
+    UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -473,4 +474,3 @@ def xml_archive(request, tournament_name):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
-
