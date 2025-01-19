@@ -1,26 +1,22 @@
 # Guide to Setting Up the Development Environment
 
-This is a guide to getting a minimum viable **software development** setup of MIT-Tab on Windows. If you're a tournament or tab director looking for help on how to use mit-tab, please reference [the docs](https://mit-tab.readthedocs.io/en/latest/) instead.
+This is a guide to getting a minimum viable **software development** setup of MIT-Tab on MacOS. If you're a tournament or tab director looking for help on how to use mit-tab, please reference [the docs](https://mit-tab.readthedocs.io/en/latest/) instead.
 
 
 ## Preliminary notes and Disclaimers
 1. This guide is meant to get new devs off the ground as quickly as possible, so it is deliberately opinionated, and there are plenty of other ways to reach similar outcomes.
-2. This guide has also only been tested on Windows. Ubuntu or other Debian-based Linux users should be able to follow along, skipping step 1, but for MacOS and non-Debian Linux distributions, most of these specific commands won't work, and this should just serve as a rough guideline on what needs to be installed, and in roughly what order.
-3. This guide assumes surface-level familiarity with software development, using IDEs, and bash commands. Specific familiarity with these libraries, technologies, and package managers is not strictly required, but may become needed if unexpected issues surface during installation. Feel free to post an issue on GitHub or contact the APDA tech committee if such issues occur.
-4. At many instances throughout the guide, some terminal interaction will be required that is not strictly explained here, for example, typing "Y" to proceed with an installation or entering a root password. There are also various expected warnings, so don't panic when you see these during installation.
-5. Especially due to the use of WSL, be aware that this setup usually takes up ~20 gb of disk space
+2. This guide assumes surface-level familiarity with software development, using IDEs, and bash commands. Specific familiarity with these libraries, technologies, and package managers is not strictly required, but may become needed if unexpected issues surface during installation. Feel free to post an issue on GitHub or contact the APDA tech committee if such issues occur.
+3. At many instances throughout the guide, some terminal interaction will be required that is not strictly explained here, for example, typing "Y" to proceed with an installation or entering a root password. There are also various expected warnings, so don't panic when you see these during installation.
 
-## Step 1: Install WSL (Windows Only)
+## Step 1: Install Brew
 
-It is strongly recommended that Windows users install and develop through the Windows Subsystem for Linux (WSL). Open a terminal and install the default distribution (Ubuntu) by running:
+It is strongly recommended that MacOS users install brew to assist with package management. Open a terminal and install brew by running:
 
 ```bash
-wsl --install
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Once WSL is installed, log in and create a password. If you are using VSCode, click the blue button in the bottom-left corner, select **WSL**, choose **Ubuntu**, and follow the prompts to enter a username and password. Other IDEs may have similar workflows, but it is strongly recommended to connect to WSL through your IDE.
-
----
+More information on brew can be found [here](https://brew.sh/).
 
 ## Step 2: Clone the Repository and Set Up MySQL
 
@@ -33,21 +29,25 @@ cd mit-tab
 
 In addition to opening the `mit-tab` directory in your terminal, you should also open in with your IDE at this stage.
 
-### Install Required Packages for MySQL
+### Install MySQL and Enable Startup Service
 
 ```bash
-sudo apt update
-sudo apt install mysql-server libmysqlclient-dev
+brew install mysql
+brew services start mysql
 ```
-> **Note**: Make sure not to skip the `sudo apt update` command. Although in many other tutorials, this command is unnecessary, because we're on a new Ubuntu instance, it is strictly necessary for the rest of this tutorial to run.
-
 
 ### Configure MySQL
 
-Log into the MySQL shell:
+By default, MySQL is installed with a root user and no password. Run the following command to secure the installation. The default settings are generally fine for a development environment.
 
 ```bash
-sudo mysql -u root -p
+mysql_secure_installation
+```
+
+Log into the MySQL shell with the password you set during the installation:
+
+```bash
+mysql -u root -p
 ```
 
 > **Note**: Since this is just a dev environment, security is unlikely to be a concern, so feel free to select a simple password (i.e. 123) that you won't forget.
@@ -66,13 +66,21 @@ FLUSH PRIVILEGES;
 
 ### Configure Environment Variables
 
-Create a file named `.env` in the project directory and copy the contents of `.env.example` into it. Modify the following line:
+Create a file named `.env` in the project directory and copy the contents of `.env.example` into it:
+```bash
+cp .env.example .env
+```
+
+Modify the following line:
 
 ```env
 MYSQL_USER=root
 ```
-Change `root` to `django` and fill in the MySQL credentials with the password you set above.
-
+Change `root` to `django` and fill in the MySQL credentials with the passwords you set above in the `.env` file:
+```env
+MYSQL_PASSWORD=
+MYSQL_ROOT_PASSWORD=
+```
 ---
 
 ## Step 3: Install Node Version Manager (NVM) for Node.js
@@ -83,9 +91,16 @@ Run the following command to install NVM:
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 ```
 
-> **Note**: The version number in this command may update frequently. Check the [NVM repository](https://github.com/nvm-sh/nvm) and copy the latest installation command from the "How to install" section in the README.
+> **Note**: The version number in this command may update frequently. Check the [NVM repository](https://github.com/nvm-sh/nvm) and copy the latest installation command from the "How to install" section in the README. We don't recommend using the `brew` installation method for NVM.
 
-Restart your shell and install Node.js version 18:
+Restart your shell and `cd` to the repo or run the following command to re-init nvm:
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+```
+
+Install Node.js version 18:
 
 ```bash
 nvm install 18
@@ -98,25 +113,29 @@ nvm use 18
 
 ### Install Python and Dependencies
 
+Install python3 with the following command:
 ```bash
-sudo apt-get install libffi-dev python3-venv python3-pip
+brew install python3
 ```
+> **Note**: This may already be installed on your system, but it's good to check.
 
 ### Install Pyenv
 
 Install Pyenv with the following command:
 
 ```bash
-curl -fsSL https://pyenv.run | bash
+brew install pyenv
 ```
 
-To run `pyenv` commands, you'll need to add it to your path file. You can do so with the below command, although the curl command above should output similar instructions on how to do this
+To run `pyenv` commands, you'll need to add it to your path file. You can do so with the below command if using ZSH, although the brew command above should output similar instructions on how to do this. 
 
 ```bash
-export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init - bash)"
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init - zsh)"' >> ~/.zshrc
 ```
+
+> **Note**: If you're using a different shell, guidance on how to add `pyenv` to your path can be found in the [pyenv documentation](https://github.com/pyenv/pyenv?tab=readme-ov-file#b-set-up-your-shell-environment-for-pyenv).
 
 Restart your shell.
 
@@ -134,8 +153,6 @@ pyenv local 3.7.13
 ### Set Up Virtual Environment
 
 ```bash
-python -m venv venv
-source venv/bin/activate
 pip install pipenv
 pipenv install --python 3.7
 ```
