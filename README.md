@@ -20,7 +20,7 @@ information**
 
 ## Local Installation + Running
 
-A more comprehensive guide to setting up your development environment on Windows can be found **[here](WINDOWS-DEVELOPMENT.md)**. A similar guide for MacOS can be found **[here](MACOS-DEVELOPMENT.md)**. This should provide an in-depth outline for other operating systems as well, although specific commands will vary.
+A more comprehensive guide to setting up your development environment on Windows can be found **[here](dev-docs/WINDOWS-DEVELOPMENT.md)**. A similar guide for MacOS can be found **[here](dev-docs/MACOS-DEVELOPMENT.md)**. This should provide an in-depth outline for other operating systems as well, although specific commands will vary.
 
 
 Currently the installation consists of downloading the code, installing
