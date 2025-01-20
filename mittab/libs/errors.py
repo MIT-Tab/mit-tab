@@ -63,7 +63,7 @@ class PrevRoundNotEnteredError(Exception):
 
 class RoomAssignmentError(Exception):
     def __init__(self, reason=None):
-        super(JudgeAssignmentError, self).__init__()
+        super(RoomAssignmentError, self).__init__()
         if reason is not None:
             self.msg = reason
         else:

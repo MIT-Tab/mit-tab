@@ -1,7 +1,7 @@
 import random
+from django.db import transaction
 from mittab.apps.tab.models import RoomCheckIn, Round, TabSettings
 from mittab.libs import errors, mwmatching, tab_logic
-from django.db import transaction
 
 
 def add_rooms():
@@ -27,9 +27,6 @@ def add_rooms():
 
     for pairing_i, pairing in enumerate(pairings):
         for room_i, room in enumerate(rooms):
-            # I chose to put this logic directly into the loop because some later changes that aren't
-            # in this branch require some data prep that made breaking the weight calculation out
-            # a lot less natural, and this ended up being a bit more readable
             weight = 0
 
             # High seed high room bonus
@@ -64,4 +61,4 @@ def add_rooms():
         updated_pairings.append(pairing)
 
     with transaction.atomic():
-        Round.objects.bulk_update(updated_pairings, ['room'])
+        Round.objects.bulk_update(updated_pairings, ["room"])

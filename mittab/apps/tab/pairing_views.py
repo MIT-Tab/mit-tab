@@ -13,7 +13,6 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
@@ -111,15 +110,10 @@ def assign_judges_to_pairing(request):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
-    warnings = []
     if request.method == "POST":
         try:
-            # A bit ambivalent about including a backup. Its probably good
-            # But the backup list might start getting long
             backup.backup_round("round_%s_before_room_assignment" %
                                 current_round_number)
-            warnings = assign_rooms.add_rooms()
-            request.session['room_warnings'] = warnings
         except Exception:
             emit_current_exception()
             return redirect_and_flash_error(request,
@@ -144,26 +138,10 @@ def alternative_rooms(request, round_id, room_id=""):
     rooms = set(Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
-        has_round=Exists(Round.objects.filter(room_id=OuterRef('id')))
+        has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
     ).order_by("-rank"))
 
-    """
-    There are three relavent pieces of information tab staff may need about rooms
-    1. Is it checked in?
-    2. Is it already paired?
-    3. Is it viable (meets all the tags of the round)?
-    
-    Right now, #1 is filtered and #2 and #3 are displayed via separate lists
-    The rationale is that allowing you to select an unchecked in room either
-    a. requires you to check it in, which could accidentally check in a room that shouldn't be
-    b. not check it in, which would break the rule of paired rooms needing a room checkin
-    
-    I think displaying unchecked in rooms too might be helpful, but only if its implimented
-    with a pop-up to check in the room, which was overhead I didn't want to include in this
-    slate of features.
-    """
-
-    # For now all checked in rooms are "viable", but room tags will make having three categories nessicary
+    # First layer of filtering goes here
     viable_rooms = rooms
 
     viable_unpaired_rooms = filter(lambda room: not room.has_round, rooms)
@@ -174,7 +152,7 @@ def alternative_rooms(request, round_id, room_id=""):
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
-        "viable_rooms": viable_rooms,
+        "viable_rooms": viable_unpaired_rooms,
         "viable_paired_rooms": viable_paired_rooms,
         "other_rooms": other_rooms,
     })

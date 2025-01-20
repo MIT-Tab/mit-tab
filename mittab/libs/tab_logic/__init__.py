@@ -140,8 +140,6 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else:
                     pull_up = None
-                    # i is the last team in the bracket below
-                    i = len(list_of_teams[bracket - 1]) - 1
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [
                         r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
@@ -195,7 +193,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing bracket %i of size %i" % (bracket, len(temp)))
         for pair in temp:
-            pairings.append([pair[0], pair[1], None])
+            pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
@@ -214,7 +212,7 @@ def pair_round():
 
     # Enter into database
     all_rounds = []
-    for gov, opp, room in pairings:
+    for gov, opp in pairings:
         round_obj = Round(
             round_number=current_round, gov_team=gov, opp_team=opp
         )

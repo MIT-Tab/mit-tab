@@ -390,7 +390,6 @@ class Room(models.Model):
                                           round_number=round_number).exists()
 
     def get_color(self):
-        # TODO: Get color from tags when tags are implimented
         return None
 
     class Meta:
