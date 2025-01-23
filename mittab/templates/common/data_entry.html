@@ -1,5 +1,8 @@
 {% extends "base/__normal.html" %}
 
+{% load render_bundle from webpack_loader %}
+{% render_bundle 'select' %}
+
 {% block title %}Data Entry{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}

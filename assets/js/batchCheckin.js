@@ -1,5 +1,3 @@
-import $ from "jquery";
-
 function checkInOrOut(target, isCheckIn) {
   const $target = $(target);
   $target.prop("disabled", true);

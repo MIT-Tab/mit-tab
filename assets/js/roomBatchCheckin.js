@@ -1,4 +1,4 @@
-import $ from "jquery";
+
 
 function roomCheckInOrOut(target, isCheckIn) {
   const $target = $(target);

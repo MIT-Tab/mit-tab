@@ -13,9 +13,11 @@ module.exports = {
     main: "./assets/js/index",
     pairingDisplay: "./assets/js/pairingDisplay",
     publicDisplay: "./assets/js/publicDisplay",
+    select: "./assets/js/multiselect",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],
+    
   },
   output: {
     path: path.resolve("./assets/webpack_bundles/"),
@@ -75,7 +77,11 @@ module.exports = {
       $: "jquery",
       jQuery: "jquery",
       "window.jQuery": "jquery",
-      Tether: "tether",
     }),
   ],
+  externals: {
+    jquery: "jQuery",
+    bootstrap: "bootstrap",
+    select2: "select2",
+  },
 };

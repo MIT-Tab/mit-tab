@@ -2,8 +2,6 @@ import "../css/app.scss";
 import "./pairing";
 import "./outround";
 
-import $ from "jquery";
-
 import "popper.js";
 import "bootstrap";
 
@@ -13,7 +11,6 @@ import checkinInit from "./batchCheckin";
 import roomCheckinInit from "./roomBatchCheckin";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
-import multiselectInit from "./multiselect";
 
 function initializeConfirms() {
   $("[confirm]").click(e => {
@@ -48,7 +45,6 @@ $(document).ready(() => {
   roomCheckinInit();
   filtersInit();
   quickSearchInit();
-  multiselectInit();
   bsCustomFileInput.init();
 
   initializeConfirms();

@@ -1,4 +1,4 @@
-import $ from "jquery";
+
 
 $.expr[":"].Contains = (a, i, m) => {
   return (

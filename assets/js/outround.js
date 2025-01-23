@@ -1,5 +1,3 @@
-import $ from "jquery";
-
 import quickSearchInit from "./quickSearch";
 
 function cycleChoice(event) {

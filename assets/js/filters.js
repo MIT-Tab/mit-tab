@@ -1,5 +1,3 @@
-import $ from "jquery";
-
 function filterOnFlags(flags) {
   $("li.filterable").each((index, element) => {
     let show = 1;
