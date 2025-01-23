@@ -123,6 +123,7 @@ TEMPLATES = [
 ]
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
