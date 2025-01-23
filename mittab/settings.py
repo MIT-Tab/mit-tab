@@ -21,7 +21,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "sentry_sdk.integrations.django",
-                  "webpack_loader", "bootstrap4",)
+                  "webpack_loader", "bootstrap4")
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",
@@ -85,7 +85,6 @@ TIME_ZONE = "UTC"
 
 USE_I18N = True
 
-USE_L10N = True
 
 USE_TZ = True
 

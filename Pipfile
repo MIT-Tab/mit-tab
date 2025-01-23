@@ -9,8 +9,7 @@ verify_ssl = true
 haikunator = "==2.1"
 mock = "==1.0.1"
 boto3 = "*"
-django-bootstrap4 = "==2.2.0"
-django-localflavor = "==1.0"
+django-bootstrap4 = "==24.4"
 django-webpack-loader = "==0.6.0"
 django-silk = "*"
 gunicorn = "==19.7.1"
@@ -29,7 +28,7 @@ selenium = "==3.141.0"
 splinter = "==0.10.0"
 sentry-sdk = "==2.13.0"
 urllib3 = "==1.26.11"
-Django = "==2.2.10"
+Django = "==5.1"
 PyYAML = "==5.1.2"
 
 [requires]
