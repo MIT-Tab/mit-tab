@@ -81,7 +81,7 @@ module.exports = {
     }),
   ],
   externals: {
-    jquery: "django.jQuery",
+    jquery: "jQuery",
     Bootstrap: "Bootstrap",
   },
 };
