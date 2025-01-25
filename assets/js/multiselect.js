@@ -11,6 +11,7 @@ function multiselectInit($elem) {
   $select.select2({ theme: "bootstrap4" });
 }
 
-export default multiselectInit;
 
-multiselectInit();
+$(function() {
+  multiselectInit();
+});

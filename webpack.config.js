@@ -4,7 +4,7 @@ const BundleTracker = require("webpack-bundle-tracker");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
-const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+// const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
 module.exports = {
   mode: "production",
@@ -13,7 +13,7 @@ module.exports = {
     main: "./assets/js/index",
     pairingDisplay: "./assets/js/pairingDisplay",
     publicDisplay: "./assets/js/publicDisplay",
-    select: "./assets/js/multiselect",
+    selectionForm: "./assets/js/multiselect",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],
@@ -61,13 +61,14 @@ module.exports = {
   },
   resolve: {
     alias: {
-      jquery: "jquery/src/jquery",
+      jquery: require.resolve("jquery"),
     },
     extensions: [".js", ".scss", ".css"],
   },
 
   plugins: [
-    new BundleAnalyzerPlugin(),
+    new BundleTracker({ path: path.resolve(__dirname), filename: "webpack-stats.json" }),
+    // new BundleAnalyzerPlugin(),
     new MiniCssExtractPlugin({
       filename: "[name].css",
       chunkFilename: "[id].css",
@@ -80,8 +81,7 @@ module.exports = {
     }),
   ],
   externals: {
-    jquery: "jQuery",
-    bootstrap: "bootstrap",
-    select2: "select2",
+    jquery: "django.jQuery",
+    Bootstrap: "Bootstrap",
   },
 };

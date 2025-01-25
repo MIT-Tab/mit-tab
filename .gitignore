@@ -122,3 +122,6 @@ typings/
 .env
 
 *.dump.sql
+.venv/
+.vscode/
+*chrome-stable*

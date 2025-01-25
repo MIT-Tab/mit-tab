@@ -1,13 +1,15 @@
 {% extends "base/__normal.html" %}
 
-{% load render_bundle from webpack_loader %}
-{% render_bundle 'select' %}
 
 {% block title %}Data Entry{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
+
+{% load render_bundle from webpack_loader %}
+{% render_bundle 'selectionForm' %}
+
 <div class="col-md-6">
   {% include "common/_form.html" %}
 </div>
