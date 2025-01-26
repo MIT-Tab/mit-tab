@@ -51,7 +51,7 @@
     "bs-custom-file-input": "*",
     "jquery": "^3.7.1",
     "popper.js": "*",
-    "select2": "*",
+    "select2": "4.0.13",
     "select2-bootstrap-theme": "^0.1.0-beta.10"
   }
 }
