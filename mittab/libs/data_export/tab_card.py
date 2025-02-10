@@ -236,9 +236,9 @@ def get_tab_card_data(request, team_id):
 def csv_tab_cards(writer):
     # Write the CSV header row
     header = [
-        "Round id",
         "Team Name",
         "School",
+        "Round id",
         "Round",
         "Gov/Opp",
         "Win/Loss",
