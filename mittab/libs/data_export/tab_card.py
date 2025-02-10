@@ -18,6 +18,7 @@ OPP = "O"
 def get_victor_label(victor_code, side):
     side = 0 if side == GOV else 1
     victor_map = {
+        0 : ("", ""),
         1: ("W", "L"),
         2: ("L", "W"),
         3: ("WF", "LF"),
@@ -235,6 +236,7 @@ def get_tab_card_data(request, team_id):
 def csv_tab_cards(writer):
     # Write the CSV header row
     header = [
+        "Round id",
         "Team Name",
         "School",
         "Round",
@@ -290,6 +292,7 @@ def csv_tab_cards(writer):
             dstat1, dstat2 = get_dstats(
                 round_obj, deb1, deb2, len(debaters) == 1)
             round_data[round_obj.round_number - 1] = [
+                round_obj.pk,
                 round_obj.round_number,
                 side,
                 result,
@@ -324,6 +327,7 @@ def csv_tab_cards(writer):
         # Write the total stats for this team
         writer.writerow(
             [
+                "",
                 team.get_or_create_team_code(),
                 team.school.name,
                 "Total",
