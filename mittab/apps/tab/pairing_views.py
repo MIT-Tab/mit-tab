@@ -1,6 +1,7 @@
 import random
 import time
 import datetime
+import logging
 
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
@@ -19,6 +20,9 @@ import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
+
+
+logger = logging.getLogger('mittab')
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -120,7 +124,7 @@ def view_backup(request, filename):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def download_backup(request, key):
-    print("Trying to download {}".format(key))
+    logger.info(f"Trying to download {key}")
     data = backup.get_backup_content(key)
     response = HttpResponse(data, content_type="text/plain")
     response["Content-Disposition"] = "attachment; filename=%s" % key
@@ -409,11 +413,10 @@ def pretty_pair(request, printable=False):
     for present_team in Team.objects.filter(checked_in=True):
         if present_team not in paired_teams:
             if present_team not in byes:
-                print("got error for", present_team)
+                logger.error(f"got error for {present_team}")
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
     return render(request, "pairing/pairing_display.html", locals())
 
 
@@ -591,7 +594,6 @@ def enter_multiple_results(request, round_id, num_entered):
             if all_good:
                 final_scores, final_winner = score_panel(
                     result, "discard_minority" in request.POST)
-                print(final_scores)
                 for (debater, role, speaks, ranks) in final_scores:
                     RoundStats.objects.create(debater=debater,
                                               round=round_obj,

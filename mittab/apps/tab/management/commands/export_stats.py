@@ -59,7 +59,6 @@ class Command(BaseCommand):
         if not os.path.exists(kwargs["root"]):
             os.makedirs(kwargs["root"])
 
-        print("Calculating ranks")
         teams = [
             self.make_team_row(team_score.team)
             for team_score in tab_logic.rankings.rank_teams()
@@ -84,7 +83,6 @@ class Command(BaseCommand):
             if deb_score.debater.novice_status == Debater.NOVICE
         ]
 
-        print("Writing to csv")
         self.write_to_csv(os.path.join(kwargs["root"], kwargs["team_file"]),
                           self.TEAM_ROWS, teams)
         self.write_to_csv(
@@ -95,4 +93,3 @@ class Command(BaseCommand):
         self.write_to_csv(
             os.path.join(kwargs["root"], kwargs["nov_debater_file"]),
             self.DEBATER_ROWS, nov_debaters)
-        print("Done!")
