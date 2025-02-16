@@ -130,20 +130,40 @@ CACHES = {
     }
 }
 
-if os.environ.get("MITTAB_LOG_QUERIES"):
-    LOGGING = {
-        "version": 1,
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-            },
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
         },
-        "loggers": {
-            "django.db.backends": {
-                "level": "DEBUG",
-            },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
         },
-        "root": {
-            "handlers": ["console"],
-        }
-    }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+        'mittab': {
+            'handlers': ['console'],
+            'level': os.environ.get('MITTAB_LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

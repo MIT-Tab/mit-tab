@@ -1,7 +1,7 @@
 from decimal import Decimal
 import os
 import itertools
-import pprint
+import logging
 
 from django.db import transaction
 from django import forms
@@ -10,6 +10,9 @@ from django.core.exceptions import ValidationError
 from mittab.apps.tab.models import *
 from mittab.libs import errors, cache_logic
 from mittab import settings
+
+
+logger = logging.getLogger('mittab')
 
 
 class UploadBackupForm(forms.Form):
@@ -458,7 +461,7 @@ class EBallotForm(ResultEntryForm):
                     self._errors[key] = self.error_class([msg])
 
         except Exception as e:
-            print(("Caught error %s" % e))
+            logger.error("Error validating eballot form", exc_info=True)
             self._errors["winner"] = self.error_class(
                 ["Non handled error, preventing data contamination"])
 
@@ -565,9 +568,6 @@ def score_panel(result, discard_minority):
     ranked = [(deb, role, speak, rank + 1)
               for (rank, (deb, role, speak, _)) in enumerate(ranked)]
 
-    print("Ranked Debaters")
-    pprint.pprint(ranked)
-
     # Break any ties by taking the average of the tied ranks
     ties = {}
     for (score_i, score) in enumerate(ranked):
@@ -580,9 +580,6 @@ def score_panel(result, discard_minority):
         else:
             ties[tie_key] = [(score_i, score[3])]
 
-    print("Ties")
-    pprint.pprint(ties)
-
     # Average over the tied ranks
     for val in ties.values():
         if len(val) > 1:
@@ -592,8 +589,6 @@ def score_panel(result, discard_minority):
                 final_score = ranked[i]
                 ranked[i] = (final_score[0], final_score[1], final_score[2],
                              avg)
-    print("Final scores")
-    pprint.pprint(ranked)
 
     return ranked, final_winner
 
