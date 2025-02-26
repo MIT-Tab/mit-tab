@@ -1,10 +1,5 @@
-{% extends "base/__normal.html" %}
 {% load tags %}
 
-{% block title %}Room Check-In{% endblock %}
-{% block banner %}Batch Room Check-In{% endblock %}
-
-{% block content %}
 {% csrf_token %}
 
 <div class="col">
@@ -40,4 +35,3 @@
     {% endfor %}
   </table>
 </div>
-{% endblock %}

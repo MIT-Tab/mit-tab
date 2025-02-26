@@ -1,27 +1,56 @@
 import $ from "jquery";
 
-function checkInOrOut(target, isCheckIn) {
+document.addEventListener("DOMContentLoaded", function () {
+  const categorySelect = document.getElementById("categorySelect");
+  const contentContainer = document.getElementById("contentContainer");
+
+  const loadContent = (value) => {
+    fetch(`${value}/`)
+      .then(response => response.text())
+      .then(html => {
+        contentContainer.innerHTML = html;
+      })
+      .then(() => checkinInit()) // Ensure event listeners are reattached
+      .catch(error => console.error("Error loading content:", error));
+  };
+
+  const savedSelection = localStorage.getItem("selectedCategory") || "team";
+  categorySelect.value = savedSelection;
+  loadContent(savedSelection);
+
+  categorySelect.addEventListener("change", function () {
+    localStorage.setItem("selectedCategory", this.value);
+    loadContent(this.value);
+  });
+});
+
+function checkInOrOut(target, isCheckIn, type) {
   const $target = $(target);
+  
+  if ($target.prop("disabled")) return; // Prevent duplicate clicks
+
   $target.prop("disabled", true);
-
-  const judgeId = $target.data("judge-id");
+  const id = $target.data(`${type}-id`);
   const roundNumber = $target.data("round-number");
-
   const $label = $(`label[for=${$target.attr("id")}]`);
   $label.text(isCheckIn ? "Checked In" : "Checked Out");
 
-  const url = `/judge/${judgeId}/check_ins/round/${roundNumber}/`;
+  let url = `/${type}/${id}/check_ins/`;
+  if (roundNumber !== undefined) {
+    url += `round/${roundNumber}/`;
+  }
+
   const method = isCheckIn ? "POST" : "DELETE";
 
   $.ajax({
     url,
+    method,
     beforeSend(xhr) {
       xhr.setRequestHeader(
         "X-CSRFToken",
         $("[name=csrfmiddlewaretoken]").val()
       );
     },
-    method,
     success() {
       $target.prop("disabled", false);
     },
@@ -29,14 +58,26 @@ function checkInOrOut(target, isCheckIn) {
       $target.prop("disabled", false);
       $target.prop("checked", !isCheckIn);
       $label.text(isCheckIn ? "Checked Out" : "Checked In");
-      window.alert("An error occured. Refresh and try again");
+      window.alert("An error occurred. Refresh and try again");
     }
   });
 }
 
 function checkinInit() {
-  $(".checkin-toggle").click(e => {
-    checkInOrOut(e.target, $(e.target).prop("checked"));
+  // Remove existing event listeners before adding new ones
+  $(document).off("click", ".judge-checkin-toggle, .team-checkin-toggle, .room-checkin-toggle");
+
+  // Use event delegation for dynamically added elements
+  $(document).on("click", ".judge-checkin-toggle", function () {
+    checkInOrOut(this, $(this).prop("checked"), "judge");
+  });
+
+  $(document).on("click", ".team-checkin-toggle", function () {
+    checkInOrOut(this, $(this).prop("checked"), "team");
+  });
+
+  $(document).on("click", ".room-checkin-toggle", function () {
+    checkInOrOut(this, $(this).prop("checked"), "room");
   });
 }
 

@@ -214,7 +214,7 @@ def view_scratches(request, judge_id):
         })
 
 
-def batch_checkin(request):
+def judge_batch_check_in(request):
     judges_and_checkins = []
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
@@ -224,7 +224,7 @@ def batch_checkin(request):
             checkins.append(judge.is_checked_in_for_round(round_number))
         judges_and_checkins.append((judge, checkins))
 
-    return render(request, "tab/batch_checkin.html", {
+    return render(request, "batch_check_in/_judge.html", {
         "judges_and_checkins": judges_and_checkins,
         "round_numbers": round_numbers
     })

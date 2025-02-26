@@ -1,6 +1,6 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -381,3 +381,18 @@ def rank_teams(request):
         "novice": nov_teams,
         "title": "Team Rankings"
     })
+
+def batch_team_check_in(request):
+    team_and_checkins = []
+    team_and_checkins = [(team, team.checked_in) for team in Team.objects.all()]
+    return render(request, "batch_check_in/_team.html", {
+        "teams_and_checkins": team_and_checkins,
+    })
+
+@permission_required("tab.tab_settings.can_change", login_url="/403")
+def team_check_in(request, team_id):
+    team_id = int(team_id)
+    team = get_object_or_404(Team, pk=team_id)
+    team.checked_in = not team.checked_in
+    team.save()
+    return JsonResponse({"success": True})

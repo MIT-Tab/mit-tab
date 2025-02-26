@@ -240,7 +240,7 @@ def enter_room(request):
     })
 
 
-def batch_checkin(request):
+def batch_room_check_in(request):
     rooms_and_checkins = []
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
@@ -250,7 +250,7 @@ def batch_checkin(request):
             checkins.append(room.is_checked_in_for_round(round_number))
         rooms_and_checkins.append((room, checkins))
 
-    return render(request, "tab/room_batch_checkin.html", {
+    return render(request, "batch_check_in/_room.html", {
         "rooms_and_checkins": rooms_and_checkins,
         "round_numbers": round_numbers
     })
@@ -420,3 +420,6 @@ def generate_archive(request):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
+
+def batch_checkin(request):
+    return render(request, "batch_check_in/check_in.html")

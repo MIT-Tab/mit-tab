@@ -1,6 +1,6 @@
 from django.views import i18n
 from django.conf.urls import url, include
-from django.urls import path
+from django.urls import path, re_path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
 
@@ -44,7 +44,7 @@ urlpatterns = [
         name="judge_check_in"),
     url(r"^view_judges/$", judge_views.view_judges, name="view_judges"),
     url(r"^enter_judge/$", judge_views.enter_judge, name="enter_judge"),
-    url(r"^batch_checkin/$", judge_views.batch_checkin, name="batch_checkin"),
+    url(r"^batch_checkin/judge/$", judge_views.judge_batch_check_in, name="batch_checkin"),
 
     # School related
     url(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -59,7 +59,7 @@ urlpatterns = [
     url(r"^room/(\d+)/check_ins/round/(\d+)/$",
         views.room_check_in,
         name="room_check_in"),
-    url(r"^batch_room_checkin/$", views.batch_checkin, name="batch_room_checkin"),
+    url(r"^batch_checkin/room/$", views.batch_room_check_in, name="batch_room_checkin"),
 
 
     # Scratch related
@@ -91,6 +91,10 @@ urlpatterns = [
     url(r"^team/ranking/$", team_views.rank_teams_ajax,
         name="rank_teams_ajax"),
     url(r"^team/rank/$", team_views.rank_teams, name="rank_teams"),
+    url(r"^batch_checkin/team/$", team_views.batch_team_check_in, name="batch_team_check_in"),
+    re_path(r"^team/(\d+)/check_ins/$",
+        team_views.team_check_in,
+        name="team_check_in"),
 
     # Debater related
     url(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
@@ -167,6 +171,7 @@ urlpatterns = [
     url(r"e_ballots/(\S+)/$",
         pairing_views.enter_e_ballot,
         name="enter_e_ballot"),
+    url(r"^batch_checkin/$", views.batch_checkin, name="batch_checkin"),
 
     # Outround related
     url(r"break/",
