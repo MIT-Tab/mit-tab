@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .then(html => {
         contentContainer.innerHTML = html;
       })
-      .then(() => checkinInit()) // Ensure event listeners are reattached
+      .then(() => checkinInit()) 
       .catch(error => console.error("Error loading content:", error));
   };
 
@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
 function checkInOrOut(target, isCheckIn, type) {
   const $target = $(target);
   
-  if ($target.prop("disabled")) return; // Prevent duplicate clicks
+  if ($target.prop("disabled")) return; 
 
   $target.prop("disabled", true);
   const id = $target.data(`${type}-id`);
@@ -64,10 +64,8 @@ function checkInOrOut(target, isCheckIn, type) {
 }
 
 function checkinInit() {
-  // Remove existing event listeners before adding new ones
   $(document).off("click", ".judge-checkin-toggle, .team-checkin-toggle, .room-checkin-toggle");
 
-  // Use event delegation for dynamically added elements
   $(document).on("click", ".judge-checkin-toggle", function () {
     checkInOrOut(this, $(this).prop("checked"), "judge");
   });
@@ -79,6 +77,7 @@ function checkinInit() {
   $(document).on("click", ".room-checkin-toggle", function () {
     checkInOrOut(this, $(this).prop("checked"), "room");
   });
+  
 }
 
 export default checkinInit;
