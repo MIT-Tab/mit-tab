@@ -244,11 +244,14 @@ def batch_room_check_in(request):
     rooms_and_checkins = []
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    for room in Room.objects.all():
+    all_round_numbers = [0]+round_numbers
+    rooms = Room.objects.prefetch_related("roomcheckin_set")
+    
+    for room in rooms:
         checkins = []
-        for round_number in [0] + round_numbers:  # 0 is for outrounds
-            checkins.append(room.is_checked_in_for_round(round_number))
-        rooms_and_checkins.append((room, checkins))
+        checkins = {checkin.round_number for checkin in room.roomcheckin_set.all()}
+        checkins_list = [round_number in checkins for round_number in all_round_numbers]
+        rooms_and_checkins.append((room, checkins_list))
 
     return render(request, "batch_check_in/_room.html", {
         "rooms_and_checkins": rooms_and_checkins,
