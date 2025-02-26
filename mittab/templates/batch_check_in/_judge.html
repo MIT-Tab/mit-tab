@@ -30,9 +30,9 @@
           <input type="checkbox" class="custom-control-input judge-checkin-toggle"
                  data-judge-id="{{judge.id}}"
                  data-round-number="{{forloop.counter0}}"
-                 id="toggle-{{ judge.id }}-{{ forloop.counter0 }}"
+                 id="toggle-judge-{{ judge.id }}-{{ forloop.counter0 }}"
                  {% if is_checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-{{ judge.id }}-{{ forloop.counter0 }}">
+          <label class="custom-control-label" for="toggle-judge-{{ judge.id }}-{{ forloop.counter0 }}">
             Checked {% if is_checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>

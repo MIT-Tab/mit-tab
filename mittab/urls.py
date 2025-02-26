@@ -44,7 +44,6 @@ urlpatterns = [
         name="judge_check_in"),
     url(r"^view_judges/$", judge_views.view_judges, name="view_judges"),
     url(r"^enter_judge/$", judge_views.enter_judge, name="enter_judge"),
-    url(r"^batch_checkin/judge/$", judge_views.judge_batch_check_in, name="batch_checkin"),
 
     # School related
     url(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -59,7 +58,6 @@ urlpatterns = [
     url(r"^room/(\d+)/check_ins/round/(\d+)/$",
         views.room_check_in,
         name="room_check_in"),
-    url(r"^batch_checkin/room/$", views.batch_room_check_in, name="batch_room_checkin"),
 
 
     # Scratch related
@@ -91,10 +89,9 @@ urlpatterns = [
     url(r"^team/ranking/$", team_views.rank_teams_ajax,
         name="rank_teams_ajax"),
     url(r"^team/rank/$", team_views.rank_teams, name="rank_teams"),
-    url(r"^batch_checkin/team/$", team_views.batch_team_check_in, name="batch_team_check_in"),
     re_path(r"^team/(\d+)/check_ins/$",
-        team_views.team_check_in,
-        name="team_check_in"),
+            team_views.team_check_in,
+            name="team_check_in"),
 
     # Debater related
     url(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),

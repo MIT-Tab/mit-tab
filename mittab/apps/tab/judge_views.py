@@ -214,23 +214,6 @@ def view_scratches(request, judge_id):
         })
 
 
-def judge_batch_check_in(request):
-    judges_and_checkins = []
-
-    round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    all_round_numbers = [0]+round_numbers
-    judges = Judge.objects.prefetch_related("checkin_set")
-    
-    for judge in judges:
-        checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        judges_and_checkins.append((judge, checkins_list))
-
-    return render(request, "batch_check_in/_judge.html", {
-        "judges_and_checkins": judges_and_checkins,
-        "round_numbers": round_numbers
-    })
-
 
 @permission_required("tab.tab_settings.can_change", login_url="/403")
 def judge_check_in(request, judge_id, round_number):

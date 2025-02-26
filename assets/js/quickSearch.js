@@ -14,19 +14,21 @@ function filter(matchingText) {
   $(`.searchable:Contains(${matchingText})`).show();
 }
 
-function quickSearchInit(searchElem) {
+function quickSearchInit(elem) {
+  let searchElem = elem;
   if (!searchElem) {
     searchElem = $("#quick-search");
   }
 
-  $(searchElem).off("keyup").on("keyup", function (e) { 
-    if ($(e.target).val()) {
-      filter($(e.target).val());
-    } else {
-      $(".searchable").show();
-    }
-  });
+  $(searchElem)
+    .off("keyup")
+    .on("keyup", e => {
+      if ($(e.target).val()) {
+        filter($(e.target).val());
+      } else {
+        $(".searchable").show();
+      }
+    });
 }
-
 
 export default quickSearchInit;

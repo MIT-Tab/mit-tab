@@ -13,7 +13,7 @@
       <th>Checked In?</th>
 	
     </thead>
-    {% for school, team, names, checked_in in teams_and_checkins %}
+    {% for school, team, debaters, checked_in in teams_and_checkins %}
     <tr class="searchable">
       <td>
         <a href="/school/{{school.id}}">{{ school }}</a>
@@ -22,14 +22,16 @@
         <a href="/team/{{team.id}}">{{ team.name }}</a>
       </td>
       <td>
-        {{ names }}
+        {% for debater in debaters %}
+          {{ debater.name }}{% if not forloop.last %} and {% endif %}
+        {% endfor %}
       <td>
         <div class="custom-control custom-switch">
           <input type="checkbox" class="custom-control-input team-checkin-toggle"
                  data-team-id="{{team.id}}"
-                 id="toggle-{{ team.id }}-{{ forloop.counter0 }}"
+                 id="toggle-team-{{ team.id }}-{{ forloop.counter0 }}"
                  {% if checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-{{ team.id }}-{{ forloop.counter0 }}">
+          <label class="custom-control-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">
             Checked {% if checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>
