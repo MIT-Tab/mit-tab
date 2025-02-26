@@ -167,6 +167,7 @@ urlpatterns = [
     url(r"e_ballots/(\S+)/$",
         pairing_views.enter_e_ballot,
         name="enter_e_ballot"),
+    path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),
 
     # Outround related
     url(r"break/",

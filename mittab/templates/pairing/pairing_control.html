@@ -33,7 +33,19 @@
             <button id="assign-judges" type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
-            {% endif %}
+            {% endif %}  
+        </form>
+            {% if simulate_round_button %}
+            <form action="/pairings/simulate_rounds/" method="post" class="d-inline"> 
+              {% csrf_token %}
+              <div class="btn-group btn-group-sm">
+                <button id="simulate-round" type="submit" class="mid btn btn-primary" title="Simulate the round">
+                  <i class="fas fa-play"></i> Simulate Round
+                </button>
+              </div>
+            </form>
+          {% endif %}
+
             <a class="btn btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
                 id="close-pairings"
                 title="Release the pairings to the participants">
