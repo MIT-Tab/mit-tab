@@ -5,18 +5,28 @@
 {% block banner %}Batch Room Check-In{% endblock %}
 
 {% block content %}
+
 <div class="container mt-4">
     <label for="categorySelect" class="form-label">Select Category:</label>
-    <select id="categorySelect" class="form-select shadow-sm ">
+    <select id="categorySelect" class="form-select">
         <option value="team">Team</option>
         <option value="judge">Judge</option>
         <option value="room">Room</option>
     </select>
+    {% quick_search %}
 
-    <div id="contentContainer" class="mt-3">
-        
+    <div id="teamCheckin" class="checkin-container">
+        {% include "batch_check_in/_team.html" %}
+    </div>
+    <div id="judgeCheckin" class="checkin-container hidden">
+        {% include "batch_check_in/_judge.html" %}
+    </div>
+    <div id="roomCheckin" class="checkin-container hidden">
+        {% include "batch_check_in/_room.html" %}
     </div>
 </div>
 
-
+<style>
+    .hidden { display: none; }
+</style>
 {% endblock %}

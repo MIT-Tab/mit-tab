@@ -4,18 +4,23 @@
 {% csrf_token %}
 
 <div class="col">
-  {% quick_search %}
 
 
   <table class="table table-striped table-bordered table-sm">
     <thead>
+      <th>School</th>
       <th>Judge</th>
       <th>Outrounds</th>
  
       {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
     </thead>
-    {% for judge, checkins in judges_and_checkins %}
+    {% for schools, judge, checkins in judges_and_checkins %}
     <tr class="searchable">
+      <td>
+        {% for school in schools %}
+              <a href="/school/{{school.id}}">{{ school.name }}</a>{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+      </td>
       <td>
         <a href="/judge/{{judge.id}}">{{ judge.name }}</a>
       </td>

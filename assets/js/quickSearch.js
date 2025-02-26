@@ -14,12 +14,12 @@ function filter(matchingText) {
   $(`.searchable:Contains(${matchingText})`).show();
 }
 
-function quickSearchInit(elem) {
-  let searchElem = elem;
+function quickSearchInit(searchElem) {
   if (!searchElem) {
     searchElem = $("#quick-search");
   }
-  $(searchElem).keyup(e => {
+
+  $(searchElem).off("keyup").on("keyup", function (e) { 
     if ($(e.target).val()) {
       filter($(e.target).val());
     } else {
@@ -27,5 +27,6 @@ function quickSearchInit(elem) {
     }
   });
 }
+
 
 export default quickSearchInit;

@@ -383,8 +383,12 @@ def rank_teams(request):
     })
 
 def batch_team_check_in(request):
-    team_and_checkins = []
-    team_and_checkins = [(team, team.checked_in) for team in Team.objects.all()]
+    teams = Team.objects.prefetch_related('school', 'debaters').all()
+    team_and_checkins = [(team.school.name,
+                          team,
+                          " and ".join([debater.name for debater in team.debaters.all()]),
+                          team.checked_in) 
+                          for team in teams]
     return render(request, "batch_check_in/_team.html", {
         "teams_and_checkins": team_and_checkins,
     })
