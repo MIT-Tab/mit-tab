@@ -135,8 +135,6 @@ def alternative_rooms(request, round_id, room_id=""):
             pass
 
     # Fetch all rooms checked in for the given round, ordered by rank
-    # A little out of depth on the Django ORM here, but this seems like the
-    # way to get this data with the least amount of queries
     rooms = set(Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
