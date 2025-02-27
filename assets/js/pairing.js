@@ -4,26 +4,24 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
-  if (roundNumber) {
-    $.ajax({
-      url: `/round/${roundNumber}/stats`,
-      success(result) {
-        Object.entries(result).forEach(([teamId, stats]) => {
-          const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
-          const text = [
-            stats.wins,
-            stats.total_speaks.toFixed(2),
-            stats.govs,
-            stats.opps,
-            stats.seed
-          ].join(" / ");
-          tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
-          tabCardElement.attr("href", `/team/card/${teamId}`);
-          tabCardElement.text(`${text}`);
-        });
-      }
-    });
-  }
+  $.ajax({
+    url: `/round/${roundNumber}/stats`,
+    success(result) {
+      Object.entries(result).forEach(([teamId, stats]) => {
+        const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
+        const text = [
+          stats.wins,
+          stats.total_speaks.toFixed(2),
+          stats.govs,
+          stats.opps,
+          stats.seed
+        ].join(" / ");
+        tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
+        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.text(`${text}`);
+      });
+    }
+  });
 }
 
 function assignTeam(e) {
@@ -63,7 +61,7 @@ function assignRoom(e) {
   const roundId = $(e.target).attr("round-id");
   const roomId = $(e.target).attr("room-id");
   const curRoomId = $(e.target).attr("current-room-id");
-  const url = `/round/${roundId}/assign_room/${roomId}/${curRoomId || ""}`;
+  const url = `/round/${roundId}/assign_room/${roomId}/`;
 
   let $buttonWrapper;
   if (curRoomId) {
@@ -78,7 +76,7 @@ function assignRoom(e) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("room-id", result.room_id);
-      $button.html(`${result.room_name}`);
+      $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
       $(`.room span[round-id=${roundId}] .room-toggle`).css(
         "background-color",
         result.room_color
@@ -224,8 +222,6 @@ $(document).ready(() => {
   $("#debater_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/debater/rank/");
   });
-  // Note: getting a warning that .click is deprecated.
-  // Still working but should be migrated at some point.
   $(".judge-toggle").click(populateAlternativeJudges);
   $(".team-toggle").click(populateAlternativeTeams);
   $(".room-toggle").click(populateAlternativeRooms);

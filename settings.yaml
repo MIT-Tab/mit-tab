@@ -56,7 +56,7 @@
   value: false
   type: boolean
 - disable_room_seeding:
-  name: disable_room_seeding
+  name: enable_room_seeding
   description: "Toggle to disable room seeding. When enabled, rooms are assigned randomly after fulfilling room tags."
-  value: false
+  value: true
   type: boolean

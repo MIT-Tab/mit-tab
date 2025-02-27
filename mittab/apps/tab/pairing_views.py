@@ -146,33 +146,27 @@ def alternative_rooms(request, round_id, room_id=""):
     # First layer of filtering goes here
     viable_rooms = rooms
 
-    viable_unpaired_rooms = filter(lambda room: not room.has_round, rooms)
-    viable_paired_rooms = filter(lambda room: room.has_round, rooms)
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
     other_rooms = rooms - viable_rooms
-
-    # Render the response
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
-        "viable_rooms": viable_unpaired_rooms,
+        "viable_unpaired_rooms": viable_unpaired_rooms,
         "viable_paired_rooms": viable_paired_rooms,
         "other_rooms": other_rooms,
     })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def assign_room(request, round_id, room_id, remove_id=None):
+def assign_room(request, round_id, new_room_id):
     try:
         round_obj = Round.objects.get(id=int(round_id))
-        if remove_id is not None and round_obj.room.id != remove_id:
-            round_obj.room = None
-        room_obj = Room.objects.get(id=int(room_id))
+        room_obj = Room.objects.get(id=int(new_room_id))
         round_obj.room = room_obj
         round_obj.save()
-        room_color = room_obj.get_color()
         data = {
             "success": True,
-            "room_color": room_color if room_color else "",
             "room_id": room_obj.id,
             "round_id": round_obj.id,
             "room_name": room_obj.name,

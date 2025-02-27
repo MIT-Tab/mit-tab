@@ -5,7 +5,7 @@ from mittab.libs import errors, mwmatching, tab_logic
 
 
 def add_rooms():
-    no_seeding = TabSettings.get("disable_room_seeding", 0)
+    room_seeding = TabSettings.get("enable_room_seeding", 0)
 
     # Clear any existing room assignments
     Round.objects.filter(round_number=TabSettings.get(
@@ -17,11 +17,16 @@ def add_rooms():
     rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
     pairings = tab_logic.sorted_pairings(round_number)
 
-    if no_seeding:
+    if not room_seeding:
         random.shuffle(pairings)
 
-    if not pairings or not rooms or len(pairings) > len(rooms):
-        raise errors.RoomAssignmentError("Not enough rooms or pairings")
+    if not pairings:
+        raise errors.RoomAssignmentError(
+            "Attempted to assign rooms to an empty pairing")
+    if len(pairings) > len(rooms):
+        raise errors.RoomAssignmentError(
+            f"Not enough rooms. Found {len(pairings)}\
+                  rounds and only {len(rooms)} rooms")
 
     graph_edges = []
 
@@ -30,20 +35,15 @@ def add_rooms():
             weight = 0
 
             # High seed high room bonus
-            if no_seeding == 0:
+            if room_seeding:
                 weight -= abs(pairing_i - room_i)
 
             # Bad room penalty
-            weight -= room.rank
+            weight -= room.rank * 100
 
             edge = (pairing_i, len(pairings) + room_i, weight)
             graph_edges.append(edge)
 
-    # This is of course super overkill for the required logic in this branch
-    # but even with just ~3 room tags it was pretty easy to find scenarios
-    # where the simpler/more naive greedy algorithms would fail. The overhead
-    # isn't too bad, (it was under 0.02 seconds on my system)
-    # and since we already use this elsewhere it seemed reasonable
     room_assignments = mwmatching.maxWeightMatching(
         graph_edges, maxcardinality=True)
 

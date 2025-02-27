@@ -104,9 +104,24 @@
         {% else %}
         <a class="btn-sm btn-block btn-warning" href="/outround/{{pairing.id}}/result/">Enter Ballot</a>
         {%endif%}
-        <a class="btn-sm btn-block btn-light" href="/room/{{pairing.room.id}}" >
-          <i class="far fa-building"></i> {{pairing.room.name}}
-        </a>
+        <div class="dropdown room">
+          <span 
+            room-id="{{pairing.room.id}}" 
+            round-id="{{pairing.id}}">
+            <a 
+              class="btn-sm btn-block btn-light room-toggle dropdown-toggle text-wrap" 
+              href="#" 
+              role="button" 
+              id="roomDropdown-{{pairing.id}}" 
+              data-toggle="dropdown" 
+              aria-haspopup="true" 
+              aria-expanded="false" 
+              style="white-space: normal;">
+              <i class="far fa-building"></i> {{pairing.room.name}}
+            </a>
+            <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
+          </span>
+        </div>
         <a class="btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>

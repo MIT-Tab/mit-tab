@@ -18,7 +18,7 @@
       {% for round_number in round_numbers %}<th>Round {{ round_number }}</th>{% endfor %}
     </thead>
     {% for room, checkins in rooms_and_checkins %}
-    <tr class="searchable" style="border-left: 8px solid {{ room.get_color }};">
+    <tr class="searchable">
       <td>
         <a href="/room/{{room.id}}">{{ room.name }}</a>
       </td>

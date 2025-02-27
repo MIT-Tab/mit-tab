@@ -44,8 +44,6 @@ def backup_round(key=None, round_number=None, btime=None):
         if round_number is None:
             round_number = TabSettings.get("cur_round", "no-round-number")
 
-        elif round_number == 0:
-            raise errors.RoundZeroBackupError()
 
         if btime is None:
             btime = int(time.time())
