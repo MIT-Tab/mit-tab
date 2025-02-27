@@ -138,8 +138,8 @@ urlpatterns = [
     url(r"^pairing/assign_judges/$",
         pairing_views.assign_judges_to_pairing,
         name="assign_judges"),
-    url(r"^round/(\d+)/assign_room/(\d+)/$",
-        pairing_views.assign_room, name="assign_room"),
+    path("round/<int:round_id>/assign_room/<int:new_room_id>/", pairing_views.assign_room, name="assign_room"),
+    path("round/<int:round_id>/assign_room/<int:new_room_id>/<int:outround>/", pairing_views.assign_room, name="assign_room_outround"),
     url(r"^pairing/assign_rooms_to_pairing/$",
         pairing_views.assign_rooms_to_pairing,
         name="assign_rooms_to_pairing"),
@@ -228,6 +228,12 @@ urlpatterns = [
     path("outround_choice/<int:outround_id>",
          outround_pairing_views.update_choice,
          name="update_choice"),
+    url(r"^round/(\d+)/alternative_rooms/$",
+        outround_pairing_views.alternative_rooms,
+        name="alternative_rooms"),
+    url(r"^round/(\d+)/alternative_rooms/(\d+)$",
+        outround_pairing_views.alternative_rooms,
+        name="alternative_rooms"),
 
     # Settings related
     url(r"^settings_form",

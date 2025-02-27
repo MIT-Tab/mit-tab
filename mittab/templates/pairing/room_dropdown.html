@@ -27,13 +27,3 @@
   {% empty %}
   <a class="dropdown-item">No viable rooms paired in</a>
   {% endfor %}
-
-  <div class="dropdown-divider"></div>
-  <h6 class="text-center dropdown-header">Other Rooms</h6>
-  {% for room in other_rooms %}
-  <a href="#" class="dropdown-item room-assign searchable" room-id="{{room.id}}" round-id="{{round_obj.id}}" current-room-id="{{current_room.id}}">
-    {{room.name}}
-  </a>
-  {% empty %}
-  <a class="dropdown-item">No other rooms</a>
-  {% endfor %}

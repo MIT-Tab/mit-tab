@@ -123,14 +123,14 @@ def assign_rooms_to_pairing(request):
     return redirect("/pairings/status/")
 
 
-def alternative_rooms(request, round_id, room_id=""):
+def alternative_rooms(request, round_id, current_room_id=None):
     round_obj = Round.objects.get(id=int(round_id))
     round_number = round_obj.round_number
 
     current_room_obj = None
-    if room_id.isdigit():
+    if current_room_id is not None:
         try:
-            current_room_obj = Room.objects.get(id=int(room_id))
+            current_room_obj = Room.objects.get(id=int(current_room_id))
         except Room.DoesNotExist:
             pass
 
@@ -141,25 +141,23 @@ def alternative_rooms(request, round_id, room_id=""):
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
     ).order_by("-rank"))
 
-    # First layer of filtering goes here
-    viable_rooms = rooms
-
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
     viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
-    other_rooms = rooms - viable_rooms
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
         "viable_unpaired_rooms": viable_unpaired_rooms,
         "viable_paired_rooms": viable_paired_rooms,
-        "other_rooms": other_rooms,
     })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def assign_room(request, round_id, new_room_id):
+def assign_room(request, round_id, new_room_id, outround=False):
     try:
-        round_obj = Round.objects.get(id=int(round_id))
+        if outround:
+            round_obj = Outround.objects.get(id=int(round_id))
+        else:
+            round_obj = Round.objects.get(id=int(round_id))
         room_obj = Room.objects.get(id=int(new_room_id))
         round_obj.room = room_obj
         round_obj.save()
@@ -172,6 +170,7 @@ def assign_room(request, round_id, new_room_id):
     except Exception:
         emit_current_exception()
         data = {"success": False}
+        return JsonResponse(data, status=400)
     return JsonResponse(data)
 
 
