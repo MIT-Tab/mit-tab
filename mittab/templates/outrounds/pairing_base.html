@@ -102,7 +102,7 @@
             {% if judge %} <a class="{% if judge.rank > warning %}text-danger{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
         </td>
         <td>
-            {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a>  {% endif %}
+            {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a> {% endif %}
         </td>
           </tr>
       {% endfor %}
