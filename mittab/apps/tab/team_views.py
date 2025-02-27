@@ -1,6 +1,6 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.data_export.tab_card import get_tab_card_data
@@ -292,8 +292,17 @@ def rank_teams(request):
         get_team_rankings, "team_rankings", cache_logic.DEFAULT, request
     )
 
-    return render(
-        request,
-        "tab/rank_teams_component.html",
-        {"varsity": teams, "novice": nov_teams, "title": "Team Rankings"},
-    )
+    return render(request, "tab/rank_teams_component.html", {
+        "varsity": teams,
+        "novice": nov_teams,
+        "title": "Team Rankings"
+    })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403")
+def team_check_in(request, team_id):
+    team_id = int(team_id)
+    team = get_object_or_404(Team, pk=team_id)
+    team.checked_in = not team.checked_in
+    team.save()
+    return JsonResponse({"success": True})

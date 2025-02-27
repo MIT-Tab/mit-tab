@@ -19,13 +19,16 @@ function quickSearchInit(elem) {
   if (!searchElem) {
     searchElem = $("#quick-search");
   }
-  $(searchElem).keyup(e => {
-    if ($(e.target).val()) {
-      filter($(e.target).val());
-    } else {
-      $(".searchable").show();
-    }
-  });
+
+  $(searchElem)
+    .off("keyup")
+    .on("keyup", e => {
+      if ($(e.target).val()) {
+        filter($(e.target).val());
+      } else {
+        $(".searchable").show();
+      }
+    });
 }
 
 export default quickSearchInit;
