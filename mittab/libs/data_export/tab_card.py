@@ -208,7 +208,7 @@ def get_tab_card_data(request, team_id):
 
     for i in range(cur_round - 1):
         # Don't fill in totals for incomplete rounds
-        if round_stats[i][6] == blank and blank not in round_stats[i + 1][:5]:
+        if round_stats[i][6] == blank and len(round_stats)>=i+2 and blank not in round_stats[i + 1][:5]:
             round_stats[i][6] = (0, 0) if i == 0 else round_stats[i - 1][6]
 
     try:

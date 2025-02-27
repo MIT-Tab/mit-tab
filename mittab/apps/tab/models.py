@@ -56,8 +56,7 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache("tab_settings_%s" % self.key,
                                      cache_logic.PERSISTENT)
-        super(TabSettings, self).save(force_insert,
-                                      force_update, using, update_fields)
+        super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 
 class School(models.Model):
@@ -107,8 +106,7 @@ class Debater(models.Model):
         while not self.tiebreaker or \
                 Debater.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
-        super(Debater, self).save(force_insert,
-                                  force_update, using, update_fields)
+        super(Debater, self).save(force_insert, force_update, using, update_fields)
 
     @property
     def num_teams(self):
@@ -208,8 +206,7 @@ class Team(models.Model):
         haikunator = Haikunator()
 
         def gen_haiku_and_clean():
-            code = haikunator.haikunate(
-                token_length=0).replace("-", " ").title()
+            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
 
             return code
 
@@ -233,8 +230,13 @@ class Team(models.Model):
                 Team.objects.filter(tiebreaker=self.tiebreaker).exists():
             self.tiebreaker = random.choice(range(0, 2**16))
 
-        super(Team, self).save(force_insert,
-                               force_update, using, update_fields)
+        super(Team, self).save(force_insert, force_update, using, update_fields)
+
+    def get_or_create_team_code(self):
+        if not self.team_code:
+            self.set_unique_team_code()
+            self.save()
+        return self.team_code
 
     @property
     def display_backend(self):
@@ -273,12 +275,6 @@ class Team(models.Model):
         if debaters_public:
             return ", ".join([debater.name for debater in self.debaters.all()])
         return ""
-
-    def get_or_create_team_code(self):
-        if not self.team_code:
-            self.set_unique_team_code()
-            self.save()
-        return self.team_code
 
     class Meta:
         ordering = ["pk"]
@@ -355,10 +351,8 @@ class Judge(models.Model):
 
 
 class Scratch(models.Model):
-    judge = models.ForeignKey(
-        Judge, related_name="scratches", on_delete=models.CASCADE)
-    team = models.ForeignKey(
-        Team, related_name="scratches", on_delete=models.CASCADE)
+    judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
     TAB_SCRATCH = 1
     TYPE_CHOICES = (
@@ -419,8 +413,7 @@ class Outround(models.Model):
                               blank=True,
                               on_delete=models.CASCADE,
                               related_name="chair_outround")
-    judges = models.ManyToManyField(
-        Judge, blank=True, related_name="judges_outrounds")
+    judges = models.ManyToManyField(Judge, blank=True, related_name="judges_outrounds")
     UNKNOWN = 0
     GOV = 1
     OPP = 2
@@ -545,8 +538,7 @@ class Round(models.Model):
 
 
 class Bye(models.Model):
-    bye_team = models.ForeignKey(
-        Team, related_name="byes", on_delete=models.CASCADE)
+    bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
 
     def __str__(self):
