@@ -1,5 +1,4 @@
 import $ from "jquery";
-import quickSearchInit from "./quickSearch";
 
 function checkInOrOut(target, isCheckIn, type) {
   const $target = $(target);
@@ -49,40 +48,5 @@ function checkinInit() {
     checkInOrOut(e.target, $(e.target).prop("checked"), "room");
   });
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  const categorySelect = document.getElementById("categorySelect");
-
-  const checkinContainers = {
-    team: document.getElementById("teamCheckin"),
-    judge: document.getElementById("judgeCheckin"),
-    room: document.getElementById("roomCheckin")
-  };
-
-  const searchInputs = {
-    team: document.getElementById("team-search"),
-    judge: document.getElementById("judge-search"),
-    room: document.getElementById("room-search")
-  };
-
-  function updateCheckinVisibility(selected) {
-    Object.values(checkinContainers).forEach(el => el.classList.add("hidden"));
-    checkinContainers[selected].classList.remove("hidden");
-
-    quickSearchInit(searchInputs[selected]);
-  }
-
-  const savedSelection = localStorage.getItem("selectedCategory") || "team";
-  categorySelect.value = savedSelection;
-  updateCheckinVisibility(savedSelection);
-
-  categorySelect.addEventListener("change", e => {
-    localStorage.setItem("selectedCategory", e.target.value);
-    updateCheckinVisibility(e.target.value);
-  });
-
-  quickSearchInit(searchInputs[savedSelection]);
-  checkinInit();
-});
 
 export default checkinInit;
