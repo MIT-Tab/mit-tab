@@ -372,6 +372,7 @@ def alternative_judges(request, round_id, judge_id=None):
 
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+    is_outround = True
 
     return render(request, "pairing/judge_dropdown.html", locals())
 
