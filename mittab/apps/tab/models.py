@@ -169,6 +169,7 @@ class Team(models.Model):
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    ranking_public = models.BooleanField(default=True)
 
     """
     Consolidate the knowledge of what relations need
