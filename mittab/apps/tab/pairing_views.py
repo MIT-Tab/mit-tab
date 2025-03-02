@@ -667,7 +667,7 @@ def remove_judge(request, round_id, judge_id, is_outround=False):
         round_obj.judges.remove(judge)
         all_judges.remove(judge)
         if round_obj.chair == judge:
-            if len(all_judges):
+            if all_judges:
                 round_obj.chair = all_judges[0]
             else:
                 round_obj.chair = None
