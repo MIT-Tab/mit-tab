@@ -122,7 +122,3 @@ typings/
 .env
 
 *.dump.sql
-.venv/
-htmlcov/
-.vscode/
-google-chrome-*.deb
