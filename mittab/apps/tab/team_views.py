@@ -345,7 +345,7 @@ def rank_teams_ajax(request):
 
 
 def get_team_rankings(request, public=True):
-    ranked_teams = tab_logic.rankings.rank_teams()
+    ranked_teams = tab_logic.rankings.rank_teams(public)
     teams = []
     for i, team_stat in enumerate(ranked_teams):
         if public:
@@ -390,13 +390,12 @@ def rank_teams(request):
     })
 
 def rank_teams_public(request):
-    teams = cache_logic.cache_fxn_key(
-        get_team_rankings,
-        "team_rankings",
-        cache_logic.DEFAULT,
-        request,
-        public=True,
-    )
+    display_rankings = TabSettings.get("rankings_public", 0)
+
+    if not request.user.is_authenticated and not display_rankings:
+        return redirect_and_flash_error(request, "This view is not public", path="/")
+
+    teams = get_team_rankings(request, public=True)
 
     return render(request, "public/public_team_rankings.html", {
         "teams": teams,

@@ -8,6 +8,11 @@
   description: "Check this box to make the judges list publicly visible"
   value: false
   type: boolean
+- rankings_public:
+  name: rankings_public
+  description: "A toggle to indicate whether you would like to display the rankings of teams publicly. You can opt teams out by unchecking the 'ranking public' box on the team edit page."
+  value: false
+  type: boolean
 - lenient_late:
   name: lenient_late
   description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
