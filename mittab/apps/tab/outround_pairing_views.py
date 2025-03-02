@@ -677,10 +677,10 @@ def alternative_rooms(request, round_id, current_room_id=None):
     rooms = set(Room.objects.filter(
         roomcheckin__round_number=0
     ).annotate(
-        has_round=Exists(Outround.objects.filter(room_id=OuterRef("id"), num_teams=num_teams))
+        has_round=Exists(Outround.objects.filter(room_id=OuterRef("id"),
+                                                 num_teams=num_teams))
     ).order_by("-rank"))
 
-    viable_rooms = rooms
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
     viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
     return render(request, "pairing/room_dropdown.html", {
