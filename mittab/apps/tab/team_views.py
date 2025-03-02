@@ -344,7 +344,7 @@ def rank_teams_ajax(request):
     return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
 
-def get_team_rankings(request, public=True):
+def get_team_rankings(request, public=False):
     ranked_teams = tab_logic.rankings.rank_teams(public)
     teams = []
     for i, team_stat in enumerate(ranked_teams):
