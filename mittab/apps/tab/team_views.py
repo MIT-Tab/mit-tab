@@ -352,7 +352,7 @@ def get_team_rankings(request, public=True):
             if not team_stat.team.ranking_public:
                 continue
             teams.append((team_stat.team, team_stat[rankings.WINS],
-                      team_stat[rankings.SPEAKS], team_stat[rankings.RANKS]))
+                          team_stat[rankings.SPEAKS], team_stat[rankings.RANKS]))
         else:
             tiebreaker = "N/A"
             if i != len(ranked_teams) - 1:
@@ -363,15 +363,14 @@ def get_team_rankings(request, public=True):
                 else:
                     tiebreaker = "Tie not broken"
             teams.append((team_stat.team, team_stat[rankings.WINS],
-                        team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
-                        tiebreaker))
+                          team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
+                          tiebreaker))
     if not public:
         nov_teams = list(filter(
             lambda ts: all(
                 map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
                     all())), teams))
         return teams, nov_teams
-    
     return teams
 
 
