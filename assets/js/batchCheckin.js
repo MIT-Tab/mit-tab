@@ -1,16 +1,19 @@
 import $ from "jquery";
 
-function checkInOrOut(target, isCheckIn) {
+function checkInOrOut(target, isCheckIn, type) {
   const $target = $(target);
   $target.prop("disabled", true);
 
-  const judgeId = $target.data("judge-id");
+  const id = $target.data(`${type}-id`);
   const roundNumber = $target.data("round-number");
-
   const $label = $(`label[for=${$target.attr("id")}]`);
   $label.text(isCheckIn ? "Checked In" : "Checked Out");
 
-  const url = `/judge/${judgeId}/check_ins/round/${roundNumber}/`;
+  let url = `/${type}/${id}/check_ins/`;
+  if (roundNumber !== undefined) {
+    url += `round/${roundNumber}/`;
+  }
+
   const method = isCheckIn ? "POST" : "DELETE";
 
   $.ajax({
@@ -29,14 +32,20 @@ function checkInOrOut(target, isCheckIn) {
       $target.prop("disabled", false);
       $target.prop("checked", !isCheckIn);
       $label.text(isCheckIn ? "Checked Out" : "Checked In");
-      window.alert("An error occured. Refresh and try again");
+      window.alert("An error occurred. Refresh and try again");
     }
   });
 }
 
 function checkinInit() {
-  $(".checkin-toggle").click(e => {
-    checkInOrOut(e.target, $(e.target).prop("checked"));
+  $(".judge-checkin-toggle").click(e => {
+    checkInOrOut(e.target, $(e.target).prop("checked"), "judge");
+  });
+  $(".team-checkin-toggle").click(e => {
+    checkInOrOut(e.target, $(e.target).prop("checked"), "team");
+  });
+  $(".room-checkin-toggle").click(e => {
+    checkInOrOut(e.target, $(e.target).prop("checked"), "room");
   });
 }
 

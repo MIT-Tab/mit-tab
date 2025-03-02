@@ -4,6 +4,9 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
+  if (!roundNumber || !$(".tabcard").length) {
+    return;
+  }
   $.ajax({
     url: `/round/${roundNumber}/stats`,
     success(result) {

@@ -11,7 +11,7 @@
     </style>
 </head>
 
-<body>
+<body class="show-team-names">
     {% if printable %}
         <!-- Center pairings table -->
 	{% for outround in outround_pairings %}
@@ -31,8 +31,26 @@
 		    </tr>
 		    {% for pairing in outround.rounds %}
 			<tr>
-			    <td>{{pairing.gov_team.display}}</td>
-			    <td>{{pairing.opp_team.display}}</td>
+				<td>
+					<div class="team-names">
+						{{pairing.gov_team.display}}
+					</div>
+					{% if debater_team_memberships_public %}
+					<div class="member-names">
+						{{pairing.gov_team.debaters_display}}
+					</div>
+					{% endif %}
+				</td>
+				<td>
+					<div class="team-names">
+						{{pairing.opp_team.display}}
+					</div>
+					{% if debater_team_memberships_public %}
+					<div class="member-names">
+						{{pairing.opp_team.debaters_display}}
+					</div>
+					{% endif %}
+				</td>
 			    <td>
 				{% for judge in pairing.judges.all %}
 				    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
@@ -84,13 +102,27 @@
 			<td>
 			    {% if sidelock and pairing.sidelock %}<b>{% endif %}
 			    {% if choice and pairing.choice == 1 %}<b>{% endif %}
-			    {{pairing.gov_team.display}}
+				<div class="team-names">
+					{{pairing.gov_team.display}}
+				</div>
+				{% if debater_team_memberships_public %}
+				<div class="member-names">
+					{{pairing.gov_team.debaters_display}}
+				</div>
+				{% endif %}
 			    {% if choice and pairing.choice == 1 %}</b>{% endif %}
 			    {% if sidelock and pairing.sidelock %}</b>{% endif %}
 			</td>
 			<td>
 			    {% if choice and pairing.choice == 2 %}<b>{% endif %}
-				{{pairing.opp_team.display}}
+				<div class="team-names">
+					{{pairing.opp_team.display}}
+				</div>
+				{% if debater_team_memberships_public %}
+				<div class="member-names">
+					{{pairing.opp_team.debaters_display}}
+				</div>
+				{% endif %}
 			    {% if choice and pairing.choice == 2 %}</b>{% endif %}
 			</td>
 			<td>
@@ -130,6 +162,14 @@
 	    {% if choice %}
 		<span class="left">
 		    * Bold indicates choice.
+	    {% endif %}
+		{% if debater_team_memberships_public %}
+		<span class="right">
+		<label for="Member Names">
+			Member Names:
+			<input type="checkbox" name="names" id="name_display_toggle"/>
+		</label>
+		</span>
 	    {% endif %}
 	    <span class="right">
 		<label for="autoscroll">

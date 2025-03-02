@@ -10,7 +10,6 @@ import "bootstrap";
 import bsCustomFileInput from "bs-custom-file-input";
 import ballotsInit from "./ballots";
 import checkinInit from "./batchCheckin";
-import roomCheckinInit from "./roomBatchCheckin";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
 import multiselectInit from "./multiselect";
@@ -45,7 +44,6 @@ function loadTabCards() {
 $(document).ready(() => {
   ballotsInit();
   checkinInit();
-  roomCheckinInit();
   filtersInit();
   quickSearchInit();
   multiselectInit();

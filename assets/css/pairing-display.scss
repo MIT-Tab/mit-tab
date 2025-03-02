@@ -124,3 +124,9 @@ body
 {
     float: right;
 }
+
+.show-team-names .team-names { display: block !important; }
+.show-team-names .member-names { display: none !important; }
+
+.team-names { display: none !important; }
+.member-names { display: block !important; }

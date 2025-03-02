@@ -566,6 +566,7 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
 
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
+    debater_team_memberships_public = TabSettings.get("debaters_public", 1)
 
     return render(request, "outrounds/pretty_pairing.html", locals())
 

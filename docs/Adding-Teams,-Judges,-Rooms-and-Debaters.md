@@ -23,7 +23,7 @@ error in the format of the xlsx files, all changes generated from the file are a
 even if some were valid, so that you can simply re-upload a corrected version of the
 file
 
-You can use [these templates](https://drive.google.com/drive/folders/1w5dWkOn_p6HD24pI04xR7lzDakQMmQk3)
+You can use [these templates](https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5?usp=sharing)
 for the teams, judges, and rooms files
 
 **NOTE:** The files _must_ be `.xlsx` files. Not `.xls`, `.csv`, or anything
