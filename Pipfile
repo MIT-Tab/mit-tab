@@ -24,12 +24,12 @@ pytest = "==4.4.1"
 pytest-circleci-parallelized = "==0.0.4"
 pytest-cov = "==2.7.1"
 pytest-django = "==3.4.8"
-raven = "==6.4.0"
-requests = "==2.22.0"
+requests = "==2.31.0"
 selenium = "==3.141.0"
 splinter = "==0.10.0"
 Django = "==2.2.10"
 PyYAML = "==5.1.2"
+sentry-sdk = {extras = ["django"], version = "*"}
 
 [requires]
 python_version = "3.7"
