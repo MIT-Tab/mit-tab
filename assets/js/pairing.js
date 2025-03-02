@@ -89,9 +89,9 @@ function populateAlternativeRooms() {
   const $parent = $(this).parent();
   const roomId = $parent.attr("room-id");
   const roundId = $parent.attr("round-id");
-  const outround = $parent.attr("outround") == "true";
-  const base_url = outround ? "/outround" : "/round";
-  const url = `${base_url}/${roundId}/alternative_rooms/${roomId || ""}`;
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}`;
 
   $.ajax({
     url,
