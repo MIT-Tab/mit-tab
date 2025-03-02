@@ -61,7 +61,9 @@ function assignTeam(e) {
 
 function assignRoom(e) {
   e.preventDefault();
-  const $parent = $(this).parent().parent();
+  const $parent = $(this)
+    .parent()
+    .parent();
   const roundId = $(e.target).attr("round-id");
   const roomId = $(e.target).attr("room-id");
   const curRoomId = $(e.target).attr("current-room-id");
