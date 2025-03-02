@@ -4,6 +4,9 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
+  if (!roundNumber || !$(".tabcard").length) {
+    return;
+  }
   $.ajax({
     url: `/round/${roundNumber}/stats`,
     success(result) {
@@ -58,10 +61,13 @@ function assignTeam(e) {
 
 function assignRoom(e) {
   e.preventDefault();
+  const $parent = $(this).parent().parent();
   const roundId = $(e.target).attr("round-id");
   const roomId = $(e.target).attr("room-id");
   const curRoomId = $(e.target).attr("current-room-id");
-  const url = `/round/${roundId}/assign_room/${roomId}/`;
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/assign_room/${roomId}/`;
 
   let $buttonWrapper;
   if (curRoomId) {

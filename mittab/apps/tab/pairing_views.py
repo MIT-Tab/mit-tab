@@ -485,6 +485,7 @@ def pretty_pair(request, printable=False):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
+    debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     return render(request, "pairing/pairing_display.html", locals())
 
 
