@@ -15,6 +15,6 @@ def redirect_and_flash_error(request, message, **kwargs):
 
 
 def redirect_and_flash(request, message, message_level, **kwargs):
-    path = kwargs.get("path", request.META.get("HTTP_REFERER", "/"))
+    path = kwargs.get("path", request.headers.get("referer", "/"))
     messages.add_message(request, message_level, message)
     return redirect(path)

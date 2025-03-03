@@ -9,8 +9,7 @@ verify_ssl = true
 haikunator = "==2.1"
 mock = "==1.0.1"
 boto3 = "*"
-django-bootstrap4 = "==0.0.8"
-django-localflavor = "==1.0"
+django-bootstrap4 = "==3.0.0"
 django-webpack-loader = "==0.6.0"
 django-silk = "*"
 gunicorn = "==19.7.1"
@@ -27,7 +26,7 @@ pytest-django = "==3.4.8"
 requests = "==2.31.0"
 selenium = "==3.141.0"
 splinter = "==0.10.0"
-Django = "==2.2.10"
+Django = "==3.2.25"
 PyYAML = "==5.1.2"
 sentry-sdk = {extras = ["django"], version = "*"}
 
