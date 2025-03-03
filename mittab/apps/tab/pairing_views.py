@@ -207,7 +207,9 @@ def view_round(request, round_number):
                              if not Bye.objects.filter(round_number=round_number,
                                                        bye_team=team).exists()]
     num_excluded = len(excluded_teams_no_bye)
-
+    simulate_round_button = os.environ.get("MITTAB_ENV") in (
+        "development", "test-deployment"
+    )
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
