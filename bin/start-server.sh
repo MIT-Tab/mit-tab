@@ -21,7 +21,7 @@ if [[ $(execute-mysql "show tables like 'tournament_initialized'") ]]; then
   echo "Tournament already initialized, skipping init phase";
 else
   echo "Initializing tournament";
-  python manage.py initialize_tourney --tab-password $TAB_PASSWORD;
+  python manage.py initialize_tourney --tab-password $TAB_PASSWORD --first-init;
   execute-mysql "CREATE TABLE tournament_initialized(id int not null, PRIMARY KEY (id));"
 fi
 

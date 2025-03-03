@@ -25,9 +25,20 @@ class Command(BaseCommand):
             help="Password for the entry user",
             nargs="?",
             default=User.objects.make_random_password(length=8))
+        parser.add_argument(
+            "--first-init",
+            dest="first_init",
+            help="Boolean specifying if this is the first initialization.\
+                  Disables backup before new tournament",
+            action="store_true",
+            default=False)
 
     def handle(self, *args, **options):
-        backup_round("before_new_tournament")
+        if not options["first_init"]:
+            self.stdout.write("Backing up the previous tournament data")
+            backup_round("before_new_tournament")
+        else:
+            self.stdout.write("Skipping backup for first initialization.")
         self.stdout.write("Clearing data from database")
         try:
             call_command("flush", interactive=False)
@@ -50,7 +61,7 @@ class Command(BaseCommand):
         TabSettings.set("cur_round", 1)
 
         self.stdout.write(
-            "Done setting up tournament, after backing up old one. "
+            "Done setting up tournament "
             "New tournament information:")
         self.stdout.write(
             "%s | %s" % ("Username".ljust(10, " "), "Password".ljust(10, " ")))
@@ -60,3 +71,5 @@ class Command(BaseCommand):
         self.stdout.write(
             "%s | %s" %
             ("entry".ljust(10, " "), options["entry_password"].ljust(10, " ")))
+        if options["first_init"]:
+            backup_round("inital_tournament")
