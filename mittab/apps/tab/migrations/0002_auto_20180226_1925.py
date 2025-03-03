@@ -14,10 +14,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RemoveField(
             model_name='debater',
-            name='phone',
-        ),
-        migrations.RemoveField(
-            model_name='debater',
             name='provider',
         ),
     ]

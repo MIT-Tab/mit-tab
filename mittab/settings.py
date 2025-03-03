@@ -130,6 +130,9 @@ CACHES = {
     }
 }
 
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+
 if os.environ.get("MITTAB_LOG_QUERIES"):
     LOGGING = {
         "version": 1,
