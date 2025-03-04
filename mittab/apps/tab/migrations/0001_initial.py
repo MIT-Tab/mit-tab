@@ -3,7 +3,6 @@
 
 from django.db import migrations, models
 import django.db.models.deletion
-import localflavor.us.models
 
 
 class Migration(migrations.Migration):
@@ -44,9 +43,6 @@ class Migration(migrations.Migration):
                                   serialize=False,
                                   verbose_name='ID')),
                 ('name', models.CharField(max_length=30, unique=True)),
-                ('phone',
-                 localflavor.us.models.PhoneNumberField(blank=True,
-                                                        max_length=20)),
                 ('provider', models.CharField(blank=True, max_length=40)),
                 ('novice_status',
                  models.IntegerField(choices=[(0, 'Varsity'), (1, 'Novice')])),
@@ -62,9 +58,6 @@ class Migration(migrations.Migration):
                                   verbose_name='ID')),
                 ('name', models.CharField(max_length=30, unique=True)),
                 ('rank', models.DecimalField(decimal_places=2, max_digits=4)),
-                ('phone',
-                 localflavor.us.models.PhoneNumberField(blank=True,
-                                                        max_length=20)),
                 ('provider', models.CharField(blank=True, max_length=40)),
             ],
         ),
