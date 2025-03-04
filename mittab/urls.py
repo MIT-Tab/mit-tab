@@ -129,6 +129,10 @@ urlpatterns = [
     re_path(r"^round/(\d+)/assign_judge/(\d+)/$",
             pairing_views.assign_judge,
             name="assign_judge"),
+    path("round/<int:round_id>/remove_judge/<int:judge_id>/",
+         pairing_views.remove_judge,
+         {"is_outround": False},
+         name="remove_judge"),
     re_path(r"^pairings/assign_team/(\d+)/(gov|opp)/(\d+)/$",
             pairing_views.assign_team,
             name="assign_team"),
@@ -170,6 +174,10 @@ urlpatterns = [
             name="enter_e_ballot"),
     path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),
     path("batch_checkin/", views.batch_checkin, name="batch_checkin"),
+    path("round/<int:round_id>/assign_chair/<int:chair_id>/",
+         pairing_views.assign_chair,
+         {"is_outround": False},
+         name="assign_chair"),
 
     # Outround related
     re_path(r"break/",
@@ -193,6 +201,10 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_assign_judge"),
+    path("outround/<int:round_id>/remove_judge/<int:judge_id>/",
+         pairing_views.remove_judge,
+         {"is_outround": True},
+         name="remove_judge"),
     re_path(r"^outround/pairings/assign_team/(\d+)/(gov|opp)/(\d+)/$",
             outround_pairing_views.assign_team,
             name="outround_assign_team"),
@@ -220,6 +232,10 @@ urlpatterns = [
     path("outround_choice/<int:outround_id>",
          outround_pairing_views.update_choice,
          name="update_choice"),
+    path("outround/<int:round_id>/assign_chair/<int:chair_id>/",
+         pairing_views.assign_chair,
+         {"is_outround": True},
+         name="assign_chair"),
 
     # Settings related
     re_path(r"^settings_form",

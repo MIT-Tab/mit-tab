@@ -168,6 +168,62 @@ function togglePairingRelease(event) {
   });
 }
 
+function handleJudgeRemoveClick(event) {
+  event.preventDefault();
+  const roundId = $(this).attr("round-id");
+  const judgeId = $(this).attr("judge-id");
+
+  const isOutround = $(this).hasClass("outround-judge-remove");
+  const endpointPrefix = isOutround ? "outround" : "round";
+
+  function handleRemoveSuccess(response) {
+    if (response.success) {
+      window.location.reload();
+    } else {
+      alert("Failed to remove judge.");
+    }
+  }
+
+  function handleRemoveError() {
+    alert("Error removing judge.");
+  }
+
+  $.ajax({
+    url: `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+    dataType: "json",
+    success: handleRemoveSuccess,
+    error: handleRemoveError
+  });
+}
+
+function handleChairClick(event) {
+  event.preventDefault();
+  const roundId = $(this).attr("round-id");
+  const judgeId = $(this).attr("judge-id");
+
+  const isOutround = $(this).hasClass("outround-judge-chair");
+  const endpointPrefix = isOutround ? "outround" : "round";
+
+  function handleAssignSuccess(response) {
+    if (response.success) {
+      window.location.reload();
+    } else {
+      alert("Failed to assign chair.");
+    }
+  }
+
+  function handleAssignError() {
+    alert("Error assigning chair.");
+  }
+
+  $.ajax({
+    url: `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+    dataType: "json",
+    success: handleAssignSuccess,
+    error: handleAssignError
+  });
+}
+
 $(document).ready(() => {
   populateTabCards();
   $("#team_ranking").each((_, element) => {
@@ -181,4 +237,16 @@ $(document).ready(() => {
   $(".team-toggle").click(populateAlternativeTeams);
   $(".alert-link").click(alertLink);
   $(".btn.release").click(togglePairingRelease);
+
+  $(document).on(
+    "click",
+    ".judge-chair, .outround-judge-chair",
+    handleChairClick
+  );
+
+  $(document).on(
+    "click",
+    ".judge-remove, .outround-judge-remove",
+    handleJudgeRemoveClick
+  );
 });
