@@ -2,7 +2,7 @@ import random
 import time
 import datetime
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
@@ -658,3 +658,35 @@ def delete_obj(obj_type):
     objs = obj_type.objects.all()
     for obj in objs:
         obj_type.delete(obj)
+
+def remove_judge(request, round_id, judge_id, is_outround=False):
+    round_id, judge_id = int(round_id), int(judge_id)
+    round_model = Outround if is_outround else Round
+    round_obj = get_object_or_404(round_model, id=round_id)
+    judge = get_object_or_404(Judge, id=judge_id)
+    all_judges = list(round_obj.judges.all().order_by("-rank"))
+    if judge in all_judges:
+        round_obj.judges.remove(judge)
+        all_judges.remove(judge)
+        if round_obj.chair == judge:
+            if all_judges:
+                round_obj.chair = all_judges[0]
+            else:
+                round_obj.chair = None
+            round_obj.save()
+        return JsonResponse({"success": True})
+    return redirect_and_flash_error(request, "Judge not found in round")
+
+def assign_chair(request, round_id, chair_id, is_outround=False):
+    round_id, chair_id = int(round_id), int(chair_id)
+    round_model = Outround if is_outround else Round
+    round_obj = get_object_or_404(round_model, id=round_id)
+    chair = get_object_or_404(Judge, id=chair_id)
+    if chair in round_obj.judges.all():
+        try:
+            round_obj.chair = chair
+            round_obj.save()
+            return JsonResponse({"success": True})
+        except ValueError:
+            return redirect_and_flash_error(request, "Chair could not be assigned")
+    return redirect_and_flash_error(request, "Judge not found in round")
