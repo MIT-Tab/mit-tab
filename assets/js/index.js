@@ -13,6 +13,7 @@ import checkinInit from "./batchCheckin";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
 import multiselectInit from "./multiselect";
+import "./backupList";
 
 function initializeConfirms() {
   $("[confirm]").click(e => {

@@ -92,9 +92,9 @@ Use cases:
 
 ### Creating a back-up
 
-1. Under the "Backups" menu in the navigation bar, select "Backup Current"
-2. You will now be redirected to the lists page, where you can see the backup
-   `manual_backup_round_{x}_{timestamp}` file
+1. Under the "Backups" menu in the navigation bar, select "View Backups"
+2. Name your backup, then click "Create Manual Backup"
+3. You will now be redirected to the lists page, where you can see the backup file
 3. (Optional) Click on the backup file and click the "Download Backup" copy to
    have a local version just in case
 

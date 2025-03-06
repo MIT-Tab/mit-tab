@@ -1,5 +1,4 @@
 import random
-import time
 import datetime
 
 from django.shortcuts import render, get_object_or_404
@@ -13,7 +12,8 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
-from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
+from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
+    UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 import mittab.libs.tab_logic as tab_logic
@@ -30,8 +30,8 @@ def pair_round(request):
         # We should pair the round
         try:
             TabSettings.set("pairing_released", 0)
-            backup.backup_round("round_%i_before_pairing" %
-                                (current_round_number))
+            backup.backup_round(
+                btype=backup.BEFORE_PAIRING)
 
             with transaction.atomic():
                 tab_logic.pair_round()
@@ -96,8 +96,10 @@ def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
         try:
-            backup.backup_round("round_%s_before_judge_assignment" %
-                                current_round_number)
+            backup.backup_round(
+                round_number=current_round_number,
+                btype=backup.BEFORE_JUDGE_ASSIGN
+                )
             assign_judges.add_judges()
         except Exception:
             emit_current_exception()
@@ -108,11 +110,8 @@ def assign_judges_to_pairing(request):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backup(request, filename):
-    backups = backup.list_backups()
-    item_list = []
-    item_type = "backup"
-    title = "Viewing Backup: {}".format(filename)
-    item_manip = "restore from that backup"
+    _, name, btype, round_num, btime = backup.get_metadata(filename)
+    title = "Viewing Backup: {}".format(name)
     links = [("/backup/download/{}/".format(filename), "Download Backup"),
              ("/backup/restore/{}/".format(filename), "Restore From Backup")]
     return render(request, "common/list_data.html", locals())
@@ -123,7 +122,8 @@ def download_backup(request, key):
     print("Trying to download {}".format(key))
     data = backup.get_backup_content(key)
     response = HttpResponse(data, content_type="text/plain")
-    response["Content-Disposition"] = "attachment; filename=%s" % key
+    filename = key.split("_")[0]
+    response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
 
@@ -146,29 +146,39 @@ def upload_backup(request):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def manual_backup(request):
-    try:
-        cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(
-            time.time())
-        now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
-        backup.backup_round("manual_backup_round_{}_{}_{}".format(
-            cur_round, btime, now))
-    except Exception:
-        emit_current_exception()
-        return redirect_and_flash_error(request, "Error creating backup")
-    return redirect_and_flash_success(
-        request,
-        "Backup created for round {} at timestamp {}".format(cur_round, btime))
+    if request.method == "POST":
+        form = BackupForm(request.POST)
+        if form.is_valid():
+            backup_name = form.cleaned_data["backup_name"]
+        try:
+
+            backup.backup_round(
+                name=backup_name,
+                btype=backup.MANUAL
+            )
+
+            cur_round = TabSettings.objects.get(key="cur_round").value
+            now = datetime.datetime.now().strftime("%Y-%m-%d_%I:%M")
+            return redirect_and_flash_success(request,
+                                              f"Backup {backup_name} created \
+                                                for round {cur_round} at {now}")
+        except Exception:
+            emit_current_exception()
+            return redirect_and_flash_error(request, "Error creating backup")
+
+    return redirect("view_backups")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backups(request):
     backups = backup.list_backups()
-    item_list = [(i, i, 0, "") for i in sorted(backups)]
-    item_type = "backup"
-    title = "Viewing All Backups"
-    item_manip = "restore from that backup"
-    links = [("/upload_backup/", "Upload Backup")]
-    return render(request, "common/list_data.html", locals())
+    backups.sort(key=lambda x: x[3])
+    form = BackupForm()
+
+    return render(request, "tab/backup_list.html", {
+        "backups": backups,
+        "form": form
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")

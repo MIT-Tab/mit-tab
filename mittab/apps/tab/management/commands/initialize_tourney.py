@@ -6,8 +6,7 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.models import TabSettings
-from mittab.libs.backup import backup_round
-
+from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT
 
 class Command(BaseCommand):
     help = "Setup a new tounament and backup the last one"
@@ -27,7 +26,8 @@ class Command(BaseCommand):
             default=User.objects.make_random_password(length=8))
 
     def handle(self, *args, **options):
-        backup_round("before_new_tournament")
+        backup_round(
+            btype=BEFORE_NEW_TOURNAMENT)
         self.stdout.write("Clearing data from database")
         try:
             call_command("flush", interactive=False)

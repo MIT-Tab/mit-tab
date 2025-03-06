@@ -6,7 +6,6 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q
 from django.shortcuts import redirect, reverse
-from django.utils import timezone
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -22,8 +21,10 @@ import mittab.libs.backup as backup
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
-        backup.backup_round("before_pairing_%s_%s" %
-                            (num_teams / 2, type_of_round))
+        backup.backup_round(
+            round_number=f"Outround {num_teams / 2}, {type_of_round})",
+            btype=backup.BEFORE_PAIRING)
+
 
         Outround.objects.filter(num_teams__lt=num_teams,
                                 type_of_round=type_of_round).delete()
@@ -125,7 +126,8 @@ def get_outround_options(var_teams_to_break,
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
-        backup.backup_round("before_the_break_%s" % (timezone.now().strftime("%H:%M"),))
+        backup.backup_round(
+            btype=backup.BEFORE_BREAK)
 
         success, msg = outround_tab_logic.perform_the_break()
 
