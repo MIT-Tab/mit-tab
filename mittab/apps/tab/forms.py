@@ -197,8 +197,12 @@ class ScratchForm(forms.ModelForm):
 
         super(ScratchForm, self).__init__(*args, **kwargs)
 
-        self.fields["team"].choices = [(team.id, team.name) for team in team_queryset]
-        self.fields["judge"].choices = [(judge.id, judge.name) for judge in judge_queryset]
+        self.fields["team"].choices = [
+            (team.id, team.name) for team in team_queryset
+        ]
+        self.fields["judge"].choices = [
+            (judge.id, judge.name) for judge in judge_queryset
+        ]
 
     class Meta:
         model = Scratch

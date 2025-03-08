@@ -23,9 +23,9 @@ def public_view_teams(request):
     return render(
         request, "public/teams.html", {
             "teams": Team.objects
-            .order_by("-checked_in", "school__name")
-            .prefetch_related("debaters", "school", "hybrid_school")
-            .all(),
+                     .order_by("-checked_in", "school__name")
+                     .prefetch_related("debaters", "school", "hybrid_school")
+                     .all(),
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
@@ -278,24 +278,26 @@ def tab_card(request, team_id):
     round_stats_by_round_and_debater_id = dict()
 
     for debater in team.debaters.all():
-        for rs in debater.roundstats_set.all():
-            if rs.round.round_number not in round_stats_by_round_and_debater_id:
-                round_stats_by_round_and_debater_id[rs.round.round_number] = dict(
-                )
+        for stat in debater.roundstats_set.all():
+            round_number = stat.round.round_number
+            debater_id = stat.debater.id
 
-            if rs.debater.id not in round_stats_by_round_and_debater_id[rs.round.round_number]:
-                round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id] = [
-                ]
+            if round_number not in round_stats_by_round_and_debater_id:
+                round_stats_by_round_and_debater_id[round_number] = dict()
 
-            round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id].append(
-                rs)
+            if debater_id not in round_stats_by_round_and_debater_id[round_number]:
+                round_stats_by_round_and_debater_id[round_number][debater_id] = []
+
+            round_stats_by_round_and_debater_id[round_number][debater_id].append(stat)
 
     for round_obj in rounds:
-        dstat1 = round_stats_by_round_and_debater_id[round_obj.round_number][deb1.id]
+        round_number = round_obj.round_number
+
+        dstat1 = round_stats_by_round_and_debater_id[round_number][deb1.id]
 
         dstat2 = []
         if not iron_man:
-            dstat2 = round_stats_by_round_and_debater_id[round_obj.round_number][deb2.id]
+            dstat2 = round_stats_by_round_and_debater_id[round_number][deb2.id]
 
         blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
 
