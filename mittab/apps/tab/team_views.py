@@ -244,39 +244,55 @@ def tab_card(request, team_id):
         team_id = int(team_id)
     except ValueError:
         return redirect_and_flash_error(request, "Invalid team id")
-    team = Team.objects.get(pk=team_id)
-    rounds = ([r for r in Round.objects.filter(gov_team=team)] +
-              [r for r in Round.objects.filter(opp_team=team)])
+    team = Team.with_preloaded_relations_for_tab_card().get(pk=team_id)
+
+    rounds = ([r for r in team.gov_team.all()] +
+              [r for r in team.opp_team.all()])
     rounds.sort(key=lambda x: x.round_number)
+
     debaters = [d for d in team.debaters.all()]
     iron_man = False
+
     if len(debaters) == 1:
         iron_man = True
+
     deb1 = debaters[0]
     if not iron_man:
         deb2 = debaters[1]
+
     round_stats = []
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
     cur_round = TabSettings.objects.get(key="cur_round").value
     blank = " "
+
     for i in range(num_rounds):
         round_stats.append([blank] * 7)
 
+    round_stats_by_round_and_debater_id = dict()
+
+    for debater in team.debaters.all():
+        for rs in debater.roundstats_set.all():
+            if rs.round.round_number not in round_stats_by_round_and_debater_id:
+                round_stats_by_round_and_debater_id[rs.round.round_number] = dict()
+
+            if rs.debater.id not in round_stats_by_round_and_debater_id[rs.round.round_number]:
+                round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id] = []
+
+            round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id].append(rs)
+
     for round_obj in rounds:
-        dstat1 = [
-            k for k in RoundStats.objects.filter(debater=deb1).filter(
-                round=round_obj).all()
-        ]
+        dstat1 = round_stats_by_round_and_debater_id[round_obj.round_number][deb1.id]
+
         dstat2 = []
         if not iron_man:
-            dstat2 = [
-                k for k in RoundStats.objects.filter(debater=deb2).filter(
-                    round=round_obj).all()
-            ]
+            dstat2 = round_stats_by_round_and_debater_id[round_obj.round_number][deb2.id]
+
         blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
+
         while len(dstat1) + len(dstat2) < 2:
             # Something is wrong with our data, but we don't want to crash
             dstat1.append(blank_rs)
+
         if not dstat2 and not dstat1:
             break
         if not dstat2:
@@ -285,7 +301,9 @@ def tab_card(request, team_id):
             dstat1, dstat2 = dstat2[0], dstat2[1]
         else:
             dstat1, dstat2 = dstat1[0], dstat2[0]
+
         index = round_obj.round_number - 1
+
         round_stats[index][3] = " - ".join(
             [j.name for j in round_obj.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
