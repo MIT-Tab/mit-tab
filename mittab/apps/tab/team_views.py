@@ -21,8 +21,10 @@ def public_view_teams(request):
 
     return render(
         request, "public/teams.html", {
-            "teams": Team.objects.order_by("-checked_in",
-                                           "school__name").all(),
+            "teams": Team.objects \
+                .order_by("-checked_in", "school__name") \
+                .prefetch_related("debaters", "school", "hybrid_school") \
+                .all(),
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
