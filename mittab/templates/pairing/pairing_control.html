@@ -23,76 +23,71 @@
       <div class="col-8">
         <h6>Pairing Controls</h6>
 
-        <form action="/pairing/assign_judges/"
-          method="post"
-          onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
-        >
-          {% csrf_token %}
-          <div class="btn-group btn-group-sm">
+          <form action="/pairing/assign_judges/"
+            method="post"
+            onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
+            class="d-inline"
+          >
+            {% csrf_token %}
             {% if judges_assigned %}
-            <button id="assign-judges" type="submit" class="mid btn btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
+            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges Again
             </button>
             {% else %}
-            <button id="assign-judges" type="submit" class="mid btn btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
+            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
             {% endif %}
-          </div>
-        </form>
+          </form>
 
-        <form action="/pairing/assign_rooms_to_pairing/" method="post" 
-          onsubmit="return confirm('Do you really want to assign rooms? All previous assignments will be lost. If you are unsure, click cancel and back up')" 
-          class="d-inline"
-        >
-          {% csrf_token %}
+          <form action="/pairing/assign_rooms_to_pairing/" method="post" 
+            onsubmit="return confirm('Do you really want to assign rooms? All previous assignments will be lost. If you are unsure, click cancel and back up')" 
+            class="d-inline"
+          >
+            {% csrf_token %}
 
-          <div class="btn-group btn-group-sm">
             {% if rooms_assigned %}
-            <button id="assign-rooms" type="submit" class="mid btn btn-success" title="Assign rooms to your pairing">
+            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-success" title="Assign rooms to your pairing">
               <i class="fas fa-chalkboard-teacher"></i> Assign Rooms Again
             </button>
             {% else %}
-            <button id="assign-rooms" type="submit" class="mid btn btn-warning" title="Assign rooms to your pairing">
+            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-warning" title="Assign rooms to your pairing">
               <i class="fas fa-chalkboard-teacher"></i> Assign Rooms
             </button>
             {% endif %}
-          </div>
-        </form>
+          </form>
 
-        {% if simulate_round_button %}
-        <form action="/pairings/simulate_rounds/" method="post" class="d-inline"> 
-          {% csrf_token %}
-          <div class="btn-group btn-group-sm">
-            <button id="simulate-round" type="submit" class="mid btn btn-primary" title="Simulate the round">
+          {% if simulate_round_button %}
+          <form action="/pairings/simulate_rounds/" method="post" class="d-inline"> 
+            {% csrf_token %}
+            <button id="simulate-round" type="submit" class="btn btn-sm btn-primary" title="Simulate the round">
               <i class="fas fa-play"></i> Simulate Round
             </button>
-          </div>
-        </form>
-        {% endif %}
+          </form>
+          {% endif %}
 
-        <a class="btn btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
-            id="close-pairings"
-            title="Release the pairings to the participants">
-          <i class="fas fa-door-closed"></i> Close Pairings
-        </a>
+          <a class="btn btn-sm btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
+              id="close-pairings"
+              title="Release the pairings to the participants">
+            <i class="fas fa-door-closed"></i> Close Pairings
+          </a>
 
-        <a class="btn btn-warning release {% if pairing_released %}d-none{% endif %}" href="#"
-            id="release-pairings"
-            title="Release the pairings to the participants">
-          <i class="fas fa-door-open"></i> Release Pairings
-        </a>
+          <a class="btn btn-sm btn-warning release {% if pairing_released %}d-none{% endif %}" href="#"
+              id="release-pairings"
+              title="Release the pairings to the participants">
+            <i class="fas fa-door-open"></i> Release Pairings
+          </a>
 
-        {% if round_number == tot_rounds %}
-        <a class="btn btn-info" href="{% url "break" %}" title="Break 'em">
-          <i class="fas fa-arrow-right"></i> Break 'em
-        </a>
-        {% else %}
-        <a class="btn btn-info" href="/pairing/pair_round" title="Pair the next round of debate">
-          <i class="fas fa-arrow-right"></i> Prepare Next Round
-        </a>
-        {% endif %}
-      </div>
+          {% if round_number == tot_rounds %}
+          <a class="btn btn-sm btn-info" href="{% url "break" %}" title="Break 'em">
+            <i class="fas fa-arrow-right"></i> Break 'em
+          </a>
+          {% else %}
+          <a class="btn btn-sm btn-info" href="/pairing/pair_round" title="Pair the next round of debate">
+            <i class="fas fa-arrow-right"></i> Prepare Next Round
+          </a>
+          {% endif %}
+        </div>
 
       <div class="col-4">
         <h6>Display Options</h6>
