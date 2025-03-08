@@ -2,7 +2,7 @@ import random
 import time
 import datetime
 
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
@@ -275,7 +275,9 @@ def view_round(request, round_number):
                              if not Bye.objects.filter(round_number=round_number,
                                                        bye_team=team).exists()]
     num_excluded = len(excluded_teams_no_bye)
-
+    simulate_round_button = os.environ.get("MITTAB_ENV") in (
+        "development", "test-deployment"
+    )
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
@@ -727,3 +729,35 @@ def delete_obj(obj_type):
     objs = obj_type.objects.all()
     for obj in objs:
         obj_type.delete(obj)
+
+def remove_judge(request, round_id, judge_id, is_outround=False):
+    round_id, judge_id = int(round_id), int(judge_id)
+    round_model = Outround if is_outround else Round
+    round_obj = get_object_or_404(round_model, id=round_id)
+    judge = get_object_or_404(Judge, id=judge_id)
+    all_judges = list(round_obj.judges.all().order_by("-rank"))
+    if judge in all_judges:
+        round_obj.judges.remove(judge)
+        all_judges.remove(judge)
+        if round_obj.chair == judge:
+            if all_judges:
+                round_obj.chair = all_judges[0]
+            else:
+                round_obj.chair = None
+            round_obj.save()
+        return JsonResponse({"success": True})
+    return redirect_and_flash_error(request, "Judge not found in round")
+
+def assign_chair(request, round_id, chair_id, is_outround=False):
+    round_id, chair_id = int(round_id), int(chair_id)
+    round_model = Outround if is_outround else Round
+    round_obj = get_object_or_404(round_model, id=round_id)
+    chair = get_object_or_404(Judge, id=chair_id)
+    if chair in round_obj.judges.all():
+        try:
+            round_obj.chair = chair
+            round_obj.save()
+            return JsonResponse({"success": True})
+        except ValueError:
+            return redirect_and_flash_error(request, "Chair could not be assigned")
+    return redirect_and_flash_error(request, "Judge not found in round")

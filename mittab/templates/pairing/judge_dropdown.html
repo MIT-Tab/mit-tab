@@ -1,3 +1,20 @@
+
+{% if current_judge_id %}
+<h6 class="text-center dropdown-header">Options</h6>
+
+<a href="#" class="btn btn-danger btn-sm dropdown-item {% if is_outround %}outround-judge-remove{% else %}judge-remove{% endif %}" round-id="{{round_obj.id}}" judge-id="{{current_judge_id}}">
+  Remove Judge
+</a>
+
+{% if current_judge_id != round_obj.chair.id %}
+<a href="#" class="btn btn-primary btn-sm dropdown-item {% if is_outround %}outround-judge-chair{% else %}judge-chair{% endif %}" round-id="{{round_obj.id}}" judge-id="{{current_judge_id}}">
+  Set To Chair
+</a>
+{% endif %}
+
+<div class="dropdown-divider"></div>
+{% endif %}
+
 <div class="form-group pl-2 pt-2 mb-1">
   <input id="quick-search"
         class="form-control form-control-sm" type="text" placeholder="Search...">
