@@ -178,9 +178,10 @@ def view_scratches(request, judge_id):
     except ValueError:
         return redirect_and_flash_error(request, "Received invalid data")
 
-    judge = Judge.objects.prefetch_related("scratches", "scratches__judge", "scratches__team").get(pk=judge_id)
+    judge = Judge.objects.prefetch_related(
+        "scratches", "scratches__judge", "scratches__team"
+    ).get(pk=judge_id)
     scratches = judge.scratches.all()
-    number_scratches = len(scratches)
 
     all_teams = Team.objects.all()
     all_judges = Judge.objects.all()

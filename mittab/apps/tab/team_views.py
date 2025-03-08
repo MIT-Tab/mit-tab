@@ -17,14 +17,15 @@ def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
     if not request.user.is_authenticated and not display_teams:
-        return redirect_and_flash_error(request, "This view is not public", path="/")
+        return redirect_and_flash_error(
+            request, "This view is not public", path="/")
 
     return render(
         request, "public/teams.html", {
-            "teams": Team.objects \
-                .order_by("-checked_in", "school__name") \
-                .prefetch_related("debaters", "school", "hybrid_school") \
-                .all(),
+            "teams": Team.objects
+            .order_by("-checked_in", "school__name")
+            .prefetch_related("debaters", "school", "hybrid_school")
+            .all(),
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
@@ -116,7 +117,8 @@ def enter_team(request):
             else:
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(team.display_backend),
+                    "Team {} created successfully".format(
+                        team.display_backend),
                     path="/")
     else:
         form = TeamEntryForm()
@@ -140,7 +142,12 @@ def add_scratches(request, team_id, number_scratches):
     all_judges = Judge.objects.all()
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i + 1), team_queryset=all_teams, judge_queryset=all_judges)
+            ScratchForm(
+                request.POST,
+                prefix=str(
+                    i + 1),
+                team_queryset=all_teams,
+                judge_queryset=all_judges)
             for i in range(number_scratches)
         ]
         all_good = True
@@ -273,12 +280,15 @@ def tab_card(request, team_id):
     for debater in team.debaters.all():
         for rs in debater.roundstats_set.all():
             if rs.round.round_number not in round_stats_by_round_and_debater_id:
-                round_stats_by_round_and_debater_id[rs.round.round_number] = dict()
+                round_stats_by_round_and_debater_id[rs.round.round_number] = dict(
+                )
 
             if rs.debater.id not in round_stats_by_round_and_debater_id[rs.round.round_number]:
-                round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id] = []
+                round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id] = [
+                ]
 
-            round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id].append(rs)
+            round_stats_by_round_and_debater_id[rs.round.round_number][rs.debater.id].append(
+                rs)
 
     for round_obj in rounds:
         dstat1 = round_stats_by_round_and_debater_id[round_obj.round_number][deb1.id]

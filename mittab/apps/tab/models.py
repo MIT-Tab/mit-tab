@@ -186,10 +186,6 @@ class Team(models.Model):
             "debaters__team_set__no_shows",
         )
 
-    """
-    Consolidate the knowledge of what relations need
-    to be pre-loaded to minimize queries for team stats
-    """
     @classmethod
     def with_preloaded_relations_for_tabbing(cls):
         return cls.objects.prefetch_related(
