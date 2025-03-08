@@ -17,7 +17,8 @@
 {% url "view_teams" as view_teams%}
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
-{% url "download_archive" as download_archive %}
+{% url "export_tournament" as export_tournament %}
+
 
 {% url "enter_debater" as enter_debater %}
 {% url "view_debaters" as view_debaters %}
@@ -76,8 +77,7 @@
             <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
             <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
             <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
-            <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
-          </div>
+            <a class="dropdown-item {%active request export_tournament %}" href="{{ export_tournament }}">Export Tournament</a>
         </li>
 
         <li class="nav-item dropdown">

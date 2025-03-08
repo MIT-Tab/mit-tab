@@ -86,6 +86,9 @@ urlpatterns = [
     re_path(r"^team/card/(\d+)/pretty/$",
             team_views.pretty_tab_card,
             name="pretty_tab_card"),
+    path("export_tournament/", views.export_tournament, name="export_tournament"),
+    re_path(r"^archive/download/(?P<format>json|csv|xml)/$",
+            views.export_tournament, name="export_tournament"),
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
@@ -278,9 +281,6 @@ urlpatterns = [
 
     # Data Upload
     path("import_data/", views.upload_data, name="upload_data"),
-
-    # Tournament Archive
-    path("archive/download/", views.generate_archive, name="download_archive"),
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
