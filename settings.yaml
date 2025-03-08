@@ -55,3 +55,8 @@
   description: "A toggle to indicate whether you would like to display who has choice, whether you would like this to be  be indicated on the pairing card, and bolded on the front-facing pairing display"
   value: false
   type: boolean
+- disable_room_seeding:
+  name: enable_room_seeding
+  description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
+  value: true
+  type: boolean

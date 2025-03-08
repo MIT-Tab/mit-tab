@@ -1,10 +1,13 @@
 import csv
 import json
+import os
+
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
+from django.core.management import call_command
 import yaml
 
 from mittab.libs.data_export.tab_card import JSONDecimalEncoder, \
@@ -459,6 +462,14 @@ def xml_archive(request, tournament_name):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
+
+@permission_required("tab.tab_settings.can_change", login_url="/403")
+def simulate_round(request):
+    enviornment = os.environ.get("MITTAB_ENV")
+    if enviornment in ("development", "test-deployment"):
+        call_command("simulate_rounds")
+        return redirect_and_flash_success(request, "Simulated round")
+    return redirect_and_flash_error(request, "Simulated rounds are disabled")
 
 def batch_checkin(request):
     judges_and_checkins = []

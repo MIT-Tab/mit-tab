@@ -4,7 +4,7 @@ import math
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from django.shortcuts import redirect, reverse
 from django.utils import timezone
 
@@ -372,6 +372,7 @@ def alternative_judges(request, round_id, judge_id=None):
 
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+    is_outround = True
 
     return render(request, "pairing/judge_dropdown.html", locals())
 
@@ -663,3 +664,30 @@ def forum_view(request, type_of_round):
     return render(request,
                   "outrounds/forum_result.html",
                   locals())
+
+def alternative_rooms(request, round_id, current_room_id=None):
+    round_obj = Outround.objects.get(id=int(round_id))
+    num_teams = round_obj.num_teams
+
+    current_room_obj = None
+    if current_room_id is not None:
+        try:
+            current_room_obj = Room.objects.get(id=int(current_room_id))
+        except Room.DoesNotExist:
+            pass
+
+    rooms = set(Room.objects.filter(
+        roomcheckin__round_number=0
+    ).annotate(
+        has_round=Exists(Outround.objects.filter(room_id=OuterRef("id"),
+                                                 num_teams=num_teams))
+    ).order_by("-rank"))
+
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
+    return render(request, "pairing/room_dropdown.html", {
+        "current_room": current_room_obj,
+        "round_obj": round_obj,
+        "viable_unpaired_rooms": viable_unpaired_rooms,
+        "viable_paired_rooms": viable_paired_rooms
+    })
