@@ -187,9 +187,18 @@ class TeamEntryForm(TeamForm):
 
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.all())
-    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    team = forms.ChoiceField(choices=[])
+    judge = forms.ChoiceField(choices=[])
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
+    def __init__(self, *args, **kwargs):
+        team_queryset = kwargs.pop('team_queryset', Team.objects.all())
+        judge_queryset = kwargs.pop('judge_queryset', Judge.objects.all())
+
+        super(ScratchForm, self).__init__(*args, **kwargs)
+        
+        self.fields['team'].choices = [(team.id, team.name) for team in team_queryset]
+        self.fields['judge'].choices = [(judge.id, judge.name) for judge in judge_queryset]
 
     class Meta:
         model = Scratch
