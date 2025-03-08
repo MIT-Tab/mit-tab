@@ -59,6 +59,62 @@ function assignTeam(e) {
   });
 }
 
+function assignRoom(e) {
+  e.preventDefault();
+  const $parent = $(this)
+    .parent()
+    .parent();
+  const roundId = $(e.target).attr("round-id");
+  const roomId = $(e.target).attr("room-id");
+  const curRoomId = $(e.target).attr("current-room-id");
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/assign_room/${roomId}/`;
+
+  let $buttonWrapper;
+  if (curRoomId) {
+    $buttonWrapper = $(`span[round-id=${roundId}][room-id=${curRoomId}]`);
+  }
+  const $button = $buttonWrapper.find(".btn-sm");
+  $button.addClass("disabled");
+
+  $.ajax({
+    url,
+    success(result) {
+      $button.removeClass("disabled");
+      $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.attr("room-id", result.room_id);
+      $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
+      $(`.room span[round-id=${roundId}] .room-toggle`).css(
+        "background-color",
+        result.room_color
+      );
+    }
+  });
+}
+
+function populateAlternativeRooms() {
+  const $parent = $(this).parent();
+  const roomId = $parent.attr("room-id");
+  const roundId = $parent.attr("round-id");
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}`;
+
+  $.ajax({
+    url,
+    success(result) {
+      $parent.find(".dropdown-menu").html(result);
+      $parent
+        .find(".dropdown-menu")
+        .find(".room-assign")
+        .click(assignRoom);
+      quickSearchInit($parent.find("#quick-search"));
+      $parent.find("#quick-search").focus();
+    }
+  });
+}
+
 function populateAlternativeTeams() {
   const $parent = $(this).parent();
   const teamId = $parent.attr("team-id");
@@ -232,9 +288,9 @@ $(document).ready(() => {
   $("#debater_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/debater/rank/");
   });
-
   $(".judge-toggle").click(populateAlternativeJudges);
   $(".team-toggle").click(populateAlternativeTeams);
+  $(".room-toggle").click(populateAlternativeRooms);
   $(".alert-link").click(alertLink);
   $(".btn.release").click(togglePairingRelease);
 

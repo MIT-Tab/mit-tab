@@ -497,7 +497,8 @@ class Round(models.Model):
         (ALL_DROP, "ALL DROP"),
         (ALL_WIN, "ALL WIN"),
     )
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    room = models.ForeignKey(
+        Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
