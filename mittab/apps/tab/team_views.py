@@ -134,10 +134,12 @@ def add_scratches(request, team_id, number_scratches):
     except Team.DoesNotExist:
         return redirect_and_flash_error(request,
                                         "The selected team does not exist")
+    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all()
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i))
-            for i in range(1, number_scratches + 1)
+            ScratchForm(request.POST, prefix=str(i + 1), team_queryset=all_teams, judge_queryset=all_judges)
+            for i in range(number_scratches)
         ]
         all_good = True
         for form in forms:
@@ -154,7 +156,9 @@ def add_scratches(request, team_id, number_scratches):
                 initial={
                     "team": team_id,
                     "scratch_type": 0
-                }
+                },
+                team_queryset=all_teams,
+                judge_queryset=all_judges
             ) for i in range(1, number_scratches + 1)
         ]
     return render(
@@ -173,10 +177,18 @@ def view_scratches(request, team_id):
     scratches = Scratch.objects.filter(team=team_id)
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
+    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all()
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i), instance=scratches[i - 1])
-            for i in range(1, number_scratches + 1)
+            ScratchForm(
+                request.POST,
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(number_scratches)
         ]
         all_good = True
         for form in forms:
@@ -188,9 +200,13 @@ def view_scratches(request, team_id):
                 request, "Scratches successfully modified")
     else:
         forms = [
-            ScratchForm(prefix=str(i), instance=scratches[i - 1])
-            for i in range(1,
-                           len(scratches) + 1)
+            ScratchForm(
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(len(scratches))
         ]
     delete_links = [
         "/team/" + str(team_id) + "/scratches/delete/" + str(scratches[i].id)
