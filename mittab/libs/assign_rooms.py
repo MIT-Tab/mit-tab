@@ -39,7 +39,7 @@ def add_rooms():
                 weight -= abs(pairing_i - room_i)
 
             # Bad room penalty
-            weight -= room.rank * 100
+            weight += room.rank * 100
 
             edge = (pairing_i, len(pairings) + room_i, weight)
             graph_edges.append(edge)
