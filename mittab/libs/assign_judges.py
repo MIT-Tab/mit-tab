@@ -7,6 +7,11 @@ from mittab.apps.tab.models import *
 def add_judges():
     current_round_number = TabSettings.get("cur_round") - 1
 
+    # First clear any existing judge assignments
+    Round.judges.through.objects.filter(
+        round__round_number=current_round_number
+    ).delete()
+
     judges = list(
         Judge.objects.filter(
             checkin__round_number=current_round_number
@@ -16,11 +21,6 @@ def add_judges():
         )
     )
     pairings = tab_logic.sorted_pairings(current_round_number)
-
-    # First clear any existing judge assignments
-    Round.judges.through.objects.filter(
-        round__round_number=current_round_number
-    ).delete()
 
     # Try to have consistent ordering with the round display
     random.seed(1337)
