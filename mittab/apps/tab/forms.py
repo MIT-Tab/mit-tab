@@ -212,8 +212,8 @@ class ScratchForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super(ScratchForm, self).save(commit=False)
         # Convert string IDs to actual model instances
-        instance.team = Team.objects.get(pk=int(self.cleaned_data['team']))
-        instance.judge = Judge.objects.get(pk=int(self.cleaned_data['judge']))
+        instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
+        instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
         if commit:
             instance.save()
         return instance
@@ -221,7 +221,7 @@ class ScratchForm(forms.ModelForm):
     class Meta:
         model = Scratch
         fields = "__all__"
-        exclude = ['team', 'judge']
+        exclude = ["team", "judge"]
 
 
 class DebaterForm(forms.ModelForm):
