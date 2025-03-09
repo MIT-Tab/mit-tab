@@ -464,6 +464,8 @@ def pretty_pair(request, printable=False):
             "chair",
             "judges",
             "room",
+            "gov_team__debaters",
+            "opp_team__debaters",
         )
     )
 
