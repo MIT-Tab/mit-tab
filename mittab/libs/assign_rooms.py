@@ -38,8 +38,8 @@ def add_rooms():
             if room_seeding:
                 weight -= abs(pairing_i - room_i)
 
-            # Bad room penalty
-            weight -= room.rank * 100
+            # Good room bonus
+            weight += room.rank * 100
 
             edge = (pairing_i, len(pairings) + room_i, weight)
             graph_edges.append(edge)
