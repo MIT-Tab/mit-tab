@@ -1,4 +1,4 @@
-FROM circleci/python:3.7.3-node-browsers
+FROM circleci/python:3.10-node-browsers
 
 RUN sudo apt-get update
 RUN sudo apt-get upgrade -y
