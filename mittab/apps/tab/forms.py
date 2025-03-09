@@ -198,15 +198,30 @@ class ScratchForm(forms.ModelForm):
         super(ScratchForm, self).__init__(*args, **kwargs)
 
         self.fields["team"].choices = [
-            (team.id, team.name) for team in team_queryset
+            (str(team.id), team.name) for team in team_queryset
         ]
         self.fields["judge"].choices = [
-            (judge.id, judge.name) for judge in judge_queryset
+            (str(judge.id), judge.name) for judge in judge_queryset
         ]
+
+        # If we're editing an existing scratch, set initial values
+        if self.instance and self.instance.pk:
+            self.fields["team"].initial = str(self.instance.team.id)
+            self.fields["judge"].initial = str(self.instance.judge.id)
+
+    def save(self, commit=True):
+        instance = super(ScratchForm, self).save(commit=False)
+        # Convert string IDs to actual model instances
+        instance.team = Team.objects.get(pk=int(self.cleaned_data['team']))
+        instance.judge = Judge.objects.get(pk=int(self.cleaned_data['judge']))
+        if commit:
+            instance.save()
+        return instance
 
     class Meta:
         model = Scratch
         fields = "__all__"
+        exclude = ['team', 'judge']
 
 
 class DebaterForm(forms.ModelForm):
