@@ -3,7 +3,7 @@ import pytest
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class PairingARoundTestCase(BaseWebTestCase):
     """
     Test pairing a round, assigning judges, and enterring ballots

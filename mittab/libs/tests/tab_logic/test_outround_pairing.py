@@ -8,7 +8,7 @@ from mittab.apps.tab.models import *
 from mittab.libs import outround_tab_logic
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestOutroundPairingLogic(TestCase):
     fixtures = ["testing_finished_db"]
     pytestmark = pytest.mark.django_db(transaction=True)
@@ -91,6 +91,4 @@ class TestOutroundPairingLogic(TestCase):
 
             var_teams_to_break /= 2
     
-    def tearDown(self):
-        super().tearDown()
-        cache.clear()
+

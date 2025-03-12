@@ -2,7 +2,7 @@ import pytest
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class SettingUpATournamentTestCase(BaseWebTestCase):
     """
     Tests setting up a tournament by entering rooms, judges, schools, debaters,

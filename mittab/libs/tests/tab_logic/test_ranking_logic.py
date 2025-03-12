@@ -9,7 +9,7 @@ from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tab_logic.rankings import TeamScore, DebaterScore
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestRankingLogic(TestCase):
     """Tests that the methods related to debater and team scoring work as
     expected"""
@@ -57,6 +57,4 @@ class TestRankingLogic(TestCase):
                 for pair in zip(left, right)
             ]
     
-    def tearDown(self):
-        super().tearDown()
-        cache.clear()
+

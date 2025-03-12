@@ -6,7 +6,7 @@ from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_judges import JudgeImporter
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestImportingJudges(TestCase):
     pytestmark = pytest.mark.django_db(transaction=True)
     fixtures = ["testing_empty"]

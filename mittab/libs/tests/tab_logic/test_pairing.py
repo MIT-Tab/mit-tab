@@ -11,7 +11,7 @@ from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestPairingLogic(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
@@ -79,7 +79,3 @@ class TestPairingLogic(TestCase):
         for _ in range(1, last_round):
             round_number = self.round_number()
             self.check_pairing(round_number, last_round)
-    
-    def tearDown(self):
-        super().tearDown()
-        cache.clear()
