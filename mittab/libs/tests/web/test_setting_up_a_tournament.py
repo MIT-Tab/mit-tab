@@ -127,6 +127,10 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         """
         Test adding an entity (i.e. School, Room, etc.) via the dashboard and verify
         that it was successfully added
+          - The model must have a name attribute used to determine links
+         - The name cannot be shared with any other entity
+         - Only submits data for plain text/number fields. Pass in a lambda for
+           the custom_form_logic parameter to fill in any additional fields
         """
         self._go_home()
         self.browser.find_by_xpath(f"//*[@id='{entity_name.lower()}-list-btn-add']").first.click()
@@ -148,6 +152,8 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
     def _submit_form(self, **data):
         """
         Submits the generic form used for model data with the passed data.
+        For more complex forms, (i.e. non-text data), fill that in before calling
+        this method.
         """
         for key, value in data.items():
             self.browser.fill(key, value)
