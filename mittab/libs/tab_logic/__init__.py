@@ -24,11 +24,10 @@ def pair_round():
         5) Calculate byes
         6) Calculate pull ups based on byes
         7) Pass in evened brackets to the perfect pairing algorithm
-        8) Assign rooms to pairings
 
     Judges are added later.
 
-    pairings are computed in the following format: [gov,opp,judge,room]
+    pairings are computed in the following format: [gov,opp,judge]
     and then saved immediately into the database
     """
     current_round = TabSettings.get("cur_round")
@@ -135,8 +134,6 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else:
                     pull_up = None
-                    # i is the last team in the bracket below
-                    i = len(list_of_teams[bracket - 1]) - 1
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [
                         r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
@@ -190,7 +187,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing bracket %i of size %i" % (bracket, len(temp)))
         for pair in temp:
-            pairings.append([pair[0], pair[1], None])
+            pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
         random.shuffle(pairings)
@@ -207,22 +204,11 @@ def pair_round():
             ),
         )
 
-    # Assign rooms (does this need to be random? maybe bad to have top
-    #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related(
-        "room"
-    )
-    rooms = map(lambda r: r.room, rooms)
-    rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
-
-    for i, pairing in enumerate(pairings):
-        pairing[2] = rooms[i]
-
     # Enter into database
     all_rounds = []
-    for gov, opp, room in pairings:
+    for gov, opp in pairings:
         round_obj = Round(
-            round_number=current_round, gov_team=gov, opp_team=opp, room=room
+            round_number=current_round, gov_team=gov, opp_team=opp
         )
         if gov in all_pull_ups:
             round_obj.pullup = Round.GOV

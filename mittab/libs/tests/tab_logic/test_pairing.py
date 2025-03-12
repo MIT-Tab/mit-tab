@@ -4,8 +4,9 @@ from django.test import TestCase
 from django.core.cache import cache
 import pytest
 
-from mittab.apps.tab.models import CheckIn, Judge, Room, RoomCheckIn, TabSettings, Round, Team
-from mittab.libs import assign_judges
+from mittab.apps.tab.models import CheckIn, Judge, Room, RoomCheckIn,\
+    TabSettings, Round, Team
+from mittab.libs import assign_judges, assign_rooms
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
@@ -44,8 +45,11 @@ class TestPairingLogic(TestCase):
         CheckIn.objects.bulk_create(checkins)
         RoomCheckIn.objects.bulk_create(room_checkins)
 
-    def assign_judges(self):
+    def assign_judges_to_pairing(self):
         assign_judges.add_judges()
+    
+    def assign_rooms_to_pairing(self):
+        assign_rooms.add_rooms()
 
     def round_number(self):
         return TabSettings.get("cur_round") - 1
@@ -54,7 +58,8 @@ class TestPairingLogic(TestCase):
         assert self.round_number() == round_number
         self.pair_round()
         assert self.round_number() == round_number + 1
-        self.assign_judges()
+        self.assign_judges_to_pairing()
+        self.assign_rooms_to_pairing()
         generate_results(round_number + 1, 0.05, 0.05)
         if round_number + 2 != last:
             tab_logic.validate_round_data(round_number + 2)
@@ -73,7 +78,6 @@ class TestPairingLogic(TestCase):
         self.generate_checkins(last_round)
         for _ in range(1, last_round):
             round_number = self.round_number()
-            print(f"Pairing round {round_number}")
             self.check_pairing(round_number, last_round)
     
     def tearDown(self):

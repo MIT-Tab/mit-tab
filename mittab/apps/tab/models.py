@@ -170,10 +170,22 @@ class Team(models.Model):
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
 
-    """
-    Consolidate the knowledge of what relations need
-    to be pre-loaded to minimize queries for team stats
-    """
+    @classmethod
+    def with_preloaded_relations_for_tab_card(cls):
+        return cls.objects.prefetch_related(
+            "gov_team",
+            "opp_team",
+            "gov_team__judges",
+            "opp_team__judges",
+            "gov_team__opp_team",
+            "opp_team__gov_team",
+            "debaters",
+            "debaters__roundstats_set",
+            "debaters__roundstats_set__round",
+            "debaters__team_set",
+            "debaters__team_set__no_shows",
+        )
+
     @classmethod
     def with_preloaded_relations_for_tabbing(cls):
         return cls.objects.prefetch_related(
@@ -497,7 +509,8 @@ class Round(models.Model):
         (ALL_DROP, "ALL DROP"),
         (ALL_WIN, "ALL WIN"),
     )
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    room = models.ForeignKey(
+        Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
