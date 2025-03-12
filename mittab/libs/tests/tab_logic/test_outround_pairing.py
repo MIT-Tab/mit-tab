@@ -1,16 +1,17 @@
 import random
 
 from django.test import TestCase
+from django.core.cache import cache
 import pytest
 
 from mittab.apps.tab.models import *
 from mittab.libs import outround_tab_logic
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestOutroundPairingLogic(TestCase):
     fixtures = ["testing_finished_db"]
-    pytestmark = pytest.mark.django_db
+    pytestmark = pytest.mark.django_db(transaction=True)
 
     def generate_checkins(self):
         for r in Room.objects.all():
@@ -89,3 +90,7 @@ class TestOutroundPairingLogic(TestCase):
             self.enter_results(BreakingTeam.VARSITY)
 
             var_teams_to_break /= 2
+    
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()

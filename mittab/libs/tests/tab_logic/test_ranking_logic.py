@@ -1,26 +1,28 @@
 from django.test import TestCase
+from django.core.cache import cache
 import pytest
 
-from mittab.apps.tab.models import Debater, Team
+from mittab.apps.tab.models import Debater, TabSettings, Team
 from mittab.libs.tests.assertion import assert_nearly_equal
 from mittab.libs.tests.data.load_data import load_debater_rankings
 from mittab.libs.tests.data.load_data import load_team_rankings
 from mittab.libs.tab_logic.rankings import TeamScore, DebaterScore
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestRankingLogic(TestCase):
     """Tests that the methods related to debater and team scoring work as
     expected"""
 
     fixtures = ["testing_finished_db"]
-    pytestmark = pytest.mark.django_db
+    pytestmark = pytest.mark.django_db(transaction=True)
 
     def test_debater_score(self):
         """ Comprehensive test of ranking calculations, done on real world
         data that has real world problems (e.g. teams not paired in, ironmen,
         etc ...)
         """
+        TabSettings.set("cur_round", 6)
         debaters = Debater.objects.order_by("pk")
         actual_scores = [(debater.name,
                           DebaterScore(debater).scoring_tuple()[:6])
@@ -39,6 +41,7 @@ class TestRankingLogic(TestCase):
     def test_team_score(self):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
+        TabSettings.set("cur_round", 6)
         teams = Team.objects.order_by("pk")
         actual_scores = [(team.name, TeamScore(team).scoring_tuple()[:8])
                          for team in teams]
@@ -53,3 +56,7 @@ class TestRankingLogic(TestCase):
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)
             ]
+    
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()

@@ -1,8 +1,14 @@
 import os
 import time
+import tempfile
 
 from django.test import LiveServerTestCase
+from django.core.cache import cache
 from selenium import webdriver
+from selenium.common.exceptions import NoAlertPresentException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from splinter import Browser
 
 from mittab.apps.tab.models import TabSettings
@@ -23,8 +29,10 @@ class BaseWebTestCase(LiveServerTestCase):
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--start-maximized")
             chrome_options.add_argument("--no-sandbox")
+            temp_dir = tempfile.mkdtemp()
+            chrome_options.add_argument("--user-data-dir=" + temp_dir)
             self.browser = Browser("chrome",
-                                   headless=False,
+                                   headless=True,
                                    wait_time=30,
                                    options=chrome_options)
         else:
@@ -38,6 +46,7 @@ class BaseWebTestCase(LiveServerTestCase):
     def tearDown(self):
         self.browser.quit()
         super(BaseWebTestCase, self).tearDown()
+        cache.clear()
 
     def _wait(self):
         time.sleep(self.wait_seconds)
@@ -48,29 +57,33 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.fill("password", self.password)
         self.browser.find_by_text("Sign in").first.click()
 
-        assert self.browser.is_text_present(
-            "Admin")  # checks that the nav is visible
-        assert not self.browser.is_text_present("Sign in")
+        assert self._wait_for_text("Admin")  # checks that the nav is visible
+        assert not self._wait_for_text("Sign in")
 
     def _go_home(self):
         self._visit("/")
 
-    def _setup_confirm(self):
-        """
-        First part of work-around to let phantomjs accept confirmation dialogs
-        http://stackoverflow.com/questions/19903146/confirm-alert-window-in-phantom-js
-        """
-        js_confirm = "window.confirm = function() { return true }"
-        self.browser.execute_script(js_confirm)
-
     def _accept_confirm(self):
-        """
-        Second part of work-around to let phantomjs accept confirmation dialogs
-        MUST call self._setup_confirm() for this to work
-        """
-        self.browser.execute_script("return window.confirm")
+        try:
+            alert = self.browser.driver.switch_to.alert
+            alert.accept()
+        except NoAlertPresentException:
+            pass
 
     def _visit(self, path):
         path = self.live_server_url + path
         self.browser.visit(path)
         self._wait()
+
+    def _wait_for_text(self, text, timeout=10, retries=5):
+        for attempt in range(retries):
+            try:
+                return WebDriverWait(self.browser.driver, timeout).until(
+                    EC.text_to_be_present_in_element((By.TAG_NAME, "body"), text)
+                )
+            except Exception as e:
+                if attempt < retries - 1:
+                    continue
+                print(e)
+                return False
+        return False
