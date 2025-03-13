@@ -8,8 +8,8 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
-    SettingsForm
+from mittab.apps.tab.forms import RoomTagForm, SchoolForm, RoomForm, \
+    UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -415,6 +415,38 @@ def simulate_round(request):
         call_command("simulate_rounds")
         return redirect_and_flash_success(request, "Simulated round")
     return redirect_and_flash_error(request, "Simulated rounds are disabled")
+
+def room_tag(request, tag_id=None):
+    tag = get_object_or_404(RoomTag, pk=tag_id) if tag_id else None
+
+    if request.method == "POST":
+        form = RoomTagForm(request.POST, instance=tag)
+
+        if not form.is_valid():
+            return redirect_and_flash_error(request, "Error saving tag.")
+        if form.cleaned_data.get("delete"):
+            form.save()
+            path = "/"
+            message = "Deleted successfully"
+        else:
+            priority = form.cleaned_data.get("priority")
+            if priority < 0 or priority > 100:
+                return redirect_and_flash_error(request,
+                                                "Priority must be between 0 and 100.")
+            tag_instance = form.save()
+            path = reverse("room_tag", args=[tag_instance.pk])
+            message = f"Tag {tag_instance.tag} \
+                {'updated' if tag else 'created'} successfully"
+        return redirect_and_flash_success(request, message,
+                                          path=path)
+
+    form = RoomTagForm(instance=tag)
+    return render(request, "common/data_entry.html", {
+        "form": form,
+        "links": [],
+        "tag_obj": tag,
+        "title": f"Viewing Tag: {tag.tag}" if tag else "Create New Tag"
+    })
 
 def batch_checkin(request):
     judges_and_checkins = []

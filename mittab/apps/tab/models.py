@@ -165,7 +165,7 @@ class Team(models.Model):
         (VARSITY, "Varsity"),
         (NOVICE, "Novice")
     )
-
+    room_tags = models.ManyToManyField("RoomTag", blank=True)
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
@@ -313,6 +313,7 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
@@ -379,6 +380,7 @@ class Scratch(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    tags = models.ManyToManyField("RoomTag", blank=True)
 
     def __str__(self):
         return self.name
@@ -597,3 +599,19 @@ class RoomCheckIn(models.Model):
     def __str__(self):
         return "Room %s is checked in for round %s" % (self.room,
                                                        self.round_number)
+
+DEFAULT_COLORS = [
+    "#f8d7da",
+    "#cce5ff",
+    "#d6d8db",
+    "#d4edda",
+    "#ffeeba",
+]
+
+class RoomTag(models.Model):
+    tag = models.CharField(max_length=255)
+    priority = models.DecimalField(max_digits=4, decimal_places=2)
+    color = models.CharField(max_length=7, default="#000000")
+
+    def __str__(self):
+        return self.tag

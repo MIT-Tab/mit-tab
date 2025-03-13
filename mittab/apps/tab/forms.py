@@ -687,3 +687,48 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+
+class RoomTagForm(forms.ModelForm):
+    # Add fields to handle many-to-many relationships
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    judges = forms.ModelMultipleChoiceField(
+        queryset=Judge.objects.all(),
+        required=False,
+    )
+
+    delete = forms.BooleanField(
+        required=False,
+        initial=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.team_set.all()
+            self.fields["judges"].initial = self.instance.judge_set.all()
+
+    def save(self, commit=True):
+        if self.cleaned_data.get("delete"):
+            if self.instance.pk:
+                self.instance.delete()
+            return None
+
+        room_tag = super().save(commit=False)
+
+        if commit:
+            room_tag.save()
+
+        if room_tag.pk:
+            self.save_m2m()
+            room_tag.team_set.set(self.cleaned_data["teams"])
+            room_tag.judge_set.set(self.cleaned_data["judges"])
+
+        return room_tag
+
+    class Meta:
+        model = RoomTag
+        fields = ("tag", "priority", "color", "teams", "judges")
