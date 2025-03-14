@@ -13,9 +13,23 @@ def add_rooms():
     round_number = TabSettings.get("cur_round") - 1
 
     rooms = RoomCheckIn.objects.filter(
-        round_number=round_number).select_related("room")
+        round_number=round_number).select_related("room").prefetch_related("room__tags")
     rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
-    pairings = tab_logic.sorted_pairings(round_number)
+    pairings = tab_logic.sorted_pairings(round_number, additional_prefetches=[
+        "gov_team__room_tags", "opp_team__room_tags", "judges__room_tags"
+    ])
+    
+    pairing_to_tag = {
+    pairing: set().union(
+            pairing.gov_team.room_tags.all(),
+            pairing.opp_team.room_tags.all(),
+            *(judge.room_tags.all() for judge in pairing.judges.all())
+        )
+        for pairing in pairings
+    }
+
+    
+    room_to_tag = {room : set(room.tags.all()) for room in rooms}
 
     if not room_seeding:
         random.shuffle(pairings)
@@ -31,6 +45,7 @@ def add_rooms():
     graph_edges = []
 
     for pairing_i, pairing in enumerate(pairings):
+        pairing_tags = pairing_to_tag[pairing]
         for room_i, room in enumerate(rooms):
             weight = 0
 
@@ -40,6 +55,9 @@ def add_rooms():
 
             # Good room bonus
             weight += room.rank * 100
+            
+            # Missing tags penalty
+            weight -= 1000 * sum(tag.priority for tag in (pairing_tags - room_to_tag[room]))
 
             edge = (pairing_i, len(pairings) + room_i, weight)
             graph_edges.append(edge)

@@ -133,16 +133,23 @@ def alternative_rooms(request, round_id, current_room_id=None):
             current_room_obj = Room.objects.get(id=int(current_room_id))
         except Room.DoesNotExist:
             pass
-
+        
     # Fetch all rooms checked in for the given round, ordered by rank
-    rooms = set(Room.objects.filter(
+    rooms = Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
-    ).order_by("-rank"))
+    ).order_by("-rank").prefetch_related("tags")
+    
+    required_tags = set().union(
+            round_obj.gov_team.room_tags.all(),
+            round_obj.opp_team.room_tags.all(),
+            *(judge.room_tags.all() for judge in round_obj.judges.all()))
+    
+    viable_rooms = set(room for room in rooms if set(room.tags.all()) >= required_tags)
 
-    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
-    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, viable_rooms))
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
