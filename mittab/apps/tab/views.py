@@ -33,7 +33,18 @@ def index(request):
     number_debaters = len(debater_list)
     number_rooms = len(room_list)
 
-    return render(request, "common/index.html", locals())
+    return render(request, "common/index.html", {
+        "number_teams": number_teams,
+        "number_judges": number_judges,
+        "number_schools": number_schools,
+        "number_debaters": number_debaters,
+        "number_rooms": number_rooms,
+        "school_list": school_list,
+        "judge_list": judge_list,
+        "team_list": team_list,
+        "debater_list": debater_list,
+        "room_list": room_list
+    })
 
 
 def tab_logout(request, *args):

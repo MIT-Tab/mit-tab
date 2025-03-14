@@ -37,12 +37,6 @@ def pair_next_outround(request, num_teams, type_of_round):
                                                   "type_of_round": type_of_round
                                               }))
 
-    # See if we can pair the round
-    title = "Pairing Outrounds"
-    current_round_number = 0
-
-    previous_round_number = TabSettings.get("tot_rounds", 5)
-
     check_status = []
 
     judges = outround_tab_logic.have_enough_judges_type(type_of_round)
@@ -72,18 +66,17 @@ def pair_next_outround(request, num_teams, type_of_round):
                                  num_teams)
     msg = "All Rounds properly entered for Round %s" % (
         round_label)
-    ready_to_pair = "Yes"
-    ready_to_pair_alt = "Checks passed!"
     try:
         outround_tab_logic.have_properly_entered_data(num_teams, type_of_round)
         check_status.append((msg, "Yes", "All rounds look good"))
     except PrevRoundNotEnteredError as e:
-        ready_to_pair = "No"
-        ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "Not all rounds are entered. %s" % str(e)))
 
-    return render(request, "pairing/pair_round.html", locals())
+    return render(request, "pairing/pair_round.html", {
+        "title": "Pairing Outrounds",
+        "check_status": check_status,
+    })
 
 
 def get_outround_options(var_teams_to_break,
@@ -138,7 +131,6 @@ def break_teams(request):
         )
 
     # See if we can pair the round
-    title = "Pairing Outrounds"
     current_round_number = 0
 
     previous_round_number = TabSettings.get("tot_rounds", 5)
@@ -148,24 +140,16 @@ def break_teams(request):
     msg = "All Rounds properly entered for Round %s" % (
         previous_round_number)
 
-    ready_to_pair = "Yes"
-    ready_to_pair_alt = "Checks passed!"
     try:
         tab_logic.have_properly_entered_data(current_round_number)
         check_status.append((msg, "Yes", "All rounds look good"))
     except PrevRoundNotEnteredError as e:
-        ready_to_pair = "No"
-        ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "Not all rounds are entered. %s" % str(e)))
     except ByeAssignmentError as e:
-        ready_to_pair = "No"
-        ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "You have a bye and results. %s" % str(e)))
     except NoShowAssignmentError as e:
-        ready_to_pair = "No"
-        ready_to_pair_alt = str(e)
         check_status.append(
             (msg, "No", "You have a noshow and results. %s" % str(e)))
 
@@ -177,7 +161,11 @@ def break_teams(request):
     else:
         check_status.append((msg, "No", "Not enough rooms"))
 
-    return render(request, "pairing/pair_round.html", locals())
+    return render(request, "pairing/pair_round.html", {
+        "title": "Pairing Outrounds",
+        "current_round_number": current_round_number,
+        "check_status" : check_status
+    })
 
 
 def outround_pairing_view(request,
@@ -310,7 +298,22 @@ def outround_pairing_view(request,
 
     return render(request,
                   "outrounds/pairing_base.html",
-                  locals())
+                  {
+                      "outround_options": outround_options,
+                      "outrounds": outrounds,
+                      "type_of_round": type_of_round,
+                      "num_teams": num_teams,
+                      "label": label,
+                      "pairing_exists": pairing_exists,
+                      "pairing_released": pairing_released,
+                      "excluded_people": excluded_people,
+                      "judge_slots": judge_slots,
+                      "var_to_nov": var_to_nov,
+                      "var_teams_to_break": var_teams_to_break,
+                      "nov_teams_to_break": nov_teams_to_break,
+                      "choice": choice,
+                      "warning": warning
+                  })
 
 
 def alternative_judges(request, round_id, judge_id=None):
@@ -374,7 +377,15 @@ def alternative_judges(request, round_id, judge_id=None):
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
     is_outround = True
 
-    return render(request, "pairing/judge_dropdown.html", locals())
+    return render(request, "pairing/judge_dropdown.html", {
+        "current_judge_id": current_judge_id,
+        "current_judge_name": current_judge_name,
+        "current_judge_rank": current_judge_rank,
+        "round_obj": round_obj,
+        "excluded_judges": excluded_judges,
+        "included_judges": included_judges,
+        "is_outround": is_outround
+    })
 
 
 def alternative_teams(request, round_id, current_team_id, position):
@@ -400,7 +411,13 @@ def alternative_teams(request, round_id, current_team_id, position):
         pk__in=excluded_teams
     )
 
-    return render(request, "pairing/team_dropdown.html", locals())
+    return render(request, "pairing/team_dropdown.html", {
+        "current_team": current_team,
+        "round_obj": round_obj,
+        "excluded_teams": excluded_teams,
+        "included_teams": included_teams,
+        "position": position
+        })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -545,7 +562,8 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
             "label": "[%s] Ro%s" % ("N" if type_of_round else "V", value),
             "rounds": Outround.objects.filter(num_teams=value,
                                               type_of_round=type_of_round),
-            "excluded": excluded_teams
+            "excluded": excluded_teams,
+            "gov_opp_display": gov_opp_display
         })
 
     label = "%s Outrounds Pairings" % ("Novice" if type_of_round else "Varsity",)
@@ -562,14 +580,24 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     team_count = len(paired_teams)
 
     pairing_exists = True
-    #pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
 
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
 
-    return render(request, "outrounds/pretty_pairing.html", locals())
+    return render(request, "outrounds/pretty_pairing.html", {
+        "label" : label,
+        "outround_pairings": outround_pairings,
+        "round_pairing": round_pairing,
+        "paired_teams": paired_teams,
+        "team_count": team_count,
+        "pairing_exists": pairing_exists,
+        "printable": printable,
+        "sidelock": sidelock,
+        "choice": choice,
+        "debater_team_memberships_public": debater_team_memberships_public,
+    })
 
 
 def pretty_pair_print(request, type_of_round=BreakingTeam.VARSITY):
@@ -663,7 +691,10 @@ def forum_view(request, type_of_round):
 
     return render(request,
                   "outrounds/forum_result.html",
-                  locals())
+                  {
+                      "results": results,
+                      "type_of_round": type_of_round
+                  })
 
 def alternative_rooms(request, round_id, current_room_id=None):
     round_obj = Outround.objects.get(id=int(round_id))
