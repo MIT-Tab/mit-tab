@@ -1,42 +1,45 @@
 {% extends "base/__wide.html" %}
 {% load tags %}
-
-{% block title %}Data Entry{% endblock %}
-
-{% block banner %} {{title}} {% endblock %}
-
+{% block title %}
+    Data Entry
+{% endblock title %}
+{% block banner %}
+    {{ title }}
+{% endblock banner %}
 {% block content %}
-<div class="col">
-  <div class="container-fluid">
-    <form action="" method="post" class="ballot-form" enctype="multipart/form-data">
-
-
-      <div class="row">
-        <div class="col">
-          <div class="alert alert-info">
-            <div class="form-group">
-              <label class="checkbox" for="discard_minority">
-                Check this box if you would like to discard any minority ballots.
-                This will ensure that you cannot have low point wins.
-              </label>
-              <input type="checkbox" id="discard_minority" class="form-control" name="discard_minority" value="minority" checked/>
-            </div>
-          </div>
+    <div class="col">
+        <div class="container-fluid">
+            <form action=""
+                  method="post"
+                  class="ballot-form"
+                  enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col">
+                        <div class="alert alert-info">
+                            <div class="form-group">
+                                <label class="checkbox" for="discard_minority">
+                                    Check this box if you would like to discard any minority ballots.
+                                    This will ensure that you cannot have low point wins.
+                                </label>
+                                <input type="checkbox"
+                                       id="discard_minority"
+                                       class="form-control"
+                                       name="discard_minority"
+                                       value="minority"
+                                       checked />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% for form in forms %}
+                    <div class="pb-4 mb-4 border-bottom">{% round_form form gov_team opp_team %}</div>
+                {% endfor %}
+                <div class="row">
+                    <div class="col">
+                        <input class="btn btn-primary" type="submit" value="Save" />
+                    </div>
+                </div>
+            </form>
         </div>
-      </div>
-
-      {% for form in forms %}
-      <div class="pb-4 mb-4 border-bottom">
-        {% round_form form gov_team opp_team %}
-      </div>
-      {% endfor %}
-
-      <div class="row">
-        <div class="col">
-          <input class="btn btn-primary" type="submit" value="Save"/>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-{% endblock %}
+    </div>
+{% endblock content %}

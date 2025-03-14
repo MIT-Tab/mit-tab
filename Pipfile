@@ -27,8 +27,9 @@ requests = "==2.31.0"
 selenium = "==3.141.0"
 splinter = "==0.10.0"
 Django = "==3.2.25"
-PyYAML = "==5.1.2"
+PyYAML = "*"
 sentry-sdk = {extras = ["django"], version = "*"}
+djlint = "*"
 
 [requires]
 python_version = "3.7"

@@ -1,20 +1,16 @@
 <!DOCTYPE html>
-
-<html>
-<head>
-    <title>Forum Result Display</title>
-
-    <style type="text/css">
-    </style>
-</head>
-
-<body>
-    {% for category in results %}
-	<h1>{{ category.label }}</h1>
-	
-	{% for result in category.results %}
-	    {{ result }}
-	    <br>
-	{% endfor %}
-    {% endfor %}
-</body>
+<html lang="en">
+    <head>
+        <title>Forum Result Display</title>
+        <style type="text/css"></style>
+    </head>
+    <body>
+        {% for category in results %}
+            <h1>{{ category.label }}</h1>
+            {% for result in category.results %}
+                {{ result }}
+                <br>
+            {% endfor %}
+        {% endfor %}
+    </body>
+</html>

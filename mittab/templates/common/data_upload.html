@@ -1,35 +1,29 @@
 {% extends "base/__normal.html" %}
-
-{% block title %} {{ title }} {% endblock %}
-
+{% block title %}
+    {{ title }}
+{% endblock title %}
 {% block content %}
-<div class="col-md-2"></div>
-<div class="col-md-8">
-  <h3 class="text-center">Upload Data Files</h3>
-  {% with obj_type="team" info_obj=team_info %}
-    {% include "common/_upload_error.html" %}
-  {% endwith %}
-
-  {% with obj_type="judge" info_obj=judge_info %}
-    {% include "common/_upload_error.html" %}
-  {% endwith %}
-
-  {% with obj_type="room" info_obj=room_info %}
-    {% include "common/_upload_error.html" %}
-  {% endwith %}
-
-  {% with obj_type="scratch" info_obj=scratch_info %}
-    {% include "common/_upload_error.html" %}
-  {% endwith %}
-
-  <p class="text-center">
-    Check out
-    <a href="https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5">
-      these templates
-    </a>
-    to get started and make sure to keep the header rows!
-  </p>
-  {% include "common/_form.html" %}
-</div>
-<div class="col-md-2"></div>
-{% endblock %}
+    <div class="col-md-2"></div>
+    <div class="col-md-8">
+        <h3 class="text-center">Upload Data Files</h3>
+        {% with obj_type="team" info_obj=team_info %}
+            {% include "common/_upload_error.html" %}
+        {% endwith %}
+        {% with obj_type="judge" info_obj=judge_info %}
+            {% include "common/_upload_error.html" %}
+        {% endwith %}
+        {% with obj_type="room" info_obj=room_info %}
+            {% include "common/_upload_error.html" %}
+        {% endwith %}
+        {% with obj_type="scratch" info_obj=scratch_info %}
+            {% include "common/_upload_error.html" %}
+        {% endwith %}
+        <p class="text-center">
+            Check out
+            <a href="https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5">these templates</a>
+            to get started and make sure to keep the header rows!
+        </p>
+        {% include "common/_form.html" %}
+    </div>
+    <div class="col-md-2"></div>
+{% endblock content %}

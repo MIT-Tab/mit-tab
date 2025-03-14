@@ -1,0 +1,9 @@
+{
+    "profile" : "django",
+    "ignore" : "D018,H017,H021,H030,H031",
+    "_comments": ["D018 = Internal links should use the {% url ... %}",
+                  "H017 = Tag should be self closing",
+                  "H021 = Inline styles should be avoided]",
+                  "H030 = Consider adding a meta description",
+                  "H031 = Consider adding meta keywords"]
+}

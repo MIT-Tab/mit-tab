@@ -1,16 +1,13 @@
 {% extends "base/__normal.html" %}
-
-{% block title %}Confirm Action{% endblock %}
-
+{% block title %}
+    Confirm Action
+{% endblock title %}
 {% block content %}
-<div class="col">
-  <center>
-    <h1>{{ title }}</h1>
-    <p class="lead">
-      This action is final. This will nuke everything, please backup and download if you are not sure.
-    </p>
-    <a class="btn btn-warning btn-lg" href='{{link}}'>{{confirm_text}}</a>
-  </center>
-</div>
-
-{% endblock %}
+    <div class="col">
+        <center>
+            <h1>{{ title }}</h1>
+            <p class="lead">This action is final. This will nuke everything, please backup and download if you are not sure.</p>
+            <a class="btn btn-warning btn-lg" href='{{ link }}'>{{ confirm_text }}</a>
+        </center>
+    </div>
+{% endblock content %}

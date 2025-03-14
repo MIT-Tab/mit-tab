@@ -1,21 +1,19 @@
 {% if info_obj.uploaded %}
-  {% if info_obj.errors %}
-  <div class="alert alert-danger">
-    <h6 class="alert-heading">
-      Errors in {{ obj_type }} file, all {{ obj_type }} uploads aborted
-      <small data-toggle="collapse" class="float-right" data-target="#{{ obj_type }}-errors">
-        Show/hide errors
-      </small>
-    </h6>
-    <div class="alert-content collapse show" id="{{ obj_type }}-errors">
-      <ul>
-        {% for error in info_obj.errors %}<li>{{ error }}</li>{% endfor %}
-      </ul>
-    </div>
-  </div>
-  {% else %}
-  <div class="alert alert-success">
-    Imported {{ obj_type }} file successfully
-  </div>
-  {% endif %}
+    {% if info_obj.errors %}
+        <div class="alert alert-danger">
+            <h6 class="alert-heading">
+                Errors in {{ obj_type }} file, all {{ obj_type }} uploads aborted
+                <small data-toggle="collapse"
+                       class="float-right"
+                       data-target="#{{ obj_type }}-errors">Show/hide errors</small>
+            </h6>
+            <div class="alert-content collapse show" id="{{ obj_type }}-errors">
+                <ul>
+                    {% for error in info_obj.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-success">Imported {{ obj_type }} file successfully</div>
+    {% endif %}
 {% endif %}

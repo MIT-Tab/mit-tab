@@ -1,70 +1,69 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
-<head>
-    {% load render_bundle from webpack_loader %}
-    {% render_bundle 'main' %}
-
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-    <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
-    <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
-    <link rel="stylesheet"
-        href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"
-        integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"
-        crossorigin="anonymous">
-    <title>{% block title %}{% endblock %}</title>
-</head>
-<body>
-  {% with smaller_width=True %}
-  {% include "base/_navigation.html" %}
-  {% endwith %}
-
-  <div class="container-fluid text-left">
-
-    <div id="container-main" class="container p-3 rounded shadow-sm">
-      <div class="row">
-        <div class="col">
-          {% if messages %}
-            {% for message in messages %}
-            <div class="alert {% if message.tags %}alert-{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}danger{% else %}{{ message.tags }}{% endif %}{% endif %}">
-              {{ message }}
+    <head>
+        {% load render_bundle from webpack_loader %}
+        {% render_bundle 'main' %}
+        <script type="text/javascript"
+                src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
+        <script type="text/javascript"
+                src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+        <link rel="stylesheet"
+              href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"
+              integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"
+              crossorigin="anonymous">
+        <title>
+            {% block title %}
+            {% endblock title %}
+        </title>
+    </head>
+    <body>
+        {% with smaller_width=True %}
+            {% include "base/_navigation.html" %}
+        {% endwith %}
+        <div class="container-fluid text-left">
+            <div id="container-main" class="container p-3 rounded shadow-sm">
+                <div class="row">
+                    <div class="col">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert {% if message.tags %}alert-{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}danger{% else %}{{ message.tags }}{% endif %}{% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <h3>
+                            {% block banner %}
+                            {% endblock banner %}
+                        </h3>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    {% block content %}
+                    {% endblock content %}
+                </div>
+                {% if links %}
+                    <div class="row mt-2 mb-2">
+                        <div class="col">
+                            <hr />
+                            <div class="btn-group">
+                                {% for link,text in links %}<a class="btn btn-sm btn-secondary" href="{{ link }}">{{ text }}</a>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
-            {% endfor %}
-          {% endif %}
+            <div class="row-fluid mt-3 text-center footer">
+                <small>
+                    Need help? Check out <a href="https://mit-tab.readthedocs.io">the documentation.</a>
+                    <br />
+                    MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz
+                </small>
+            </div>
         </div>
-      </div>
-
-      <div class="row">
-        <div class="col">
-          <h3>{% block banner %}{% endblock %}</h3>
-        </div>
-      </div>
-
-      <div class="row mt-2">
-        {% block content %}{% endblock %}
-      </div>
-
-      {% if links %}
-      <div class="row mt-2 mb-2">
-        <div class="col">
-          <hr/>
-          <div class="btn-group">
-            {% for link,text in links %}
-              <a class="btn btn-sm btn-secondary" href="{{link}}">{{text}}</a>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-      {%endif%}
-
-    </div>
-
-    <div class="row-fluid mt-3 text-center footer">
-      <small>
-        Need help? Check out <a href="https://mit-tab.readthedocs.io">the documentation.</a>
-        <br/>
-        MIT-TAB, published under the MIT License by Joey Lynch and Julia Boortz
-      </small>
-    </div>
-  </div>
-</body>
+    </body>
 </html>

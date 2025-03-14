@@ -1,16 +1,12 @@
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
     <head>
         {% load render_bundle from webpack_loader %}
         {% render_bundle 'publicDisplay' %}
-
         <title>Team List</title>
     </head>
-
     <body>
         <div id="scrollPage" class="hidden"></div>
-
         <div class="public_header">
             <h1>Team List</h1>
             <h3>({{ num_checked_in }} checked in)</h3>
@@ -24,30 +20,26 @@
                 </tr>
             </table>
         </div>
-
         <div class="public_header_spacer"></div>
-
-		<table class="public_table">
-			{% for team in teams %}
-			<tr>
-				<td style="width: 25%;">{{ team.display }}</td>
-				<td style="width: 15%;">{{ team.school.display }}</td>
-				<td style="width: 15%;">{{ team.hybrid_school.name }}</td>
-				<td style="width: 30%;">{{ team.debaters_display }}</td>
-				<td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
-			</tr>
-			{% endfor %}
-		</table>
-
+        <table class="public_table">
+            {% for team in teams %}
+                <tr>
+                    <td style="width: 25%;">{{ team.display }}</td>
+                    <td style="width: 15%;">{{ team.school.display }}</td>
+                    <td style="width: 15%;">{{ team.hybrid_school.name }}</td>
+                    <td style="width: 30%;">{{ team.debaters_display }}</td>
+                    <td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
+                </tr>
+            {% endfor %}
+        </table>
         <div class="pairings_footer_spacer"></div>
-
-		<div class="public_footer">
+        <div class="public_footer">
             <span class="right">
-				<label for="autoscroll">
-					Autoscroll:
-					<input type="checkbox" name="autoscroll" id="autoscroll" checked/>
-				</label>
-			</span>
-		</div>
+                <label for="autoscroll">
+                    Autoscroll:
+                    <input type="checkbox" name="autoscroll" id="autoscroll" checked />
+                </label>
+            </span>
+        </div>
     </body>
 </html>

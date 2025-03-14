@@ -1,17 +1,15 @@
 {% extends "base/__normal.html" %}
-
-{% block title %}Tab Card for {{team.display_backend}}{% endblock %}
-
-{% block banner %}Tab Card for {{team.display_backend}} {% endblock %}
-
+{% block title %}
+    Tab Card for {{ team.display_backend }}
+{% endblock title %}
+{% block banner %}
+    Tab Card for {{ team.display_backend }}
+{% endblock banner %}
 {% block content %}
-
-<div class="col">
-  <a class="btn btn-secondary" href="/team/{{team.id}}/">View {{team.display_backend}}</a>
-
-  <div style="padding:1em 0 0"></div>
-  <div class="tab_card_item" data-team-id={{team.id}}></div>
-</div>
-{% endblock %}
-
-
+    <div class="col">
+        <a class="btn btn-secondary" href="/team/{{ team.id }}/">View {{ team.display_backend }}</a>
+        <div style="padding:1em 0 0"></div>
+        <div class="tab_card_item" data-team-id={{ team.id }}>
+        </div>
+    </div>
+{% endblock content %}

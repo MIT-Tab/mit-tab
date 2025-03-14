@@ -1,35 +1,35 @@
 {% extends "base/__normal.html" %}
 {% load bootstrap4 %}
-
-{% block title %} {{title}} {% endblock %}
-{% block banner %} {{title}} {% endblock %}
-
+{% block title %}
+    {{ title }}
+{% endblock title %}
+{% block banner %}
+    {{ title }}
+{% endblock banner %}
 {% block content %}
-<div class="col-md-6">
-  <form method="post" action=""> {% csrf_token %}
-    {% for form, delete in forms %}
-    <div class="card mb-3">
-      <div class="card-header">
-        <h5 class="float-left">{{data_type}} #{{ form.prefix }}</h5>
-        {% if delete %}
-          <a class="btn btn-sm float-right btn-outline-danger"
-             confirm="Are you sure?"
-             href="{{delete}}">
-            <i class="fas fa-times"></i>
-          </a>
-        {% endif %}
-      </div>
-      <div class="card-body">
-        {% bootstrap_form form %}
-      </div>
+    <div class="col-md-6">
+        <form method="post" action="">
+            {% csrf_token %}
+            {% for form, delete in forms %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="float-left">{{ data_type }} #{{ form.prefix }}</h5>
+                        {% if delete %}
+                            <a class="btn btn-sm float-right btn-outline-danger"
+                               confirm="Are you sure?"
+                               href="{{ delete }}">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">{% bootstrap_form form %}</div>
+                </div>
+            {% endfor %}
+            {% if forms %}
+                <input type="submit" class="btn btn-primary" value="Submit" />
+            {% else %}
+                <p class="text-center lead">No scratches</p>
+            {% endif %}
+        </form>
     </div>
-    {% endfor %}
-
-    {% if forms %}
-    <input type="submit" class="btn btn-primary" value="Submit"/>
-    {% else %}
-    <p class="text-center lead">No scratches</p>
-    {% endif %}
-  </form>
-</div>
-{% endblock %}
+{% endblock content %}

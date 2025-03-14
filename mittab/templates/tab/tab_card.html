@@ -1,33 +1,29 @@
 <table id="pairing_list" class="table-bordered table">
-<thead>
-    <th>R</th>
-    <th>G/O</th>
-    <th>W/L</th>
-    <th>Opponent</th>
-    <th>Judge</th>
-    <th>
-      {{debater_1}} ({{debater_1_status|slice:":1" }})
-    </th>
-    <th>
-      {{debater_2}} ({{debater_2_status|slice:":1" }})
-    </th>
-    <th>Total</th>
-</thead>
-{% for round_stat in round_stats %}
-<tr>
-    <td>{{forloop.counter}}</td>
-    {% ifequal forloop.counter bye_round %}
-    <td>BYE</td>
-    {% else %}
-    <td>{{round_stat.0}}</td>
-    {% endifequal %}
-    <td>{{round_stat.1}}</td>
-    <td>{{round_stat.2}}</td>
-    <td>{{round_stat.3}}</td>
-    <td>{{round_stat.4}}</td>
-    <td>{{round_stat.5}}</td>
-    <td>{{round_stat.6}}</td>
-</tr>
+    <thead>
+        <th>R</th>
+        <th>G/O</th>
+        <th>W/L</th>
+        <th>Opponent</th>
+        <th>Judge</th>
+        <th>{{ debater_1 }} ({{ debater_1_status|slice:":1" }})</th>
+        <th>{{ debater_2 }} ({{ debater_2_status|slice:":1" }})</th>
+        <th>Total</th>
+    </thead>
+    {% for round_stat in round_stats %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            {% ifequal forloop.counter bye_round %}
+            <td>BYE</td>
+        {% else %}
+            <td>{{ round_stat.0 }}</td>
+        {% endifequal %}
+        <td>{{ round_stat.1 }}</td>
+        <td>{{ round_stat.2 }}</td>
+        <td>{{ round_stat.3 }}</td>
+        <td>{{ round_stat.4 }}</td>
+        <td>{{ round_stat.5 }}</td>
+        <td>{{ round_stat.6 }}</td>
+    </tr>
 {% endfor %}
 <tr>
     <td colspan=5>Tournament Totals:</td>
