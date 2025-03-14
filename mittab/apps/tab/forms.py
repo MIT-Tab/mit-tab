@@ -703,6 +703,12 @@ class RoomTagForm(forms.ModelForm):
         required=False,
         initial=False,
     )
+    
+    
+    color = forms.CharField(
+        required=False,  # Make color truly optional
+        widget=forms.TextInput(attrs={'placeholder': 'Optional color'}),  # Optional UI improvement
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -718,6 +724,9 @@ class RoomTagForm(forms.ModelForm):
             return None
 
         room_tag = super().save(commit=False)
+
+        if not self.cleaned_data.get("color"):
+            room_tag.color = "FFFFF"
 
         if commit:
             room_tag.save()

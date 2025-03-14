@@ -214,7 +214,9 @@ def view_room(request, room_id):
     return render(request, "common/data_entry.html", {
         "form": form,
         "links": [],
-        "title": "Viewing Room: %s" % (room.name)
+        "title": "Viewing Room: %s" % (room.name),
+        "show_room_tags": True,
+        "room_tags": RoomTag.objects.all()
     })
 
 
@@ -420,25 +422,26 @@ def room_tag(request, tag_id=None):
     tag = get_object_or_404(RoomTag, pk=tag_id) if tag_id else None
 
     if request.method == "POST":
+        if request.POST.get("_method") == "DELETE":
+            if tag:
+                tag.delete()
+                return redirect_and_flash_success(request, "Tag deleted successfully")
+            return redirect_and_flash_error(request, "Tag does not exist")
+
         form = RoomTagForm(request.POST, instance=tag)
 
         if not form.is_valid():
             return redirect_and_flash_error(request, "Error saving tag.")
-        if form.cleaned_data.get("delete"):
-            form.save()
-            path = "/"
-            message = "Deleted successfully"
-        else:
-            priority = form.cleaned_data.get("priority")
-            if priority < 0 or priority > 100:
-                return redirect_and_flash_error(request,
-                                                "Priority must be between 0 and 100.")
-            tag_instance = form.save()
-            path = reverse("room_tag", args=[tag_instance.pk])
-            message = f"Tag {tag_instance.tag} \
-                {'updated' if tag else 'created'} successfully"
+        priority = form.cleaned_data.get("priority")
+        if priority < 0 or priority > 100:
+            return redirect_and_flash_error(request,
+                                            "Priority must be between 0 and 100.")
+        tag_instance = form.save()
+        path = reverse("room_tag", args=[tag_instance.pk])
+        message = f"Tag {tag_instance.tag} \
+            {'updated' if tag else 'created'} successfully"
         return redirect_and_flash_success(request, message,
-                                          path=path)
+                                        path=path)
 
     form = RoomTagForm(instance=tag)
     return render(request, "common/data_entry.html", {
