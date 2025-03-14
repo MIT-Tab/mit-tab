@@ -1,61 +1,56 @@
 {% extends "base/__wide.html" %}
 {% load tags %}
-
-{% block title %}Data Entry{% endblock %}
-
-{% block banner %} {{title}} {% endblock %}
-
+{% block title %}
+    Data Entry
+{% endblock title %}
+{% block banner %}
+    {{ title }}
+{% endblock banner %}
 {% block content %}
-<div class="col">
-  {% quick_search %}
-  <div class="data-list">
-    <ul class="list_item">
-      {% for id, item, flags, symbols in item_list%}
-        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
-        </li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
-
-{% if filters %}
-<div class="col-4">
-  <div class="card mb-2">
-    <div class="card-header">Quick Filters</div>
-    <div class="card-body">
-      <ul class="list-group">
-        {% for filter_group in filters %}
-          {% for key, value in filter_group %}
-            <li class="list-group-item">
-              <div class="form-check">
-                <input class="form-check-input filter" type="checkbox" value="{{value}}"
-                      id="filter-{{key}}"
-                      data-filter-group="{{forloop.parent.counter}}"
-                      data-filter="{{key}}"/>
-                <label class="form-check-label" for="filter-{{key}}">
-                  {{value}}
-                </label>
-              </div>
-            </li>
-          {% endfor %}
-        {% endfor %}
-      </ul>
-
-      {% if symbol_text%}
-        <div class="symbol-legend mt-4">
-          {% for key, value in symbol_text %}
-          <span>{{key}}<small class="text-muted"> = {{value}}</small></span>
-          {% endfor %}
+    <div class="col">
+        {% quick_search %}
+        <div class="data-list">
+            <ul class="list_item">
+                {% for id, item, flags, symbols in item_list %}
+                    <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{% else %}odd{% endif %}"
+                        data-filters="{{ flags }}">
+                        <a class="no_decoration" href="/{{ item_type }}/{{ id }}">{{ item }} {{ symbols }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
         </div>
-      {% endif %}
     </div>
-  </div>
-</div>
-{% endif %}
-
-
-<div class="clear"></div>
-
-<div class="clear"></div>
-{% endblock %}
+    {% if filters %}
+        <div class="col-4">
+            <div class="card mb-2">
+                <div class="card-header">Quick Filters</div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for filter_group in filters %}
+                            {% for key, value in filter_group %}
+                                <li class="list-group-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input filter"
+                                               type="checkbox"
+                                               value="{{ value }}"
+                                               id="filter-{{ key }}"
+                                               data-filter-group="{{ forloop.parent.counter }}"
+                                               data-filter="{{ key }}" />
+                                        <label class="form-check-label" for="filter-{{ key }}">{{ value }}</label>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                    {% if symbol_text %}
+                        <div class="symbol-legend mt-4">
+                            {% for key, value in symbol_text %}<span>{{ key }}<small class="text-muted">= {{ value }}</small></span>{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    <div class="clear"></div>
+    <div class="clear"></div>
+{% endblock content %}

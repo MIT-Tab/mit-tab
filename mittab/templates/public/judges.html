@@ -1,48 +1,49 @@
 <!DOCTYPE html>
-
 {% load tags %}
-
-<html>
+<html lang="en">
     <head>
-	{% load render_bundle from webpack_loader %}
-	{% render_bundle 'publicDisplay' %}
-
-	<title>Judge List</title>
+        {% load render_bundle from webpack_loader %}
+        {% render_bundle 'publicDisplay' %}
+        <title>Judge List</title>
     </head>
     <body>
-        <div id="scrollPage" class="hidden"></div>	
-	<div class="public_header">
-	    <h1>Judge List</h1>
-	    <table class="public_table">
-		<tr>
-		    <th style="width: 25%;">Name</th>
-		    <th style="width: 40%;">Affiliations</th>
-		    {% for round in rounds %}
-			<th>R{{ round }}</th>
-		    {% endfor %}
-		</tr>
-	    </table>
-	</div>
-	<div class="public_header_spacer"></div>
-	<table class="public_table">
-	    {% for judge in judges %}
-		<tr>
-		    <td style="width: 25%;">{{ judge.name }}</td>
-		    <td style="width: 40%;">{{ judge.affiliations_display }}</td>
-		    {% for round in rounds %}
-			<td>{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
-		    {% endfor %}
-		</tr>
-	    {% endfor %}
-	</table>
+        <div id="scrollPage" class="hidden"></div>
+        <div class="public_header">
+            <h1>Judge List</h1>
+            <table class="public_table">
+                <tr>
+                    <th style="width: 25%;">Name</th>
+                    <th style="width: 40%;">Affiliations</th>
+                    {% for round in rounds %}<th>R{{ round }}</th>{% endfor %}
+                </tr>
+            </table>
+        </div>
+        <div class="public_header_spacer"></div>
+        <table class="public_table">
+            {% for judge in judges %}
+                <tr>
+                    <td style="width: 25%;">{{ judge.name }}</td>
+                    <td style="width: 40%;">{{ judge.affiliations_display }}</td>
+                    {% for round in rounds %}
+                        <td>
+                            {% if judge|is_checked_in:round %}
+                                {{ "✔" }}
+                            {% else %}
+                                X
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
         <div class="pairings_footer_spacer"></div>
-	<div class="public_footer">
+        <div class="public_footer">
             <span class="right">
-		<label for="autoscroll">
+                <label for="autoscroll">
                     Autoscroll:
-                    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
-		</label>
+                    <input type="checkbox" name="autoscroll" id="autoscroll" checked />
+                </label>
             </span>
-	</div>	
+        </div>
     </body>
 </html>

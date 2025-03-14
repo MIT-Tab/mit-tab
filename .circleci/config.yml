@@ -103,6 +103,9 @@ jobs:
       - run:
           name: Lint -- JS
           command: npm run lint
+      - run:
+          name: Lint -- HTML
+          command: pipenv run djlint .
   docs:
     docker:
       - image: circleci/python:3.8

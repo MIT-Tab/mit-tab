@@ -1,14 +1,15 @@
 {% extends "base/__normal.html" %}
-
-{% block title %}Data Entry{% endblock %}
-
-{% block banner %} {{title}} {% endblock %}
-
+{% block title %}
+    Data Entry
+{% endblock title %}
+{% block banner %}
+    {{ title }}
+{% endblock banner %}
 {% block content %}
-<div class="col-md-6">
-  {% include "common/_form.html" %}
-</div>
-<div class="col-md-6">
-    <div class="alert alert-warning">Please be careful editing these settings.  If you require assistance, please check out the <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html"> documentation!</a>
-</div>
-{% endblock %}
+    <div class="col-md-6">{% include "common/_form.html" %}</div>
+    <div class="col-md-6">
+        <div class="alert alert-warning">
+            Please be careful editing these settings.  If you require assistance, please check out the <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html">documentation!</a>
+        </div>
+    </div>
+{% endblock content %}

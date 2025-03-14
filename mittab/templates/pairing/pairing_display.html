@@ -1,191 +1,151 @@
 <!DOCTYPE html>
-
-<html>
-<head>
-    {% load render_bundle from webpack_loader %}
-    {% render_bundle 'pairingDisplay' %}
-
-    <title>Pairings for Round {{round_number}}</title>
-
-    <meta name="round-number" content="{{ round_number }}">
-
-    <style type="text/css">
-    </style>
-</head>
-
-<body class="show-team-names">
-
-{% if pairing_exists %}
-    {% if printable %}
-        <!-- Center pairings table -->
-        <table class="pairings_table printable">
-        <tr>
-            <th>
-                Government
-            </th> <th>
-                Opposition
-            </th> <th>
-                Judge
-            </th> <th>
-                Room
-            </th>
-        </tr>
-        {% for pairing in round_pairing %}
-        <tr>
-            <td>
-                <div class="team-names">
-                    {{pairing.gov_team.display}}
-                </div>
-                {% if debater_team_memberships_public %}
-                <div class="member-names">
-                    {{pairing.gov_team.debaters_display}}
-                </div>
-                {% endif %}
-            </td>
-            <td>
-                <div class="team-names">
-                    {{pairing.opp_team.display}}
-                </div>
-                {% if debater_team_memberships_public %}
-                <div class="member-names">
-                    {{pairing.opp_team.debaters_display}}
-                </div>
-                {% endif %}
-            </td>
-            <td>
-                {% for judge in pairing.judges.all %}
-                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-                    <b>{{judge.name}}</b><br>
-                    {% else %}
-                    {{judge.name}}<br>
+<html lang="en">
+    <head>
+        {% load render_bundle from webpack_loader %}
+        {% render_bundle 'pairingDisplay' %}
+        <title>Pairings for Round {{ round_number }}</title>
+        <meta name="round-number" content="{{ round_number }}">
+        <style type="text/css"></style>
+    </head>
+    <body class="show-team-names">
+        {% if pairing_exists %}
+            {% if printable %}
+                <!-- Center pairings table -->
+                <table class="pairings_table printable">
+                    <tr>
+                        <th>Government</th>
+                        <th>Opposition</th>
+                        <th>Judge</th>
+                        <th>Room</th>
+                    </tr>
+                    {% for pairing in round_pairing %}
+                        <tr>
+                            <td>
+                                <div class="team-names">{{ pairing.gov_team.display }}</div>
+                                {% if debater_team_memberships_public %}
+                                    <div class="member-names">{{ pairing.gov_team.debaters_display }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="team-names">{{ pairing.opp_team.display }}</div>
+                                {% if debater_team_memberships_public %}
+                                    <div class="member-names">{{ pairing.opp_team.debaters_display }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for judge in pairing.judges.all %}
+                                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                                        <b>{{ judge.name }}</b>
+                                        <br>
+                                    {% else %}
+                                        {{ judge.name }}
+                                        <br>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>{{ pairing.room.name }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+                <div class="pairings_footer_printable">
+                    {% if byes %}
+                        <span class="pairings_bye_label">Giving the Bye to:</span>
+                        {% for team in byes %}
+                            <span class="pairings_bye_entry">{{ team.display }}</span>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
                     {% endif %}
-                {% endfor %}
-            </td>
-            <td>{{pairing.room.name}}</td>
-        </tr>
-        {% endfor %}
-        </table>
-        <div class="pairings_footer_printable">
-            {% if byes %}
-                <span class="pairings_bye_label">Giving the Bye to:</span>
-                {% for team in byes %}
-                <span class="pairings_bye_entry">{{team.display}}</span>
-                {% if not forloop.last %},{% endif%}
-                {% endfor %}
-            {% endif %}
-            {% if errors %}
-                <span class="pairings_bye_label">Teams not Paired in:</span>
-                {% for team in errors %}
-                <span class="pairings_bye_entry">{{team.display}}</span>
-                {% if not forloop.last %},{% endif%}
-                {% endfor %}
-            {% endif %}
-        </div>
-
-    {% else %}
-        <div id="scrollPage" class="hidden"></div>
-        <!-- Floating top header -->
-        <div class="pairings_header">
-          <h1>Pairings for Round {{round_number}} </h1>
-          <h3>({{team_count}} teams)</h3>
-
-          <table class="pairings_table">
-              <tr>
-              <th>
-                  Government
-              </th> <th>
-                  Opposition
-              </th> <th>
-                  Judge
-              </th> <th>
-                  Room
-              </th>
-              </tr>
-          </table>
-        </div>
-
-        <div class="pairings_header_spacer"></div>
-
-        <!-- Center pairings table -->
-        <table class="pairings_table">
-        {% for pairing in round_pairing %}
-        <tr>
-            <td>
-                <div class="team-names">
-                    {{pairing.gov_team.display}}
-                </div>
-                {% if debater_team_memberships_public %}
-                <div class="member-names">
-                    {{pairing.gov_team.debaters_display}}
-                </div>
-                {% endif %}
-            </td>
-            <td>
-                <div class="team-names">
-                    {{pairing.opp_team.display}}
-                </div>
-                {% if debater_team_memberships_public %}
-                <div class="member-names">
-                    {{pairing.opp_team.debaters_display}}
-                </div>
-                {% endif %}
-            </td>
-            <td>
-                {% for judge in pairing.judges.all %}
-                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-                    <b>{{judge.name}}</b><br>
-                    {% else %}
-                    {{judge.name}}<br>
+                    {% if errors %}
+                        <span class="pairings_bye_label">Teams not Paired in:</span>
+                        {% for team in errors %}
+                            <span class="pairings_bye_entry">{{ team.display }}</span>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
                     {% endif %}
-                {% endfor %}
-            </td>
-            <td>{{pairing.room.name}}</td>
-        </tr>
-        {% endfor %}
-        </table>
-
-        <div class="pairings_footer_spacer"></div>
-
-        <!-- Floating bottom header -->
-        <div class="pairings_footer">
-            {% if byes %}
-                <span class="pairings_bye_label">Giving the Bye to:</span>
-                {% for team in byes %}
-                <span class="pairings_bye_entry">{{team.display}}</span>
-                {% if not forloop.last %},{% endif%}
-                {% endfor %}
+                </div>
+            {% else %}
+                <div id="scrollPage" class="hidden"></div>
+                <!-- Floating top header -->
+                <div class="pairings_header">
+                    <h1>Pairings for Round {{ round_number }}</h1>
+                    <h3>({{ team_count }} teams)</h3>
+                    <table class="pairings_table">
+                        <tr>
+                            <th>Government</th>
+                            <th>Opposition</th>
+                            <th>Judge</th>
+                            <th>Room</th>
+                        </tr>
+                    </table>
+                </div>
+                <div class="pairings_header_spacer"></div>
+                <!-- Center pairings table -->
+                <table class="pairings_table">
+                    {% for pairing in round_pairing %}
+                        <tr>
+                            <td>
+                                <div class="team-names">{{ pairing.gov_team.display }}</div>
+                                {% if debater_team_memberships_public %}
+                                    <div class="member-names">{{ pairing.gov_team.debaters_display }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="team-names">{{ pairing.opp_team.display }}</div>
+                                {% if debater_team_memberships_public %}
+                                    <div class="member-names">{{ pairing.opp_team.debaters_display }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for judge in pairing.judges.all %}
+                                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                                        <b>{{ judge.name }}</b>
+                                        <br>
+                                    {% else %}
+                                        {{ judge.name }}
+                                        <br>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>{{ pairing.room.name }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+                <div class="pairings_footer_spacer"></div>
+                <!-- Floating bottom header -->
+                <div class="pairings_footer">
+                    {% if byes %}
+                        <span class="pairings_bye_label">Giving the Bye to:</span>
+                        {% for team in byes %}
+                            <span class="pairings_bye_entry">{{ team.display }}</span>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if errors %}
+                        <span class="pairings_bye_label">Teams not Paired in:</span>
+                        {% for team in errors %}
+                            <span class="pairings_bye_entry">{{ team.display }}</span>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if debater_team_memberships_public %}
+                        <span class="right">
+                            <label for="Member Names">
+                                Member Names:
+                                <input type="checkbox" name="names" id="name_display_toggle" />
+                            </label>
+                        </span>
+                    {% endif %}
+                    <span class="right">
+                        <label for="autoscroll">
+                            Autoscroll:
+                            <input type="checkbox" name="autoscroll" id="autoscroll" checked />
+                        </label>
+                    </span>
+                </div>
             {% endif %}
-            {% if errors %}
-                <span class="pairings_bye_label">Teams not Paired in:</span>
-                {% for team in errors %}
-                <span class="pairings_bye_entry">{{team.display}}</span>
-                {% if not forloop.last %},{% endif%}
-                {% endfor %}
-            {% endif %}
-            {% if debater_team_memberships_public %}
-            <span class="right">
-            <label for="Member Names">
-                Member Names:
-                <input type="checkbox" name="names" id="name_display_toggle"/>
-            </label>
-            </span>
-            {% endif %}
-            <span class="right">
-              <label for="autoscroll">
-                Autoscroll:
-                <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
-              </label>
-            </span>
-        </div>
-    {% endif %}
-{% else %}
-
-    Round {{round_number}} does not yet have a valid pairing. Please wait until
-    your tournament directors release a valid pairing before viewing this page.
-
-{% endif %}
-
-</body>
-
+        {% else %}
+            Round {{ round_number }} does not yet have a valid pairing. Please wait until
+            your tournament directors release a valid pairing before viewing this page.
+        {% endif %}
+    </body>
 </html>
-

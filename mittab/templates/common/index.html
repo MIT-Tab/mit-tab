@@ -1,68 +1,57 @@
 {% extends "base/__wide.html" %}
 {% load tags %}
-
-{% block title %}Welcome to MIT Tab{% endblock %}
-
+{% block title %}
+    Welcome to MIT Tab
+{% endblock title %}
 {% block content %}
-
-{% url "view_judges" as view_judges %}
-{% url "view_schools" as view_schools %}
-{% url "view_teams" as view_teams %}
-{% url "view_debaters" as view_debaters %}
-{% url "view_rooms" as view_rooms %}
-
-{% url "enter_judge" as enter_judge %}
-{% url "enter_school" as enter_school %}
-{% url "enter_team" as enter_team %}
-{% url "enter_debater" as enter_debater %}
-{% url "enter_room" as enter_room %}
-
-
-
-<div class="col container-fluid index">
-  {% quick_search %}
-
-  <div class="row index_container">
-
-    {% with count=number_schools model_name="Schools" list_data=school_list %}
-      {% with html_id="school-list" list_path=view_schools %}
-        {% with enter_path=enter_school view_path_prefix="school" %}
-          {% include "common/_index_list.html" %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with count=number_judges model_name="Judges" list_data=judge_list %}
-      {% with html_id="judge-list" list_path=view_judges %}
-        {% with enter_path=enter_judge view_path_prefix="judge" %}
-          {% include "common/_index_list.html" %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with count=number_teams model_name="Teams" list_data=team_list %}
-      {% with html_id="team-list" list_path=view_teams %}
-        {% with enter_path=enter_team view_path_prefix="team" %}
-          {% include "common/_index_list.html" %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with count=number_debaters model_name="Debaters" list_data=debater_list %}
-      {% with html_id="debater-list" list_path=view_debaters %}
-        {% with enter_path=enter_debater view_path_prefix="debater" %}
-          {% include "common/_index_list.html" %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-
-    {% with count=number_rooms model_name="Rooms" list_data=room_list %}
-      {% with html_id="room-list" list_path=view_rooms %}
-        {% with enter_path=enter_room view_path_prefix="room" %}
-          {% include "common/_index_list.html" %}
-        {% endwith %}
-      {% endwith %}
-    {% endwith %}
-  </div>
-</div>
-{% endblock %}
+    {% url "view_judges" as view_judges %}
+    {% url "view_schools" as view_schools %}
+    {% url "view_teams" as view_teams %}
+    {% url "view_debaters" as view_debaters %}
+    {% url "view_rooms" as view_rooms %}
+    {% url "enter_judge" as enter_judge %}
+    {% url "enter_school" as enter_school %}
+    {% url "enter_team" as enter_team %}
+    {% url "enter_debater" as enter_debater %}
+    {% url "enter_room" as enter_room %}
+    <div class="col container-fluid index">
+        {% quick_search %}
+        <div class="row index_container">
+            {% with count=number_schools model_name="Schools" list_data=school_list %}
+                {% with html_id="school-list" list_path=view_schools %}
+                    {% with enter_path=enter_school view_path_prefix="school" %}
+                        {% include "common/_index_list.html" %}
+                    {% endwith %}
+                {% endwith %}
+            {% endwith %}
+            {% with count=number_judges model_name="Judges" list_data=judge_list %}
+                {% with html_id="judge-list" list_path=view_judges %}
+                    {% with enter_path=enter_judge view_path_prefix="judge" %}
+                        {% include "common/_index_list.html" %}
+                    {% endwith %}
+                {% endwith %}
+            {% endwith %}
+            {% with count=number_teams model_name="Teams" list_data=team_list %}
+                {% with html_id="team-list" list_path=view_teams %}
+                    {% with enter_path=enter_team view_path_prefix="team" %}
+                        {% include "common/_index_list.html" %}
+                    {% endwith %}
+                {% endwith %}
+            {% endwith %}
+            {% with count=number_debaters model_name="Debaters" list_data=debater_list %}
+                {% with html_id="debater-list" list_path=view_debaters %}
+                    {% with enter_path=enter_debater view_path_prefix="debater" %}
+                        {% include "common/_index_list.html" %}
+                    {% endwith %}
+                {% endwith %}
+            {% endwith %}
+            {% with count=number_rooms model_name="Rooms" list_data=room_list %}
+                {% with html_id="room-list" list_path=view_rooms %}
+                    {% with enter_path=enter_room view_path_prefix="room" %}
+                        {% include "common/_index_list.html" %}
+                    {% endwith %}
+                {% endwith %}
+            {% endwith %}
+        </div>
+    </div>
+{% endblock content %}

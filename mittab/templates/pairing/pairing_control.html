@@ -1,171 +1,191 @@
 {% extends "base/__wide.html" %}
-
-{% block title %}Round Status{% endblock %}
-
+{% block title %}
+    Round Status
+{% endblock title %}
 {% block content %}
-<div id="round-number" data-round-number={{ round_number }} style="display: none;"></div>
-
-<div class="col">
-  <div class="containter">
-    <div class="row">
-      <div class="col">
-        <h3>
-          Round Status for Round {{round_number}}:
-          <small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
-            {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
-          </small>
-        </h3>
-      </div>
-    </div> <!-- end heading row -->
-
-
-    <div class="row mb-3">
-      <div class="col-8">
-        <h6>Pairing Controls</h6>
-
-          <form action="/pairing/assign_judges/"
-            method="post"
-            onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
-            class="d-inline"
-          >
-            {% csrf_token %}
-            {% if judges_assigned %}
-            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
-              <i class="fas fa-gavel"></i> Assign Judges Again
-            </button>
-            {% else %}
-            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" href="/pairing/assign_judges/" title="Assign judges to your pairing">
-              <i class="fas fa-gavel"></i> Assign Judges
-            </button>
-            {% endif %}
-          </form>
-
-          <form action="/pairing/assign_rooms_to_pairing/" method="post" 
-            onsubmit="return confirm('Do you really want to assign rooms? All previous assignments will be lost. If you are unsure, click cancel and back up')" 
-            class="d-inline"
-          >
-            {% csrf_token %}
-
-            {% if rooms_assigned %}
-            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-success" title="Assign rooms to your pairing">
-              <i class="fas fa-chalkboard-teacher"></i> Assign Rooms Again
-            </button>
-            {% else %}
-            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-warning" title="Assign rooms to your pairing">
-              <i class="fas fa-chalkboard-teacher"></i> Assign Rooms
-            </button>
-            {% endif %}
-          </form>
-
-          {% if simulate_round_button %}
-          <form action="/pairings/simulate_rounds/" method="post" class="d-inline"> 
-            {% csrf_token %}
-            <button id="simulate-round" type="submit" class="btn btn-sm btn-primary" title="Simulate the round">
-              <i class="fas fa-play"></i> Simulate Round
-            </button>
-          </form>
-          {% endif %}
-
-          <a class="btn btn-sm btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
-              id="close-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-closed"></i> Close Pairings
-          </a>
-
-          <a class="btn btn-sm btn-warning release {% if pairing_released %}d-none{% endif %}" href="#"
-              id="release-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-open"></i> Release Pairings
-          </a>
-
-          {% if round_number == tot_rounds %}
-          <a class="btn btn-sm btn-info" href="{% url "break" %}" title="Break 'em">
-            <i class="fas fa-arrow-right"></i> Break 'em
-          </a>
-          {% else %}
-          <a class="btn btn-sm btn-info" href="/pairing/pair_round" title="Pair the next round of debate">
-            <i class="fas fa-arrow-right"></i> Prepare Next Round
-          </a>
-          {% endif %}
+    <div id="round-number"
+         data-round-number="{{ round_number }}"
+         style="display: none"></div>
+    <div class="col">
+        <div class="containter">
+            <div class="row">
+                <div class="col">
+                    <h3>
+                        Round Status for Round {{ round_number }}:
+                        <small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if not errors or num_excluded == 0 %}
+                                Valid
+                            {% else %}
+                                Invalid
+                            {% endif %}
+                            pairing
+                        </small>
+                    </h3>
+                </div>
+            </div>
+            <!-- end heading row -->
+            <div class="row mb-3">
+                <div class="col-8">
+                    <h6>Pairing Controls</h6>
+                    <form action="/pairing/assign_judges/"
+                          method="post"
+                          onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
+                          class="d-inline">
+                        {% csrf_token %}
+                        {% if judges_assigned %}
+                            <button id="assign-judges"
+                                    type="submit"
+                                    class="mid btn btn-sm btn-success"
+                                    href="/pairing/assign_judges/"
+                                    title="Assign judges to your pairing">
+                                <i class="fas fa-gavel"></i> Assign Judges Again
+                            </button>
+                        {% else %}
+                            <button id="assign-judges"
+                                    type="submit"
+                                    class="mid btn btn-sm btn-warning"
+                                    href="/pairing/assign_judges/"
+                                    title="Assign judges to your pairing">
+                                <i class="fas fa-gavel"></i> Assign Judges
+                            </button>
+                        {% endif %}
+                    </form>
+                    <form action="/pairing/assign_rooms_to_pairing/"
+                          method="post"
+                          onsubmit="return confirm('Do you really want to assign rooms? All previous assignments will be lost. If you are unsure, click cancel and back up')"
+                          class="d-inline">
+                        {% csrf_token %}
+                        {% if rooms_assigned %}
+                            <button id="assign-rooms"
+                                    type="submit"
+                                    class="mid btn btn-sm btn-success"
+                                    title="Assign rooms to your pairing">
+                                <i class="fas fa-chalkboard-teacher"></i> Assign Rooms Again
+                            </button>
+                        {% else %}
+                            <button id="assign-rooms"
+                                    type="submit"
+                                    class="mid btn btn-sm btn-warning"
+                                    title="Assign rooms to your pairing">
+                                <i class="fas fa-chalkboard-teacher"></i> Assign Rooms
+                            </button>
+                        {% endif %}
+                    </form>
+                    {% if simulate_round_button %}
+                        <form action="/pairings/simulate_rounds/" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button id="simulate-round"
+                                    type="submit"
+                                    class="btn btn-sm btn-primary"
+                                    title="Simulate the round">
+                                <i class="fas fa-play"></i> Simulate Round
+                            </button>
+                        </form>
+                    {% endif %}
+                    <a class="btn btn-sm btn-success release {% if not pairing_released %}d-none{% endif %}"
+                       href="#"
+                       id="close-pairings"
+                       title="Release the pairings to the participants">
+                        <i class="fas fa-door-closed"></i> Close Pairings
+                    </a>
+                    <a class="btn btn-sm btn-warning release {% if pairing_released %}d-none{% endif %}"
+                       href="#"
+                       id="release-pairings"
+                       title="Release the pairings to the participants">
+                        <i class="fas fa-door-open"></i> Release Pairings
+                    </a>
+                    {% if round_number == tot_rounds %}
+                        <a class="btn btn-sm btn-info"
+                           href="{% url "break" %}"
+                           title="Break 'em">
+                            <i class="fas fa-arrow-right"></i> Break 'em
+                        </a>
+                    {% else %}
+                        <a class="btn btn-sm btn-info"
+                           href="/pairing/pair_round"
+                           title="Pair the next round of debate">
+                            <i class="fas fa-arrow-right"></i> Prepare Next Round
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="col-4">
+                    <h6>Display Options</h6>
+                    <div class="btn-group btn-group-sm">
+                        <a class="btn btn-secondary"
+                           href="/pairings/pairinglist/"
+                           title="To display in GA">
+                            <i class="fas fa-tv"></i> Announcement View
+                        </a>
+                        <a class="btn btn-secondary"
+                           href="/pairings/pairinglist/printable"
+                           title="Printable version of the GA view">
+                            <i class="fas fa-print"></i> Printable View
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <!-- end control row -->
+            <div class="row">
+                <div class="col-12">
+                    {% if errors %}
+                        {% for error in errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+                    {% endif %}
+                    {% if num_excluded > 0 %}
+                        <div class="alert alert-danger">
+                            {{ num_excluded }} teams are checked-in but have no round or bye.
+                            <button class="btn btn-small btn-link"
+                                    data-toggle="collapse"
+                                    data-target="#excluded_teams_no_bye">Show/Hide</button>
+                            <div id="excluded_teams_no_bye" class="collapse">
+                                {% for team in excluded_teams_no_bye %}
+                                    {{ team.name }}
+                                    <br>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- end alert row -->
+            <div class="row">
+                {% for pairing in round_info %}
+                    <div class="col-xl-6">{% include "pairing/_pairing_card.html" %}</div>
+                {% endfor %}
+            </div>
+            <!-- end pairings row -->
+            <div class="row mt-2 mb-2">
+                <div class="col not-paired-in overflow-auto border-bottom">
+                    <h5>People Not Paired In</h5>
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <th>Checked in Teams ({{ excluded_teams|length }})</th>
+                            <th>Checked in Judges ({{ excluded_judges|length }})</th>
+                            <th>Non Checked in Judges ({{ non_checkins|length }})</th>
+                            <th>Available Rooms ({{ available_rooms|length }})</th>
+                        </thead>
+                        {% for team, cjudge, judge, room in excluded_people %}
+                            <tr>
+                                <td>
+                                    {% if team %}<a href="/team/{{ team.id }}">{{ team.name }}</a>{% endif %}
+                                </td>
+                                <td>
+                                    {% if cjudge %}<a href="/judge/{{ cjudge.id }}">{{ cjudge.name }}</a>{% endif %}
+                                </td>
+                                <td>
+                                    {% if judge %}
+                                        <a class="{% if judge.rank > warning %}text-danger{% endif %}"
+                                           href="/judge/{{ judge.id }}">{{ judge.name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if room %}<a href="/room/{{ room.id }}">{{ room.name }}</a>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+            <!-- end not-paired-in row -->
         </div>
-
-      <div class="col-4">
-        <h6>Display Options</h6>
-
-        <div class="btn-group btn-group-sm">
-          <a class="btn btn-secondary" href="/pairings/pairinglist/" title="To display in GA">
-            <i class="fas fa-tv"></i> Announcement View
-          </a>
-
-          <a class="btn btn-secondary" href="/pairings/pairinglist/printable" title="Printable version of the GA view">
-            <i class="fas fa-print"></i> Printable View
-          </a>
-        </div>
-      </div>
-    </div> <!-- end control row -->
-
-    <div class="row">
-      <div class="col-12">
-        {% if errors %}
-        {% for error in errors %}
-        <div class="alert alert-danger">{{ error }}</div>
-        {% endfor %}
-        {% endif %}
-
-        {% if num_excluded > 0 %}
-        <div class="alert alert-danger">
-          {{ num_excluded }} teams are checked-in but have no round or bye.
-
-          <button class="btn btn-small btn-link" data-toggle="collapse" data-target="#excluded_teams_no_bye">Show/Hide</button>
-
-          <div id="excluded_teams_no_bye" class="collapse">
-          {% for team in excluded_teams_no_bye %}
-          {{ team.name }}<br>
-          {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-      </div>
-    </div><!-- end alert row -->
-
-    <div class="row">
-      {% for pairing in round_info %}
-      <div class="col-xl-6">
-      {% include "pairing/_pairing_card.html" %}
-      </div>
-      {% endfor %}
-    </div> <!-- end pairings row -->
-
-    <div class="row mt-2 mb-2">
-      <div class="col not-paired-in overflow-auto border-bottom">
-        <h5>People Not Paired In</h5>
-        <table class="table table-striped table-sm">
-          <thead>
-            <th>Checked in Teams ({{ excluded_teams|length }})</th>
-            <th>Checked in Judges ({{ excluded_judges|length }})</th>
-            <th>Non Checked in Judges ({{ non_checkins|length }})</th>
-            <th>Available Rooms ({{ available_rooms|length }})</th>
-          </thead>
-          {% for team, cjudge, judge, room in excluded_people %}
-          <tr>
-            <td>
-              {% if team %} <a href="/team/{{team.id}}" >{{team.name}}</a> {% endif %}
-            </td>
-            <td>
-              {% if cjudge %} <a href="/judge/{{cjudge.id}}" >{{cjudge.name}}</a> {% endif %}
-            </td>
-            <td>
-              {% if judge %} <a class="{% if judge.rank > warning %}text-danger{%endif%}"href="/judge/{{judge.id}}" >{{judge.name}}</a> {% endif %}
-            </td>
-            <td>
-              {% if room %} <a href="/room/{{room.id}}" >{{room.name}}</a> {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </table>
-      </div>
-    </div><!-- end not-paired-in row -->
-
-  </div>
-</div>
-{% endblock %}
+    </div>
+{% endblock content %}
