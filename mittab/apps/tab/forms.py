@@ -699,37 +699,19 @@ class RoomTagForm(forms.ModelForm):
         required=False,
     )
 
-    delete = forms.BooleanField(
-        required=False,
-        initial=False,
-    )
-    
-    
-    color = forms.CharField(
-        required=False,  # Make color truly optional
-        widget=forms.TextInput(attrs={'placeholder': 'Optional color'}),  # Optional UI improvement
-    )
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, mini=False, **kwargs):
         super().__init__(*args, **kwargs)
 
         if self.instance.pk:
             self.fields["teams"].initial = self.instance.team_set.all()
             self.fields["judges"].initial = self.instance.judge_set.all()
 
+        if mini:
+            self.fields.pop("teams")
+            self.fields.pop("judges")
+
     def save(self, commit=True):
-        if self.cleaned_data.get("delete"):
-            if self.instance.pk:
-                self.instance.delete()
-            return None
-
-        room_tag = super().save(commit=False)
-
-        if not self.cleaned_data.get("color"):
-            room_tag.color = "FFFFF"
-
-        if commit:
-            room_tag.save()
+        room_tag = super().save()
 
         if room_tag.pk:
             self.save_m2m()
@@ -740,4 +722,4 @@ class RoomTagForm(forms.ModelForm):
 
     class Meta:
         model = RoomTag
-        fields = ("tag", "priority", "color", "teams", "judges")
+        fields = ("tag", "priority", "teams", "judges")

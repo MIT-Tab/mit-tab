@@ -44,40 +44,4 @@
 </div>
 {% endif %}
 
-{% if show_room_tags %}
-<div class="col-md-1"></div>
-<div class="col-md-5">
-    <h5>Manage Room Tags</h5>
-    <div class="dialogue mb-4">
-      <form method="post" action="{% url 'room_tag' %}" class="form-inline d-flex align-items-center">
-        {% csrf_token %}
-        <label for="tag" class="mr-2">Create New Tag:</label>
-        <div class="form-group mr-2">
-          <input type="text" class="form-control" id="tag" name="tag" placeholder="Tag" required>
-          <input type="number" class="form-control" id="priority" name="priority" placeholder="Priority" min="0" max="99" required>
-        <button type="submit" class="btn btn-primary">Add Tag</button>
-      </div>
-      </form>
-    </div>
-    
-
-    <table class="table table-striped">
-      <thead><th>Tag</th><th>Priority</th><th>Delete</th></thead>
-      {% for tag in room_tags %}
-      <tr>
-        <td><a href='/room-tag/{{ tag.id }}/'>{{ tag.tag }}</a></td>
-          <td>{{tag.priority}}</td>
-            <td>
-            <form action="/room-tag/{{ tag.id }}/" method="POST" style="display:inline;">
-              {% csrf_token %}
-              <input type="hidden" name="_method" value="DELETE">
-              <button type="submit" class="btn btn-danger btn-sm">x</button>
-            </form>
-            </td>
-      </tr>
-      {% endfor %}
-    </table>
-</div>
-{% endif %}
-
 {% endblock %}

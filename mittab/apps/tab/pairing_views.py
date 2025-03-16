@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Subquery
 from django.shortcuts import redirect
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -266,7 +266,16 @@ def view_round(request, round_number):
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    round_pairing = tab_logic.sorted_pairings(round_number)
+    highest_priority_tag_color = RoomTag.objects.filter(
+        room=OuterRef('room')
+    ).order_by('-priority').values('color')[:1]
+
+    round_pairing = tab_logic.sorted_pairings(
+        round_number,
+        extra_prefetches=["room__tags"],  
+        extra_annotations={'room_color': Subquery(highest_priority_tag_color)}
+    )
+    
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 

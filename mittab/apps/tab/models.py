@@ -600,18 +600,10 @@ class RoomCheckIn(models.Model):
         return "Room %s is checked in for round %s" % (self.room,
                                                        self.round_number)
 
-DEFAULT_COLORS = [
-    "#f8d7da",
-    "#cce5ff",
-    "#d6d8db",
-    "#d4edda",
-    "#ffeeba",
-]
 
 class RoomTag(models.Model):
     tag = models.CharField(max_length=255)
     priority = models.DecimalField(max_digits=4, decimal_places=2)
-    color = models.CharField(max_length=7, default="#000000")
 
     def __str__(self):
         return self.tag
