@@ -367,7 +367,7 @@ def sorted_pairings(round_number, extra_prefetches=None):
     """
     if extra_prefetches is None:
         extra_prefetches = []
-    
+
     prefetches = [
         "judges",
         "chair",
@@ -396,8 +396,7 @@ def sorted_pairings(round_number, extra_prefetches=None):
         "opp_team__debaters__roundstats_set__round",
         ] + extra_prefetches
     round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(*prefetches
-        )
+        Round.objects.filter(round_number=round_number).prefetch_related(*prefetches)
     )
     round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
 

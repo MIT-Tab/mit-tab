@@ -6,7 +6,6 @@ from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
 from django.core.management import call_command
 import yaml
-from django.db.models import Subquery, OuterRef
 
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.forms import RoomTagForm, SchoolForm, RoomForm, \
@@ -439,7 +438,7 @@ def room_tag(request, tag_id=None):
         message = f"Tag {tag_instance.tag} \
             {'updated' if tag else 'created'} successfully"
         return redirect_and_flash_success(request, message,
-                                        path=path)
+                                          path=path)
 
     form = RoomTagForm(instance=tag)
     return render(request, "common/data_entry.html", {
@@ -453,7 +452,7 @@ def manage_room_tags(request):
     if request.method == "POST":
         return room_tag(request)
     form = RoomTagForm(mini=True)
-    room_tags = RoomTag.objects.all().order_by('-priority')
+    room_tags = RoomTag.objects.all().order_by("-priority")
     return render(request, "pairing/manage_room_tags.html",
                   {"room_tags": room_tags,
                    "form": form})

@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Subquery
+from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -133,19 +133,16 @@ def alternative_rooms(request, round_id, current_room_id=None):
             current_room_obj = Room.objects.get(id=int(current_room_id))
         except Room.DoesNotExist:
             pass
-        
+
     # Fetch all rooms checked in for the given round, ordered by rank
     rooms = Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
     ).order_by("-rank").prefetch_related("tags")
-    
-    required_tags = set().union(
-            round_obj.gov_team.room_tags.all(),
-            round_obj.opp_team.room_tags.all(),
-            *(judge.room_tags.all() for judge in round_obj.judges.all()))
-    
+
+    required_tags = room_helpers.get_required_tags(round_obj)
+
     viable_rooms = set(room for room in rooms if set(room.tags.all()) >= required_tags)
 
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
@@ -269,7 +266,7 @@ def view_round(request, round_number):
     round_pairing = tab_logic.sorted_pairings(
         round_number,
         extra_prefetches=["room__tags", "judges__room_tags", "gov_team__room_tags",
-                          "opp_team__room_tags"],  
+                          "opp_team__room_tags"],
     )
     warnings = []
     for pairing in round_pairing:
@@ -284,8 +281,9 @@ def view_round(request, round_number):
             missing_tags_str = ", ".join(str(tag) for tag in missing_tags)
 
             warnings.append(
-                f"{pairing.gov_team or 'No Gov Team'} vs {pairing.opp_team or 'No Opp Team'} "
-                f"requires tag{plural} {missing_tags_str} that are not in room {pairing.room}"
+                f"{pairing.gov_team} vs {pairing.opp_team}"
+                f"requires tag{plural} {missing_tags_str}"
+                f"that are not in room {pairing.room}"
             )
 
     # For the template since we can't pass in something nicer like a hash

@@ -18,12 +18,12 @@ def add_rooms():
     pairings = tab_logic.sorted_pairings(round_number, extra_prefetches=[
         "gov_team__room_tags", "opp_team__room_tags", "judges__room_tags"
     ])
-    
+
     pairing_to_tag = {
         pairing: get_required_tags(pairing) for pairing in pairings
     }
 
-    
+
     room_to_tag = {room : set(room.tags.all()) for room in rooms}
 
     if not room_seeding:
@@ -50,9 +50,10 @@ def add_rooms():
 
             # Good room bonus
             weight += room.rank * 100
-            
+
             # Missing tags penalty
-            weight -= 1000 * sum(tag.priority for tag in (pairing_tags - room_to_tag[room]))
+            missing = pairing_tags - room_to_tag[room]
+            weight -= 1000 * sum(tag.priority for tag in missing)
 
             edge = (pairing_i, len(pairings) + room_i, weight)
             graph_edges.append(edge)
@@ -75,12 +76,13 @@ def add_rooms():
 
     with transaction.atomic():
         Round.objects.bulk_update(updated_pairings, ["room"])
-        
+
 
 def get_required_tags(pairing):
-    """Gets required room tags from a pairing. Only call after using appropriate prefetches"""
+    """Gets required room tags from a pairing.
+    Only call after using appropriate prefetches"""
     required_tags = set()
-    
+
     if pairing.gov_team:
         required_tags.update(pairing.gov_team.room_tags.all())
 
@@ -90,5 +92,5 @@ def get_required_tags(pairing):
     if pairing.judges:
         for judge in pairing.judges.all():
             required_tags.update(judge.room_tags.all())
-    
+
     return required_tags
