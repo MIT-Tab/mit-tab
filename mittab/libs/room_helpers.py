@@ -15,17 +15,12 @@ def add_rooms():
     rooms = RoomCheckIn.objects.filter(
         round_number=round_number).select_related("room").prefetch_related("room__tags")
     rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
-    pairings = tab_logic.sorted_pairings(round_number, additional_prefetches=[
+    pairings = tab_logic.sorted_pairings(round_number, extra_prefetches=[
         "gov_team__room_tags", "opp_team__room_tags", "judges__room_tags"
     ])
     
     pairing_to_tag = {
-    pairing: set().union(
-            pairing.gov_team.room_tags.all(),
-            pairing.opp_team.room_tags.all(),
-            *(judge.room_tags.all() for judge in pairing.judges.all())
-        )
-        for pairing in pairings
+        pairing: get_required_tags(pairing) for pairing in pairings
     }
 
     
@@ -80,3 +75,20 @@ def add_rooms():
 
     with transaction.atomic():
         Round.objects.bulk_update(updated_pairings, ["room"])
+        
+
+def get_required_tags(pairing):
+    """Gets required room tags from a pairing. Only call after using appropriate prefetches"""
+    required_tags = set()
+    
+    if pairing.gov_team:
+        required_tags.update(pairing.gov_team.room_tags.all())
+
+    if pairing.opp_team:
+        required_tags.update(pairing.opp_team.room_tags.all())
+
+    if pairing.judges:
+        for judge in pairing.judges.all():
+            required_tags.update(judge.room_tags.all())
+    
+    return required_tags

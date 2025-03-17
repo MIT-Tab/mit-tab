@@ -13,7 +13,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import assign_rooms
+from mittab.libs import room_helpers
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
@@ -115,7 +115,7 @@ def assign_rooms_to_pairing(request):
         try:
             backup.backup_round("round_%s_before_room_assignment" %
                                 current_round_number)
-            assign_rooms.add_rooms()
+            room_helpers.add_rooms()
         except Exception:
             emit_current_exception()
             return redirect_and_flash_error(request,
@@ -266,16 +266,28 @@ def view_round(request, round_number):
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    highest_priority_tag_color = RoomTag.objects.filter(
-        room=OuterRef('room')
-    ).order_by('-priority').values('color')[:1]
-
     round_pairing = tab_logic.sorted_pairings(
         round_number,
-        extra_prefetches=["room__tags"],  
-        extra_annotations={'room_color': Subquery(highest_priority_tag_color)}
+        extra_prefetches=["room__tags", "judges__room_tags", "gov_team__room_tags",
+                          "opp_team__room_tags"],  
     )
-    
+    warnings = []
+    for pairing in round_pairing:
+        if pairing.room is None:
+            continue
+        required_tags = room_helpers.get_required_tags(pairing)
+        actual_tags = set(pairing.room.tags.all())
+
+        if not required_tags <= actual_tags:
+            missing_tags = required_tags - actual_tags
+            plural = "s" if len(missing_tags) > 1 else ""
+            missing_tags_str = ", ".join(str(tag) for tag in missing_tags)
+
+            warnings.append(
+                f"{pairing.gov_team or 'No Gov Team'} vs {pairing.opp_team or 'No Opp Team'} "
+                f"requires tag{plural} {missing_tags_str} that are not in room {pairing.room}"
+            )
+
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 

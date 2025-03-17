@@ -698,6 +698,10 @@ class RoomTagForm(forms.ModelForm):
         queryset=Judge.objects.all(),
         required=False,
     )
+    rooms = forms.ModelMultipleChoiceField(
+        queryset=Room.objects.all(),
+        required=False,
+    )
 
     def __init__(self, *args, mini=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -705,18 +709,20 @@ class RoomTagForm(forms.ModelForm):
         if self.instance.pk:
             self.fields["teams"].initial = self.instance.team_set.all()
             self.fields["judges"].initial = self.instance.judge_set.all()
+            self.fields["rooms"].initial = self.instance.room_set.all()
 
         if mini:
             self.fields.pop("teams")
             self.fields.pop("judges")
+            self.fields.pop("rooms")
 
     def save(self, commit=True):
         room_tag = super().save()
 
         if room_tag.pk:
-            self.save_m2m()
             room_tag.team_set.set(self.cleaned_data["teams"])
             room_tag.judge_set.set(self.cleaned_data["judges"])
+            room_tag.room_set.set(self.cleaned_data["rooms"])
 
         return room_tag
 
