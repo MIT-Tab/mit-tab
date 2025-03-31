@@ -293,11 +293,8 @@ def tab_card(request, team_id):
     for round_obj in rounds:
         round_number = round_obj.round_number
 
-        dstat1 = round_stats_by_round_and_debater_id[round_number][deb1.id]
-
-        dstat2 = []
-        if not iron_man:
-            dstat2 = round_stats_by_round_and_debater_id[round_number][deb2.id]
+        dstat1 = round_stats_by_round_and_debater_id[round_number].get(deb1.id, [])
+        dstat2 = round_stats_by_round_and_debater_id[round_number].get(deb2.id, [])
 
         blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
 
