@@ -1,0 +1,44 @@
+{% extends "base/__normal.html" %}
+
+{% block title %} Manage Room Tags {% endblock title %}
+{% block banner %} Manage Room Tags {% endblock banner %}
+
+
+{% block content %}
+
+<div class="col-md-6 ">
+    <h5>Current Room Tags</h5>
+    <table class="table rounded shadow-sm table-bordered table-resonsive">
+      <thead><th>Tag</th><th>Priority</th><th>Delete</th></thead>
+    
+      {% for tag in room_tags %}
+      <tr>
+        <td >
+            <h5>
+            <a href='/room-tag/{{ tag.id }}/' class="badge badge-{{ tag.color }}" >
+            {{ tag.tag }}
+            </a>
+            </h5>
+        </td>
+        <td>{{tag.priority}}</td>
+        <td>
+        <form action="/room-tag/{{ tag.id }}/" 
+        method="POST" style="display:inline;" 
+        onsubmit="return confirm('Are you sure you want to delete this room tag?');">
+            {% csrf_token %}
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" class="btn btn-danger btn-sm">X</button>
+        </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+</div>
+
+<div class="col-md-4 container p-3 rounded shadow-sm border ">
+    <h5>Add New Room Tag</h5>
+    {% include "common/_form.html" %}
+</div>
+    
+
+{% endblock content %}
