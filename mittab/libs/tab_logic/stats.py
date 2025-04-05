@@ -11,16 +11,25 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 ##############################
 
 
-def num_byes(team):
+def num_byes(team, exclude_round=False):
+    if exclude_round:
+        return team.byes.exclude(round_number=TabSettings.get
+                                 ("cur_round")).count()
     return team.byes.count()
 
 
-def num_forfeit_wins(team):
+def num_forfeit_wins(team, exclude_round=False):
     num_wins = 0
-    for round_obj in team.gov_team.all():
+    if exclude_round:
+        govs = team.gov_team.exclude(round_number=exclude_round)
+        opps = team.opp_team.exclude(round_number=exclude_round)
+    else:
+        govs = team.gov_team.all()
+        opps = team.opp_team.all()
+    for round_obj in govs:
         if round_obj.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
             num_wins += 1
-    for round_obj in team.opp_team.all():
+    for round_obj in opps:
         if round_obj.victor in (Round.ALL_WIN, Round.OPP_VIA_FORFEIT,):
             num_wins += 1
     return num_wins
@@ -89,19 +98,28 @@ def had_bye(team, round_number=None):
 
 
 @cache()
-def tot_wins(team):
+def tot_wins(team, exclude_round=False):
     """
     Calculate total wins, using in-memory iteration rather than db queries to avoid n+1
     problems
     """
     normal_wins = 0
-    for round_obj in team.opp_team.all():
+    if exclude_round:
+        govs = team.gov_team.exclude(round_number=exclude_round)
+        opps = team.opp_team.exclude(round_number=exclude_round)
+    else:
+        govs = team.gov_team.all()
+        opps = team.opp_team.all()
+
+    for round_obj in opps:
         if round_obj.victor == Round.OPP:
             normal_wins += 1
-    for round_obj in team.gov_team.all():
+    for round_obj in govs:
         if round_obj.victor == Round.GOV:
             normal_wins += 1
-    return normal_wins + num_byes(team) + num_forfeit_wins(team)
+    byes = num_byes(team, exclude_round)
+    forfeits = num_forfeit_wins(team, exclude_round)
+    return normal_wins + byes + forfeits
 
 
 ################
@@ -110,20 +128,23 @@ def tot_wins(team):
 
 
 @cache()
-def tot_speaks(team):
-    return sum([tot_speaks_deb(deb, False) for deb in team.debaters.all()])
+def tot_speaks(team, exclude_round=False):
+    return sum([tot_speaks_deb(deb, False, exclude_round)
+                for deb in team.debaters.all()])
 
 
 @cache()
-def single_adjusted_speaks(team):
-    speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
+def single_adjusted_speaks(team, exclude_round=False):
+    speaks = [speaks_for_debater(deb, False, exclude_round)
+              for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[1:-1])
 
 
 @cache()
-def double_adjusted_speaks(team):
-    speaks = [speaks_for_debater(deb, False) for deb in team.debaters.all()]
+def double_adjusted_speaks(team, exclude_round=False):
+    speaks = [speaks_for_debater(deb, False, exclude_round)
+              for deb in team.debaters.all()]
     speaks = sorted([item for sublist in speaks for item in sublist])
     return sum(speaks[2:-2])
 
@@ -134,26 +155,29 @@ def double_adjusted_speaks(team):
 
 
 @cache()
-def tot_ranks(team):
-    return sum([tot_ranks_deb(deb, False) for deb in team.debaters.all()])
+def tot_ranks(team, exclude_round=False):
+    return sum([tot_ranks_deb(deb, False, exclude_round)
+                for deb in team.debaters.all()])
 
 
 @cache()
-def single_adjusted_ranks(team):
-    ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
+def single_adjusted_ranks(team, exclude_round=False):
+    ranks = [ranks_for_debater(deb, False, exclude_round)
+             for deb in team.debaters.all()]
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[1:-1])
 
 
 @cache()
-def double_adjusted_ranks(team):
-    ranks = [ranks_for_debater(deb, False) for deb in team.debaters.all()]
+def double_adjusted_ranks(team, exclude_round=False):
+    ranks = [ranks_for_debater(deb, False, exclude_round)
+             for deb in team.debaters.all()]
     ranks = sorted([item for sublist in ranks for item in sublist])
     return sum(ranks[2:-2])
 
 
 @cache()
-def opp_strength(team):
+def opp_strength(team, exclude_round=False):
     """
     Average number of wins per opponent
 
@@ -163,13 +187,17 @@ def opp_strength(team):
     opponent_count = 0
     opponent_wins = 0
 
-    gov_rounds = team.gov_team
-    opp_rounds = team.opp_team
+    if exclude_round:
+        govs = team.gov_team.exclude(round_number=exclude_round)
+        opps = team.opp_team.exclude(round_number=exclude_round)
+    else:
+        govs = team.gov_team.all()
+        opps = team.opp_team.all()
 
-    for round_obj in gov_rounds.all():
+    for round_obj in govs:
         opponent_wins += tot_wins(round_obj.opp_team)
         opponent_count += 1
-    for round_obj in opp_rounds.all():
+    for round_obj in opps:
         opponent_wins += tot_wins(round_obj.gov_team)
         opponent_count += 1
 
@@ -233,7 +261,7 @@ def debater_forfeit_speaks(_debater):
 
 
 @cache()
-def speaks_for_debater(debater, average_ironmen=True):
+def speaks_for_debater(debater, average_ironmen=True, exclude_round=False):
     """Returns a list of speaks for the provided debater
 
     In most normal rounds the speaks of the debater are the speaks the judge
@@ -257,6 +285,9 @@ def speaks_for_debater(debater, average_ironmen=True):
     # in round 5 and should have 5 speaks
 
     debater_roundstats = debater.roundstats_set.all()
+    if exclude_round:
+        debater_roundstats = debater_roundstats.exclude(round__round_number=
+                                                        exclude_round)
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -337,9 +368,9 @@ def double_adjusted_speaks_deb(debater):
 
 
 @cache()
-def tot_speaks_deb(debater, average_ironmen=True):
+def tot_speaks_deb(debater, average_ironmen=True, exclude_round=False):
     """Return the total of all speaks for a debater"""
-    debater_speaks = speaks_for_debater(debater, average_ironmen)
+    debater_speaks = speaks_for_debater(debater, average_ironmen, exclude_round)
     return sum(debater_speaks)
 
 
@@ -388,7 +419,7 @@ def avg_deb_ranks(debater):
 
 
 @cache()
-def ranks_for_debater(debater, average_ironmen=True):
+def ranks_for_debater(debater, average_ironmen=True, exclude_round=False):
     """Returns a list of ranks for the provided debater
 
     In most normal rounds the ranks of the debater are the ranks the judge
@@ -413,6 +444,9 @@ def ranks_for_debater(debater, average_ironmen=True):
     num_ranks = TabSettings.get("cur_round") - 1
 
     debater_roundstats = debater.roundstats_set.all()
+    if exclude_round:
+        debater_roundstats = debater_roundstats.exclude(round__round_number=
+                                                        exclude_round)
     debater_ranks = []
 
     ranks_per_round = defaultdict(list)
@@ -487,6 +521,8 @@ def double_adjusted_ranks_deb(debater):
 
 
 @cache()
-def tot_ranks_deb(debater, average_ironmen=True):
-    debater_ranks = ranks_for_debater(debater, average_ironmen=average_ironmen)
+def tot_ranks_deb(debater, average_ironmen=True, exclude_round=False):
+    debater_ranks = ranks_for_debater(debater,
+                                      average_ironmen=average_ironmen,
+                                      exclude_round=exclude_round)
     return sum(debater_ranks)
