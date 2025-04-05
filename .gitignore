@@ -122,3 +122,4 @@ typings/
 .env
 
 *.dump.sql
+.vscode/
