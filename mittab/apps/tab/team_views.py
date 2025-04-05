@@ -234,7 +234,9 @@ def view_scratches(request, team_id):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
-    return render(request, "tab/all_tab_cards.html", locals())
+    return render(request, "tab/all_tab_cards.html", {
+        "all_teams" : all_teams
+    })
 
 
 def pretty_tab_card(request, team_id):
