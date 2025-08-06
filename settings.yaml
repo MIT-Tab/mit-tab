@@ -60,3 +60,8 @@
   description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
   value: true
   type: boolean
+- use_apda_ids:
+  name: use_apda_ids
+  description: "A toggle to indicate whether you would like to use APDA IDs for debaters and schools. Used to automatically upload results after tournament concludes."
+  value: false
+  type: boolean

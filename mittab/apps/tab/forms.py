@@ -24,6 +24,12 @@ class UploadDataForm(forms.Form):
 
 
 class SchoolForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(SchoolForm, self).__init__(*args, **kwargs)
+        if TabSettings.get("use_apda_ids", 0) == 0:
+            if 'APDA_id' in self.fields:
+                del self.fields['APDA_id']
+
     class Meta:
         model = School
         fields = "__all__"
@@ -225,6 +231,11 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(DebaterForm, self).__init__(*args, **kwargs)
+        if TabSettings.get("use_apda_ids", 0) == 0:
+            if 'APDA_id' in self.fields:
+                del self.fields['APDA_id']
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
