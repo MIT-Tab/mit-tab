@@ -61,7 +61,7 @@
   value: true
   type: boolean
 - use_apda_ids:
-  name: use_apda_ids
-  description: "A toggle to indicate whether you would like to use APDA IDs for debaters and schools. Used to automatically upload results after tournament concludes."
+  name: official_apda_tournament
+  description: "A toggle to indicate whether this is an officially sanctioned APDA tournament. If true, the APDA IDs will be used for the tournament."
   value: false
   type: boolean
