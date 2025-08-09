@@ -20,8 +20,8 @@ class TestImportingTeams(TestCase):
             ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
             ["Team 2", "Harvard", "", "", "Alice", "", "1251", "Bob", "", "1252"],
             [
-                "Team 3", "Deis", "Harvard", "Half Seed ", "Carly", "1111",
-                "Novice", "Dan", "Novice ", "1112"]
+                "Team 3", "Deis", "Harvard", "Half Seed ", "Carly",
+                "Novice", "1111", "Dan", "Novice ", "1112"]
         ]
 
         importer = TeamImporter(MockWorkbook(data))
@@ -67,8 +67,10 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
 
-        data = [["Team 1", "NU", "Deis", "full", "John", "", "Jane", "n"],
-                ["Team 2", "Harvard", "", "", "Alice", "", "John", ""]]
+        data = [
+            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
+            ["Team 2", "Harvard", "", "", "Alice", "", "1251", "John", "", "1252"]
+        ]
 
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()
@@ -85,8 +87,10 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
 
-        data = [["Team 1", "NU", "Deis", "full", "John", "", "Jane", "n"],
-                ["Team 2", "Harvard", "", "invalid", "Alice", "", "Bob", ""]]
+        data = [
+            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
+            ["Team 2", "Harvard", "", "invalid", "Alice", "", "1251", "Bob", "", "1252"]
+        ]
 
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()
@@ -105,7 +109,9 @@ class TestImportingTeams(TestCase):
         assert Team.objects.count() == 0
         assert School.objects.count() == 1
 
-        data = [["Team 1", "NU", "Deis", "invalid", "John", "", "Jane", "n"]]
+        data = [
+            ["Team 1", "NU", "Deis", "invalid", "John", "", "1241", "Jane", "n", "1242"]
+        ]
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()
 
