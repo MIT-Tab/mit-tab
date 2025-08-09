@@ -17,12 +17,9 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
 
         data = [
-            ["Team 1", "NU", "Deis", "full", "John", "", "Jane", "n"],
-            ["Team 2", "Harvard", "", "", "Alice", "", "Bob", ""],
-            [
-                "Team 3", "Deis", "Harvard", "Half Seed ", "Carly",
-                "Novice", "Dan", "Novice "
-            ]
+            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
+            ["Team 2", "Harvard", "", "", "Alice", "", "1251", "Bob", "", "1252"],
+            ["Team 3", "Deis", "Harvard", "Half Seed ", "Carly", "1111", "Novice", "Dan", "Novice ", "1112"]
         ]
 
         importer = TeamImporter(MockWorkbook(data))
