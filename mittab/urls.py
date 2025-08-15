@@ -89,6 +89,8 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
+    path("rank_teams_public/", team_views.rank_teams_public,
+         name="rank_teams_public"),
     re_path(r"^team/(\d+)/check_ins/$",
             team_views.team_check_in,
             name="team_check_in"),

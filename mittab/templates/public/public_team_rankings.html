@@ -1,0 +1,5 @@
+{% extends "base/__normal.html" %}
+
+{% block content %}
+    {% include "tab/_rank_teams_table.html" with teams=teams table_title="Team Rankings" public=True%}
+{% endblock %}
