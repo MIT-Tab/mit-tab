@@ -416,11 +416,14 @@ def simulate_round(request):
     return redirect_and_flash_error(request, "Simulated rounds are disabled")
 
 def room_tag(request, tag_id=None):
-    tag = get_object_or_404(RoomTag, pk=tag_id) if tag_id else None
+    tag = None
+    if tag_id is not None:
+        tag = RoomTag.objects.filter(pk=tag_id).first()
 
     if request.method == "POST":
+        # _method is a hidden field used to simulate DELETE requests
         if request.POST.get("_method") == "DELETE":
-            if tag:
+            if tag is not None:
                 tag.delete()
                 return redirect_and_flash_success(request, "Tag deleted successfully")
             return redirect_and_flash_error(request, "Tag does not exist")

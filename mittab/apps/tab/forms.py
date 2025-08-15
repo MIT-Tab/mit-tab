@@ -704,10 +704,10 @@ class RoomTagForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self.fields["teams"].initial = self.instance.team_set.all()
-        self.fields["judges"].initial = self.instance.judge_set.all()
-        self.fields["rooms"].initial = self.instance.room_set.all()
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.team_set.all()
+            self.fields["judges"].initial = self.instance.judge_set.all()
+            self.fields["rooms"].initial = self.instance.room_set.all()
 
     def save(self, commit=True):
         room_tag = super().save(commit=commit)

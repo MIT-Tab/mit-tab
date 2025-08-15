@@ -124,7 +124,10 @@ def assign_rooms_to_pairing(request):
 
 
 def alternative_rooms(request, round_id, current_room_id=None):
-    round_obj = Round.objects.get(id=int(round_id))
+    round_obj = Round.objects.get(id=int(round_id)).prefetch_related(
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags",
+        "judges__required_room_tags")
     round_number = round_obj.round_number
 
     current_room_obj = None
@@ -143,7 +146,8 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
     required_tags = room_helpers.get_required_tags(round_obj)
 
-    viable_rooms = set(room for room in rooms if set(room.tags.all()) >= required_tags)
+    viable_rooms = set(room for room in rooms if
+                       set(room.tags.all()).issuperset(required_tags))
 
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
     viable_paired_rooms = list(filter(lambda room: room.has_round, viable_rooms))
@@ -265,8 +269,9 @@ def view_round(request, round_number):
 
     round_pairing = tab_logic.sorted_pairings(
         round_number,
-        extra_prefetches=["room__tags", "judges__room_tags", "gov_team__room_tags",
-                          "opp_team__room_tags"],
+        extra_prefetches=["room__tags", "judges__required_room_tags",
+                          "gov_team__required_room_tags",
+                          "opp_team__required_room_tags"],
     )
     warnings = []
     for pairing in round_pairing:
@@ -281,9 +286,9 @@ def view_round(request, round_number):
             missing_tags_str = ", ".join(str(tag) for tag in missing_tags)
 
             warnings.append(
-                f"{pairing.gov_team} vs {pairing.opp_team}"
-                f"requires tag{plural} {missing_tags_str}"
-                f"that are not in room {pairing.room}"
+                f"{pairing.gov_team} vs {pairing.opp_team} "
+                f"requires tag{plural} {missing_tags_str} "
+                f"that are not assigned to room {pairing.room}"
             )
 
     # For the template since we can't pass in something nicer like a hash

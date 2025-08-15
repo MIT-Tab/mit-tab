@@ -16,7 +16,9 @@ def add_rooms():
         round_number=round_number).select_related("room").prefetch_related("room__tags")
     rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
     pairings = tab_logic.sorted_pairings(round_number, extra_prefetches=[
-        "gov_team__room_tags", "opp_team__room_tags", "judges__room_tags"
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags",
+        "judges__required_room_tags"
     ])
 
     pairing_to_tag = {
@@ -84,13 +86,13 @@ def get_required_tags(pairing):
     required_tags = set()
 
     if pairing.gov_team:
-        required_tags.update(pairing.gov_team.room_tags.all())
+        required_tags.update(pairing.gov_team.required_room_tags.all())
 
     if pairing.opp_team:
-        required_tags.update(pairing.opp_team.room_tags.all())
+        required_tags.update(pairing.opp_team.required_room_tags.all())
 
     if pairing.judges:
         for judge in pairing.judges.all():
-            required_tags.update(judge.room_tags.all())
+            required_tags.update(judge.required_room_tags.all())
 
     return required_tags

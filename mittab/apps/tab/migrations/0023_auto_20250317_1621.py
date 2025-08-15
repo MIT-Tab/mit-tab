@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='judge',
-            name='room_tags',
+            name='required_room_tags',
             field=models.ManyToManyField(blank=True, to='tab.RoomTag'),
         ),
         migrations.AddField(
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='team',
-            name='room_tags',
+            name='required_room_tags',
             field=models.ManyToManyField(blank=True, to='tab.RoomTag'),
         ),
     ]
