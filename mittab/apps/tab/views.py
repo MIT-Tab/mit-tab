@@ -8,7 +8,7 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import RoomTagForm, SchoolForm, RoomForm, \
+from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
     UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -451,7 +451,7 @@ def room_tag(request, tag_id=None):
 def manage_room_tags(request):
     if request.method == "POST":
         return room_tag(request)
-    form = RoomTagForm(mini=True)
+    form = MiniRoomTagForm(request.POST or None)
     room_tags = RoomTag.objects.all().order_by("-priority")
     return render(request, "pairing/manage_room_tags.html",
                   {"room_tags": room_tags,

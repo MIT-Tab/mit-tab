@@ -689,7 +689,6 @@ class OutroundResultEntryForm(forms.Form):
         return round_obj
 
 class RoomTagForm(forms.ModelForm):
-    # Add fields to handle many-to-many relationships
     teams = forms.ModelMultipleChoiceField(
         queryset=Team.objects.all(),
         required=False,
@@ -703,29 +702,30 @@ class RoomTagForm(forms.ModelForm):
         required=False,
     )
 
-    def __init__(self, *args, mini=False, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.instance.pk:
-            self.fields["teams"].initial = self.instance.team_set.all()
-            self.fields["judges"].initial = self.instance.judge_set.all()
-            self.fields["rooms"].initial = self.instance.room_set.all()
-
-        if mini:
-            self.fields.pop("teams")
-            self.fields.pop("judges")
-            self.fields.pop("rooms")
+        self.fields["teams"].initial = self.instance.team_set.all()
+        self.fields["judges"].initial = self.instance.judge_set.all()
+        self.fields["rooms"].initial = self.instance.room_set.all()
 
     def save(self, commit=True):
-        room_tag = super().save()
+        room_tag = super().save(commit=commit)
 
-        if room_tag.pk:
-            room_tag.team_set.set(self.cleaned_data["teams"])
-            room_tag.judge_set.set(self.cleaned_data["judges"])
-            room_tag.room_set.set(self.cleaned_data["rooms"])
+        room_tag.team_set.set(self.cleaned_data.get("teams", []))
+        room_tag.judge_set.set(self.cleaned_data.get("judges", []))
+        room_tag.room_set.set(self.cleaned_data.get("rooms", []))
 
         return room_tag
 
     class Meta:
         model = RoomTag
         fields = ("tag", "priority", "teams", "judges")
+
+
+class MiniRoomTagForm(RoomTagForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("judges")
+        self.fields.pop("rooms")
