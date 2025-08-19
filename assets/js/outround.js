@@ -15,27 +15,33 @@ function cycleChoice(event) {
   });
 }
 
-function populateTabCard(tabCardElement) {
-  const teamId = tabCardElement.attr("team-id");
+function populateTabCard() {
+  const roundNumber = $("#round-number").data("round-number");
+  if (!roundNumber || !$(".outround-tabcard").length) {
+    return;
+  }
   $.ajax({
-    url: `/team/${teamId}/stats`,
+    url: `/outround/${roundNumber}/stats`,
     success(result) {
-      const stats = result.result;
-      const text = [
-        stats.effective_outround_seed,
-        stats.outround_seed,
-        stats.wins,
-        stats.total_speaks.toFixed(2),
-        stats.govs,
-        stats.opps,
-        stats.seed
-      ].join(" / ");
-      tabCardElement.attr(
-        "title",
-        "Effective Seed / Outround Seed / Wins / Speaks / Govs / Opps / Seed"
-      );
-      tabCardElement.attr("href", `/team/card/${teamId}`);
-      tabCardElement.text(text);
+      Object.entries(result).forEach(([teamId, stats]) => {
+        const tabCardElement = $(`.outround-tabcard[team-id=${teamId}]`);
+        const text = [
+          stats.effective_outround_seed,
+          stats.outround_seed,
+          stats.wins,
+          stats.total_speaks.toFixed(2),
+          stats.govs,
+          stats.opps,
+          stats.seed
+        ].join(" / ");
+        tabCardElement.attr(
+          "title",
+          "Effective Seed / Outround Seed / In-round Wins" +
+            " / Speaks / Govs / Opps / Seed"
+        );
+        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.text(text);
+      });
     }
   });
 }

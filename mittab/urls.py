@@ -111,6 +111,8 @@ urlpatterns = [
          name="view_rounds"),
     re_path(r"^round/(\d+)/$", pairing_views.view_round, name="view_round"),
     re_path(r"^round/(\d+)/stats/$", pairing_views.team_stats, name="team_stats"),
+    re_path(r"^outround/(\d+)/stats/$", pairing_views.team_stats,
+            {"outround": True}, name="outround_team_stats"),
     re_path(r"^round/(\d+)/result/$",
             pairing_views.enter_result,
             name="enter_result"),
