@@ -83,13 +83,13 @@ def add_judges():
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
 
-def add_outround_judges(round_type = Outround.VARSITY):
+def add_outround_judges(round_type=Outround.VARSITY):
     num_teams = Outround.objects.filter(type_of_round=round_type
                                         ).aggregate(Min("num_teams"))["num_teams__min"]
 
     # First clear any existing judge assignments
     Outround.judges.through.objects.filter(
-        outround__type_of_round = round_type,
+        outround__type_of_round=round_type,
         outround__num_teams=num_teams
     ).delete()
 
@@ -114,13 +114,13 @@ def add_outround_judges(round_type = Outround.VARSITY):
 
     # Sorting done by higest position in bracket
     pairings.sort(
-        key=lambda x: min(x.gov_team.breaking_team.effective_seed, 
+        key=lambda x: min(x.gov_team.breaking_team.effective_seed,
                           x.opp_team.breaking_team.effective_seed), reverse=True
     )
 
     num_rounds = len(pairings)
     judge_round_joins = []
-    
+
     if round_type == Outround.VARSITY:
         panel_size = TabSettings.get("", 3)
     else:
@@ -141,7 +141,8 @@ def add_outround_judges(round_type = Outround.VARSITY):
                 graph_edges.append(edge)
     # Iterate once for each member of the panel
     for panel_member in range(panel_size):
-        judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+        judge_assignments = mwmatching.maxWeightMatching(graph_edges,
+                                                         maxcardinality=True)
 
         # If there is no possible assignment of judges, raise an error
         if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
@@ -160,7 +161,7 @@ def add_outround_judges(round_type = Outround.VARSITY):
 
         # Track which judges to remove after this iteration
         judges_to_remove = []
-        
+
         # Because we can't bulk-update the judges field of rounds (it's many-to-many),
         # we use the join table model and bulk-create it
         for pairing_i, padded_judge_i in enumerate(judge_assignments[:num_rounds]):
@@ -172,9 +173,10 @@ def add_outround_judges(round_type = Outround.VARSITY):
             if panel_member == 0:
                 round_obj.chair = judge
 
-            judge_round_joins.append(Outround.judges.through(judge=judge, outround=round_obj))
+            judge_round_joins.append(Outround.judges.through(judge=judge,
+                                                             outround=round_obj))
             judges_to_remove.append(padded_judge_i)
-        
+
         #Remove edges for already assigned judges rather than re-calculating weights
         graph_edges = [edge for edge in graph_edges if edge[1] not in judges_to_remove]
 

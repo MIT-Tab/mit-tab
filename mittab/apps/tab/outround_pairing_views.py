@@ -697,14 +697,14 @@ def alternative_rooms(request, round_id, current_room_id=None):
 def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
     if round_type not in dict(Outround.TYPE_OF_ROUND_CHOICES).keys():
         return redirect_and_flash_error(request, "Invalid round type specified.")
-    
     num_teams = Outround.objects.filter(type_of_round=round_type
                                         ).aggregate(Min("num_teams"))["num_teams__min"]
-    
+
     if request.method == "POST":
         try:
-            type_str = "Varsity" if round_type==Outround.VARSITY else "Novice"
-            backup.backup_round(f"before_judge_assignments_round_of_{type_str}_{num_teams}")
+            type_str = "Varsity" if round_type == Outround.VARSITY else "Novice"
+            round_str = f"round_of_{type_str}_{num_teams}"
+            backup.backup_round(f"before_judge_assignments_{round_str}")
             assign_judges.add_outround_judges(round_type=round_type)
         except Exception:
             emit_current_exception()
