@@ -32,21 +32,15 @@
     <div class="col-8">
       <h6>Pairing Controls</h6>
       <div class="btn-group btn-group-sm">
-        <form action="/outround_pairing/assign_judges/"
+        <form action="/outround_pairing/assign_judges/{{ type_of_round }}/"
             method="post"
             onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
             class="d-inline"
           >
             {% csrf_token %}
-            {% if judges_assigned %}
-            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-success" href="/outround_pairing/assign_judges/" title="Assign judges to your pairing">
-              <i class="fas fa-gavel"></i> Assign Judges Again
-            </button>
-            {% else %}
-            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" href="/outround_pairing/assign_judges/" title="Assign judges to your pairing">
+            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
-            {% endif %}
           </form>
           <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
              id="close-pairings"
