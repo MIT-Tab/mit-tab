@@ -356,11 +356,14 @@ def alternative_teams(request, round_id, current_team_id, position):
     return render(request, "pairing/team_dropdown.html", locals())
 
 
-def team_stats(request, round_number):
+def team_stats(request, round_number, outround=False):
     """
     Returns the tab card data for all teams in the pairings of this given round number
     """
-    pairings = tab_logic.sorted_pairings(round_number)
+    if outround:
+        pairings = tab_logic.sorted_pairings(round_number, outround=True)
+    else:
+        pairings = tab_logic.sorted_pairings(round_number)
     stats_by_team_id = {}
 
     def stats_for_team(team):
