@@ -15,7 +15,7 @@ function cycleChoice(event) {
   });
 }
 
-function populateTabCard() {
+function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
   if (!roundNumber || !$(".outround-tabcard").length) {
     return;
