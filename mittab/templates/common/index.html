@@ -19,9 +19,16 @@
 
 
 
-<div class="col container-fluid index">
-  {% quick_search %}
-
+<div class="col container-fluid index h-100">
+  <div class="d-flex mb-3">
+    <div class="flex-grow-1 me-2">
+      {% quick_search %}
+    </div>
+    <button type="button" class="btn {% if not publish_ready %}btn-secondary{% else %}btn-primary{% endif %} ms-2 text-nowrap" 
+      style="height: 38px; min-width: 120px;" {% if not publish_ready %}disabled data-toggle="tooltip" data-placement="top" title="Results can only be published after all rounds have been entered."{% endif %}>
+      Publish Results
+    </button>
+  </div>
   <div class="row index_container">
 
     {% with count=number_schools model_name="Schools" list_data=school_list %}
