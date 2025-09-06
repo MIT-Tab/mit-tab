@@ -37,7 +37,6 @@ def index(request):
     number_schools = len(school_list)
     number_debaters = len(debater_list)
     number_rooms = len(room_list)
-    
 
     return render(request, "common/index.html", locals())
 
@@ -248,7 +247,6 @@ def enter_room(request):
     })
 
 
-
 @permission_required("tab.tab_settings.can_change", login_url="/403")
 def room_check_in(request, room_id, round_number):
     room_id, round_number = int(room_id), int(round_number)
@@ -414,6 +412,7 @@ def generate_archive(request):
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
 
+
 @permission_required("tab.tab_settings.can_change", login_url="/403")
 def simulate_round(request):
     enviornment = os.environ.get("MITTAB_ENV")
@@ -422,10 +421,10 @@ def simulate_round(request):
         return redirect_and_flash_success(request, "Simulated round")
     return redirect_and_flash_error(request, "Simulated rounds are disabled")
 
+
 def batch_checkin(request):
     judges_and_checkins = []
     rooms_and_checkins = []
-
 
     teams = Team.objects.prefetch_related("school", "debaters").all()
     team_and_checkins = [(team.school.name,
@@ -433,8 +432,6 @@ def batch_checkin(request):
                           team.debaters.all(),
                           team.checked_in)
                          for team in teams]
-
-
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     all_round_numbers = [0]+round_numbers
@@ -444,8 +441,6 @@ def batch_checkin(request):
         checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
         checkins_list = [round_number in checkins for round_number in all_round_numbers]
         judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
-
-
 
     rooms = Room.objects.prefetch_related("roomcheckin_set")
 
@@ -462,11 +457,12 @@ def batch_checkin(request):
         "rooms_and_checkins": rooms_and_checkins,
         })
 
+
 def publish_results(request, action):
     # Convert URL parameter: 0 = unpublish, 1 = publish
     new_setting = bool(action)
     current_setting = TabSettings.get("results_published", False)
- 
+
     if new_setting != current_setting:
         TabSettings.set("results_published", new_setting)
         status = "published" if new_setting else "unpublished"
@@ -484,6 +480,7 @@ def publish_results(request, action):
             path="/",
         )
 
+
 def standings_api(request):
     """API method to communicate with APDA Standings website"""
     if not TabSettings.get("apda_tournament", False):
@@ -499,7 +496,7 @@ def standings_api(request):
 
     finals = Outround.objects.filter(num_teams=2)
     if not finals.exists() or any(
-        final.victor == Outround.UNKNOWN for final in finals
+            final.victor == Outround.UNKNOWN for final in finals
     ):
         return JsonResponse({"error": "Tournament incomplete"}, status=409)
 

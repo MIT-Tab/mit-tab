@@ -41,7 +41,7 @@ def get_team_placements_data(team_type):
 def get_registered_debater_ids():
     """Get list of all registered debater APDA IDs, excluding -1."""
     return list(Debater.objects.exclude(
-        apda_id=-1).values_list('apda_id', flat=True))
+        apda_id=-1).values_list("apda_id", flat=True))
 
 
 def get_new_debater_data():
