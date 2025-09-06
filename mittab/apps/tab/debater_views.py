@@ -90,7 +90,7 @@ def rank_debaters_ajax(request):
                   {"title": "Debater Rankings"})
 
 
-def get_speaker_rankings(request):
+def get_speaker_rankings(request=None):
     speakers = tab_logic.rank_speakers()
     debaters = []
     for i, debater_stats in enumerate(speakers):

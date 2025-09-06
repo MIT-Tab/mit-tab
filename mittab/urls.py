@@ -284,6 +284,10 @@ urlpatterns = [
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
 
+    # Standings API
+    path("publish_results/", views.publish_results, name="publish_results"),
+    path("api/results", views.standings_api, name="standings_api"),
+    
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 ]

@@ -14,6 +14,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import cache_logic
+from mittab.libs.api_standings import get_tournament_standings
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
@@ -26,12 +27,16 @@ def index(request):
     debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
+    publish_ready = Outround.objects.filter(num_teams=2).exclude(
+        victor=Outround.UNKNOWN
+    ).exists()
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
     number_schools = len(school_list)
     number_debaters = len(debater_list)
     number_rooms = len(room_list)
+    
 
     return render(request, "common/index.html", locals())
 
@@ -455,3 +460,45 @@ def batch_checkin(request):
         "round_numbers": round_numbers,
         "rooms_and_checkins": rooms_and_checkins,
         })
+
+def publish_results(request):
+    if request.method == "POST":
+        current_setting = TabSettings.get("results_published", False)
+        TabSettings.set("results_published", not current_setting)
+        status = "published" if not current_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results successfully {status}. Results are now "
+            f"{'visible' if not current_setting else 'hidden'}.",
+            path="/",
+        )
+
+    return render(
+        request,
+        "common/publish_results.html",
+        {"results_published": TabSettings.get("results_published", False)},
+    )
+
+def standings_api(request):
+    """API method to communicate with APDA Standings website"""
+    if not TabSettings.get("apda_tournament", False):
+        return JsonResponse(
+            {
+                "error": (
+                    "Tournament is not sanctioned. Please check and update the "
+                    "'apda_tournament' setting if this message is incorrect."
+                )
+            },
+            status=403,
+        )
+
+    finals = Outround.objects.filter(num_teams=2)
+    if not finals.exists() or any(
+        final.victor == Outround.UNKNOWN for final in finals
+    ):
+        return JsonResponse({"error": "Tournament incomplete"}, status=409)
+
+    if not TabSettings.get("results_published", False):
+        return JsonResponse({"error": "Results not published"}, status=423)
+
+    return JsonResponse(get_tournament_standings())
