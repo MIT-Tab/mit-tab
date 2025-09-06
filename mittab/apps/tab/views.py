@@ -29,7 +29,8 @@ def index(request):
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
     publish_ready = Outround.objects.filter(num_teams=2).exclude(
         victor=Outround.UNKNOWN
-    ).exists()
+    ).count() == bool(TabSettings.get("nov_teams_to_break", 4)) + 1
+    results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
@@ -461,23 +462,27 @@ def batch_checkin(request):
         "rooms_and_checkins": rooms_and_checkins,
         })
 
-def publish_results(request):
-    if request.method == "POST":
-        current_setting = TabSettings.get("results_published", False)
-        TabSettings.set("results_published", not current_setting)
-        status = "published" if not current_setting else "unpublished"
+def publish_results(request, action):
+    # Convert URL parameter: 0 = unpublish, 1 = publish
+    new_setting = bool(action)
+    current_setting = TabSettings.get("results_published", False)
+ 
+    if new_setting != current_setting:
+        TabSettings.set("results_published", new_setting)
+        status = "published" if new_setting else "unpublished"
         return redirect_and_flash_success(
             request,
             f"Results successfully {status}. Results are now "
-            f"{'visible' if not current_setting else 'hidden'}.",
+            f"{'visible' if new_setting else 'hidden'}.",
             path="/",
         )
-
-    return render(
-        request,
-        "common/publish_results.html",
-        {"results_published": TabSettings.get("results_published", False)},
-    )
+    else:
+        status = "published" if current_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results are already {status}.",
+            path="/",
+        )
 
 def standings_api(request):
     """API method to communicate with APDA Standings website"""

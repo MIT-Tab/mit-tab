@@ -24,13 +24,10 @@
     <div class="flex-grow-1 me-2">
       {% quick_search %}
     </div>
-    <form method="post" action="{% url 'publish_results' %}" class="ms-2">
-      {% csrf_token %}
-      <button type="submit" class="btn {% if not publish_ready %}btn-secondary{% else %}btn-primary{% endif %} text-nowrap" 
-      style="height: 38px; min-width: 120px;" {% if not publish_ready %}disabled data-toggle="tooltip" data-placement="top" title="Results can only be published after all rounds have been entered."{% endif %}>
-      Publish Results
-      </button>
-    </form>
+    <a href="{% url 'publish_results' action=results_published|yesno:'0,1' %}" class="btn {% if not publish_ready %}btn-secondary{% elif results_published %}btn-warning{% else %}btn-primary{% endif %} text-nowrap ms-2" 
+    style="height: 38px; min-width: 120px;" {% if not publish_ready %}onclick="return false;" data-toggle="tooltip" data-placement="top" title="Results can only be published after all rounds have been entered."{% endif %}>
+    {% if results_published %}Unpublish Results{% else %}Publish Results{% endif %}
+    </a>
   </div>
   <div class="row index_container">
 
