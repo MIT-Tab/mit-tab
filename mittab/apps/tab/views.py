@@ -27,9 +27,11 @@ def index(request):
     debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
-    publish_ready = Outround.objects.filter(num_teams=2).exclude(
+    expected_finals = 1+ bool(TabSettings.get("nov_teams_to_break", 4))
+    completed_finals = Outround.objects.filter(num_teams=2).exclude(
         victor=Outround.UNKNOWN
-    ).count() == bool(TabSettings.get("nov_teams_to_break", 4)) + 1
+    ).count()
+    publish_ready = completed_finals == expected_finals
     results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
@@ -458,9 +460,9 @@ def batch_checkin(request):
         })
 
 
-def publish_results(request, action):
+def publish_results(request, new_setting):
     # Convert URL parameter: 0 = unpublish, 1 = publish
-    new_setting = bool(action)
+    new_setting = bool(new_setting)
     current_setting = TabSettings.get("results_published", False)
 
     if new_setting != current_setting:

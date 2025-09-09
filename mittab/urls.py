@@ -285,7 +285,7 @@ urlpatterns = [
     path("archive/download/", views.generate_archive, name="download_archive"),
 
     # Standings API
-    path("publish_results/<int:action>/", views.publish_results,
+    path("publish_results/<int:new_setting>/", views.publish_results,
          name="publish_results"),
     path("api/results", views.standings_api, name="standings_api"),
 
