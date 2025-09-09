@@ -15,7 +15,7 @@ function cycleChoice(event) {
   });
 }
 
-function populateTabCard() {
+function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
   if (!roundNumber || !$(".outround-tabcard").length) {
     return;
@@ -68,11 +68,11 @@ function assignTeam(e) {
         $container.find(".team-link").attr("href", `/team/${result.team.id}`);
         $container.find(".outround-tabcard").attr("team-id", result.team.id);
 
-        populateTabCard($(`.outround-tabcard[team-id=${result.team.id}]`));
+        populateTabCards($(`.outround-tabcard[team-id=${result.team.id}]`));
 
         const $oldTeamTabCard = $(`.outround-tabcard[team-id=${oldTeamId}]`);
         if ($oldTeamTabCard) {
-          populateTabCard($oldTeamTabCard);
+          populateTabCards($oldTeamTabCard);
         }
       } else {
         window.alert(alertMsg);
@@ -180,7 +180,7 @@ function togglePairingRelease(event) {
 
 $(document).ready(() => {
   $(".team.outround-tabcard").each((_, element) => {
-    populateTabCard($(element));
+    populateTabCards($(element));
   });
   $(".choice-update").each((_, element) => {
     $(element).click(cycleChoice);

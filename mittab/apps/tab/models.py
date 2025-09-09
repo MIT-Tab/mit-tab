@@ -61,6 +61,7 @@ class TabSettings(models.Model):
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def __str__(self):
         return self.name
@@ -97,6 +98,7 @@ class Debater(models.Model):
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def save(self,
              force_insert=False,
