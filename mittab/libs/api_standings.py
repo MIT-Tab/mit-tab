@@ -145,25 +145,3 @@ def get_non_placing_teams():
     _, novice_placing_ids = get_team_placements_and_ids(Team.NOVICE)
     all_placing_team_ids = varsity_placing_ids | novice_placing_ids
     return get_nonplacing_teams(all_placing_team_ids)
-
-
-def get_tournament_standings():
-    """Get complete tournament standings data formatted for API consumption."""
-    varsity_speakers, novice_speakers = get_speaker_rankings()
-    varsity_speakers = varsity_speakers[:10]
-    novice_speakers = novice_speakers[:10]
-
-    varsity_placements, varsity_placing_ids = get_team_placements_and_ids(Team.VARSITY)
-    novice_placements, novice_placing_ids = get_team_placements_and_ids(Team.NOVICE)
-
-    all_placing_team_ids = varsity_placing_ids | novice_placing_ids
-
-    return {
-        "varsity_speaker_awards": get_speaker_awards_data(varsity_speakers),
-        "novice_speaker_awards": get_speaker_awards_data(novice_speakers),
-        "varsity_team_placements": varsity_placements,
-        "novice_team_placements": novice_placements,
-        "non-placing_teams": get_nonplacing_teams(all_placing_team_ids),
-        "new_debater_data": get_new_debater_data(),
-        "new_schools_data": get_new_schools_data()
-    }
