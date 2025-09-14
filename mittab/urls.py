@@ -6,6 +6,7 @@ from django.contrib.auth.views import LoginView
 
 import mittab.settings as settings
 import mittab.apps.tab.views as views
+import mittab.apps.tab.api_views as api_views
 import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
@@ -290,7 +291,13 @@ urlpatterns = [
     # Standings API
     path("publish_results/<int:new_setting>/", views.publish_results,
          name="publish_results"),
-    path("api/results", views.standings_api, name="standings_api"),
+    path("api/varsity-speaker-awards", api_views.varsity_speaker_awards_api, name="varsity_speaker_awards_api"),
+    path("api/novice-speaker-awards", api_views.novice_speaker_awards_api, name="novice_speaker_awards_api"),
+    path("api/varsity-team-placements", api_views.varsity_team_placements_api, name="varsity_team_placements_api"),
+    path("api/novice-team-placements", api_views.novice_team_placements_api, name="novice_team_placements_api"),
+    path("api/non-placing-teams", api_views.non_placing_teams_api, name="non_placing_teams_api"),
+    path("api/new-debater-data", api_views.new_debater_data_api, name="new_debater_data_api"),
+    path("api/new-schools", api_views.new_schools_api, name="new_schools_api"),
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
