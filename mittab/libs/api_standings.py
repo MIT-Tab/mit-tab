@@ -32,7 +32,7 @@ def get_team_placements_and_ids(team_type):
             placing_team_ids.add(outround.gov_team.pk)
         if outround.opp_team:
             placing_team_ids.add(outround.opp_team.pk)
-            
+
         if outround.gov_team not in placement_results:
             placement_results.append(outround.gov_team)
         else:
@@ -42,7 +42,7 @@ def get_team_placements_and_ids(team_type):
                         "tournament_id": debater.pk}
                        for debater in team.debaters.all()]
                       for team in placement_results]
-    
+
     return formatted_data, placing_team_ids
 
 
@@ -53,7 +53,7 @@ def get_team_placements_data(team_type):
 
 def get_nonplacing_teams(placing_team_ids):
     teams = Team.objects.prefetch_related("debaters").exclude(pk__in=placing_team_ids)
-    
+
     return [
         [
             {
@@ -69,11 +69,11 @@ def get_nonplacing_teams(placing_team_ids):
 def get_new_debater_data():
     """Get data for debaters who are new (no APDA ID yet)."""
     from django.db.models import Count
-    
+
     teams_with_min_rounds = Team.objects.annotate(
-        total_rounds=Count('gov_team') + Count('opp_team')
-    ).filter(total_rounds__gte=3).values_list('pk', flat=True)
-    
+        total_rounds=Count("gov_team") + Count("opp_team")
+    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
+
     return [
         {
             "name": debater["name"],
@@ -85,31 +85,31 @@ def get_new_debater_data():
         for debater in Debater.objects.filter(apda_id=-1)
         .filter(team__pk__in=teams_with_min_rounds)
         .select_related("team__school")
-        .values("name", "novice_status", "team__school__apda_id", "team__school__name", "pk")
+        .values("name", "novice_status",
+                "team__school__apda_id", "team__school__name", "pk")
     ]
 
 
 def get_new_schools_data():
-    """Get data for schools that are new (school APDA ID is -1 for debaters with APDA ID -1)."""
+    """Get data for schools that are new
+    (school APDA ID is -1 for debaters with APDA ID -1)."""
     from django.db.models import Count
-    
-    # Use the same filtering logic as get_new_debater_data
+
     teams_with_min_rounds = Team.objects.annotate(
-        total_rounds=Count('gov_team') + Count('opp_team')
-    ).filter(total_rounds__gte=3).values_list('pk', flat=True)
-    
+        total_rounds=Count("gov_team") + Count("opp_team")
+    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
+
     school_names = set()
-    
-    # Get debaters with apda_id=-1 from teams with at least 3 rounds
+
     debater_data = Debater.objects.filter(apda_id=-1)\
         .filter(team__pk__in=teams_with_min_rounds)\
         .select_related("team__school")\
         .values("team__school__name", "team__school__apda_id")
-    
+
     for debater in debater_data:
         if debater["team__school__apda_id"] == -1:
             school_names.add(debater["team__school__name"])
-    
+
     return list(school_names)
 
 
@@ -155,7 +155,7 @@ def get_tournament_standings():
 
     varsity_placements, varsity_placing_ids = get_team_placements_and_ids(Team.VARSITY)
     novice_placements, novice_placing_ids = get_team_placements_and_ids(Team.NOVICE)
-    
+
     all_placing_team_ids = varsity_placing_ids | novice_placing_ids
 
     return {

@@ -480,4 +480,3 @@ def publish_results(request, new_setting):
             f"Results are already {status}.",
             path="/",
         )
-

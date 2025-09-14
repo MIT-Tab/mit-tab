@@ -2,7 +2,6 @@ from django.http import JsonResponse
 
 from mittab.apps.tab.models import Outround, TabSettings
 from mittab.libs.api_standings import (
-    get_tournament_standings, 
     get_varsity_speaker_awards,
     get_novice_speaker_awards,
     get_varsity_team_placements,
