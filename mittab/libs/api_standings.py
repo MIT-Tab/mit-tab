@@ -1,5 +1,6 @@
 from mittab.apps.tab.debater_views import get_speaker_rankings
 from mittab.apps.tab.models import Debater, Team, Outround
+from mittab.libs.tab_logic.stats import tot_wins
 
 
 def get_speaker_awards_data(speaker_results):
@@ -37,6 +38,16 @@ def get_team_placements_and_ids(team_type):
             placement_results.append(outround.gov_team)
         else:
             placement_results.append(outround.opp_team)
+
+    # Add non-breaking teams with 4 wins
+    all_teams = Team.objects.filter(
+        break_preference=team_type
+    ).prefetch_related("debaters")
+    
+    for team in all_teams:
+        if tot_wins(team) == 4 and team.pk not in placing_team_ids:
+            placement_results.append(team)
+            placing_team_ids.add(team.pk)
 
     formatted_data = [[{"apda_id": debater.apda_id,
                         "tournament_id": debater.pk}
