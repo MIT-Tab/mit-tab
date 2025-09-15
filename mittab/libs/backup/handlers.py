@@ -12,8 +12,8 @@ DB_PORT = DB_SETTINGS["PORT"]
 
 class MysqlDumpRestorer:
 
-    def dump(self):
-        return subprocess.check_output(self._dump_cmd())
+    def dump(self, include_scratches=True):
+        return subprocess.check_output(self._dump_cmd(include_scratches=include_scratches))
 
     def restore(self, content):
         """
@@ -49,7 +49,7 @@ class MysqlDumpRestorer:
 
         return cmd
 
-    def _dump_cmd(self):
+    def _dump_cmd(self, include_scratches=True):
         cmd = [
             "mysqldump",
             DB_NAME,
@@ -63,5 +63,8 @@ class MysqlDumpRestorer:
 
         if DB_PASS:
             cmd.append("--password={}".format(DB_PASS))
+
+        if not include_scratches:
+            cmd.append("--ignore-table={}.tab_scratch".format(DB_NAME))
 
         return cmd
