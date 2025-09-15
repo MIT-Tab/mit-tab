@@ -13,7 +13,8 @@ DB_PORT = DB_SETTINGS["PORT"]
 class MysqlDumpRestorer:
 
     def dump(self, include_scratches=True):
-        return subprocess.check_output(self._dump_cmd(include_scratches=include_scratches))
+        return subprocess.check_output(self._dump_cmd(
+            include_scratches=include_scratches))
 
     def restore(self, content):
         """
