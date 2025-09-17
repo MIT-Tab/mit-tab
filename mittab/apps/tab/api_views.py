@@ -1,98 +1,138 @@
 from django.http import JsonResponse
+from django.db.models import Count
 
-from mittab.apps.tab.models import Outround, TabSettings
-from mittab.libs.api_standings import (
-    get_varsity_speaker_awards,
-    get_novice_speaker_awards,
-    get_varsity_team_placements,
-    get_novice_team_placements,
-    get_non_placing_teams,
-    get_new_debater_data,
-    get_new_schools_data
-)
+from mittab.apps.tab.debater_views import get_speaker_rankings
+from mittab.apps.tab.models import Debater, Team, Outround
+from mittab.libs.tab_logic.stats import tot_wins
 
-def _check_tournament_status():
-    """Helper function to check tournament status for API endpoints."""
-    if not TabSettings.get("apda_tournament", False):
-        return JsonResponse(
-            {
-                "error": (
-                    "Tournament is not sanctioned. Please check and update the "
-                    "'apda_tournament' setting if this message is incorrect."
-                )
-            },
-            status=403,
-        )
 
-    finals = Outround.objects.filter(num_teams=2)
-    if not finals.exists() or any(
-            final.victor == Outround.UNKNOWN for final in finals
-    ):
-        return JsonResponse({"error": "Tournament incomplete"}, status=409)
+def _get_team_placements_and_ids(team_type):
+    """Helper function to get team placements and placing team IDs."""
+    outrounds = Outround.objects.filter(
+        type_of_round=team_type
+    ).prefetch_related(
+        "gov_team", "opp_team", "gov_team__debaters", "opp_team__debaters"
+    ).order_by("num_teams")
 
-    if not TabSettings.get("results_published", False):
-        return JsonResponse({"error": "Results not published"}, status=423)
+    if not outrounds.exists():
+        return [], set()
 
-    return None
+    finals = outrounds.first()
+    placement_results = []
+    placing_team_ids = set()
+
+    if finals.victor in [Outround.GOV, Outround.GOV_VIA_FORFEIT]:
+        placement_results.append(finals.gov_team)
+    else:
+        placement_results.append(finals.opp_team)
+
+    for outround in outrounds:
+        if outround.gov_team not in placement_results:
+            placement_results.append(outround.gov_team)
+            placing_team_ids.add(outround.gov_team.pk)
+        else:
+            placement_results.append(outround.opp_team)
+            placing_team_ids.add(outround.opp_team.pk)
+
+    # Add non-breaking teams with 4 wins
+    all_teams = Team.objects.filter(
+        break_preference=team_type
+    ).prefetch_related("debaters")
+
+    for team in all_teams:
+        if tot_wins(team) == 4 and team.pk not in placing_team_ids:
+            placement_results.append(team)
+            placing_team_ids.add(team.pk)
+
+    formatted_data = [[{"apda_id": debater.apda_id, "tournament_id": debater.pk}
+                       for debater in team.debaters.all()]
+                      for team in placement_results]
+
+    return formatted_data, placing_team_ids
 
 def varsity_speaker_awards_api(request):
     """API endpoint for varsity speaker awards."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
-
-    return JsonResponse({"varsity_speaker_awards": get_varsity_speaker_awards()})
+    varsity_speakers, _ = get_speaker_rankings()
+    varsity_speakers = varsity_speakers[:10]
+    data = [{"apda_id": result[0].apda_id, "tournament_id": result[0].pk}
+            for result in varsity_speakers]
+    return JsonResponse({"varsity_speaker_awards": data})
 
 
 def novice_speaker_awards_api(request):
     """API endpoint for novice speaker awards."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
-
-    return JsonResponse({"novice_speaker_awards": get_novice_speaker_awards()})
+    _, novice_speakers = get_speaker_rankings()
+    novice_speakers = novice_speakers[:10]
+    data = [{"apda_id": result[0].apda_id, "tournament_id": result[0].pk}
+            for result in novice_speakers]
+    return JsonResponse({"novice_speaker_awards": data})
 
 
 def varsity_team_placements_api(request):
     """API endpoint for varsity team placements."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
-
-    return JsonResponse({"varsity_team_placements": get_varsity_team_placements()})
+    placements, _ = _get_team_placements_and_ids(Team.VARSITY)
+    return JsonResponse({"varsity_team_placements": placements})
 
 
 def novice_team_placements_api(request):
     """API endpoint for novice team placements."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
-
-    return JsonResponse({"novice_team_placements": get_novice_team_placements()})
+    placements, _ = _get_team_placements_and_ids(Team.NOVICE)
+    return JsonResponse({"novice_team_placements": placements})
 
 
 def non_placing_teams_api(request):
     """API endpoint for non-placing teams."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
+    _, varsity_placing_ids = _get_team_placements_and_ids(Team.VARSITY)
+    _, novice_placing_ids = _get_team_placements_and_ids(Team.NOVICE)
+    all_placing_team_ids = varsity_placing_ids | novice_placing_ids
 
-    return JsonResponse({"non_placing_teams": get_non_placing_teams()})
+    teams = Team.objects.prefetch_related("debaters").exclude(
+        pk__in=all_placing_team_ids)
+    data = [[{"apda_id": debater.apda_id, "tournament_id": debater.pk}
+             for debater in team.debaters.all()]
+            for team in teams]
+
+    return JsonResponse({"non_placing_teams": data})
 
 
 def new_debater_data_api(request):
     """API endpoint for new debater data."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
+    teams_with_min_rounds = Team.objects.annotate(
+        total_rounds=Count("gov_team") + Count("opp_team")
+    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
 
-    return JsonResponse({"new_debater_data": get_new_debater_data()})
+    data = [
+        {
+            "name": debater["name"],
+            "novice_status": debater["novice_status"],
+            "school_id": debater["team__school__apda_id"],
+            "school_name": debater["team__school__name"],
+            "debater_id": debater["pk"]
+        }
+        for debater in Debater.objects.filter(apda_id=-1)
+        .filter(team__pk__in=teams_with_min_rounds)
+        .select_related("team__school")
+        .values("name", "novice_status",
+                "team__school__apda_id", "team__school__name", "pk")
+    ]
+
+    return JsonResponse({"new_debater_data": data})
 
 
 def new_schools_api(request):
     """API endpoint for new schools data."""
-    error_response = _check_tournament_status()
-    if error_response:
-        return error_response
+    teams_with_min_rounds = Team.objects.annotate(
+        total_rounds=Count("gov_team") + Count("opp_team")
+    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
 
-    return JsonResponse({"new_schools": get_new_schools_data()})
+    school_names = set()
+    debater_data = Debater.objects.filter(apda_id=-1)\
+        .filter(team__pk__in=teams_with_min_rounds)\
+        .select_related("team__school")\
+        .values("team__school__name", "team__school__apda_id")
+
+    for debater in debater_data:
+        if debater["team__school__apda_id"] == -1:
+            school_names.add(debater["team__school__name"])
+
+    return JsonResponse({"new_schools": list(school_names)})
