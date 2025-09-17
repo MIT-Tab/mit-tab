@@ -6,6 +6,13 @@ from mittab.apps.tab.models import Debater, Team, Outround
 from mittab.libs.tab_logic.stats import tot_wins
 
 
+def _get_teams_with_min_rounds(min_rounds=3):
+    """Helper function to get teams with minimum number of rounds."""
+    return Team.objects.annotate(
+        total_rounds=Count("gov_team") + Count("opp_team")
+    ).filter(total_rounds__gte=min_rounds).values_list("pk", flat=True)
+
+
 def _get_team_placements_and_ids(team_type):
     """Helper function to get team placements and placing team IDs."""
     outrounds = Outround.objects.filter(
@@ -23,8 +30,10 @@ def _get_team_placements_and_ids(team_type):
 
     if finals.victor in [Outround.GOV, Outround.GOV_VIA_FORFEIT]:
         placement_results.append(finals.gov_team)
+        placing_team_ids.add(finals.gov_team.pk)
     else:
         placement_results.append(finals.opp_team)
+        placing_team_ids.add(finals.opp_team.pk)
 
     for outround in outrounds:
         if outround.gov_team not in placement_results:
@@ -97,9 +106,7 @@ def non_placing_teams_api(request):
 
 def new_debater_data_api(request):
     """API endpoint for new debater data."""
-    teams_with_min_rounds = Team.objects.annotate(
-        total_rounds=Count("gov_team") + Count("opp_team")
-    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
+    teams_with_min_rounds = _get_teams_with_min_rounds()
 
     data = [
         {
@@ -121,15 +128,15 @@ def new_debater_data_api(request):
 
 def new_schools_api(request):
     """API endpoint for new schools data."""
-    teams_with_min_rounds = Team.objects.annotate(
-        total_rounds=Count("gov_team") + Count("opp_team")
-    ).filter(total_rounds__gte=3).values_list("pk", flat=True)
+    teams_with_min_rounds = _get_teams_with_min_rounds()
 
     school_names = set()
-    debater_data = Debater.objects.filter(apda_id=-1)\
-        .filter(team__pk__in=teams_with_min_rounds)\
-        .select_related("team__school")\
+    debater_data = (
+        Debater.objects.filter(apda_id=-1)
+        .filter(team__pk__in=teams_with_min_rounds)
+        .select_related("team__school")
         .values("team__school__name", "team__school__apda_id")
+    )
 
     for debater in debater_data:
         if debater["team__school__apda_id"] == -1:

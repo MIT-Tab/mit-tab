@@ -60,8 +60,7 @@ class TournamentStatusCheck:
             }, status=403)
 
         finals = Outround.objects.filter(num_teams=2)
-        if not finals.exists() or any(
-                final.victor == Outround.UNKNOWN for final in finals):
+        if not finals.exists() or finals.filter(victor=Outround.UNKNOWN).exists():
             return JsonResponse({"error": "Tournament incomplete"}, status=409)
 
         if not TabSettings.get("results_published", False):
