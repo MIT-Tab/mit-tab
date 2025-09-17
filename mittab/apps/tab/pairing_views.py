@@ -213,19 +213,21 @@ def upload_backup(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def manual_backup(request):
+def manual_backup(request, include_scratches=True):
     try:
         cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(
             time.time())
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
-        backup.backup_round("manual_backup_round_{}_{}_{}".format(
-            cur_round, btime, now))
+        backup_name = f"manual_backup_round_{cur_round}_{btime}_{now}"
+        message = f"Backup created for round {cur_round} at timestamp {btime}"
+        if not include_scratches:
+            backup_name = "no_scratches_" + backup_name
+            message += " (scratches not included)"
+        backup.backup_round(backup_name, include_scratches=include_scratches)
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(request, "Error creating backup")
-    return redirect_and_flash_success(
-        request,
-        "Backup created for round {} at timestamp {}".format(cur_round, btime))
+    return redirect_and_flash_success(request, message)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
