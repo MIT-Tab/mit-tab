@@ -65,3 +65,7 @@
   description: "A toggle to indicate whether this is an officially sanctioned APDA tournament. If true, the APDA IDs will be used for the tournament."
   value: false
   type: boolean
+- max_rejudges:
+  name: max_rejudges
+  description: "The maximum number of times a judge can judge the same team."
+  value: 1

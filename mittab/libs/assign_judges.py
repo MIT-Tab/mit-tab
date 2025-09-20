@@ -41,10 +41,24 @@ def add_judges():
     for judge_i, judge in enumerate(judges):
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
+                weight = calc_weight(judge_i, pairing_i)
+                
+                gov_rejudges = sum(1 for r in judge.judges.all() 
+                                if r.gov_team_id == pairing.gov_team.id)
+                opp_rejudges = sum(1 for r in judge.judges.all() 
+                                if r.opp_team_id == pairing.opp_team.id)
+                
+                total_rejudges = gov_rejudges + opp_rejudges
+                
+                if total_rejudges > 0:
+                    rejudge_penalty = total_rejudges * -1000
+                    rank_penalty = judge_i * -10
+                    weight += (rejudge_penalty + rank_penalty)
+                
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
-                    calc_weight(judge_i, pairing_i),
+                    weight,
                 )
                 graph_edges.append(edge)
 
@@ -132,11 +146,12 @@ def add_outround_judges(round_type=Outround.VARSITY):
     graph_edges = []
     for judge_i, judge in enumerate(available_judges):
         for pairing_i, pairing in enumerate(pairings):
-            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
+            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, float('inf')):
+                weight = calc_weight(judge_i, pairing_i)
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
-                    calc_weight(judge_i, pairing_i),
+                    weight,
                 )
                 graph_edges.append(edge)
     # Iterate once for each member of the panel
@@ -193,7 +208,9 @@ def calc_weight(judge_i, pairing_i):
     return -1 * abs(judge_i - (-1 * pairing_i))
 
 
-def judge_conflict(judge, team1, team2):
+def judge_conflict(judge, team1, team2, max_rejudges=None):
+    if max_rejudges is None:
+        max_rejudges = TabSettings.get("max_rejudges", 1)
     return (
         any(
             s.team_id
@@ -203,16 +220,17 @@ def judge_conflict(judge, team1, team2):
             )
             for s in judge.scratches.all()
         )
-        or had_judge(judge, team1)
-        or had_judge(judge, team2)
+        or had_judge(judge, team1, max_rejudges)
+        or had_judge(judge, team2, max_rejudges)
     )
 
 
-def had_judge(judge, team):
+def had_judge(judge, team, max_rejudges=1):
+    rejudges = 0
     for round_obj in judge.judges.all():
         if round_obj.gov_team_id == team.id or round_obj.opp_team_id == team.id:
-            return True
-    return False
+            rejudges += 1
+    return rejudges >= max_rejudges
 
 
 def can_judge_teams(list_of_judges, team1, team2):
