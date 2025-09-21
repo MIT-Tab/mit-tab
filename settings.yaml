@@ -60,8 +60,3 @@
   description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
   value: true
   type: boolean
-- apda_tournament:
-  name: apda_tournament
-  description: "A toggle to indicate whether this is an officially sanctioned APDA tournament. If true, the APDA IDs will be used for the tournament."
-  value: false
-  type: boolean
