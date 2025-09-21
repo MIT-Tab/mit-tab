@@ -117,12 +117,22 @@ def view_school(request, school_id):
                     form.cleaned_data["name"]))
     else:
         form = SchoolForm(instance=school)
-        links = [("/school/" + str(school_id) + "/delete/", "Delete")]
+        links = [(f"/school/{school_id}/delete/", "Delete")]
+
+        teams = Team.objects.filter(school=school).prefetch_related("debaters")
+        hybrid_teams = Team.objects.filter(
+            hybrid_school=school
+        ).prefetch_related("debaters")
+        judges = Judge.objects.filter(schools=school)
+
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/school_detail.html", {
                 "form": form,
                 "links": links,
-                "title": "Viewing School: %s" % (school.name)
+                "school_teams": teams,
+                "school_hybrid_teams": hybrid_teams,
+                "school_judges": judges,
+                "title": f"Viewing School: {school.name}"
             })
 
 
@@ -217,10 +227,21 @@ def view_room(request, room_id):
                     form.cleaned_data["name"]))
     else:
         form = RoomForm(instance=room)
-    return render(request, "common/data_entry.html", {
+
+        # Get all rounds that happened in this room with related judges
+        rounds = Round.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+        # Get all outrounds that happened in this room with related judges
+        outrounds = Outround.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+    return render(request, "tab/room_detail.html", {
         "form": form,
         "links": [],
-        "title": "Viewing Room: %s" % (room.name)
+        "room_rounds": rounds,
+        "room_outrounds": outrounds,
+        "title": f"Viewing Room: {room.name}"
     })
 
 

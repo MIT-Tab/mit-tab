@@ -1,0 +1,62 @@
+{% extends "common/data_entry.html" %}
+
+{% block detail_content %}
+{% if school_teams or school_hybrid_teams or school_judges %}
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  {% if school_teams %}
+  <div class="team-record">
+    <h5>Teams</h5>
+    <table class="table table-striped">
+      <thead><th>Team Name</th><th>Debaters</th></thead>
+      {% for team in school_teams %}
+      <tr>
+        <td><a href='/team/{{ team.id }}/'>{{ team.name }}</a></td>
+        <td>
+          {% for debater in team.debaters.all %}
+            <a href='/debater/{{ debater.id }}/'>{{ debater.name }}</a>{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  
+  {% if school_hybrid_teams %}
+  <div class="team-record mt-4">
+    <h5>Hybrid Teams</h5>
+    <table class="table table-striped">
+      <thead><th>Team Name</th><th>Primary School</th><th>Debaters</th></thead>
+      {% for team in school_hybrid_teams %}
+      <tr>
+        <td><a href='/team/{{ team.id }}/'>{{ team.name }}</a></td>
+        <td><a href='/school/{{ team.school.id }}/'>{{ team.school.name }}</a></td>
+        <td>
+          {% for debater in team.debaters.all %}
+            <a href='/debater/{{ debater.id }}/'>{{ debater.name }}</a>{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  
+  {% if school_judges %}
+  <div class="team-record mt-4">
+    <h5>Judges</h5>
+    <table class="table table-striped">
+      <thead><th>Judge Name</th><th>Rank</th></thead>
+      {% for judge in school_judges %}
+      <tr>
+        <td><a href='/judge/{{ judge.id }}/'>{{ judge.name }}</a></td>
+        <td>{{ judge.rank }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
