@@ -21,6 +21,7 @@ body
 
     background:             #9CF;
     border-bottom:          .1em solid #000;
+    z-index:                1000;
 }
 
 .pairings_header h1
@@ -130,3 +131,8 @@ body
 
 .team-names { display: none !important; }
 .member-names { display: block !important; }
+
+.tab-content .tab-pane { display: none; }
+.tab-content .tab-pane.active { display: block; }
+
+body.bracket-view-active .list-view-only { display: none !important; }
