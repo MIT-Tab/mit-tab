@@ -84,11 +84,8 @@ def view_team(request, team_id):
         form = TeamForm(instance=team)
         links = [("/team/" + str(team_id) + "/scratches/view/",
                   "Scratches for {}".format(team.display_backend))]
-        for deb in team.debaters.all():
-            links.append(
-                ("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/team_detail.html", {
                 "title": "Viewing Team: %s" % (team.display_backend),
                 "form": form,
                 "links": links,

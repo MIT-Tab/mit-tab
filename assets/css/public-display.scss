@@ -121,3 +121,23 @@ body
 
 .team-names { display: none !important; }
 .member-names { display: block !important; }
+
+.home-link {
+    display: inline-block;
+    padding: 0.3em 0.7em;
+    background-color: #337ab7;
+    color: white;
+    text-decoration: none;
+    border-radius: 0.2em;
+    font-size: 0.7em;
+    margin-right: 0.8em;
+    transition: all 0.2s ease-in-out;
+}
+
+.home-link:hover {
+    background-color: #23527c;
+    color: white;
+    text-decoration: none;
+    transform: scale(1.05);
+}
+

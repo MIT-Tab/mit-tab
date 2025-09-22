@@ -53,12 +53,6 @@ class TournamentStatusCheck:
         if not request.path.startswith("/api/"):
             return self.get_response(request)
 
-        if not TabSettings.get("apda_tournament", False):
-            return JsonResponse({
-                "error": "Tournament is not sanctioned. Please check and update "
-                         "the \"apda_tournament\" setting if this message is incorrect."
-            }, status=403)
-
         finals = Outround.objects.filter(num_teams=2)
         if not finals.exists() or finals.filter(victor=Outround.UNKNOWN).exists():
             return JsonResponse({"error": "Tournament incomplete"}, status=409)
