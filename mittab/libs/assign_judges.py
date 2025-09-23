@@ -39,7 +39,7 @@ def add_judges():
     all_teams = []
     for pairing in pairings:
         all_teams.extend([pairing.gov_team, pairing.opp_team])
-    
+
     rejudge_counts = judge_team_rejudge_counts(judges, all_teams)
 
     # Assign chairs (single judges) to each round using perfect pairing
@@ -48,14 +48,14 @@ def add_judges():
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
                 weight = calc_weight(judge_i, pairing_i)
-                total_rejudges = 0
+                rejudge_sum = 0
                 if judge.id in rejudge_counts:
-                    total_rejudges += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
-                    total_rejudges += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
-                
-                if total_rejudges > 0:
-                    weight += -1 * (1000 + 10 * judge_i) * total_rejudges
-                
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
+
+                if rejudge_sum > 0:
+                    weight += -1 * (1000 + 10 * judge_i) * rejudge_sum
+
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
