@@ -12,85 +12,28 @@
 </head>
 
 <body class="show-team-names">
-    {% if printable %}
-        <!-- Center pairings table -->
-	{% for outround in outround_pairings %}
-	    <div style="padding: 20px;">
-		<center>{{ outround.label }}</center>
-		<table class="pairings_table printable">
-		    <tr>
-			<th>
-			    Government
-			</th> <th>
-			    Opposition
-			</th> <th>
-			    Judge
-			</th> <th>
-			    Room
-			</th>
-		    </tr>
-		    {% for pairing in outround.rounds %}
-			<tr>
-				<td>
-					<div class="team-names">
-						{{pairing.gov_team.display}}
-					</div>
-					{% if debater_team_memberships_public %}
-					<div class="member-names">
-						{{pairing.gov_team.debaters_display}}
-					</div>
-					{% endif %}
-				</td>
-				<td>
-					<div class="team-names">
-						{{pairing.opp_team.display}}
-					</div>
-					{% if debater_team_memberships_public %}
-					<div class="member-names">
-						{{pairing.opp_team.debaters_display}}
-					</div>
-					{% endif %}
-				</td>
-			    <td>
-				{% for judge in pairing.judges.all %}
-				    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-					<b>{{judge.name}}</b><br>
-				    {% else %}
-					{{judge.name}}<br>
-				    {% endif %}
-				{% endfor %}
-			    </td>
-			    <td>{{pairing.room.name}}</td>
-			</tr>
-		    {% endfor %}
-		</table>
-	    </div>
-	{% empty %}
-	    Nothing is visible.
-	{% endfor %}
-    {% else %}
-        <div id="scrollPage" class="hidden"></div>
-        <!-- Floating top header -->
-        <div class="pairings_header">
-          <h1>{{ label }}</h1>
-          <!--<h3>({{team_count}} teams)</h3>-->
+    <div id="scrollPage" class="hidden"></div>
+    <!-- Floating top header -->
+    <div class="pairings_header">
+      <h1>{{ label }}</h1>
+      <!--<h3>({{team_count}} teams)</h3>-->
 
-          <table class="pairings_table">
-              <tr>
-              <th>
-                  {% if gov_opp_display %}Government{% else %}Team 1{% endif %}
-              </th> <th>
-                  {% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}
-              </th> <th>
-                  Judge
-              </th> <th>
-                  Room
-              </th>
-              </tr>
-          </table>
-        </div>
-	
-        <div class="pairings_header_spacer"></div>
+      <table class="pairings_table">
+          <tr>
+          <th>
+              {% if gov_opp_display %}Government{% else %}Team 1{% endif %}
+          </th> <th>
+              {% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}
+          </th> <th>
+              Judge
+          </th> <th>
+              Room
+          </th>
+          </tr>
+      </table>
+    </div>
+
+    <div class="pairings_header_spacer"></div>
 	
         <!-- Center pairings table -->
 	{% for outround in outround_pairings %}
@@ -151,35 +94,34 @@
 	{% empty %}
 	    <div style="padding: 20px;">Nothing is visible.</div>
 	{% endfor %}
-        <div class="pairings_footer_spacer"></div>
-        <!-- Floating bottom header -->
-        <div class="pairings_footer">
-            <a href="/" class="home-link">Home</a>
-	    {% if sidelock %}
-		<span class="left">
-		    * Bold indicates sidelock.
-		</span>
-	    {% endif %}
-	    {% if choice %}
-		<span class="left">
-		    * Bold indicates choice.
-	    {% endif %}
-		{% if debater_team_memberships_public %}
-		<span class="right">
-		<label for="Member Names">
-			Member Names:
-			<input type="checkbox" name="names" id="name_display_toggle"/>
-		</label>
-		</span>
-	    {% endif %}
-	    <span class="right">
-		<label for="autoscroll">
-		    Autoscroll:
-		    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
-		</label>
+    <div class="pairings_footer_spacer"></div>
+    <!-- Floating bottom header -->
+    <div class="pairings_footer">
+        <a href="/" class="home-link">Home</a>
+	{% if sidelock %}
+	    <span class="left">
+		* Bold indicates sidelock.
 	    </span>
-        </div>
-    {% endif %}
+	{% endif %}
+	{% if choice %}
+	    <span class="left">
+		* Bold indicates choice.
+	{% endif %}
+	    {% if debater_team_memberships_public %}
+	    <span class="right">
+	    <label for="Member Names">
+		    Member Names:
+		    <input type="checkbox" name="names" id="name_display_toggle"/>
+	    </label>
+	    </span>
+	{% endif %}
+	<span class="right">
+	    <label for="autoscroll">
+		Autoscroll:
+		<input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+	    </label>
+	</span>
+    </div>
 
 </body>
 
