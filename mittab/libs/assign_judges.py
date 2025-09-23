@@ -207,11 +207,11 @@ def calc_rejudge_penalty(judge, pairing, judge_i):
         [pairing.gov_team, pairing.opp_team]
     )
 
-    # Sum up rejudge counts for both teams
+    # Sum up  rejudge counts for both teams
     total_rejudges = 0
     if judge.id in result:
         total_rejudges = sum(result[judge.id].values())
-    
+
     if total_rejudges > 0:
         return -1 * (1000 + 10 * judge_i) * total_rejudges
     return 0
@@ -249,6 +249,8 @@ def can_judge_teams(list_of_judges, team1, team2):
     return result
 
 def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
+    """Judges must have prefetch_related('judges__judges') to prevent N+1
+        before calling this function"""
     result = {}
     team_ids = [team.id for team in teams]
 
@@ -257,10 +259,12 @@ def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
         for round_obj in judge.judges.all():
             if exclude_round_id and round_obj.id == exclude_round_id:
                 continue
-                
+
             if round_obj.gov_team_id in team_ids:
-                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(round_obj.gov_team_id, 0) + 1
+                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(
+                    round_obj.gov_team_id, 0) + 1
             if round_obj.opp_team_id in team_ids:
-                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(round_obj.opp_team_id, 0) + 1
-    
+                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
+                    round_obj.opp_team_id, 0) + 1
+
     return result

@@ -1,6 +1,7 @@
 import random
 import time
 import datetime
+import os
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
@@ -22,7 +23,6 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
-import os
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -268,18 +268,18 @@ def view_round(request, round_number):
     round_pairing = tab_logic.sorted_pairings(round_number)
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
-    
+
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
-    
+
     if all_judges_in_round:
         # Get all teams for batch processing
         all_teams = []
         for pairing in round_info:
             all_teams.extend([pairing.gov_team, pairing.opp_team])
-        
+
         # Make single batch call instead of nested loops (fixes N+1 issue)
         display_counts = judge_team_rejudge_counts(all_judges_in_round, all_teams)
-        
+
         judge_rejudge_counts = {}
         for judge in all_judges_in_round:
             judge_rejudge_counts[judge.id] = {}
@@ -290,7 +290,9 @@ def view_round(request, round_number):
                     gov_count = display_counts[judge.id].get(pairing.gov_team.id, 0)
                     opp_count = display_counts[judge.id].get(pairing.opp_team.id, 0)
                     total_rejudges = max(gov_count, opp_count)
-                judge_rejudge_counts[judge.id][pairing.id] = total_rejudges if total_rejudges > 0 else None
+                judge_rejudge_counts[judge.id][pairing.id] = (
+                    total_rejudges if total_rejudges > 0 else None
+                )
     else:
         judge_rejudge_counts = {}
 
@@ -352,45 +354,49 @@ def alternative_judges(request, round_id, judge_id=None):
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related('judges')
+                                   .prefetch_related("judges")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related('judges')
-    
-    excluded_judges_list = assign_judges.can_judge_teams(excluded_judges, round_gov, round_opp)
-    included_judges_list = assign_judges.can_judge_teams(included_judges, round_gov, round_opp)
-    
+                                   .prefetch_related("judges")
+
+    excluded_judges_list = assign_judges.can_judge_teams(
+        excluded_judges, round_gov, round_opp)
+    included_judges_list = assign_judges.can_judge_teams(
+        included_judges, round_gov, round_opp)
+
     current_judge_obj = None
     try:
         current_judge_id = int(judge_id)
-        current_judge_obj = Judge.objects.prefetch_related('judges').get(id=current_judge_id)
+        current_judge_obj = Judge.objects.prefetch_related(
+            "judges").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
         current_judge_id, current_judge_rank = "", ""
         current_judge_name = "No judge"
-    
+
     all_judges = list(excluded_judges_list) + list(included_judges_list)
     if current_judge_obj:
         all_judges.append(current_judge_obj)
-    
+
     display_counts = judge_team_rejudge_counts(
         all_judges, [round_gov, round_opp], exclude_round_id=round_obj.id
     )
-    
-    # Pre-calculate rejudge display counts for all judges to avoid repeated function calls
+
     rejudge_display_counts = {}
     for judge_id, judge_counts in display_counts.items():
         if judge_counts:
             total_rejudges = max(judge_counts.values()) + 1
-            rejudge_display_counts[judge_id] = total_rejudges if total_rejudges > 0 else None
+            rejudge_display_counts[judge_id] = (
+                total_rejudges if total_rejudges > 0 else None
+            )
         else:
             rejudge_display_counts[judge_id] = None
-    
+
     current_judge_rejudge_display = (
         rejudge_display_counts.get(current_judge_obj.id) if current_judge_obj else None
     )
-    
+
     excluded_judges = [
         (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
         for j in excluded_judges_list
