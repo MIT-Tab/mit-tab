@@ -272,7 +272,6 @@ def view_round(request, round_number):
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
 
     if all_judges_in_round:
-        # Get all teams for batch processing
         all_teams = []
         for pairing in round_info:
             all_teams.extend([pairing.gov_team, pairing.opp_team])
@@ -286,7 +285,6 @@ def view_round(request, round_number):
             for pairing in round_info:
                 total_rejudges = 0
                 if judge.id in display_counts and display_counts[judge.id]:
-                    # Get counts for both teams in this pairing
                     gov_count = display_counts[judge.id].get(pairing.gov_team.id, 0)
                     opp_count = display_counts[judge.id].get(pairing.opp_team.id, 0)
                     total_rejudges = max(gov_count, opp_count)

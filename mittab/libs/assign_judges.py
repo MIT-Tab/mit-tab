@@ -36,6 +36,11 @@ def add_judges():
     )
 
     num_rounds = len(pairings)
+    all_teams = []
+    for pairing in pairings:
+        all_teams.extend([pairing.gov_team, pairing.opp_team])
+    
+    rejudge_counts = judge_team_rejudge_counts(judges, all_teams)
 
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
@@ -43,7 +48,14 @@ def add_judges():
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
                 weight = calc_weight(judge_i, pairing_i)
-                weight += calc_rejudge_penalty(judge, pairing, judge_i)
+                total_rejudges = 0
+                if judge.id in rejudge_counts:
+                    total_rejudges += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
+                    total_rejudges += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
+                
+                if total_rejudges > 0:
+                    weight += -1 * (1000 + 10 * judge_i) * total_rejudges
+                
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
@@ -197,24 +209,7 @@ def calc_weight(judge_i, pairing_i):
     return -1 * abs(judge_i - (-1 * pairing_i))
 
 
-def calc_rejudge_penalty(judge, pairing, judge_i):
-    """Calculate penalty for a judge that has previously judged teams in a pairing
 
-    Returns a negative penalty value (0 if no penalty)
-    """
-    result = judge_team_rejudge_counts(
-        [judge],
-        [pairing.gov_team, pairing.opp_team]
-    )
-
-    # Sum up  rejudge counts for both teams
-    total_rejudges = 0
-    if judge.id in result:
-        total_rejudges = sum(result[judge.id].values())
-
-    if total_rejudges > 0:
-        return -1 * (1000 + 10 * judge_i) * total_rejudges
-    return 0
 
 
 def judge_conflict(judge, team1, team2, allow_rejudges=None):
