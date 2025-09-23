@@ -60,3 +60,8 @@
   description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
   value: true
   type: boolean
+- allow_rejudges:
+  name: allow_rejudges
+  description: "A toggle to indicate whether or not rejudges are allowed. If true, assign judges will try to assign judges without rejudging, but will allow for rejudges if necessary."
+  value: false
+  type: boolean

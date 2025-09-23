@@ -36,3 +36,11 @@ def is_file_field(field):
 @register.filter("is_checked_in")
 def is_checked_in(judge, round_value):
     return judge.is_checked_in_for_round(round_value)
+
+
+@register.simple_tag(takes_context=True)
+def judge_team_count(context, judge, pairing):
+    judge_rejudge_counts = context.get('judge_rejudge_counts', {})
+    if judge_rejudge_counts and judge.id in judge_rejudge_counts:
+        return judge_rejudge_counts[judge.id].get(pairing.id)
+    

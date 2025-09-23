@@ -69,11 +69,16 @@
       </div>
 
       <div class="col-4 judges">
+        {% load tags %}
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
           <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
              data-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
+            {% judge_team_count judge pairing as rejudge_count %}
+            {% if rejudge_count > 1 %}
+              <span class="badge badge-warning ml-1">({{rejudge_count}})</span>
+            {% endif %}
           </a>
           <ul class="dropdown-menu"></ul>
         </span>
