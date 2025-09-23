@@ -18,6 +18,7 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 from mittab.libs.outround_tab_logic import offset_to_quotient
 import mittab.libs.backup as backup
+from mittab.libs.data_export.pairings_export import export_pairings_csv
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -498,7 +499,7 @@ def enter_result(request,
         })
 
 
-def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
+def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 
     round_number = 256
@@ -564,7 +565,6 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
 
     pairing_exists = True
     #pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
 
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
@@ -573,8 +573,8 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
     return render(request, "outrounds/pretty_pairing.html", locals())
 
 
-def pretty_pair_print(request, type_of_round=BreakingTeam.VARSITY):
-    return pretty_pair(request, type_of_round, True)
+def export_outround_pairings_csv_view(request, type_of_round=BreakingTeam.VARSITY):
+    return export_pairings_csv(is_outround=True, type_of_round=type_of_round)
 
 
 def toggle_pairing_released(request, type_of_round, num_teams):

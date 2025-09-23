@@ -18,6 +18,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
+from mittab.libs.data_export.pairings_export import export_pairings_csv
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 import mittab.libs.backup as backup
@@ -458,7 +459,7 @@ def toggle_pairing_released(request):
     return JsonResponse(data)
 
 
-def pretty_pair(request, printable=False):
+def pretty_pair(request):
     errors, byes = [], []
 
     round_number = TabSettings.get("cur_round") - 1
@@ -493,13 +494,12 @@ def pretty_pair(request, printable=False):
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     return render(request, "pairing/pairing_display.html", locals())
 
 
-def pretty_pair_print(request):
-    return pretty_pair(request, True)
+def export_pairings_csv_view(request):
+    return export_pairings_csv(is_outround=False)
 
 
 def missing_ballots(request):
