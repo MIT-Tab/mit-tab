@@ -315,6 +315,7 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    wing_only = models.BooleanField(default=False)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()

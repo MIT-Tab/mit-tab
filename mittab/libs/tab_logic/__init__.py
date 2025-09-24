@@ -367,6 +367,7 @@ def sorted_pairings(round_number, outround=False):
     """
     fields = [
         "judges",
+        "judges__judges",
         "chair",
         "room",
         "gov_team",
