@@ -1,4 +1,4 @@
-import "./bracket.scss";
+import "../css/bracket.scss";
 
 const SELECTOR = "#brackets-viewer-container";
 const TAB_CONFIG = [
