@@ -78,7 +78,7 @@
         <div class="pairings_header">
           <h1>{{ label }}</h1>
           <!--<h3>({{team_count}} teams)</h3>-->
-
+		{% if show_outrounds_bracket %}
           <ul class="nav nav-tabs" role="tablist">
               <li class="nav-item" role="presentation">
                   <a class="nav-link active" id="list-view-tab" href="#list-view" role="tab" aria-controls="list-view" aria-selected="true">List View</a>
@@ -89,6 +89,7 @@
               </li>
               {% endif %}
           </ul>
+		{% endif %}
 
           <table class="pairings_table list-view-only">
               <tr>
