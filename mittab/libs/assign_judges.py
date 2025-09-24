@@ -244,7 +244,7 @@ def can_judge_teams(list_of_judges, team1, team2):
     return result
 
 def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
-    """Judges must have prefetch_related('judges__judges') to prevent N+1
+    """Judges must have prefetch_related('judges') to prevent N+1
         before calling this function"""
     result = {}
     team_ids = [team.id for team in teams]
