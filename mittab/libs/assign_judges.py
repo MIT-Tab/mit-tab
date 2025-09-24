@@ -209,9 +209,6 @@ def calc_weight(judge_i, pairing_i):
     return -1 * abs(judge_i - (-1 * pairing_i))
 
 
-
-
-
 def judge_conflict(judge, team1, team2, allow_rejudges=None):
     if allow_rejudges is None:
         allow_rejudges = TabSettings.get("allow_rejudges", False)
