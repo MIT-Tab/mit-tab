@@ -1,3 +1,5 @@
+import "./bracket";
+
 const SELECTOR = "#brackets-viewer-container";
 const TAB_CONFIG = [
   ["list-view-tab", "list-view"],

@@ -4,9 +4,11 @@
 <head>
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'pairingDisplay' %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css" />
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
-
+	{% if show_outrounds_bracket %}
+		{% render_bundle 'bracket' %}
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css" />
+		<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+	{% endif %}
     <title>{{ label }}</title>
 
     <style type="text/css">
@@ -81,9 +83,11 @@
               <li class="nav-item" role="presentation">
                   <a class="nav-link active" id="list-view-tab" href="#list-view" role="tab" aria-controls="list-view" aria-selected="true">List View</a>
               </li>
+              {% if show_outrounds_bracket %}
               <li class="nav-item" role="presentation">
                   <a class="nav-link" id="bracket-view-tab" href="#bracket-view" role="tab" aria-controls="bracket-view" aria-selected="false">Bracket View</a>
               </li>
+              {% endif %}
           </ul>
 
           <table class="pairings_table list-view-only">
@@ -166,6 +170,7 @@
 	{% endfor %}
         </div>
 
+        {% if show_outrounds_bracket %}
         <div id="bracket-view" class="tab-pane" role="tabpanel" aria-labelledby="bracket-view-tab">
             {% if bracket_data_json %}
                 <div class="brackets-viewer" id="brackets-viewer-container"></div>
@@ -182,6 +187,7 @@
                 <div class="bracket-empty">No bracket data available.</div>
             {% endif %}
         </div>
+        {% endif %}
         </div>
         <div class="pairings_footer_spacer"></div>
         <!-- Floating bottom header -->
