@@ -43,4 +43,5 @@ def judge_team_count(context, judge, pairing):
     judge_rejudge_counts = context.get("judge_rejudge_counts", {})
     if judge_rejudge_counts and judge.id in judge_rejudge_counts:
         return judge_rejudge_counts[judge.id].get(pairing.id)
+    return None
     
