@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
-from django.shortcuts import render, reverse, get_object_or_404
+from django.shortcuts import render, reverse
 from django.core.management import call_command
 import yaml
 
@@ -273,34 +273,36 @@ def enter_room(request):
 def room_bulk_check_in(request):
     if request.method != "POST":
         raise Http404("Must be POST")
-    
+
     room_ids = request.POST.getlist("room_ids")
     round_numbers = request.POST.getlist("round_numbers")
     action = request.POST.get("action")  # "check_in" or "check_out"
-    
+
     if not room_ids or not round_numbers:
         return JsonResponse({"success": True})
-    
+
     room_ids = [int(rid) for rid in room_ids if rid.isdigit()]
     round_numbers = [int(rn) for rn in round_numbers if rn.isdigit()]
-    
+
     max_rounds = TabSettings.get("tot_rounds")
     round_numbers = [rn for rn in round_numbers if 0 <= rn <= max_rounds]
-    
+
     if not room_ids or not round_numbers:
         return JsonResponse({"success": True})
-    
-    existing_rooms = set(Room.objects.filter(pk__in=room_ids).values_list('pk', flat=True))
-    
+
+    existing_rooms = set(
+        Room.objects.filter(pk__in=room_ids).values_list("pk", flat=True)
+    )
+
     if action == "check_in":
         checkins_to_create = []
         existing_checkins = set(
             RoomCheckIn.objects.filter(
-                room_id__in=room_ids, 
+                room_id__in=room_ids,
                 round_number__in=round_numbers
-            ).values_list('room_id', 'round_number')
+            ).values_list("room_id", "round_number")
         )
-        
+
         for room_id in room_ids:
             if room_id in existing_rooms:
                 for round_number in round_numbers:
@@ -308,16 +310,16 @@ def room_bulk_check_in(request):
                         checkins_to_create.append(
                             RoomCheckIn(room_id=room_id, round_number=round_number)
                         )
-        
+
         if checkins_to_create:
             RoomCheckIn.objects.bulk_create(checkins_to_create, ignore_conflicts=True)
-            
+
     elif action == "check_out":
         RoomCheckIn.objects.filter(
-            room_id__in=room_ids, 
+            room_id__in=room_ids,
             round_number__in=round_numbers
         ).delete()
-    
+
     return JsonResponse({"success": True})
 
 

@@ -1,6 +1,6 @@
 from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -431,16 +431,16 @@ def rank_teams(request):
 def team_bulk_check_in(request):
     if request.method != "POST":
         return JsonResponse({"error": "Method Not Allowed."}, status=405)
-    
+
     team_ids = request.POST.getlist("team_ids")
     action = request.POST.get("action")  # "check_in" or "check_out"
-    
+
     if not team_ids:
         return JsonResponse({"success": True})
-    
+
     if action == "check_in":
         Team.objects.filter(pk__in=team_ids).update(checked_in=True)
     elif action == "check_out":
         Team.objects.filter(pk__in=team_ids).update(checked_in=False)
-    
+
     return JsonResponse({"success": True})
