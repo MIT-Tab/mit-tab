@@ -10,8 +10,13 @@
       <th>School</th>
       <th>Team</th>
       <th>Debater Names</th>
-      <th>Checked In?</th>
-	
+      <th>
+        Checked In?
+        <div class="custom-control custom-switch d-inline-block ml-2">
+          <input type="checkbox" class="custom-control-input bulk-team-col-toggle" id="bulk-team-col-toggle">
+          <label class="custom-control-label" for="bulk-team-col-toggle"></label>
+        </div>
+      </th>
     </thead>
     {% for school, team, debaters, checked_in in teams_and_checkins %}
     <tr class="searchable">
@@ -31,7 +36,7 @@
                  data-team-id="{{team.id}}"
                  id="toggle-team-{{ team.id }}-{{ forloop.counter0 }}"
                  {% if checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">
+          <label class="custom-control-label checkin-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">
             Checked {% if checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>

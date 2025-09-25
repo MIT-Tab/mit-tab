@@ -234,24 +234,49 @@ def view_scratches(request, judge_id):
 
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def judge_check_in(request, judge_id, round_number):
-    judge_id, round_number = int(judge_id), int(round_number)
 
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # This is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
+@permission_required("tab.judge.can_change", login_url="/403/")
+def judge_bulk_check_in(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method Not Allowed."}, status=405)
 
-    judge = get_object_or_404(Judge, pk=judge_id)
-    if request.method == "POST":
-        if not judge.is_checked_in_for_round(round_number):
-            check_in = CheckIn(judge=judge, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if judge.is_checked_in_for_round(round_number):
-            check_ins = CheckIn.objects.filter(judge=judge,
-                                               round_number=round_number)
-            check_ins.delete()
-    else:
-        raise Http404("Must be POST or DELETE")
+    judge_ids = request.POST.getlist("judge_ids")
+    round_numbers = request.POST.getlist("round_numbers")
+    action = request.POST.get("action")  # "check_in" or "check_out"
+    
+    if not judge_ids or not round_numbers:
+        return JsonResponse({"success": True})
+    
+    judge_ids = [int(jid) for jid in judge_ids if jid.isdigit()]
+    round_numbers = [int(rn) for rn in round_numbers if rn.isdigit()]
+    
+    existing_judges = set(Judge.objects.filter(pk__in=judge_ids).values_list('pk', flat=True))
+    
+    if action == "check_in":
+        checkins_to_create = []
+        existing_checkins = set(
+            CheckIn.objects.filter(
+                judge_id__in=judge_ids, 
+                round_number__in=round_numbers
+            ).values_list('judge_id', 'round_number')
+        )
+        
+        for judge_id in judge_ids:
+            if judge_id in existing_judges:
+                for round_number in round_numbers:
+                    if (judge_id, round_number) not in existing_checkins:
+                        checkins_to_create.append(
+                            CheckIn(judge_id=judge_id, round_number=round_number)
+                        )
+        
+        if checkins_to_create:
+            CheckIn.objects.bulk_create(checkins_to_create, ignore_conflicts=True)
+            
+    elif action == "check_out":
+        # Delete CheckIn objects for all judge/round combinations
+        CheckIn.objects.filter(
+            judge_id__in=judge_ids, 
+            round_number__in=round_numbers
+        ).delete()
+    
     return JsonResponse({"success": True})

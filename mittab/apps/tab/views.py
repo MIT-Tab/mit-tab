@@ -270,25 +270,54 @@ def enter_room(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403")
-def room_check_in(request, room_id, round_number):
-    room_id, round_number = int(room_id), int(round_number)
-
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # 0 is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
-
-    room = get_object_or_404(Room, pk=room_id)
-    if request.method == "POST":
-        if not room.is_checked_in_for_round(round_number):
-            check_in = RoomCheckIn(room=room, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if room.is_checked_in_for_round(round_number):
-            check_ins = RoomCheckIn.objects.filter(room=room,
-                                                   round_number=round_number)
-            check_ins.delete()
-    else:
-        raise Http404("Must be POST or DELETE")
+def room_bulk_check_in(request):
+    if request.method != "POST":
+        raise Http404("Must be POST")
+    
+    room_ids = request.POST.getlist("room_ids")
+    round_numbers = request.POST.getlist("round_numbers")
+    action = request.POST.get("action")  # "check_in" or "check_out"
+    
+    if not room_ids or not round_numbers:
+        return JsonResponse({"success": True})
+    
+    room_ids = [int(rid) for rid in room_ids if rid.isdigit()]
+    round_numbers = [int(rn) for rn in round_numbers if rn.isdigit()]
+    
+    max_rounds = TabSettings.get("tot_rounds")
+    round_numbers = [rn for rn in round_numbers if 0 <= rn <= max_rounds]
+    
+    if not room_ids or not round_numbers:
+        return JsonResponse({"success": True})
+    
+    existing_rooms = set(Room.objects.filter(pk__in=room_ids).values_list('pk', flat=True))
+    
+    if action == "check_in":
+        checkins_to_create = []
+        existing_checkins = set(
+            RoomCheckIn.objects.filter(
+                room_id__in=room_ids, 
+                round_number__in=round_numbers
+            ).values_list('room_id', 'round_number')
+        )
+        
+        for room_id in room_ids:
+            if room_id in existing_rooms:
+                for round_number in round_numbers:
+                    if (room_id, round_number) not in existing_checkins:
+                        checkins_to_create.append(
+                            RoomCheckIn(room_id=room_id, round_number=round_number)
+                        )
+        
+        if checkins_to_create:
+            RoomCheckIn.objects.bulk_create(checkins_to_create, ignore_conflicts=True)
+            
+    elif action == "check_out":
+        RoomCheckIn.objects.filter(
+            room_id__in=room_ids, 
+            round_number__in=round_numbers
+        ).delete()
+    
     return JsonResponse({"success": True})
 
 

@@ -1,0 +1,46 @@
+.table {
+  th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) {
+    width: 16ch;
+    min-width: 16ch;
+  }
+}
+
+.round-header {
+  .full-text {
+    display: inline;
+  }
+  .short-text {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+    // We can't use display:none because we still want to display the switch
+  .checkin-label {
+    font-size: 0;
+    line-height: 0;
+    text-indent: -9999px;
+    
+    &::before,
+    &::after {
+      font-size: 1rem;
+      text-indent: 0;
+    }
+  }
+  
+  .round-header {
+    .full-text {
+      display: none;
+    }
+    .short-text {
+      display: inline;
+    }
+  }
+  
+  .table {
+    th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) {
+      width: 3ch;
+      min-width: 3ch;
+    }
+  }
+}
