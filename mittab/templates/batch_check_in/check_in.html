@@ -1,4 +1,11 @@
-{% extends "base/__normal.html" %}
+{% extends "base/__wide.html" %}
+
+
+{% block extra_bundles %}
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'batchCheckin' %}
+{% endblock extra_bundles %}
+
 {% load tags %}
 
 {% block title %}Check-In{% endblock %}

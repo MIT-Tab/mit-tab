@@ -40,9 +40,10 @@ urlpatterns = [
     re_path(r"^judge/(\d+)/scratches/view/",
             judge_views.view_scratches,
             name="view_scratches"),
-    re_path(r"^judge/(\d+)/check_ins/round/(\d+)/$",
-            judge_views.judge_check_in,
-            name="judge_check_in"),
+
+    path("judge/bulk_check_in/",
+         judge_views.judge_bulk_check_in,
+         name="judge_bulk_check_in"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
 
@@ -56,9 +57,10 @@ urlpatterns = [
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
-    re_path(r"^room/(\d+)/check_ins/round/(\d+)/$",
-            views.room_check_in,
-            name="room_check_in"),
+
+    path("room/bulk_check_in/",
+         views.room_bulk_check_in,
+         name="room_bulk_check_in"),
 
 
     # Scratch related
@@ -90,9 +92,10 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    re_path(r"^team/(\d+)/check_ins/$",
-            team_views.team_check_in,
-            name="team_check_in"),
+
+    path("team/bulk_check_in/",
+         team_views.team_bulk_check_in,
+         name="team_bulk_check_in"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
