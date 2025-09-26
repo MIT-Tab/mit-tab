@@ -17,7 +17,7 @@ from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 from mittab.libs.outround_tab_logic import offset_to_quotient
-from mittab.libs.bracket_logic import get_bracket_data_json
+from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 
 

@@ -13,24 +13,26 @@ WINNER_SIDES = {
 }
 
 def _build_match_skeleton(bracket_size):
+    # Create the first round with initial pairings from bracket generation
     rounds = [[
-        {"slots": [{"seeds": {left}, "team": None, "participant": None,
-                    "position": left, "bye": False},
-                   {"seeds": {right}, "team": None, "participant": None,
-                    "position": right, "bye": False}],
+        {"slots": [{"seeds": {left}, "team": None, "participant": None, "bye": False},
+                   {"seeds": {right}, "team": None, "participant": None, "bye": False}],
          "winner_side": None, "outround": None}
         for left, right in gen_bracket(bracket_size)
     ]]
+    # Build next rounds by pairing adjacent matches from previous round
     while len(rounds[-1]) > 1:
         def make_match(left, right):
+            # Combine seed sets from both child matches
             left_seeds = left["slots"][0]["seeds"] | left["slots"][1]["seeds"]
             right_seeds = right["slots"][0]["seeds"] | right["slots"][1]["seeds"]
             return {"slots": [{"seeds": left_seeds, "team": None,
-                               "participant": None, "position": None, "bye": False},
+                               "participant": None, "bye": False},
                               {"seeds": right_seeds, "team": None,
-                               "participant": None, "position": None, "bye": False}],
+                               "participant": None, "bye": False}],
                     "winner_side": None, "outround": None}
 
+        # Pair up adjacent matches (even/odd indices) to create the next round
         rounds.append([make_match(left, right)
                        for left, right in zip(rounds[-1][::2], rounds[-1][1::2])])
     return rounds
@@ -54,21 +56,17 @@ def _match_status(match):
         return WAITING
     return COMPLETED if match["winner_side"] is not None else READY
 
-def _serialize_bracket(rounds, bracket_size, round_labels):
-    round_names = [
-        round_labels.get(idx)
-        or ("Final" if idx == len(rounds) - 1 else
-            f"Round of {bracket_size // (2 ** idx)}")
-        for idx in range(len(rounds))
-    ]
+
+
+def _serialize_bracket(rounds):
     rounds_payload = [
         {"id": idx, "number": idx, "stage_id": 1,
-         "group_id": 1, "name": round_names[idx - 1]}
+         "group_id": 1}
         for idx in range(1, len(rounds) + 1)
     ]
     matches_payload, metadata = [], {}
     match_id = 1
-    for round_index, (round_name, round_matches) in enumerate(zip(round_names, rounds)):
+    for round_index, round_matches in enumerate(rounds):
         for match_index, match in enumerate(round_matches, 1):
             opponents = [
                 _opponent_payload(slot, match, slot_idx, round_index)
@@ -105,7 +103,6 @@ def _serialize_bracket(rounds, bracket_size, round_labels):
                                              get_fallback_display(slots[0])),
                     "opp_team": slots[1].get("display_info",
                                              get_fallback_display(slots[1])),
-                    "round_name": round_name,
                 }
             match_id += 1
     return rounds_payload, matches_payload, metadata
@@ -116,7 +113,6 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
         return [], [], {}, []
     participants, team_to_participant, participants_by_team_id = [], {}, {}
     team_to_seed = {team.id: seed for seed, team in seed_to_team.items() if team}
-    round_labels = {}
 
     def ensure_participant(team, seed):
         existing = team_to_participant.get(team.id)
@@ -129,7 +125,7 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
             "id": participant_id,
             "tournament_id": 1,
             "name": display, "team_name": display,
-            "debaters_names": members, "debater_names": members,
+            "debaters_names": members,
         }
         participants.append(participant_data)
         team_to_participant[team.id] = participant_id
@@ -155,19 +151,20 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
                 fill_slot(slot, team, seed)
 
     for block in outround_pairings:
-        label = block.get("label")
         for matchup in block["rounds"]:
             if matchup.num_teams < 2:
                 continue
+            # Calculate which round this matchup belongs to based on number of teams
+            # bit_length gives log2 + 1, subtract 1 for round offset from end
             round_index = len(rounds) - (matchup.num_teams.bit_length() - 1)
             if not 0 <= round_index < len(rounds):
                 continue
-            if label:
-                round_labels.setdefault(round_index, label)
             teams = [matchup.gov_team, matchup.opp_team]
             if None in teams:
                 continue
             seeds = [team_to_seed.get(team.id) for team in teams]
+            # Find bracket match corresponding to this matchup by checking seeds
+            # by checking if the teams' seeds are in the expected positions
             match, invert = None, False
             for candidate_match in rounds[round_index]:
                 left, right = candidate_match["slots"]
@@ -175,6 +172,7 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
                     match, invert = candidate_match, False
                     break
                 if seeds[0] in right["seeds"] and seeds[1] in left["seeds"]:
+                    # Teams are swapped from expected positions, so we'll need to invert
                     match, invert = candidate_match, True
                     break
             if None in seeds or not match:
@@ -186,13 +184,16 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
                 fill_slot(slot, team, seed)
             match["outround"] = matchup
             side = WINNER_SIDES.get(matchup.victor, None)
+            # Apply XOR to flip winner side if teams were inverted
             match["winner_side"] = side ^ invert if side is not None else None
 
+    # Propagate wins up the bracket tree
     last_round = len(rounds) - 1
     for round_index, round_matches in enumerate(rounds):
         for match_index, match in enumerate(round_matches):
             slots = match["slots"]
             winner_side = match["winner_side"]
+            # Auto-advance teams that have byes (opponent didn't show up)
             if winner_side is None:
                 winner_side = 0 if slots[0]["team"] and slots[1]["bye"] else (
                     1 if slots[1]["team"] and slots[0]["bye"] else None
@@ -200,14 +201,14 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
             match["winner_side"] = winner_side
             if round_index == last_round or winner_side is None:
                 continue
+            # Calculate parent slot in next round: match_index // 2 gives parent match,
+            # match_index % 2 gives which slot (0 or 1) within that parent match
             parent = rounds[round_index + 1][match_index // 2]["slots"][match_index % 2]
             team = slots[winner_side].get("team")
             if team:
                 fill_slot(parent, team, team_to_seed.get(team.id))
 
-    rounds_payload, matches_payload, metadata = _serialize_bracket(
-        rounds, bracket_size, round_labels
-    )
+    rounds_payload, matches_payload, metadata = _serialize_bracket(rounds)
     return rounds_payload, matches_payload, metadata, participants
 
 def _calculate_bracket_size(outround_pairings):
@@ -215,6 +216,8 @@ def _calculate_bracket_size(outround_pairings):
     if not matchups:
         return None, None
     size = max(m.num_teams for m in matchups)
+    # Ensure bracket size is a power of 2 by rounding up to next power of 2
+    # Uses bit manipulation: size & (size - 1) == 0 tests if size is already power of 2
     if size & (size - 1):
         size = 1 << (size - 1).bit_length()
     return size, matchups[0].type_of_round

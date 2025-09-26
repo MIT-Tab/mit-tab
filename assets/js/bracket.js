@@ -1,4 +1,5 @@
 import "../css/bracket.scss";
+import $ from "jquery";
 
 const SELECTOR = "#brackets-viewer-container";
 const TAB_CONFIG = [
@@ -7,8 +8,6 @@ const TAB_CONFIG = [
 ];
 
 let matchMetadata = {};
-const $id = id => document.getElementById(id);
-const on = (node, evt, handler) => node && node.addEventListener(evt, handler);
 
 const reshapeParticipants = (participants = [], useTeamNames) =>
   participants.map(entry => {
@@ -24,7 +23,7 @@ const renderTeamBlock = (label, info) => {
       ? `<div class="team-members text-muted small mt-1">${info.debaters}</div>`
       : "";
   return (
-    `<div class="match-team mb-3"><strong>${label}:</strong>` +
+    `<div class="match-team mb-3"><strong>${label}</strong>` +
     `<span class="team-name d-block font-weight-bold">${name}</span>` +
     `${members}</div>`
   );
@@ -32,11 +31,11 @@ const renderTeamBlock = (label, info) => {
 
 const renderBracket = () => {
   const viewer = window.bracketsViewer;
-  const container = document.querySelector(SELECTOR);
+  const $container = $(SELECTOR);
   const payload = window.bracketViewerData;
-  if (!viewer || !viewer.render || !container || !payload) return;
+  if (!viewer || !viewer.render || !$container.length || !payload) return;
 
-  const useTeamNames = document.body.classList.contains("show-team-names");
+  const useTeamNames = $("body").hasClass("show-team-names");
   const data = {
     ...payload,
     participants: reshapeParticipants(payload.participants, useTeamNames)
@@ -49,28 +48,24 @@ window.renderBracket = renderBracket;
 
 const activateTab = (targetPane, { render = false } = {}) => {
   TAB_CONFIG.forEach(([tab, pane]) => {
-    const tabNode = $id(tab);
-    const paneNode = $id(pane);
+    const $tab = $(`#${tab}`);
+    const $pane = $(`#${pane}`);
     const active = pane === targetPane;
-    if (tabNode) {
-      tabNode.classList.toggle("active", active);
-      tabNode.setAttribute("aria-selected", active);
-    }
-    if (paneNode) {
-      paneNode.classList.toggle("active", active);
-    }
+
+    $tab.toggleClass("active", active).attr("aria-selected", active);
+    $pane.toggleClass("active", active);
   });
 
   const showBracket = targetPane === "bracket-view";
-  document.body.classList.toggle("bracket-view-active", showBracket);
+  $("body").toggleClass("bracket-view-active", showBracket);
   if (showBracket && render) renderBracket();
 };
 
 const openModal = metadata => {
-  const modal = $id("match-metadata-modal");
-  const backdrop = $id("match-modal-backdrop");
-  const content = $id("modal-content");
-  if (!modal || !backdrop || !content) return;
+  const $modal = $("#match-metadata-modal");
+  const $backdrop = $("#match-modal-backdrop");
+  const $content = $("#modal-content");
+  if (!$modal.length || !$backdrop.length || !$content.length) return;
 
   const judges =
     metadata.judges && metadata.judges.length
@@ -85,80 +80,73 @@ const openModal = metadata => {
           .join("")
       : '<span class="text-muted">TBD</span>';
 
-  content.innerHTML = `
+  $content.html(`
     <button id="close-modal" class="close text-muted position-absolute"
             style="right: 0;" aria-label="Close">
       <span aria-hidden="true">&times;</span>
     </button>
     <div class="match-teams mb-3">
-      ${renderTeamBlock("Government", metadata.gov_team)}
-      ${renderTeamBlock("Opposition", metadata.opp_team)}
+      ${renderTeamBlock("Team 1: ", metadata.gov_team)}
+      ${renderTeamBlock("Team 2: ", metadata.opp_team)}
     </div>
     <div class="match-room mb-3"><strong>Room:</strong> ${metadata.room ||
       "TBD"}</div>
     <div class="match-judges">
       <strong>Judges:</strong>
       <div class="judge-list mt-2">${judges}</div>
-    </div>`;
+    </div>`);
 
-  modal.style.display = "block";
-  backdrop.style.display = "block";
+  $modal.show();
+  $backdrop.show();
 };
 
 const closeModal = () => {
-  const modal = $id("match-metadata-modal");
-  const backdrop = $id("match-modal-backdrop");
-  if (modal) modal.style.display = "none";
-  if (backdrop) backdrop.style.display = "none";
+  $("#match-metadata-modal").hide();
+  $("#match-modal-backdrop").hide();
 };
 
 const initTabs = () => {
   TAB_CONFIG.forEach(([tabId, pane]) => {
-    on($id(tabId), "click", evt => {
+    $(`#${tabId}`).on("click", evt => {
       evt.preventDefault();
       activateTab(pane, { render: pane === "bracket-view" });
     });
   });
 
-  on($id("name_display_toggle"), "change", evt => {
+  $("#name_display_toggle").on("change", evt => {
     const useTeamNames = !evt.target.checked;
-    document.body.classList.toggle("show-team-names", useTeamNames);
-    if (document.body.classList.contains("bracket-view-active"))
-      renderBracket();
+    $("body").toggleClass("show-team-names", useTeamNames);
+    if ($("body").hasClass("bracket-view-active")) renderBracket();
   });
 
-  const bracketPane = $id("bracket-view");
+  const $bracketPane = $("#bracket-view");
   const shouldRender =
-    window.location.hash === "#bracket-view" ||
-    (bracketPane && bracketPane.classList.contains("active"));
+    window.location.hash === "#bracket-view" || $bracketPane.hasClass("active");
   if (shouldRender) activateTab("bracket-view", { render: true });
 };
 
-on(document, "DOMContentLoaded", initTabs);
-on(document, "click", evt => {
-  const { target } = evt;
-  const backdropHit = target.closest
-    ? target.closest("#match-modal-backdrop")
-    : null;
-  if (target.id === "close-modal" || backdropHit) {
+$(document).ready(initTabs);
+
+$(document).on("click", evt => {
+  const $target = $(evt.target);
+  const $backdropHit = $target.closest("#match-modal-backdrop");
+
+  if (evt.target.id === "close-modal" || $backdropHit.length) {
     evt.preventDefault();
     closeModal();
     return;
   }
 
-  const matchNode = target.closest
-    ? target.closest(`${SELECTOR} .match`)
-    : null;
-  if (!matchNode) return;
+  const $matchNode = $target.closest(`${SELECTOR} .match`);
+  if (!$matchNode.length) return;
 
   evt.preventDefault();
   const matchId =
-    (matchNode.dataset && matchNode.dataset.matchId) ||
-    matchNode.getAttribute("data-match-id");
+    $matchNode.data("match-id") || $matchNode.attr("data-match-id");
   const metadata = matchMetadata[matchId];
   if (metadata) openModal(metadata);
 });
 
-on(document, "keydown", evt => {
+$(document).on("keydown", evt => {
   if (evt.key === "Escape") closeModal();
 });
