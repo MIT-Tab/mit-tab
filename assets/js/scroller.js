@@ -32,7 +32,7 @@ setupScroll = () => {
 };
 
 $(document).ready(() => {
-  $("#autoscroll").change(() => {
+  $("#autoscroll").change(function() {
     if ($(this).prop("checked")) {
       setupScroll();
     } else {
@@ -40,5 +40,4 @@ $(document).ready(() => {
     }
   });
 
-  setupScroll();
 });
