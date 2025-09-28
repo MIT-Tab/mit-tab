@@ -32,12 +32,11 @@ setupScroll = () => {
 };
 
 $(document).ready(() => {
-  $("#autoscroll").change(function() {
+  $("#autoscroll").change(function handleAutoscrollChange() {
     if ($(this).prop("checked")) {
       setupScroll();
     } else {
       window.clearInterval(timer);
     }
   });
-
 });
