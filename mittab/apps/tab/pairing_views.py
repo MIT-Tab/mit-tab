@@ -49,7 +49,6 @@ def pair_round(request):
         return view_status(request)
     else:
         # See if we can pair the round
-        title = "Pairing Round %s" % (current_round_number)
         check_status = []
 
         judges = tab_logic.have_enough_judges(current_round_number)
@@ -71,28 +70,23 @@ def pair_round(request):
 
         msg = "All Rounds properly entered for Round %s" % (
             current_round_number - 1)
-        ready_to_pair = "Yes"
-        ready_to_pair_alt = "Checks passed!"
         try:
             tab_logic.have_properly_entered_data(current_round_number)
             check_status.append((msg, "Yes", "All rounds look good"))
         except PrevRoundNotEnteredError as e:
-            ready_to_pair = "No"
-            ready_to_pair_alt = str(e)
             check_status.append(
                 (msg, "No", "Not all rounds are entered. %s" % str(e)))
         except ByeAssignmentError as e:
-            ready_to_pair = "No"
-            ready_to_pair_alt = str(e)
             check_status.append(
                 (msg, "No", "You have a bye and results. %s" % str(e)))
         except NoShowAssignmentError as e:
-            ready_to_pair = "No"
-            ready_to_pair_alt = str(e)
             check_status.append(
                 (msg, "No", "You have a noshow and results. %s" % str(e)))
 
-        return render(request, "pairing/pair_round.html", locals())
+        return render(request, "pairing/pair_round.html", {
+            "title" : f"Pairing Round %s {current_round_number}",
+            "check_status": check_status
+            })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -180,14 +174,16 @@ def assign_room(request, round_id, new_room_id, outround=False):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backup(request, filename):
-    backups = backup.list_backups()
-    item_list = []
-    item_type = "backup"
-    title = "Viewing Backup: {}".format(filename)
-    item_manip = "restore from that backup"
-    links = [("/backup/download/{}/".format(filename), "Download Backup"),
-             ("/backup/restore/{}/".format(filename), "Restore From Backup")]
-    return render(request, "common/list_data.html", locals())
+    return render(request, "common/list_data.html", {
+        "backups" : backup.list_backups(),
+        "item_list": [],
+        "item_type" : "backup",
+        "title" : f"Viewing Backup {filename}",
+        "item_manip" : "restore from that backup",
+        "links" : [("/backup/download/{}/".format(filename), "Download Backup"),
+                   ("/backup/restore/{}/".format(filename), "Restore From Backup")]
+
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -237,12 +233,14 @@ def manual_backup(request, include_scratches=True):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backups(request):
     backups = backup.list_backups()
-    item_list = [(i, i, 0, "") for i in sorted(backups)]
-    item_type = "backup"
-    title = "Viewing All Backups"
-    item_manip = "restore from that backup"
-    links = [("/upload_backup/", "Upload Backup")]
-    return render(request, "common/list_data.html", locals())
+    return render(request, "common/list_data.html", {
+        "backups" : backups,
+        "item_list" : [(i, i, 0, "") for i in sorted(backups)],
+        "item_type" : "backup",
+        "title" : "Viewing All Backups",
+        "item_manip" : "restore from that backup",
+        "links" : [("/upload_backup/", "Upload Backup")]
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -296,7 +294,6 @@ def view_round(request, round_number):
 
     paired_teams = [team.gov_team for team in round_pairing
                     ] + [team.opp_team for team in round_pairing]
-    n_over_two = Team.objects.filter(checked_in=True).count() / 2
 
     for present_team in Team.objects.filter(checked_in=True):
         if present_team not in paired_teams:
@@ -309,7 +306,7 @@ def view_round(request, round_number):
     simulate_round_button = os.environ.get("MITTAB_ENV") in (
         "development", "test-deployment"
     )
-    pairing_exists = len(round_pairing) > 0
+
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     rooms_assigned = all((r.room is not None for r in round_info))
@@ -343,7 +340,21 @@ def view_round(request, round_number):
             ]
         ]))
 
-    return render(request, "pairing/pairing_control.html", locals())
+    return render(request, "pairing/pairing_control.html", {
+        "round_number": round_number,
+        "errors" : errors,
+        "num_exclude": num_excluded,
+        "judges_assigned" : judges_assigned,
+        "rooms_assigned" : rooms_assigned,
+        "simulate_round_button" : simulate_round_button,
+        "pairing_released" : pairing_released,
+        "tot_rounds" : tot_rounds,
+        "excluded_teams_no_bye": excluded_teams_no_bye,
+        "round_info": round_info,
+        "excluded_people": excluded_people,
+        "warning": warning,
+        "judge_slots": judge_slots
+    })
 
 
 def alternative_judges(request, round_id, judge_id=None):
@@ -406,7 +417,14 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
-    return render(request, "pairing/judge_dropdown.html", locals())
+    return render(request, "pairing/judge_dropdown.html", {
+        "current_judge_id": current_judge_id,
+        "current_judge_name": current_judge_name,
+        "current_judge_rank": current_judge_rank,
+        "round_obj": round_obj,
+        "excluded_judges": excluded_judges,
+        "included_judges": included_judges
+    })
 
 
 def alternative_teams(request, round_id, current_team_id, position):
@@ -418,7 +436,12 @@ def alternative_teams(request, round_id, current_team_id, position):
         .exclude(pk=current_team_id)
     included_teams = Team.objects.exclude(pk__in=excluded_teams) \
         .exclude(pk=current_team_id)
-    return render(request, "pairing/team_dropdown.html", locals())
+    return render(request, "pairing/team_dropdown.html", {
+        "current_team": current_team,
+        "round_obj": round_obj,
+        "excluded_teams": excluded_teams,
+        "included_teams": included_teams,
+    })
 
 
 def team_stats(request, round_number, outround=False):
@@ -558,7 +581,16 @@ def pretty_pair(request, printable=False):
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     printable = printable
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    return render(request, "pairing/pairing_display.html", locals())
+    return render(request, "pairing/pairing_display.html", {
+        "round_number": round_number,
+        "round_pairing": round_pairing,
+        "errors": errors,
+        "byes": byes,
+        "team_count": team_count,
+        "pairing_exists": pairing_exists,
+        "printable": printable,
+        "debater_team_memberships_public": debater_team_memberships_public
+    })
 
 
 def pretty_pair_print(request):
@@ -573,7 +605,10 @@ def missing_ballots(request):
 
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    return render(request, "ballots/missing_ballots.html", locals())
+    return render(request, "ballots/missing_ballots.html", {
+        "rounds": rounds,
+        "pairing_exists": pairing_exists
+    })
 
 
 def view_rounds(request):
