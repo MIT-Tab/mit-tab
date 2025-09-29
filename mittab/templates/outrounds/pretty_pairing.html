@@ -173,14 +173,40 @@
         <div id="bracket-view" class="tab-pane" role="tabpanel" aria-labelledby="bracket-view-tab">
             {% if bracket_data_json %}
                 <div class="brackets-viewer" id="brackets-viewer-container"></div>
-                <div id="match-metadata-modal" class="match-modal" style="display: none;">
+                <div id="match-modal-backdrop" class="match-modal__backdrop" hidden></div>
+                <div id="match-metadata-modal" class="match-modal" role="dialog" aria-modal="true" aria-labelledby="match-modal-title" hidden>
                     <div class="match-modal__content card shadow-lg border border-primary">
-                        <div id="modal-content" class="card-body position-relative"></div>
+                        <button type="button" class="match-modal__close close text-muted" id="close-modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="card-body match-modal__body">
+                            <h2 id="match-modal-title" class="h5 mb-3">Match Details</h2>
+                            <div class="match-teams">
+                                <div class="match-team" data-team="gov">
+                                    <span class="match-team__label" data-team-label="gov">Team 1</span>
+                                    <span class="match-team__name" data-team-name="gov">TBD</span>
+                                    <span class="match-team__members d-none" data-team-members="gov"></span>
+                                </div>
+                                <div class="match-team" data-team="opp">
+                                    <span class="match-team__label" data-team-label="opp">Team 2</span>
+                                    <span class="match-team__name" data-team-name="opp">TBD</span>
+                                    <span class="match-team__members d-none" data-team-members="opp"></span>
+                                </div>
+                            </div>
+                            <div class="match-section match-room">
+                                <span class="match-section__label">Room</span>
+                                <span class="room-name" data-room>TBD</span>
+                            </div>
+                            <div class="match-section match-judges">
+                                <span class="match-section__label">Judges</span>
+                                <ul class="match-section__value judge-list list-unstyled mb-0" data-judges></ul>
+                            </div>
+                            <p class="match-error text-danger small d-none" id="match-modal-error"></p>
+                        </div>
                     </div>
                 </div>
-                <div id="match-modal-backdrop" class="match-modal__backdrop" style="display: none;"></div>
                 <script>
-                window.bracketViewerData = {{ bracket_data_json|safe }};
+                window.bracketViewerData = JSON.parse('{{ bracket_data_json|escapejs }}');
                 </script>
             {% else %}
                 <div class="bracket-empty">No bracket data available.</div>
@@ -221,4 +247,3 @@
 </body>
 
 </html>
-
