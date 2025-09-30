@@ -23,17 +23,21 @@ const updateTeam = (teamKey, info = {}, fallbackLabel) => {
   const $label = $team.find("[data-team-label]");
   if ($label.length) {
     const seed = info && info.seed != null ? info.seed : null;
-    const labelText = seed != null ? `Seed ${seed}` : info.label || fallbackLabel;
+    const labelText =
+      seed != null ? `Seed ${seed}` : info.label || fallbackLabel;
     $label.text(labelText || fallbackLabel);
   }
 
   const name = typeof info.name === "string" ? info.name.trim() : "";
-  const displayName = name || (typeof info.display === "string" ? info.display.trim() : "");
+  const displayName =
+    name || (typeof info.display === "string" ? info.display.trim() : "");
   $team.find("[data-team-name]").text(displayName || "TBD");
 
   const rawMembers =
     typeof info.debaters_plain === "string" ? info.debaters_plain.trim() : "";
-  const members = rawMembers || (typeof info.debaters === "string" ? info.debaters.trim() : "");
+  const members =
+    rawMembers ||
+    (typeof info.debaters === "string" ? info.debaters.trim() : "");
   const $members = $team.find("[data-team-members]");
   if ($members.length) {
     $members.text(members);
@@ -50,9 +54,10 @@ const renderJudges = ($modal, judges) => {
   const lineup = hasJudges ? judges : [{ name: "TBD" }];
 
   lineup.forEach(judge => {
-    const name = judge && typeof judge.name === "string" && judge.name.trim()
-      ? judge.name.trim()
-      : "TBD";
+    const name =
+      judge && typeof judge.name === "string" && judge.name.trim()
+        ? judge.name.trim()
+        : "TBD";
 
     const $item = $("<li/>", { class: "judge-pill" });
     if (judge && judge.is_chair) $item.addClass("is-chair");
@@ -60,7 +65,9 @@ const renderJudges = ($modal, judges) => {
     $("<span/>", { class: "judge-pill__name", text: name }).appendTo($item);
 
     if (judge && judge.is_chair) {
-      $("<span/>", { class: "judge-pill__badge", text: "Chair" }).appendTo($item);
+      $("<span/>", { class: "judge-pill__badge", text: "Chair" }).appendTo(
+        $item
+      );
     }
 
     if (!hasJudges) $item.addClass("text-muted");
