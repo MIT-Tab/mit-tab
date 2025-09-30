@@ -60,7 +60,7 @@ def add_judges():
     rejudge_penalty = TabSettings.get("rejudge_penalty", 100)
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
-    
+
     mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
     for judge_i, judge in enumerate(judges):
         judge_score = judge_scores[judge_i]
@@ -74,7 +74,7 @@ def add_judges():
                     rejudge_sum += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
 
                 if rejudge_sum > 0:
-                    weight += -1 * rejudge_penalty * (1 + .1 * judge_score) * rejudge_sum
+                    weight -= rejudge_penalty * (1 + .1 * judge_score) * rejudge_sum
 
                 edge = (
                     pairing_i,
