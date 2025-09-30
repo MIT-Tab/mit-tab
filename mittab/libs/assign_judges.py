@@ -3,6 +3,21 @@ from django.db.models import Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 
+class JudgePairingMode:
+    DEFAULT = 0
+    CLASSIC = 1
+
+def construct_judge_scores(judges):
+    judge_scores = []
+    judge_score = -1
+    previous_rank = 0
+    for judge_i, judge in enumerate(judges):
+        if previous_rank != judge.rank:
+            judge_score = judge_i
+            previous_rank = judge.rank
+        judge_scores.append(judge_score)
+    return judge_scores
+
 
 def add_judges():
     current_round_number = TabSettings.get("cur_round") - 1
@@ -31,6 +46,7 @@ def add_judges():
 
     # Order the judges and pairings by power ranking
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
+    judge_scores = construct_judge_scores(judges)
     pairings.sort(
         key=lambda x: tab_logic.team_comp(x, current_round_number), reverse=True
     )
@@ -41,20 +57,24 @@ def add_judges():
         all_teams.extend([pairing.gov_team, pairing.opp_team])
 
     rejudge_counts = judge_team_rejudge_counts(judges, all_teams)
-
+    rejudge_penalty = TabSettings.get("rejudge_penalty", 100)
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
+    
+    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
     for judge_i, judge in enumerate(judges):
+        judge_score = judge_scores[judge_i]
+
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
-                weight = calc_weight(judge_i, pairing_i)
+                weight = calc_weight(judge_score, pairing_i, mode)
                 rejudge_sum = 0
                 if judge.id in rejudge_counts:
                     rejudge_sum += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
                     rejudge_sum += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
 
                 if rejudge_sum > 0:
-                    weight += -1 * (1000 + 10 * judge_i) * rejudge_sum
+                    weight += -1 * rejudge_penalty * (1 + .1 * judge_score) * rejudge_sum
 
                 edge = (
                     pairing_i,
@@ -126,6 +146,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
 
     # Order the judges and pairings by power ranking
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
+    judge_scores = construct_judge_scores(judges)
 
     # Sorting done by higest position in bracket
     pairings.sort(
@@ -144,11 +165,12 @@ def add_outround_judges(round_type=Outround.VARSITY):
     # Create a working copy of judges for assignment
     available_judges = judges.copy()
 
+    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
     graph_edges = []
     for judge_i, judge in enumerate(available_judges):
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, True):
-                weight = calc_weight(judge_i, pairing_i)
+                weight = calc_weight(judge_scores[judge_i], pairing_i, mode)
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
@@ -200,13 +222,15 @@ def add_outround_judges(round_type=Outround.VARSITY):
     Outround.objects.bulk_update(pairings, ["chair"])
     Outround.judges.through.objects.bulk_create(judge_round_joins)
 
-def calc_weight(judge_i, pairing_i):
-    """Calculate the relative badness of this judge assignment
+def calc_weight(judge_i, pairing_i, mode=JudgePairingMode.DEFAULT):
+    """Calculate the relative badness of this judge assignment"""
+    if mode == JudgePairingMode.CLASSIC:
+        return -1 * abs(judge_i - (-1 * pairing_i))
 
-    We want small negative numbers to be preferred to large negative numbers
-
-    """
-    return -1 * abs(judge_i - (-1 * pairing_i))
+    delta = judge_i - pairing_i
+    if delta <= 0:
+        return 0
+    return -1 * (delta ** 2)
 
 
 def judge_conflict(judge, team1, team2, allow_rejudges=None):
