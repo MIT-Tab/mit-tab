@@ -4,7 +4,6 @@ import tempfile
 
 from django.test import LiveServerTestCase
 from django.core.cache import cache
-from django.contrib.staticfiles.handlers import StaticFilesHandler
 from selenium import webdriver
 from selenium.common.exceptions import NoAlertPresentException
 from selenium.webdriver.common.by import By
@@ -30,7 +29,7 @@ class BaseWebTestCase(LiveServerTestCase):
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--start-maximized")
             chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--incognito") 
+            chrome_options.add_argument("--incognito")
             temp_dir = tempfile.mkdtemp()
             chrome_options.add_argument("--user-data-dir=" + temp_dir)
             self.browser = Browser("chrome",
