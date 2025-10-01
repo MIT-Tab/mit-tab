@@ -6,6 +6,7 @@ from django.contrib.auth.views import LoginView
 
 import mittab.settings as settings
 import mittab.apps.tab.views as views
+import mittab.apps.tab.api_views as api_views
 import mittab.apps.tab.judge_views as judge_views
 import mittab.apps.tab.team_views as team_views
 import mittab.apps.tab.debater_views as debater_views
@@ -111,6 +112,8 @@ urlpatterns = [
          name="view_rounds"),
     re_path(r"^round/(\d+)/$", pairing_views.view_round, name="view_round"),
     re_path(r"^round/(\d+)/stats/$", pairing_views.team_stats, name="team_stats"),
+    re_path(r"^outround/(\d+)/stats/$", pairing_views.team_stats,
+            {"outround": True}, name="outround_team_stats"),
     re_path(r"^round/(\d+)/result/$",
             pairing_views.enter_result,
             name="enter_result"),
@@ -172,6 +175,10 @@ urlpatterns = [
     path("pairing/backup/",
          pairing_views.manual_backup,
          name="manual_backup"),
+    path("pairing/backup_without_scratches/",
+         pairing_views.manual_backup,
+         {"include_scratches":False},
+         name="manual_backup_without_scratches"),
     path("pairing/release/",
          pairing_views.toggle_pairing_released,
          name="toggle_pairing_released"),
@@ -228,6 +235,9 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_swap_judge"),
+    path("outround_pairing/assign_judges/<int:round_type>/",
+         outround_pairing_views.assign_judges_to_pairing,
+         name="outround_assign_judges"),
     re_path(r"^outround/(\d+)/result/$",
             outround_pairing_views.enter_result,
             name="enter_result"),
@@ -281,6 +291,32 @@ urlpatterns = [
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
+
+    # Standings API
+    path("publish_results/<int:new_setting>/",
+         views.publish_results,
+         name="publish_results"),
+    path("api/varsity-speaker-awards",
+         api_views.varsity_speaker_awards_api,
+         name="varsity_speaker_awards_api"),
+    path("api/novice-speaker-awards",
+         api_views.novice_speaker_awards_api,
+         name="novice_speaker_awards_api"),
+    path("api/varsity-team-placements",
+         api_views.varsity_team_placements_api,
+         name="varsity_team_placements_api"),
+    path("api/novice-team-placements",
+         api_views.novice_team_placements_api,
+         name="novice_team_placements_api"),
+    path("api/non-placing-teams",
+         api_views.non_placing_teams_api,
+         name="non_placing_teams_api"),
+    path("api/new-debater-data",
+         api_views.new_debater_data_api,
+         name="new_debater_data_api"),
+    path("api/new-schools",
+         api_views.new_schools_api,
+         name="new_schools_api"),
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),

@@ -8,7 +8,7 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=20)
+    key = models.CharField(max_length=25)
     value = models.IntegerField()
 
     class Meta:
@@ -61,6 +61,7 @@ class TabSettings(models.Model):
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def __str__(self):
         return self.name
@@ -97,6 +98,7 @@ class Debater(models.Model):
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def save(self,
              force_insert=False,
@@ -313,6 +315,7 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    wing_only = models.BooleanField(default=False)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()

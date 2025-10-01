@@ -1,5 +1,5 @@
 import random
-
+from django.db.models import Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 
@@ -14,7 +14,8 @@ def add_judges():
 
     judges = list(
         Judge.objects.filter(
-            checkin__round_number=current_round_number
+            checkin__round_number=current_round_number,
+            wing_only=False
         ).prefetch_related(
             "judges",  # poorly named relation for the round
             "scratches",
@@ -35,16 +36,30 @@ def add_judges():
     )
 
     num_rounds = len(pairings)
+    all_teams = []
+    for pairing in pairings:
+        all_teams.extend([pairing.gov_team, pairing.opp_team])
+
+    rejudge_counts = judge_team_rejudge_counts(judges, all_teams)
 
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
     for judge_i, judge in enumerate(judges):
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
+                weight = calc_weight(judge_i, pairing_i)
+                rejudge_sum = 0
+                if judge.id in rejudge_counts:
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
+
+                if rejudge_sum > 0:
+                    weight += -1 * (1000 + 10 * judge_i) * rejudge_sum
+
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
-                    calc_weight(judge_i, pairing_i),
+                    weight,
                 )
                 graph_edges.append(edge)
 
@@ -83,6 +98,108 @@ def add_judges():
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
 
+def add_outround_judges(round_type=Outround.VARSITY):
+    num_teams = Outround.objects.filter(type_of_round=round_type
+                                        ).aggregate(Min("num_teams"))["num_teams__min"]
+
+    # First clear any existing judge assignments
+    Outround.judges.through.objects.filter(
+        outround__type_of_round=round_type,
+        outround__num_teams=num_teams
+    ).delete()
+
+    judges = list(
+        Judge.objects.filter(
+            checkin__round_number=0
+        ).prefetch_related(
+            "judges",  # poorly named relation for the round
+            "scratches",
+        )
+    )
+    pairings = tab_logic.sorted_pairings(num_teams, outround=True)
+    pairings = [p for p in pairings if p.type_of_round == round_type]
+    # Try to have consistent ordering with the round display
+    random.seed(1337)
+    random.shuffle(pairings)
+    random.seed(1337)
+    random.shuffle(judges)
+
+    # Order the judges and pairings by power ranking
+    judges = sorted(judges, key=lambda j: j.rank, reverse=True)
+
+    # Sorting done by higest position in bracket
+    pairings.sort(
+        key=lambda x: min(x.gov_team.breaking_team.effective_seed,
+                          x.opp_team.breaking_team.effective_seed), reverse=True
+    )
+
+    num_rounds = len(pairings)
+    judge_round_joins = []
+
+    if round_type == Outround.VARSITY:
+        panel_size = TabSettings.get("", 3)
+    else:
+        panel_size = TabSettings.get("nov_panel_size", 1)
+
+    # Create a working copy of judges for assignment
+    available_judges = judges.copy()
+
+    graph_edges = []
+    for judge_i, judge in enumerate(available_judges):
+        for pairing_i, pairing in enumerate(pairings):
+            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, True):
+                weight = calc_weight(judge_i, pairing_i)
+                edge = (
+                    pairing_i,
+                    num_rounds + judge_i,
+                    weight,
+                )
+                graph_edges.append(edge)
+    # Iterate once for each member of the panel
+    for panel_member in range(panel_size):
+        judge_assignments = mwmatching.maxWeightMatching(graph_edges,
+                                                         maxcardinality=True)
+
+        # If there is no possible assignment of judges, raise an error
+        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
+            if not graph_edges:
+                raise errors.JudgeAssignmentError(
+                    "Impossible to assign judges."
+                )
+            elif -1 in judge_assignments[:num_rounds]:
+                pairing_list = judge_assignments[: len(pairings)]
+                bad_pairing = pairings[pairing_list.index(-1)]
+                raise errors.JudgeAssignmentError(
+                    f"Could not find a judge for: {bad_pairing}"
+                )
+            else:
+                raise errors.JudgeAssignmentError()
+
+        # Track which judges to remove after this iteration
+        judges_to_remove = []
+
+        # Because we can't bulk-update the judges field of rounds (it's many-to-many),
+        # we use the join table model and bulk-create it
+        for pairing_i, padded_judge_i in enumerate(judge_assignments[:num_rounds]):
+            judge_i = padded_judge_i - num_rounds
+
+            round_obj = pairings[pairing_i]
+            judge = available_judges[judge_i]
+
+            if panel_member == 0:
+                round_obj.chair = judge
+
+            judge_round_joins.append(Outround.judges.through(judge=judge,
+                                                             outround=round_obj))
+            judges_to_remove.append(padded_judge_i)
+
+        #Remove edges for already assigned judges rather than re-calculating weights
+        graph_edges = [edge for edge in graph_edges if edge[1] not in judges_to_remove]
+
+    # Save the judges to the pairings
+    Outround.objects.bulk_update(pairings, ["chair"])
+    Outround.judges.through.objects.bulk_create(judge_round_joins)
+
 def calc_weight(judge_i, pairing_i):
     """Calculate the relative badness of this judge assignment
 
@@ -92,19 +209,21 @@ def calc_weight(judge_i, pairing_i):
     return -1 * abs(judge_i - (-1 * pairing_i))
 
 
-def judge_conflict(judge, team1, team2):
-    return (
-        any(
-            s.team_id
-            in (
-                team1.id,
-                team2.id,
-            )
-            for s in judge.scratches.all()
-        )
-        or had_judge(judge, team1)
-        or had_judge(judge, team2)
+def judge_conflict(judge, team1, team2, allow_rejudges=None):
+    if allow_rejudges is None:
+        allow_rejudges = TabSettings.get("allow_rejudges", False)
+    has_scratches = any(
+        s.team_id in (team1.id, team2.id)
+        for s in judge.scratches.all()
     )
+    if not allow_rejudges:
+        return (
+            has_scratches
+            or had_judge(judge, team1)
+            or had_judge(judge, team2)
+        )
+    else:
+        return has_scratches
 
 
 def had_judge(judge, team):
@@ -119,4 +238,25 @@ def can_judge_teams(list_of_judges, team1, team2):
     for judge in list_of_judges:
         if not judge_conflict(judge, team1, team2):
             result.append(judge)
+    return result
+
+def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
+    """Judges must have prefetch_related('judges') to prevent N+1
+        before calling this function"""
+    result = {}
+    team_ids = [team.id for team in teams]
+
+    for judge in judges:
+        result[judge.id] = {}
+        for round_obj in judge.judges.all():
+            if exclude_round_id and round_obj.id == exclude_round_id:
+                continue
+
+            if round_obj.gov_team_id in team_ids:
+                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(
+                    round_obj.gov_team_id, 0) + 1
+            if round_obj.opp_team_id in team_ids:
+                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
+                    round_obj.opp_team_id, 0) + 1
+
     return result
