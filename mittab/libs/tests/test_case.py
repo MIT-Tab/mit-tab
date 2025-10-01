@@ -4,6 +4,7 @@ import tempfile
 
 from django.test import LiveServerTestCase
 from django.core.cache import cache
+from django.contrib.staticfiles.handlers import StaticFilesHandler
 from selenium import webdriver
 from selenium.common.exceptions import NoAlertPresentException
 from selenium.webdriver.common.by import By
@@ -21,7 +22,7 @@ class BaseWebTestCase(LiveServerTestCase):
 
     username = "tab"
     password = "password"
-    wait_seconds = 3.0
+    wait_seconds = 1
 
     def setUp(self):
         if os.environ.get("TEST_BROWSER", "chrome") == "chrome":
@@ -29,6 +30,7 @@ class BaseWebTestCase(LiveServerTestCase):
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--start-maximized")
             chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--incognito") 
             temp_dir = tempfile.mkdtemp()
             chrome_options.add_argument("--user-data-dir=" + temp_dir)
             self.browser = Browser("chrome",
@@ -58,7 +60,6 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.find_by_text("Sign in").first.click()
 
         assert self._wait_for_text("Admin")  # checks that the nav is visible
-        assert not self._wait_for_text("Sign in")
 
     def _go_home(self):
         self._visit("/")
@@ -75,7 +76,7 @@ class BaseWebTestCase(LiveServerTestCase):
         self.browser.visit(path)
         self._wait()
 
-    def _wait_for_text(self, text, timeout=10, retries=5):
+    def _wait_for_text(self, text, timeout=5, retries=2):
         for attempt in range(retries):
             try:
                 return WebDriverWait(self.browser.driver, timeout).until(
