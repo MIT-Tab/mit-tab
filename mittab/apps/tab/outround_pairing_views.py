@@ -572,7 +572,7 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
     bracket_data_json = None
-    if not printable and outround_pairings and show_outrounds_bracket:
+    if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)
 
     return render(request, "outrounds/pretty_pairing.html", locals())
