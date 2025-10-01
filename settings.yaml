@@ -60,3 +60,13 @@
   description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
   value: true
   type: boolean
+- show_outrounds_bracket:
+  name: show_outs_bracket
+  description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
+  value: false
+  type: boolean
+- allow_rejudges:
+  name: allow_rejudges
+  description: "A toggle to indicate whether or not rejudges are allowed. If true, assign judges will try to assign judges without rejudging, but will allow for rejudges if necessary."
+  value: false
+  type: boolean

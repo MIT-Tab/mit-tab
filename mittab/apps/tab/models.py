@@ -8,7 +8,7 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=20)
+    key = models.CharField(max_length=25)
     value = models.IntegerField()
 
     class Meta:
@@ -315,6 +315,7 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    wing_only = models.BooleanField(default=False)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()

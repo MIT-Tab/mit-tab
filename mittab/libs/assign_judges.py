@@ -14,7 +14,8 @@ def add_judges():
 
     judges = list(
         Judge.objects.filter(
-            checkin__round_number=current_round_number
+            checkin__round_number=current_round_number,
+            wing_only=False
         ).prefetch_related(
             "judges",  # poorly named relation for the round
             "scratches",
@@ -35,16 +36,30 @@ def add_judges():
     )
 
     num_rounds = len(pairings)
+    all_teams = []
+    for pairing in pairings:
+        all_teams.extend([pairing.gov_team, pairing.opp_team])
+
+    rejudge_counts = judge_team_rejudge_counts(judges, all_teams)
 
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
     for judge_i, judge in enumerate(judges):
         for pairing_i, pairing in enumerate(pairings):
             if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
+                weight = calc_weight(judge_i, pairing_i)
+                rejudge_sum = 0
+                if judge.id in rejudge_counts:
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.gov_team.id, 0)
+                    rejudge_sum += rejudge_counts[judge.id].get(pairing.opp_team.id, 0)
+
+                if rejudge_sum > 0:
+                    weight += -1 * (1000 + 10 * judge_i) * rejudge_sum
+
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
-                    calc_weight(judge_i, pairing_i),
+                    weight,
                 )
                 graph_edges.append(edge)
 
@@ -132,11 +147,12 @@ def add_outround_judges(round_type=Outround.VARSITY):
     graph_edges = []
     for judge_i, judge in enumerate(available_judges):
         for pairing_i, pairing in enumerate(pairings):
-            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team):
+            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, True):
+                weight = calc_weight(judge_i, pairing_i)
                 edge = (
                     pairing_i,
                     num_rounds + judge_i,
-                    calc_weight(judge_i, pairing_i),
+                    weight,
                 )
                 graph_edges.append(edge)
     # Iterate once for each member of the panel
@@ -193,19 +209,21 @@ def calc_weight(judge_i, pairing_i):
     return -1 * abs(judge_i - (-1 * pairing_i))
 
 
-def judge_conflict(judge, team1, team2):
-    return (
-        any(
-            s.team_id
-            in (
-                team1.id,
-                team2.id,
-            )
-            for s in judge.scratches.all()
-        )
-        or had_judge(judge, team1)
-        or had_judge(judge, team2)
+def judge_conflict(judge, team1, team2, allow_rejudges=None):
+    if allow_rejudges is None:
+        allow_rejudges = TabSettings.get("allow_rejudges", False)
+    has_scratches = any(
+        s.team_id in (team1.id, team2.id)
+        for s in judge.scratches.all()
     )
+    if not allow_rejudges:
+        return (
+            has_scratches
+            or had_judge(judge, team1)
+            or had_judge(judge, team2)
+        )
+    else:
+        return has_scratches
 
 
 def had_judge(judge, team):
@@ -220,4 +238,25 @@ def can_judge_teams(list_of_judges, team1, team2):
     for judge in list_of_judges:
         if not judge_conflict(judge, team1, team2):
             result.append(judge)
+    return result
+
+def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
+    """Judges must have prefetch_related('judges') to prevent N+1
+        before calling this function"""
+    result = {}
+    team_ids = [team.id for team in teams]
+
+    for judge in judges:
+        result[judge.id] = {}
+        for round_obj in judge.judges.all():
+            if exclude_round_id and round_obj.id == exclude_round_id:
+                continue
+
+            if round_obj.gov_team_id in team_ids:
+                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(
+                    round_obj.gov_team_id, 0) + 1
+            if round_obj.opp_team_id in team_ids:
+                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
+                    round_obj.opp_team_id, 0) + 1
+
     return result
