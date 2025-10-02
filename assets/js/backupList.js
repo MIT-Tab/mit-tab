@@ -41,11 +41,9 @@ document.addEventListener("DOMContentLoaded", function initBackupList() {
   }
 
   // Populate type filter
-  [...typeSet]
-    .sort()
-    .forEach(type => {
-      typeFilter.innerHTML += `<option value="${type}">${type}</option>`;
-    });
+  [...typeSet].sort().forEach(type => {
+    typeFilter.innerHTML += `<option value="${type}">${type}</option>`;
+  });
 
   // Filter function
   function applyFilters() {
@@ -59,12 +57,15 @@ document.addEventListener("DOMContentLoaded", function initBackupList() {
       const rowScratches = row.getAttribute("data-scratches");
 
       const typeMatch = !typeValue || rowType === typeValue;
-      const roundMatch = !roundValue || 
-        rowRound === roundValue || 
+      const roundMatch =
+        !roundValue ||
+        rowRound === roundValue ||
         (roundValue === "Other" && !/^\d+$/.test(rowRound));
       const scratchesMatch = !scratchesValue || rowScratches === scratchesValue;
 
-      row.style.display = (typeMatch && roundMatch && scratchesMatch) ? "" : "none";
+      const rowElement = row;
+      rowElement.style.display =
+        typeMatch && roundMatch && scratchesMatch ? "" : "none";
     });
   }
 
@@ -74,15 +75,63 @@ document.addEventListener("DOMContentLoaded", function initBackupList() {
   scratchesFilter.addEventListener("change", applyFilters);
 
   // Sorting functionality
-  let currentSort = { column: null, direction: null };
+  function sortTable(column, direction) {
+    const rowsArray = Array.from(rows);
+    const tbody = table.querySelector("tbody");
+
+    rowsArray.sort((a, b) => {
+      let aValue = a.getAttribute(`data-${column}`);
+      let bValue = b.getAttribute(`data-${column}`);
+
+      // Handle numeric sorting for rounds
+      if (column === "round") {
+        const aNum = parseInt(aValue, 10);
+        const bNum = parseInt(bValue, 10);
+
+        if (!Number.isNaN(aNum) && !Number.isNaN(bNum)) {
+          return direction === "asc" ? aNum - bNum : bNum - aNum;
+        }
+      }
+
+      // Handle timestamp sorting
+      if (column === "timestamp") {
+        const order = ["Today", "Yesterday"];
+        const aIndex = order.findIndex(o => aValue.startsWith(o));
+        const bIndex = order.findIndex(o => bValue.startsWith(o));
+
+        if (aIndex !== -1 && bIndex !== -1) {
+          if (aIndex !== bIndex) {
+            return direction === "asc" ? aIndex - bIndex : bIndex - aIndex;
+          }
+        } else if (aIndex !== -1) {
+          return direction === "asc" ? -1 : 1;
+        } else if (bIndex !== -1) {
+          return direction === "asc" ? 1 : -1;
+        }
+      }
+
+      // String sorting
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+
+      if (aValue < bValue) return direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    // Reorder rows in the DOM
+    rowsArray.forEach(row => tbody.appendChild(row));
+  }
+
+  const currentSort = { column: null, direction: null };
 
   const sortableHeaders = table.querySelectorAll("th.sortable");
-  
-  sortableHeaders.forEach(header => {
-    header.addEventListener("click", function() {
+
+  sortableHeaders.forEach(function sortableHeaderClick(header) {
+    header.addEventListener("click", function handleHeaderClick() {
       const column = this.getAttribute("data-column");
       const icon = this.querySelector(".sort-icon");
-      
+
       // Reset other column icons
       sortableHeaders.forEach(h => {
         if (h !== this) {
@@ -109,52 +158,4 @@ document.addEventListener("DOMContentLoaded", function initBackupList() {
       sortTable(column, currentSort.direction);
     });
   });
-
-  function sortTable(column, direction) {
-    const rowsArray = Array.from(rows);
-    const tbody = table.querySelector("tbody");
-
-    rowsArray.sort((a, b) => {
-      let aValue = a.getAttribute(`data-${column}`);
-      let bValue = b.getAttribute(`data-${column}`);
-
-      // Handle numeric sorting for rounds
-      if (column === "round") {
-        const aNum = parseInt(aValue, 10);
-        const bNum = parseInt(bValue, 10);
-        
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-          return direction === "asc" ? aNum - bNum : bNum - aNum;
-        }
-      }
-
-      // Handle timestamp sorting
-      if (column === "timestamp") {
-        const order = ["Today", "Yesterday"];
-        const aIndex = order.findIndex(o => aValue.startsWith(o));
-        const bIndex = order.findIndex(o => bValue.startsWith(o));
-        
-        if (aIndex !== -1 && bIndex !== -1) {
-          if (aIndex !== bIndex) {
-            return direction === "asc" ? aIndex - bIndex : bIndex - aIndex;
-          }
-        } else if (aIndex !== -1) {
-          return direction === "asc" ? -1 : 1;
-        } else if (bIndex !== -1) {
-          return direction === "asc" ? 1 : -1;
-        }
-      }
-
-      // String sorting
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
-
-      if (aValue < bValue) return direction === "asc" ? -1 : 1;
-      if (aValue > bValue) return direction === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    // Reorder rows in the DOM
-    rowsArray.forEach(row => tbody.appendChild(row));
-  }
 });
