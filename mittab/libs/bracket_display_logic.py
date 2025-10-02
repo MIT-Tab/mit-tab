@@ -91,9 +91,16 @@ def _serialize_bracket(rounds):
                 slots = match["slots"]
 
                 def get_fallback_display(slot):
-                    seeds_display = " / ".join(f"Seed {seed}"
-                                               for seed in sorted(slot["seeds"]))
-                    return {"display": seeds_display or "TBD", "debaters": ""}
+                    seeds_sorted = sorted(slot["seeds"])
+                    seeds_display = " / ".join(f"Seed {seed}" for seed in seeds_sorted)
+                    seed_value = seeds_sorted[0] if seeds_sorted else None
+                    return {
+                        "display": seeds_display or "TBD",
+                        "debaters": "",
+                        "seed": seed_value,
+                        "name": seeds_display or "TBD",
+                        "debaters_plain": "",
+                    }
 
                 metadata[match_id] = {
                     "id": matchup.id,
@@ -139,7 +146,10 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
         participant = participants_by_team_id[team.id]
         slot["display_info"] = {
             "display": participant["name"],
-            "debaters": participant["debaters_names"]
+            "debaters": participant["debaters_names"],
+            "seed": seed,
+            "name": str(team),
+            "debaters_plain": team.debaters_display(),
         }
 
     for match in rounds[0]:
