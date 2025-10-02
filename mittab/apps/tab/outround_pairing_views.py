@@ -4,18 +4,21 @@ import math
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.libs import assign_judges
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
 from mittab.libs.outround_tab_logic import offset_to_quotient
+from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
+from mittab.libs.data_export.pairings_export import export_pairings_csv
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -499,7 +502,7 @@ def enter_result(request,
         })
 
 
-def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
+def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 
     round_number = 256
@@ -565,17 +568,20 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY, printable=False):
 
     pairing_exists = True
     #pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
 
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
+    show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
+    bracket_data_json = None
+    if outround_pairings and show_outrounds_bracket:
+        bracket_data_json = get_bracket_data_json(outround_pairings)
 
     return render(request, "outrounds/pretty_pairing.html", locals())
 
 
-def pretty_pair_print(request, type_of_round=BreakingTeam.VARSITY):
-    return pretty_pair(request, type_of_round, True)
+def export_outround_pairings_csv_view(request, type_of_round=BreakingTeam.VARSITY):
+    return export_pairings_csv(is_outround=True, type_of_round=type_of_round)
 
 
 def toggle_pairing_released(request, type_of_round, num_teams):
@@ -666,3 +672,49 @@ def forum_view(request, type_of_round):
     return render(request,
                   "outrounds/forum_result.html",
                   locals())
+
+def alternative_rooms(request, round_id, current_room_id=None):
+    round_obj = Outround.objects.get(id=int(round_id))
+    num_teams = round_obj.num_teams
+
+    current_room_obj = None
+    if current_room_id is not None:
+        try:
+            current_room_obj = Room.objects.get(id=int(current_room_id))
+        except Room.DoesNotExist:
+            pass
+
+    rooms = set(Room.objects.filter(
+        roomcheckin__round_number=0
+    ).annotate(
+        has_round=Exists(Outround.objects.filter(room_id=OuterRef("id"),
+                                                 num_teams=num_teams))
+    ).order_by("-rank"))
+
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
+    return render(request, "pairing/room_dropdown.html", {
+        "current_room": current_room_obj,
+        "round_obj": round_obj,
+        "viable_unpaired_rooms": viable_unpaired_rooms,
+        "viable_paired_rooms": viable_paired_rooms
+    })
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
+    if round_type not in dict(Outround.TYPE_OF_ROUND_CHOICES).keys():
+        return redirect_and_flash_error(request, "Invalid round type specified.")
+    num_teams = Outround.objects.filter(type_of_round=round_type
+                                        ).aggregate(Min("num_teams"))["num_teams__min"]
+
+    if request.method == "POST":
+        try:
+            type_str = "Varsity" if round_type == Outround.VARSITY else "Novice"
+            round_str = f"round_of_{type_str}_{num_teams}"
+            backup.backup_round(f"before_judge_assignments_{round_str}")
+            assign_judges.add_outround_judges(round_type=round_type)
+        except Exception:
+            emit_current_exception()
+            return redirect_and_flash_error(request,
+                                            "Got error during judge assignment")
+    return redirect(f"/outround_pairing/{round_type}/{num_teams}")

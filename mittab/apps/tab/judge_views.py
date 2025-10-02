@@ -97,14 +97,17 @@ def view_judge(request, judge_id):
                     form.cleaned_data["name"]))
     else:
         form = JudgeForm(instance=judge)
-    base_url = "/judge/" + str(judge_id) + "/"
-    scratch_url = base_url + "scratches/view/"
-    links = [(scratch_url, "Scratches for {}".format(judge.name))]
+        judging_rounds = list(Round.objects.filter(judges=judge).select_related(
+            "gov_team", "opp_team", "room"))
+    base_url = f"/judge/{judge_id}/"
+    scratch_url = f"{base_url}scratches/view/"
+    links = [(scratch_url, f"Scratches for {judge.name}")]
     return render(
-        request, "common/data_entry.html", {
+        request, "tab/judge_detail.html", {
             "form": form,
             "links": links,
-            "title": "Viewing Judge: {}".format(judge.name)
+            "judge_rounds": judging_rounds,
+            "title": f"Viewing Judge: {judge.name}"
         })
 
 
@@ -177,13 +180,25 @@ def view_scratches(request, judge_id):
         judge_id = int(judge_id)
     except ValueError:
         return redirect_and_flash_error(request, "Received invalid data")
-    scratches = Scratch.objects.filter(judge=judge_id)
-    judge = Judge.objects.get(pk=judge_id)
-    number_scratches = len(scratches)
+
+    judge = Judge.objects.prefetch_related(
+        "scratches", "scratches__judge", "scratches__team"
+    ).get(pk=judge_id)
+    scratches = judge.scratches.all()
+
+    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all()
+
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i), instance=scratches[i - 1])
-            for i in range(1, number_scratches + 1)
+            ScratchForm(
+                request.POST,
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(len(scratches))
         ]
         all_good = True
         for form in forms:
@@ -195,9 +210,13 @@ def view_scratches(request, judge_id):
                 request, "Scratches created successfully")
     else:
         forms = [
-            ScratchForm(prefix=str(i), instance=scratches[i - 1])
-            for i in range(1,
-                           len(scratches) + 1)
+            ScratchForm(
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(len(scratches))
         ]
     delete_links = [
         "/judge/" + str(judge_id) + "/scratches/delete/" + str(scratches[i].id)

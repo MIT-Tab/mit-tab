@@ -42,6 +42,10 @@ function loadTabCards() {
   });
 }
 
+function initializeTooltips() {
+  $('[data-toggle="tooltip"]').tooltip();
+}
+
 $(document).ready(() => {
   ballotsInit();
   checkinInit();
@@ -49,6 +53,7 @@ $(document).ready(() => {
   quickSearchInit();
   multiselectInit();
   bsCustomFileInput.init();
+  initializeTooltips();
 
   initializeConfirms();
   initializeRevealButtons();

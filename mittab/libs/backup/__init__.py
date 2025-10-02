@@ -50,9 +50,10 @@ class ActiveBackupContextManager:
         os.environ[ACTIVE_BACKUP_KEY] = "0"
         cache_logic.clear_cache()
 
-def _name_backup(btype=None, round_number=None, btime=None, name=None):
+def _name_backup(btype=None, round_number=None, btime=None, include_scratches=True, name=None):
     if round_number is None:
         round_number = TabSettings.get("cur_round", "no-round-number")
+
 
     if btime is None:
         btime = int(time.time())
@@ -69,7 +70,7 @@ def backup_round(btype=None, round_number=None, btime=None, name=None):
     filename = _name_backup(btype, round_number, btime, name)
     with ActiveBackupContextManager() as _:
         print("Trying to backup to backups directory")
-        BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump()
+        BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump(include_scratches=include_scratches)
 
 def upload_backup(f):
     filename = _name_backup(

@@ -11,6 +11,7 @@ def rank_speakers():
         "team_set__byes",
         "team_set__no_shows",
         "roundstats_set",
+        "roundstats_set__round",
     ).all()
     return sorted([
         DebaterScore(d)
