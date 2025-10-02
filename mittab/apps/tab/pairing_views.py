@@ -252,7 +252,7 @@ def manual_backup(request):
 def view_backups(request):
     backups = backup.list_backups()
     backups.sort(key=lambda x: x[3])
-    
+
     # Initialize both forms
     create_form = BackupForm()
     upload_form = UploadBackupForm()
