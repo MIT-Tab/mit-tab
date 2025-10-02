@@ -8,7 +8,7 @@ from mittab.libs.data_import.import_scratches import ScratchImporter
 
 @pytest.mark.django_db
 class TestImportingScratches(TestCase):
-    pytestmark = pytest.mark.django_db
+    pytestmark = pytest.mark.django_db(transaction=True)
     fixtures = ["testing_db"]
 
     def test_valid_scratches(self):
