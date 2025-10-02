@@ -1,5 +1,4 @@
-Running a Tournament
-====================
+# Running a Tournament
 
 This document will cover anything you need to do after all the teams, judges,
 and rooms are registered and checked in.
@@ -10,8 +9,7 @@ entering result information and checking that information makes your tournament
 run significantly better (faster and more accurate).** It is **highly**
 advised that you do this.
 
-Entering Results
-----------------
+## Entering Results
 
 After pairing a round, you will mostly be dealing with the current round's
 pairing view located at `/pairings/status/`. This is kind of the control center
@@ -56,8 +54,7 @@ view.  The areas of importance are shown below:
   really should not need to ever delete a round, the various options for the
   results of a round should be sufficient.
 
-E-Ballots
----------
+## E-Ballots
 
 MIT-Tab supports electronic ballot submission (e-ballots) for judges. Each judge
 has a unique ballot code that is automatically generated when they are created. This code
@@ -85,15 +82,13 @@ This page shows all rounds that don't have results entered yet, helping you
 track down missing ballots quickly. This is especially useful when you're ready to pair
 the next round but waiting on a few stragglers.
 
-Missing Ballots
----------------
+## Missing Ballots
 
 To see which rounds are still missing results, navigate to `/pairings/missing_ballots/`.
 This page shows all rounds that don't have results entered yet, helping you
 track down missing ballots quickly.
 
-Viewing Team Statistics
------------------------
+## Viewing Team Statistics
 
 MIT-Tab provides detailed statistics and records for each team:
 
@@ -120,8 +115,8 @@ Tab cards display:
 - Judges assigned to each round
 - Current tournament statistics and standings
 
-Pairing the Next Round
-----------------------
+(pairing-the-next-round)=
+## Pairing the Next Round
 
 To pair a round, navigate to `/pairings/status/` and hit "Prepare Next Round".
 For any round after round 1, make sure that all results have been entered.
@@ -177,8 +172,7 @@ When released, pairings can be viewed at `/pairings/status/` by anyone without a
 
 Afterwards, hit the "Assign Judges" button to pair judges into the rounds.
 
-Backing Up
-----------
+## Backing Up
 
 MIT-TAB supports the concept of "backups" which allow you to create full
 backups of the state of your tournament at any given moment. Treat your
@@ -219,8 +213,7 @@ Use cases:
 NOTE: You may be logged out after restoring from a back-up. The
 username/password is still the same.
 
-Re-pairing a round
-------------------
+## Re-pairing a round
 
 If something went wrong in the pairings, you may want to pair the round again.
 In order to do this, all you have to do is restore from the before pairing
@@ -230,8 +223,7 @@ To find the back-up to restore from, go to "Backups" > "View Backups" and
 click on the one with the name `round_x_before_pairing.db`, where `x` is the
 round number that you want to re-pair.
 
-Removing Teams, Rooms and Judges
---------------------------------
+## Removing Teams, Rooms and Judges
 
 Throughout a tournament, you may have to remove a room, drop a team, etc.
 There used to be a delete button, but deleting teams/rooms/judges can
@@ -268,8 +260,7 @@ To remove a room, uncheck it in for the given round. You must have enough checke
 ![](img/removing_a_room.png)
 
 
-Public Displays
----------------
+## Public Displays
 
 MIT-Tab supports public displays for teams, pairings, and results to allow competitors and spectators to view tournament information.
 
@@ -300,8 +291,7 @@ Note that judges are displayed with their ballot codes in the admin interface fo
 
 The judges list can be made publicly visible by enabling `judges_public` (set to 1). This makes the judges list accessible at `/judges/` without authentication, displaying all judges and their affiliations.
 
-Batch Check-in
---------------
+## Batch Check-in
 
 MIT-Tab provides a batch check-in interface at `/batch_checkin/` that allows you to check in or out teams, judges, and rooms for multiple rounds at once. This is significantly faster than checking in entities individually and is useful for managing availability across the entire tournament.
 

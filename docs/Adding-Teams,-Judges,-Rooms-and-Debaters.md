@@ -1,5 +1,4 @@
-Adding Teams, Judges, Rooms, and Debaters
-=========================================
+# Adding Teams, Judges, Rooms, and Debaters
 
 There are two ways to enter teams, judges, rooms, and debaters:
 [Manually entering individually](#manual-data-entry) or
@@ -8,8 +7,8 @@ import is probably easier. However, you may need to enter data manually to add
 one or two teams at a time, or to fix any errors that may have occurred when
 importing data in bulk.
 
-Batch Data Import
------------------
+(batch-data-import)=
+## Batch Data Import
 
 To import data in bulk: First, navigate to the "File Data Upload" link under
 the "Admin" section of the navigation menu:
@@ -40,7 +39,7 @@ Here is the format of the .xlsx file:
 
 **NOTE:** Debaters will automatically be created from this sheet, too.
 
-```eval_rst
+```{eval-rst}
 +-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
 | Name* | School*                  | Hybrid School         | Seed              | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
 |       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          |                               | (“N” or blank)          |  |
@@ -54,7 +53,7 @@ Here is the format of the .xlsx file:
 
 ### Judges
 
-```eval_rst
+```{eval-rst}
 +-------+-------+-----------------------------------+
 | Name* | Rank* | Affiliated Schools (1 per column) |
 +-------+-------+-----------------------------------+
@@ -64,7 +63,7 @@ Here is the format of the .xlsx file:
 
 ### Rooms
 
-```eval_rst
+```{eval-rst}
 +-------+------------------------+
 | Name* | Rank* (Decimal, 0-100) |
 +-------+------------------------+
@@ -74,7 +73,7 @@ Here is the format of the .xlsx file:
 
 ### Scratches
 
-```eval_rst
+```{eval-rst}
 +------------+-------------+---------------------------------+--+
 | Team Name* | Judge Name* | Scratch Type ("tab" or "team")* |  |
 +------------+-------------+---------------------------------+--+
@@ -82,8 +81,8 @@ Here is the format of the .xlsx file:
 +------------+-------------+---------------------------------+--+
 ```
 
-Manual Data Entry
------------------
+(manual-data-entry)=
+## Manual Data Entry
 
 From the home page, you can add and view all _Schools, Judges, Teams, Debaters,
 and Rooms_.  To enter information quickly, you should have multiple people

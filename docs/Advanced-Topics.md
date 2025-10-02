@@ -1,5 +1,4 @@
-Advanced Topics
-===============
+# Advanced Topics
 
 MIT-Tab's TabSetting module allows tournaments to modify the internal logic of
 how mit-tab works. This article will document ways that you can use tab settings
@@ -22,21 +21,18 @@ click the "Tab settings" link. You should now be on a page with the heading
 
 ![](img/tab_settings_admin.png)
 
-Modifying a Tab Setting
------------------------
+## Modifying a Tab Setting
 
 To edit a tab setting, click on the one that you want to modify and change the
 "value" attribute
 
-Creating a Tab Setting
-----------------------
+## Creating a Tab Setting
 
 To create a tab setting, click the "Add tab settings" button in the top right
 corner of the page. The "key" should be the (case-sensitive) name of the
 setting, and the "value" should be the desired value for the setting
 
-Default Tab Settings
---------------------
+## Default Tab Settings
 
 Here are the default `TabSettings` unrelated to the power-pairing calculations
 (those related to that can be seen at the bottom of this page.)
@@ -47,7 +43,7 @@ Note: Some may already exist on your server, some may not. The code will use
 these settings if provided regardless of if it showed up in the interface before
 you created it
 
-```eval_rst
+```{eval-rst}
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Name                     | Default value | Purpose                                                                                                                                                                                                                                                                                                                                                                |
 +==========================+===============+========================================================================================================================================================================================================================================================================================================================================================================+
@@ -109,15 +105,13 @@ you created it
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
-Running a Tournament with a Non-Standard number of rounds
----------------------------------------------------------
+## Running a Tournament with a Non-Standard number of rounds
 
 To run a tournament that has more/less than 5 round, change the value of the
 `tot_rounds` setting to the number of rounds. If you don't do this, the
 gov/opp count optimization will not work, and pairings may get messed up.
 
-Dropping a Team with Average Speaks
------------------------------------
+## Dropping a Team with Average Speaks
 
 By default, when teams forfeit, they are given speaks of 0 and ranks of 7.
 To override this behavior, create a tab_setting with the key `lenient_late`.
@@ -132,8 +126,8 @@ formatted as `{Team name} was a no-show for round {round number}`. Find the
 team and round that you want to override, check/uncheck the "lenient late"
 option, and click "save".
 
-Modifying the Pairing Algorithm
--------------------------------
+(modifying-the-pairing-algorithm)=
+## Modifying the Pairing Algorithm
 
 The pairing algorithm uses creates minimum weight maximal matching algorithm to
 create the round. You can read more about the algorithm used
@@ -149,7 +143,7 @@ will be very bad.
 
 Here are the settings you can create, along with their default values:
 
-```eval_rst
+```{eval-rst}
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Tab setting name         | Default value | Description                                                                                                                                                |
 +==========================+===============+============================================================================================================================================================+
@@ -176,8 +170,7 @@ important as it usually is, I'd change the value of `high_gov_penalty` to
 If you would like to prevent seeded teams from getting the bye, set
 `fair_bye` to `1`
 
-Common Issues and Troubleshooting
----------------------------------
+## Common Issues and Troubleshooting
 
 ### Judge Assignment Issues
 

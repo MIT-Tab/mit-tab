@@ -1,13 +1,11 @@
-Before Round 1
-==============
+# Before Round 1
 
 Before Round 1 on your tournament day you need to enter scratches as teams
 check in, check in judges and teams, adjust registration as needed, and pair the
 first round.  All of this can be done very quickly if you split up the tasks and
 have multiple people working on them (i.e. multiple people entering scratches).
 
-Entering Scratches
-------------------
+## Entering Scratches
 
 School Scratch: Navigate to the judge page in question, and then add an
 affiliation with the school you would like them to be scratched from.
@@ -27,8 +25,7 @@ Then click "Add Scratch" at the bottom of the page
 
 ![](img/judge_add_scratch.png)
 
-Judge/Team/Rooms Check Ins
---------------------
+## Judge/Team/Rooms Check Ins
 
 For judges, you should check them in for the rounds that they can judge during.
 Some tab staffs like to make judges check in every round, others take them down
@@ -62,8 +59,7 @@ and ranks of 7.  If you want to give a team that you had checked out a Bye
 because they should have been checked in, give them a Bye via the admin
 interface and **remove the No Show** loss.
 
-Pairing the First Round
------------------------
+## Pairing the First Round
 
 To pair the first round, click "Prepare Next Pairing", check that all of the
 sanity checks are green, and click "Pair This Round".  While the program is
