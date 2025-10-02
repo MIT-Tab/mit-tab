@@ -120,8 +120,10 @@ def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
         try:
-            backup.backup_round("round_%s_before_room_assignment" %
-                                current_round_number)
+            backup.backup_round(
+                round_number=current_round_number,
+                btype=backup.BEFORE_ROOM_ASSIGN
+            )
             assign_rooms.add_rooms()
         except Exception:
             emit_current_exception()
@@ -183,7 +185,9 @@ def assign_room(request, round_id, new_room_id, outround=False):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backup(request, filename):
-    _, name, btype, round_num, btime = backup.get_metadata(filename)
+    metadata = backup.get_metadata(filename)
+    # metadata format: [filename, name, type, round_num, timestamp, scratches]
+    name = metadata[1] if len(metadata) > 1 else "Unknown"
     title = "Viewing Backup: {}".format(name)
     links = [("/backup/download/{}/".format(filename), "Download Backup"),
              ("/backup/restore/{}/".format(filename), "Restore From Backup")]
@@ -208,13 +212,13 @@ def upload_backup(request):
             backup.upload_backup(request.FILES["file"])
             return redirect_and_flash_success(
                 request, "Backup {} uploaded successfully".format(
-                    request.FILES["file"].name))
-    else:
-        form = UploadBackupForm()
-    return render(request, "common/data_entry.html", {
-        "form": form,
-        "title": "Upload a Backup"
-    })
+                    request.FILES["file"].name),
+                path="/view_backups/")
+        else:
+            return redirect_and_flash_error(
+                request, "Error uploading backup",
+                path="/view_backups/")
+    return redirect("/view_backups/")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -248,11 +252,20 @@ def manual_backup(request):
 def view_backups(request):
     backups = backup.list_backups()
     backups.sort(key=lambda x: x[3])
-    form = BackupForm()
+    
+    # Initialize both forms
+    create_form = BackupForm()
+    upload_form = UploadBackupForm()
+
+    # Define table headers (all sortable)
+    headers = ["Name", "Type", "Round", "Timestamp", "Scratches"]
 
     return render(request, "tab/backup_list.html", {
         "backups": backups,
-        "form": form
+        "create_form": create_form,
+        "upload_form": upload_form,
+        "headers": headers,
+        "title": "Backup List"
     })
 
 

@@ -24,9 +24,12 @@ from mittab.libs.data_export.pairings_export import export_pairings_csv
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
+        type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
+        round_str = f"Round-of-{num_teams}-{type_str}"
         backup.backup_round(
-            round_number=f"Outround {num_teams / 2}, {type_of_round})",
-            btype=backup.BEFORE_PAIRING)
+            round_number=round_str,
+            btype=backup.BEFORE_PAIRING
+            )
 
 
         Outround.objects.filter(num_teams__lt=num_teams,
@@ -710,8 +713,11 @@ def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
     if request.method == "POST":
         try:
             type_str = "Varsity" if round_type == Outround.VARSITY else "Novice"
-            round_str = f"round_of_{type_str}_{num_teams}"
-            backup.backup_round(f"before_judge_assignments_{round_str}")
+            round_str = f"Round-of-{num_teams}-{type_str}"
+            backup.backup_round(
+                round_number=round_str,
+                btype=backup.BEFORE_JUDGE_ASSIGN
+            )
             assign_judges.add_outround_judges(round_type=round_type)
         except Exception:
             emit_current_exception()

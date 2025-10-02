@@ -351,7 +351,7 @@ class ResultEntryForm(forms.Form):
                 self.add_error("winner",
                                self.error_class(["Someone has to win!"]))
 
-            # If we already have errors, don"t bother with the other validations
+            # If we already have errors, don't bother with the other validations
             if self.errors:
                 return
 
@@ -701,6 +701,13 @@ class BackupForm(forms.Form):
         widget=forms.TextInput(
             attrs={"class": "form-control",
                    "placeholder": "Enter backup name"})
+    )
+    include_scratches = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        )
     )
 
     def clean_backup_name(self):
