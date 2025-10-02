@@ -1,5 +1,4 @@
-Setting up your server
-----------------------
+# Setting up your server
 
 In order to run mit-tab for your tournament, it has to be accessible to all of
 your competitors on the internet. The

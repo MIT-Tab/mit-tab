@@ -116,29 +116,31 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.10
     steps:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "docs/requirements.txt" }}
-            - v1-dependencies-
+            - v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
+            - v2-docs-dependencies-
       - run:
           name: install dependencies
           command: |
+            sudo apt-get update
+            sudo apt-get install -y python3.10-venv
             python3 -m venv venv
             . venv/bin/activate
             pip install -r docs/requirements.txt
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
+          key: v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
       - run:
           name: Build docs
           command: |
             . venv/bin/activate
             cd docs
-            mkdir _static
+            mkdir -p _static
             make html
       - run:
           name: Check links
