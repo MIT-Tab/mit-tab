@@ -27,7 +27,7 @@ Then click "Add Scratch" at the bottom of the page
 
 ![](img/judge_add_scratch.png)
 
-Judge/Team Check Ins
+Judge/Team/Rooms Check Ins
 --------------------
 
 For judges, you should check them in for the rounds that they can judge during.
@@ -36,16 +36,25 @@ at the start.  Either way, the judge will only be paired into the round if they
 are checked into the round.
 
 The easiest way to check-in judges is via the batch check-in page ("Admin >
-Batch Judge Check In"), pictured below:
+Batch Judge Check In" or at `/batch_checkin/`), pictured below:
 
 ![](img/judge_batch_checkin.png)
+
+The batch check-in interface allows you to:
+- Check judges in or out for specific rounds (including outrounds - round 0)
+- Check teams in or out for the entire tournament
+- Check rooms in or out for specific rounds
+- Use quick search to filter entities by name or school
+- Changes save immediately via AJAX
+
+**Pro tip**: Use the quick search box at the top to quickly find judges, teams, or rooms by typing their name or school. The interface auto-saves changes as you make them, so there's no need to click a "Save" button.
 
 Alternatively, you can check a judge in individually on the page for that
 specific judge:
 
 ![](img/judge_view_checkins.png)
 
-Unlike judges you cannot check a team into certain rounds but not others ahead
+Unlike judges, you cannot check a team into certain rounds but not others ahead
 of time. Every time you pair a round, teams that are "Checked in" will be paired
 in and any that are not "Checked in" will be given a "No Show" loss. For the
 purposes of tabbing this is a loss, with both speakers receiving 0s for speaks
