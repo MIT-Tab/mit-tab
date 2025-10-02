@@ -116,13 +116,13 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.10
     steps:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "docs/requirements.txt" }}
-            - v1-dependencies-
+            - v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
+            - v2-docs-dependencies-
       - run:
           name: install dependencies
           command: |
@@ -132,13 +132,12 @@ jobs:
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
+          key: v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
       - run:
           name: Build docs
           command: |
             . venv/bin/activate
             cd docs
-            mkdir _static
             make html
       - run:
           name: Check links
