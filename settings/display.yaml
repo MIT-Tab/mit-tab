@@ -1,0 +1,27 @@
+category:
+  name: "Display"
+  description: "Configure how information is displayed to users and the public"
+  id: "display"
+  order: 1
+
+settings:
+  - teams_public:
+    name: teams_public
+    description: "Check this box to make the team list publicly visible"
+    value: false
+    type: boolean
+  - judges_public:
+    name: judges_public
+    description: "Check this box to make the judges list publicly visible"
+    value: false
+    type: boolean
+  - gov_opp_display:
+    name: gov_opp_display
+    description: "Toggle to switch the outrounds view from displaying Gov and Opp (when enabled) and Team 1 and Team 2 (when disabled)"
+    value: false
+    type: boolean
+  - show_outrounds_bracket:
+    name: show_outs_bracket
+    description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
+    value: false
+    type: boolean
