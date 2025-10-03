@@ -255,7 +255,7 @@ def view_backups(request):
 
     # Extract unique filter values
     types = sorted(set(b[2] for b in backups if b[2] != "Unknown"))
-    
+
     # Sort rounds: numeric first (by value), then non-numeric (alphabetically)
     round_set = set(b[3] for b in backups if b[3] != "Unknown")
     numeric_rounds = sorted([r for r in round_set if r.isdigit()], key=int)
