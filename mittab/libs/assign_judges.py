@@ -7,7 +7,9 @@ class JudgePairingMode:
     DEFAULT = 0
     CLASSIC = 1
 
-def construct_judge_scores(judges):
+def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
+    if mode == JudgePairingMode.CLASSIC:
+        return list(range(len(judges)))
     judge_scores = []
     judge_score = -1
     previous_rank = 0
@@ -21,6 +23,7 @@ def construct_judge_scores(judges):
 
 def add_judges():
     current_round_number = TabSettings.get("cur_round") - 1
+    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
 
     # First clear any existing judge assignments
     Round.judges.through.objects.filter(
@@ -46,7 +49,7 @@ def add_judges():
 
     # Order the judges and pairings by power ranking
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
-    judge_scores = construct_judge_scores(judges)
+    judge_scores = construct_judge_scores(judges, mode)
     pairings.sort(
         key=lambda x: tab_logic.team_comp(x, current_round_number), reverse=True
     )
@@ -60,8 +63,6 @@ def add_judges():
     rejudge_penalty = TabSettings.get("rejudge_penalty", 100)
     # Assign chairs (single judges) to each round using perfect pairing
     graph_edges = []
-
-    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
     for judge_i, judge in enumerate(judges):
         judge_score = judge_scores[judge_i]
 
