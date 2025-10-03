@@ -8,11 +8,14 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
     SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.outround_pairing_views import create_forum_view_data
+from mittab.apps.tab.team_views import get_team_rankings
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
@@ -501,3 +504,75 @@ def publish_results(request, new_setting):
             f"Results are already {status}.",
             path="/",
         )
+
+
+def forum_post(request):
+    dinos = Judge.objects.filter(is_dino=True)
+    dino_string = None
+    if dinos:
+        dino_names = [dino.name for dino in dinos]
+        if len(dino_names) > 1:
+            dino_string = ", ".join(dino_names[:-1]) + " and " + dino_names[-1]
+        else:
+            dino_string = dino_names[0] 
+    
+    nov_debaters, varsity_debaters = get_speaker_rankings(None)
+    nov_debaters = nov_debaters[:min(10, len(nov_debaters)-1)]
+    varsity_debaters = varsity_debaters[:min(10, len(varsity_debaters)-1)]
+    
+    qualifying_teams = Team.objects.prefetch_related('debaters').annotate(
+        num_rounds=models.Count('gov_team', distinct=True) + 
+                  models.Count('opp_team', distinct=True)
+    ).filter(
+        num_rounds__gte=3
+    )
+    qualifying_debaters = Debater.objects.filter(
+        team__in=qualifying_teams
+    )
+    qualifying_novices = qualifying_debaters.filter(
+        novice_status=True)
+
+    team_count = qualifying_teams.count()
+    novice_count = qualifying_novices.count()    
+
+    varsity_teams, nov_teams = get_team_rankings(None)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    
+    varsity_teams = varsity_teams[:var_teams_to_break]
+    novice_teams_in_varsity_break = len([team for team in nov_teams if team in varsity_teams])
+    novice_teams = nov_teams[:nov_teams_to_break + novice_teams_in_varsity_break]
+
+    varsity_outs = create_forum_view_data(0)
+    novice_outs = create_forum_view_data(1)
+
+    finals = Outround.objects.filter(num_teams=2)
+    novice_champ, varsity_champ = None, None
+    varsity_finals = finals.filter(type_of_round=0)
+    novice_finals = finals.filter(type_of_round=1)
+
+    if varsity_finals and varsity_finals[0].victor:
+        if varsity_finals[0].victor % 2 == 0:
+            varsity_champ = varsity_finals[0].gov_team
+        else:
+            varsity_champ = varsity_finals[0].opp_team
+
+    if novice_finals and novice_finals[0].victor:
+        if novice_finals[0].victor % 2 == 0:
+            novice_champ = novice_finals[0].gov_team
+        else:
+            novice_champ = novice_finals[0].opp_team
+
+    return render(request, "tab/forum_post.html", {
+        "dino_string": dino_string,
+        "nov_debaters": nov_debaters,
+        "varsity_debaters": varsity_debaters,
+        "team_count": team_count,
+        "novice_count": novice_count,
+        "varsity_teams": varsity_teams,
+        "novice_teams": novice_teams,
+        "novice_outs": novice_outs["results"],
+        "varsity_outs": varsity_outs["results"],
+        "novice_champ": novice_champ,
+        "varsity_champ": varsity_champ,
+        })

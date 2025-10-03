@@ -293,6 +293,7 @@ urlpatterns = [
     path("archive/download/", views.generate_archive, name="download_archive"),
 
     # Standings API
+    path("forum_post", views.forum_post, name="forum_post"),
     path("publish_results/<int:new_setting>/",
          views.publish_results,
          name="publish_results"),
