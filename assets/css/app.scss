@@ -1,11 +1,11 @@
-$body-bg: #BFD9FF;
-$font-size-base: 0.95rem !default;
+body {
+  background-color: #BFD9FF;
+  font-size: 0.95rem;
+}
 
 .form-control {
   background-image: none !important;
 }
-
-@import "node_modules/bootstrap/scss/bootstrap";
 
 .bg-dark {
   background-color: #00438A !important;

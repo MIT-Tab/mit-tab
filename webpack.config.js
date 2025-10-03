@@ -57,10 +57,13 @@ module.exports = {
     ],
   },
   resolve: {
-    alias: {
-      jquery: "jquery/src/jquery",
-    },
     extensions: [".js", ".scss", ".css"],
+  },
+
+  externals: {
+    jquery: "jQuery",
+    bootstrap: "bootstrap",
+    "popper.js": "Popper",
   },
 
   plugins: [
@@ -74,7 +77,6 @@ module.exports = {
       $: "jquery",
       jQuery: "jquery",
       "window.jQuery": "jquery",
-      Tether: "tether",
     }),
   ],
 };

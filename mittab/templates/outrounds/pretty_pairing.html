@@ -2,6 +2,13 @@
 
 <html>
 <head>
+    <script src="https://code.jquery.com/jquery-1.9.1.min.js" 
+            integrity="sha256-wS9gmOZBqsqWxgIVgA8Y9WcQOa7PgSIX+rPA0VL2rbQ=" 
+            crossorigin="anonymous"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.15.0/dist/umd/popper.min.js" 
+            integrity="sha384-L2pyEeut/H3mtgCBaUNw7KWzp5n9+4pDQiExs933/5QfaTh8YStYFFkOzSoXjlTb" 
+            crossorigin="anonymous"></script>
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'pairingDisplay' %}
 	{% if show_outrounds_bracket %}
