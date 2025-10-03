@@ -16,7 +16,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
-from mittab.libs.outround_tab_logic import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import get_varsity_to_novice_ratio
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -227,13 +227,11 @@ def outround_pairing_view(request,
         else TabSettings.get("nov_panel_size", 3)
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    ratio = get_varsity_to_novice_ratio()
 
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = num_teams / var_to_nov
+    other_round_num = num_teams / ratio
     if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
+        other_round_num = num_teams * ratio
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -329,13 +327,11 @@ def alternative_judges(request, round_id, judge_id=None):
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    ratio = get_varsity_to_novice_ratio()
 
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = round_obj.num_teams / var_to_nov
+    other_round_num = round_obj.num_teams / ratio
     if round_obj.type_of_round == BreakingTeam.NOVICE:
-        other_round_num = round_obj.num_teams * var_to_nov
+        other_round_num = round_obj.num_teams * ratio
 
     other_round_type = BreakingTeam.NOVICE \
         if round_obj.type_of_round == BreakingTeam.VARSITY \

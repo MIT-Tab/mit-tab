@@ -94,3 +94,14 @@ $font-size-base: 0.95rem !default;
 .form-inline .input-group {
   width: 100%;
 }
+
+.tab-content {
+  .form-group select,
+  .form-group input {
+    max-width: 200px;
+  }
+  
+  .custom-control.custom-switch {
+    padding-top: 0.25rem;
+  }
+}

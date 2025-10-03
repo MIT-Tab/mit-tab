@@ -1,0 +1,53 @@
+category:
+  name: "Tab Policy"
+  description: "Basic settings to set up tab for different tournament rules and sizes."
+  id: "tab_policy"
+  order: 3
+
+settings:
+  - tot_rounds:
+    name: tot_rounds
+    description: "The total number of preliminary rounds in the tournament"
+    value: 5
+  - nov_teams_to_break:
+    name: nov_teams_to_break
+    description: "The number of novice teams to be included in the break (exclusive of novice teams who are varsity breaking)"
+    value: 4
+  - var_teams_to_break:
+    name: var_teams_to_break
+    description: "The number of varsity teams to be included in the break."
+    value: 8
+  - nov_panel_size:
+    name: nov_panel_size
+    description: "The number of judges on a novice outs panel"
+    value: 3
+  - var_panel_size:
+    name: var_panel_size
+    description: "The number of judges on a varsity outs panel"
+    value: 3
+  - novice_outrounds_start_at:
+    name: novice_outrounds_start_at
+    description: "Which varsity round runs at the same time as the first novice outround?"
+    value: 16
+    type: choice
+    choices:
+      - [64, "Varsity Triple Octos"]
+      - [32, "Varsity Double Octos"]
+      - [16, "Varsity Octos"]
+      - [8, "Varsity Quarters"]
+      - [4, "Varsity Semis"]
+      - [2, "Varsity Finals"]
+  - sidelock:
+    name: sidelock
+    description: "Toggle to indicate whether you are side-locking outrounds. When enabled, the gov/opp assignments for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card and bolded on the front-facing pairing display."
+    value: false
+    type: boolean
+  - choice:
+    name: choice
+    description: "Toggle to indicate whether you would like to display who has choice. When enabled, this will be indicated on the pairing card and bolded on the front-facing pairing display."
+    value: false
+    type: boolean
+  - lenient_late:
+    name: lenient_late
+    description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
+    value: 0

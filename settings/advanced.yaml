@@ -1,0 +1,48 @@
+category:
+  name: "Advanced"
+  description: "Advanced settings for fine-tuning the tournament experience. Do not change these settings unless you are very sure of what you're doing, as they can significantly affect tournament operations."
+  id: "advanced"
+  order: 99
+
+settings:
+  - power_pairing_multiple:
+    name: power_pairing_multiple
+    description: "Multiplier for power pairing weight in the pairing algorithm (advanced setting, leave at -1 for default behavior)"
+    value: -1
+  - high_opp_penalty:
+    name: high_opp_penalty
+    description: "Penalty for teams being on opposition too often (advanced pairing algorithm setting)"
+    value: 0
+  - high_gov_penalty:
+    name: high_gov_penalty
+    description: "Penalty for teams being on government too often (advanced pairing algorithm setting)"
+    value: -100
+  - higher_opp_penalty:
+    name: higher_opp_penalty
+    description: "Additional penalty for teams being on opposition significantly more (advanced pairing algorithm setting)"
+    value: -10
+  - same_school_penalty:
+    name: same_school_penalty
+    description: "Penalty for pairing teams from the same school against each other (advanced pairing algorithm setting)"
+    value: -1000
+  - hit_pull_up_before:
+    name: hit_pull_up_before
+    description: "Penalty for teams that have already been pulled up facing each other again (advanced pairing algorithm setting)"
+    value: -10000
+  - hit_team_before:
+    name: hit_team_before
+    description: "Penalty for teams that have already debated each other being paired again (advanced pairing algorithm setting)"
+    value: -100000
+  - min_speak:
+    name: min_speak
+    description: "The absolute minimum speaker score allowed in the tournament even with justification (used for validation)"
+    value: 0
+  - max_speak:
+    name: max_speak
+    description: "The absolute maximum speaker score allowed in the tournament, even with justification (used for validation)"
+    value: 50
+  - fair_bye:
+    name: fair_bye
+    description: "Toggle to ensure fair distribution of byes across teams. When enabled, teams that have already received a bye are less likely to receive another one."
+    value: true
+    type: boolean

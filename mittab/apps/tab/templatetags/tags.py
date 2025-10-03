@@ -44,4 +44,17 @@ def judge_team_count(context, judge, pairing):
     if judge_rejudge_counts and judge.id in judge_rejudge_counts:
         return judge_rejudge_counts[judge.id].get(pairing.id)
     return None
-    
+
+@register.simple_tag
+def fields_for_category(form, category_id):
+    """Return form fields for a specific category"""
+    return form.fields_for_category(category_id)
+
+@register.filter
+def format_setting_name(value):
+    """Convert setting_name to Title Case"""
+    if not value:
+        return value
+    if value.startswith("setting_"):
+        value = value[8:]
+    return value.replace("_", " ").title()

@@ -14,12 +14,14 @@ All teams have a `break_preference` field which determines which break they'd pr
 
 It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_setting` for more information.  It will let you pair if you don't have enough judges, but it will warn you.
 
-The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `var_to_nov` variable.  If you would like varsity octafinals to happen at the same time as novice quarterfinals, this value should be `2` as the quotient of number of teams in varsity break rounds to the simultaneous novice break round is 2.  If they are happening at the same time, the value should be `1`, if they are octafinals at the same time as semifinals, then it should be 4, etc.
+The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `first_novice_outround_matches_varsity` setting. This specifies which varsity outround runs concurrently with the first novice outround (novice finals). For example:
+- If novice finals (2 teams) happen when varsity quarterfinals (8 teams) happen, select "Quarterfinals (8 teams)"
+- If novice finals happen when varsity octofinals (16 teams) happen, select "Octofinals (16 teams)"
 
 Managing Pairings
 ----------------
 
-Currently MIT Tab does NOT support judge assignment, this must be done by hand.  However, assuming you have set `var_to_nov` correctly (see above) AND all scratches are entered, the dropdowns on the pairing view will allow you to place judges very quickly.  Furthermore, gov opp will be assigned randomly, so be sure to change that according to whichever type of system your tournament has chosen to use.
+Currently MIT Tab does NOT support judge assignment, this must be done by hand.  However, assuming you have set `first_novice_outround_matches_varsity` correctly (see above) AND all scratches are entered, the dropdowns on the pairing view will allow you to place judges very quickly.  Furthermore, gov opp will be assigned randomly, so be sure to change that according to whichever type of system your tournament has chosen to use.
 
 Please also note the release pairings button that appears on the pairings page as normally appears.  This will toggle the visibility of that round's pairings.
 

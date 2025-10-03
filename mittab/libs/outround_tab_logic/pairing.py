@@ -4,7 +4,7 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import get_varsity_to_novice_ratio
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
     add_scratches_for_school_affil
@@ -89,16 +89,14 @@ def get_next_available_room(num_teams, type_of_break):
     base_queryset = Outround.objects.filter(num_teams=num_teams,
                                             type_of_round=type_of_break)
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
+    ratio = get_varsity_to_novice_ratio()
 
     other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
 
     if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / var_to_nov)
+        other_queryset = other_queryset.filter(num_teams=num_teams / ratio)
     else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
+        other_queryset = other_queryset.filter(num_teams=num_teams * ratio)
 
     rooms = [r.room
              for r in RoomCheckIn.objects.filter(round_number=0)
