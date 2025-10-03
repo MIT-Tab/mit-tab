@@ -152,7 +152,7 @@ class TeamForm(forms.ModelForm):
                 debater.team_set.first().id != self.instance.id):
                 raise forms.ValidationError(
                     """A debater cannot already be on a different team!
-                    Consider editing the debaters' existing team,
+                    Consider editing the debaters" existing team,
                      or removing them from it before creating this one."""
                 )
         return data
@@ -179,7 +179,7 @@ class TeamEntryForm(TeamForm):
             if debater.team_set.count() > 0:
                 raise forms.ValidationError(
                     """A debater cannot already be on a different team!
-                    Consider editing the debaters' existing team,
+                    Consider editing the debaters" existing team,
                      or removing them from it before creating this one."""
                 )
         return data
@@ -693,3 +693,25 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+
+class BackupForm(forms.Form):
+    backup_name = forms.CharField(
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(
+            attrs={"class": "form-control",
+                   "placeholder": "Enter backup name"})
+    )
+    include_scratches = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        )
+    )
+
+    def clean_backup_name(self):
+        backup_name = self.cleaned_data["backup_name"]
+        if "_" in backup_name:
+            raise forms.ValidationError("Backup name cannot contain underscores (_).")
+        return backup_name

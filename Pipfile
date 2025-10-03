@@ -29,6 +29,7 @@ splinter = "==0.10.0"
 Django = "==3.2.25"
 PyYAML = "==5.1.2"
 sentry-sdk = {extras = ["django"], version = "*"}
+pytz = "*"
 
 [requires]
 python_version = "3.7"
