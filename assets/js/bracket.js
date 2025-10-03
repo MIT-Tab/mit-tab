@@ -24,7 +24,7 @@ const renderTeamBlock = (label, info) => {
       : "";
   return (
     `<div class="match-team mb-3"><strong>${label}</strong>` +
-    `<span class="team-name d-block font-weight-bold">${name}</span>` +
+    `<span class="team-name d-block fw-bold">${name}</span>` +
     `${members}</div>`
   );
 };
@@ -47,14 +47,14 @@ const renderBracket = () => {
 window.renderBracket = renderBracket;
 
 const activateTab = (targetPane, { render = false } = {}) => {
-  TAB_CONFIG.forEach(([tab, pane]) => {
-    const $tab = $(`#${tab}`);
-    const $pane = $(`#${pane}`);
-    const active = pane === targetPane;
-
-    $tab.toggleClass("active", active).attr("aria-selected", active);
-    $pane.toggleClass("active", active);
-  });
+  // Bootstrap 5: Use Bootstrap's Tab API
+  const targetTab = targetPane === "list-view" ? "list-view-tab" : "bracket-view-tab";
+  const tabElement = document.getElementById(targetTab);
+  
+  if (tabElement) {
+    const tab = new bootstrap.Tab(tabElement);
+    tab.show();
+  }
 
   const showBracket = targetPane === "bracket-view";
   $("body").toggleClass("bracket-view-active", showBracket);
@@ -106,11 +106,20 @@ const closeModal = () => {
 };
 
 const initTabs = () => {
+  // Bootstrap 5: Listen for tab events
   TAB_CONFIG.forEach(([tabId, pane]) => {
-    $(`#${tabId}`).on("click", evt => {
-      evt.preventDefault();
-      activateTab(pane, { render: pane === "bracket-view" });
-    });
+    const tabEl = document.getElementById(tabId);
+    if (tabEl) {
+      tabEl.addEventListener('shown.bs.tab', () => {
+        if (pane === "bracket-view") renderBracket();
+      });
+      
+      // Also support direct clicks
+      $(`#${tabId}`).on("click", evt => {
+        evt.preventDefault();
+        activateTab(pane, { render: pane === "bracket-view" });
+      });
+    }
   });
 
   $("#name_display_toggle").on("change", evt => {

@@ -1,10 +1,15 @@
-{% load bootstrap4 %}
+{% load tags %}
 
 {% if form.errors %}
   <div class="alert alert-danger">
     Please correct the error{{ form.errors|pluralize }} below.
-
-    {% bootstrap_form_errors form type='non_fields' %}
+    {% if form.non_field_errors %}
+      <ul class="mb-0">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   </div>
 {% endif %}
 
@@ -16,7 +21,7 @@
 
 <div class="row">
   <div class="form-group col-md-6">
-    {% bootstrap_field form.winner %}
+    {{ form.winner|bs5_field }}
     <div class="mt-2">
       <div class="hidden winner" data-option=0>Please select a winner</div>
       <div class="hidden winner alert alert-info" data-option=1>
@@ -57,7 +62,7 @@
   </div>
   {% if form.ballot_code %}
   <div class="form-group col-md-6">
-    {% bootstrap_field form.ballot_code %}
+    {{ form.ballot_code|bs5_field }}
   </div>
   {% endif %}
 </div>
@@ -74,29 +79,29 @@
       <div class="gov">
         <div class="pm row pb-1 border-bottom">
           <div class="col-12 form-group">
-            {% bootstrap_field form.pm_debater %}
+            {{ form.pm_debater|bs5_field }}
           </div>
 
           <div class="speaks col-md-6 form-group">
-            {% bootstrap_field form.pm_speaks %}
+            {{ form.pm_speaks|bs5_field }}
           </div>
 
           <div class="ranks col-md-6 form-group">
-            {% bootstrap_field form.pm_ranks %}
+            {{ form.pm_ranks|bs5_field }}
           </div>
         </div>
 
         <div class="mg row pt-3">
           <div class="col-12 form-group">
-            {% bootstrap_field form.mg_debater %}
+            {{ form.mg_debater|bs5_field }}
           </div>
 
           <div class="speaks col-md-6 form-group">
-            {% bootstrap_field form.mg_speaks %}
+            {{ form.mg_speaks|bs5_field }}
           </div>
 
           <div class="ranks col-md-6 form-group">
-            {% bootstrap_field form.mg_ranks %}
+            {{ form.mg_ranks|bs5_field }}
           </div>
         </div>
       </div>
@@ -113,29 +118,29 @@
       <div class="opp">
         <div class="lo row pb-1 border-bottom">
           <div class="col-12 form-group">
-            {% bootstrap_field form.lo_debater %}
+            {{ form.lo_debater|bs5_field }}
           </div>
 
           <div class="speaks col-md-6 form-group">
-            {% bootstrap_field form.lo_speaks %}
+            {{ form.lo_speaks|bs5_field }}
           </div>
 
           <div class="ranks col-md-6 form-group">
-            {% bootstrap_field form.lo_ranks %}
+            {{ form.lo_ranks|bs5_field }}
           </div>
         </div>
 
         <div class="mo row pt-3">
           <div class="col-12 form-group">
-            {% bootstrap_field form.mo_debater %}
+            {{ form.mo_debater|bs5_field }}
           </div>
 
           <div class="speaks col-md-6 form-group">
-            {% bootstrap_field form.mo_speaks %}
+            {{ form.mo_speaks|bs5_field }}
           </div>
 
           <div class="ranks col-md-6 form-group">
-            {% bootstrap_field form.mo_ranks %}
+            {{ form.mo_ranks|bs5_field }}
           </div>
         </div>
       </div>

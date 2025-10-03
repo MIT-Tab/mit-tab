@@ -1,13 +1,13 @@
-<div class="col-sm" id="school_list">
-  <h4 class="text-center font-weight-normal">
+<div class="col-sm bg-white border border-secondary rounded p-3 m-1 shadow-sm" id="school_list">
+  <h4 class="text-center fw-semibold text-dark mb-3 pb-2 border-bottom">
     {{count}} {{model_name}}
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-sm btn-light" href="{{ list_path }}"
+    <div class="btn-group btn-group-sm float-end">
+      <a class="btn btn-sm btn-outline-primary" href="{{ list_path }}"
         title="List {{model_name|lower}}"
         id="{{ html_id }}-btn-list">
         <i class="fas fa-list"></i>
       </a>
-      <a class="btn btn-sm btn-light" href="{{ enter_path }}"
+      <a class="btn btn-sm btn-outline-success" href="{{ enter_path }}"
         title="Add {{model_name|lower}}"
         id="{{ html_id }}-btn-add">
         <i class="fas fa-plus"></i>
@@ -15,9 +15,11 @@
     </div>
   </h4>
 
-  <ol id="{{ html_id }}">
+  <ol id="{{ html_id }}" class="ps-3 mb-0" style="max-height: 400px; overflow-y: auto;">
     {% for id, name in list_data %}
-      <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+      <li class="searchable py-1">
+        <a href="/{{ view_path_prefix }}/{{ id }}/" class="text-primary">{{ name }}</a>
+      </li>
     {% endfor %}
   </ol>
 </div>

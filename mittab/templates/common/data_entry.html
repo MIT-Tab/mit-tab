@@ -5,10 +5,14 @@
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="col-md-6">
-  {% include "common/_form.html" %}
+<div class="col-12">
+  <div class="row g-3">
+    <div class="col-lg-6 col-md-12">
+      {% include "common/_form.html" %}
+    </div>
+    
+    {% block detail_content %}
+    {% endblock %}
+  </div>
 </div>
-
-{% block detail_content %}
-{% endblock %}
 {% endblock %}

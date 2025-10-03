@@ -38,74 +38,74 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
   <div class="container {% if not smaller_width %} w-95{% endif %}">
-    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{{ home }}">MIT-TAB</a>
+    <a class="navbar-brand fs-4 fw-bold{% if not user.is_authenticated %} no-nav{% endif %}" style="letter-spacing: -0.025em;" href="{{ home }}">MIT-TAB</a>
 
     {% if user.is_authenticated %}
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav mr-auto order-0">
+      <ul class="navbar-nav me-auto order-0">
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
+          <a data-bs-toggle="dropdown" class="nav-link dropdown-toggle text-decoration-none {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}" style="color: rgba(255, 255, 255, 0.75);">
             Pairings
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_status %}" href="{{ view_status }}">Current Round</a>
-            <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
-	    <a class="dropdown-item {%active request outround_pairings %}" href="{{ outround_pairings }}">Outround Pairings</a>
+            <a class="dropdown-item text-decoration-none {%active request view_status %}" href="{{ view_status }}">Current Round</a>
+            <a class="dropdown-item text-decoration-none {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
+	    <a class="dropdown-item text-decoration-none {%active request outround_pairings %}" href="{{ outround_pairings }}">Outround Pairings</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}">
+          <a data-bs-toggle="dropdown" class="nav-link dropdown-toggle text-decoration-none {% active request rank_teams %}{% active request rank_debaters %}" style="color: rgba(255, 255, 255, 0.75);">
             Rankings
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
-            <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
+            <a class="dropdown-item text-decoration-none {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
+            <a class="dropdown-item text-decoration-none {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}">
+          <a data-bs-toggle="dropdown" class="nav-link dropdown-toggle text-decoration-none {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}" style="color: rgba(255, 255, 255, 0.75);">
             Backups
           </a>
 
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
-            <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
-            <a class="dropdown-item {%active request backup_without_scratches %}" href="{{ backup_without_scratches }}">Backup Current Without Scratches</a>
-            <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
-            <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
+            <a class="dropdown-item text-decoration-none {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
+            <a class="dropdown-item text-decoration-none {%active request backup %}" href="{{ backup }}">Backup Current</a>
+            <a class="dropdown-item text-decoration-none {%active request backup_without_scratches %}" href="{{ backup_without_scratches }}">Backup Current Without Scratches</a>
+            <a class="dropdown-item text-decoration-none {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
+            <a class="dropdown-item text-decoration-none {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
+          <a data-bs-toggle="dropdown" class="nav-link dropdown-toggle text-decoration-none {% active request view_scratches %}{% active request add_scratch %}" style="color: rgba(255, 255, 255, 0.75);">
             Scratches
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a>
-            <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a>
+            <a class="dropdown-item text-decoration-none {%active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a>
+            <a class="dropdown-item text-decoration-none {%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
+          <a data-bs-toggle="dropdown" class="nav-link dropdown-toggle text-decoration-none {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}" style="color: rgba(255, 255, 255, 0.75);">
             Admin
           </a>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Checkin</a>
-            <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
-            <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
-            <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
-            <a class="dropdown-item" href="/admin">Admin Interface</a>
+            <a class="dropdown-item text-decoration-none {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
+            <a class="dropdown-item text-decoration-none {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
+            <a class="dropdown-item text-decoration-none {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
+            <a class="dropdown-item text-decoration-none" href="/admin">Admin Interface</a>
           </div>
         </li>
 	<li class="nav-item">
-        <a class="nav-link" href="{{ logout }}">Logout</a>
+        <a class="nav-link text-decoration-none" href="{{ logout }}" style="color: rgba(255, 255, 255, 0.75);">Logout</a>
 	</li>
       </ul>
     </div>

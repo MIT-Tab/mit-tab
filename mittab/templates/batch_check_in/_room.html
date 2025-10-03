@@ -17,13 +17,13 @@
       </td>
       {% for is_checked_in in checkins %}
       <td>
-        <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input room-checkin-toggle"
+        <div class="form-check form-switch">
+          <input type="checkbox" class="form-check-input room-checkin-toggle"
                  data-room-id="{{room.id}}"
                  data-round-number="{{forloop.counter0}}"
                  id="toggle-room-{{ room.id }}-{{ forloop.counter0 }}"
                  {% if is_checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-room-{{ room.id }}-{{ forloop.counter0 }}">
+          <label class="form-check-label" for="toggle-room-{{ room.id }}-{{ forloop.counter0 }}">
             Checked {% if is_checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>

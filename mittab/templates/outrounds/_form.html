@@ -1,10 +1,15 @@
-{% load bootstrap4 %}
+{% load tags %}
 
 {% if form.errors %}
   <div class="alert alert-danger">
     Please correct the error{{ form.errors|pluralize }} below.
-
-    {% bootstrap_form_errors form type='non_fields' %}
+    {% if form.non_field_errors %}
+      <ul class="mb-0">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   </div>
 {% endif %}
 
@@ -16,7 +21,7 @@
 
 <div class="row">
   <div class="form-group col-md-6">
-    {% bootstrap_field form.winner %}
+    {{ form.winner|bs5_field }}
     <div class="mt-2">
       <div class="hidden winner" data-option=0>Please select a winner</div>
     </div>

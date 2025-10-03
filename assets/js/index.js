@@ -39,7 +39,13 @@ function loadTabCards() {
 }
 
 function initializeTooltips() {
-  $('[data-toggle="tooltip"]').tooltip();
+  // Bootstrap 5: Initialize all tooltips
+  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+  
+  // Also support legacy data-toggle for backwards compatibility
+  const legacyTooltips = document.querySelectorAll('[data-toggle="tooltip"]');
+  [...legacyTooltips].map(el => new bootstrap.Tooltip(el));
 }
 
 $(document).ready(() => {

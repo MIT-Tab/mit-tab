@@ -26,12 +26,12 @@
           {{ debater.name }}{% if not forloop.last %} and {% endif %}
         {% endfor %}
       <td>
-        <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input team-checkin-toggle"
+        <div class="form-check form-switch">
+          <input type="checkbox" class="form-check-input team-checkin-toggle"
                  data-team-id="{{team.id}}"
                  id="toggle-team-{{ team.id }}-{{ forloop.counter0 }}"
                  {% if checked_in %}checked{% endif %}>
-          <label class="custom-control-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">
+          <label class="form-check-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">
             Checked {% if checked_in %}In{% else %}Out{% endif %}
           </label>
         </div>

@@ -1,18 +1,91 @@
 body {
-  background-color: #BFD9FF;
-  font-size: 0.95rem;
+  background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f8f9fa 50%, #f3f4f6 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
-.form-control {
-  background-image: none !important;
+
+.pairing-card {
+  transition: box-shadow 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .dropdown-toggle:not(.btn) {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    
+    &::after {
+      display: none;
+    }
+    
+    &:hover, &:focus, &:active {
+      background-color: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  .table {
+    background-color: transparent !important;
+    
+    td, th, tr {
+      background-color: transparent !important;
+      border: none;
+    }
+    
+    td {
+      padding: 0.5rem 0.25rem;
+    }
+  }
 }
 
-.bg-dark {
-  background-color: #00438A !important;
+.team-toggle.dropdown-toggle {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  
+  &:hover, &:focus, &:active {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 }
 
-.navbar-brand {
-  font-size: 1.5rem;
+.judges {
+  min-width: fit-content;
+  
+  .btn {
+    margin-bottom: 0.375rem;
+  }
+
+  .judge-toggle {
+    min-width: 100%;
+  }
+  
+  .chair {
+    border-left: 3px solid #2563eb;
+    
+    small::after {
+      font-family: "Font Awesome 5 Free";
+      font-weight: 900;
+      content: " \f6c0";
+    }
+  }
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+}
+
+.w-95 {
+  max-width: 95%;
 }
 
 .no-nav {
@@ -80,15 +153,22 @@ body {
   line-height: 2.5;
 }
 
-.chair small::after {
-  font-family: "Font Awesome 5 Free";
-  font-weight: 900;
-  content: " \f6c0";
-}
 
 .dropdown-menu {
   max-height: 500px;
   overflow-y: auto;
+}
+
+.data-list {
+  column-count: 4;
+  
+  ul {
+    list-style-type: none;
+  }
+
+  .list-group-item {
+    text-overflow: clip;
+  }
 }
 
 .form-inline .input-group {

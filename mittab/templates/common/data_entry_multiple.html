@@ -1,5 +1,5 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
+{% load tags %}
 
 {% block title %} {{title}} {% endblock %}
 {% block banner %} {{title}} {% endblock %}
@@ -10,9 +10,9 @@
     {% for form, delete in forms %}
     <div class="card mb-3">
       <div class="card-header">
-        <h5 class="float-left">{{data_type}} #{{ form.prefix }}</h5>
+        <h5 class="float-start">{{data_type}} #{{ form.prefix }}</h5>
         {% if delete %}
-          <a class="btn btn-sm float-right btn-outline-danger"
+          <a class="btn btn-sm float-end btn-outline-danger"
              confirm="Are you sure?"
              href="{{delete}}">
             <i class="fas fa-times"></i>
@@ -20,7 +20,11 @@
         {% endif %}
       </div>
       <div class="card-body">
-        {% bootstrap_form form %}
+        {% for field in form %}
+          <div class="mb-3">
+            {{ field|bs5_field }}
+          </div>
+        {% endfor %}
       </div>
     </div>
     {% endfor %}

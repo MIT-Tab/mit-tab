@@ -18,7 +18,7 @@
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
                     <a class="dropdown-toggle outround-team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-bs-toggle="dropdown"
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -47,7 +47,7 @@
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
                     <a class="dropdown-toggle outround-team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-bs-toggle="dropdown"
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -71,8 +71,8 @@
       <div class="col-4 judges">
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
-             data-toggle="dropdown" href="#">
+          <a class="btn btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+             data-bs-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
           </a>
           <ul class="dropdown-menu"></ul>
@@ -82,7 +82,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn btn-sm btn-light outround-judge-toggle dropdown-toggle" data-bs-toggle="dropdown" href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
@@ -94,15 +94,15 @@
 
       <div class="col-3 text-center">
         {% if pairing.victor == 1 %}
-        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV win</a>
+        <a class="btn btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV win</a>
         {% elif pairing.victor == 2 %}
-        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP win</a>
+        <a class="btn btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP win</a>
         {% elif pairing.victor == 3 %}
-        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV via Forfeit</a>
+        <a class="btn btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">GOV via Forfeit</a>
         {% elif pairing.victor == 4 %}
-        <a class="btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP via Forfeit</a>
+        <a class="btn btn-sm btn-block btn-success" href="/outround/{{pairing.id}}/result/">OPP via Forfeit</a>
         {% else %}
-        <a class="btn-sm btn-block btn-warning" href="/outround/{{pairing.id}}/result/">Enter Ballot</a>
+        <a class="btn btn-sm btn-block btn-warning" href="/outround/{{pairing.id}}/result/">Enter Ballot</a>
         {%endif%}
         <div class="dropdown room">
           <span 
@@ -110,11 +110,11 @@
             round-id="{{pairing.id}}"
             outround="true">
             <a 
-              class="btn-sm btn-block btn-light room-toggle dropdown-toggle text-wrap" 
+              class="btn btn-sm btn-block btn-light room-toggle dropdown-toggle text-wrap" 
               href="#" 
               role="button" 
               id="roomDropdown-{{pairing.id}}" 
-              data-toggle="dropdown" 
+              data-bs-toggle="dropdown" 
               aria-haspopup="true" 
               aria-expanded="false" 
               style="white-space: normal;">
@@ -123,11 +123,11 @@
             <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
           </span>
         </div>
-        <a class="btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
+        <a class="btn btn-sm btn-block btn-light" href="/admin/tab/outround/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>
 	{% if choice %}
-    <a class="btn-sm btn-block btn-success choice-update" href="" data-outround-id="{{ pairing.id }}">
+    <a class="btn btn-sm btn-block btn-success choice-update" href="" data-outround-id="{{ pairing.id }}">
       {{ pairing.get_choice_display }} choice
     </a>
 	{% endif %}
