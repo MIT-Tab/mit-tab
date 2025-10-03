@@ -514,15 +514,15 @@ def forum_post(request):
         if len(dino_names) > 1:
             dino_string = ", ".join(dino_names[:-1]) + " and " + dino_names[-1]
         else:
-            dino_string = dino_names[0] 
-    
+            dino_string = dino_names[0]
+
     nov_debaters, varsity_debaters = get_speaker_rankings(None)
     nov_debaters = nov_debaters[:min(10, len(nov_debaters)-1)]
     varsity_debaters = varsity_debaters[:min(10, len(varsity_debaters)-1)]
-    
-    qualifying_teams = Team.objects.prefetch_related('debaters').annotate(
-        num_rounds=models.Count('gov_team', distinct=True) + 
-                  models.Count('opp_team', distinct=True)
+
+    qualifying_teams = Team.objects.prefetch_related("debaters").annotate(
+        num_rounds=models.Count("gov_team", distinct=True) +
+        models.Count("opp_team", distinct=True)
     ).filter(
         num_rounds__gte=3
     )
@@ -533,14 +533,15 @@ def forum_post(request):
         novice_status=True)
 
     team_count = qualifying_teams.count()
-    novice_count = qualifying_novices.count()    
+    novice_count = qualifying_novices.count()
 
     varsity_teams, nov_teams = get_team_rankings(None)
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
-    
+
     varsity_teams = varsity_teams[:var_teams_to_break]
-    novice_teams_in_varsity_break = len([team for team in nov_teams if team in varsity_teams])
+    novice_teams_in_varsity_break = len([team for team in nov_teams if
+                                         team in varsity_teams])
     novice_teams = nov_teams[:nov_teams_to_break + novice_teams_in_varsity_break]
 
     varsity_outs = create_forum_view_data(0)
