@@ -26,7 +26,7 @@ function applyFilters() {
 function toggleJudgeDisplay() {
   const button = $("#toggle-judge-display");
   const details = $(".item-detail");
-  
+
   if (button.text() === "Show Rank") {
     details.each((index, element) => {
       $(element).text($(element).data("rank"));
