@@ -71,12 +71,18 @@
                         <label for="type-filter" class="small text-muted mb-1">Type</label>
                         <select id="type-filter" class="custom-select custom-select-sm">
                             <option value="">All</option>
+                            {% for type in filter_types %}
+                            <option value="{{ type }}">{{ type }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="round-filter" class="small text-muted mb-1">Round</label>
                         <select id="round-filter" class="custom-select custom-select-sm">
                             <option value="">All</option>
+                            {% for round in filter_rounds %}
+                            <option value="{{ round }}">{{ round }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="form-group mb-0">
@@ -96,30 +102,27 @@
     <!-- Main Content -->
     <div class="col px-0">
         <div class="px-3 py-3">
-            {% quick_search %}
-
             <!-- Backup Table -->
-            <div class="card rounded shadow-sm">
+            <div id="backup-table" class="card rounded shadow-sm">
                 <div class="table-responsive">
-                    <table class="table table-striped table-sm mb-0" id="backup-table">
+                    <table class="table table-striped table-sm mb-0">
                         <thead class="thead-light">
                             <tr>
                                 {% for header in headers %}
-                                <th class="sortable border-top-0" data-column="{{ header|lower }}" role="button" style="cursor: pointer;">
+                                <th class="sort border-top-0" data-sort="{{ header|lower }}" role="button" style="cursor: pointer;">
                                     {{ header }}
-                                    <span class="sort-icon text-muted"></span>
                                 </th>
                                 {% endfor %}
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="list">
                             {% for key, name, type, round, timestamp, scratches in backups %}
-                            <tr class="searchable" data-name="{{ name }}" data-type="{{ type }}" data-round="{{ round }}" data-timestamp="{{ timestamp }}" data-scratches="{{ scratches }}">
-                                <td><a href="/backup/{{ key }}">{{ name }}</a></td>
-                                <td class="text-muted">{{ type }}</td>
-                                <td class="text-muted">{{ round }}</td>
-                                <td class="text-muted">{{ timestamp }}</td>
-                                <td class="text-muted">{{ scratches }}</td>
+                            <tr data-type="{{ type }}" data-round="{{ round }}" data-scratches="{{ scratches }}">
+                                <td class="name"><a href="/backup/{{ key }}">{{ name }}</a></td>
+                                <td class="type text-muted">{{ type }}</td>
+                                <td class="round text-muted">{{ round }}</td>
+                                <td class="timestamp text-muted">{{ timestamp }}</td>
+                                <td class="scratches text-muted">{{ scratches }}</td>
                             </tr>
                             {% empty %}
                             <tr>

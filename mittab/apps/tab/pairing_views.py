@@ -253,6 +253,15 @@ def view_backups(request):
     backups = backup.list_backups()
     backups.sort(key=lambda x: x[3])
 
+    # Extract unique filter values
+    types = sorted(set(b[2] for b in backups if b[2] != "Unknown"))
+    
+    # Sort rounds: numeric first (by value), then non-numeric (alphabetically)
+    round_set = set(b[3] for b in backups if b[3] != "Unknown")
+    numeric_rounds = sorted([r for r in round_set if r.isdigit()], key=int)
+    text_rounds = sorted([r for r in round_set if not r.isdigit()])
+    rounds = numeric_rounds + text_rounds
+
     # Initialize both forms
     create_form = BackupForm()
     upload_form = UploadBackupForm()
@@ -265,7 +274,9 @@ def view_backups(request):
         "create_form": create_form,
         "upload_form": upload_form,
         "headers": headers,
-        "title": "Backup List"
+        "title": "Backup List",
+        "filter_types": types,
+        "filter_rounds": rounds
     })
 
 
