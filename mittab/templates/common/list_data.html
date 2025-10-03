@@ -10,10 +10,18 @@
   {% quick_search %}
   <div class="data-list">
     <ul class="list_item">
-      {% for id, item, flags, symbols in item_list%}
-        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
-        </li>
+      {% for item_data in item_list %}
+        {% if item_data|length == 5 %}
+          {# Judge view with 5 items: id, name, flags, symbols, rank #}
+          <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{item_data.2}}" data-rank="{{item_data.4}}">
+            <a class="no_decoration" href="/{{item_type}}/{{item_data.0}}">{{item_data.1}} <span class="item-detail" data-code="{{item_data.3}}" data-rank="({{item_data.4}})">{{item_data.3}}</span></a>
+          </li>
+        {% else %}
+          {# Other views with 4 items: id, name, flags, symbols #}
+          <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{item_data.2}}">
+            <a class="no_decoration" href="/{{item_type}}/{{item_data.0}}">{{item_data.1}} {{item_data.3}}</a>
+          </li>
+        {% endif %}
       {% endfor %}
     </ul>
   </div>
@@ -24,6 +32,11 @@
   <div class="card mb-2">
     <div class="card-header">Quick Filters</div>
     <div class="card-body">
+      {% if item_type == "judge" %}
+      <div class="mb-3">
+        <button class="btn btn-sm btn-primary" id="toggle-judge-display">Show Rank</button>
+      </div>
+      {% endif %}
       <ul class="list-group">
         {% for filter_group in filters %}
           {% for key, value in filter_group %}
