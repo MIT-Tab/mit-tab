@@ -47,9 +47,8 @@ def pair_round():
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for team in forfeit_teams:
-        lenient_late = TabSettings.get("lenient_late", 0) >= current_round
         no_show = NoShow(
-            no_show_team=team, round_number=current_round, lenient_late=lenient_late
+            no_show_team=team, round_number=current_round
         )
         no_show.save()
 

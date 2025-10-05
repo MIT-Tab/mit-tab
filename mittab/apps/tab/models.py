@@ -561,7 +561,15 @@ class NoShow(models.Model):
                                      related_name="no_shows",
                                      on_delete=models.CASCADE)
     round_number = models.IntegerField()
-    lenient_late = models.BooleanField(default=False)
+
+    @property
+    def lenient_late(self):
+        """
+        Determines if this no-show should be treated leniently based on
+        the current tab setting. Returns True if the lenient_late setting
+        is greater than or equal to this round number.
+        """
+        return TabSettings.get("lenient_late", 0) >= self.round_number
 
     def __str__(self):
         return str(self.no_show_team) + " was no-show for round " + str(
