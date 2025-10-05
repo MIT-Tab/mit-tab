@@ -832,3 +832,13 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
         except ValueError:
             return redirect_and_flash_error(request, "Chair could not be assigned")
     return redirect_and_flash_error(request, "Judge not found in round")
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def round_stats(request):
+    from mittab.libs.tab_logic.stats import get_all_round_stats
+    stats = get_all_round_stats()
+    return render(request, "tab/round_stats.html", {
+        "title": "Round Statistics",
+        **stats
+    })

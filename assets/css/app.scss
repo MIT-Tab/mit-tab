@@ -94,3 +94,29 @@ $font-size-base: 0.95rem !default;
 .form-inline .input-group {
   width: 100%;
 }
+
+.stats-bar-container {
+  height: 30px;
+  overflow: hidden;
+  display: flex;
+}
+
+.stats-bar-gov {
+  background-color: #28a745;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.stats-bar-opp {
+  background-color: #dc3545;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
