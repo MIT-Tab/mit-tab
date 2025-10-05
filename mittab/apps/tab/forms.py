@@ -24,6 +24,9 @@ class UploadDataForm(forms.Form):
 
 
 class SchoolForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(SchoolForm, self).__init__(*args, **kwargs)
+
     class Meta:
         model = School
         fields = "__all__"
@@ -187,16 +190,47 @@ class TeamEntryForm(TeamForm):
 
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.all())
-    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    team = forms.ChoiceField(choices=[])
+    judge = forms.ChoiceField(choices=[])
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
+    def __init__(self, *args, **kwargs):
+        team_queryset = kwargs.pop("team_queryset", Team.objects.all())
+        judge_queryset = kwargs.pop("judge_queryset", Judge.objects.all())
+
+        super(ScratchForm, self).__init__(*args, **kwargs)
+
+        self.fields["team"].choices = [
+            (str(team.id), team.name) for team in team_queryset
+        ]
+        self.fields["judge"].choices = [
+            (str(judge.id), judge.name) for judge in judge_queryset
+        ]
+
+        # If we're editing an existing scratch, set initial values
+        if self.instance and self.instance.pk:
+            self.fields["team"].initial = str(self.instance.team.id)
+            self.fields["judge"].initial = str(self.instance.judge.id)
+
+    def save(self, commit=True):
+        instance = super(ScratchForm, self).save(commit=False)
+        # Convert string IDs to actual model instances
+        instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
+        instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
+        if commit:
+            instance.save()
+        return instance
 
     class Meta:
         model = Scratch
         fields = "__all__"
+        exclude = ["team", "judge"]
 
 
 class DebaterForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(DebaterForm, self).__init__(*args, **kwargs)
+
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
@@ -473,15 +507,25 @@ class SettingsForm(forms.Form):
         super(SettingsForm, self).__init__(*args, **kwargs)
 
         for setting in self.settings:
-            if "type" in setting and setting["type"] == "boolean":
-                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
+            field_name = "setting_%s" % (setting["name"],)
+            if setting.get("type") == "boolean":
+                self.fields[field_name] = forms.BooleanField(
                     label=setting["name"],
                     help_text=setting["description"],
                     initial=setting["value"],
                     required=False
                 )
+            elif setting.get("type") == "choice":
+                choices = [(c[0], c[1]) for c in setting.get("choices", [])]
+                self.fields[field_name] = forms.TypedChoiceField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    choices=choices,
+                    initial=setting["value"],
+                    coerce=int
+                )
             else:
-                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
+                self.fields[field_name] = forms.IntegerField(
                     label=setting["name"],
                     help_text=setting["description"],
                     initial=setting["value"]

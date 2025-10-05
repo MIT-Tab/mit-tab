@@ -1,8 +1,10 @@
+import os
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render, reverse, get_object_or_404
+from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
@@ -24,6 +26,12 @@ def index(request):
     debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
+    expected_finals = 1+ bool(TabSettings.get("nov_teams_to_break", 4))
+    completed_finals = Outround.objects.filter(num_teams=2).exclude(
+        victor=Outround.UNKNOWN
+    ).count()
+    publish_ready = completed_finals == expected_finals
+    results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
@@ -109,12 +117,22 @@ def view_school(request, school_id):
                     form.cleaned_data["name"]))
     else:
         form = SchoolForm(instance=school)
-        links = [("/school/" + str(school_id) + "/delete/", "Delete")]
+        links = [(f"/school/{school_id}/delete/", "Delete")]
+
+        teams = Team.objects.filter(school=school).prefetch_related("debaters")
+        hybrid_teams = Team.objects.filter(
+            hybrid_school=school
+        ).prefetch_related("debaters")
+        judges = Judge.objects.filter(schools=school)
+
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/school_detail.html", {
                 "form": form,
                 "links": links,
-                "title": "Viewing School: %s" % (school.name)
+                "school_teams": teams,
+                "school_hybrid_teams": hybrid_teams,
+                "school_judges": judges,
+                "title": f"Viewing School: {school.name}"
             })
 
 
@@ -209,10 +227,21 @@ def view_room(request, room_id):
                     form.cleaned_data["name"]))
     else:
         form = RoomForm(instance=room)
-    return render(request, "common/data_entry.html", {
+
+        # Get all rounds that happened in this room with related judges
+        rounds = Round.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+        # Get all outrounds that happened in this room with related judges
+        outrounds = Outround.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+    return render(request, "tab/room_detail.html", {
         "form": form,
         "links": [],
-        "title": "Viewing Room: %s" % (room.name)
+        "room_rounds": rounds,
+        "room_outrounds": outrounds,
+        "title": f"Viewing Room: {room.name}"
     })
 
 
@@ -237,22 +266,6 @@ def enter_room(request):
     return render(request, "common/data_entry.html", {
         "form": form,
         "title": "Create Room"
-    })
-
-
-def batch_checkin(request):
-    rooms_and_checkins = []
-
-    round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    for room in Room.objects.all():
-        checkins = []
-        for round_number in [0] + round_numbers:  # 0 is for outrounds
-            checkins.append(room.is_checked_in_for_round(round_number))
-        rooms_and_checkins.append((room, checkins))
-
-    return render(request, "tab/room_batch_checkin.html", {
-        "rooms_and_checkins": rooms_and_checkins,
-        "round_numbers": round_numbers
     })
 
 
@@ -420,3 +433,71 @@ def generate_archive(request):
     response["Content-Length"] = len(xml)
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403")
+def simulate_round(request):
+    enviornment = os.environ.get("MITTAB_ENV")
+    if enviornment in ("development", "test-deployment"):
+        call_command("simulate_rounds")
+        return redirect_and_flash_success(request, "Simulated round")
+    return redirect_and_flash_error(request, "Simulated rounds are disabled")
+
+
+def batch_checkin(request):
+    judges_and_checkins = []
+    rooms_and_checkins = []
+
+    teams = Team.objects.prefetch_related("school", "debaters").all()
+    team_and_checkins = [(team.school.name,
+                          team,
+                          team.debaters.all(),
+                          team.checked_in)
+                         for team in teams]
+
+    round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
+    all_round_numbers = [0]+round_numbers
+    judges = Judge.objects.prefetch_related("checkin_set", "schools")
+
+    for judge in judges:
+        checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
+        checkins_list = [round_number in checkins for round_number in all_round_numbers]
+        judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
+
+    rooms = Room.objects.prefetch_related("roomcheckin_set")
+
+    for room in rooms:
+        checkins = []
+        checkins = {checkin.round_number for checkin in room.roomcheckin_set.all()}
+        checkins_list = [round_number in checkins for round_number in all_round_numbers]
+        rooms_and_checkins.append((room, checkins_list))
+
+    return render(request, "batch_check_in/check_in.html", {
+        "teams_and_checkins": team_and_checkins,
+        "judges_and_checkins": judges_and_checkins,
+        "round_numbers": round_numbers,
+        "rooms_and_checkins": rooms_and_checkins,
+        })
+
+
+def publish_results(request, new_setting):
+    # Convert URL parameter: 0 = unpublish, 1 = publish
+    new_setting = bool(new_setting)
+    current_setting = TabSettings.get("results_published", False)
+
+    if new_setting != current_setting:
+        TabSettings.set("results_published", new_setting)
+        status = "published" if new_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results successfully {status}. Results are now "
+            f"{'visible' if new_setting else 'hidden'}.",
+            path="/",
+        )
+    else:
+        status = "published" if current_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results are already {status}.",
+            path="/",
+        )

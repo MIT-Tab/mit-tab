@@ -122,7 +122,7 @@ Modifying the Pairing Algorithm
 
 The pairing algorithm uses creates minimum weight maximal matching algorithm to
 create the round. You can read more about the algorithm used
-[here](https://www.wikiwand.com/en/Blossom_algorithm). What this means is that
+[here](https://www.wikiwand.com/en/articles/Blossom_algorithm?upgrade=true). What this means is that
 the pairing algorithm isn't a list of specific rules. Instead, it generates
 every possible pairing for the round, gives a score to each pairing, and then
 selected the pairings with the highest score. Penalties with the highest

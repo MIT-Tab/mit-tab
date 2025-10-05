@@ -1,6 +1,6 @@
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -17,12 +17,15 @@ def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
     if not request.user.is_authenticated and not display_teams:
-        return redirect_and_flash_error(request, "This view is not public", path="/")
+        return redirect_and_flash_error(
+            request, "This view is not public", path="/")
 
     return render(
         request, "public/teams.html", {
-            "teams": Team.objects.order_by("-checked_in",
-                                           "school__name").all(),
+            "teams": Team.objects
+                     .order_by("-checked_in", "school__name")
+                     .prefetch_related("debaters", "school", "hybrid_school")
+                     .all(),
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
@@ -81,11 +84,8 @@ def view_team(request, team_id):
         form = TeamForm(instance=team)
         links = [("/team/" + str(team_id) + "/scratches/view/",
                   "Scratches for {}".format(team.display_backend))]
-        for deb in team.debaters.all():
-            links.append(
-                ("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/team_detail.html", {
                 "title": "Viewing Team: %s" % (team.display_backend),
                 "form": form,
                 "links": links,
@@ -114,7 +114,8 @@ def enter_team(request):
             else:
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(team.display_backend),
+                    "Team {} created successfully".format(
+                        team.display_backend),
                     path="/")
     else:
         form = TeamEntryForm()
@@ -134,10 +135,17 @@ def add_scratches(request, team_id, number_scratches):
     except Team.DoesNotExist:
         return redirect_and_flash_error(request,
                                         "The selected team does not exist")
+    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all()
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i))
-            for i in range(1, number_scratches + 1)
+            ScratchForm(
+                request.POST,
+                prefix=str(
+                    i + 1),
+                team_queryset=all_teams,
+                judge_queryset=all_judges)
+            for i in range(number_scratches)
         ]
         all_good = True
         for form in forms:
@@ -154,7 +162,9 @@ def add_scratches(request, team_id, number_scratches):
                 initial={
                     "team": team_id,
                     "scratch_type": 0
-                }
+                },
+                team_queryset=all_teams,
+                judge_queryset=all_judges
             ) for i in range(1, number_scratches + 1)
         ]
     return render(
@@ -173,10 +183,18 @@ def view_scratches(request, team_id):
     scratches = Scratch.objects.filter(team=team_id)
     number_scratches = len(scratches)
     team = Team.objects.get(pk=team_id)
+    all_teams = Team.objects.all()
+    all_judges = Judge.objects.all()
     if request.method == "POST":
         forms = [
-            ScratchForm(request.POST, prefix=str(i), instance=scratches[i - 1])
-            for i in range(1, number_scratches + 1)
+            ScratchForm(
+                request.POST,
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(number_scratches)
         ]
         all_good = True
         for form in forms:
@@ -188,9 +206,13 @@ def view_scratches(request, team_id):
                 request, "Scratches successfully modified")
     else:
         forms = [
-            ScratchForm(prefix=str(i), instance=scratches[i - 1])
-            for i in range(1,
-                           len(scratches) + 1)
+            ScratchForm(
+                prefix=str(i + 1),
+                instance=scratches[i],
+                team_queryset=all_teams,
+                judge_queryset=all_judges
+            )
+            for i in range(len(scratches))
         ]
     delete_links = [
         "/team/" + str(team_id) + "/scratches/delete/" + str(scratches[i].id)
@@ -226,39 +248,59 @@ def tab_card(request, team_id):
         team_id = int(team_id)
     except ValueError:
         return redirect_and_flash_error(request, "Invalid team id")
-    team = Team.objects.get(pk=team_id)
-    rounds = ([r for r in Round.objects.filter(gov_team=team)] +
-              [r for r in Round.objects.filter(opp_team=team)])
+    team = Team.with_preloaded_relations_for_tab_card().get(pk=team_id)
+
+    rounds = ([r for r in team.gov_team.all()] +
+              [r for r in team.opp_team.all()])
     rounds.sort(key=lambda x: x.round_number)
+
     debaters = [d for d in team.debaters.all()]
     iron_man = False
+
     if len(debaters) == 1:
         iron_man = True
+
     deb1 = debaters[0]
     if not iron_man:
         deb2 = debaters[1]
+
     round_stats = []
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
     cur_round = TabSettings.objects.get(key="cur_round").value
     blank = " "
+
     for i in range(num_rounds):
         round_stats.append([blank] * 7)
 
+    round_stats_by_round_and_debater_id = dict()
+
+    for debater in team.debaters.all():
+        for stat in debater.roundstats_set.all():
+            round_number = stat.round.round_number
+            debater_id = stat.debater.id
+
+            if round_number not in round_stats_by_round_and_debater_id:
+                round_stats_by_round_and_debater_id[round_number] = dict()
+
+            if debater_id not in round_stats_by_round_and_debater_id[round_number]:
+                round_stats_by_round_and_debater_id[round_number][debater_id] = []
+
+            round_stats_by_round_and_debater_id[round_number][debater_id].append(stat)
+
     for round_obj in rounds:
-        dstat1 = [
-            k for k in RoundStats.objects.filter(debater=deb1).filter(
-                round=round_obj).all()
-        ]
+        round_number = round_obj.round_number
+        dstat1 = []
         dstat2 = []
-        if not iron_man:
-            dstat2 = [
-                k for k in RoundStats.objects.filter(debater=deb2).filter(
-                    round=round_obj).all()
-            ]
+        if round_number in round_stats_by_round_and_debater_id:
+            dstat1 = round_stats_by_round_and_debater_id[round_number].get(deb1.id, [])
+            dstat2 = round_stats_by_round_and_debater_id[round_number].get(deb2.id, [])
+
         blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
+
         while len(dstat1) + len(dstat2) < 2:
             # Something is wrong with our data, but we don't want to crash
             dstat1.append(blank_rs)
+
         if not dstat2 and not dstat1:
             break
         if not dstat2:
@@ -267,7 +309,9 @@ def tab_card(request, team_id):
             dstat1, dstat2 = dstat2[0], dstat2[1]
         else:
             dstat1, dstat2 = dstat1[0], dstat2[0]
+
         index = round_obj.round_number - 1
+
         round_stats[index][3] = " - ".join(
             [j.name for j in round_obj.judges.all()])
         round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
@@ -381,3 +425,12 @@ def rank_teams(request):
         "novice": nov_teams,
         "title": "Team Rankings"
     })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403")
+def team_check_in(request, team_id):
+    team_id = int(team_id)
+    team = get_object_or_404(Team, pk=team_id)
+    team.checked_in = not team.checked_in
+    team.save()
+    return JsonResponse({"success": True})

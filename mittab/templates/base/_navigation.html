@@ -12,7 +12,6 @@
 {% url "enter_judge" as enter_judge %}
 {% url "view_judges" as view_judges%}
 {% url "batch_checkin" as batch_checkin %}
-{% url "batch_room_checkin" as batch_room_checkin %}
 
 {% url "enter_team" as enter_team %}
 {% url "view_teams" as view_teams%}
@@ -30,6 +29,7 @@
 {% url "confirm_start_tourny" as confirm_start_new_tourny %}
 {% url "upload_data" as upload_data %}
 {% url "manual_backup" as backup %}
+{% url "manual_backup_without_scratches" as backup_without_scratches %}
 {% url "view_backups" as view_backups %}
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
@@ -76,6 +76,7 @@
           <div class="dropdown-menu">
             <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
             <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
+            <a class="dropdown-item {%active request backup_without_scratches %}" href="{{ backup_without_scratches }}">Backup Current Without Scratches</a>
             <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
             <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
           </div>
@@ -96,8 +97,7 @@
             Admin
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Judge Checkin</a>
-            <a class=" dropdown-item {% active request batch_room_checkin %}" href="{{ batch_room_checkin }}">Batch Room Checkin</a>
+            <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Checkin</a>
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>

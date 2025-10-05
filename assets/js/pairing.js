@@ -4,6 +4,9 @@ import quickSearchInit from "./quickSearch";
 
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
+  if (!roundNumber || !$(".tabcard").length) {
+    return;
+  }
   $.ajax({
     url: `/round/${roundNumber}/stats`,
     success(result) {
@@ -52,6 +55,62 @@ function assignTeam(e) {
     },
     failure() {
       window.alert(alertMsg);
+    }
+  });
+}
+
+function assignRoom(e) {
+  e.preventDefault();
+  const $parent = $(this)
+    .parent()
+    .parent();
+  const roundId = $(e.target).attr("round-id");
+  const roomId = $(e.target).attr("room-id");
+  const curRoomId = $(e.target).attr("current-room-id");
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/assign_room/${roomId}/`;
+
+  let $buttonWrapper;
+  if (curRoomId) {
+    $buttonWrapper = $(`span[round-id=${roundId}][room-id=${curRoomId}]`);
+  }
+  const $button = $buttonWrapper.find(".btn-sm");
+  $button.addClass("disabled");
+
+  $.ajax({
+    url,
+    success(result) {
+      $button.removeClass("disabled");
+      $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.attr("room-id", result.room_id);
+      $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
+      $(`.room span[round-id=${roundId}] .room-toggle`).css(
+        "background-color",
+        result.room_color
+      );
+    }
+  });
+}
+
+function populateAlternativeRooms() {
+  const $parent = $(this).parent();
+  const roomId = $parent.attr("room-id");
+  const roundId = $parent.attr("round-id");
+  const outround = $parent.attr("outround") === "true";
+  const baseUrl = outround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}`;
+
+  $.ajax({
+    url,
+    success(result) {
+      $parent.find(".dropdown-menu").html(result);
+      $parent
+        .find(".dropdown-menu")
+        .find(".room-assign")
+        .click(assignRoom);
+      quickSearchInit($parent.find("#quick-search"));
+      $parent.find("#quick-search").focus();
     }
   });
 }
@@ -165,6 +224,62 @@ function togglePairingRelease(event) {
   });
 }
 
+function handleJudgeRemoveClick(event) {
+  event.preventDefault();
+  const roundId = $(this).attr("round-id");
+  const judgeId = $(this).attr("judge-id");
+
+  const isOutround = $(this).hasClass("outround-judge-remove");
+  const endpointPrefix = isOutround ? "outround" : "round";
+
+  function handleRemoveSuccess(response) {
+    if (response.success) {
+      window.location.reload();
+    } else {
+      alert("Failed to remove judge.");
+    }
+  }
+
+  function handleRemoveError() {
+    alert("Error removing judge.");
+  }
+
+  $.ajax({
+    url: `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+    dataType: "json",
+    success: handleRemoveSuccess,
+    error: handleRemoveError
+  });
+}
+
+function handleChairClick(event) {
+  event.preventDefault();
+  const roundId = $(this).attr("round-id");
+  const judgeId = $(this).attr("judge-id");
+
+  const isOutround = $(this).hasClass("outround-judge-chair");
+  const endpointPrefix = isOutround ? "outround" : "round";
+
+  function handleAssignSuccess(response) {
+    if (response.success) {
+      window.location.reload();
+    } else {
+      alert("Failed to assign chair.");
+    }
+  }
+
+  function handleAssignError() {
+    alert("Error assigning chair.");
+  }
+
+  $.ajax({
+    url: `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+    dataType: "json",
+    success: handleAssignSuccess,
+    error: handleAssignError
+  });
+}
+
 $(document).ready(() => {
   populateTabCards();
   $("#team_ranking").each((_, element) => {
@@ -173,9 +288,21 @@ $(document).ready(() => {
   $("#debater_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/debater/rank/");
   });
-
   $(".judge-toggle").click(populateAlternativeJudges);
   $(".team-toggle").click(populateAlternativeTeams);
+  $(".room-toggle").click(populateAlternativeRooms);
   $(".alert-link").click(alertLink);
   $(".btn.release").click(togglePairingRelease);
+
+  $(document).on(
+    "click",
+    ".judge-chair, .outround-judge-chair",
+    handleChairClick
+  );
+
+  $(document).on(
+    "click",
+    ".judge-remove, .outround-judge-remove",
+    handleJudgeRemoveClick
+  );
 });

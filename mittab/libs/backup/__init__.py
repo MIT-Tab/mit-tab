@@ -39,10 +39,11 @@ def _generate_unique_key(base):
         return base
 
 
-def backup_round(key=None, round_number=None, btime=None):
+def backup_round(key=None, round_number=None, btime=None, include_scratches=True):
     with ActiveBackupContextManager() as _:
         if round_number is None:
             round_number = TabSettings.get("cur_round", "no-round-number")
+
 
         if btime is None:
             btime = int(time.time())
@@ -51,7 +52,7 @@ def backup_round(key=None, round_number=None, btime=None):
         if key is None:
             key = "site_round_%i_%i" % (round_number, btime)
         key = _generate_unique_key(key)
-        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump()
+        BACKUP_STORAGE[key] = BACKUP_HANDLER.dump(include_scratches=include_scratches)
 
 
 def upload_backup(f):
