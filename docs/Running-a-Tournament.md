@@ -12,7 +12,7 @@ advised that you do this.
 ## Entering Results
 
 After pairing a round, you will mostly be dealing with the current round's
-pairing view located at `/pairings/status/`. This is kind of the control center
+pairing view (navigate to Pairings > View Current Pairing in the navigation menu). This is kind of the control center
 for the whole tournament, and you can change pretty much anything from this
 view.  The areas of importance are shown below:
 ![](img/result_entry_colored.png)
@@ -62,31 +62,19 @@ can be found on the judge list view and in the judge detail page.
 
 To use e-ballots:
 1. Ensure pairings are released (see "Releasing Pairings" below)
-2. Judges can access the e-ballot interface at `/e_ballots/` and enter their unique ballot code
+2. Judges can access the e-ballot interface from the public homepage and enter their unique ballot code
 3. Only the chair of a panel can submit e-ballot results
 4. E-ballots have configurable minimum and maximum speaker score limits (see Advanced Topics)
    - Default minimum: 15 (configurable via `min_eballot_speak` setting)
    - Default maximum: 35 (configurable via `max_eballot_speak` setting)
    - Scores outside these bounds require justification to tab staff
 
-This is particularly useful for:
-- Remote judging
-- Reducing paper usage
-- Faster result submission
-- Minimizing data entry errors
-
 ### Tracking Missing Ballots
 
-To see which rounds are still missing results, navigate to `/pairings/missing_ballots/`.
+To see which rounds are still missing results, navigate to missing ballots from the public homepage.
 This page shows all rounds that don't have results entered yet, helping you
 track down missing ballots quickly. This is especially useful when you're ready to pair
 the next round but waiting on a few stragglers.
-
-## Missing Ballots
-
-To see which rounds are still missing results, navigate to `/pairings/missing_ballots/`.
-This page shows all rounds that don't have results entered yet, helping you
-track down missing ballots quickly.
 
 ## Viewing Team Statistics
 
@@ -103,9 +91,7 @@ When you click on a team from the teams list, you'll see:
 - Links to view the team's tab card
 
 ### Tab Cards
-Each team has a "tab card" that shows their complete tournament record:
-- **Individual Tab Card**: View at `/team/card/<team_id>/pretty/` or click "View Tab Card" from team detail
-- **All Tab Cards**: View all team tab cards at once at `/team/all_tab_cards/` (useful for printing)
+Each team has a "tab card" that shows their complete tournament record. You can view a team's tab card by clicking "View Tab Card" from the team detail page, or view all team tab cards at once from the Backups menu in the navigation bar.
 
 Tab cards display:
 - Round-by-round results (W/L)
@@ -118,7 +104,7 @@ Tab cards display:
 (pairing-the-next-round)=
 ## Pairing the Next Round
 
-To pair a round, navigate to `/pairings/status/` and hit "Prepare Next Round".
+To pair a round, navigate to the current pairing view (Pairings > View Current Pairing in the navigation menu) and hit "Prepare Next Round".
 For any round after round 1, make sure that all results have been entered.
 After that, you should see this page:
 
@@ -140,7 +126,7 @@ assignment algorithm:
 - **Excludes wing-only judges from chair positions** (they can still be assigned as panel members)
 - Uses a maximum weight matching algorithm for optimal assignments
 
-**Manual Judge Assignment**: You can also manually assign or swap judges:
+**Manual Judge Assignment**: You can also manually assign or swap judges, this is frequently needed after the automatic assignments:
 - Click on any judge name in the pairing to see alternative options
 - Use "Set To Chair" to change who is chairing the round (for paneled rounds)
 - Use "Remove Judge" to remove a judge from a panel
@@ -152,7 +138,7 @@ assignment algorithm:
 
 After judge assignment, you can also use the "Assign Rooms" button to automatically
 assign rooms to pairings based on room rankings. Higher-seeded rounds will get better rooms
-if `enable_room_seeding` is enabled (default). 
+if the `enable_room_seeding` setting is checked (default). 
 
 You can also manually change room assignments by clicking on any room name and selecting an alternative room from the dropdown.
 
@@ -168,7 +154,7 @@ This is useful for quickly fixing pairing mistakes without having to go through 
 ### Releasing Pairings
 
 Use the "Release/Close Pairings" button to toggle whether pairings are publicly visible.
-When released, pairings can be viewed at `/pairings/status/` by anyone without authentication.
+When released, pairings can be viewed by anyone without authentication (navigate to Pairings > View Current Pairing).
 
 Afterwards, hit the "Assign Judges" button to pair judges into the rounds.
 
@@ -266,34 +252,26 @@ MIT-Tab supports public displays for teams, pairings, and results to allow compe
 
 ### Settings Form
 
-The easiest way to manage public visibility and other tournament settings is through the Settings Form, accessible at `/settings_form/` in the navigation menu under "Admin" > "Settings". This provides a user-friendly interface with descriptions for all available settings, eliminating the need to manually edit settings in the admin interface.
+The easiest way to manage public visibility and other tournament settings is through the Settings Form (accessible via Admin > Settings in the navigation menu). This provides a user-friendly interface with descriptions for all available settings, eliminating the need to manually edit settings in the admin interface.
 
 ### Public Pairings
 
-Pairings can be made publicly visible by setting `pairing_released` to 1 (use the "Release/Close Pairings" button on the pairing view). When released, the current round's pairings are accessible at `/pairings/status/` without authentication. This allows teams to view their opponents and judges.
-
-For anonymity, you can enable `use_team_codes` to display team codes instead of team names on public views. Team codes are automatically generated fun names like "Icy Firefly" that help maintain anonymity during data entry or for public display.
-
-Additionally, the `team_codes_backend` setting allows you to use team codes throughout the admin interface (backend), which is useful for maintaining complete anonymity during tabulation.
+Pairings can be made publicly visible with the "Release/Close Pairings" button on the pairing view. When released, the current round's pairings are accessible without authentication from the public homepage.
 
 ### Public Teams List
 
-The teams list can be made publicly visible by enabling `teams_public` (set to 1). This makes the teams list accessible at `/teams/` without authentication. You can control whether debater names are shown using the `debaters_public` setting.
+The teams list can be made publicly visible by checking the `teams_public` setting. This makes the teams list accessible without authentication. You can control whether debater names are shown using the `debaters_public` setting.
 
 ### Public Judges List
 
-The judges list can be made publicly visible by enabling `judges_public` (set to 1). This makes the judges list accessible at `/judges/` without authentication. The public judges list shows:
+The judges list can be made publicly visible by checking the `judges_public` setting. This makes the judges list accessible without authentication. The public judges list shows:
 - Judge names
 - School affiliations
 - Check-in status for each round
 
-Note that judges are displayed with their ballot codes in the admin interface for e-ballot use, but these codes are not visible on the public view for security reasons.
-
-The judges list can be made publicly visible by enabling `judges_public` (set to 1). This makes the judges list accessible at `/judges/` without authentication, displaying all judges and their affiliations.
-
 ## Batch Check-in
 
-MIT-Tab provides a batch check-in interface at `/batch_checkin/` that allows you to check in or out teams, judges, and rooms for multiple rounds at once. This is significantly faster than checking in entities individually and is useful for managing availability across the entire tournament.
+MIT-Tab provides a batch check-in interface (navigate to Admin > Batch Check In) that allows you to check in or out teams, judges, and rooms for multiple rounds at once. This is significantly faster than checking in entities individually and is useful for managing availability across the entire tournament.
 
 The batch check-in interface has three tabs:
 - **Team**: Check teams in or out for the entire tournament (teams are either in or out)

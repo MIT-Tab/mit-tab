@@ -31,56 +31,6 @@ similar
 **NOTE:** All data in the first row will be ignored. That row is assumed to be
 a header row.
 
-Here is the format of the .xlsx file:
-
-\* = required field
-
-### Teams (and Debaters)
-
-**NOTE:** Debaters will automatically be created from this sheet, too.
-
-```{eval-rst}
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-| Name* | School*                  | Hybrid School         | Seed              | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
-|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          |                               | (“N” or blank)          |  |
-|       | protection they take)    | whose protection they | “Free”, or empty) |                 |                         |                               |                         |  |
-|       |                          | don't take, otherwise |                   |                 |                         |                               |                         |  |
-|       |                          | leave empty)          |                   |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-|       |                          |                       |                   |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-```
-
-### Judges
-
-```{eval-rst}
-+-------+-------+-----------------------------------+
-| Name* | Rank* | Affiliated Schools (1 per column) |
-+-------+-------+-----------------------------------+
-|       |       |                                   |
-+-------+-------+-----------------------------------+
-```
-
-### Rooms
-
-```{eval-rst}
-+-------+------------------------+
-| Name* | Rank* (Decimal, 0-100) |
-+-------+------------------------+
-|       |                        |
-+-------+------------------------+
-```
-
-### Scratches
-
-```{eval-rst}
-+------------+-------------+---------------------------------+--+
-| Team Name* | Judge Name* | Scratch Type ("tab" or "team")* |  |
-+------------+-------------+---------------------------------+--+
-|            |             |                                 |  |
-+------------+-------------+---------------------------------+--+
-```
-
 (manual-data-entry)=
 ## Manual Data Entry
 
@@ -104,7 +54,7 @@ judge. **Use this for team scratches as well as multiple affiliations**
 **Note:** Judges automatically get assigned unique "ballot codes" (e.g., "wandering-tsunami", "icy-firefly") when created. These codes allow judges to submit e-ballots remotely. You can find a judge's ballot code:
 - In the judge list view (appears in parentheses after the name)
 - On the judge detail page
-- Ballot codes can be used at `/e_ballots/` for online ballot submission
+- Ballot codes can be used for online ballot submission Enter e-ballots from the mit-tab homepage under E-Ballots.
 
 ### Teams
 1. Name - Name of the team, e.g. "Yale A"
@@ -130,16 +80,6 @@ added from either the judge page or the team page at any time).
 **Note:** Teams automatically get assigned unique "team codes" (fun names like
 "Icy Firefly" or "Wandering Tsunami") that can be used for anonymous display on public views if
 enabled in settings. These codes are automatically generated and are unique to each team.
-
-### Team Codes for Anonymity
-
-MIT-Tab supports anonymous team display through automatically generated team codes:
-
-- **Automatic Generation**: Every team is automatically assigned a unique, memorable team code when created
-- **Public Display**: Enable `use_team_codes` to show codes instead of names on public pairing views
-- **Backend Anonymity**: Enable `team_codes_backend` to use codes throughout the admin interface, useful when you want complete anonymity during tabulation (e.g., blind data entry)
-- **Format**: Codes are in the format "Adjective Noun" (e.g., "Icy Firefly", "Wandering Tsunami")
-- **Finding Codes**: Team codes can be viewed in the team detail page and in the teams list view
 
 ### Debaters
 1. Name - Name of the debater, e.g. "Matt Smith".

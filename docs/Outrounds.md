@@ -23,8 +23,6 @@ MIT Tab supports automatic judge assignment for outrounds. On the pairing view, 
 The automatic judge assignment algorithm:
 - Assigns the highest-ranked judges to the highest-seeded matchups
 - Respects all scratches (both tab and team)
-- Avoids rejudging when possible (if `allow_rejudges` is not enabled)
-- Prioritizes non-wing-only judges for chair positions
 - Creates backups before assignment for easy rollback
 
 You can also manually assign judges using the dropdowns on the pairing view, which allows you to place judges very quickly if needed. When manually assigning:
@@ -32,19 +30,13 @@ You can also manually assign judges using the dropdowns on the pairing view, whi
 - You can set any judge as chair or remove them from the panel
 - Wing-only judges will still appear in manual assignment options but are marked
 
-Gov/opp assignment behavior depends on the `sidelock` TabSetting:
-- If `sidelock` is set to `1`, gov/opp assignments will respect previous matchups to ensure teams don't switch sides when facing the same opponent, and sidelock status will be indicated on the pairing card and bolded on the front-facing pairing display.
-- If `sidelock` is set to `0` (default), gov/opp will be assigned randomly, so be sure to change assignments according to whichever system your tournament has chosen to use.
-
-If the `choice` TabSetting is enabled, the pairing card will indicate which team has choice (Gov or Opp) and this will be bolded on the front-facing pairing display. You can toggle choice assignments by clicking on the choice indicator in the pairing view.
-
 Please also note the release pairings button that appears on the pairings page as normally appears.  This will toggle the visibility of that round's pairings.
 
 ## Viewing Pairings
 
 MIT-Tab supports both list and bracket views for outround pairings. If the `show_outrounds_bracket` setting is enabled, users can switch between "List View" and "Bracket View" tabs on the outround pairings page. 
 
-To enable bracket view, set `show_outrounds_bracket` to `1` in the Settings Form (Admin > Settings) or Admin Interface.
+To enable bracket view, check the `show_outrounds_bracket` setting in the Settings Form (Admin > Settings) or Admin Interface.
 
 ## Entering Results
 

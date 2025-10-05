@@ -32,8 +32,8 @@ Some tab staffs like to make judges check in every round, others take them down
 at the start.  Either way, the judge will only be paired into the round if they
 are checked into the round.
 
-The easiest way to check-in judges is via the batch check-in page ("Admin >
-Batch Judge Check In" or at `/batch_checkin/`), pictured below:
+The easiest way to check-in judges is via the batch check-in page (accessible via
+Admin > Batch Judge Check In in the navigation menu), pictured below:
 
 ![](img/judge_batch_checkin.png)
 

@@ -20,8 +20,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'MIT-Tab'
-copyright = '2019, Joey Lynch, Julia Boortz, and Ben Muschol'
-author = 'Joey Lynch, Julia Boortz, and Ben Muschol'
+copyright = '2025, Joey Lynch, Julia Boortz, Ben Muschol, and Joey Rubas'
+author = 'Joey Lynch, Julia Boortz, Ben Muschol, and Joey Rubas'
 
 # The short X.Y version
 version = ''
