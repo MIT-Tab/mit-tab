@@ -255,7 +255,10 @@ def judge_check_in(request, judge_id, round_number):
 
 
 def download_judge_codes(request):
-    codes = [f"{judge.name}: {judge.ballot_code}" for judge in Judge.objects.all()]
+    codes = [
+        f"{getattr(judge, 'name', 'Unknown')}: {getattr(judge, 'ballot_code', 'N/A')}"
+        for judge in Judge.objects.all()
+    ]
     response_content = "\n".join(codes)
     response = HttpResponse(response_content, content_type="text/plain")
     response["Content-Disposition"] = "attachment; filename=judge_codes.txt"
