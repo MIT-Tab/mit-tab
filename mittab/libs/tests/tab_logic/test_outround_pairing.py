@@ -65,6 +65,28 @@ class TestOutroundPairingLogic(TestCase):
 
             var_teams_to_break /= 2
 
+    def test_break_with_zero_novice_teams(self):
+        """Test that breaking works when nov_teams_to_break is set to 0"""
+        self.generate_checkins()
+
+        # Set novice teams to break to 0
+        TabSettings.set("nov_teams_to_break", 0)
+
+        # This should not crash
+        success, message = outround_tab_logic.perform_the_break()
+        
+        # Verify the break was successful
+        assert success is True
+        assert message == "Success!"
+        
+        # Verify no novice teams were broken
+        novice_breaking_teams = BreakingTeam.objects.filter(type_of_team=BreakingTeam.NOVICE)
+        assert novice_breaking_teams.count() == 0
+        
+        # Verify varsity teams were still broken
+        varsity_breaking_teams = BreakingTeam.objects.filter(type_of_team=BreakingTeam.VARSITY)
+        assert varsity_breaking_teams.count() > 0
+
     def test_partials(self):
         self.generate_checkins()
 
