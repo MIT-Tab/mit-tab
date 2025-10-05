@@ -553,13 +553,13 @@ def forum_post(request):
     novice_finals = finals.filter(type_of_round=1)
 
     if varsity_finals and varsity_finals[0].victor:
-        if varsity_finals[0].victor % 2 == 0:
+        if varsity_finals[0].victor % 2 == 1:
             varsity_champ = varsity_finals[0].gov_team
         else:
             varsity_champ = varsity_finals[0].opp_team
 
     if novice_finals and novice_finals[0].victor:
-        if novice_finals[0].victor % 2 == 0:
+        if novice_finals[0].victor % 2 == 1:
             novice_champ = novice_finals[0].gov_team
         else:
             novice_champ = novice_finals[0].opp_team
