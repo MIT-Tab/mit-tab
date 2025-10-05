@@ -1,6 +1,7 @@
 import random
 import time
 import datetime
+import os
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
@@ -18,8 +19,10 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
+from mittab.libs.data_export.pairings_export import export_pairings_csv
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
+from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
 
 
@@ -101,6 +104,8 @@ def assign_judges_to_pairing(request):
             backup.backup_round("round_%s_before_judge_assignment" %
                                 current_round_number)
             assign_judges.add_judges()
+        except JudgeAssignmentError as e:
+            return redirect_and_flash_error(request, str(e).replace("'", ""))
         except Exception:
             emit_current_exception()
             return redirect_and_flash_error(request,
@@ -213,19 +218,21 @@ def upload_backup(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def manual_backup(request):
+def manual_backup(request, include_scratches=True):
     try:
         cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(
             time.time())
         now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
-        backup.backup_round("manual_backup_round_{}_{}_{}".format(
-            cur_round, btime, now))
+        backup_name = f"manual_backup_round_{cur_round}_{btime}_{now}"
+        message = f"Backup created for round {cur_round} at timestamp {btime}"
+        if not include_scratches:
+            backup_name = "no_scratches_" + backup_name
+            message += " (scratches not included)"
+        backup.backup_round(backup_name, include_scratches=include_scratches)
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(request, "Error creating backup")
-    return redirect_and_flash_success(
-        request,
-        "Backup created for round {} at timestamp {}".format(cur_round, btime))
+    return redirect_and_flash_success(request, message)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -262,6 +269,31 @@ def view_round(request, round_number):
     round_pairing = tab_logic.sorted_pairings(round_number)
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
+
+    all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
+
+    if all_judges_in_round:
+        all_teams = []
+        for pairing in round_info:
+            all_teams.extend([pairing.gov_team, pairing.opp_team])
+
+        # Make single batch call instead of nested loops (fixes N+1 issue)
+        display_counts = judge_team_rejudge_counts(all_judges_in_round, all_teams)
+
+        judge_rejudge_counts = {}
+        for judge in all_judges_in_round:
+            judge_rejudge_counts[judge.id] = {}
+            for pairing in round_info:
+                total_rejudges = 0
+                if judge.id in display_counts and display_counts[judge.id]:
+                    gov_count = display_counts[judge.id].get(pairing.gov_team.id, 0)
+                    opp_count = display_counts[judge.id].get(pairing.opp_team.id, 0)
+                    total_rejudges = max(gov_count, opp_count)
+                judge_rejudge_counts[judge.id][pairing.id] = (
+                    total_rejudges if total_rejudges > 0 else None
+                )
+    else:
+        judge_rejudge_counts = {}
 
     paired_teams = [team.gov_team for team in round_pairing
                     ] + [team.opp_team for team in round_pairing]
@@ -319,25 +351,59 @@ def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
     round_number = round_obj.round_number
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
-    # All of these variables are for the convenience of the template
+    excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
+                                   .filter(checkin__round_number=round_number) \
+                                   .prefetch_related("judges")
+    included_judges = Judge.objects.filter(judges__round_number=round_number) \
+                                   .filter(checkin__round_number=round_number) \
+                                   .prefetch_related("judges")
+
+    excluded_judges_list = assign_judges.can_judge_teams(
+        excluded_judges, round_gov, round_opp)
+    included_judges_list = assign_judges.can_judge_teams(
+        included_judges, round_gov, round_opp)
+
+    current_judge_obj = None
     try:
         current_judge_id = int(judge_id)
-        current_judge_obj = Judge.objects.get(id=current_judge_id)
+        current_judge_obj = Judge.objects.prefetch_related(
+            "judges").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
-        current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
+        current_judge_id, current_judge_rank = "", ""
         current_judge_name = "No judge"
-    excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
-                                   .filter(checkin__round_number=round_number)
-    included_judges = Judge.objects.filter(judges__round_number=round_number) \
-                                   .filter(checkin__round_number=round_number)
-    excluded_judges = [(j.name, j.id, float(j.rank))
-                       for j in assign_judges.can_judge_teams(
-                           excluded_judges, round_gov, round_opp)]
-    included_judges = [(j.name, j.id, float(j.rank))
-                       for j in assign_judges.can_judge_teams(
-                           included_judges, round_gov, round_opp)]
+
+    all_judges = list(excluded_judges_list) + list(included_judges_list)
+    if current_judge_obj:
+        all_judges.append(current_judge_obj)
+
+    display_counts = judge_team_rejudge_counts(
+        all_judges, [round_gov, round_opp], exclude_round_id=round_obj.id
+    )
+
+    rejudge_display_counts = {}
+    for judge_id, judge_counts in display_counts.items():
+        if judge_counts:
+            total_rejudges = max(judge_counts.values()) + 1
+            rejudge_display_counts[judge_id] = (
+                total_rejudges if total_rejudges > 0 else None
+            )
+        else:
+            rejudge_display_counts[judge_id] = None
+
+    current_judge_rejudge_display = (
+        rejudge_display_counts.get(current_judge_obj.id) if current_judge_obj else None
+    )
+
+    excluded_judges = [
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        for j in excluded_judges_list
+    ]
+    included_judges = [
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        for j in included_judges_list
+    ]
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
@@ -356,11 +422,14 @@ def alternative_teams(request, round_id, current_team_id, position):
     return render(request, "pairing/team_dropdown.html", locals())
 
 
-def team_stats(request, round_number):
+def team_stats(request, round_number, outround=False):
     """
     Returns the tab card data for all teams in the pairings of this given round number
     """
-    pairings = tab_logic.sorted_pairings(round_number)
+    if outround:
+        pairings = tab_logic.sorted_pairings(round_number, outround=True)
+    else:
+        pairings = tab_logic.sorted_pairings(round_number)
     stats_by_team_id = {}
 
     def stats_for_team(team):
@@ -453,7 +522,7 @@ def toggle_pairing_released(request):
     return JsonResponse(data)
 
 
-def pretty_pair(request, printable=False):
+def pretty_pair(request):
     errors, byes = [], []
 
     round_number = TabSettings.get("cur_round") - 1
@@ -488,18 +557,18 @@ def pretty_pair(request, printable=False):
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    printable = printable
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     return render(request, "pairing/pairing_display.html", locals())
 
 
-def pretty_pair_print(request):
-    return pretty_pair(request, True)
+def export_pairings_csv_view(request):
+    return export_pairings_csv(is_outround=False)
 
 
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
-    rounds = Round.objects.filter(victor=Round.NONE, round_number=round_number)
+    rounds = Round.objects.prefetch_related("gov_team", "opp_team") \
+        .filter(victor=Round.NONE, round_number=round_number)
     # need to do this to not reveal brackets
 
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")

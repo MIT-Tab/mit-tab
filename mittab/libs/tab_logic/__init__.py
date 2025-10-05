@@ -360,39 +360,44 @@ def get_middle_and_non_middle_teams(all_teams):
     return middle_of_bracket, non_middle_of_bracket
 
 
-def sorted_pairings(round_number):
+def sorted_pairings(round_number, outround=False):
     """
     Helper function to get the sorted pairings for a round while minimizing the
     number of DB queries required to calculate it
     """
+    fields = [
+        "judges",
+        "judges__judges",
+        "chair",
+        "room",
+        "gov_team",
+        "opp_team",
+        "gov_team__breaking_team",
+        "gov_team__gov_team",  # poorly named relation, points to rounds as gov
+        "gov_team__opp_team",  # poorly named relation, points to rounds as gov
+        "gov_team__byes",
+        "gov_team__no_shows",
+        "gov_team__debaters__team_set",
+        "gov_team__debaters__team_set__byes",
+        "gov_team__debaters__team_set__no_shows",
+        "gov_team__debaters__roundstats_set",
+        "gov_team__debaters__roundstats_set__round",
+        "opp_team__breaking_team",
+        "opp_team__gov_team",  # poorly named relation, points to rounds as gov
+        "opp_team__opp_team",  # poorly named relation, points to rounds as gov
+        "opp_team__byes",
+        "opp_team__no_shows",
+        "opp_team__debaters__team_set",
+        "opp_team__debaters__team_set__byes",
+        "opp_team__debaters__team_set__no_shows",
+        "opp_team__debaters__roundstats_set",
+        "opp_team__debaters__roundstats_set__round",
+    ]
+    model = Outround if outround else Round
+    filter_field = "num_teams" if outround else "round_number"
+
     round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(
-            "judges",
-            "chair",
-            "room",
-            "gov_team",
-            "opp_team",
-            "gov_team__breaking_team",
-            "gov_team__gov_team",  # poorly named relation, points to rounds as gov
-            "gov_team__opp_team",  # poorly named relation, points to rounds as gov
-            "gov_team__byes",
-            "gov_team__no_shows",
-            "gov_team__debaters__team_set",
-            "gov_team__debaters__team_set__byes",
-            "gov_team__debaters__team_set__no_shows",
-            "gov_team__debaters__roundstats_set",
-            "gov_team__debaters__roundstats_set__round",
-            "opp_team__breaking_team",
-            "opp_team__gov_team",  # poorly named relation, points to rounds as gov
-            "opp_team__opp_team",  # poorly named relation, points to rounds as gov
-            "opp_team__byes",
-            "opp_team__no_shows",
-            "opp_team__debaters__team_set",
-            "opp_team__debaters__team_set__byes",
-            "opp_team__debaters__team_set__no_shows",
-            "opp_team__debaters__roundstats_set",
-            "opp_team__debaters__roundstats_set__round",
-        )
+        model.objects.filter(**{filter_field: round_number}).prefetch_related(*fields)
     )
     round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
 

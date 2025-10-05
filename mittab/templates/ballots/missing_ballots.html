@@ -4,6 +4,10 @@
 
 {% block content %}
 
+<div class="col-12 mb-3 text-left pl-3">
+  <a href="/" class="btn btn-sm btn-primary">Back to Home</a>
+</div>
+
 <div class="col-2"></div>
 <div class="col-8">
 {% if pairing_exists %}
@@ -16,7 +20,8 @@
     <li class="missing-round-item list-group-item text-lg">
       <h5>
         {{r.chair.name}}
-        <small class="text-muted">Round between {{r.gov_team.display}} and {{r.opp_team.display}}</small>
+        <small class="text-muted">Round between {{r.gov_team.display}} and {{r.opp_team.display}} 
+          <span class="text-danger">({{r.room.name}})</span></small>
       </h5>
     </li>
     {% endfor %}

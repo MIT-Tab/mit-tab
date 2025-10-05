@@ -97,14 +97,17 @@ def view_judge(request, judge_id):
                     form.cleaned_data["name"]))
     else:
         form = JudgeForm(instance=judge)
-    base_url = "/judge/" + str(judge_id) + "/"
-    scratch_url = base_url + "scratches/view/"
-    links = [(scratch_url, "Scratches for {}".format(judge.name))]
+        judging_rounds = list(Round.objects.filter(judges=judge).select_related(
+            "gov_team", "opp_team", "room"))
+    base_url = f"/judge/{judge_id}/"
+    scratch_url = f"{base_url}scratches/view/"
+    links = [(scratch_url, f"Scratches for {judge.name}")]
     return render(
-        request, "common/data_entry.html", {
+        request, "tab/judge_detail.html", {
             "form": form,
             "links": links,
-            "title": "Viewing Judge: {}".format(judge.name)
+            "judge_rounds": judging_rounds,
+            "title": f"Viewing Judge: {judge.name}"
         })
 
 

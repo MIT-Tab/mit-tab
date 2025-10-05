@@ -69,17 +69,19 @@ class TeamImporter(WorkbookImporter):
             deb1_status = Debater.NOVICE
         else:
             deb1_status = Debater.VARSITY
-
-        deb2_name = row[6]
-        deb2_status = row[7].strip().lower()
+        deb1_apda_id = row[6].strip() or -1
+        deb2_name = row[7]
+        deb2_status = row[8].strip().lower()
         if deb2_status in self.novice_values:
             deb2_status = Debater.NOVICE
         else:
             deb2_status = Debater.VARSITY
+        deb2_apda_id = row[9].strip() or -1
 
         deb1_form = DebaterForm(data={
             "name": deb1_name,
-            "novice_status": deb1_status
+            "novice_status": deb1_status,
+            "apda_id": deb1_apda_id
         })
         if deb1_form.is_valid():
             self.create(deb1_form)
@@ -91,7 +93,8 @@ class TeamImporter(WorkbookImporter):
 
         deb2_form = DebaterForm(data={
             "name": deb2_name,
-            "novice_status": deb2_status
+            "novice_status": deb2_status,
+            "apda_id": deb2_apda_id
         })
         if deb2_form.is_valid():
             self.create(deb2_form)
