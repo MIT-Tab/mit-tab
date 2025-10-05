@@ -645,7 +645,7 @@ def clear_current_round_pairing():
 
     Returns the round number that was cleared.
     """
-    current_round = TabSettings.get("cur_round") - 1 
+    current_round = TabSettings.get("cur_round") - 1
 
     if current_round < 1:
         raise ValueError("No round has been paired yet")
