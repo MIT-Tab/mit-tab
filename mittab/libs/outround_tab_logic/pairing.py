@@ -189,10 +189,14 @@ def pair(type_of_break=BreakingTeam.VARSITY):
     bracket = gen_bracket(num_teams)
 
     for pairing in bracket:
-        team_one = base_queryset.filter(effective_seed=pairing[0]).first()
-        team_two = base_queryset.filter(effective_seed=pairing[1]).first()
-
-        print(pairing)
+        team_one = base_queryset.filter(
+            effective_seed=pairing[0]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
+        team_two = base_queryset.filter(
+            effective_seed=pairing[1]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
 
         if not team_one or not team_two:
             continue

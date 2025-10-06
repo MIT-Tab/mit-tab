@@ -69,11 +69,11 @@ def pull_up_count(team):
 
 
 def num_opps(team):
-    return len(team.opp_team.all())
+    return len(team.opp_team.all()) + len(team.opp_team_outround.all())
 
 
 def num_govs(team):
-    return len(team.gov_team.all())
+    return len(team.gov_team.all()) + len(team.gov_team_outround.all())
 
 
 def had_bye(team, round_number=None):
