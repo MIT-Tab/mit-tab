@@ -1,0 +1,98 @@
+<div class="card mb-3" data-form="team">
+    <div class="card-body py-2">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-danger mb-2">{{ error }}</div>
+        {% endfor %}
+        <div class="form-row">
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <div class="card-body p-2">
+                        <h6 class="mb-2">Team Info</h6>
+                        <div class="input-group input-group-sm mb-2">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">Name</span>
+                            </div>
+                            {{ form.name }}
+                        </div>
+                        {% if form.name.errors %}
+                        <div class="text-danger small mb-2">{{ form.name.errors }}</div>
+                        {% endif %}
+                        <div class="form-check">
+                            {{ form.is_free_seed }}
+                            {{ form.is_free_seed.label_tag }}
+                            {{ form.is_free_seed.errors }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100" data-debater="first">
+                    <div class="card-body p-2">
+                        <h6 class="mb-2">First Debater</h6>
+                        {{ form.debater_one_id }}
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
+                            </div>
+                            {{ form.debater_one_name }}
+                        </div>
+                        {% if form.debater_one_name.errors %}
+                        <div class="text-danger small mb-1">{{ form.debater_one_name.errors }}</div>
+                        {% endif %}
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">School</span>
+                            </div>
+                            {{ form.debater_one_school }}
+                        </div>
+                        <small class="form-text text-muted d-block mb-1" style="font-size: 0.7rem;">Showing top 25 active schools. <a href="#" data-load-all-schools>See more</a></small>
+                        {% if form.debater_one_school.errors %}
+                        <div class="text-danger small mb-1">{{ form.debater_one_school.errors }}</div>
+                        {% endif %}
+                        <datalist id="{{ form.debater_one_name.field.widget.attrs.list }}" style="display:none;"></datalist>
+                        {{ form.debater_one_apda_id }}
+                        {{ form.debater_one_novice_status }}
+                        {{ form.debater_one_qualified }}
+                        {{ form.debater_one_school_name }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100" data-debater="second">
+                    <div class="card-body p-2">
+                        <h6 class="mb-2">Second Debater</h6>
+                        {{ form.debater_two_id }}
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
+                            </div>
+                            {{ form.debater_two_name }}
+                        </div>
+                        {% if form.debater_two_name.errors %}
+                        <div class="text-danger small mb-1">{{ form.debater_two_name.errors }}</div>
+                        {% endif %}
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">School</span>
+                            </div>
+                            {{ form.debater_two_school }}
+                        </div>
+                        <small class="form-text text-muted d-block mb-1" style="font-size: 0.7rem;">Showing top 25 active schools. <a href="#" data-load-all-schools>See more</a></small>
+                        {% if form.debater_two_school.errors %}
+                        <div class="text-danger small mb-1">{{ form.debater_two_school.errors }}</div>
+                        {% endif %}
+                        <datalist id="{{ form.debater_two_name.field.widget.attrs.list }}" style="display:none;"></datalist>
+                        {{ form.debater_two_apda_id }}
+                        {{ form.debater_two_novice_status }}
+                        {{ form.debater_two_qualified }}
+                        {{ form.debater_two_school_name }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto d-flex align-items-start pt-2">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="team">Remove</button>
+            </div>
+        </div>
+    </div>
+</div>

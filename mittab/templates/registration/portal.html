@@ -1,0 +1,194 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Tournament Registration{% endblock %}
+{% block banner %}Tournament Registration{% endblock %}
+
+{% block content %}
+{% render_bundle 'registrationPortal' %}
+<div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
+    {% if config and not config.is_open %}
+    <div class="alert alert-warning">Registration is currently closed.</div>
+    {% endif %}
+    <!-- {% if config and config.extra_information %}
+    <div class="alert alert-info">{{ config.extra_information }}</div>
+    {% endif %} -->
+    <form method="post" novalidate data-registration-form>
+        {% csrf_token %}
+        <div class="form-row mb-3">
+            <!-- School and Contact card - left half -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body py-3">
+                        <h5 class="card-title mb-3">School And Contact</h5>
+                        {% for error in registration_form.non_field_errors %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                        {% endfor %}
+                        <div class="input-group mb-2">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">School</span>
+                            </div>
+                            {{ registration_form.school }}
+                        </div>
+                        <small class="form-text text-muted d-block mb-2">Showing top 25 active schools. <a href="#" data-load-all-schools>See more schools</a></small>
+                        {% if registration_form.school.errors %}
+                        <div class="text-danger mb-2">{{ registration_form.school.errors }}</div>
+                        {% endif %}
+                        <div class="input-group mb-2">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">Email</span>
+                            </div>
+                            {{ registration_form.email }}
+                        </div>
+                        {% if registration_form.email.errors %}
+                        <div class="text-danger mb-2">{{ registration_form.email.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right half: Create forms -->
+            <div class="col-md-6">
+                <div class="row">
+                    <!-- Create New School -->
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 h-100">
+                            <h6 class="mb-2">Create New School</h6>
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Name</span>
+                                </div>
+                                <input type="text" id="new-school-name" class="form-control form-control-sm" placeholder="Enter school name">
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm btn-block" id="create-school-btn">Add School</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Create New Debater -->
+                    <div class="col-md-6">
+                        <div class="border rounded p-2 h-100">
+                            <h6 class="mb-2">Create New Debater</h6>
+                            <div class="input-group input-group-sm mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="font-size: 0.75rem;">School</span>
+                                </div>
+                                <select id="new-debater-school" class="form-control form-control-sm" data-school-select="new-debater">
+                                    <option value="">Select school</option>
+                                </select>
+                            </div>
+                            <small class="form-text text-muted d-block mb-1" style="font-size: 0.7rem;">Showing top 25 active schools. <a href="#" data-load-all-schools>See more</a></small>
+                            <div class="input-group input-group-sm mb-1">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
+                                </div>
+                                <input type="text" id="new-debater-name" class="form-control form-control-sm" placeholder="Debater name">
+                            </div>
+                            <div class="input-group input-group-sm mb-2">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="font-size: 0.75rem;">Status</span>
+                                </div>
+                                <select id="new-debater-status" class="form-control form-control-sm">
+                                    <option value="0">Varsity</option>
+                                    <option value="1">Novice</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm btn-block" id="create-debater-btn">Add Debater</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title mb-0">Teams</h5>
+                    <button type="button" class="btn btn-secondary btn-sm" data-add-form="team" disabled>Add Team</button>
+                </div>
+                <small class="text-muted d-block mb-2">Select a school above before adding teams. Team schools will be automatically populated from your registration school.</small>
+                {{ team_formset.management_form }}
+                {% if team_formset.non_form_errors %}
+                <div class="alert alert-danger mt-2">
+                    {% for error in team_formset.non_form_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="mt-2" data-formset-container="team">
+                    {% for form in team_formset.forms %}
+                        {% include "registration/_team_form.html" with form=form %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="card-title mb-0">Judges</h5>
+                    <button type="button" class="btn btn-secondary btn-sm" data-add-form="judge">Add Judge</button>
+                </div>
+                {{ judge_formset.management_form }}
+                {% if judge_formset.non_form_errors %}
+                <div class="alert alert-danger mt-2">
+                    {% for error in judge_formset.non_form_errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="mt-2" data-formset-container="judge">
+                    {% for form in judge_formset.forms %}
+                        {% include "registration/_judge_form.html" with form=form %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center mt-3">
+            <button type="submit" class="btn btn-primary">Submit Registration</button>
+            {% if summary %}
+            <span class="text-muted ml-3">Editing registration {{ summary.code }}</span>
+            {% endif %}
+        </div>
+    </form>
+    <template id="team-empty-form">
+        {% include "registration/_team_form.html" with form=team_formset.empty_form %}
+    </template>
+    <template id="judge-empty-form">
+        {% include "registration/_judge_form.html" with form=judge_formset.empty_form %}
+    </template>
+    {% if summary %}
+    <section class="mt-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Registration Saved</h5>
+                <p class="mb-2">Herokunator Code: <strong>{{ summary.code }}</strong></p>
+                <p class="mb-2">School: {{ summary.school }}</p>
+                <p class="mb-3">Email: {{ summary.email }}</p>
+                <h6>Teams</h6>
+                <div class="mb-3">
+                    {% for team in summary.teams %}
+                    <div class="border rounded p-3 mb-2">
+                        <strong>{{ team.name }}</strong>
+                        {% if team.is_free_seed %}
+                        <span class="badge badge-info ml-2">Free Seed</span>
+                        {% endif %}
+                        <ul class="mb-0">
+                            {% for debater in team.debaters %}
+                            <li>{{ debater }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                </div>
+                <h6>Judges</h6>
+                <div>
+                    {% for judge in summary.judges %}
+                    <div class="border rounded p-3 mb-2">
+                        <p class="mb-1">{{ judge.name }}{% if judge.code %} (Code: {{ judge.code }}){% endif %}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

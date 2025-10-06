@@ -11,7 +11,8 @@ module.exports = {
     main: "./assets/js/index",
     pairingDisplay: "./assets/js/pairingDisplay",
     publicDisplay: "./assets/js/publicDisplay",
-    bracket : "./assets/js/bracket",
+    bracket: "./assets/js/bracket",
+    registrationPortal: "./assets/js/registration/index",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

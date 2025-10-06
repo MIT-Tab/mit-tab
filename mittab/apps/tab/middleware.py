@@ -27,8 +27,11 @@ class Login:
         self.get_response = get_response
 
     def __call__(self, request):
-        whitelisted = (request.path in LOGIN_WHITELIST) or \
-            EBALLOT_REGEX.match(request.path)
+        whitelisted = (
+            request.path in LOGIN_WHITELIST or
+            EBALLOT_REGEX.match(request.path) or
+            request.path.startswith("/registration")
+        )
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:

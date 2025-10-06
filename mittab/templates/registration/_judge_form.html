@@ -1,0 +1,28 @@
+<div class="card mb-2" data-form="judge">
+    <div class="card-body py-2">
+        <div class="form-row align-items-center">
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="form-group col-md-5 mb-0">
+                <div class="input-group input-group-sm">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">Name</span>
+                    </div>
+                    {{ form.name }}
+                </div>
+                {{ form.name.errors }}
+            </div>
+            <div class="form-group col-md-5 mb-0">
+                <div class="input-group input-group-sm">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text">Experience</span>
+                    </div>
+                    {{ form.experience }}
+                </div>
+                {{ form.experience.errors }}
+            </div>
+            <div class="col-auto d-flex align-items-center">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="judge">Remove</button>
+            </div>
+        </div>
+    </div>
+</div>
