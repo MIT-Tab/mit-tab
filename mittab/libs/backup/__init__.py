@@ -2,9 +2,8 @@ import io
 import os
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from wsgiref.util import FileWrapper
-import pytz
 
 
 from mittab.apps.tab.models import TabSettings
@@ -151,8 +150,10 @@ def get_metadata(filename):
         # Field 4: Timestamp
         try:
             btime = int(data[3])
-            est = pytz.timezone("US/Eastern")
-            backup_time = datetime.fromtimestamp(btime, tz=pytz.UTC).astimezone(est)
+            # US/Eastern is UTC-5 (EST) or UTC-4 (EDT)
+            # Using a fixed UTC-5 offset for simplicity
+            est = timezone(timedelta(hours=-5))
+            backup_time = datetime.fromtimestamp(btime, tz=timezone.utc).astimezone(est)
             current_time = datetime.now(est)
 
             backup_date = backup_time.date()
