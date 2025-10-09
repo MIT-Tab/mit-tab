@@ -58,7 +58,6 @@ def _name_backup(btype=None, round_number=None, btime=None,
     if round_number is None:
         round_number = TabSettings.get("cur_round", "no-round-number")
     else:
-        # Convert round_number to string to support both int and string inputs
         round_number = str(round_number)
 
     if btime is None:
