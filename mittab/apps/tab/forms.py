@@ -507,15 +507,25 @@ class SettingsForm(forms.Form):
         super(SettingsForm, self).__init__(*args, **kwargs)
 
         for setting in self.settings:
-            if "type" in setting and setting["type"] == "boolean":
-                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
+            field_name = "setting_%s" % (setting["name"],)
+            if setting.get("type") == "boolean":
+                self.fields[field_name] = forms.BooleanField(
                     label=setting["name"],
                     help_text=setting["description"],
                     initial=setting["value"],
                     required=False
                 )
+            elif setting.get("type") == "choice":
+                choices = [(c[0], c[1]) for c in setting.get("choices", [])]
+                self.fields[field_name] = forms.TypedChoiceField(
+                    label=setting["name"],
+                    help_text=setting["description"],
+                    choices=choices,
+                    initial=setting["value"],
+                    coerce=int
+                )
             else:
-                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
+                self.fields[field_name] = forms.IntegerField(
                     label=setting["name"],
                     help_text=setting["description"],
                     initial=setting["value"]

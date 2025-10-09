@@ -45,6 +45,9 @@ urlpatterns = [
             name="judge_check_in"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
+    path("download_judge_codes/",
+         judge_views.download_judge_codes,
+         name="download_judge_codes"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),

@@ -1,17 +1,19 @@
-Welcome to the MIT-Tab Docs!
-============================
+# Welcome to the MIT-Tab Docs!
 
 Looking to learn how to run a tournament? Check out the sidebar for a structured guide to using mit-tab
 
 If you have any other questions, contact Ben Muschol at muschol.b@husky.neu.edu
 
-Contents
---------
+## Contents
 
-* [Setting Up Your Server](Setting-up-your-server.md)
-* [MIT-Tab Tab Policy](Tab-Policy.md)
-* [Adding Teams, Rooms, Judges, and Debaters](Adding-Teams,-Judges,-Rooms-and-Debaters.md)
-* [Before Round 1](Before-Round-1.md)
-* [During the Tournament](Running-a-Tournament.md)
-* [Outrounds](Outrounds.md)
-* [Advanced topics](Advanced-Topics.md)
+```{toctree}
+:maxdepth: 2
+
+Setting-up-your-server
+Tab-Policy
+Adding-Teams,-Judges,-Rooms-and-Debaters
+Before-Round-1
+Running-a-Tournament
+Outrounds
+Advanced-Topics
+```
