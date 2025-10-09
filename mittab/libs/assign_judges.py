@@ -239,7 +239,7 @@ def calc_weight(judge_i, pairing_i, mode=JudgePairingMode.DEFAULT):
 def judge_conflict(judge, team1, team2, allow_rejudges=None):
     if allow_rejudges is None:
         allow_rejudges = TabSettings.get("allow_rejudges", False)
-    
+
     has_scratches = any(
         s.team_id in (team1.id, team2.id)
         for s in judge.scratches.all()
