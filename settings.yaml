@@ -82,3 +82,19 @@
   name: rejudge_penalty
   description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
   value: 100
+- outround_judge_pairing_mode:
+  name: outs_judge_pairing_mode
+  description: "Choose the outround judge pairing method. 'Straight' assigns judges in order from highest ranked to lowest ranked. 'Snake Draft' assigns judges in a snake draft order, where the first panelist is assigned normally, then the second panelist is assigned in reverse order, and so on."
+  value: 0
+  type: choice
+  choices:
+    - [0, "Snake Draft"]
+    - [1, "Straight"]
+- outs_round_priority:
+  name: outs_round_priority
+  description: "Choose which outround is prioritized when assigning judges. Top of bracket assigns the best panel to the round highest in the bracket (i.e. 1 seed vs 8 seed). Middle of bracket assigns the best panel to the closest seeded rounds in the middle of the bracket (i.e. 4 seed vs 5 seed)."
+  value: 0
+  type: choice
+  choices:
+    - [0, "Top of Bracket"]
+    - [1, "Middle of Bracket"]

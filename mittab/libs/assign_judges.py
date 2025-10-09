@@ -7,6 +7,15 @@ class JudgePairingMode:
     DEFAULT = 0
     CLASSIC = 1
 
+class OutsJudgePairingMode:
+    SnakeDraft = 0
+    Straight = 1
+
+class OutsRoundPriorityMode:
+    TopOfBracket = 0
+    MiddleOfBracket = 1
+    
+
 def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
     if mode == JudgePairingMode.CLASSIC:
         return list(range(len(judges)))
@@ -122,6 +131,9 @@ def add_judges():
 def add_outround_judges(round_type=Outround.VARSITY):
     num_teams = Outround.objects.filter(type_of_round=round_type
                                         ).aggregate(Min("num_teams"))["num_teams__min"]
+    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
+    outround_judge_mode = TabSettings.get("outs_judge_pairing_mode", OutsJudgePairingMode.SnakeDraft)
+    outround_round_mode = TabSettings.get("outs_round_priority", OutsRoundPriorityMode.TopOfBracket)
 
     # First clear any existing judge assignments
     Outround.judges.through.objects.filter(
@@ -149,11 +161,16 @@ def add_outround_judges(round_type=Outround.VARSITY):
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
     judge_scores = construct_judge_scores(judges)
 
-    # Sorting done by higest position in bracket
-    pairings.sort(
-        key=lambda x: min(x.gov_team.breaking_team.effective_seed,
-                          x.opp_team.breaking_team.effective_seed), reverse=True
-    )
+    if outround_round_mode == OutsRoundPriorityMode.TopOfBracket:
+        pairings.sort(
+            key=lambda x: min(x.gov_team.breaking_team.effective_seed,
+                            x.opp_team.breaking_team.effective_seed)
+        )
+    else:
+        pairings.sort(
+            key=lambda x: max(x.gov_team.breaking_team.effective_seed, 
+                            x.opp_team.breaking_team.effective_seed)
+        )
 
     num_rounds = len(pairings)
     judge_round_joins = []
@@ -166,20 +183,23 @@ def add_outround_judges(round_type=Outround.VARSITY):
     # Create a working copy of judges for assignment
     available_judges = judges.copy()
 
-    mode = TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT)
-    graph_edges = []
-    for judge_i, judge in enumerate(available_judges):
-        for pairing_i, pairing in enumerate(pairings):
-            if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, True):
-                weight = calc_weight(judge_scores[judge_i], pairing_i, mode)
-                edge = (
-                    pairing_i,
-                    num_rounds + judge_i,
-                    weight,
-                )
-                graph_edges.append(edge)
+
     # Iterate once for each member of the panel
     for panel_member in range(panel_size):
+        graph_edges = []
+        for judge_i, judge in enumerate(available_judges):
+            for pairing_i, pairing in enumerate(pairings):
+                if not judge_conflict(judge, pairing.gov_team, pairing.opp_team, True):
+                    effective_pairing_i = pairing_i
+                    if outround_judge_mode == OutsJudgePairingMode.SnakeDraft and panel_member % 2 == 1:
+                        effective_pairing_i = num_rounds - 1 - pairing_i
+                    weight = calc_weight(judge_scores[judge_i], effective_pairing_i, mode)
+                    edge = (
+                        pairing_i,
+                        num_rounds + judge_i,
+                        weight,
+                    )
+                    graph_edges.append(edge)
         judge_assignments = mwmatching.maxWeightMatching(graph_edges,
                                                          maxcardinality=True)
 
@@ -216,8 +236,9 @@ def add_outround_judges(round_type=Outround.VARSITY):
                                                              outround=round_obj))
             judges_to_remove.append(padded_judge_i)
 
-        #Remove edges for already assigned judges rather than re-calculating weights
-        graph_edges = [edge for edge in graph_edges if edge[1] not in judges_to_remove]
+        # Remove assigned judges from available pool
+        available_judges = [j for i, j in enumerate(available_judges) 
+                           if num_rounds + i not in judges_to_remove]
 
     # Save the judges to the pairings
     Outround.objects.bulk_update(pairings, ["chair"])
