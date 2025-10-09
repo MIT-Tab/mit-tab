@@ -100,97 +100,42 @@ def get_backup_content(key):
     return BACKUP_STORAGE[key]
 
 def get_metadata(filename):
-    """
-    Dynamically process backup filename fields to extract metadata.
-    Returns list: [filename, name, type, round_num, timestamp, scratches]
-    Gracefully handles corrupted or incomplete filenames without raising exceptions.
-    """
-    # Default values if parsing fails
-    default_metadata = [
-        filename,      # 0: key/filename
-        "Unknown",     # 1: name
-        "Unknown",     # 2: type
-        "Unknown",     # 3: round_num
-        "Unknown",     # 4: timestamp
-        "Unknown"      # 5: scratches
-    ]
-
+    data = filename.split("_")
+    defaults = [filename, "Unknown", "Unknown", "Unknown", "Unknown", "Unknown"]
+    
+    if len(data) < 4:
+        return defaults
+    
+    name = data[0] if len(data) > 0 else "Unknown"
+    
     try:
-        data = filename.split("_")
-
-        # We need at least 4 parts for a valid backup (name, btype, round, time)
-        if len(data) < 4:
-            return default_metadata
-
-        # Process each field individually with error handling
-        metadata = [filename]  # Start with the filename
-
-        # Field 1: Name (always use if available)
-        try:
-            metadata.append(data[0])
-        except (IndexError, Exception):
-            metadata.append("Unknown")
-
-        # Field 2: Backup type
-        try:
-            btype = int(data[1])
-            if 0 <= btype < len(TYPE_CHOICES):
-                metadata.append(TYPE_CHOICES[btype][1])
-            else:
-                metadata.append("Unknown Type")
-        except (ValueError, IndexError, Exception):
-            metadata.append("Unknown")
-
-        # Field 3: Round number
-        try:
-            metadata.append(str(data[2]))
-        except (IndexError, Exception):
-            metadata.append("Unknown")
-
-        # Field 4: Timestamp
-        try:
-            btime = int(data[3])
-            # US/Eastern is UTC-5 (EST) or UTC-4 (EDT)
-            # Using a fixed UTC-5 offset for simplicity
-            est = timezone(timedelta(hours=-5))
-            backup_time = datetime.fromtimestamp(btime, tz=timezone.utc).astimezone(est)
-            current_time = datetime.now(est)
-
-            backup_date = backup_time.date()
-            current_date = current_time.date()
-
-            if backup_date == current_date:
-                formatted_time = f"Today at {backup_time.strftime('%I:%M %p')}"
-            elif (current_date - backup_date).days == 1:
-                formatted_time = f"Yesterday at {backup_time.strftime('%I:%M %p')}"
-            else:
-                formatted_time = backup_time.strftime("%b %d at %I:%M %p")
-
-            metadata.append(formatted_time)
-        except (ValueError, IndexError, OSError, Exception):
-            metadata.append("Unknown")
-
-        # Field 5: Scratches flag (optional, only in newer backups)
-        try:
-            if len(data) >= 5:
-                scratches_flag = data[4]
-                if scratches_flag == "1":
-                    metadata.append("Yes")
-                elif scratches_flag == "0":
-                    metadata.append("No")
-                else:
-                    metadata.append("Unknown")
-            else:
-                # Legacy format without scratches flag
-                metadata.append("Unknown")
-        except (IndexError, Exception):
-            metadata.append("Unknown")
-
-        return metadata
-
-    except Exception:
-        # Catch-all for any unexpected errors - return defaults
-        return default_metadata
+        btype = int(data[1])
+        backup_type = TYPE_CHOICES[btype][1] if 0 <= btype < len(TYPE_CHOICES) else "Unknown"
+    except (ValueError, IndexError):
+        backup_type = "Unknown"
+    
+    round_num = str(data[2]) if len(data) > 2 else "Unknown"
+    
+    try:
+        est = timezone(timedelta(hours=-5))
+        backup_time = datetime.fromtimestamp(int(data[3]), tz=timezone.utc).astimezone(est)
+        days_ago = (datetime.now(est).date() - backup_time.date()).days
+        
+        if days_ago == 0:
+            timestamp = f"Today at {backup_time.strftime('%I:%M %p')}"
+        elif days_ago == 1:
+            timestamp = f"Yesterday at {backup_time.strftime('%I:%M %p')}"
+        else:
+            timestamp = backup_time.strftime("%b %d at %I:%M %p")
+    except (ValueError, IndexError, OSError):
+        timestamp = "Unknown"
+    
+    if len(data) >= 5 and data[4] in ("0", "1"):
+        scratches = "Yes" if data[4] == "1" else "No"
+    else:
+        scratches = "Unknown"
+    
+    return [filename, name, backup_type, round_num, timestamp, scratches]
 
 def list_backups():
     print("Checking backups directory")
