@@ -35,8 +35,7 @@ def pair_round(request):
         # We should pair the round
         try:
             TabSettings.set("pairing_released", 0)
-            backup.backup_round(
-                btype=backup.BEFORE_PAIRING)
+            backup.backup_round(btype=backup.BEFORE_PAIRING)
 
             with transaction.atomic():
                 tab_logic.pair_round()
@@ -103,8 +102,7 @@ def assign_judges_to_pairing(request):
         try:
             backup.backup_round(
                 round_number=current_round_number,
-                btype=backup.BEFORE_JUDGE_ASSIGN
-                )
+                btype=backup.BEFORE_JUDGE_ASSIGN)
             assign_judges.add_judges()
         except JudgeAssignmentError as e:
             return redirect_and_flash_error(request, str(e).replace("'", ""))
@@ -122,8 +120,7 @@ def assign_rooms_to_pairing(request):
         try:
             backup.backup_round(
                 round_number=current_round_number,
-                btype=backup.BEFORE_ROOM_ASSIGN
-            )
+                btype=backup.BEFORE_ROOM_ASSIGN)
             assign_rooms.add_rooms()
         except Exception:
             emit_current_exception()
@@ -213,39 +210,54 @@ def upload_backup(request):
             return redirect_and_flash_success(
                 request, "Backup {} uploaded successfully".format(
                     request.FILES["file"].name),
-                path="/view_backups/")
+                path="/pairing/view_backups/")
         else:
             return redirect_and_flash_error(
                 request, "Error uploading backup",
-                path="/view_backups/")
-    return redirect("/view_backups/")
+                path="/pairing/view_backups/")
+    return redirect("/pairing/view_backups/")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def manual_backup(request):
-    if request.method == "POST":
-        form = BackupForm(request.POST)
-        if form.is_valid():
-            backup_name = form.cleaned_data["backup_name"]
-            include_scratches = form.cleaned_data["include_scratches"]
-        try:
+    if request.method != "POST":
+        return redirect("view_backups")
 
-            backup.backup_round(
-                name=backup_name,
-                btype=backup.MANUAL,
-                include_scratches=include_scratches
-            )
+    form = BackupForm(request.POST)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Error creating backup: invalid submission.",
+            path="/pairing/view_backups/"
+        )
 
-            cur_round = TabSettings.objects.get(key="cur_round").value
-            now = datetime.datetime.now().strftime("%Y-%m-%d_%I:%M")
-            return redirect_and_flash_success(request,
-                                              f"Backup {backup_name} created \
-                                                for round {cur_round} at {now}")
-        except Exception:
-            emit_current_exception()
-            return redirect_and_flash_error(request, "Error creating backup")
+    backup_name = form.cleaned_data["backup_name"]
+    include_scratches = form.cleaned_data["include_scratches"]
 
-    return redirect("view_backups")
+    try:
+        backup.backup_round(
+            name=backup_name,
+            btype=backup.MANUAL,
+            include_scratches=include_scratches
+        )
+    except Exception:
+        emit_current_exception()
+        return redirect_and_flash_error(
+            request,
+            "Error creating backup",
+            path="/pairing/view_backups/"
+        )
+
+    cur_round = TabSettings.objects.get(key="cur_round").value
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    message = (
+        f"Backup {backup_name} created for round {cur_round} at {timestamp}"
+    )
+    return redirect_and_flash_success(
+        request,
+        message,
+        path="/pairing/view_backups/"
+    )
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -269,14 +281,19 @@ def view_backups(request):
     # Define table headers (all sortable)
     headers = ["Name", "Type", "Round", "Timestamp", "Scratches"]
 
+    filters = [
+        {"id": "type", "label": "Type", "options": types},
+        {"id": "round", "label": "Round", "options": rounds},
+        {"id": "scratches", "label": "Scratches", "options": ["Yes", "No", "Unknown"]},
+    ]
+
     return render(request, "tab/backup_list.html", {
         "backups": backups,
         "create_form": create_form,
         "upload_form": upload_form,
         "headers": headers,
         "title": "Backup List",
-        "filter_types": types,
-        "filter_rounds": rounds
+        "filters": filters,
     })
 
 

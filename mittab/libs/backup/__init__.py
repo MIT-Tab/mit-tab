@@ -16,7 +16,7 @@ ACTIVE_BACKUP_KEY = "MITTAB_ACTIVE_BACKUP"
 ACTIVE_BACKUP_VAL = "1"
 
 MANUAL = 0
-INITAL = 1
+INITIAL = 1
 BEFORE_NEW_TOURNAMENT = 2
 BEFORE_JUDGE_ASSIGN = 3
 BEFORE_PAIRING = 4
@@ -26,7 +26,7 @@ UPLOAD = 7
 OTHER = 8
 TYPE_CHOICES = (
     (MANUAL, "Manual"),
-    (INITAL, "Inital"),
+    (INITIAL, "Initial"),
     (BEFORE_NEW_TOURNAMENT, "Before New Tournament"),
     (BEFORE_JUDGE_ASSIGN, "Before Judge Assign"),
     (BEFORE_PAIRING, "Before Pairing"),
@@ -70,7 +70,10 @@ def _name_backup(btype=None, round_number=None, btime=None,
     if name is None:
         name = f"{TYPE_CHOICES[btype][1]} Round {round_number}"
 
-    scratches_flag = "1" if include_scratches else "0"
+    if include_scratches in ("Unknown", None):
+        scratches_flag = "U"
+    else:
+        scratches_flag = "1" if include_scratches else "0"
     return f"{name}_{btype}_{round_number}_{btime}_{scratches_flag}"
 
 def backup_round(btype=None, round_number=None, btime=None,
@@ -102,25 +105,27 @@ def get_backup_content(key):
 def get_metadata(filename):
     data = filename.split("_")
     defaults = [filename, "Unknown", "Unknown", "Unknown", "Unknown", "Unknown"]
-    
+
     if len(data) < 4:
         return defaults
-    
-    name = data[0] if len(data) > 0 else "Unknown"
-    
+
+    name = data[0] if data else filename
+
     try:
         btype = int(data[1])
-        backup_type = TYPE_CHOICES[btype][1] if 0 <= btype < len(TYPE_CHOICES) else "Unknown"
+        type_exists = 0 <= btype < len(TYPE_CHOICES)
+        backup_type = TYPE_CHOICES[btype][1] if type_exists else "Unknown"
     except (ValueError, IndexError):
         backup_type = "Unknown"
-    
+
     round_num = str(data[2]) if len(data) > 2 else "Unknown"
-    
+
     try:
         est = timezone(timedelta(hours=-5))
-        backup_time = datetime.fromtimestamp(int(data[3]), tz=timezone.utc).astimezone(est)
+        backup_time = datetime.fromtimestamp(int(data[3]),
+                                             tz=timezone.utc).astimezone(est)
         days_ago = (datetime.now(est).date() - backup_time.date()).days
-        
+
         if days_ago == 0:
             timestamp = f"Today at {backup_time.strftime('%I:%M %p')}"
         elif days_ago == 1:
@@ -129,21 +134,20 @@ def get_metadata(filename):
             timestamp = backup_time.strftime("%b %d at %I:%M %p")
     except (ValueError, IndexError, OSError):
         timestamp = "Unknown"
-    
-    if len(data) >= 5 and data[4] in ("0", "1"):
-        scratches = "Yes" if data[4] == "1" else "No"
+
+    scratches_code = data[4] if len(data) >= 5 else None
+    if scratches_code == "1":
+        scratches = "Yes"
+    elif scratches_code == "0":
+        scratches = "No"
     else:
         scratches = "Unknown"
-    
+
     return [filename, name, backup_type, round_num, timestamp, scratches]
 
 def list_backups():
     print("Checking backups directory")
-    keys = BACKUP_STORAGE.keys()
-    metadata = []
-    for key in keys:
-        metadata.append(get_metadata(key))
-    return metadata
+    return [get_metadata(key) for key in BACKUP_STORAGE.keys()]
 
 
 def restore_from_backup(key):
