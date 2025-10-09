@@ -719,6 +719,13 @@ class BackupForm(forms.Form):
             attrs={"class": "form-check-input"}
         )
     )
+    include_judge_scores = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        )
+    )
 
     def clean_backup_name(self):
         backup_name = self.cleaned_data["backup_name"]

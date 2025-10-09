@@ -228,12 +228,14 @@ def manual_backup(request):
         if form.is_valid():
             backup_name = form.cleaned_data["backup_name"]
             include_scratches = form.cleaned_data["include_scratches"]
+            include_judge_scores = form.cleaned_data["include_judge_scores"]
         try:
 
             backup.backup_round(
                 name=backup_name,
                 btype=backup.MANUAL,
-                include_scratches=include_scratches
+                include_scratches=include_scratches,
+                include_judge_scores=include_judge_scores
             )
 
             cur_round = TabSettings.objects.get(key="cur_round").value

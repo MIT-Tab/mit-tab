@@ -1,4 +1,8 @@
 import subprocess
+import re
+from decimal import Decimal
+from django.db import transaction
+from mittab.apps.tab.models import Judge
 
 from mittab import settings
 
@@ -12,9 +16,40 @@ DB_PORT = DB_SETTINGS["PORT"]
 
 class MysqlDumpRestorer:
 
-    def dump(self, include_scratches=True):
-        return subprocess.check_output(self._dump_cmd(
-            include_scratches=include_scratches))
+    def dump(self, include_scratches=True, include_judge_scores=True):
+        # If we need to anonymize judge ranks, do it at the ORM level before dumping
+        if not include_judge_scores:
+            return self._dump_with_anonymized_judge_ranks(include_scratches)
+        else:
+            return subprocess.check_output(self._dump_cmd(
+                include_scratches=include_scratches))
+    
+    def _dump_with_anonymized_judge_ranks(self, include_scratches=True):
+        """
+        Create a backup with judge ranks set to 99.00 using Django ORM.
+        Uses a transaction that gets rolled back to restore original values automatically.
+        """
+        try:
+            with transaction.atomic():
+                # Set all judge ranks to 99
+                for judge in Judge.objects.all():
+                    judge.rank = Decimal('99.00')
+                    judge.save()
+                
+                # Create the backup with anonymized judge ranks
+                dump_output = subprocess.check_output(self._dump_cmd(
+                    include_scratches=include_scratches))
+                
+                # Force rollback to restore original judge ranks
+                raise Exception("Intentional rollback to restore original ranks")
+                
+        except Exception as e:
+            # The transaction rollback restores the original judge ranks
+            # But we still have the dump with anonymized ranks
+            if "Intentional rollback" not in str(e):
+                raise
+        
+        return dump_output
 
     def restore(self, content):
         """

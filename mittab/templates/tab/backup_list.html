@@ -36,9 +36,13 @@
                                 <div class="form-group">
                                     <input type="text" name="backup_name" id="backup_name" class="form-control form-control-sm" pattern="[^_]*" title="Underscores are not allowed." placeholder="Backup name" required>
                                 </div>
-                                <div class="custom-control custom-checkbox mb-3">
+                                <div class="custom-control custom-checkbox mb-2">
                                     <input type="checkbox" name="include_scratches" id="include_scratches" class="custom-control-input" checked>
                                     <label class="custom-control-label small" for="include_scratches">Include scratches</label>
+                                </div>
+                                <div class="custom-control custom-checkbox mb-3">
+                                    <input type="checkbox" name="include_judge_scores" id="include_judge_scores" class="custom-control-input" checked>
+                                    <label class="custom-control-label small" for="include_judge_scores">Include judge scores</label>
                                 </div>
                                 <button type="submit" class="btn btn-sm btn-primary btn-block">
                                     <i class="fas fa-save mr-1"></i>Create

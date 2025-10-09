@@ -75,13 +75,15 @@ def _name_backup(btype=None, round_number=None, btime=None,
     return f"{name}_{btype}_{round_number}_{btime}_{scratches_flag}"
 
 def backup_round(btype=None, round_number=None, btime=None,
-                 name=None, include_scratches=True):
+                 name=None, include_scratches=True, include_judge_scores=True):
     filename = _name_backup(btype, round_number, btime,
                             include_scratches, name)
     with ActiveBackupContextManager() as _:
         print("Trying to backup to backups directory")
-        BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump(include_scratches=
-                                                       include_scratches)
+        BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump(
+            include_scratches=include_scratches,
+            include_judge_scores=include_judge_scores
+        )
 
 def upload_backup(f):
     filename = _name_backup(
