@@ -318,30 +318,35 @@ def view_scratches(request):
         })
 
 
+def _apply_saved_setting_value(setting):
+    lookup_keys = [setting.get("name")]
+    legacy_names = setting.get("legacy_names", [])
+
+    if legacy_names:
+        if isinstance(legacy_names, (list, tuple)):
+            lookup_keys.extend(legacy_names)
+        else:
+            lookup_keys.append(legacy_names)
+
+    for key in filter(None, lookup_keys):
+        tab_setting = TabSettings.objects.filter(key=key).first()
+        if tab_setting:
+            stored_value = tab_setting.value
+            if setting.get("type") == "boolean":
+                setting["value"] = stored_value == 1
+            else:
+                setting["value"] = stored_value
+            break
+
+
 def get_settings_from_yaml():
-    settings_dir = os.path.join(settings.BASE_DIR, "settings")
+    with open(settings.SETTING_YAML_PATH, "r", encoding="utf-8") as stream:
+        default_settings = yaml.safe_load(stream)
 
-    if os.path.exists(settings_dir):
-        return get_categorized_settings_from_yaml()
-    else:
-        default_settings = []
-        with open(settings.SETTING_YAML_PATH, "r") as stream:
-            default_settings = yaml.safe_load(stream)
+    for setting in default_settings:
+        _apply_saved_setting_value(setting)
 
-        to_return = []
-
-        for setting in default_settings:
-            tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
-
-            if tab_setting:
-                if setting.get("type") == "boolean":
-                    setting["value"] = tab_setting.value == 1
-                else:
-                    setting["value"] = tab_setting.value
-
-            to_return.append(setting)
-
-        return to_return
+    return default_settings
 
 def get_categorized_settings_from_yaml():
 
@@ -351,37 +356,30 @@ def get_categorized_settings_from_yaml():
     settings_by_category = {}
     categories = []
 
-    for filename in os.listdir(settings_dir):
-        if filename.endswith(".yaml"):
-            yaml_file = os.path.join(settings_dir, filename)
+    for filename in sorted(os.listdir(settings_dir)):
+        if not filename.endswith(".yaml"):
+            continue
 
-            with open(yaml_file, "r", encoding="utf-8") as stream:
-                data = yaml.safe_load(stream)
+        yaml_file = os.path.join(settings_dir, filename)
 
-            if not data or "category" not in data or "settings" not in data:
-                continue
+        with open(yaml_file, "r", encoding="utf-8") as stream:
+            data = yaml.safe_load(stream)
 
-            category_info = data["category"]
-            category_settings = data["settings"]
+        if not data or "category" not in data or "settings" not in data:
+            continue
 
-            category_id = category_info.get("id", filename[:-5])
+        category_info = data["category"]
+        category_settings = data["settings"]
 
-            categories.append(category_info)
-            settings_by_category[category_id] = []
+        category_id = category_info.get("id", filename[:-5])
 
-            for setting in category_settings:
-                tab_setting = TabSettings.objects.filter(
-                    key=setting["name"]
-                ).first()
+        categories.append(category_info)
+        settings_by_category[category_id] = []
 
-                if tab_setting:
-                    if setting.get("type") == "boolean":
-                        setting["value"] = tab_setting.value == 1
-                    else:
-                        setting["value"] = tab_setting.value
-
-                all_settings.append(setting)
-                settings_by_category[category_id].append(setting["name"])
+        for setting in category_settings:
+            _apply_saved_setting_value(setting)
+            all_settings.append(setting)
+            settings_by_category[category_id].append(setting["name"])
 
     categories.sort(key=lambda x: x.get("order", 999))
 

@@ -199,6 +199,8 @@ def outround_pairing_view(request,
                         type_of_round=BreakingTeam.VARSITY,
                         num_teams=num_teams)
 
+    num_teams = int(num_teams)
+
     pairing_released = False
 
     if type_of_round == BreakingTeam.VARSITY:
@@ -229,9 +231,12 @@ def outround_pairing_view(request,
 
     ratio = get_varsity_to_novice_ratio()
 
-    other_round_num = num_teams / ratio
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * ratio
+    else:
+        other_round_num = num_teams // ratio
+
+    other_round_num = int(other_round_num)
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -329,9 +334,12 @@ def alternative_judges(request, round_id, judge_id=None):
 
     ratio = get_varsity_to_novice_ratio()
 
-    other_round_num = round_obj.num_teams / ratio
     if round_obj.type_of_round == BreakingTeam.NOVICE:
         other_round_num = round_obj.num_teams * ratio
+    else:
+        other_round_num = round_obj.num_teams // ratio
+
+    other_round_num = int(other_round_num)
 
     other_round_type = BreakingTeam.NOVICE \
         if round_obj.type_of_round == BreakingTeam.VARSITY \
@@ -566,7 +574,10 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
+    show_outrounds_bracket = TabSettings.get(
+        "show_outrounds_bracket",
+        TabSettings.get("show_outs_bracket", False)
+    )
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)

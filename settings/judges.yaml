@@ -5,7 +5,7 @@ category:
   order: 2
 
 settings:
-  - disable_room_seeding:
+  - enable_room_seeding:
     name: enable_room_seeding
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
     value: true
@@ -25,7 +25,7 @@ settings:
     value: 15
   - judge_pairing_mode:
     name: judge_pairing_mode
-    description: "Choose the judge pairing method. 'Default' assigns top judges to the highest-ranked rounds. 'Classic' uses the traditional weighting used from 2019-September 2025." 
+    description: "Choose the judge pairing method. 'Default' assigns top judges to the highest-ranked rounds. 'Classic' uses the traditional weighting used from 2019-September 2025."
     value: 0
     type: choice
     choices:

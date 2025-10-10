@@ -12,11 +12,11 @@ All teams have a `break_preference` field which determines which break they'd pr
 
 It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_size` TabSettings for more information.  It will let you pair if you don't have enough judges, but it will warn you.
 
-The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `var_to_nov` variable.  If you would like varsity octafinals to happen at the same time as novice quarterfinals, this value should be `2` as the quotient of number of teams in varsity break rounds to the simultaneous novice break round is 2.  If they are happening at the same time, the value should be `1`, if they are octafinals at the same time as semifinals, then it should be 4, etc.
+The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is `novice_outrounds_start_at`.  Choose the varsity bracket size that runs at the same time as the first novice outround (for instance, pick `16` if novice semifinals happen while varsity octafinals run).  MIT Tab combines that value with `nov_teams_to_break` to keep schedules aligned and resources from overlapping.  Existing tournaments that still rely on the legacy `var_to_nov` offset will continue to work, but moving to the new dropdown is recommended.
 
 ## Managing Pairings
 
-MIT Tab supports automatic judge assignment for outrounds. On the pairing view, you can click the "Assign Judges" button to automatically assign judges to rounds based on their rankings and scratches (assuming you have set `var_to_nov` correctly - see above - AND all scratches are entered). This will respect panel sizes as configured in `var_panel_size` and `nov_panel_size`.
+MIT Tab supports automatic judge assignment for outrounds. On the pairing view, you can click the "Assign Judges" button to automatically assign judges to rounds based on their rankings and scratches (assuming you have set `novice_outrounds_start_at` correctly - see above - AND all scratches are entered). This will respect panel sizes as configured in `var_panel_size` and `nov_panel_size`.
 
 **Important**: Wing-only judges (judges with the "Wing Only" checkbox enabled) will be automatically excluded from chair assignments. They can still be assigned as panel members but will never be selected as the chair during automatic assignment.
 

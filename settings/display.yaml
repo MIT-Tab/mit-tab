@@ -21,7 +21,9 @@ settings:
     value: false
     type: boolean
   - show_outrounds_bracket:
-    name: show_outs_bracket
+    name: show_outrounds_bracket
+    legacy_names:
+      - show_outs_bracket
     description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
     value: false
     type: boolean

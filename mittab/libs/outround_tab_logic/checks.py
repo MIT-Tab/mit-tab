@@ -34,9 +34,12 @@ def have_enough_judges_type(type_of_round):
 
     num_teams = teams_count
 
-    other_round_num = num_teams / ratio
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * ratio
+    else:
+        other_round_num = num_teams // ratio
+
+    other_round_num = int(other_round_num)
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -79,9 +82,12 @@ def have_enough_rooms_type(type_of_round):
 
     ratio = get_varsity_to_novice_ratio()
 
-    other_round_num = num_teams / ratio
     if type_of_round == BreakingTeam.NOVICE:
         other_round_num = num_teams * ratio
+    else:
+        other_round_num = num_teams // ratio
+
+    other_round_num = int(other_round_num)
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \

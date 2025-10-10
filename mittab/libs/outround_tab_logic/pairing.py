@@ -93,12 +93,15 @@ def get_next_available_room(num_teams, type_of_break):
 
     ratio = get_varsity_to_novice_ratio()
 
-    other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
-
     if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / ratio)
+        other_round_num = num_teams // ratio
     else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * ratio)
+        other_round_num = num_teams * ratio
+
+    other_round_num = int(other_round_num)
+
+    other_queryset = Outround.objects.filter(type_of_round=not type_of_break,
+                                             num_teams=other_round_num)
 
     rooms = [r.room
              for r in RoomCheckIn.objects.filter(round_number=0)
