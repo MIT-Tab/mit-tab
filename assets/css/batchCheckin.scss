@@ -1,5 +1,5 @@
 .table {
-  th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) {
+  th.round-header {
     width: 16ch;
     min-width: 16ch;
   }
@@ -32,8 +32,8 @@ th.drag-selecting {
   }
 }
 
-// Prevent text selection during drag
-.tab-pane table {
+.tab-pane.dragging table td,
+.tab-pane.dragging table th {
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -41,7 +41,6 @@ th.drag-selecting {
 }
 
 @media (max-width: 767px) {
-    // We can't use display:none because we still want to display the switch
   .checkin-label {
     font-size: 0;
     line-height: 0;
@@ -64,7 +63,7 @@ th.drag-selecting {
   }
   
   .table {
-    th:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) {
+    th.round-header {
       width: 3ch;
       min-width: 3ch;
     }

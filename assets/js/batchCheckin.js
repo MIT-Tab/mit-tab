@@ -1,88 +1,70 @@
 import $ from "jquery";
 import "../css/batchCheckin.scss";
 
-const SEL = {
-  pane: ".tab-pane",
-  check: ".checkin-toggle",
-  bulk: ".bulk-toggle",
-  cell: "td, th",
-  csrf: "[name=csrfmiddlewaretoken]"
-};
-
 const debounce = (fn, ms) => {
-  let timeout;
+  let timer;
   return (...args) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), ms);
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
   };
 };
-
-const parseRound = val => {
-  const n = parseInt(val, 10);
-  return Number.isNaN(n) ? null : n;
-};
-
-const collectTargets = $toggle => {
+const setLabel = ($cb, checked) =>
+  $cb.next("label").text(`Checked ${checked ? "In" : "Out"}`);
+const applyCheckboxState = ($boxes, value) =>
+  $boxes.each((i, cb) => {
+    const state = Array.isArray(value) ? value[i] : value;
+    const $cb = $(cb).prop("checked", state);
+    setLabel($cb, state);
+  });
+const getTargets = $toggle => {
   const type = $toggle.data("entityType");
   const scope = $toggle.data("toggleScope");
-  const $pane = $toggle.closest(SEL.pane);
-  const selector = `${SEL.check}[data-entity-type="${type}"]`;
+  const $pane = $toggle.closest(".tab-pane");
+  const sel = `.checkin-toggle[data-entity-type="${type}"]`;
 
   if (scope === "row") {
     const $row = $toggle.closest("tr");
-    return $row.is(":visible") ? $row.find(selector) : $();
+    return $row.is(":visible") ? $row.find(sel) : $();
   }
 
-  let $targets = $pane.find(selector);
-
-  if (type !== "team") {
-    const round = parseRound($toggle.data("round"));
-    if (round !== null) {
-      $targets = $targets.filter(
-        (_, el) => parseRound(el.dataset.roundNumber) === round
-      );
-    }
-  }
-
-  return $targets.filter((_, el) => {
-    const $searchable = $(el).closest(".searchable");
-    return !$searchable.length || $searchable.css("display") !== "none";
+  const round = $toggle.data("round");
+  return $pane.find(sel).filter((_, el) => {
+    const $el = $(el);
+    if (type !== "team" && round != null && $el.data("roundNumber") !== round)
+      return false;
+    const $row = $el.closest(".searchable");
+    return !$row.length || $row.is(":visible");
   });
 };
-
-const scheduleRefresh = paneSelector => {
-  const $pane = paneSelector ? $(paneSelector) : $(SEL.pane).filter(".active");
-  const refresh = () => {
-    ($pane.length ? $pane : $(SEL.pane).first())
-      .find(SEL.bulk)
-      .each((_, toggle) => {
-        const $targets = collectTargets($(toggle));
-        $(toggle).prop(
-          "checked",
-          $targets.length > 0 && $targets.toArray().every(el => el.checked)
-        );
-      });
-  };
+const refreshBulk = paneSelector => {
+  const $pane = paneSelector
+    ? $(paneSelector)
+    : $(".tab-pane").filter(".active");
+  const $target = $pane.length ? $pane : $(".tab-pane").first();
 
   requestAnimationFrame(() => {
-    refresh();
-    requestAnimationFrame(refresh);
-    setTimeout(refresh, 200);
+    $target.find(".bulk-toggle").each((_, toggle) => {
+      const $targets = getTargets($(toggle));
+      $(toggle).prop(
+        "checked",
+        $targets.length && $targets.toArray().every(cb => cb.checked)
+      );
+    });
   });
 };
-
-const sendUpdate = ({ $targets, type, checked, $trigger }) => {
+const submit = ({ $targets, type, checked, $trigger }) => {
   if (!$targets.length) return;
 
   const ids = new Set();
   const rounds = new Set();
 
   $targets.each((_, el) => {
-    const id = $(el).data("entityId");
+    const $el = $(el);
+    const id = $el.data("entityId");
     if (id) ids.add(id);
     if (type !== "team") {
-      const round = parseRound($(el).data("roundNumber"));
-      if (round !== null) rounds.add(round);
+      const r = $el.data("roundNumber");
+      if (r != null) rounds.add(r);
     }
   });
 
@@ -91,192 +73,146 @@ const sendUpdate = ({ $targets, type, checked, $trigger }) => {
     return;
   }
 
-  const formData = new FormData();
-  formData.append("csrfmiddlewaretoken", $(SEL.csrf).val());
-  formData.append("entity_type", type);
-  formData.append("action", checked ? "check_in" : "check_out");
-  [...ids].forEach(id => formData.append(`${type}_ids`, id));
-  if (type !== "team")
-    [...rounds].forEach(r => formData.append("round_numbers", r));
+  const fd = new FormData();
+  const token = $("[name=csrfmiddlewaretoken]").val();
+  fd.append("csrfmiddlewaretoken", token);
+  fd.append("entity_type", type);
+  fd.append("action", checked ? "check_in" : "check_out");
+  ids.forEach(id => fd.append(`${type}_ids`, id));
+  if (type !== "team") rounds.forEach(r => fd.append("round_numbers", r));
 
-  const prevStates = $targets.map((_, el) => el.checked).get();
+  const prev = $targets.map((_, cb) => cb.checked).get();
 
-  $targets.each((_, el) => {
-    $(el)
-      .prop("checked", checked)
-      .next("label")
-      .text(`Checked ${checked ? "In" : "Out"}`);
-  });
-  scheduleRefresh();
+  applyCheckboxState($targets, checked);
+  refreshBulk();
   if ($trigger) $trigger.prop("disabled", true);
 
   $.ajax({
     url: "/bulk_check_in/",
     method: "POST",
-    data: formData,
+    data: fd,
     processData: false,
     contentType: false,
-    beforeSend: xhr => xhr.setRequestHeader("X-CSRFToken", $(SEL.csrf).val())
+    beforeSend: xhr => xhr.setRequestHeader("X-CSRFToken", token)
   })
-    .done(() => {
-      scheduleRefresh();
-    })
+    .done(() => refreshBulk())
     .fail(() => {
       alert("Bulk operation failed");
-      $targets.each((i, el) => {
-        $(el)
-          .prop("checked", prevStates[i])
-          .next("label")
-          .text(`Checked ${prevStates[i] ? "In" : "Out"}`);
-      });
-      scheduleRefresh();
+      applyCheckboxState($targets, prev);
+      refreshBulk();
       if ($trigger) $trigger.prop("checked", !checked);
     })
     .always(() => {
       if ($trigger) $trigger.prop("disabled", false);
     });
 };
-
 const drag = {
   active: false,
   start: null,
-  startCell: null,
   end: null,
-  initialState: null,
+  toggle: null,
   $cells: $()
 };
-
-const getCellCoords = $cell => {
+const getCoords = $cell => {
   const $row = $cell.closest("tr");
   return {
     row: $row
       .closest("table")
       .find("tr")
       .index($row),
-    col: $row.find(SEL.cell).index($cell)
+    col: $row.find("td, th").index($cell)
   };
 };
-
-const collectRect = ($table, bounds) => {
-  const $cells = $();
+const getRect = ($table, r1, r2, c1, c2) => {
+  const $res = $();
   $table
     .find("tr")
-    .slice(bounds.minRow, bounds.maxRow + 1)
-    .each((unusedIndex, row) => {
+    .slice(r1, r2 + 1)
+    .each((__, row) =>
       $(row)
-        .find(SEL.cell)
-        .slice(bounds.minCol, bounds.maxCol + 1)
-        .each((unusedIdx, cell) => {
-          if ($(cell).find(SEL.check).length) $cells.push(cell);
-        });
-    });
-  return $cells;
+        .find("td, th")
+        .slice(c1, c2 + 1)
+        .each(
+          (_, cell) => $(cell).find(".checkin-toggle").length && $res.push(cell)
+        )
+    );
+  return $res;
 };
+const startDrag = e => {
+  const $cell = $(e.target).closest("td, th");
+  const $cb = $cell.find(".checkin-toggle");
+  if (!$cell.length || !$cb.length || $cb.hasClass("bulk-toggle")) return;
 
-const resetDrag = () => {
-  $(".drag-selecting").removeClass("drag-selecting");
-  drag.active = null;
-  drag.start = null;
-  drag.startCell = null;
-  drag.end = null;
-  drag.$cells = $();
-};
-
-const onDragStart = e => {
-  const $cell = $(e.target).closest(SEL.cell);
-  const $checkbox = $cell.find(SEL.check);
-  if (!$cell.length || !$checkbox.length || $checkbox.hasClass("bulk-toggle"))
-    return;
-
+  const pos = getCoords($cell);
   drag.active = true;
-  const coords = getCellCoords($cell);
-  drag.start = coords;
-  drag.end = coords;
-  const [firstCell] = $cell;
-  drag.startCell = firstCell;
-  drag.initialState = $checkbox.prop("checked");
-  drag.$cells = collectRect($cell.closest("table"), {
-    minRow: drag.start.row,
-    maxRow: drag.start.row,
-    minCol: drag.start.col,
-    maxCol: drag.start.col
-  });
-  drag.$cells.addClass("drag-selecting");
+  drag.start = pos;
+  drag.end = pos;
+  drag.toggle = !$cb.prop("checked");
+  $cell.closest(".tab-pane").addClass("dragging");
+  drag.$cells = getRect(
+    $cell.closest("table"),
+    pos.row,
+    pos.row,
+    pos.col,
+    pos.col
+  ).addClass("drag-selecting");
 };
-
-const onDragMove = e => {
+const moveDrag = e => {
   if (!drag.active) return;
-
-  const $cell = $(e.target).closest(SEL.cell);
+  const $cell = $(e.target).closest("td, th");
   if (!$cell.length) return;
 
-  const coords = getCellCoords($cell);
-  if (drag.end && drag.end.row === coords.row && drag.end.col === coords.col)
-    return;
+  const pos = getCoords($cell);
+  if (drag.end && drag.end.row === pos.row && drag.end.col === pos.col) return;
 
-  drag.end = coords;
+  drag.end = pos;
   $(".drag-selecting").removeClass("drag-selecting");
-  drag.$cells = collectRect($cell.closest("table"), {
-    minRow: Math.min(drag.start.row, drag.end.row),
-    maxRow: Math.max(drag.start.row, drag.end.row),
-    minCol: Math.min(drag.start.col, drag.end.col),
-    maxCol: Math.max(drag.start.col, drag.end.col)
-  });
-  drag.$cells.addClass("drag-selecting");
+  drag.$cells = getRect(
+    $cell.closest("table"),
+    Math.min(drag.start.row, pos.row),
+    Math.max(drag.start.row, pos.row),
+    Math.min(drag.start.col, pos.col),
+    Math.max(drag.start.col, pos.col)
+  ).addClass("drag-selecting");
 };
+const endDrag = () => {
+  if (!drag.active) return;
 
-const onDragEnd = e => {
-  if (!drag.active) return undefined;
+  const $targets = drag.$cells
+    .map((_, cell) => $(cell).find(".checkin-toggle")[0])
+    .filter((_, cb) => cb);
+  $(".drag-selecting").removeClass("drag-selecting");
+  $(".tab-pane").removeClass("dragging");
+  drag.active = false;
+  drag.$cells = $();
 
-  const isSameCell = $(e.target).closest(SEL.cell)[0] === drag.startCell;
-  const { $cells } = drag;
-  const checked = !drag.initialState;
-
-  resetDrag();
-
-  // Single cell click - toggle that one checkbox
-  if (isSameCell) {
-    const $cell = $(e.target).closest(SEL.cell);
-    const $cb = $cell.find(SEL.check);
-    if ($cb.length && !$(e.target).is('input[type="checkbox"], label')) {
-      $cb.prop("checked", checked);
-      sendUpdate({ $targets: $cb, type: $cb.data("entityType"), checked });
-    }
-    return undefined;
-  }
-
-  // Multi-cell drag - toggle all selected checkboxes
-  const $targets = $();
-  $cells.each((_, cell) => {
-    const $cb = $(cell).find(SEL.check);
-    if ($cb.length) $targets.push($cb[0]);
-  });
-
-  if ($targets.length) {
-    const $first = $targets.first();
-    sendUpdate({ $targets, type: $first.data("entityType"), checked });
-  }
-  return undefined;
+  if ($targets.length)
+    submit({
+      $targets,
+      type: $targets.first().data("entityType"),
+      checked: drag.toggle
+    });
 };
 
 $(() => {
-  $(SEL.check).on("change", e => {
-    const $cb = $(e.currentTarget);
-    sendUpdate({
-      $targets: $cb,
-      type: $cb.data("entityType"),
-      checked: $cb.prop("checked")
-    });
-  });
+  const cellSel = ".tab-pane table td, .tab-pane table th";
+  const labelSel = ".tab-pane table .checkin-label";
+  $(document)
+    .on("click", ".checkin-toggle:not(.bulk-toggle)", e => e.preventDefault())
+    .on("click", labelSel, e => e.preventDefault())
+    .on("mousedown", cellSel, startDrag)
+    .on("mousemove", cellSel, moveDrag)
+    .on("mouseup", endDrag)
+    .on("mouseleave", ".tab-pane table", endDrag);
 
-  $(SEL.bulk).on("change", e => {
+  $(".bulk-toggle").on("change", e => {
     const $toggle = $(e.currentTarget);
-    const $targets = collectTargets($toggle);
+    const $targets = getTargets($toggle);
     if (!$targets.length) {
       $toggle.prop("checked", false);
       return;
     }
-    sendUpdate({
+    submit({
       $targets,
       type: $toggle.data("entityType"),
       checked: $toggle.prop("checked"),
@@ -285,19 +221,8 @@ $(() => {
   });
 
   $('a[data-toggle="tab"]').on("click", e =>
-    setTimeout(() => scheduleRefresh($(e.currentTarget).attr("href")), 250)
+    setTimeout(refreshBulk, 250, $(e.currentTarget).attr("href"))
   );
-  $("#quick-search").on("input keyup", debounce(() => scheduleRefresh(), 120));
-
-  $(document).on("mousedown", `${SEL.pane} table ${SEL.cell}`, onDragStart);
-  $(document).on("mousemove", `${SEL.pane} table ${SEL.cell}`, onDragMove);
-  $(document).on("mouseup", onDragEnd);
-  $(document).on("mouseleave", `${SEL.pane} table`, e => {
-    if (drag.active) {
-      drag.startCell = null;
-      onDragEnd(e);
-    }
-  });
-
-  scheduleRefresh();
+  $("#quick-search").on("input keyup", debounce(() => refreshBulk(), 120));
+  refreshBulk();
 });

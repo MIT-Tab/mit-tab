@@ -461,39 +461,38 @@ def simulate_round(request):
 
 
 def batch_checkin(request):
-    judges_and_checkins = []
-    rooms_and_checkins = []
-
-    teams = Team.objects.prefetch_related("school", "debaters").all()
-    team_and_checkins = [(team.school.name,
-                          team,
-                          team.debaters.all(),
-                          team.checked_in)
-                         for team in teams]
-
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    all_round_numbers = [0]+round_numbers
-    judges = Judge.objects.prefetch_related("checkin_set", "schools")
+    all_round_numbers = [0] + round_numbers
 
-    for judge in judges:
-        checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
+    team_data = [
+        {"entity": t, "school": t.school, "debaters": t.debaters_display,
+         "checked_in": t.checked_in}
+        for t in Team.objects.prefetch_related("school", "debaters").all()
+    ]
 
-    rooms = Room.objects.prefetch_related("roomcheckin_set")
+    judge_data = [
+        {"entity": j, "schools": j.schools.all(),
+         "checkins": [rn in {c.round_number for c in j.checkin_set.all()}
+                      for rn in all_round_numbers]}
+        for j in Judge.objects.prefetch_related("checkin_set", "schools")
+    ]
 
-    for room in rooms:
-        checkins = []
-        checkins = {checkin.round_number for checkin in room.roomcheckin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        rooms_and_checkins.append((room, checkins_list))
+    room_data = [
+        {"entity": r,
+         "checkins": [rn in {c.round_number for c in r.roomcheckin_set.all()}
+                      for rn in all_round_numbers]}
+        for r in Room.objects.prefetch_related("roomcheckin_set")
+    ]
 
     return render(request, "batch_check_in/check_in.html", {
-        "teams_and_checkins": team_and_checkins,
-        "judges_and_checkins": judges_and_checkins,
+        "team_data": team_data,
+        "team_headers": ["School", "Team", "Debater Names"],
+        "judge_data": judge_data,
+        "judge_headers": ["School", "Judge"],
+        "room_data": room_data,
+        "room_headers": ["Room"],
         "round_numbers": round_numbers,
-        "rooms_and_checkins": rooms_and_checkins,
-        })
+    })
 
 
 def publish_results(request, new_setting):
