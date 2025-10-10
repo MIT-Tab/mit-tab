@@ -159,7 +159,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
     judge_round_joins = []
 
     if round_type == Outround.VARSITY:
-        panel_size = TabSettings.get("", 3)
+        panel_size = TabSettings.get("var_panel_size", 3)
     else:
         panel_size = TabSettings.get("nov_panel_size", 1)
 
