@@ -621,7 +621,7 @@ def update_choice(request, outround_id):
     return JsonResponse(data)
 
 
-def forum_view(request, type_of_round):
+def create_forum_view_data(type_of_round):
     outrounds = Outround.objects.exclude(
         victor=Outround.UNKNOWN
     ).filter(
@@ -666,10 +666,13 @@ def forum_view(request, type_of_round):
             ]
 
         results.append(to_add)
+    return locals()
 
+
+def forum_view(request, type_of_round):
     return render(request,
                   "outrounds/forum_result.html",
-                  locals())
+                  create_forum_view_data(type_of_round))
 
 def alternative_rooms(request, round_id, current_room_id=None):
     round_obj = Outround.objects.get(id=int(round_id))

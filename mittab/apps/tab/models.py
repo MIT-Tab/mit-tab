@@ -315,6 +315,7 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
 
     def set_unique_ballot_code(self):
