@@ -11,7 +11,8 @@
         <span class="full-text">Outrounds</span>
         <span class="short-text">Outs</span>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-room-col-toggle" 
+          <input type="checkbox" class="custom-control-input bulk-room-col-toggle bulk-toggle" 
+                 data-entity-type="room" data-toggle-scope="column"
                  data-round="0" id="bulk-room-col-toggle-0">
           <label class="custom-control-label" for="bulk-room-col-toggle-0"></label>
         </div>
@@ -21,7 +22,8 @@
         <span class="full-text">Round {{ round_number }}</span>
         <span class="short-text">R{{ round_number }}</span>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-room-col-toggle" 
+          <input type="checkbox" class="custom-control-input bulk-room-col-toggle bulk-toggle" 
+                 data-entity-type="room" data-toggle-scope="column"
                  data-round="{{ round_number }}" id="bulk-room-col-toggle-{{ round_number }}">
           <label class="custom-control-label" for="bulk-room-col-toggle-{{ round_number }}"></label>
         </div>
@@ -32,8 +34,10 @@
     <tr class="searchable">
       <td>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-room-row-toggle" 
-                 data-room-id="{{room.id}}" id="bulk-room-row-{{ forloop.counter0 }}">
+          <input type="checkbox" class="custom-control-input bulk-room-row-toggle bulk-toggle" 
+                 data-entity-type="room" data-toggle-scope="row"
+                 data-room-id="{{room.id}}" data-entity-id="{{room.id}}"
+                 id="bulk-room-row-{{ forloop.counter0 }}">
           <label class="custom-control-label" for="bulk-room-row-{{ forloop.counter0 }}"></label>
         </div>
       </td>
@@ -43,8 +47,10 @@
       {% for is_checked_in in checkins %}
       <td>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input room-checkin-toggle"
+          <input type="checkbox" class="custom-control-input room-checkin-toggle checkin-toggle"
+                 data-entity-type="room"
                  data-room-id="{{room.id}}"
+                 data-entity-id="{{room.id}}"
                  data-round-number="{{forloop.counter0}}"
                  id="toggle-room-{{ room.id }}-{{ forloop.counter0 }}"
                  {% if is_checked_in %}checked{% endif %}>

@@ -1,4 +1,4 @@
-{% extends "base/__wide.html" %}
+{% extends "base/__normal.html" %}
 
 
 {% block extra_bundles %}
@@ -29,13 +29,13 @@
                     </ul>
                 
                     <div class="tab-content">
-                    <div class="tab-pane fade show active" id="team" role="tabpanel" aria-labelledby="team-tab">
+                    <div class="tab-pane fade show active" id="team" role="tabpanel" data-entity-type="team" aria-labelledby="team-tab">
                            {% include "batch_check_in/_team.html" %}
                        </div>
-                  <div class="tab-pane fade" id="judge" role="tabpanel" aria-labelledby="judge-tab">
+                  <div class="tab-pane fade" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
                            {% include "batch_check_in/_judge.html" %}
                    </div>
-                       <div class="tab-pane fade" id="room" role="tabpanel" aria-labelledby="room-tab">
+                       <div class="tab-pane fade" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
                             {% include "batch_check_in/_room.html" %}
                         </div>
 

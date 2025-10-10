@@ -13,7 +13,9 @@
       <th>
         Checked In?
         <div class="custom-control custom-switch d-inline-block ml-2">
-          <input type="checkbox" class="custom-control-input bulk-team-col-toggle" id="bulk-team-col-toggle">
+          <input type="checkbox" class="custom-control-input bulk-team-col-toggle bulk-toggle"
+                 data-entity-type="team" data-toggle-scope="column"
+                 id="bulk-team-col-toggle">
           <label class="custom-control-label" for="bulk-team-col-toggle"></label>
         </div>
       </th>
@@ -32,8 +34,10 @@
         {% endfor %}
       <td>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input team-checkin-toggle"
+          <input type="checkbox" class="custom-control-input team-checkin-toggle checkin-toggle"
+                 data-entity-type="team"
                  data-team-id="{{team.id}}"
+                 data-entity-id="{{team.id}}"
                  id="toggle-team-{{ team.id }}-{{ forloop.counter0 }}"
                  {% if checked_in %}checked{% endif %}>
           <label class="custom-control-label checkin-label" for="toggle-team-{{ team.id }}-{{ forloop.counter0 }}">

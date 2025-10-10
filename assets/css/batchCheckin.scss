@@ -14,6 +14,32 @@
   }
 }
 
+// Drag selection styling
+td.drag-selecting,
+th.drag-selecting {
+  background-color: rgba(0, 123, 255, 0.15) !important;
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid rgba(0, 123, 255, 0.5);
+    pointer-events: none;
+  }
+}
+
+// Prevent text selection during drag
+.tab-pane table {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 @media (max-width: 767px) {
     // We can't use display:none because we still want to display the switch
   .checkin-label {

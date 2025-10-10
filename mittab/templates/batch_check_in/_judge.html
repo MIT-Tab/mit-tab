@@ -15,7 +15,8 @@
         <span class="full-text">Outrounds</span>
         <span class="short-text">Outs</span>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-judge-col-toggle" 
+          <input type="checkbox" class="custom-control-input bulk-judge-col-toggle bulk-toggle" 
+                 data-entity-type="judge" data-toggle-scope="column"
                  data-round="0" id="bulk-judge-col-toggle-0">
           <label class="custom-control-label" for="bulk-judge-col-toggle-0"></label>
         </div>
@@ -25,7 +26,8 @@
         <span class="full-text">Round {{ round_number }}</span>
         <span class="short-text">R{{ round_number }}</span>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-judge-col-toggle" 
+          <input type="checkbox" class="custom-control-input bulk-judge-col-toggle bulk-toggle" 
+                 data-entity-type="judge" data-toggle-scope="column"
                  data-round="{{ round_number }}" id="bulk-judge-col-toggle-{{ round_number }}">
           <label class="custom-control-label" for="bulk-judge-col-toggle-{{ round_number }}"></label>
         </div>
@@ -36,8 +38,10 @@
     <tr class="searchable">
       <td>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input bulk-judge-row-toggle" 
-                 data-judge-id="{{judge.id}}" id="bulk-judge-row-{{ forloop.counter0 }}">
+          <input type="checkbox" class="custom-control-input bulk-judge-row-toggle bulk-toggle" 
+                 data-entity-type="judge" data-toggle-scope="row"
+                 data-judge-id="{{judge.id}}" data-entity-id="{{judge.id}}"
+                 id="bulk-judge-row-{{ forloop.counter0 }}">
           <label class="custom-control-label" for="bulk-judge-row-{{ forloop.counter0 }}"></label>
         </div>
       </td>
@@ -52,8 +56,10 @@
       {% for is_checked_in in checkins %}
       <td>
         <div class="custom-control custom-switch">
-          <input type="checkbox" class="custom-control-input judge-checkin-toggle"
+          <input type="checkbox" class="custom-control-input judge-checkin-toggle checkin-toggle"
+                 data-entity-type="judge"
                  data-judge-id="{{judge.id}}"
+                 data-entity-id="{{judge.id}}"
                  data-round-number="{{forloop.counter0}}"
                  id="toggle-judge-{{ judge.id }}-{{ forloop.counter0 }}"
                  {% if is_checked_in %}checked{% endif %}>
@@ -67,7 +73,6 @@
     {% endfor %}
   </table>
 </div>
-
 
 
 

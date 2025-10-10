@@ -2,7 +2,7 @@ import os
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, reverse
 from django.core.management import call_command
 import yaml
@@ -269,56 +269,41 @@ def enter_room(request):
     })
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def room_bulk_check_in(request):
-    if request.method != "POST":
-        raise Http404("Must be POST")
+def bulk_check_in(request):
+    entity_type = request.POST.get("entity_type")
+    action = request.POST.get("action")
+    entity_ids = [int(eid) for eid in
+                  request.POST.getlist(f"{entity_type}_ids") if eid.isdigit()]
 
-    room_ids = request.POST.getlist("room_ids")
-    round_numbers = request.POST.getlist("round_numbers")
-    action = request.POST.get("action")  # "check_in" or "check_out"
-
-    if not room_ids or not round_numbers:
+    if not entity_ids:
         return JsonResponse({"success": True})
 
-    room_ids = [int(rid) for rid in room_ids if rid.isdigit()]
-    round_numbers = [int(rn) for rn in round_numbers if rn.isdigit()]
-
-    max_rounds = TabSettings.get("tot_rounds")
-    round_numbers = [rn for rn in round_numbers if 0 <= rn <= max_rounds]
-
-    if not room_ids or not round_numbers:
+    # Teams have a simple boolean field
+    if entity_type == "team":
+        Team.objects.filter(pk__in=entity_ids).update(checked_in=(action == "check_in"))
         return JsonResponse({"success": True})
 
-    existing_rooms = set(
-        Room.objects.filter(pk__in=room_ids).values_list("pk", flat=True)
-    )
+    # Judges and rooms use check-in records per round
+    round_numbers = [int(rn) for rn in
+                     request.POST.getlist("round_numbers") if rn.isdigit()]
+
+    if not round_numbers:
+        return JsonResponse({"success": True})
+
+    if entity_type == "judge":
+        checkInObj, id_field = CheckIn, "judge_id"
+    else:
+        checkInObj, id_field = RoomCheckIn, "room_id"
 
     if action == "check_in":
-        checkins_to_create = []
-        existing_checkins = set(
-            RoomCheckIn.objects.filter(
-                room_id__in=room_ids,
-                round_number__in=round_numbers
-            ).values_list("room_id", "round_number")
+        checkInObj.objects.bulk_create(
+            [checkInObj(**{id_field: eid, "round_number": rn})
+             for eid in entity_ids for rn in round_numbers],
+            ignore_conflicts=True
         )
-
-        for room_id in room_ids:
-            if room_id in existing_rooms:
-                for round_number in round_numbers:
-                    if (room_id, round_number) not in existing_checkins:
-                        checkins_to_create.append(
-                            RoomCheckIn(room_id=room_id, round_number=round_number)
-                        )
-
-        if checkins_to_create:
-            RoomCheckIn.objects.bulk_create(checkins_to_create, ignore_conflicts=True)
-
-    elif action == "check_out":
-        RoomCheckIn.objects.filter(
-            room_id__in=room_ids,
-            round_number__in=round_numbers
-        ).delete()
+    else:
+        checkInObj.objects.filter(**{f"{id_field}__in": entity_ids},
+                                  round_number__in=round_numbers).delete()
 
     return JsonResponse({"success": True})
 
