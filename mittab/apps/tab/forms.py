@@ -703,3 +703,25 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+
+class BackupForm(forms.Form):
+    backup_name = forms.CharField(
+        max_length=255,
+        label="Backup name",
+        widget=forms.TextInput(
+            attrs={"placeholder": "Enter backup name", "pattern": r"[^_]*"}
+        )
+    )
+    include_scratches = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Include scratches"
+    )
+
+    def clean_backup_name(self):
+        backup_name = self.cleaned_data["backup_name"]
+        if "_" in backup_name:
+            raise forms.ValidationError(
+                "Backup name cannot contain underscores (_)."
+            )
+        return backup_name
