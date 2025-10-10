@@ -12,6 +12,7 @@ module.exports = {
     pairingDisplay: "./assets/js/pairingDisplay",
     publicDisplay: "./assets/js/publicDisplay",
     bracket : "./assets/js/bracket",
+    batchCheckin: "./assets/js/batchCheckin",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

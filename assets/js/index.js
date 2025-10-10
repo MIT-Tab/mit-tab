@@ -9,7 +9,6 @@ import "bootstrap";
 
 import bsCustomFileInput from "bs-custom-file-input";
 import ballotsInit from "./ballots";
-import checkinInit from "./batchCheckin";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
 import multiselectInit from "./multiselect";
@@ -47,7 +46,6 @@ function initializeTooltips() {
 
 $(document).ready(() => {
   ballotsInit();
-  checkinInit();
   filtersInit();
   quickSearchInit();
   multiselectInit();

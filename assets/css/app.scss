@@ -42,6 +42,7 @@ $font-size-base: 0.95rem !default;
 #container-main {
   background: #fff;
   margin-top: 10px;
+  min-width: fit-content;
 }
 
 .navbar-brand {

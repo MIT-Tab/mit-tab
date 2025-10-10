@@ -1,6 +1,5 @@
-from django.contrib.auth.decorators import permission_required
-from django.http import Http404, JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
@@ -231,31 +230,6 @@ def view_scratches(request, judge_id):
             "links": links,
             "title": "Viewing Scratch Information for %s" % (judge.name)
         })
-
-
-
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def judge_check_in(request, judge_id, round_number):
-    judge_id, round_number = int(judge_id), int(round_number)
-
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # This is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
-
-    judge = get_object_or_404(Judge, pk=judge_id)
-    if request.method == "POST":
-        if not judge.is_checked_in_for_round(round_number):
-            check_in = CheckIn(judge=judge, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if judge.is_checked_in_for_round(round_number):
-            check_ins = CheckIn.objects.filter(judge=judge,
-                                               round_number=round_number)
-            check_ins.delete()
-    else:
-        raise Http404("Must be POST or DELETE")
-    return JsonResponse({"success": True})
-
 
 def download_judge_codes(request):
     codes = [
