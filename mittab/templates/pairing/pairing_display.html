@@ -85,14 +85,21 @@
         {% if byes %}
             <span class="pairings_bye_label">Giving the Bye to:</span>
             {% for team in byes %}
-            <span class="pairings_bye_entry">{{team.display}}</span>
-            {% if not forloop.last %},{% endif%}
-            {% endfor %}
+            <span class="pairings_bye_entry">
+                <span class="team-names">{{team.display}}</span>
+                {% if debater_team_memberships_public %}<span class="member-names">
+                    {{team.debaters_display}}</span>{% endif %}</span>
+                    {% if not forloop.last %},{% endif%}
+                    {% endfor %}
         {% endif %}
         {% if errors %}
-            <span class="pairings_bye_label">Teams not Paired in:</span>
+            <span class="pairings_bye_label">Teams not Paired in:</span> 
             {% for team in errors %}
-            <span class="pairings_bye_entry">{{team.display}}</span>
+            <span class="pairings_bye_entry">
+                <span class="team-names">{{team.display}}</span>
+                {% if debater_team_memberships_public %}
+                <span class="member-names">{{team.debaters_display}}</span>{% endif %}
+            </span>
             {% if not forloop.last %},{% endif%}
             {% endfor %}
         {% endif %}
