@@ -8,7 +8,7 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=20)
+    key = models.CharField(max_length=25)
     value = models.IntegerField()
 
     class Meta:

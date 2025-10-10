@@ -60,8 +60,25 @@
   description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
   value: true
   type: boolean
+- show_outrounds_bracket:
+  name: show_outs_bracket
+  description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
+  value: false
+  type: boolean
 - allow_rejudges:
   name: allow_rejudges
   description: "A toggle to indicate whether or not rejudges are allowed. If true, assign judges will try to assign judges without rejudging, but will allow for rejudges if necessary."
   value: false
   type: boolean
+- judge_pairing_mode:
+  name: judge_pairing_mode
+  description: "Choose the judge pairing method. 'Default' assigns top judges to the highest-ranked rounds. 'Classic' uses the traditional weighting used from 2019-September 2025." 
+  value: 0
+  type: choice
+  choices:
+    - [0, "Default"]
+    - [1, "Classic"]
+- rejudge_penalty:
+  name: rejudge_penalty
+  description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
+  value: 100
