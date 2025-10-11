@@ -77,7 +77,7 @@ Below is a reference table of available settings. Most can be modified through t
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | `var_panel_size`         | `3`           | The number of judges on a varsity outs panel.                                                                                                                                                                                                                                                                                                                          |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| `var_to_nov`             | `2`           | The offset of the novice break to the varsity break.  If novice semis happen when varsity quarters happen, the offset should be 1.  If novice semis happen when varsity octofinals happen, the offset should be 2.                                                                                                                                                     |
+| `novice_outrounds_start_at` | `16`          | Select the varsity bracket size that runs alongside the first novice outround. MIT Tab uses this together with `nov_teams_to_break` to keep outround schedules aligned and prevent double booking.                                                                                                                                                                  |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | `var_teams_visible`      | `256`         | The number of teams above which the varsity outround is visible.  For example, if it were 8, quarterfinals and above would be visible, if it were 4, semifinals and above would be visible.                                                                                                                                                                            |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -154,8 +154,12 @@ Here are the settings you can create, along with their default values:
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
+If you are using the tabbed settings UI, the `novice_outrounds_start_at` dropdown controls which varsity bracket runs alongside the first novice outround.
+
 So, if you wanted to change the penalties so that having 4 govs was half as
 important as it usually is, you could change the value of `high_gov_penalty` to
 `-50` using the settings form. If you wanted to make it not considered at all, you could change it to `0`.
 
 To prevent seeded teams from getting the bye, check `fair_bye` in the settings form.
+
+To disable the novice bracket entirely, set `nov_teams_to_break` to `0`; varsity outrounds will still run on schedule.

@@ -503,6 +503,7 @@ class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
         self.settings = settings_to_import
+        self.settings_by_category = kwargs.pop("settings_by_category", {})
 
         super(SettingsForm, self).__init__(*args, **kwargs)
 
@@ -513,7 +514,10 @@ class SettingsForm(forms.Form):
                     label=setting["name"],
                     help_text=setting["description"],
                     initial=setting["value"],
-                    required=False
+                    required=False,
+                    widget=forms.CheckboxInput(attrs={
+                        "class": "form-check-input"
+                    })
                 )
             elif setting.get("type") == "choice":
                 choices = [(c[0], c[1]) for c in setting.get("choices", [])]
@@ -522,35 +526,62 @@ class SettingsForm(forms.Form):
                     help_text=setting["description"],
                     choices=choices,
                     initial=setting["value"],
-                    coerce=int
+                    coerce=int,
+                    widget=forms.Select(attrs={
+                        "class": "form-control"
+                    })
                 )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=setting["name"],
                     help_text=setting["description"],
-                    initial=setting["value"]
+                    initial=setting["value"],
+                    widget=forms.NumberInput(attrs={
+                        "class": "form-control"
+                    })
                 )
+
+    def fields_for_category(self, category_id):
+        """Return fields for a specific category"""
+        return [
+            field for field in self
+            if self._field_in_category(field.name, category_id)
+        ]
+
+    def _field_in_category(self, field_name, category_id):
+        """Check if a field belongs to a specific category"""
+        if not field_name.startswith("setting_"):
+            return False
+        setting_name = field_name[8:]
+        return (
+            category_id in self.settings_by_category and
+            setting_name in self.settings_by_category[category_id]
+        )
 
     def save(self):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
-            tab_setting = TabSettings.objects.filter(
-                key=self.fields[field].label
-            ).first()
+            key = self.fields[field].label
 
-            value_to_set = setting["value"]
+            tab_setting = TabSettings.objects.filter(key=key).first()
 
-            if "type" in setting and setting["type"] == "boolean":
-                if not self.cleaned_data[field]:
-                    value_to_set = 0
-                else:
-                    value_to_set = 1
+            legacy_names = setting.get("legacy_names", [])
+            if not tab_setting and legacy_names:
+                if not isinstance(legacy_names, (list, tuple)):
+                    legacy_names = [legacy_names]
+                tab_setting = TabSettings.objects.filter(
+                    key__in=legacy_names
+                ).first()
+                if tab_setting:
+                    tab_setting.key = key
+
+            if setting.get("type") == "boolean":
+                value_to_set = 1 if self.cleaned_data[field] else 0
             else:
                 value_to_set = self.cleaned_data[field]
 
             if not tab_setting:
-                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
-                                                         value=value_to_set)
+                TabSettings.objects.create(key=key, value=value_to_set)
             else:
                 tab_setting.value = value_to_set
                 tab_setting.save()
