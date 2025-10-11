@@ -89,3 +89,21 @@ class TestOutroundPairingLogic(TestCase):
             self.enter_results(BreakingTeam.VARSITY)
 
             var_teams_to_break /= 2
+
+    def test_no_novice_break(self):
+        self.generate_checkins()
+
+        TabSettings.set("nov_teams_to_break", 0)
+
+        outround_tab_logic.perform_the_break()
+
+        # Should still be able to pair varsity outrounds
+        outround_tab_logic.pair(BreakingTeam.VARSITY)
+
+        assert BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.NOVICE
+        ).count() == 0
+
+        assert Outround.objects.filter(
+            type_of_round=BreakingTeam.NOVICE
+        ).count() == 0

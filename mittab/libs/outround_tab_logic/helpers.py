@@ -1,46 +1,77 @@
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import TabSettings, BreakingTeam
 
 
-def offset_to_quotient(offset):
-    return 2 ** offset
-
-
-def _next_power_of_two(value):
+def _normalize_bracket_size(value):
     try:
         value = int(value)
     except (TypeError, ValueError):
-        return 1
+        return 0
 
-    if value < 1:
-        return 1
+    if value <= 0:
+        return 0
 
     return 1 << (value - 1).bit_length()
 
 
-def _ratio_from_varsity_target(target, novice_bracket_size):
-    try:
-        varsity_value = int(target)
-    except (TypeError, ValueError):
-        return None
+def _stage_sizes(start_size):
+    size = _normalize_bracket_size(start_size)
+    if size == 0:
+        return []
 
-    if varsity_value <= 0:
-        return None
+    if size <= 2:
+        return [size]
 
-    ratio = varsity_value // max(1, novice_bracket_size)
-    return max(1, ratio)
+    stages = []
+    while True:
+        stages.append(size)
+        size = size // 2
+        if size <= 2:
+            stages.append(max(1, size))
+            break
+
+    return stages
 
 
-def get_varsity_to_novice_ratio():
-    novice_bracket_size = _next_power_of_two(
+def _concurrency_pairs():
+    novice_start = _normalize_bracket_size(
         TabSettings.get("nov_teams_to_break", 0)
     )
 
-    for target in (
-        TabSettings.get("novice_outrounds_start_at", 0),
-        TabSettings.get("first_novice_outround_matches_varsity", 0),
-    ):
-        ratio = _ratio_from_varsity_target(target, novice_bracket_size)
-        if ratio:
-            return ratio
+    if novice_start == 0:
+        return []
 
-    return max(1, offset_to_quotient(TabSettings.get("var_to_nov", 2)))
+    varsity_start_raw = (
+        TabSettings.get("novice_outrounds_start_at", None)
+        or TabSettings.get("first_novice_outround_matches_varsity", None)
+        or novice_start
+    )
+    varsity_start = _normalize_bracket_size(varsity_start_raw)
+
+    novice_stages = _stage_sizes(novice_start)
+    varsity_stages = _stage_sizes(varsity_start)
+
+    max_len = max(len(novice_stages), len(varsity_stages))
+    pairs = []
+
+    for idx in range(max_len):
+        novice_value = novice_stages[idx] if idx < len(novice_stages) else 0
+        varsity_value = varsity_stages[idx] if idx < len(varsity_stages) else 0
+        if novice_value == 0 and varsity_value == 0:
+            break
+        pairs.append((novice_value, varsity_value))
+
+    return pairs
+
+
+def get_concurrent_round_size(num_teams, type_of_round):
+    bracket_size = _normalize_bracket_size(num_teams)
+    if bracket_size == 0:
+        return 0
+
+    for novice_size, varsity_size in _concurrency_pairs():
+        if type_of_round == BreakingTeam.NOVICE and novice_size == bracket_size:
+            return varsity_size
+        if type_of_round == BreakingTeam.VARSITY and varsity_size == bracket_size:
+            return novice_size
+
+    return 0

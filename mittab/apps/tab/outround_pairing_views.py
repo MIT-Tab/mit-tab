@@ -16,7 +16,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
-from mittab.libs.outround_tab_logic.helpers import get_varsity_to_novice_ratio
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round_size
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -229,14 +229,7 @@ def outround_pairing_view(request,
         else TabSettings.get("nov_panel_size", 3)
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
-    ratio = get_varsity_to_novice_ratio()
-
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * ratio
-    else:
-        other_round_num = num_teams // ratio
-
-    other_round_num = int(other_round_num)
+    other_round_num = get_concurrent_round_size(num_teams, type_of_round)
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -266,33 +259,42 @@ def outround_pairing_view(request,
         opp_team=t
     ).exists()]
 
-    excluded_judges = Judge.objects.exclude(
+    excluded_judges_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round,
-    ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).filter(
-        checkin__round_number=0
     )
-
-    non_checkins = Judge.objects.exclude(
+    non_checkins_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round
-    ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).exclude(
+    )
+    available_rooms_queryset = Room.objects.exclude(
+        rooms_outrounds__num_teams=num_teams,
+        rooms_outrounds__type_of_round=type_of_round
+    )
+
+    if other_round_num:
+        excluded_judges_queryset = excluded_judges_queryset.exclude(
+            judges_outrounds__type_of_round=other_round_type,
+            judges_outrounds__num_teams=other_round_num
+        )
+        non_checkins_queryset = non_checkins_queryset.exclude(
+            judges_outrounds__type_of_round=other_round_type,
+            judges_outrounds__num_teams=other_round_num
+        )
+        available_rooms_queryset = available_rooms_queryset.exclude(
+            rooms_outrounds__num_teams=other_round_num,
+            rooms_outrounds__type_of_round=other_round_type
+        )
+
+    excluded_judges = excluded_judges_queryset.filter(
         checkin__round_number=0
     )
 
-    available_rooms = Room.objects.exclude(
-        rooms_outrounds__num_teams=num_teams,
-        rooms_outrounds__type_of_round=type_of_round
-    ).exclude(
-        rooms_outrounds__num_teams=other_round_num,
-        rooms_outrounds__type_of_round=other_round_type
+    non_checkins = non_checkins_queryset.exclude(
+        checkin__round_number=0
     )
+
+    available_rooms = available_rooms_queryset
 
     checked_in_rooms = [r.room for r in RoomCheckIn.objects.filter(round_number=0)]
     available_rooms = [r for r in available_rooms if r in checked_in_rooms]
@@ -332,26 +334,25 @@ def alternative_judges(request, round_id, judge_id=None):
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
 
-    ratio = get_varsity_to_novice_ratio()
-
-    if round_obj.type_of_round == BreakingTeam.NOVICE:
-        other_round_num = round_obj.num_teams * ratio
-    else:
-        other_round_num = round_obj.num_teams // ratio
-
-    other_round_num = int(other_round_num)
+    other_round_num = get_concurrent_round_size(
+        round_obj.num_teams,
+        round_obj.type_of_round
+    )
 
     other_round_type = BreakingTeam.NOVICE \
         if round_obj.type_of_round == BreakingTeam.VARSITY \
         else BreakingTeam.VARSITY
 
-    excluded_judges = Judge.objects.exclude(
+    excluded_judges_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=round_obj.num_teams,
         judges_outrounds__type_of_round=round_obj.type_of_round
-    ).exclude(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    ).filter(
+    )
+    if other_round_num:
+        excluded_judges_queryset = excluded_judges_queryset.exclude(
+            judges_outrounds__num_teams=other_round_num,
+            judges_outrounds__type_of_round=other_round_type
+        )
+    excluded_judges = excluded_judges_queryset.filter(
         checkin__round_number=0
     )
 
@@ -359,10 +360,11 @@ def alternative_judges(request, round_id, judge_id=None):
         judges_outrounds__num_teams=round_obj.num_teams,
         judges_outrounds__type_of_round=round_obj.type_of_round
     )
-    query = query | Q(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    )
+    if other_round_num:
+        query = query | Q(
+            judges_outrounds__num_teams=other_round_num,
+            judges_outrounds__type_of_round=other_round_type
+        )
 
     included_judges = Judge.objects.filter(query) \
                                    .filter(checkin__round_number=0) \

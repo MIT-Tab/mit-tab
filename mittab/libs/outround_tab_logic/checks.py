@@ -1,7 +1,7 @@
 from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
-from mittab.libs.outround_tab_logic.helpers import get_varsity_to_novice_ratio
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round_size
 
 
 def lost_teams():
@@ -30,16 +30,10 @@ def have_enough_judges_type(type_of_round):
         teams_count // 2
     ) * panel_size
 
-    ratio = get_varsity_to_novice_ratio()
-
-    num_teams = teams_count
-
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * ratio
-    else:
-        other_round_num = num_teams // ratio
-
-    other_round_num = int(other_round_num)
+    other_round_num = get_concurrent_round_size(
+        teams_count,
+        type_of_round
+    )
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -80,14 +74,10 @@ def have_enough_rooms_type(type_of_round):
         num_teams // 2
     )
 
-    ratio = get_varsity_to_novice_ratio()
-
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * ratio
-    else:
-        other_round_num = num_teams // ratio
-
-    other_round_num = int(other_round_num)
+    other_round_num = get_concurrent_round_size(
+        num_teams,
+        type_of_round
+    )
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
