@@ -93,11 +93,13 @@ def get_outround_options(var_teams_to_break,
                          nov_teams_to_break):
     outround_options = []
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
-        var_teams_to_break += 1
+    if var_teams_to_break > 0:
+        while not math.log(var_teams_to_break, 2) % 1 == 0:
+            var_teams_to_break += 1
 
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
-        nov_teams_to_break += 1
+    if nov_teams_to_break > 0:
+        while not math.log(nov_teams_to_break, 2) % 1 == 0:
+            nov_teams_to_break += 1
 
     while var_teams_to_break > 1:
         if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
@@ -213,7 +215,7 @@ def outround_pairing_view(request,
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if nov_teams_to_break is None or var_teams_to_break is None:
         return redirect_and_flash_error(request,
                                         "Please check your break tab settings",
                                         path="/")

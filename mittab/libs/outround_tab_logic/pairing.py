@@ -31,7 +31,6 @@ def perform_the_break():
     if not var_teams_to_break:
         return False, "Please check your break tab settings"
 
-    # This forces a refresh of the breaking teams
     Outround.objects.all().delete()
     BreakingTeam.objects.all().delete()
 
@@ -170,6 +169,9 @@ def pair(type_of_break=BreakingTeam.VARSITY):
     )
 
     num_teams = base_queryset.count()
+
+    if num_teams == 0:
+        return
 
     teams_for_bracket = num_teams
 
