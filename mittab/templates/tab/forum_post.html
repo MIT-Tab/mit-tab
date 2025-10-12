@@ -9,8 +9,7 @@
       {% if dinos %} 
         Special thanks to our dino{% if dinos|length > 1 %}s{% endif %}: 
         {% for dino in dinos %}
-          {% if forloop.last and not forloop.first %}and {% endif %}{{ dino }}{% if not forloop.last and dinos|length > 2 %}, {% endif %}
-        {% endfor %}.
+          {% if forloop.last and not forloop.first %}and {% endif %}{{ dino }}{% if not forloop.last and dinos|length > 2 %}, {% endif %}{% endfor %}.
       {% endif %} 
       We had <strong>{{ team_count}} teams</strong> and <strong>{{novice_count}} novices</strong> participate for at least 3 rounds.</p>
   </div>
