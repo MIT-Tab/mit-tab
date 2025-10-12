@@ -252,6 +252,7 @@ def view_room(request, room_id):
         "title": f"Viewing Room: {room.name}"
     })
 
+
 def enter_room(request):
     if request.method == "POST":
         form = RoomForm(request.POST)

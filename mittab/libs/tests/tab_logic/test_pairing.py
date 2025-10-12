@@ -4,7 +4,7 @@ from django.test import TestCase
 import pytest
 
 from mittab.apps.tab.models import CheckIn, Judge, TabSettings, Round
-from mittab.libs import assign_judges, room_helpers
+from mittab.libs import assign_judges, assign_rooms
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
@@ -49,7 +49,7 @@ class TestPairingLogic(TestCase):
         assign_judges.add_judges()
     
     def assign_rooms_to_pairing(self):
-        room_helpers.add_rooms()
+        assign_rooms.add_rooms()
 
     def round_number(self):
         return TabSettings.get("cur_round") - 1

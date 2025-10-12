@@ -21,7 +21,6 @@ def add_rooms():
         pairing: get_required_tags(pairing) for pairing in pairings
     }
 
-
     room_to_tag = {room : set(room.tags.all()) for room in rooms}
 
     if not room_seeding:

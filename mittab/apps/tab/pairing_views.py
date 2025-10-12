@@ -150,7 +150,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
     ).order_by("-rank").prefetch_related("tags")
 
-    required_tags = room_helpers.get_required_tags(round_obj)
+    required_tags = assign_rooms.get_required_tags(round_obj)
 
     viable_rooms = set(room for room in rooms if
                        set(room.tags.all()).issuperset(required_tags))
@@ -282,7 +282,7 @@ def view_round(request, round_number):
     for pairing in round_pairing:
         if pairing.room is None:
             continue
-        required_tags = room_helpers.get_required_tags(pairing)
+        required_tags = assign_rooms.get_required_tags(pairing)
         actual_tags = set(pairing.room.tags.all())
 
         if not required_tags <= actual_tags:
