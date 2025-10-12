@@ -193,6 +193,8 @@ class Team(models.Model):
         return cls.objects.prefetch_related(
             "gov_team",  # poorly named relation, gets rounds as gov team
             "opp_team",  # poorly named relation, rounds as opp team
+            "gov_team_outround",  # outround data for gov team
+            "opp_team_outround",  # outround data for opp team
             # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
             # and team record
             "gov_team__opp_team__gov_team",

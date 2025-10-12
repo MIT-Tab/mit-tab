@@ -15,11 +15,7 @@ def add_rooms():
     rooms = RoomCheckIn.objects.filter(
         round_number=round_number).select_related("room").prefetch_related("room__tags")
     rooms = sorted((r.room for r in rooms), key=lambda r: r.rank, reverse=True)
-    pairings = tab_logic.sorted_pairings(round_number, extra_prefetches=[
-        "gov_team__required_room_tags",
-        "opp_team__required_room_tags",
-        "judges__required_room_tags"
-    ])
+    pairings = tab_logic.sorted_pairings(round_number)
 
     pairing_to_tag = {
         pairing: get_required_tags(pairing) for pairing in pairings

@@ -129,10 +129,11 @@ def assign_rooms_to_pairing(request):
 
 
 def alternative_rooms(request, round_id, current_room_id=None):
-    round_obj = Round.objects.get(id=int(round_id)).prefetch_related(
+    round_obj = Round.objects.prefetch_related(
         "gov_team__required_room_tags",
         "opp_team__required_room_tags",
-        "judges__required_room_tags")
+        "judges__required_room_tags"
+    ).get(id=int(round_id))
     round_number = round_obj.round_number
 
     current_room_obj = None
@@ -275,10 +276,7 @@ def view_round(request, round_number):
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
     round_pairing = tab_logic.sorted_pairings(
-        round_number,
-        extra_prefetches=["room__tags", "judges__required_room_tags",
-                          "gov_team__required_room_tags",
-                          "opp_team__required_room_tags"],
+        round_number
     )
     warnings = []
     for pairing in round_pairing:
