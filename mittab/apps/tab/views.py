@@ -474,8 +474,10 @@ def room_tag(request, tag_id=None):
                                             "Priority must be between 0 and 100.")
         tag_instance = form.save()
         path = reverse("manage_room_tags")
-        message = f"Tag {tag_instance.tag} \
-            {'updated' if tag else 'created'} successfully"
+        message = (
+            f"Tag {tag_instance.tag} "
+            f"{'updated' if tag else 'created'} successfully"
+        )
         return redirect_and_flash_success(request, message,
                                           path=path)
 
