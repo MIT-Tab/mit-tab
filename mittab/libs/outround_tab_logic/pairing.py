@@ -65,7 +65,7 @@ def perform_the_break():
 
     pair(BreakingTeam.VARSITY)
     if BreakingTeam.objects.filter(
-        type_of_team=BreakingTeam.NOVICE
+            type_of_team=BreakingTeam.NOVICE
     ).count() >= 2:
         pair(BreakingTeam.NOVICE)
     else:
