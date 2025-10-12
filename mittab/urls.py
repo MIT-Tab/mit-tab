@@ -3,6 +3,7 @@ from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
+from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
 import mittab.apps.tab.views as views
@@ -17,6 +18,9 @@ import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 admin.autodiscover()
 
 urlpatterns = [
+    path("favicon.ico",
+         RedirectView.as_view(url=settings.STATIC_URL +
+                              "img/favicon.ico", permanent=True)),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
@@ -59,6 +63,9 @@ urlpatterns = [
     path("enter_room/", views.enter_room, name="enter_room"),
 
     path("bulk_check_in/", views.bulk_check_in, name="bulk_check_in"),
+    path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
+    path("room-tag/", views.room_tag, name="room_tag"),
+    path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
 
 
     # Scratch related
@@ -291,6 +298,7 @@ urlpatterns = [
     path("archive/download/", views.generate_archive, name="download_archive"),
 
     # Standings API
+    path("forum_post", views.forum_post, name="forum_post"),
     path("publish_results/<int:new_setting>/",
          views.publish_results,
          name="publish_results"),
