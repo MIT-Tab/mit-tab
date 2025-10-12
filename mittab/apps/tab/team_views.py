@@ -84,11 +84,8 @@ def view_team(request, team_id):
         form = TeamForm(instance=team)
         links = [("/team/" + str(team_id) + "/scratches/view/",
                   "Scratches for {}".format(team.display_backend))]
-        for deb in team.debaters.all():
-            links.append(
-                ("/debater/" + str(deb.id) + "/", "View %s" % deb.name))
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/team_detail.html", {
                 "title": "Viewing Team: %s" % (team.display_backend),
                 "form": form,
                 "links": links,
@@ -292,9 +289,11 @@ def tab_card(request, team_id):
 
     for round_obj in rounds:
         round_number = round_obj.round_number
-
-        dstat1 = round_stats_by_round_and_debater_id[round_number].get(deb1.id, [])
-        dstat2 = round_stats_by_round_and_debater_id[round_number].get(deb2.id, [])
+        dstat1 = []
+        dstat2 = []
+        if round_number in round_stats_by_round_and_debater_id:
+            dstat1 = round_stats_by_round_and_debater_id[round_number].get(deb1.id, [])
+            dstat2 = round_stats_by_round_and_debater_id[round_number].get(deb2.id, [])
 
         blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
 

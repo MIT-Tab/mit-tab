@@ -360,16 +360,14 @@ def get_middle_and_non_middle_teams(all_teams):
     return middle_of_bracket, non_middle_of_bracket
 
 
-def sorted_pairings(round_number, extra_prefetches=None):
+def sorted_pairings(round_number, outround=False):
     """
     Helper function to get the sorted pairings for a round while minimizing the
     number of DB queries required to calculate it
     """
-    if extra_prefetches is None:
-        extra_prefetches = []
-
-    prefetches = [
+    fields = [
         "judges",
+        "judges__judges",
         "chair",
         "room",
         "gov_team",
@@ -394,9 +392,12 @@ def sorted_pairings(round_number, extra_prefetches=None):
         "opp_team__debaters__team_set__no_shows",
         "opp_team__debaters__roundstats_set",
         "opp_team__debaters__roundstats_set__round",
-        ] + extra_prefetches
+    ]
+    model = Outround if outround else Round
+    filter_field = "num_teams" if outround else "round_number"
+
     round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(*prefetches)
+        model.objects.filter(**{filter_field: round_number}).prefetch_related(*fields)
     )
     round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
 

@@ -9,39 +9,6 @@
   {% include "common/_form.html" %}
 </div>
 
-{% if team_obj %}
-<div class="col-md-1"></div>
-<div class="col-md-5">
-  <div class="team-record">
-    <h5>Team Stats</h5>
-    <table class="table table-striped">
-      <thead><th>Stat</th><th>Value</th></thead>
-      {% for stat,val in team_stats %}
-        <tr><td>{{stat}}</td><td>{{val}}</td></tr>
-      {% endfor %}
-    </table>
-    <a href='/team/card/{{ team_obj.id }}/pretty/' class="btn btn-link">View Tab Card</a>
-  </div>
-</div>
-{% endif %}
-
-{% if debater_obj %}
-<div class="col-md-1"></div>
-<div class="col-md-5">
-  <div class="team-record">
-    <h5>Debater Rounds</h5>
-    <table class="table table-striped">
-      <thead><th>Round #</th><th>Speaks</th><th>Ranks</th></thead>
-      {% for round in debater_rounds %}
-      <tr>
-        <td><a href='/round/{{ round.round.id }}/result/'>Round {{ round.round.round_number }}</a></td>
-          <td>{{round.speaks}}</td>
-          <td>{{round.ranks}}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-</div>
-{% endif %}
-
+{% block detail_content %}
+{% endblock %}
 {% endblock %}

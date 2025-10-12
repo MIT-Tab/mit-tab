@@ -5,6 +5,7 @@
 {% block title %}Round Status{% endblock %}
 
 {% block content %}
+<div id="round-number" data-round-number={{ num_teams }} style="display: none;"></div>
     <div class="col">
   <div class="containter">
       <div class="row">
@@ -26,14 +27,21 @@
         </ul>
     </div>
       </div> <!-- end heading row -->
-      <hr />
+      <hr /> 
       <div class="row mb-3">
     <div class="col-8">
-        <h6>Pairing Controls</h6>
-        <form action="/pairing/assign_judges/"
-        method="post"
-        onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"> {% csrf_token %}
+      <h6>Pairing Controls</h6>
       <div class="btn-group btn-group-sm">
+        <form action="/outround_pairing/assign_judges/{{ type_of_round }}/"
+            method="post"
+            onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
+            class="d-inline"
+          >
+            {% csrf_token %}
+            <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" title="Assign judges to your pairing">
+              <i class="fas fa-gavel"></i> Assign Judges
+            </button>
+          </form>
           <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
              id="close-pairings"
              data-num_teams="{{ num_teams }}"
@@ -64,8 +72,8 @@
       <a class="btn btn-secondary" href="/outround_pairings/pairinglist/{{ type_of_round }}/" title="To display in GA">
           <i class="fas fa-tv"></i> Announcement View
       </a>
-      <a class="btn btn-secondary" href="/outround_pairings/pairinglist/printable/{{ type_of_round }}/" title="Printable version of the GA view">
-          <i class="fas fa-print"></i> Printable View
+      <a class="btn btn-secondary" href="/outround_pairings/export_csv/{{ type_of_round }}/" title="Export pairings as CSV">
+          <i class="fas fa-download"></i> Export CSV
       </a>
       <a class="btn btn-secondary" href="/outround_result/{{ type_of_round }}">
           Forum View

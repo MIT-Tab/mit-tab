@@ -41,23 +41,34 @@ def view_debater(request, debater_id):
                 request, "Debater {} updated successfully".format(
                     form.cleaned_data["name"]))
     else:
-        rounds = RoundStats.objects.filter(debater=debater)
+        rounds = RoundStats.objects.filter(debater=debater).select_related(
+            "round__room", "round__chair").prefetch_related("round__judges")
         rounds = sorted(list(rounds), key=lambda x: x.round.round_number)
         form = DebaterForm(instance=debater)
-        # Really only should be one
-        teams = Team.objects.filter(debaters=debater)
+        teams = Team.objects.filter(debaters=debater).select_related(
+            "school", "hybrid_school"
+        )
         links = []
+        team_schools = []
+        has_hybrid_school = False
         for team in teams:
             links.append(
-                ("/team/" + str(team.id) + "/", "View %s" % team.name))
+                (f"/team/{team.id}/", f"View {team.name}"))
+            school_info = {"team": team, "school": team.school}
+            if team.hybrid_school:
+                school_info["hybrid_school"] = team.hybrid_school
+                has_hybrid_school = True
+            team_schools.append(school_info)
 
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/debater_detail.html", {
                 "form": form,
                 "debater_obj": debater,
                 "links": links,
                 "debater_rounds": rounds,
-                "title": "Viewing Debater: %s" % (debater.name)
+                "team_schools": team_schools,
+                "has_hybrid_school": has_hybrid_school,
+                "title": f"Viewing Debater: {debater.name}"
             })
 
 
@@ -90,7 +101,7 @@ def rank_debaters_ajax(request):
                   {"title": "Debater Rankings"})
 
 
-def get_speaker_rankings(request):
+def get_speaker_rankings(request=None):
     speakers = tab_logic.rank_speakers()
     debaters = []
     for i, debater_stats in enumerate(speakers):

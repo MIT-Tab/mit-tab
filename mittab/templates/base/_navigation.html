@@ -18,6 +18,7 @@
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
 {% url "download_archive" as download_archive %}
+{% url "forum_post" as forum_post %}
 
 {% url "enter_debater" as enter_debater %}
 {% url "view_debaters" as view_debaters %}
@@ -29,6 +30,7 @@
 {% url "confirm_start_tourny" as confirm_start_new_tourny %}
 {% url "upload_data" as upload_data %}
 {% url "manual_backup" as backup %}
+{% url "manual_backup_without_scratches" as backup_without_scratches %}
 {% url "view_backups" as view_backups %}
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
@@ -58,12 +60,13 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request forum_post %}">
             Rankings
           </a>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
             <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
+            <a class="dropdown-item {% active request forum_post %}" href="{{ forum_post }}">Forum Post Results</a>
           </div>
         </li>
 
@@ -75,6 +78,7 @@
           <div class="dropdown-menu">
             <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
             <a class="dropdown-item {%active request backup %}" href="{{ backup }}">Backup Current</a>
+            <a class="dropdown-item {%active request backup_without_scratches %}" href="{{ backup_without_scratches }}">Backup Current Without Scratches</a>
             <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
             <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
           </div>

@@ -1,5 +1,5 @@
 from django.contrib.auth.decorators import permission_required
-from django.http import Http404, JsonResponse
+from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
 
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
@@ -97,14 +97,17 @@ def view_judge(request, judge_id):
                     form.cleaned_data["name"]))
     else:
         form = JudgeForm(instance=judge)
-    base_url = "/judge/" + str(judge_id) + "/"
-    scratch_url = base_url + "scratches/view/"
-    links = [(scratch_url, "Scratches for {}".format(judge.name))]
+        judging_rounds = list(Round.objects.filter(judges=judge).select_related(
+            "gov_team", "opp_team", "room"))
+    base_url = f"/judge/{judge_id}/"
+    scratch_url = f"{base_url}scratches/view/"
+    links = [(scratch_url, f"Scratches for {judge.name}")]
     return render(
-        request, "common/data_entry.html", {
+        request, "tab/judge_detail.html", {
             "form": form,
             "links": links,
-            "title": "Viewing Judge: {}".format(judge.name)
+            "judge_rounds": judging_rounds,
+            "title": f"Viewing Judge: {judge.name}"
         })
 
 
@@ -252,3 +255,14 @@ def judge_check_in(request, judge_id, round_number):
     else:
         raise Http404("Must be POST or DELETE")
     return JsonResponse({"success": True})
+
+
+def download_judge_codes(request):
+    codes = [
+        f"{getattr(judge, 'name', 'Unknown')}: {getattr(judge, 'ballot_code', 'N/A')}"
+        for judge in Judge.objects.all()
+    ]
+    response_content = "\n".join(codes)
+    response = HttpResponse(response_content, content_type="text/plain")
+    response["Content-Disposition"] = "attachment; filename=judge_codes.txt"
+    return response

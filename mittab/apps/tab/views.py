@@ -1,4 +1,5 @@
 import os
+from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
@@ -8,11 +9,14 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
     UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.outround_pairing_views import create_forum_view_data
+from mittab.apps.tab.team_views import get_team_rankings
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
@@ -26,6 +30,12 @@ def index(request):
     debater_list = [(debater.pk, debater.display)
                     for debater in Debater.objects.all()]
     room_list = [(room.pk, room.name) for room in Room.objects.all()]
+    expected_finals = 1+ bool(TabSettings.get("nov_teams_to_break", 4))
+    completed_finals = Outround.objects.filter(num_teams=2).exclude(
+        victor=Outround.UNKNOWN
+    ).count()
+    publish_ready = completed_finals == expected_finals
+    results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
@@ -66,7 +76,11 @@ def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
         if form.is_valid():
-            form.save()
+            try:
+                form.save()
+            except IntegrityError:
+                return redirect_and_flash_error(request,
+                                                "This scratch already exists.")
         return redirect_and_flash_success(request,
                                           "Scratch created successfully")
     else:
@@ -111,12 +125,22 @@ def view_school(request, school_id):
                     form.cleaned_data["name"]))
     else:
         form = SchoolForm(instance=school)
-        links = [("/school/" + str(school_id) + "/delete/", "Delete")]
+        links = [(f"/school/{school_id}/delete/", "Delete")]
+
+        teams = Team.objects.filter(school=school).prefetch_related("debaters")
+        hybrid_teams = Team.objects.filter(
+            hybrid_school=school
+        ).prefetch_related("debaters")
+        judges = Judge.objects.filter(schools=school)
+
         return render(
-            request, "common/data_entry.html", {
+            request, "tab/school_detail.html", {
                 "form": form,
                 "links": links,
-                "title": "Viewing School: %s" % (school.name)
+                "school_teams": teams,
+                "school_hybrid_teams": hybrid_teams,
+                "school_judges": judges,
+                "title": f"Viewing School: {school.name}"
             })
 
 
@@ -211,10 +235,21 @@ def view_room(request, room_id):
                     form.cleaned_data["name"]))
     else:
         form = RoomForm(instance=room)
-    return render(request, "common/data_entry.html", {
+
+        # Get all rounds that happened in this room with related judges
+        rounds = Round.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+        # Get all outrounds that happened in this room with related judges
+        outrounds = Outround.objects.filter(room=room).select_related(
+            "gov_team", "opp_team", "chair").prefetch_related("judges")
+
+    return render(request, "tab/room_detail.html", {
         "form": form,
         "links": [],
-        "title": "Viewing Room: %s" % (room.name),
+        "room_rounds": rounds,
+        "room_outrounds": outrounds,
+        "title": f"Viewing Room: {room.name}"
     })
 
 def enter_room(request):
@@ -239,7 +274,6 @@ def enter_room(request):
         "form": form,
         "title": "Create Room"
     })
-
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403")
@@ -407,6 +441,7 @@ def generate_archive(request):
     response["Content-Disposition"] = "attachment; filename=%s" % filename
     return response
 
+
 @permission_required("tab.tab_settings.can_change", login_url="/403")
 def simulate_round(request):
     enviornment = os.environ.get("MITTAB_ENV")
@@ -464,15 +499,12 @@ def batch_checkin(request):
     judges_and_checkins = []
     rooms_and_checkins = []
 
-
     teams = Team.objects.prefetch_related("school", "debaters").all()
     team_and_checkins = [(team.school.name,
                           team,
                           team.debaters.all(),
                           team.checked_in)
                          for team in teams]
-
-
 
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     all_round_numbers = [0]+round_numbers
@@ -482,8 +514,6 @@ def batch_checkin(request):
         checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
         checkins_list = [round_number in checkins for round_number in all_round_numbers]
         judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
-
-
 
     rooms = Room.objects.prefetch_related("roomcheckin_set")
 
@@ -499,3 +529,99 @@ def batch_checkin(request):
         "round_numbers": round_numbers,
         "rooms_and_checkins": rooms_and_checkins,
         })
+
+
+def publish_results(request, new_setting):
+    # Convert URL parameter: 0 = unpublish, 1 = publish
+    new_setting = bool(new_setting)
+    current_setting = TabSettings.get("results_published", False)
+
+    if new_setting != current_setting:
+        TabSettings.set("results_published", new_setting)
+        status = "published" if new_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results successfully {status}. Results are now "
+            f"{'visible' if new_setting else 'hidden'}.",
+            path="/",
+        )
+    else:
+        status = "published" if current_setting else "unpublished"
+        return redirect_and_flash_success(
+            request,
+            f"Results are already {status}.",
+            path="/",
+        )
+
+
+def forum_post(request):
+    # Get dino judges
+    dinos = Judge.objects.filter(is_dino=True).values_list("name", flat=True)
+
+    # Get top debaters (limiting to top 10)
+    nov_debaters, varsity_debaters = get_speaker_rankings(None)
+    nov_debaters = nov_debaters[:min(10, len(nov_debaters))]
+    varsity_debaters = varsity_debaters[:min(10, len(varsity_debaters))]
+
+    # Get qualifying teams and debaters
+    qualifying_teams = Team.objects.prefetch_related("debaters").annotate(
+        num_rounds=models.Count("gov_team", distinct=True) +
+        models.Count("opp_team", distinct=True)
+    ).filter(
+        num_rounds__gte=3
+    )
+
+    qualifying_novices = Debater.objects.filter(
+        team__in=qualifying_teams,
+        novice_status=True
+    )
+
+    team_count = qualifying_teams.count()
+    novice_count = qualifying_novices.count()
+
+    # Get team rankings and calculate breaking teams
+    varsity_teams, nov_teams = get_team_rankings(None)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    varsity_teams = varsity_teams[:var_teams_to_break]
+
+    # Calculate novice teams that made varsity break
+    novice_teams_in_varsity_break = sum(
+        1 for team in nov_teams if team in varsity_teams
+    )
+    novice_teams = nov_teams[:nov_teams_to_break + novice_teams_in_varsity_break]
+
+    # Get outround data
+    varsity_outs = create_forum_view_data(0)
+    novice_outs = create_forum_view_data(1)
+
+    # Determine champions
+    novice_champ = None
+    varsity_champ = None
+
+    finals = Outround.objects.filter(num_teams=2)
+    varsity_finals = finals.filter(type_of_round=0).first()
+    novice_finals = finals.filter(type_of_round=1).first()
+
+    if varsity_finals and varsity_finals.victor:
+        varsity_champ = (varsity_finals.gov_team if varsity_finals.victor % 2 == 1
+                         else varsity_finals.opp_team)
+
+    if novice_finals and novice_finals.victor:
+        novice_champ = (novice_finals.gov_team if novice_finals.victor % 2 == 1
+                        else novice_finals.opp_team)
+
+    return render(request, "tab/forum_post.html", {
+        "dinos": dinos,
+        "nov_debaters": nov_debaters,
+        "varsity_debaters": varsity_debaters,
+        "team_count": team_count,
+        "novice_count": novice_count,
+        "varsity_teams": varsity_teams,
+        "novice_teams": novice_teams,
+        "novice_outs": novice_outs["results"],
+        "varsity_outs": varsity_outs["results"],
+        "novice_champ": novice_champ,
+        "varsity_champ": varsity_champ,
+    })
