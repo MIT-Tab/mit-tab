@@ -10,19 +10,19 @@
   {% quick_search %}
   <div class="data-list">
     <ul class="list_item">
-      {% for id, name, flags, symbols, rank in item_list %}
-        {% if rank is not None %}
-          {# Judge view with 5 items: id, name, flags, symbols, rank #}
-          <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}" data-rank="{{rank}}">
-            <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} <span class="item-detail" data-code="{{symbols}}" data-rank="({{rank}})">{{symbols}}</span></a>
-          </li>
-        {% else %}
-          {# Other views with 4 items: id, name, flags, symbols #}
+      {% if item_type == "judge" %}
+        {% for id, name, flags, symbols, rank in item_list %}
+            <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}" data-rank="{{rank}}">
+              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} <span class="item-detail" data-code="{{symbols}}" data-rank="({{rank}})">{{symbols}}</span></a>
+            </li>
+        {% endfor %}
+      {% else %}
+        {% for id, name, flags, symbols in item_list %}
           <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-            <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} {{symbols}}</a>
+              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} {{symbols}}</a>
           </li>
-        {% endif %}
-      {% endfor %}
+        {% endfor %}
+      {% endif %}
     </ul>
   </div>
 </div>
