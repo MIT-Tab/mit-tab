@@ -553,7 +553,6 @@ def pretty_pair(request):
     for present_team in Team.objects.filter(checked_in=True):
         if present_team not in paired_teams:
             if present_team not in byes:
-                print("got error for", present_team)
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1

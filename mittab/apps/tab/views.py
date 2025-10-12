@@ -1,4 +1,5 @@
 import os
+from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
@@ -75,7 +76,11 @@ def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
         if form.is_valid():
-            form.save()
+            try:
+                form.save()
+            except IntegrityError:
+                return redirect_and_flash_error(request,
+                                                "This scratch already exists.")
         return redirect_and_flash_success(request,
                                           "Scratch created successfully")
     else:
