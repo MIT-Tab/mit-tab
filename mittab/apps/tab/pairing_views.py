@@ -14,7 +14,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import room_helpers
+from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
@@ -120,7 +120,7 @@ def assign_rooms_to_pairing(request):
         try:
             backup.backup_round("round_%s_before_room_assignment" %
                                 current_round_number)
-            room_helpers.add_rooms()
+            assign_rooms.add_rooms()
         except Exception:
             emit_current_exception()
             return redirect_and_flash_error(request,

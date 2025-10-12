@@ -167,6 +167,7 @@ class Team(models.Model):
         (VARSITY, "Varsity"),
         (NOVICE, "Novice")
     )
+
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)

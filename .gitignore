@@ -51,7 +51,7 @@ mittab/backups/
 *.sqlite3-journal
 
 # venv
-venv*/
+venv/
 
 # doc stuff
 docs/_static/
