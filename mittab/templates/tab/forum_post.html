@@ -1,59 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forum Post</title>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-        
-        table, th, td {
-            border: 1px solid black;
-            padding: 1px;
-        }
-    </style>
-</head>
-<body>
-    <p>Thank you for a great tournament!{% if dino_string %} Special thanks to our dinos: {{ dino_string }}.{% endif %} We had {{ team_count}} teams and {{novice_count}} novices participate for at least 3 rounds.</p>
+{% extends "base/__normal.html" %}
+{% block title %}Forum Post{% endblock title %}
+{% block banner %}Tournament Results{% endblock banner %}
+{% block content %}
 
-    <br>
-    Novice Speaker Awards:
-    <table>
-        <thead>
-          <th>#</th>
-          <th>Name</th>
-          <th>Speaks</th>
-          <th>Ranks</th>
-          <th>Team</th>
-          <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
-        </thead>
-        {% for debater, speaks, ranks, team, tiebreaker in nov_debaters %}
-        <tr>
-          <td>{{ forloop.counter }}</td>
-          <td><a>{{ debater.name }}</a></td>
-          <td>{{ speaks|floatformat:2 }}</td>
-          <td>{{ ranks|floatformat:2 }}</td>
-          <td> <a >{{ team.name }}</a></td>
-          <td>{{ tiebreaker }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+<div class="container-fluid">
+  <div class="w-100 mt-4 mb-4">
+    <p class="lead">Thank you for a great tournament!
+      {% if dinos %} 
+        Special thanks to our dino{% if dinos|length > 1 %}s{% endif %}: 
+        {% for dino in dinos %}
+          {% if forloop.last and not forloop.first %}and {% endif %}{{ dino }}{% if not forloop.last and dinos|length > 2 %}, {% endif %}
+        {% endfor %}.
+      {% endif %} 
+      We had <strong>{{ team_count}} teams</strong> and <strong>{{novice_count}} novices</strong> participate for at least 3 rounds.</p>
+  </div>
 
-
-    <br>
-    <table>
-      Varsity Speaker Awards:
-      <thead>
-        <th>#</th>
-        <th>Name</th>
-        <th>Speaks</th>
-        <th>Ranks</th>
-        <th>Team</th>
-        <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
+  {% if nov_debaters %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Novice Speaker Awards</h4>
+    <table class="table table-striped table-sm table-bordered table-hover">
+      <thead class="thead-dark">
+        <th>#</th><th>Name</th><th>Speaks</th><th>Ranks</th><th>Team</th><th>Tiebreaker</th>
       </thead>
+      <tbody>
+      {% for debater, speaks, ranks, team, tiebreaker in nov_debaters %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a>{{ debater.name }}</a></td>
+        <td>{{ speaks|floatformat:2 }}</td>
+        <td>{{ ranks|floatformat:2 }}</td>
+        <td> <a >{{ team.name }}</a></td>
+        <td>{{ tiebreaker }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if varsity_debaters %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Varsity Speaker Awards</h4>
+    <table class="table table-striped table-sm table-bordered table-hover">
+      <thead class="thead-dark">
+        <th>#</th><th>Name</th><th>Speaks</th><th>Ranks</th><th>Team</th><th>Tiebreaker</th>
+      </thead>
+      <tbody>
       {% for debater, speaks, ranks, team, tiebreaker in varsity_debaters %}
       <tr>
         <td> {{ forloop.counter }} </td>
@@ -64,74 +56,82 @@
         <td>{{ tiebreaker }}</td>
       </tr>
       {% endfor %}
+      </tbody>
     </table>
+  </div>
+  {% endif %}
 
-    <br>
-    Novice Breaking Teams:
-    <table class="table table-striped table-sm table-bordered">
-        <thead>
-          <th>#</th>
-          <th>Team Name</th>
-          <th>Wins</th>
-          <th>Speaks</th>
-          <th>Ranks</th>
-          <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
-        </thead>
-        {% for team, wins, speaks, ranks, tiebreaker in novice_teams %}
-        <tr>
-            <td>{{ forloop.counter }}</td>
-            <td><a>{{ team.display_backend }}</a></td>
-            <td>{{ wins }}</td>
-            <td>{{ speaks|floatformat:2 }}</td>
-            <td>{{ ranks|floatformat:2 }}</td>
-            <td>{{ tiebreaker }}</td>
-        </tr>
-        {% endfor %}
-      </table>
+  {% if novice_teams %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Novice Breaking Teams</h4>
+    <table class="table table-striped table-sm table-bordered table-hover">
+      <thead class="thead-dark">
+        <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th><th>Tiebreaker</th>
+      </thead>
+      <tbody>
+      {% for team, wins, speaks, ranks, tiebreaker in novice_teams %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a>{{ team.display_backend }}</a></td>
+        <td>{{ wins }}</td>
+        <td>{{ speaks|floatformat:2 }}</td>
+        <td>{{ ranks|floatformat:2 }}</td>
+        <td>{{ tiebreaker }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
-    <br><br>
-
-    Novice Results:
+  {% if novice_outs %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Novice Results</h4>
     {% include "outrounds/forum_result.html" with results=novice_outs%}
+  </div>
+  {% endif %}
 
-    <br><br>
+  {% if varsity_teams %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Varsity Breaking Teams</h4>
+    <table class="table table-striped table-sm table-bordered table-hover">
+      <thead class="thead-dark">
+        <th>#</th><th>Team Name</th><th>Wins</th><th>Speaks</th><th>Ranks</th><th>Tiebreaker</th>
+      </thead>
+      <tbody>
+      {% for team, wins, speaks, ranks, tiebreaker in varsity_teams %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a>{{ team.display_backend }}</a></td>
+        <td>{{ wins }}</td>
+        <td>{{ speaks|floatformat:2 }}</td>
+        <td>{{ ranks|floatformat:2 }}</td>
+        <td>{{ tiebreaker }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
-    Varsity Breaking Teams:
-    <table class="table table-striped table-sm table-bordered">
-        <thead>
-          <th>#</th>
-          <th>Team Name</th>
-          <th>Wins</th>
-          <th>Speaks</th>
-          <th>Ranks</th>
-          <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
-        </thead>
-        {% for team, wins, speaks, ranks, tiebreaker in varsity_teams %}
-        <tr>
-            <td>{{ forloop.counter }}</td>
-            <td><a>{{ team.display_backend }}</a></td>
-            <td>{{ wins }}</td>
-            <td>{{ speaks|floatformat:2 }}</td>
-            <td>{{ ranks|floatformat:2 }}</td>
-            <td>{{ tiebreaker }}</td>
-        </tr>
-        {% endfor %}
-      </table>
-
-    <br><br>
-    Varsity Results:
+  {% if varsity_outs %}
+  <div class="w-100 mt-4">
+    <h4 class="mb-3">Varsity Results</h4>
     {% include "outrounds/forum_result.html" with results=varsity_outs%}
-    
-    <br> 
-    {% if novice_champ %}
+  </div>
+  {% endif %}
 
-    <h3>Congratulations to the Novice Champions: {{ novice_champ.display_backend }}</h3>
-    {% endif %}
+  {% if novice_champ %}
+  <div class="w-100 mt-5 mb-4">
+    <h3 > Congratulations to the Novice Champions: <strong>{{ novice_champ.display_backend }}</strong></h3>
+  </div>
+  {% endif %}
 
-    <br>
-    {% if varsity_champ %}
-    <h3>Congratulations to the Varsity Champions: {{ varsity_champ.display_backend }}</h3>
-    {% endif %}
+  {% if varsity_champ %}
+  <div class="w-100 mt-5 mb-4">
+    <h3> Congratulations to the Varsity Champions: <strong>{{ varsity_champ.display_backend }}</strong></h3>
+  </div>
+  {% endif %}
+</div>
 
-</body>
-</html>
+{% endblock %}
