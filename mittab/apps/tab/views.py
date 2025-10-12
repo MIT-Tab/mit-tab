@@ -317,7 +317,7 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
-def get__settings_from_yaml():
+def get_settings_from_yaml():
 
     settings_dir = os.path.join(settings.BASE_DIR, "settings")
 
