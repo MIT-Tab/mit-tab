@@ -736,7 +736,7 @@ class RoomTagForm(forms.ModelForm):
 
     class Meta:
         model = RoomTag
-        fields = ("tag", "priority", "teams", "judges")
+        fields = ("tag", "priority", "teams", "judges", "rooms")
 
 
 class MiniRoomTagForm(RoomTagForm):
