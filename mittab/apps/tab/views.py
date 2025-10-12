@@ -317,13 +317,6 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
-
-def _apply_saved_setting_value(setting):
-    lookup_keys = [setting.get("name")]
-
-    for key in filter(None, lookup_keys):
-        
-
 def get__settings_from_yaml():
 
     settings_dir = os.path.join(settings.BASE_DIR, "settings")
