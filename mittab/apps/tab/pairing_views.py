@@ -129,7 +129,11 @@ def assign_rooms_to_pairing(request):
 
 
 def alternative_rooms(request, round_id, current_room_id=None):
-    round_obj = Round.objects.get(id=int(round_id))
+    round_obj = Round.objects.prefetch_related(
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags",
+        "judges__required_room_tags"
+    ).get(id=int(round_id))
     round_number = round_obj.round_number
 
     current_room_obj = None
@@ -140,14 +144,19 @@ def alternative_rooms(request, round_id, current_room_id=None):
             pass
 
     # Fetch all rooms checked in for the given round, ordered by rank
-    rooms = set(Room.objects.filter(
+    rooms = Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
-    ).order_by("-rank"))
+    ).order_by("-rank").prefetch_related("tags")
 
-    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
-    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
+    required_tags = assign_rooms.get_required_tags(round_obj)
+
+    viable_rooms = set(room for room in rooms if
+                       set(room.tags.all()).issuperset(required_tags))
+
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, viable_rooms))
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
@@ -266,7 +275,27 @@ def view_round(request, round_number):
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    round_pairing = tab_logic.sorted_pairings(round_number)
+    round_pairing = tab_logic.sorted_pairings(
+        round_number
+    )
+    warnings = []
+    for pairing in round_pairing:
+        if pairing.room is None:
+            continue
+        required_tags = assign_rooms.get_required_tags(pairing)
+        actual_tags = set(pairing.room.tags.all())
+
+        if not required_tags <= actual_tags:
+            missing_tags = required_tags - actual_tags
+            plural = "s" if len(missing_tags) > 1 else ""
+            missing_tags_str = ", ".join(str(tag) for tag in missing_tags)
+
+            warnings.append(
+                f"{pairing.gov_team} vs {pairing.opp_team} "
+                f"requires tag{plural} {missing_tags_str} "
+                f"that are not assigned to room {pairing.room}"
+            )
+
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 

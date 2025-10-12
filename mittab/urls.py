@@ -66,6 +66,9 @@ urlpatterns = [
     re_path(r"^room/(\d+)/check_ins/round/(\d+)/$",
             views.room_check_in,
             name="room_check_in"),
+    path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
+    path("room-tag/", views.room_tag, name="room_tag"),
+    path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
 
 
     # Scratch related

@@ -703,3 +703,45 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+
+class RoomTagForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    judges = forms.ModelMultipleChoiceField(
+        queryset=Judge.objects.all(),
+        required=False,
+    )
+    rooms = forms.ModelMultipleChoiceField(
+        queryset=Room.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.team_set.all()
+            self.fields["judges"].initial = self.instance.judge_set.all()
+            self.fields["rooms"].initial = self.instance.room_set.all()
+
+    def save(self, commit=True):
+        room_tag = super().save(commit=commit)
+
+        room_tag.team_set.set(self.cleaned_data.get("teams", []))
+        room_tag.judge_set.set(self.cleaned_data.get("judges", []))
+        room_tag.room_set.set(self.cleaned_data.get("rooms", []))
+
+        return room_tag
+
+    class Meta:
+        model = RoomTag
+        fields = ("tag", "priority", "teams", "judges", "rooms")
+
+
+class MiniRoomTagForm(RoomTagForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("judges")
+        self.fields.pop("rooms")
