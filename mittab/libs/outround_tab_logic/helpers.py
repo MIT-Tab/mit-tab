@@ -41,8 +41,7 @@ def _concurrency_pairs():
         return []
 
     varsity_start_raw = (
-        TabSettings.get("novice_outrounds_start_at", None)
-        or novice_start
+        TabSettings.get("novice_outrounds_start_at", novice_start)
     )
     varsity_start = _normalize_bracket_size(varsity_start_raw)
 
