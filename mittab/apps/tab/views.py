@@ -516,7 +516,7 @@ def forum_post(request):
     dinos = Judge.objects.filter(is_dino=True).values_list("name", flat=True)
 
     # Get top debaters (limiting to top 10)
-    nov_debaters, varsity_debaters = get_speaker_rankings(None)
+    varsity_debaters, nov_debaters = get_speaker_rankings(None)
     nov_debaters = nov_debaters[:min(10, len(nov_debaters))]
     varsity_debaters = varsity_debaters[:min(10, len(varsity_debaters))]
 
