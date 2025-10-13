@@ -503,7 +503,6 @@ class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
         self.settings = settings_to_import
-        self.settings_by_category = kwargs.pop("settings_by_category", {})
 
         super(SettingsForm, self).__init__(*args, **kwargs)
 
@@ -542,23 +541,6 @@ class SettingsForm(forms.Form):
                         "class": "form-control"
                     })
                 )
-
-    def fields_for_category(self, category_id):
-        """Return fields for a specific category"""
-        return [
-            field for field in self
-            if self._field_in_category(field.name, category_id)
-        ]
-
-    def _field_in_category(self, field_name, category_id):
-        """Check if a field belongs to a specific category"""
-        if not field_name.startswith("setting_"):
-            return False
-        setting_name = field_name[8:]
-        return (
-            category_id in self.settings_by_category and
-            setting_name in self.settings_by_category[category_id]
-        )
 
     def save(self):
         for setting in self.settings:

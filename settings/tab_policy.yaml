@@ -25,18 +25,10 @@ settings:
     name: var_panel_size
     description: "The number of judges on a varsity outs panel"
     value: 3
-  - novice_outrounds_start_at:
-    name: novice_outrounds_start_at
-    description: "Which varsity round runs at the same time as the first novice outround?"
-    value: 16
-    type: choice
-    choices:
-      - [64, "Varsity Triple Octos"]
-      - [32, "Varsity Double Octos"]
-      - [16, "Varsity Octos"]
-      - [8, "Varsity Quarters"]
-      - [4, "Varsity Semis"]
-      - [2, "Varsity Finals"]
+  - var_to_nov:
+    name: var_to_nov
+    description: "The offset of the novice break to the varsity break.  If novice semis happen when varsity quarters happen, the offset should be 1.  If novice semis happen when varsity octofinals happen, the offset should be 2."
+    value: 2
   - sidelock:
     name: sidelock
     description: "Toggle to indicate whether you are side-locking outrounds. When enabled, the gov/opp assignments for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card and bolded on the front-facing pairing display."
@@ -51,3 +43,8 @@ settings:
     name: lenient_late
     description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
     value: 0
+  - enable_room_seeding:
+    name: enable_room_seeding
+    description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
+    value: true
+    type: boolean

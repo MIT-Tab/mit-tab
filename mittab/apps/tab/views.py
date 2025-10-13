@@ -346,7 +346,7 @@ def get_settings_from_yaml():
     settings_dir = os.path.join(settings.BASE_DIR, "settings")
 
     all_settings = []
-    settings_by_category = {}
+    setting_dict = {}
     categories = []
 
     for filename in sorted(os.listdir(settings_dir)):
@@ -361,7 +361,7 @@ def get_settings_from_yaml():
         category_id = category_info.get("id")
 
         categories.append(category_info)
-        settings_by_category[category_id] = []
+        setting_dict[category_id] = []
 
         for setting in category_settings:
             tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
@@ -372,52 +372,44 @@ def get_settings_from_yaml():
                 else:
                     setting["value"] = stored_value
             all_settings.append(setting)
-            settings_by_category[category_id].append(setting["name"])
+            setting_dict[category_id].append(setting["name"])
 
     categories.sort(key=lambda x: x.get("order", 999))
 
-    return all_settings, settings_by_category, categories
+    return all_settings, setting_dict, categories
 
 ### SETTINGS VIEWS ###
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    yaml_settings, settings_by_category, categories = (
-            get_settings_from_yaml()
-        )
-    template_name = "tab/settings_form.html"
+    yaml_settings, setting_dict, categories = get_settings_from_yaml()
 
     if request.method == "POST":
-        _settings_form = SettingsForm(
-            request.POST,
-            settings=yaml_settings,
-            settings_by_category=settings_by_category
-        )
+        settings_form = SettingsForm(request.POST, settings=yaml_settings)
 
-        if _settings_form.is_valid():
-            _settings_form.save()
+        if settings_form.is_valid():
+            settings_form.save()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
-        return render(
-            request, template_name, {
-                "form": _settings_form,
-                "categories": categories,
-                "title": "Tab Settings"
-            })
+    else:
+        settings_form = SettingsForm(settings=yaml_settings)
 
-    _settings_form = SettingsForm(
-        settings=yaml_settings,
-        settings_by_category=settings_by_category
-    )
+    categories_with_fields = [
+        {
+            **category, 
+            'fields': [settings_form[f"setting_{sname}"] for sname in setting_dict[category['id']]]
+        }
+        for category in categories
+    ]
 
     return render(
-        request, template_name, {
-            "form": _settings_form,
-            "categories": categories,
+        request, "tab/settings_form.html", {
+            "form": settings_form,
+            "categories": categories_with_fields,
             "title": "Tab Settings"
         })
 

@@ -32,7 +32,7 @@
                     </div>
                     
                     <div class="form-row">
-                        {% for field in form.fields_for_category category.id %}
+                        {% for field in category.fields %}
                             <div class="col-md-6 mb-3">
                                 <label for="{{ field.id_for_label }}" class="font-weight-bold">
                                     {{ field.label }}
