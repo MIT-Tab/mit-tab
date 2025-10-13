@@ -108,7 +108,7 @@ def get_metadata(filename):
     if len(data) < 4:
         return defaults
 
-    name = data[0] if data else filename
+    name = data[0]
 
     try:
         btype = int(data[1])
