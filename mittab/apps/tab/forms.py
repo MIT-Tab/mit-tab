@@ -545,21 +545,10 @@ class SettingsForm(forms.Form):
     def save(self):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
-            key = setting["name"]  # Use the raw setting name as the key
-
+            key = setting["name"]
             tab_setting = TabSettings.objects.filter(key=key).first()
 
-            legacy_names = setting.get("legacy_names", [])
-            if not tab_setting and legacy_names:
-                if not isinstance(legacy_names, (list, tuple)):
-                    legacy_names = [legacy_names]
-                tab_setting = TabSettings.objects.filter(
-                    key__in=legacy_names
-                ).first()
-                if tab_setting:
-                    tab_setting.key = key
-
-            if setting.get("type") == "boolean":
+            if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
             else:
                 value_to_set = self.cleaned_data[field]
