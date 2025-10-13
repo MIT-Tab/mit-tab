@@ -1,17 +1,18 @@
+// Table layout
 .table {
   th.round-header {
     width: 16ch;
     min-width: 16ch;
   }
+  th, td {
+    max-width: 10vw;
+  }
 }
 
+// Round header text toggle
 .round-header {
-  .full-text {
-    display: inline;
-  }
-  .short-text {
-    display: none;
-  }
+  .full-text { display: inline; }
+  .short-text { display: none; }
 }
 
 // Drag selection styling
@@ -23,49 +24,63 @@ th.drag-selecting {
   &::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     border: 2px solid rgba(0, 123, 255, 0.5);
     pointer-events: none;
   }
 }
 
+// Disable text selection while dragging
 .tab-pane.dragging table td,
 .tab-pane.dragging table th {
   user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
 }
 
-@media (max-width: 767px) {
+// Shared button container styles
+.table tbody tr td:first-child .d-flex,
+.round-header .d-flex {
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 2px;
+  width: fit-content !important;
+  margin: 0 auto !important;
+  
+  .btn {
+    margin-left: 0 !important;
+    width: 100% !important;
+    white-space: nowrap;
+  }
+}
+
+// Mobile responsiveness
+@media (max-width: 1200px) {
   .checkin-label {
     font-size: 0;
-    line-height: 0;
     text-indent: -9999px;
     
-    &::before,
-    &::after {
+    &::before, &::after {
       font-size: 1rem;
       text-indent: 0;
     }
   }
   
   .round-header {
-    .full-text {
-      display: none;
-    }
-    .short-text {
-      display: inline;
-    }
+    .full-text { display: none; }
+    .short-text { display: inline; }
   }
   
   .table {
-    th.round-header {
-      width: 3ch;
-      min-width: 3ch;
+    th.round-header { width: 3ch; min-width: 3ch; }
+    
+    td, th {
+      font-size: 0.85rem;
+      padding: 0.25rem !important;
+    }
+    
+    tbody tr td:first-child .d-flex .btn,
+    .round-header .d-flex .btn {
+      padding: 1px 2px !important;
+      font-size: 1.2vw !important;
     }
   }
 }

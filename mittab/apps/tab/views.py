@@ -280,8 +280,9 @@ def enter_room(request):
 def bulk_check_in(request):
     entity_type = request.POST.get("entity_type")
     action = request.POST.get("action")
-    entity_ids = [int(eid) for eid in
-                  request.POST.getlist(f"{entity_type}_ids") if eid.isdigit()]
+    
+    entity_ids = request.POST.getlist("entity_ids")
+    entity_ids = [int(eid) for eid in entity_ids if eid.isdigit()]
 
     if not entity_ids:
         return JsonResponse({"success": True})
@@ -292,8 +293,7 @@ def bulk_check_in(request):
         return JsonResponse({"success": True})
 
     # Judges and rooms use check-in records per round
-    round_numbers = [int(rn) for rn in
-                     request.POST.getlist("round_numbers") if rn.isdigit()]
+    round_numbers = [int(rn) for rn in request.POST.getlist("rounds") if rn.isdigit()]
 
     if not round_numbers:
         return JsonResponse({"success": True})
