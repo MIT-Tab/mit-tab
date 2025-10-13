@@ -341,53 +341,77 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
-
 def get_settings_from_yaml():
-    default_settings = []
-    with open(settings.SETTING_YAML_PATH, "r") as stream:
-        default_settings = yaml.safe_load(stream)
 
-    to_return = []
+    settings_dir = os.path.join(settings.BASE_DIR, "settings")
 
-    for setting in default_settings:
-        tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+    all_settings = []
+    setting_dict = {}
+    categories = []
 
-        if tab_setting:
-            if "type" in setting and setting["type"] == "boolean":
-                setting["value"] = tab_setting.value == 1
-            else:
-                setting["value"] = tab_setting.value
+    for filename in sorted(os.listdir(settings_dir)):
+        yaml_file = os.path.join(settings_dir, filename)
 
-        to_return.append(setting)
+        with open(yaml_file, "r") as stream:
+            data = yaml.safe_load(stream)
 
-    return to_return
+        category_info = data["category"]
+        category_settings = data["settings"]
+
+        category_id = category_info.get("id")
+
+        categories.append(category_info)
+        setting_dict[category_id] = []
+
+        for setting in category_settings:
+            tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+            if tab_setting:
+                stored_value = tab_setting.value
+                if setting.get("type") == "boolean":
+                    setting["value"] = stored_value == 1
+                else:
+                    setting["value"] = stored_value
+            all_settings.append(setting)
+            setting_dict[category_id].append(setting["name"])
+
+    categories.sort(key=lambda x: x.get("order", 999))
+
+    return all_settings, setting_dict, categories
 
 ### SETTINGS VIEWS ###
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    yaml_settings = get_settings_from_yaml()
-    if request.method == "POST":
-        _settings_form = SettingsForm(request.POST, settings=yaml_settings)
+    yaml_settings, setting_dict, categories = get_settings_from_yaml()
 
-        if _settings_form.is_valid():
-            _settings_form.save()
+    if request.method == "POST":
+        form = SettingsForm(request.POST, settings=yaml_settings)
+
+        if form.is_valid():
+            form.save()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
-        return render(  # Allows for proper validation checking
-            request, "tab/settings_form.html", {
-                "form": settings_form,
-            })
+    else:
+        form = SettingsForm(settings=yaml_settings)
 
-    _settings_form = SettingsForm(settings=yaml_settings)
+    categories_with_fields = [
+        {
+            **category,
+            "fields": [form[f"setting_{sname}"] for
+                       sname in setting_dict[category["id"]]]
+        }
+        for category in categories
+    ]
 
     return render(
         request, "tab/settings_form.html", {
-            "form": _settings_form,
+            "form": form,
+            "categories": categories_with_fields,
+            "title": "Tab Settings"
         })
 
 

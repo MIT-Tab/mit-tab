@@ -44,6 +44,20 @@ function initializeTooltips() {
   $('[data-toggle="tooltip"]').tooltip();
 }
 
+function initializeSettingsForm() {
+  $(".custom-control-input").on(
+    "change",
+    function handleCustomControlInputChange() {
+      const label = $(this).siblings(".custom-control-label");
+      if ($(this).is(":checked")) {
+        label.text("Enabled");
+      } else {
+        label.text("Disabled");
+      }
+    }
+  );
+}
+
 $(document).ready(() => {
   ballotsInit();
   filtersInit();
@@ -51,6 +65,7 @@ $(document).ready(() => {
   multiselectInit();
   bsCustomFileInput.init();
   initializeTooltips();
+  initializeSettingsForm();
 
   initializeConfirms();
   initializeRevealButtons();
