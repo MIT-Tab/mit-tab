@@ -1,7 +1,7 @@
 from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
-from mittab.libs.outround_tab_logic.helpers import get_concurrent_round_size
+from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 
 
 def lost_teams():
@@ -30,10 +30,15 @@ def have_enough_judges_type(type_of_round):
         teams_count // 2
     ) * panel_size
 
-    other_round_num = get_concurrent_round_size(
-        teams_count,
-        type_of_round
-    )
+    var_to_nov = TabSettings.get("var_to_nov", 2)
+
+    var_to_nov = offset_to_quotient(var_to_nov)
+
+    num_teams = teams_count
+
+    other_round_num = num_teams / var_to_nov
+    if type_of_round == BreakingTeam.NOVICE:
+        other_round_num = num_teams * var_to_nov
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -74,10 +79,13 @@ def have_enough_rooms_type(type_of_round):
         num_teams // 2
     )
 
-    other_round_num = get_concurrent_round_size(
-        num_teams,
-        type_of_round
-    )
+    var_to_nov = TabSettings.get("var_to_nov", 2)
+
+    var_to_nov = offset_to_quotient(var_to_nov)
+
+    other_round_num = num_teams / var_to_nov
+    if type_of_round == BreakingTeam.NOVICE:
+        other_round_num = num_teams * var_to_nov
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
