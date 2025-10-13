@@ -51,8 +51,12 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    c_judge = [(judge.pk, judge.name, flags(judge), "(%s)" % judge.ballot_code)
-               for judge in Judge.objects.all()]
+    judges = sorted(Judge.objects.all(), key=lambda j: (-j.rank, j.name))
+
+    c_judge = [
+        (judge.pk, judge.name, flags(judge), f"({judge.ballot_code})", judge.rank)
+        for judge in judges
+    ]
 
     all_flags = [
         [
