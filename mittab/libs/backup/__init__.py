@@ -103,7 +103,7 @@ def get_backup_content(key):
 
 def get_metadata(filename):
     data = filename.split("_")
-    defaults = [filename, "Unknown", "Unknown", "Unknown", "Unknown", "Unknown"]
+    defaults = [filename, filename, "Unknown", "Unknown", "Unknown", "Unknown"]
 
     if len(data) < 4:
         return defaults

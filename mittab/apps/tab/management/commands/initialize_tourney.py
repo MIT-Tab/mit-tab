@@ -71,4 +71,4 @@ class Command(BaseCommand):
             "%s | %s" %
             ("entry".ljust(10, " "), options["entry_password"].ljust(10, " ")))
         if options["first_init"]:
-            backup_round(name="initial_tournament", btype=INITIAL)
+            backup_round(name="initial-tournament", btype=INITIAL)
