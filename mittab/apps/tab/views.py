@@ -383,12 +383,10 @@ def get_settings_from_yaml():
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    settings_dir = os.path.join(settings.BASE_DIR, "settings")
-    if os.path.exists(settings_dir):
-        yaml_settings, settings_by_category, categories = (
+    yaml_settings, settings_by_category, categories = (
             get_settings_from_yaml()
         )
-        template_name = "tab/settings_form.html"
+    template_name = "tab/settings_form.html"
 
     if request.method == "POST":
         _settings_form = SettingsForm(
@@ -404,7 +402,7 @@ def settings_form(request):
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
-        return render(  # Allows for proper validation checking
+        return render(
             request, template_name, {
                 "form": _settings_form,
                 "categories": categories,
