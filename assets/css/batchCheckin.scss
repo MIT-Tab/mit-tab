@@ -1,4 +1,3 @@
-// Table layout
 .table {
   th.round-header {
     width: 16ch;
@@ -9,13 +8,11 @@
   }
 }
 
-// Round header text toggle
 .round-header {
   .full-text { display: inline; }
   .short-text { display: none; }
 }
 
-// Drag selection styling
 td.drag-selecting,
 th.drag-selecting {
   background-color: rgba(0, 123, 255, 0.15) !important;
@@ -30,13 +27,11 @@ th.drag-selecting {
   }
 }
 
-// Disable text selection while dragging
 .tab-pane.dragging table td,
 .tab-pane.dragging table th {
   user-select: none;
 }
 
-// Shared button container styles
 .table tbody tr td:first-child .d-flex,
 .round-header .d-flex {
   flex-direction: column !important;
@@ -52,7 +47,6 @@ th.drag-selecting {
   }
 }
 
-// Mobile responsiveness
 @media (max-width: 1200px) {
   .checkin-label {
     font-size: 0;

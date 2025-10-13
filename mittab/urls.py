@@ -44,7 +44,6 @@ urlpatterns = [
     re_path(r"^judge/(\d+)/scratches/view/",
             judge_views.view_scratches,
             name="view_scratches"),
-
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
     path("download_judge_codes/",
@@ -97,7 +96,6 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
