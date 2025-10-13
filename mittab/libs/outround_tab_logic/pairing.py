@@ -5,7 +5,7 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round_size
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
     add_scratches_for_school_affil
@@ -25,13 +25,12 @@ def perform_the_break():
         None
     )
 
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 0)
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 0)
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if not var_teams_to_break:
         return False, "Please check your break tab settings"
 
-    # This forces a refresh of the breaking teams
     Outround.objects.all().delete()
     BreakingTeam.objects.all().delete()
 
@@ -65,7 +64,13 @@ def perform_the_break():
         current_seed += 1
 
     pair(BreakingTeam.VARSITY)
-    pair(BreakingTeam.NOVICE)
+    if BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.NOVICE
+    ).count() >= 2:
+        pair(BreakingTeam.NOVICE)
+    else:
+        Outround.objects.filter(type_of_round=BreakingTeam.NOVICE).delete()
+        TabSettings.set("nov_outrounds_public", 0)
 
     return True, "Success!"
 
@@ -91,16 +96,15 @@ def get_next_available_room(num_teams, type_of_break):
     base_queryset = Outround.objects.filter(num_teams=num_teams,
                                             type_of_round=type_of_break)
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    other_round_num = get_concurrent_round_size(num_teams, type_of_break)
 
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
-
-    if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / var_to_nov)
+    if other_round_num:
+        other_queryset = Outround.objects.filter(
+            type_of_round=not type_of_break,
+            num_teams=other_round_num
+        )
     else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
+        other_queryset = Outround.objects.none()
 
     rooms = [r.room
              for r in RoomCheckIn.objects.filter(round_number=0)
@@ -166,7 +170,18 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
     num_teams = base_queryset.count()
 
+    if num_teams == 0:
+        return
+
     teams_for_bracket = num_teams
+
+    if num_teams < 2:
+        Outround.objects.filter(type_of_round=type_of_break).delete()
+        if type_of_break == BreakingTeam.VARSITY:
+            TabSettings.set("var_outrounds_public", 0)
+        else:
+            TabSettings.set("nov_outrounds_public", 0)
+        return
 
     while not math.log(teams_for_bracket, 2) % 1 == 0:
         teams_for_bracket += 1

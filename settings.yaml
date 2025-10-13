@@ -82,3 +82,15 @@
   name: rejudge_penalty
   description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
   value: 100
+- novice_outrounds_start_at:
+    name: novice_outrounds_start_at
+    description: "Which varsity round runs at the same time as the first novice outround?"
+    value: 16
+    type: choice
+    choices:
+      - [64, "Varsity Triple Octos"]
+      - [32, "Varsity Double Octos"]
+      - [16, "Varsity Octos"]
+      - [8, "Varsity Quarters"]
+      - [4, "Varsity Semis"]
+      - [2, "Varsity Finals"]

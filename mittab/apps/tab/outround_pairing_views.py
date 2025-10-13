@@ -16,7 +16,7 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
-from mittab.libs.outround_tab_logic import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round_size
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -93,11 +93,13 @@ def get_outround_options(var_teams_to_break,
                          nov_teams_to_break):
     outround_options = []
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
-        var_teams_to_break += 1
+    if var_teams_to_break > 0:
+        while not math.log(var_teams_to_break, 2) % 1 == 0:
+            var_teams_to_break += 1
 
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
-        nov_teams_to_break += 1
+    if nov_teams_to_break > 0:
+        while not math.log(nov_teams_to_break, 2) % 1 == 0:
+            nov_teams_to_break += 1
 
     while var_teams_to_break > 1:
         if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
@@ -199,6 +201,8 @@ def outround_pairing_view(request,
                         type_of_round=BreakingTeam.VARSITY,
                         num_teams=num_teams)
 
+    num_teams = int(num_teams)
+
     pairing_released = False
 
     if type_of_round == BreakingTeam.VARSITY:
@@ -211,7 +215,7 @@ def outround_pairing_view(request,
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if nov_teams_to_break is None or var_teams_to_break is None:
         return redirect_and_flash_error(request,
                                         "Please check your break tab settings",
                                         path="/")
@@ -227,13 +231,7 @@ def outround_pairing_view(request,
         else TabSettings.get("nov_panel_size", 3)
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
+    other_round_num = get_concurrent_round_size(num_teams, type_of_round)
 
     other_round_type = BreakingTeam.VARSITY \
         if type_of_round == BreakingTeam.NOVICE \
@@ -263,33 +261,42 @@ def outround_pairing_view(request,
         opp_team=t
     ).exists()]
 
-    excluded_judges = Judge.objects.exclude(
+    excluded_judges_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round,
-    ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).filter(
-        checkin__round_number=0
     )
-
-    non_checkins = Judge.objects.exclude(
+    non_checkins_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round
-    ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).exclude(
+    )
+    available_rooms_queryset = Room.objects.exclude(
+        rooms_outrounds__num_teams=num_teams,
+        rooms_outrounds__type_of_round=type_of_round
+    )
+
+    if other_round_num:
+        excluded_judges_queryset = excluded_judges_queryset.exclude(
+            judges_outrounds__type_of_round=other_round_type,
+            judges_outrounds__num_teams=other_round_num
+        )
+        non_checkins_queryset = non_checkins_queryset.exclude(
+            judges_outrounds__type_of_round=other_round_type,
+            judges_outrounds__num_teams=other_round_num
+        )
+        available_rooms_queryset = available_rooms_queryset.exclude(
+            rooms_outrounds__num_teams=other_round_num,
+            rooms_outrounds__type_of_round=other_round_type
+        )
+
+    excluded_judges = excluded_judges_queryset.filter(
         checkin__round_number=0
     )
 
-    available_rooms = Room.objects.exclude(
-        rooms_outrounds__num_teams=num_teams,
-        rooms_outrounds__type_of_round=type_of_round
-    ).exclude(
-        rooms_outrounds__num_teams=other_round_num,
-        rooms_outrounds__type_of_round=other_round_type
+    non_checkins = non_checkins_queryset.exclude(
+        checkin__round_number=0
     )
+
+    available_rooms = available_rooms_queryset
 
     checked_in_rooms = [r.room for r in RoomCheckIn.objects.filter(round_number=0)]
     available_rooms = [r for r in available_rooms if r in checked_in_rooms]
@@ -329,25 +336,25 @@ def alternative_judges(request, round_id, judge_id=None):
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = round_obj.num_teams / var_to_nov
-    if round_obj.type_of_round == BreakingTeam.NOVICE:
-        other_round_num = round_obj.num_teams * var_to_nov
+    other_round_num = get_concurrent_round_size(
+        round_obj.num_teams,
+        round_obj.type_of_round
+    )
 
     other_round_type = BreakingTeam.NOVICE \
         if round_obj.type_of_round == BreakingTeam.VARSITY \
         else BreakingTeam.VARSITY
 
-    excluded_judges = Judge.objects.exclude(
+    excluded_judges_queryset = Judge.objects.exclude(
         judges_outrounds__num_teams=round_obj.num_teams,
         judges_outrounds__type_of_round=round_obj.type_of_round
-    ).exclude(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    ).filter(
+    )
+    if other_round_num:
+        excluded_judges_queryset = excluded_judges_queryset.exclude(
+            judges_outrounds__num_teams=other_round_num,
+            judges_outrounds__type_of_round=other_round_type
+        )
+    excluded_judges = excluded_judges_queryset.filter(
         checkin__round_number=0
     )
 
@@ -355,10 +362,11 @@ def alternative_judges(request, round_id, judge_id=None):
         judges_outrounds__num_teams=round_obj.num_teams,
         judges_outrounds__type_of_round=round_obj.type_of_round
     )
-    query = query | Q(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    )
+    if other_round_num:
+        query = query | Q(
+            judges_outrounds__num_teams=other_round_num,
+            judges_outrounds__type_of_round=other_round_type
+        )
 
     included_judges = Judge.objects.filter(query) \
                                    .filter(checkin__round_number=0) \
@@ -570,7 +578,10 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
+    show_outrounds_bracket = TabSettings.get(
+        "show_outrounds_bracket",
+        TabSettings.get("show_outs_bracket", False)
+    )
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)
@@ -621,7 +632,7 @@ def update_choice(request, outround_id):
     return JsonResponse(data)
 
 
-def create_forum_view_data(type_of_round):
+def forum_view(request, type_of_round):
     outrounds = Outround.objects.exclude(
         victor=Outround.UNKNOWN
     ).filter(
@@ -666,13 +677,10 @@ def create_forum_view_data(type_of_round):
             ]
 
         results.append(to_add)
-    return locals()
 
-
-def forum_view(request, type_of_round):
     return render(request,
                   "outrounds/forum_result.html",
-                  create_forum_view_data(type_of_round))
+                  locals())
 
 def alternative_rooms(request, round_id, current_room_id=None):
     round_obj = Outround.objects.get(id=int(round_id))
