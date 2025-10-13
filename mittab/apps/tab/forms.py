@@ -508,49 +508,53 @@ class SettingsForm(forms.Form):
 
         for setting in self.settings:
             field_name = "setting_%s" % (setting["name"],)
+            label = setting["name"].replace("_", " ").title()
+
             if setting.get("type") == "boolean":
                 self.fields[field_name] = forms.BooleanField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
-                    required=False
+                    required=False,
+                    widget=forms.CheckboxInput(attrs={
+                        "class": "form-check-input"
+                    })
                 )
             elif setting.get("type") == "choice":
                 choices = [(c[0], c[1]) for c in setting.get("choices", [])]
                 self.fields[field_name] = forms.TypedChoiceField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     choices=choices,
                     initial=setting["value"],
-                    coerce=int
+                    coerce=int,
+                    widget=forms.Select(attrs={
+                        "class": "form-control"
+                    })
                 )
             else:
                 self.fields[field_name] = forms.IntegerField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
-                    initial=setting["value"]
+                    initial=setting["value"],
+                    widget=forms.NumberInput(attrs={
+                        "class": "form-control"
+                    })
                 )
 
     def save(self):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
-            tab_setting = TabSettings.objects.filter(
-                key=self.fields[field].label
-            ).first()
-
-            value_to_set = setting["value"]
+            key = setting["name"]
+            tab_setting = TabSettings.objects.filter(key=key).first()
 
             if "type" in setting and setting["type"] == "boolean":
-                if not self.cleaned_data[field]:
-                    value_to_set = 0
-                else:
-                    value_to_set = 1
+                value_to_set = 1 if self.cleaned_data[field] else 0
             else:
                 value_to_set = self.cleaned_data[field]
 
             if not tab_setting:
-                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
-                                                         value=value_to_set)
+                TabSettings.objects.create(key=key, value=value_to_set)
             else:
                 tab_setting.value = value_to_set
                 tab_setting.save()
@@ -703,6 +707,48 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+
+class RoomTagForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    judges = forms.ModelMultipleChoiceField(
+        queryset=Judge.objects.all(),
+        required=False,
+    )
+    rooms = forms.ModelMultipleChoiceField(
+        queryset=Room.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.team_set.all()
+            self.fields["judges"].initial = self.instance.judge_set.all()
+            self.fields["rooms"].initial = self.instance.room_set.all()
+
+    def save(self, commit=True):
+        room_tag = super().save(commit=commit)
+
+        room_tag.team_set.set(self.cleaned_data.get("teams", []))
+        room_tag.judge_set.set(self.cleaned_data.get("judges", []))
+        room_tag.room_set.set(self.cleaned_data.get("rooms", []))
+
+        return room_tag
+
+    class Meta:
+        model = RoomTag
+        fields = ("tag", "priority", "teams", "judges", "rooms")
+
+
+class MiniRoomTagForm(RoomTagForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("judges")
+        self.fields.pop("rooms")
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(
