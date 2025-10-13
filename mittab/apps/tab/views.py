@@ -386,29 +386,30 @@ def settings_form(request):
     yaml_settings, setting_dict, categories = get_settings_from_yaml()
 
     if request.method == "POST":
-        settings_form = SettingsForm(request.POST, settings=yaml_settings)
+        form = SettingsForm(request.POST, settings=yaml_settings)
 
-        if settings_form.is_valid():
-            settings_form.save()
+        if form.is_valid():
+            form.save()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
     else:
-        settings_form = SettingsForm(settings=yaml_settings)
+        form = SettingsForm(settings=yaml_settings)
 
     categories_with_fields = [
         {
-            **category, 
-            'fields': [settings_form[f"setting_{sname}"] for sname in setting_dict[category['id']]]
+            **category,
+            "fields": [form[f"setting_{sname}"] for
+                       sname in setting_dict[category["id"]]]
         }
         for category in categories
     ]
 
     return render(
         request, "tab/settings_form.html", {
-            "form": settings_form,
+            "form": form,
             "categories": categories_with_fields,
             "title": "Tab Settings"
         })
