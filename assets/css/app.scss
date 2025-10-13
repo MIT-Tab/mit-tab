@@ -95,13 +95,23 @@ $font-size-base: 0.95rem !default;
   width: 100%;
 }
 
-.tab-content {
-  .form-group select,
-  .form-group input {
-    max-width: 200px;
-  }
+.warning-container {
+  width: 500px;
+}
 
-  .custom-control.custom-switch {
-    padding-top: 0.25rem;
-  }
+.warning-popup {
+  display: none;
+  position: absolute;
+  padding: 10px;
+  border-radius: 5px;
+  width: 500px;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.warning-container:hover .warning-popup {
+  display: block;
 }
