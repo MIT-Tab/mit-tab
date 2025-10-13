@@ -3,8 +3,8 @@ from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse, Http404
-from django.shortcuts import render, reverse, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, reverse
 from django.core.management import call_command
 import yaml
 
@@ -277,26 +277,42 @@ def enter_room(request):
     })
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def room_check_in(request, room_id, round_number):
-    room_id, round_number = int(room_id), int(round_number)
+def bulk_check_in(request):
+    entity_type = request.POST.get("entity_type")
+    action = request.POST.get("action")
 
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # 0 is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
+    entity_ids = request.POST.getlist("entity_ids[]")
+    entity_ids = [int(eid) for eid in entity_ids if eid.isdigit()]
 
-    room = get_object_or_404(Room, pk=room_id)
-    if request.method == "POST":
-        if not room.is_checked_in_for_round(round_number):
-            check_in = RoomCheckIn(room=room, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if room.is_checked_in_for_round(round_number):
-            check_ins = RoomCheckIn.objects.filter(room=room,
-                                                   round_number=round_number)
-            check_ins.delete()
+    if not entity_ids:
+        return JsonResponse({"success": True})
+
+    # Teams have a simple boolean field
+    if entity_type == "team":
+        Team.objects.filter(pk__in=entity_ids).update(checked_in=(action == "check_in"))
+        return JsonResponse({"success": True})
+
+    # Judges and rooms use check-in records per round
+    round_numbers = [int(rn) for rn in request.POST.getlist("rounds[]") if rn.isdigit()]
+
+    if not round_numbers:
+        return JsonResponse({"success": True})
+
+    if entity_type == "judge":
+        checkInObj, id_field = CheckIn, "judge_id"
     else:
-        raise Http404("Must be POST or DELETE")
+        checkInObj, id_field = RoomCheckIn, "room_id"
+
+    if action == "check_in":
+        checkInObj.objects.bulk_create(
+            [checkInObj(**{id_field: eid, "round_number": rn})
+             for eid in entity_ids for rn in round_numbers],
+            ignore_conflicts=True
+        )
+    else:
+        checkInObj.objects.filter(**{f"{id_field}__in": entity_ids},
+                                  round_number__in=round_numbers).delete()
+
     return JsonResponse({"success": True})
 
 
@@ -499,39 +515,38 @@ def manage_room_tags(request):
                    "form": form})
 
 def batch_checkin(request):
-    judges_and_checkins = []
-    rooms_and_checkins = []
-
-    teams = Team.objects.prefetch_related("school", "debaters").all()
-    team_and_checkins = [(team.school.name,
-                          team,
-                          team.debaters.all(),
-                          team.checked_in)
-                         for team in teams]
-
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    all_round_numbers = [0]+round_numbers
-    judges = Judge.objects.prefetch_related("checkin_set", "schools")
+    all_round_numbers = [0] + round_numbers
 
-    for judge in judges:
-        checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
+    team_data = [
+        {"entity": t, "school": t.school, "debaters": t.debaters_display,
+         "checked_in": t.checked_in}
+        for t in Team.objects.prefetch_related("school", "debaters").all()
+    ]
 
-    rooms = Room.objects.prefetch_related("roomcheckin_set")
+    judge_data = [
+        {"entity": j, "schools": j.schools.all(),
+         "checkins": [rn in {c.round_number for c in j.checkin_set.all()}
+                      for rn in all_round_numbers]}
+        for j in Judge.objects.prefetch_related("checkin_set", "schools")
+    ]
 
-    for room in rooms:
-        checkins = []
-        checkins = {checkin.round_number for checkin in room.roomcheckin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        rooms_and_checkins.append((room, checkins_list))
+    room_data = [
+        {"entity": r,
+         "checkins": [rn in {c.round_number for c in r.roomcheckin_set.all()}
+                      for rn in all_round_numbers]}
+        for r in Room.objects.prefetch_related("roomcheckin_set")
+    ]
 
     return render(request, "batch_check_in/check_in.html", {
-        "teams_and_checkins": team_and_checkins,
-        "judges_and_checkins": judges_and_checkins,
+        "team_data": team_data,
+        "team_headers": ["School", "Team", "Debater Names"],
+        "judge_data": judge_data,
+        "judge_headers": ["School", "Judge"],
+        "room_data": room_data,
+        "room_headers": ["Room"],
         "round_numbers": round_numbers,
-        "rooms_and_checkins": rooms_and_checkins,
-        })
+    })
 
 
 def publish_results(request, new_setting):

@@ -44,9 +44,6 @@ urlpatterns = [
     re_path(r"^judge/(\d+)/scratches/view/",
             judge_views.view_scratches,
             name="view_scratches"),
-    re_path(r"^judge/(\d+)/check_ins/round/(\d+)/$",
-            judge_views.judge_check_in,
-            name="judge_check_in"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
     path("download_judge_codes/",
@@ -63,9 +60,8 @@ urlpatterns = [
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
-    re_path(r"^room/(\d+)/check_ins/round/(\d+)/$",
-            views.room_check_in,
-            name="room_check_in"),
+
+    path("bulk_check_in/", views.bulk_check_in, name="bulk_check_in"),
     path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
     path("room-tag/", views.room_tag, name="room_tag"),
     path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
@@ -100,9 +96,6 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    re_path(r"^team/(\d+)/check_ins/$",
-            team_views.team_check_in,
-            name="team_check_in"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
