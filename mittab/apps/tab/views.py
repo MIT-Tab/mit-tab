@@ -350,9 +350,6 @@ def get_settings_from_yaml():
     categories = []
 
     for filename in sorted(os.listdir(settings_dir)):
-        if not filename.endswith(".yaml"):
-            continue
-
         yaml_file = os.path.join(settings_dir, filename)
 
         with open(yaml_file, "r") as stream:
@@ -361,7 +358,7 @@ def get_settings_from_yaml():
         category_info = data["category"]
         category_settings = data["settings"]
 
-        category_id = category_info.get("id", filename[:-5])
+        category_id = category_info.get("id")
 
         categories.append(category_info)
         settings_by_category[category_id] = []
@@ -374,7 +371,6 @@ def get_settings_from_yaml():
                     setting["value"] = stored_value == 1
                 else:
                     setting["value"] = stored_value
-                break
             all_settings.append(setting)
             settings_by_category[category_id].append(setting["name"])
 
@@ -390,9 +386,9 @@ def settings_form(request):
     settings_dir = os.path.join(settings.BASE_DIR, "settings")
     if os.path.exists(settings_dir):
         yaml_settings, settings_by_category, categories = (
-            get_categorized_settings_from_yaml()
+            get_settings_from_yaml()
         )
-        template_name = "tab/settings_form_tabbed.html"
+        template_name = "tab/settings_form.html"
 
     if request.method == "POST":
         _settings_form = SettingsForm(

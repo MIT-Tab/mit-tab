@@ -1,14 +1,119 @@
 {% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+{% load tags %}
 
-{% block title %}Data Entry{% endblock %}
+{% block title %}Tab Settings{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="col-md-6">
-  {% include "common/_form.html" %}
+<div class="col-md-8">
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        {% for category in categories %}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link{% if forloop.first %} active{% endif %}" 
+                   id="{{ category.id }}-tab" 
+                   data-toggle="tab" 
+                   href="#{{ category.id }}" 
+                   role="tab" 
+                   aria-controls="{{ category.id }}" 
+                   aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+                    {{ category.name }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {{ form.media }}
+    <form action="" method="post" id="data-entry-form">{% csrf_token %}
+        <div class="tab-content">
+            {% for category in categories %}
+                <div class="tab-pane fade{% if forloop.first %} show active{% endif %}" 
+                     id="{{ category.id }}" 
+                     role="tabpanel" 
+                     aria-labelledby="{{ category.id }}-tab">
+                    <div class="alert alert-info mb-4">
+                        <strong>{{ category.name }}</strong><br>
+                        {{ category.description }}
+                    </div>
+                    {% fields_for_category form category.id as category_fields %}
+                    
+                    <!-- Two-column layout for form fields -->
+                    <div class="row">
+                        {% for field in category_fields %}
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label for="{{ field.id_for_label }}" class="mb-0 font-weight-bold">
+                                            {{ field.name|format_setting_name }}
+                                        </label>
+                                        {% if field.help_text %}
+                                            <span class="badge badge-info ml-2" 
+                                                  data-toggle="tooltip" 
+                                                  data-placement="top" 
+                                                  data-html="true"
+                                                  title="{{ field.help_text }}"
+                                                  style="cursor: help;">?</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {% if field.field.widget.input_type == 'checkbox' %}
+                                        <div class="custom-control custom-switch">
+                                            <input type="checkbox" 
+                                                   class="custom-control-input" 
+                                                   name="{{ field.name }}" 
+                                                   id="{{ field.id_for_label }}"
+                                                   {% if field.value %}checked{% endif %}>
+                                            <label class="custom-control-label" for="{{ field.id_for_label }}">
+                                                {% if field.value %}Enabled{% else %}Disabled{% endif %}
+                                            </label>
+                                        </div>
+                                    {% else %}
+                                        {{ field }}
+                                    {% endif %}
+                                    
+                                    {% if field.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ field.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if forloop.counter|divisibleby:2 %}
+                                </div><div class="row">
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% buttons %}
+            <input type="submit" value="Save" class="btn btn-primary"/>
+        {% endbuttons %}
+    </form>
 </div>
-<div class="col-md-6">
-    <div class="alert alert-warning">Please be careful editing these settings.  If you require assistance, please check out the <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html"> documentation!</a>
+<div class="col-md-4">
+    <div class="alert alert-warning">
+        Please be careful editing these settings. If you require assistance, please check out the 
+        <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html"> documentation!</a>
+    </div>
 </div>
+
+<script>
+    // Initialize Bootstrap tooltips
+    $(document).ready(function(){
+        $('[data-toggle="tooltip"]').tooltip();
+        
+        // Handle switch toggle state changes
+        $('.custom-control-input').on('change', function() {
+            var label = $(this).siblings('.custom-control-label');
+            if ($(this).is(':checked')) {
+                label.text('Enabled');
+            } else {
+                label.text('Disabled');
+            }
+        });
+    });
+</script>
 {% endblock %}
