@@ -5,7 +5,10 @@ const submitCheckIn = (checkboxes, checked) => {
   const $boxes = $(checkboxes);
   if (!$boxes.length) return;
 
-  const entityType = $boxes.first().closest('[data-entity-type]').data('entityType');
+  const entityType = $boxes
+    .first()
+    .closest("[data-entity-type]")
+    .data("entityType");
 
   $.post("/bulk_check_in/", {
     csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
@@ -29,7 +32,9 @@ const submitCheckIn = (checkboxes, checked) => {
 
 const getBulkTargets = btn => {
   const { scope, round } = $(btn).data();
-  const entityType = $(btn).closest('[data-entity-type]').data('entityType');
+  const entityType = $(btn)
+    .closest("[data-entity-type]")
+    .data("entityType");
   const base = `.checkin-toggle`;
   const sel = `${base}:not(.bulk-toggle)`;
 

@@ -280,7 +280,7 @@ def enter_room(request):
 def bulk_check_in(request):
     entity_type = request.POST.get("entity_type")
     action = request.POST.get("action")
-    
+
     entity_ids = request.POST.getlist("entity_ids")
     entity_ids = [int(eid) for eid in entity_ids if eid.isdigit()]
 
