@@ -6,7 +6,6 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
-from django.utils import timezone
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -25,8 +24,10 @@ from mittab.libs.data_export.pairings_export import export_pairings_csv
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
-        backup.backup_round("before_pairing_%s_%s" %
-                            (num_teams / 2, type_of_round))
+        type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
+        round_str = f"Round-of-{num_teams}-{type_str}"
+        backup.backup_round(round_number=round_str,
+                            btype=backup.BEFORE_PAIRING)
 
         Outround.objects.filter(num_teams__lt=num_teams,
                                 type_of_round=type_of_round).delete()
@@ -128,7 +129,7 @@ def get_outround_options(var_teams_to_break,
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
-        backup.backup_round("before_the_break_%s" % (timezone.now().strftime("%H:%M"),))
+        backup.backup_round(btype=backup.BEFORE_BREAK)
 
         success, msg = outround_tab_logic.perform_the_break()
 
@@ -711,8 +712,9 @@ def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
     if request.method == "POST":
         try:
             type_str = "Varsity" if round_type == Outround.VARSITY else "Novice"
-            round_str = f"round_of_{type_str}_{num_teams}"
-            backup.backup_round(f"before_judge_assignments_{round_str}")
+            round_str = f"Round-of-{num_teams}-{type_str}"
+            backup.backup_round(round_number=round_str,
+                                btype=backup.BEFORE_JUDGE_ASSIGN)
             assign_judges.add_outround_judges(round_type=round_type)
         except Exception:
             emit_current_exception()

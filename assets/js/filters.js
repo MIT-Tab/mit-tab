@@ -40,10 +40,33 @@ function toggleJudgeDisplay() {
   }
 }
 
+function applyDropdownFilters() {
+  const filters = {};
+  $(".dropdown-filter").each((index, elem) => {
+    const value = $(elem).val();
+    const filterKey = $(elem).data("filter-key");
+    if (value && filterKey) {
+      filters[filterKey] = value;
+    }
+  });
+
+  $("tr.filterable-row").each((index, row) => {
+    let show = true;
+    Object.keys(filters).forEach(key => {
+      const rowValue = $(row).data(key);
+      if (rowValue !== filters[key]) {
+        show = false;
+      }
+    });
+    $(row).toggle(show);
+  });
+}
+
 function filtersInit() {
   $(".filter").change(applyFilters);
   $("#toggle-judge-display").click(toggleJudgeDisplay);
   applyFilters();
+  $(".dropdown-filter").change(applyDropdownFilters);
 }
 
 export default filtersInit;
