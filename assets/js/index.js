@@ -45,14 +45,17 @@ function initializeTooltips() {
 }
 
 function initializeSettingsForm() {
-  $('.custom-control-input').on('change', function() {
-    var label = $(this).siblings('.custom-control-label');
-    if ($(this).is(':checked')) {
-      label.text('Enabled');
-    } else {
-      label.text('Disabled');
+  $(".custom-control-input").on(
+    "change",
+    function handleCustomControlInputChange() {
+      const label = $(this).siblings(".custom-control-label");
+      if ($(this).is(":checked")) {
+        label.text("Enabled");
+      } else {
+        label.text("Disabled");
+      }
     }
-  });
+  );
 }
 
 $(document).ready(() => {
