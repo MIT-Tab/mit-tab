@@ -28,7 +28,7 @@ const submitCheckIn = (checkboxes, checked) => {
           .text(`Checked ${status}`)
       );
     })
-    .fail(() => alert("Operation failed"));
+    .fail(() => alert("Check-in failed. Please try again."));
 };
 
 const getBulkTargets = btn => {
@@ -59,8 +59,6 @@ $(() => {
     .on("mousedown", "td, th", e => {
       const $cell = $(e.currentTarget);
       if (!$cell.find(toggleSelector).length) return;
-      
-      // Don't start drag selection on hidden rows
       if (!$cell.closest("tr").is(":visible")) return;
 
       drag = {
@@ -106,9 +104,7 @@ $(() => {
   });
 
   $(document)
-    .on("click", ".checkin-toggle, .checkin-label", e =>
-      e.preventDefault()
-    )
+    .on("click", ".checkin-toggle, .checkin-label", e => e.preventDefault())
     .on("click", ".bulk-toggle", e => {
       const targets = getBulkTargets(e.currentTarget);
       const shouldCheckIn = $(e.currentTarget).data("action") === "check_in";
