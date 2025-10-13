@@ -509,9 +509,11 @@ class SettingsForm(forms.Form):
 
         for setting in self.settings:
             field_name = "setting_%s" % (setting["name"],)
+            label = setting["name"].replace("_", " ").title()
+            
             if setting.get("type") == "boolean":
                 self.fields[field_name] = forms.BooleanField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
                     required=False,
@@ -522,7 +524,7 @@ class SettingsForm(forms.Form):
             elif setting.get("type") == "choice":
                 choices = [(c[0], c[1]) for c in setting.get("choices", [])]
                 self.fields[field_name] = forms.TypedChoiceField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     choices=choices,
                     initial=setting["value"],
@@ -533,7 +535,7 @@ class SettingsForm(forms.Form):
                 )
             else:
                 self.fields[field_name] = forms.IntegerField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
                     widget=forms.NumberInput(attrs={
@@ -561,7 +563,7 @@ class SettingsForm(forms.Form):
     def save(self):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
-            key = self.fields[field].label
+            key = setting["name"]  # Use the raw setting name as the key
 
             tab_setting = TabSettings.objects.filter(key=key).first()
 
