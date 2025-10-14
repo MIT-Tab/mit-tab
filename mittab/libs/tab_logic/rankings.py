@@ -19,7 +19,7 @@ def rank_speakers():
     ])
 
 
-def rank_teams():
+def rank_teams(exclude_round=None):
     all_teams = Team.objects.all().prefetch_related(
         "gov_team",  # poorly named relation, gets rounds as gov team
         "opp_team",  # poorly named relation, rounds as opp team
@@ -42,7 +42,7 @@ def rank_teams():
         "debaters__team_set__no_shows",
         "debaters__team_set__byes",
     )
-    return sorted(TeamScore(d) for d in all_teams)
+    return sorted(TeamScore(d, exclude_round) for d in all_teams)
 
 
 class Stat:
@@ -120,15 +120,15 @@ class TeamScore(Score):
                      SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
                      DOUBLE_ADJUSTED_RANKS, OPP_STRENGTH, COIN_FLIP)
 
-    def __init__(self, team):
+    def __init__(self, team, exclude_round=None):
         super(TeamScore, self).__init__()
         self.team = team
-        self.stats[WINS] = tot_wins(team)
-        self.stats[SPEAKS] = tot_speaks(team)
-        self.stats[RANKS] = tot_ranks(team)
-        self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks(team)
-        self.stats[SINGLE_ADJUSTED_RANKS] = single_adjusted_ranks(team)
-        self.stats[DOUBLE_ADJUSTED_SPEAKS] = double_adjusted_speaks(team)
-        self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(team)
-        self.stats[OPP_STRENGTH] = opp_strength(team)
+        self.stats[WINS] = tot_wins(team, exclude_round)
+        self.stats[SPEAKS] = tot_speaks(team, exclude_round)
+        self.stats[RANKS] = tot_ranks(team, exclude_round)
+        self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks(team, exclude_round)
+        self.stats[SINGLE_ADJUSTED_RANKS] = single_adjusted_ranks(team, exclude_round)
+        self.stats[DOUBLE_ADJUSTED_SPEAKS] = double_adjusted_speaks(team, exclude_round)
+        self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(team, exclude_round)
+        self.stats[OPP_STRENGTH] = opp_strength(team, exclude_round)
         self.stats[COIN_FLIP] = team.tiebreaker

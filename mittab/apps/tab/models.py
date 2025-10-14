@@ -172,6 +172,7 @@ class Team(models.Model):
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    ranking_public = models.BooleanField(default=True)
 
     @classmethod
     def with_preloaded_relations_for_tab_card(cls):
