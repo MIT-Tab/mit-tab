@@ -23,11 +23,11 @@ def num_forfeit_wins(team, exclude_round=False):
     # Use .all() to leverage prefetched data, then filter in Python
     govs = team.gov_team.all()
     opps = team.opp_team.all()
-    
+
     if exclude_round:
         govs = [r for r in govs if r.round_number != exclude_round]
         opps = [r for r in opps if r.round_number != exclude_round]
-        
+
     for round_obj in govs:
         if round_obj.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
             num_wins += 1
@@ -109,7 +109,7 @@ def tot_wins(team, exclude_round=False):
     # Use .all() to leverage prefetched data, then filter in Python
     govs = team.gov_team.all()
     opps = team.opp_team.all()
-    
+
     if exclude_round:
         govs = [r for r in govs if r.round_number != exclude_round]
         opps = [r for r in opps if r.round_number != exclude_round]
@@ -193,7 +193,7 @@ def opp_strength(team, exclude_round=False):
     # Use .all() to leverage prefetched data, then filter in Python
     govs = team.gov_team.all()
     opps = team.opp_team.all()
-    
+
     if exclude_round:
         govs = [r for r in govs if r.round_number != exclude_round]
         opps = [r for r in opps if r.round_number != exclude_round]
@@ -291,7 +291,7 @@ def speaks_for_debater(debater, average_ironmen=True, exclude_round=False):
     # Use .all() to leverage prefetched data, then filter in Python
     debater_roundstats = debater.roundstats_set.all()
     if exclude_round:
-        debater_roundstats = [rs for rs in debater_roundstats 
+        debater_roundstats = [rs for rs in debater_roundstats
                               if rs.round.round_number != exclude_round]
     debater_speaks = []
 
@@ -451,7 +451,7 @@ def ranks_for_debater(debater, average_ironmen=True, exclude_round=False):
     # Use .all() to leverage prefetched data, then filter in Python
     debater_roundstats = debater.roundstats_set.all()
     if exclude_round:
-        debater_roundstats = [rs for rs in debater_roundstats 
+        debater_roundstats = [rs for rs in debater_roundstats
                               if rs.round.round_number != exclude_round]
     debater_ranks = []
 
