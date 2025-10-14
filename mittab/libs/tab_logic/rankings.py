@@ -19,7 +19,7 @@ def rank_speakers():
     ])
 
 
-def rank_teams(exclude_round=False):
+def rank_teams(exclude_round=None):
     all_teams = Team.objects.all().prefetch_related(
         "gov_team",  # poorly named relation, gets rounds as gov team
         "opp_team",  # poorly named relation, rounds as opp team
@@ -42,10 +42,7 @@ def rank_teams(exclude_round=False):
         "debaters__team_set__no_shows",
         "debaters__team_set__byes",
     )
-    if exclude_round:
-        current_round = TabSettings.get("cur_round") - 1
-        return sorted(TeamScore(d, current_round) for d in all_teams)
-    return sorted(TeamScore(d) for d in all_teams)
+    return sorted(TeamScore(d, exclude_round) for d in all_teams)
 
 
 class Stat:
@@ -123,7 +120,7 @@ class TeamScore(Score):
                      SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
                      DOUBLE_ADJUSTED_RANKS, OPP_STRENGTH, COIN_FLIP)
 
-    def __init__(self, team, exclude_round=False):
+    def __init__(self, team, exclude_round=None):
         super(TeamScore, self).__init__()
         self.team = team
         self.stats[WINS] = tot_wins(team, exclude_round)

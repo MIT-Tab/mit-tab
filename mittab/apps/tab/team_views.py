@@ -389,7 +389,10 @@ def rank_teams_ajax(request):
 
 
 def get_team_rankings(request, public=False):
-    ranked_teams = tab_logic.rankings.rank_teams(public)
+    exclude_round = None
+    if public:
+        exclude_round = TabSettings.get("cur_round", 0) - 1
+    ranked_teams = tab_logic.rankings.rank_teams(exclude_round=exclude_round)
     teams = []
     for i, team_stat in enumerate(ranked_teams):
         if public:
@@ -421,7 +424,7 @@ def get_team_rankings(request, public=False):
 def rank_teams(request):
     teams, nov_teams = cache_logic.cache_fxn_key(
         get_team_rankings,
-        "team_rankings",
+        f"team_rankings_private",
         cache_logic.DEFAULT,
         request,
         public=False
@@ -441,7 +444,7 @@ def rank_teams_public(request):
 
     teams = cache_logic.cache_fxn_key(
         get_team_rankings,
-        "team_rankings",
+        "team_rankings_public",
         cache_logic.DEFAULT,
         request,
         public=True
