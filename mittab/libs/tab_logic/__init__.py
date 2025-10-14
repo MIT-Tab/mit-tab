@@ -24,11 +24,10 @@ def pair_round():
         5) Calculate byes
         6) Calculate pull ups based on byes
         7) Pass in evened brackets to the perfect pairing algorithm
-        8) Assign rooms to pairings
 
     Judges are added later.
 
-    pairings are computed in the following format: [gov,opp,judge,room]
+    pairings are computed in the following format: [gov,opp,judge]
     and then saved immediately into the database
     """
     current_round = TabSettings.get("cur_round")
@@ -135,8 +134,6 @@ def pair_round():
                         raise errors.NotEnoughTeamsError()
                 else:
                     pull_up = None
-                    # i is the last team in the bracket below
-                    i = len(list_of_teams[bracket - 1]) - 1
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [
                         r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
@@ -166,7 +163,7 @@ def pair_round():
                     # sort again by speaks making sure to leave any first
                     # round bye in the correct spot
                     removed_teams = []
-                    for team in list(Team.objects.filter(checked_in=True)):
+                    for team in all_checked_in_teams:
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
                         if team in middle_of_bracket and tot_wins(team) == bracket:
@@ -190,7 +187,7 @@ def pair_round():
             temp = perfect_pairing(list_of_teams[bracket])
             print("Pairing bracket %i of size %i" % (bracket, len(temp)))
         for pair in temp:
-            pairings.append([pair[0], pair[1], None])
+            pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
         random.shuffle(pairings, random=random.random)
@@ -207,22 +204,11 @@ def pair_round():
             ),
         )
 
-    # Assign rooms (does this need to be random? maybe bad to have top
-    #               ranked teams/judges in top rooms?)
-    rooms = RoomCheckIn.objects.filter(round_number=current_round).prefetch_related(
-        "room"
-    )
-    rooms = map(lambda r: r.room, rooms)
-    rooms = sorted(rooms, key=lambda r: r.rank, reverse=True)
-
-    for i, pairing in enumerate(pairings):
-        pairing[2] = rooms[i]
-
     # Enter into database
     all_rounds = []
-    for gov, opp, room in pairings:
+    for gov, opp in pairings:
         round_obj = Round(
-            round_number=current_round, gov_team=gov, opp_team=opp, room=room
+            round_number=current_round, gov_team=gov, opp_team=opp
         )
         if gov in all_pull_ups:
             round_obj.pullup = Round.GOV
@@ -374,39 +360,47 @@ def get_middle_and_non_middle_teams(all_teams):
     return middle_of_bracket, non_middle_of_bracket
 
 
-def sorted_pairings(round_number):
+def sorted_pairings(round_number, outround=False):
     """
     Helper function to get the sorted pairings for a round while minimizing the
     number of DB queries required to calculate it
     """
+    fields = [
+        "judges",
+        "judges__judges",
+        "chair",
+        "room",
+        "gov_team",
+        "opp_team",
+        "gov_team__breaking_team",
+        "gov_team__gov_team",  # poorly named relation, points to rounds as gov
+        "gov_team__opp_team",  # poorly named relation, points to rounds as gov
+        "gov_team__byes",
+        "gov_team__no_shows",
+        "gov_team__debaters__team_set",
+        "gov_team__debaters__team_set__byes",
+        "gov_team__debaters__team_set__no_shows",
+        "gov_team__debaters__roundstats_set",
+        "gov_team__debaters__roundstats_set__round",
+        "opp_team__breaking_team",
+        "opp_team__gov_team",  # poorly named relation, points to rounds as gov
+        "opp_team__opp_team",  # poorly named relation, points to rounds as gov
+        "opp_team__byes",
+        "opp_team__no_shows",
+        "opp_team__debaters__team_set",
+        "opp_team__debaters__team_set__byes",
+        "opp_team__debaters__team_set__no_shows",
+        "opp_team__debaters__roundstats_set",
+        "opp_team__debaters__roundstats_set__round",
+        "room__tags", "judges__required_room_tags",
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags"
+    ]
+    model = Outround if outround else Round
+    filter_field = "num_teams" if outround else "round_number"
+
     round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(
-            "judges",
-            "chair",
-            "room",
-            "gov_team",
-            "opp_team",
-            "gov_team__breaking_team",
-            "gov_team__gov_team",  # poorly named relation, points to rounds as gov
-            "gov_team__opp_team",  # poorly named relation, points to rounds as gov
-            "gov_team__byes",
-            "gov_team__no_shows",
-            "gov_team__debaters__team_set",
-            "gov_team__debaters__team_set__byes",
-            "gov_team__debaters__team_set__no_shows",
-            "gov_team__debaters__roundstats_set",
-            "gov_team__debaters__roundstats_set__round",
-            "opp_team__breaking_team",
-            "opp_team__gov_team",  # poorly named relation, points to rounds as gov
-            "opp_team__opp_team",  # poorly named relation, points to rounds as gov
-            "opp_team__byes",
-            "opp_team__no_shows",
-            "opp_team__debaters__team_set",
-            "opp_team__debaters__team_set__byes",
-            "opp_team__debaters__team_set__no_shows",
-            "opp_team__debaters__roundstats_set",
-            "opp_team__debaters__roundstats_set__round",
-        )
+        model.objects.filter(**{filter_field: round_number}).prefetch_related(*fields)
     )
     round_pairing.sort(key=lambda x: team_comp(x, round_number), reverse=True)
 

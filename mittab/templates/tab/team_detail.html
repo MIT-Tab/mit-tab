@@ -1,0 +1,43 @@
+{% extends "common/data_entry.html" %}
+
+{% block detail_content %}
+{% if team_obj %}
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  <div class="team-record">
+    <h5>Team Stats</h5>
+    <table class="table table-striped">
+      <thead><th>Stat</th><th>Value</th></thead>
+      {% for stat,val in team_stats %}
+        <tr><td>{{stat}}</td><td>{{val}}</td></tr>
+      {% endfor %}
+    </table>
+    <a href='/team/card/{{ team_obj.id }}/pretty/' class="btn btn-link">View Tab Card</a>
+  </div>
+  
+  <div class="team-record mt-4">
+    <h5>Team Details</h5>
+    <table class="table table-striped">
+      <tr>
+        <td>Debaters</td>
+        <td>
+          {% for debater in team_obj.debaters.all %}
+            <a href='/debater/{{ debater.id }}/'>{{ debater.name }}</a>{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      <tr>
+        <td>School</td>
+        <td><a href='/school/{{ team_obj.school.id }}/'>{{ team_obj.school.name }}</a></td>
+      </tr>
+      {% if team_obj.hybrid_school %}
+      <tr>
+        <td>Hybrid School</td>
+        <td><a href='/school/{{ team_obj.hybrid_school.id }}/'>{{ team_obj.hybrid_school.name }}</a></td>
+      </tr>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

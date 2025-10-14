@@ -4,7 +4,7 @@ from django.test import TestCase
 import pytest
 
 from mittab.apps.tab.models import CheckIn, Judge, TabSettings, Round
-from mittab.libs import assign_judges
+from mittab.libs import assign_judges, assign_rooms
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
@@ -44,9 +44,12 @@ class TestPairingLogic(TestCase):
             for checkin in checkins:
                 checkin.save()
 
-    def assign_judges(self):
+    def assign_judges_to_pairing(self):
         self.generate_checkins()
         assign_judges.add_judges()
+    
+    def assign_rooms_to_pairing(self):
+        assign_rooms.add_rooms()
 
     def round_number(self):
         return TabSettings.get("cur_round") - 1
@@ -55,7 +58,8 @@ class TestPairingLogic(TestCase):
         assert self.round_number() == round_number
         self.pair_round()
         assert self.round_number() == round_number + 1
-        self.assign_judges()
+        self.assign_judges_to_pairing()
+        self.assign_rooms_to_pairing()
         generate_results(round_number + 1, 0.05, 0.05)
         if round_number + 2 != last:
             tab_logic.validate_round_data(round_number + 2)

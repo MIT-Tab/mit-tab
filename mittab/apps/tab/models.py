@@ -8,7 +8,7 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=20)
+    key = models.CharField(max_length=25)
     value = models.IntegerField()
 
     class Meta:
@@ -61,6 +61,7 @@ class TabSettings(models.Model):
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def __str__(self):
         return self.name
@@ -97,6 +98,7 @@ class Debater(models.Model):
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    apda_id = models.IntegerField(blank=True, null=True, default=-1)
 
     def save(self,
              force_insert=False,
@@ -166,20 +168,35 @@ class Team(models.Model):
         (NOVICE, "Novice")
     )
 
+    required_room_tags = models.ManyToManyField("RoomTag", blank=True)
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
     ranking_public = models.BooleanField(default=True)
 
-    """
-    Consolidate the knowledge of what relations need
-    to be pre-loaded to minimize queries for team stats
-    """
+    @classmethod
+    def with_preloaded_relations_for_tab_card(cls):
+        return cls.objects.prefetch_related(
+            "gov_team",
+            "opp_team",
+            "gov_team__judges",
+            "opp_team__judges",
+            "gov_team__opp_team",
+            "opp_team__gov_team",
+            "debaters",
+            "debaters__roundstats_set",
+            "debaters__roundstats_set__round",
+            "debaters__team_set",
+            "debaters__team_set__no_shows",
+        )
+
     @classmethod
     def with_preloaded_relations_for_tabbing(cls):
         return cls.objects.prefetch_related(
             "gov_team",  # poorly named relation, gets rounds as gov team
             "opp_team",  # poorly named relation, rounds as opp team
+            "gov_team_outround",  # outround data for gov team
+            "opp_team_outround",  # outround data for opp team
             # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
             # and team record
             "gov_team__opp_team__gov_team",
@@ -302,6 +319,9 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    is_dino = models.BooleanField(default=False)
+    wing_only = models.BooleanField(default=False)
+    required_room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
@@ -368,6 +388,7 @@ class Scratch(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    tags = models.ManyToManyField("RoomTag", blank=True)
 
     def __str__(self):
         return self.name
@@ -498,7 +519,8 @@ class Round(models.Model):
         (ALL_DROP, "ALL DROP"),
         (ALL_WIN, "ALL WIN"),
     )
-    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    room = models.ForeignKey(
+        Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     def clean(self):
@@ -585,3 +607,11 @@ class RoomCheckIn(models.Model):
     def __str__(self):
         return "Room %s is checked in for round %s" % (self.room,
                                                        self.round_number)
+
+
+class RoomTag(models.Model):
+    tag = models.CharField(max_length=255)
+    priority = models.DecimalField(max_digits=4, decimal_places=2)
+
+    def __str__(self):
+        return self.tag

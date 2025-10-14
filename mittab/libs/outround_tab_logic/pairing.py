@@ -1,4 +1,5 @@
 import math
+import random
 
 from mittab.apps.tab.models import *
 
@@ -9,6 +10,7 @@ from mittab.libs.tab_logic import (
     have_properly_entered_data,
     add_scratches_for_school_affil
 )
+from mittab.libs.tab_logic.stats import num_govs
 from mittab.libs import errors
 import mittab.libs.cache_logic as cache_logic
 
@@ -113,8 +115,20 @@ def get_next_available_room(num_teams, type_of_break):
 
 
 def gov_team(team_one, team_two):
+    """
+    Determine which team should be gov in an outround pairing.
+
+    Priority order:
+    1. Sidelock - if teams have debated before, they must be on opposite sides
+    2. Least govs - team with fewer gov rounds gets gov
+    3. Random - if gov counts are equal
+
+    Returns:
+        (sidelock: bool, gov_team: BreakingTeam)
+    """
     sidelock = TabSettings.get("sidelock", 0)
 
+    # 1. Check for sidelock
     if sidelock:
         if Round.objects.filter(gov_team=team_one.team,
                                 opp_team=team_two.team).exists():
@@ -122,7 +136,21 @@ def gov_team(team_one, team_two):
         elif Round.objects.filter(gov_team=team_two.team,
                                   opp_team=team_one.team).exists():
             return True, team_one
-    return False, team_one
+
+    # 2. Check for least govs
+    team_one_govs = num_govs(team_one.team)
+    team_two_govs = num_govs(team_two.team)
+
+    if team_one_govs < team_two_govs:
+        return False, team_one
+    elif team_two_govs < team_one_govs:
+        return False, team_two
+
+    # 3. Random assignment (govs are equal)
+    if random.randint(0, 1) == 0:
+        return False, team_one
+    else:
+        return False, team_two
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
@@ -161,10 +189,14 @@ def pair(type_of_break=BreakingTeam.VARSITY):
     bracket = gen_bracket(num_teams)
 
     for pairing in bracket:
-        team_one = base_queryset.filter(effective_seed=pairing[0]).first()
-        team_two = base_queryset.filter(effective_seed=pairing[1]).first()
-
-        print(pairing)
+        team_one = base_queryset.filter(
+            effective_seed=pairing[0]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
+        team_two = base_queryset.filter(
+            effective_seed=pairing[1]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
 
         if not team_one or not team_two:
             continue

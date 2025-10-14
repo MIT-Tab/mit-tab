@@ -1,0 +1,23 @@
+{% extends "common/data_entry.html" %}
+
+{% block detail_content %}
+{% if judge_rounds %}
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  <div class="team-record">
+    <h5>Rounds Judged</h5>
+    <table class="table table-striped">
+      <thead><th>Round #</th><th>Gov Team</th><th>Opp Team</th><th>Room</th></thead>
+      {% for round in judge_rounds %}
+      <tr>
+        <td><a href='/round/{{ round.id }}/result/'>{{ round.round_number }}</a></td>
+        <td><a href='/team/{{ round.gov_team.id }}/'>{{ round.gov_team.name }}</a></td>
+        <td><a href='/team/{{ round.opp_team.id }}/'>{{ round.opp_team.name }}</a></td>
+        <td>{% if round.room %}<a href='/room/{{ round.room.id }}/'>{{ round.room.name }}</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

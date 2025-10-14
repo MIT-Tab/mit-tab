@@ -11,6 +11,7 @@ def rank_speakers():
         "team_set__byes",
         "team_set__no_shows",
         "roundstats_set",
+        "roundstats_set__round",
     ).all()
     return sorted([
         DebaterScore(d)
@@ -22,6 +23,8 @@ def rank_teams(exclude_round=False):
     all_teams = Team.objects.all().prefetch_related(
         "gov_team",  # poorly named relation, gets rounds as gov team
         "opp_team",  # poorly named relation, rounds as opp team
+        "gov_team_outround",  # outround data for gov team
+        "opp_team_outround",  # outround data for opp team
         # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
         "gov_team__opp_team__gov_team",
         "gov_team__opp_team__opp_team",

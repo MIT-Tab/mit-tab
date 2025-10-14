@@ -15,27 +15,33 @@ function cycleChoice(event) {
   });
 }
 
-function populateTabCard(tabCardElement) {
-  const teamId = tabCardElement.attr("team-id");
+function populateTabCards() {
+  const roundNumber = $("#round-number").data("round-number");
+  if (!roundNumber || !$(".outround-tabcard").length) {
+    return;
+  }
   $.ajax({
-    url: `/team/${teamId}/stats`,
+    url: `/outround/${roundNumber}/stats`,
     success(result) {
-      const stats = result.result;
-      const text = [
-        stats.effective_outround_seed,
-        stats.outround_seed,
-        stats.wins,
-        stats.total_speaks.toFixed(2),
-        stats.govs,
-        stats.opps,
-        stats.seed
-      ].join(" / ");
-      tabCardElement.attr(
-        "title",
-        "Effective Seed / Outround Seed / Wins / Speaks / Govs / Opps / Seed"
-      );
-      tabCardElement.attr("href", `/team/card/${teamId}`);
-      tabCardElement.text(text);
+      Object.entries(result).forEach(([teamId, stats]) => {
+        const tabCardElement = $(`.outround-tabcard[team-id=${teamId}]`);
+        const text = [
+          stats.effective_outround_seed,
+          stats.outround_seed,
+          stats.wins,
+          stats.total_speaks.toFixed(2),
+          stats.govs,
+          stats.opps,
+          stats.seed
+        ].join(" / ");
+        tabCardElement.attr(
+          "title",
+          "Effective Seed / Outround Seed / In-round Wins" +
+            " / Speaks / Govs / Opps / Seed"
+        );
+        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.text(text);
+      });
     }
   });
 }
@@ -62,11 +68,11 @@ function assignTeam(e) {
         $container.find(".team-link").attr("href", `/team/${result.team.id}`);
         $container.find(".outround-tabcard").attr("team-id", result.team.id);
 
-        populateTabCard($(`.outround-tabcard[team-id=${result.team.id}]`));
+        populateTabCards($(`.outround-tabcard[team-id=${result.team.id}]`));
 
         const $oldTeamTabCard = $(`.outround-tabcard[team-id=${oldTeamId}]`);
         if ($oldTeamTabCard) {
-          populateTabCard($oldTeamTabCard);
+          populateTabCards($oldTeamTabCard);
         }
       } else {
         window.alert(alertMsg);
@@ -174,7 +180,7 @@ function togglePairingRelease(event) {
 
 $(document).ready(() => {
   $(".team.outround-tabcard").each((_, element) => {
-    populateTabCard($(element));
+    populateTabCards($(element));
   });
   $(".choice-update").each((_, element) => {
     $(element).click(cycleChoice);
