@@ -12,20 +12,22 @@ MINIMUM_DEBATER_SPEAKS = 0.0
 
 
 def num_byes(team, exclude_round=False):
+    # Use .all() to leverage prefetched data, then filter in Python
+    byes = team.byes.all()
     if exclude_round:
-        return team.byes.exclude(round_number=TabSettings.get
-                                 ("cur_round")).count()
-    return team.byes.count()
-
+        return sum(1 for b in byes if b.round_number != TabSettings.get("cur_round"))
+    return len(byes)
 
 def num_forfeit_wins(team, exclude_round=False):
     num_wins = 0
+    # Use .all() to leverage prefetched data, then filter in Python
+    govs = team.gov_team.all()
+    opps = team.opp_team.all()
+    
     if exclude_round:
-        govs = team.gov_team.exclude(round_number=exclude_round)
-        opps = team.opp_team.exclude(round_number=exclude_round)
-    else:
-        govs = team.gov_team.all()
-        opps = team.opp_team.all()
+        govs = [r for r in govs if r.round_number != exclude_round]
+        opps = [r for r in opps if r.round_number != exclude_round]
+        
     for round_obj in govs:
         if round_obj.victor in (Round.ALL_WIN, Round.GOV_VIA_FORFEIT,):
             num_wins += 1
@@ -104,12 +106,13 @@ def tot_wins(team, exclude_round=False):
     problems
     """
     normal_wins = 0
+    # Use .all() to leverage prefetched data, then filter in Python
+    govs = team.gov_team.all()
+    opps = team.opp_team.all()
+    
     if exclude_round:
-        govs = team.gov_team.exclude(round_number=exclude_round)
-        opps = team.opp_team.exclude(round_number=exclude_round)
-    else:
-        govs = team.gov_team.all()
-        opps = team.opp_team.all()
+        govs = [r for r in govs if r.round_number != exclude_round]
+        opps = [r for r in opps if r.round_number != exclude_round]
 
     for round_obj in opps:
         if round_obj.victor == Round.OPP:
@@ -187,12 +190,13 @@ def opp_strength(team, exclude_round=False):
     opponent_count = 0
     opponent_wins = 0
 
+    # Use .all() to leverage prefetched data, then filter in Python
+    govs = team.gov_team.all()
+    opps = team.opp_team.all()
+    
     if exclude_round:
-        govs = team.gov_team.exclude(round_number=exclude_round)
-        opps = team.opp_team.exclude(round_number=exclude_round)
-    else:
-        govs = team.gov_team.all()
-        opps = team.opp_team.all()
+        govs = [r for r in govs if r.round_number != exclude_round]
+        opps = [r for r in opps if r.round_number != exclude_round]
 
     for round_obj in govs:
         opponent_wins += tot_wins(round_obj.opp_team)
@@ -284,10 +288,11 @@ def speaks_for_debater(debater, average_ironmen=True, exclude_round=False):
     # We start counting at 1, so when cur_round says 6 that means that we are
     # in round 5 and should have 5 speaks
 
+    # Use .all() to leverage prefetched data, then filter in Python
     debater_roundstats = debater.roundstats_set.all()
     if exclude_round:
-        debater_roundstats = debater_roundstats.exclude(round__round_number=
-                                                        exclude_round)
+        debater_roundstats = [rs for rs in debater_roundstats 
+                              if rs.round.round_number != exclude_round]
     debater_speaks = []
 
     speaks_per_round = defaultdict(list)
@@ -443,10 +448,11 @@ def ranks_for_debater(debater, average_ironmen=True, exclude_round=False):
     # in round 5 and should have 5 ranks
     num_ranks = TabSettings.get("cur_round") - 1
 
+    # Use .all() to leverage prefetched data, then filter in Python
     debater_roundstats = debater.roundstats_set.all()
     if exclude_round:
-        debater_roundstats = debater_roundstats.exclude(round__round_number=
-                                                        exclude_round)
+        debater_roundstats = [rs for rs in debater_roundstats 
+                              if rs.round.round_number != exclude_round]
     debater_ranks = []
 
     ranks_per_round = defaultdict(list)

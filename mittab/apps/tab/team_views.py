@@ -436,10 +436,16 @@ def rank_teams(request):
 def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
-    if not request.user.is_authenticated and not display_rankings:
+    if not display_rankings:
         return redirect_and_flash_error(request, "This view is not public", path="/")
 
-    teams = get_team_rankings(request, public=True)
+    teams = cache_logic.cache_fxn_key(
+        get_team_rankings,
+        "team_rankings",
+        cache_logic.DEFAULT,
+        request,
+        public=True
+    )
 
     return render(request, "public/public_team_rankings.html", {
         "teams": teams,
