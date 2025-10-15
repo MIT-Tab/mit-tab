@@ -31,23 +31,20 @@ class TestPairingLogic(TestCase):
         checkin_count = CheckIn.objects.filter(round_number=cur_round).count()
 
         available = Judge.objects.exclude(judges__round_number=cur_round)
-        available = available.filter(checkin__round_number=cur_round)
+        available = available.exclude(checkin__round_number=cur_round)
         available = list(available)
         random.shuffle(available)
         if checkin_count < desired_judges:
             num_to_checkin = desired_judges - checkin_count
             judges_to_checkin = available[:num_to_checkin]
-            checkins = [
-                CheckIn(judge=judge, round_number=cur_round)
-                for judge in judges_to_checkin
-            ]
-            for checkin in checkins:
-                checkin.save()
+            for judge in judges_to_checkin:
+                CheckIn.objects.get_or_create(
+                    judge=judge, round_number=cur_round)
 
     def assign_judges_to_pairing(self):
         self.generate_checkins()
         assign_judges.add_judges()
-    
+
     def assign_rooms_to_pairing(self):
         assign_rooms.add_rooms()
 

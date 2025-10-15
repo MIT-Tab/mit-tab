@@ -599,6 +599,14 @@ class CheckIn(models.Model):
         return "Judge %s is checked in for round %s" % (self.judge,
                                                         self.round_number)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["judge", "round_number"],
+                name="unique_judge_checkin_per_round",
+            )
+        ]
+
 
 class RoomCheckIn(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
@@ -607,6 +615,14 @@ class RoomCheckIn(models.Model):
     def __str__(self):
         return "Room %s is checked in for round %s" % (self.room,
                                                        self.round_number)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "round_number"],
+                name="unique_room_checkin_per_round",
+            )
+        ]
 
 
 class RoomTag(models.Model):
