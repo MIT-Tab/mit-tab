@@ -54,7 +54,7 @@ function applyDropdownFilters() {
     let show = true;
     Object.keys(filters).forEach(key => {
       const rowValue = $(row).data(key);
-      if (rowValue !== filters[key]) {
+      if (String(rowValue) !== String(filters[key])) {
         show = false;
       }
     });

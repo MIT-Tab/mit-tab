@@ -276,10 +276,14 @@ def view_backups(request):
 
     types = sorted(set(b[2] for b in backups if b[2] != "Unknown"))
 
-    round_set = set(b[3] for b in backups if b[3] != "Unknown")
-    numeric_rounds = sorted([r for r in round_set if r.isdigit()], key=int)
-    text_rounds = sorted([r for r in round_set if not r.isdigit()])
-    rounds = numeric_rounds + text_rounds
+    round_values = {str(b[3]) for b in backups}
+    rounds = sorted(
+        round_values,
+        key=lambda value: (
+            not value.isdigit(),
+            int(value) if value.isdigit() else value.lower()
+        )
+    )
 
     create_form = BackupForm()
     upload_form = UploadBackupForm()
