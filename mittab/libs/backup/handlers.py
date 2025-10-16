@@ -13,11 +13,15 @@ SSL_CONFIG = DB_SETTINGS.get("OPTIONS", {}).get("ssl", {})
 
 def _ssl_cmd_args():
     args = []
-    ssl_mode = SSL_CONFIG.get("ssl_mode")
-    if ssl_mode:
-        args.append(f"--ssl-mode={ssl_mode}")
-
+    ssl_mode = (SSL_CONFIG.get("ssl_mode") or "").upper()
     ssl_ca = SSL_CONFIG.get("ssl_ca")
+
+    # default-mysql-client (MariaDB) does not understand --ssl-mode flags, so
+    # fallback to --ssl for encrypted transport while still passing a CA when
+    # present.
+    if ssl_mode not in ("", "DISABLED") or ssl_ca:
+        args.append("--ssl")
+
     if ssl_ca:
         args.append(f"--ssl-ca={ssl_ca}")
 

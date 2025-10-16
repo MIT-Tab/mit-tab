@@ -14,8 +14,11 @@ function execute-mysql() {
     "-D" "$MYSQL_DATABASE"
     "-P" "$MYSQL_PORT"
     "--password=$MYSQL_PASSWORD"
-    "--ssl-mode=$MYSQL_SSL_MODE"
   )
+
+  if [[ "$MYSQL_SSL_MODE" != "DISABLED" || -n "$MYSQL_SSL_CA" ]]; then
+    args+=("--ssl")
+  fi
 
   if [[ -n "$MYSQL_SSL_CA" ]]; then
     args+=("--ssl-ca=$MYSQL_SSL_CA")
