@@ -364,15 +364,24 @@ def get_settings_from_yaml():
         setting_dict[category_id] = []
 
         for setting in category_settings:
-            tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
-            if tab_setting:
-                stored_value = tab_setting.value
-                if setting.get("type") == "boolean":
-                    setting["value"] = stored_value == 1
-                else:
-                    setting["value"] = stored_value
             all_settings.append(setting)
             setting_dict[category_id].append(setting["name"])
+
+    if all_settings:
+        stored_settings = {
+            ts.key: ts.value
+            for ts in TabSettings.objects.filter(
+                key__in=(setting["name"] for setting in all_settings)
+            )
+        }
+        for setting in all_settings:
+            stored_value = stored_settings.get(setting["name"])
+            if stored_value is None:
+                continue
+            if setting.get("type") == "boolean":
+                setting["value"] = stored_value == 1
+            else:
+                setting["value"] = stored_value
 
     categories.sort(key=lambda x: x.get("order", 999))
 

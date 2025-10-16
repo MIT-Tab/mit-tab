@@ -433,10 +433,10 @@ def alternative_judges(request, round_id, judge_id=None):
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
 
     excluded_judges_list = assign_judges.can_judge_teams(
         excluded_judges, round_gov, round_opp)
@@ -447,7 +447,7 @@ def alternative_judges(request, round_id, judge_id=None):
     try:
         current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related(
-            "judges").get(id=current_judge_id)
+            "judges", "scratches").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
