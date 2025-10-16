@@ -323,7 +323,9 @@ def alternative_judges(request, round_id, judge_id=None):
     # All of these variables are for the convenience of the template
     try:
         current_judge_id = int(judge_id)
-        current_judge_obj = Judge.objects.get(id=current_judge_id)
+        current_judge_obj = Judge.objects.prefetch_related("scratches").get(
+            id=current_judge_id
+        )
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
@@ -350,7 +352,7 @@ def alternative_judges(request, round_id, judge_id=None):
         judges_outrounds__type_of_round=other_round_type
     ).filter(
         checkin__round_number=0
-    )
+    ).prefetch_related("scratches")
 
     query = Q(
         judges_outrounds__num_teams=round_obj.num_teams,
@@ -363,16 +365,24 @@ def alternative_judges(request, round_id, judge_id=None):
 
     included_judges = Judge.objects.filter(query) \
                                    .filter(checkin__round_number=0) \
-                                   .distinct()
+                                   .distinct() \
+                                   .prefetch_related("scratches")
 
-    def can_judge(judge, team1, team2):
-        query = Q(judge=judge, team=team1) | Q(judge=judge, team=team2)
-        return not Scratch.objects.filter(query).exists()
+    scratched_team_ids = {round_gov.id, round_opp.id}
 
-    excluded_judges = [(j.name, j.id, float(j.rank))
-                       for j in excluded_judges if can_judge(j, round_gov, round_opp)]
-    included_judges = [(j.name, j.id, float(j.rank))
-                       for j in included_judges if can_judge(j, round_gov, round_opp)]
+    def has_team_scratch(judge):
+        return any(s.team_id in scratched_team_ids for s in judge.scratches.all())
+
+    excluded_judges = [
+        (j.name, j.id, float(j.rank))
+        for j in excluded_judges
+        if not has_team_scratch(j)
+    ]
+    included_judges = [
+        (j.name, j.id, float(j.rank))
+        for j in included_judges
+        if not has_team_scratch(j)
+    ]
 
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])

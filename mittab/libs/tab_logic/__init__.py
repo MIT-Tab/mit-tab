@@ -382,6 +382,8 @@ def sorted_pairings(round_number, outround=False):
         "gov_team__debaters__team_set__no_shows",
         "gov_team__debaters__roundstats_set",
         "gov_team__debaters__roundstats_set__round",
+        "gov_team__gov_team_outround",
+        "gov_team__opp_team_outround",
         "opp_team__breaking_team",
         "opp_team__gov_team",  # poorly named relation, points to rounds as gov
         "opp_team__opp_team",  # poorly named relation, points to rounds as gov
@@ -392,6 +394,8 @@ def sorted_pairings(round_number, outround=False):
         "opp_team__debaters__team_set__no_shows",
         "opp_team__debaters__roundstats_set",
         "opp_team__debaters__roundstats_set__round",
+        "opp_team__gov_team_outround",
+        "opp_team__opp_team_outround",
         "room__tags", "judges__required_room_tags",
         "gov_team__required_room_tags",
         "opp_team__required_room_tags"
