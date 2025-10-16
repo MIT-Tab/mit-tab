@@ -49,15 +49,7 @@ WSGI_APPLICATION = "mittab.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE":   "django.db.backends.mysql",
-        "OPTIONS":  {
-            "charset": "utf8mb4",
-            # DigitalOcean Managed Databases require SSL connections but use self-signed
-            # certificates. Setting ssl_mode to REQUIRED enables encrypted connections
-            # without strict certificate verification, preventing "self-signed certificate
-            # in certificate chain" errors while maintaining secure encrypted communication.
-            "ssl": {"ssl_mode": "REQUIRED"} if os.environ.get("MYSQL_HOST") and 
-                   os.environ.get("MYSQL_HOST") not in ["127.0.0.1", "localhost"] else {},
-        },
+        "OPTIONS":  {"charset": "utf8mb4"},
         "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
         "USER":     os.environ.get("MYSQL_USER", "root"),
         "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
