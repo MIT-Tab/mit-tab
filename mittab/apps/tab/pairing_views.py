@@ -276,10 +276,14 @@ def view_backups(request):
 
     types = sorted(set(b[2] for b in backups if b[2] != "Unknown"))
 
-    round_set = set(b[3] for b in backups if b[3] != "Unknown")
-    numeric_rounds = sorted([r for r in round_set if r.isdigit()], key=int)
-    text_rounds = sorted([r for r in round_set if not r.isdigit()])
-    rounds = numeric_rounds + text_rounds
+    round_values = {str(b[3]) for b in backups}
+    rounds = sorted(
+        round_values,
+        key=lambda value: (
+            not value.isdigit(),
+            int(value) if value.isdigit() else value.lower()
+        )
+    )
 
     create_form = BackupForm()
     upload_form = UploadBackupForm()
@@ -429,10 +433,10 @@ def alternative_judges(request, round_id, judge_id=None):
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
 
     excluded_judges_list = assign_judges.can_judge_teams(
         excluded_judges, round_gov, round_opp)
@@ -443,7 +447,7 @@ def alternative_judges(request, round_id, judge_id=None):
     try:
         current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related(
-            "judges").get(id=current_judge_id)
+            "judges", "scratches").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:

@@ -83,6 +83,7 @@ def view_judges(request):
 
 def view_judge(request, judge_id):
     judge_id = int(judge_id)
+    judging_rounds = []
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
