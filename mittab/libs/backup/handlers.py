@@ -48,6 +48,14 @@ class MysqlDumpRestorer:
         if DB_PASS:
             cmd.append("--password={}".format(DB_PASS))
 
+        # DigitalOcean Managed Databases require SSL but use self-signed certificates.
+        # --ssl-mode=REQUIRED enables encrypted connection, --ssl-ca=/dev/null skips
+        # certificate verification to avoid "self-signed certificate" errors while
+        # still maintaining encrypted communication to the database.
+        if DB_HOST and DB_HOST != "127.0.0.1" and DB_HOST != "localhost":
+            cmd.append("--ssl-mode=REQUIRED")
+            cmd.append("--ssl-ca=/dev/null")
+
         return cmd
 
     def _dump_cmd(self, include_scratches=True):
@@ -64,6 +72,14 @@ class MysqlDumpRestorer:
 
         if DB_PASS:
             cmd.append("--password={}".format(DB_PASS))
+
+        # DigitalOcean Managed Databases require SSL but use self-signed certificates.
+        # --ssl-mode=REQUIRED enables encrypted connection, --ssl-ca=/dev/null skips
+        # certificate verification to avoid "self-signed certificate" errors while
+        # still maintaining encrypted communication to the database.
+        if DB_HOST and DB_HOST != "127.0.0.1" and DB_HOST != "localhost":
+            cmd.append("--ssl-mode=REQUIRED")
+            cmd.append("--ssl-ca=/dev/null")
 
         if not include_scratches:
             cmd.append("--ignore-table={}.tab_scratch".format(DB_NAME))
