@@ -8,6 +8,20 @@ DB_NAME = DB_SETTINGS["NAME"]
 DB_USER = DB_SETTINGS["USER"]
 DB_PASS = DB_SETTINGS["PASSWORD"]
 DB_PORT = DB_SETTINGS["PORT"]
+SSL_CONFIG = DB_SETTINGS.get("OPTIONS", {}).get("ssl", {})
+
+
+def _ssl_cmd_args():
+    args = []
+    ssl_mode = SSL_CONFIG.get("ssl_mode")
+    if ssl_mode:
+        args.append(f"--ssl-mode={ssl_mode}")
+
+    ssl_ca = SSL_CONFIG.get("ssl_ca")
+    if ssl_ca:
+        args.append(f"--ssl-ca={ssl_ca}")
+
+    return args
 
 
 class MysqlDumpRestorer:
@@ -48,6 +62,8 @@ class MysqlDumpRestorer:
         if DB_PASS:
             cmd.append("--password={}".format(DB_PASS))
 
+        cmd.extend(_ssl_cmd_args())
+
         return cmd
 
     def _dump_cmd(self, include_scratches=True):
@@ -64,6 +80,8 @@ class MysqlDumpRestorer:
 
         if DB_PASS:
             cmd.append("--password={}".format(DB_PASS))
+
+        cmd.extend(_ssl_cmd_args())
 
         if not include_scratches:
             cmd.append("--ignore-table={}.tab_scratch".format(DB_NAME))

@@ -4,13 +4,24 @@ set +x
 
 cd /var/www/tab
 
+MYSQL_SSL_MODE=${MYSQL_SSL_MODE:-REQUIRED}
+MYSQL_SSL_CA=${MYSQL_SSL_CA:-}
+
 function execute-mysql() {
-  mysql -u $MYSQL_USER \
-    -h $MYSQL_HOST \
-    -D $MYSQL_DATABASE \
-    -P $MYSQL_PORT \
-    --password="$MYSQL_PASSWORD" \
-    -e "$1"
+  local args=(
+    "-u" "$MYSQL_USER"
+    "-h" "$MYSQL_HOST"
+    "-D" "$MYSQL_DATABASE"
+    "-P" "$MYSQL_PORT"
+    "--password=$MYSQL_PASSWORD"
+    "--ssl-mode=$MYSQL_SSL_MODE"
+  )
+
+  if [[ -n "$MYSQL_SSL_CA" ]]; then
+    args+=("--ssl-ca=$MYSQL_SSL_CA")
+  fi
+
+  mysql "${args[@]}" -e "$1"
 }
 
 python manage.py migrate --noinput

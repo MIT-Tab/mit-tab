@@ -46,15 +46,36 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "mittab")
+MYSQL_USER = os.environ.get("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
+MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
+MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
+
+db_options = {"charset": "utf8mb4"}
+ssl_settings = {}
+
+if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
+    ssl_mode = os.environ.get("MYSQL_SSL_MODE", "REQUIRED")
+    if ssl_mode:
+        ssl_settings["ssl_mode"] = ssl_mode
+
+    ssl_ca = os.environ.get("MYSQL_SSL_CA")
+    if ssl_ca:
+        ssl_settings["ssl_ca"] = ssl_ca
+
+if ssl_settings:
+    db_options["ssl"] = ssl_settings
+
 DATABASES = {
     "default": {
         "ENGINE":   "django.db.backends.mysql",
-        "OPTIONS":  {"charset": "utf8mb4"},
-        "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
-        "USER":     os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "HOST":     os.environ.get("MYSQL_HOST", "127.0.0.1"),
-        "PORT":     os.environ.get("MYSQL_PORT", "3306"),
+        "OPTIONS":  db_options,
+        "NAME":     MYSQL_DATABASE,
+        "USER":     MYSQL_USER,
+        "PASSWORD": MYSQL_PASSWORD,
+        "HOST":     MYSQL_HOST,
+        "PORT":     MYSQL_PORT,
     }
 }
 
