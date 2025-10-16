@@ -97,12 +97,25 @@
             <i class="fas fa-tv"></i> Announcement View
           </a>
 
-          <a class="btn btn-secondary" href="/pairings/pairinglist/printable" title="Printable version of the GA view">
-            <i class="fas fa-print"></i> Printable View
+          <a class="btn btn-secondary" href="/pairings/export_csv/" title="Export pairings as CSV">
+            <i class="fas fa-download"></i> Export CSV
           </a>
         </div>
       </div>
     </div> <!-- end control row -->
+
+    {% if warnings %}
+    <div class="alert alert-danger warning-container">
+      <strong class="warning-text">Warning: Hover to see details.</strong>
+      <div class="alert alert-danger warning-popup">
+        <ul>
+          {% for warning in warnings %}
+            <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% endif %}
 
     <div class="row">
       <div class="col-12">

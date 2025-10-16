@@ -47,7 +47,7 @@ class TestPairingLogic(TestCase):
 
     def assign_judges_to_pairing(self):
         assign_judges.add_judges()
-    
+
     def assign_rooms_to_pairing(self):
         assign_rooms.add_rooms()
 

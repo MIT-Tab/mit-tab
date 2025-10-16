@@ -3,6 +3,7 @@ from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
+from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
 import mittab.apps.tab.views as views
@@ -17,6 +18,9 @@ import mittab.apps.tab.outround_pairing_views as outround_pairing_views
 admin.autodiscover()
 
 urlpatterns = [
+    path("favicon.ico",
+         RedirectView.as_view(url=settings.STATIC_URL +
+                              "img/favicon.ico", permanent=True)),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
@@ -40,11 +44,11 @@ urlpatterns = [
     re_path(r"^judge/(\d+)/scratches/view/",
             judge_views.view_scratches,
             name="view_scratches"),
-    re_path(r"^judge/(\d+)/check_ins/round/(\d+)/$",
-            judge_views.judge_check_in,
-            name="judge_check_in"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
+    path("download_judge_codes/",
+         judge_views.download_judge_codes,
+         name="download_judge_codes"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -56,9 +60,11 @@ urlpatterns = [
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
-    re_path(r"^room/(\d+)/check_ins/round/(\d+)/$",
-            views.room_check_in,
-            name="room_check_in"),
+
+    path("bulk_check_in/", views.bulk_check_in, name="bulk_check_in"),
+    path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
+    path("room-tag/", views.room_tag, name="room_tag"),
+    path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
 
 
     # Scratch related
@@ -90,9 +96,8 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    re_path(r"^team/(\d+)/check_ins/$",
-            team_views.team_check_in,
-            name="team_check_in"),
+    path("rank_teams_public/", team_views.rank_teams_public,
+         name="rank_teams_public"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
@@ -169,16 +174,12 @@ urlpatterns = [
     path("pairings/missing_ballots/",
          pairing_views.missing_ballots,
          name="missing_ballots"),
-    path("pairings/pairinglist/printable/",
-         pairing_views.pretty_pair_print,
-         name="pretty_pair_print"),
+    path("pairings/export_csv/",
+         pairing_views.export_pairings_csv_view,
+         name="export_pairings_csv"),
     path("pairing/backup/",
          pairing_views.manual_backup,
          name="manual_backup"),
-    path("pairing/backup_without_scratches/",
-         pairing_views.manual_backup,
-         {"include_scratches":False},
-         name="manual_backup_without_scratches"),
     path("pairing/release/",
          pairing_views.toggle_pairing_released,
          name="toggle_pairing_released"),
@@ -247,9 +248,9 @@ urlpatterns = [
     path("outround_pairings/pairinglist/<int:type_of_round>/",
          outround_pairing_views.pretty_pair,
          name="outround_pretty_pair"),
-    path("outround_pairings/pairinglist/printable/<int:type_of_round>/",
-         outround_pairing_views.pretty_pair_print,
-         name="outround_pretty_pair_print"),
+    path("outround_pairings/export_csv/<int:type_of_round>/",
+         outround_pairing_views.export_outround_pairings_csv_view,
+         name="export_outround_pairings_csv"),
     path("outround_pairing/release/<int:num_teams>/<int:type_of_round>/",
          outround_pairing_views.toggle_pairing_released,
          name="toggle_outround_pairing_released"),
@@ -293,6 +294,7 @@ urlpatterns = [
     path("archive/download/", views.generate_archive, name="download_archive"),
 
     # Standings API
+    path("forum_post", views.forum_post, name="forum_post"),
     path("publish_results/<int:new_setting>/",
          views.publish_results,
          name="publish_results"),

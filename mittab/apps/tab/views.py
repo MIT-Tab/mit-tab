@@ -1,18 +1,22 @@
 import os
+from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse, Http404
-from django.shortcuts import render, reverse, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render, reverse
 from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.forms import SchoolForm, RoomForm, UploadDataForm, ScratchForm, \
-    SettingsForm
+from mittab.apps.tab.debater_views import get_speaker_rankings
+from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
+    UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.outround_pairing_views import create_forum_view_data
+from mittab.apps.tab.team_views import get_team_rankings
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
@@ -72,7 +76,11 @@ def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
         if form.is_valid():
-            form.save()
+            try:
+                form.save()
+            except IntegrityError:
+                return redirect_and_flash_error(request,
+                                                "This scratch already exists.")
         return redirect_and_flash_success(request,
                                           "Scratch created successfully")
     else:
@@ -269,26 +277,42 @@ def enter_room(request):
     })
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def room_check_in(request, room_id, round_number):
-    room_id, round_number = int(room_id), int(round_number)
+def bulk_check_in(request):
+    entity_type = request.POST.get("entity_type")
+    action = request.POST.get("action")
 
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # 0 is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
+    entity_ids = request.POST.getlist("entity_ids[]")
+    entity_ids = [int(eid) for eid in entity_ids if eid.isdigit()]
 
-    room = get_object_or_404(Room, pk=room_id)
-    if request.method == "POST":
-        if not room.is_checked_in_for_round(round_number):
-            check_in = RoomCheckIn(room=room, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if room.is_checked_in_for_round(round_number):
-            check_ins = RoomCheckIn.objects.filter(room=room,
-                                                   round_number=round_number)
-            check_ins.delete()
+    if not entity_ids:
+        return JsonResponse({"success": True})
+
+    # Teams have a simple boolean field
+    if entity_type == "team":
+        Team.objects.filter(pk__in=entity_ids).update(checked_in=(action == "check_in"))
+        return JsonResponse({"success": True})
+
+    # Judges and rooms use check-in records per round
+    round_numbers = [int(rn) for rn in request.POST.getlist("rounds[]") if rn.isdigit()]
+
+    if not round_numbers:
+        return JsonResponse({"success": True})
+
+    if entity_type == "judge":
+        checkInObj, id_field = CheckIn, "judge_id"
     else:
-        raise Http404("Must be POST or DELETE")
+        checkInObj, id_field = RoomCheckIn, "room_id"
+
+    if action == "check_in":
+        checkInObj.objects.bulk_create(
+            [checkInObj(**{id_field: eid, "round_number": rn})
+             for eid in entity_ids for rn in round_numbers],
+            ignore_conflicts=True
+        )
+    else:
+        checkInObj.objects.filter(**{f"{id_field}__in": entity_ids},
+                                  round_number__in=round_numbers).delete()
+
     return JsonResponse({"success": True})
 
 
@@ -317,53 +341,77 @@ def view_scratches(request):
             "item_list": c_scratches
         })
 
-
 def get_settings_from_yaml():
-    default_settings = []
-    with open(settings.SETTING_YAML_PATH, "r") as stream:
-        default_settings = yaml.safe_load(stream)
 
-    to_return = []
+    settings_dir = os.path.join(settings.BASE_DIR, "settings")
 
-    for setting in default_settings:
-        tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+    all_settings = []
+    setting_dict = {}
+    categories = []
 
-        if tab_setting:
-            if "type" in setting and setting["type"] == "boolean":
-                setting["value"] = tab_setting.value == 1
-            else:
-                setting["value"] = tab_setting.value
+    for filename in sorted(os.listdir(settings_dir)):
+        yaml_file = os.path.join(settings_dir, filename)
 
-        to_return.append(setting)
+        with open(yaml_file, "r") as stream:
+            data = yaml.safe_load(stream)
 
-    return to_return
+        category_info = data["category"]
+        category_settings = data["settings"]
+
+        category_id = category_info.get("id")
+
+        categories.append(category_info)
+        setting_dict[category_id] = []
+
+        for setting in category_settings:
+            tab_setting = TabSettings.objects.filter(key=setting["name"]).first()
+            if tab_setting:
+                stored_value = tab_setting.value
+                if setting.get("type") == "boolean":
+                    setting["value"] = stored_value == 1
+                else:
+                    setting["value"] = stored_value
+            all_settings.append(setting)
+            setting_dict[category_id].append(setting["name"])
+
+    categories.sort(key=lambda x: x.get("order", 999))
+
+    return all_settings, setting_dict, categories
 
 ### SETTINGS VIEWS ###
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    yaml_settings = get_settings_from_yaml()
-    if request.method == "POST":
-        _settings_form = SettingsForm(request.POST, settings=yaml_settings)
+    yaml_settings, setting_dict, categories = get_settings_from_yaml()
 
-        if _settings_form.is_valid():
-            _settings_form.save()
+    if request.method == "POST":
+        form = SettingsForm(request.POST, settings=yaml_settings)
+
+        if form.is_valid():
+            form.save()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",
                 path=reverse("settings_form")
             )
-        return render(  # Allows for proper validation checking
-            request, "tab/settings_form.html", {
-                "form": settings_form,
-            })
+    else:
+        form = SettingsForm(settings=yaml_settings)
 
-    _settings_form = SettingsForm(settings=yaml_settings)
+    categories_with_fields = [
+        {
+            **category,
+            "fields": [form[f"setting_{sname}"] for
+                       sname in setting_dict[category["id"]]]
+        }
+        for category in categories
+    ]
 
     return render(
         request, "tab/settings_form.html", {
-            "form": _settings_form,
+            "form": form,
+            "categories": categories_with_fields,
+            "title": "Tab Settings"
         })
 
 
@@ -443,41 +491,86 @@ def simulate_round(request):
         return redirect_and_flash_success(request, "Simulated round")
     return redirect_and_flash_error(request, "Simulated rounds are disabled")
 
+def room_tag(request, tag_id=None):
+    tag = None
+    if tag_id is not None:
+        tag = RoomTag.objects.filter(pk=tag_id).first()
+
+    if request.method == "POST":
+        # _method is a hidden field used to simulate DELETE requests
+        if request.POST.get("_method") == "DELETE":
+            if tag is not None:
+                tag.delete()
+                return redirect_and_flash_success(request, "Tag deleted successfully")
+            return redirect_and_flash_error(request, "Tag does not exist")
+
+        form = RoomTagForm(request.POST, instance=tag)
+
+        if not form.is_valid():
+            return redirect_and_flash_error(request, "Error saving tag.")
+        priority = form.cleaned_data.get("priority")
+        if priority < 0 or priority > 100:
+            return redirect_and_flash_error(request,
+                                            "Priority must be between 0 and 100.")
+        tag_instance = form.save()
+        path = reverse("manage_room_tags")
+        message = (
+            f"Tag {tag_instance.tag} "
+            f"{'updated' if tag else 'created'} successfully"
+        )
+        return redirect_and_flash_success(request, message,
+                                          path=path)
+
+    form = RoomTagForm(instance=tag)
+    return render(request, "common/data_entry.html", {
+        "form": form,
+        "links": [],
+        "tag_obj": tag,
+        "title": f"Viewing Tag: {tag.tag}" if tag else "Create New Tag"
+    })
+
+def manage_room_tags(request):
+    if request.method == "POST":
+        return room_tag(request)
+    form = MiniRoomTagForm(request.POST or None)
+    room_tags = RoomTag.objects.all().order_by("-priority")
+    return render(request, "pairing/manage_room_tags.html",
+                  {"room_tags": room_tags,
+                   "form": form})
 
 def batch_checkin(request):
-    judges_and_checkins = []
-    rooms_and_checkins = []
-
-    teams = Team.objects.prefetch_related("school", "debaters").all()
-    team_and_checkins = [(team.school.name,
-                          team,
-                          team.debaters.all(),
-                          team.checked_in)
-                         for team in teams]
-
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    all_round_numbers = [0]+round_numbers
-    judges = Judge.objects.prefetch_related("checkin_set", "schools")
+    all_round_numbers = [0] + round_numbers
 
-    for judge in judges:
-        checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        judges_and_checkins.append((judge.schools.all(), judge, checkins_list))
+    team_data = [
+        {"entity": t, "school": t.school, "debaters": t.debaters_display,
+         "checked_in": t.checked_in}
+        for t in Team.objects.prefetch_related("school", "debaters").all()
+    ]
 
-    rooms = Room.objects.prefetch_related("roomcheckin_set")
+    judge_data = [
+        {"entity": j, "schools": j.schools.all(),
+         "checkins": [rn in {c.round_number for c in j.checkin_set.all()}
+                      for rn in all_round_numbers]}
+        for j in Judge.objects.prefetch_related("checkin_set", "schools")
+    ]
 
-    for room in rooms:
-        checkins = []
-        checkins = {checkin.round_number for checkin in room.roomcheckin_set.all()}
-        checkins_list = [round_number in checkins for round_number in all_round_numbers]
-        rooms_and_checkins.append((room, checkins_list))
+    room_data = [
+        {"entity": r,
+         "checkins": [rn in {c.round_number for c in r.roomcheckin_set.all()}
+                      for rn in all_round_numbers]}
+        for r in Room.objects.prefetch_related("roomcheckin_set")
+    ]
 
     return render(request, "batch_check_in/check_in.html", {
-        "teams_and_checkins": team_and_checkins,
-        "judges_and_checkins": judges_and_checkins,
+        "team_data": team_data,
+        "team_headers": ["School", "Team", "Debater Names"],
+        "judge_data": judge_data,
+        "judge_headers": ["School", "Judge"],
+        "room_data": room_data,
+        "room_headers": ["Room"],
         "round_numbers": round_numbers,
-        "rooms_and_checkins": rooms_and_checkins,
-        })
+    })
 
 
 def publish_results(request, new_setting):
@@ -501,3 +594,76 @@ def publish_results(request, new_setting):
             f"Results are already {status}.",
             path="/",
         )
+
+
+def forum_post(request):
+    # Get dino judges
+    dinos = Judge.objects.filter(is_dino=True).values_list("name", flat=True)
+
+    # Get top debaters (limiting to top 10)
+    varsity_debaters, nov_debaters = get_speaker_rankings(None)
+    nov_debaters = nov_debaters[:min(10, len(nov_debaters))]
+    varsity_debaters = varsity_debaters[:min(10, len(varsity_debaters))]
+
+    # Get qualifying teams and debaters
+    qualifying_teams = Team.objects.prefetch_related("debaters").annotate(
+        num_rounds=models.Count("gov_team", distinct=True) +
+        models.Count("opp_team", distinct=True)
+    ).filter(
+        num_rounds__gte=3
+    )
+
+    qualifying_novices = Debater.objects.filter(
+        team__in=qualifying_teams,
+        novice_status=True
+    )
+
+    team_count = qualifying_teams.count()
+    novice_count = qualifying_novices.count()
+
+    # Get team rankings and calculate breaking teams
+    varsity_teams, nov_teams = get_team_rankings(None)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    varsity_teams = varsity_teams[:var_teams_to_break]
+
+    # Calculate novice teams that made varsity break
+    novice_teams_in_varsity_break = sum(
+        1 for team in nov_teams if team in varsity_teams
+    )
+    novice_teams = nov_teams[:nov_teams_to_break + novice_teams_in_varsity_break]
+
+    # Get outround data
+    varsity_outs = create_forum_view_data(0)
+    novice_outs = create_forum_view_data(1)
+
+    # Determine champions
+    novice_champ = None
+    varsity_champ = None
+
+    finals = Outround.objects.filter(num_teams=2)
+    varsity_finals = finals.filter(type_of_round=0).first()
+    novice_finals = finals.filter(type_of_round=1).first()
+
+    if varsity_finals and varsity_finals.victor:
+        varsity_champ = (varsity_finals.gov_team if varsity_finals.victor % 2 == 1
+                         else varsity_finals.opp_team)
+
+    if novice_finals and novice_finals.victor:
+        novice_champ = (novice_finals.gov_team if novice_finals.victor % 2 == 1
+                        else novice_finals.opp_team)
+
+    return render(request, "tab/forum_post.html", {
+        "dinos": dinos,
+        "nov_debaters": nov_debaters,
+        "varsity_debaters": varsity_debaters,
+        "team_count": team_count,
+        "novice_count": novice_count,
+        "varsity_teams": varsity_teams,
+        "novice_teams": novice_teams,
+        "novice_outs": novice_outs["results"],
+        "varsity_outs": varsity_outs["results"],
+        "novice_champ": novice_champ,
+        "varsity_champ": varsity_champ,
+    })

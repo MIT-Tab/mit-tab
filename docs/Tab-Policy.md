@@ -1,12 +1,10 @@
-Tab Policy
-==========
+# Tab Policy
 
 You can find both a copy and paste tab policy for your tournament below, as
 well as an in depth explanation of the tab policy.
 
 
-Copy and Paste Tab Policy
--------------------------
+## Copy and Paste Tab Policy
 
 ```text
 1. Round 1 will be paired randomly with power pairing for seeds. Hybrids may carry the free seed of either of their schools.
@@ -39,11 +37,10 @@ Copy and Paste Tab Policy
 Below is a comprehensive listing of MIT-TAB program's Tab Policy. Many of these
 are configurable, especially the constraints within brackets, so if you need
 something special check out the dedicated section in
-[Advanced Topics](Advanced-Topics.md#modifying-the-pairing-algorithm)
+{ref}`Advanced Topics <modifying-the-pairing-algorithm>`
 
 
-Pairing
--------
+## Pairing
 
 ### Pullups
 * Pull up from the bottom of the next lowest bracket by win-loss ratio, and
@@ -98,8 +95,7 @@ pairing is the minimized total score over all possible pairings.
    (penalty = the difference between the optimal power pairing positions of
    the teams in the pairing and where they actually are)
 
-Judge Assignment
-----------------
+## Judge Assignment
 
 * In round 1, highest ranked judges are assigned to rounds in the
   following order:
@@ -111,8 +107,7 @@ Judge Assignment
   the highest speaking teams, respecting scratches. Paneling is not currently
   supported.
 
-Rankings
---------
+## Rankings
 
 ### Speaker Ranking
 

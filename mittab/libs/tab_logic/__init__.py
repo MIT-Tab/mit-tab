@@ -163,7 +163,7 @@ def pair_round():
                     # sort again by speaks making sure to leave any first
                     # round bye in the correct spot
                     removed_teams = []
-                    for team in list(Team.objects.filter(checked_in=True)):
+                    for team in all_checked_in_teams:
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
                         if team in middle_of_bracket and tot_wins(team) == bracket:
@@ -392,6 +392,9 @@ def sorted_pairings(round_number, outround=False):
         "opp_team__debaters__team_set__no_shows",
         "opp_team__debaters__roundstats_set",
         "opp_team__debaters__roundstats_set__round",
+        "room__tags", "judges__required_room_tags",
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags"
     ]
     model = Outround if outround else Round
     filter_field = "num_teams" if outround else "round_number"
