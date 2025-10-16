@@ -49,12 +49,12 @@ class MysqlDumpRestorer:
             cmd.append("--password={}".format(DB_PASS))
 
         # DigitalOcean Managed Databases require SSL but use self-signed certificates.
-        # --ssl-mode=REQUIRED enables encrypted connection, --ssl-ca=/dev/null skips
-        # certificate verification to avoid "self-signed certificate" errors while
-        # still maintaining encrypted communication to the database.
+        # --ssl enables encrypted connection without strict certificate verification
+        # to avoid "self-signed certificate" errors while still maintaining encrypted
+        # communication to the database. Using --ssl instead of --ssl-mode for
+        # compatibility with older MySQL/MariaDB clients.
         if DB_HOST and DB_HOST != "127.0.0.1" and DB_HOST != "localhost":
-            cmd.append("--ssl-mode=REQUIRED")
-            cmd.append("--ssl-ca=/dev/null")
+            cmd.append("--ssl")
 
         return cmd
 
@@ -74,12 +74,12 @@ class MysqlDumpRestorer:
             cmd.append("--password={}".format(DB_PASS))
 
         # DigitalOcean Managed Databases require SSL but use self-signed certificates.
-        # --ssl-mode=REQUIRED enables encrypted connection, --ssl-ca=/dev/null skips
-        # certificate verification to avoid "self-signed certificate" errors while
-        # still maintaining encrypted communication to the database.
+        # --ssl enables encrypted connection without strict certificate verification
+        # to avoid "self-signed certificate" errors while still maintaining encrypted
+        # communication to the database. Using --ssl instead of --ssl-mode for
+        # compatibility with older MySQL/MariaDB clients.
         if DB_HOST and DB_HOST != "127.0.0.1" and DB_HOST != "localhost":
-            cmd.append("--ssl-mode=REQUIRED")
-            cmd.append("--ssl-ca=/dev/null")
+            cmd.append("--ssl")
 
         if not include_scratches:
             cmd.append("--ignore-table={}.tab_scratch".format(DB_NAME))
