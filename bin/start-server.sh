@@ -4,39 +4,53 @@ set +x
 
 cd /var/www/tab
 
-MYSQL_SSL_MODE=${MYSQL_SSL_MODE:-REQUIRED}
-MYSQL_SSL_CA=${MYSQL_SSL_CA:-}
+python manage.py migrate --noinput
 
-function execute-mysql() {
-  local args=(
-    "-u" "$MYSQL_USER"
-    "-h" "$MYSQL_HOST"
-    "-D" "$MYSQL_DATABASE"
-    "-P" "$MYSQL_PORT"
-    "--password=$MYSQL_PASSWORD"
-  )
+tournament_initialized() {
+  python - <<'PY'
+import os
+import sys
+import django
 
-  if [[ "$MYSQL_SSL_MODE" != "DISABLED" || -n "$MYSQL_SSL_CA" ]]; then
-    args+=("--ssl")
-  fi
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mittab.settings")
+django.setup()
 
-  if [[ -n "$MYSQL_SSL_CA" ]]; then
-    args+=("--ssl-ca=$MYSQL_SSL_CA")
-  fi
+from django.db import connection  # noqa: E402
 
-  mysql "${args[@]}" -e "$1"
+with connection.cursor() as cursor:
+    cursor.execute("SHOW TABLES LIKE 'tournament_initialized'")
+    exists = cursor.fetchone() is not None
+
+sys.exit(0 if exists else 1)
+PY
 }
 
-python manage.py migrate --noinput
+create_flag_table() {
+  python - <<'PY'
+import os
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mittab.settings")
+django.setup()
+
+from django.db import connection  # noqa: E402
+
+with connection.cursor() as cursor:
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS tournament_initialized("
+        "id int not null, PRIMARY KEY (id))"
+    )
+PY
+}
 
 # Create a table tournament_intialized to use as a flag indicating the
 # tournament has been initialzed
-if [[ $(execute-mysql "show tables like 'tournament_initialized'") ]]; then
+if tournament_initialized; then
   echo "Tournament already initialized, skipping init phase";
 else
   echo "Initializing tournament";
   python manage.py initialize_tourney --tab-password $TAB_PASSWORD --first-init;
-  execute-mysql "CREATE TABLE tournament_initialized(id int not null, PRIMARY KEY (id));"
+  create_flag_table
 fi
 
 if [[ $TOURNAMENT_NAME == *-test ]]; then
