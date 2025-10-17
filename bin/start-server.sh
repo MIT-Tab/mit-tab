@@ -5,44 +5,54 @@ set +x
 cd /var/www/tab
 
 ensure_mysql_ca() {
-  python - <<'PY'
-import os
-import socket
-import ssl
-import sys
+  local host="${MYSQL_HOST}"
+  local port="${MYSQL_PORT:-3306}"
+  local target="${MYSQL_SSL_CA:-/var/www/tab/tmp/digitalocean-db-ca.pem}"
 
-host = os.environ.get("MYSQL_HOST")
-port = int(os.environ.get("MYSQL_PORT", "3306"))
-ca_path = os.environ.get("MYSQL_SSL_CA", "/var/www/tab/tmp/digitalocean-db-cert.pem")
+  if [[ -z "$host" ]]; then
+    echo ""
+    return 0
+  fi
 
-if not host:
-    sys.exit(0)
+  if [[ -s "$target" ]]; then
+    echo "$target"
+    return 0
+  fi
 
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-context.check_hostname = False
-context.verify_mode = ssl.CERT_NONE
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "openssl is required to fetch the MySQL certificate" >&2
+    return 1
+  fi
 
-try:
-    with socket.create_connection((host, port), timeout=10) as sock:
-        with context.wrap_socket(sock, server_hostname=host) as ssock:
-            der_cert = ssock.getpeercert(True)
-except Exception as exc:
-    print(f"Failed to fetch MySQL certificate: {exc}", file=sys.stderr)
-    sys.exit(1)
+  local chain cert
+  if ! chain=$(openssl s_client -starttls mysql -showcerts -servername "$host" -connect "$host:$port" </dev/null 2>/dev/null); then
+    echo "Failed to fetch MySQL certificate chain via openssl" >&2
+    return 1
+  fi
 
-pem_cert = ssl.DER_cert_to_PEM_cert(der_cert)
+  cert=$(printf '%s\n' "$chain" | awk '
+    /-----BEGIN CERTIFICATE-----/ {capture=1; current=$0; next}
+    /-----END CERTIFICATE-----/ {if (capture) {current=current "\n" $0; certificates[++count]=current; capture=0}}
+    capture {current=current "\n" $0}
+    END {if (count) print certificates[count]}
+  ')
 
-os.makedirs(os.path.dirname(ca_path), exist_ok=True)
-with open(ca_path, "w") as cert_file:
-    cert_file.write(pem_cert)
+  if [[ -z "$cert" ]]; then
+    echo "Unable to parse MySQL CA certificate" >&2
+    return 1
+  fi
 
-print(ca_path, end="")
-PY
+  mkdir -p "$(dirname "$target")"
+  printf '%s\n' "$cert" > "$target"
+  echo "$target"
 }
 
-MYSQL_SSL_MODE=${MYSQL_SSL_MODE:-REQUIRED}
+MYSQL_SSL_MODE=${MYSQL_SSL_MODE:-VERIFY_CA}
 if [[ -z "$MYSQL_SSL_CA" || ! -s "$MYSQL_SSL_CA" ]]; then
-  MYSQL_SSL_CA=$(ensure_mysql_ca)
+  if ! MYSQL_SSL_CA=$(ensure_mysql_ca); then
+    echo "Unable to obtain MySQL CA certificate; aborting startup." >&2
+    exit 1
+  fi
 fi
 export MYSQL_SSL_MODE
 export MYSQL_SSL_CA

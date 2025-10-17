@@ -3,7 +3,7 @@ FROM python:3.10
 # install dependenices
 RUN apt-get update && \
   apt-get upgrade -y && \
-  apt-get install -y vim default-mysql-client
+  apt-get install -y vim default-mysql-client openssl
 
 WORKDIR /var/www/tab
 
