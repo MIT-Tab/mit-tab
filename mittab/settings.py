@@ -1,6 +1,7 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -46,15 +47,36 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "mittab")
+MYSQL_USER = os.environ.get("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
+MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
+MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
+
+db_options = {"charset": "utf8mb4"}
+
+if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
+    ssl_ca = os.environ.get("MYSQL_SSL_CA")
+    if not ssl_ca:
+        raise ImproperlyConfigured(
+            "MYSQL_SSL_CA must be set when connecting to a remote MySQL host."
+        )
+    if not os.path.exists(ssl_ca):
+        raise ImproperlyConfigured(
+            f"Configured MYSQL_SSL_CA path '{ssl_ca}' could not be found."
+        )
+
+    db_options["ssl"] = {"ca": ssl_ca}
+
 DATABASES = {
     "default": {
         "ENGINE":   "django.db.backends.mysql",
-        "OPTIONS":  {"charset": "utf8mb4"},
-        "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
-        "USER":     os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "HOST":     os.environ.get("MYSQL_HOST", "127.0.0.1"),
-        "PORT":     os.environ.get("MYSQL_PORT", "3306"),
+        "OPTIONS":  db_options,
+        "NAME":     MYSQL_DATABASE,
+        "USER":     MYSQL_USER,
+        "PASSWORD": MYSQL_PASSWORD,
+        "HOST":     MYSQL_HOST,
+        "PORT":     MYSQL_PORT,
     }
 }
 
