@@ -6,8 +6,6 @@ from datetime import datetime, timezone, timedelta
 from wsgiref.util import FileWrapper
 
 
-import subprocess
-
 from mittab.apps.tab.models import TabSettings
 from mittab.libs import errors, cache_logic
 from mittab.libs.backup.handlers import MysqlDumpRestorer
@@ -83,18 +81,8 @@ def backup_round(btype=None, round_number=None, btime=None,
                             include_scratches, name)
     with ActiveBackupContextManager() as _:
         print("Trying to backup to backups directory")
-        try:
-            BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump(
-                include_scratches=include_scratches
-            )
-        except subprocess.CalledProcessError as exc:
-            print(
-                "Backup failed (continuing without backup): {}".format(
-                    exc.stderr.decode("utf-8", errors="ignore")
-                    if getattr(exc, "stderr", None)
-                    else str(exc)
-                )
-            )
+        BACKUP_STORAGE[filename] = BACKUP_HANDLER.dump(include_scratches=
+                                                       include_scratches)
 
 def upload_backup(f):
     filename = _name_backup(
