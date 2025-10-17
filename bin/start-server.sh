@@ -4,6 +4,49 @@ set +x
 
 cd /var/www/tab
 
+ensure_mysql_ca() {
+  python - <<'PY'
+import os
+import socket
+import ssl
+import sys
+
+host = os.environ.get("MYSQL_HOST")
+port = int(os.environ.get("MYSQL_PORT", "3306"))
+ca_path = os.environ.get("MYSQL_SSL_CA", "/var/www/tab/tmp/digitalocean-db-cert.pem")
+
+if not host:
+    sys.exit(0)
+
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+context.check_hostname = False
+context.verify_mode = ssl.CERT_NONE
+
+try:
+    with socket.create_connection((host, port), timeout=10) as sock:
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            der_cert = ssock.getpeercert(True)
+except Exception as exc:
+    print(f"Failed to fetch MySQL certificate: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+pem_cert = ssl.DER_cert_to_PEM_cert(der_cert)
+
+os.makedirs(os.path.dirname(ca_path), exist_ok=True)
+with open(ca_path, "w") as cert_file:
+    cert_file.write(pem_cert)
+
+print(ca_path, end="")
+PY
+}
+
+MYSQL_SSL_MODE=${MYSQL_SSL_MODE:-REQUIRED}
+if [[ -z "$MYSQL_SSL_CA" || ! -s "$MYSQL_SSL_CA" ]]; then
+  MYSQL_SSL_CA=$(ensure_mysql_ca)
+fi
+export MYSQL_SSL_MODE
+export MYSQL_SSL_CA
+
 python manage.py migrate --noinput
 
 tournament_initialized() {
