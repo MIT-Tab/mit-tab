@@ -306,6 +306,8 @@ def speaks_for_debater(debater, average_ironmen=True, exclude_round=None):
 
     num_speaks = TabSettings.get("cur_round") - 1
     for round_number in range(1, num_speaks + 1):
+        if round_number == exclude_round:
+            continue
         roundstats = speaks_per_round[round_number]
         if roundstats:
             # This is so if in the odd chance we get a debater paired in
