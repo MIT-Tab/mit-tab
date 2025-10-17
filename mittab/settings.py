@@ -1,6 +1,7 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 import sentry_sdk
+from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
@@ -53,19 +54,19 @@ MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
 
 db_options = {"charset": "utf8mb4"}
-ssl_settings = {}
 
 if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
-    ssl_mode = os.environ.get("MYSQL_SSL_MODE", "REQUIRED")
-    if ssl_mode:
-        ssl_settings["ssl_mode"] = ssl_mode
-
     ssl_ca = os.environ.get("MYSQL_SSL_CA")
-    if ssl_ca:
-        ssl_settings["ssl_ca"] = ssl_ca
+    if not ssl_ca:
+        raise ImproperlyConfigured(
+            "MYSQL_SSL_CA must be set when connecting to a remote MySQL host."
+        )
+    if not os.path.exists(ssl_ca):
+        raise ImproperlyConfigured(
+            f"Configured MYSQL_SSL_CA path '{ssl_ca}' could not be found."
+        )
 
-if ssl_settings:
-    db_options["ssl"] = ssl_settings
+    db_options["ssl"] = {"ca": ssl_ca}
 
 DATABASES = {
     "default": {

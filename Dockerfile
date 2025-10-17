@@ -3,7 +3,11 @@ FROM python:3.10
 # install dependenices
 RUN apt-get update && \
   apt-get upgrade -y && \
-  apt-get install -y vim default-mysql-client openssl
+  apt-get install -y vim default-mysql-client curl && \
+  curl -fsSL https://cacerts.digitalocean.com/ca-certificate.crt \
+    -o /usr/local/share/ca-certificates/digitalocean-ca.crt && \
+  chmod 644 /usr/local/share/ca-certificates/digitalocean-ca.crt && \
+  update-ca-certificates
 
 WORKDIR /var/www/tab
 
@@ -31,6 +35,8 @@ RUN ./node_modules/.bin/webpack --config webpack.config.js --mode production
 RUN python manage.py collectstatic --noinput
 
 RUN mkdir /var/tmp/django_cache
+
+ENV MYSQL_SSL_CA=/usr/local/share/ca-certificates/digitalocean-ca.crt
 
 EXPOSE 8000
 CMD ["/var/www/tab/bin/start-server.sh"]
