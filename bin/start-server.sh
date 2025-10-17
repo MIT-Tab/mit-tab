@@ -4,6 +4,12 @@ set +x
 
 cd /var/www/tab
 
+if [[ -z "$MYSQL_SSL_CA" ]]; then
+  export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
+fi
+
+python -m mittab.scripts.ensure_mysql_ca
+
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2
   exit 1
