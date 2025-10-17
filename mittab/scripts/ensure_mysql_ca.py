@@ -1,6 +1,6 @@
 import os
-import socket
-import ssl
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,15 +28,43 @@ def main() -> int:
 
 
 def _fetch_certificate(host: str, port: int) -> str:
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    if not _openssl_exists():
+        raise RuntimeError("openssl CLI not available in runtime image")
 
-    with socket.create_connection((host, port), timeout=10) as sock:
-        with context.wrap_socket(sock, server_hostname=host) as tls_sock:
-            der_cert = tls_sock.getpeercert(binary_form=True)
+    cmd = [
+        "openssl",
+        "s_client",
+        "-starttls",
+        "mysql",
+        "-showcerts",
+        "-servername",
+        host,
+        "-connect",
+        f"{host}:{port}",
+    ]
 
-    return ssl.DER_cert_to_PEM_cert(der_cert)
+    result = subprocess.run(
+        cmd,
+        input=b"\n",
+        check=True,
+        capture_output=True,
+    )
+
+    stdout = result.stdout.decode("utf-8", errors="ignore")
+    certificates = re.findall(
+        r"-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----",
+        stdout,
+    )
+
+    if not certificates:
+        raise RuntimeError("Unable to parse certificate chain from openssl output")
+
+    # Return the last certificate which corresponds to the CA provided by DO.
+    return certificates[-1] + "\n"
+
+
+def _openssl_exists() -> bool:
+    return subprocess.call(["which", "openssl"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
 
 
 if __name__ == "__main__":
