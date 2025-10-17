@@ -8,8 +8,9 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import tab_logic, cache_logic
-from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
+from mittab.libs.tab_logic import tot_speaks_deb, \
     tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.apps.tab.spreadsheet_utils import spreadsheet_view
 from mittab.libs.tab_logic import rankings
 
 
@@ -31,27 +32,103 @@ def public_view_teams(request):
 
 
 def view_teams(request):
-    def flags(team):
-        result = 0
-        if team.checked_in:
-            result |= TabFlags.TEAM_CHECKED_IN
-        else:
-            result |= TabFlags.TEAM_NOT_CHECKED_IN
-        return result
-
-    c_teams = [(team.id, team.display_backend, flags(team),
-                TabFlags.flags_to_symbols(flags(team)))
-               for team in Team.objects.all()]
-    all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
-    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "team",
-            "title": "Viewing All Teams",
-            "item_list": c_teams,
-            "filters": filters,
-            "symbol_text": symbol_text
-        })
+    seed_source = [
+        {"id": choice[0], "name": choice[1]}
+        for choice in Team.SEED_CHOICES
+    ]
+    break_pref_source = [
+        {"id": choice[0], "name": choice[1]}
+        for choice in Team.BREAK_PREFERENCE_CHOICES
+    ]
+    config = {
+        "title": "Manage Teams",
+        "model": Team,
+        "queryset": lambda: Team.objects.select_related("school", "hybrid_school").prefetch_related("debaters").order_by("name"),
+        "columns": [
+            {
+                "name": "id",
+                "title": "ID",
+                "type": "text",
+                "width": 70,
+                "read_only": True,
+            },
+            {
+                "name": "name",
+                "title": "Name",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "school",
+                "title": "School",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda team: team.school.name if team.school else None,
+            },
+            {
+                "name": "hybrid_school",
+                "title": "Hybrid School",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda team: team.hybrid_school.name if team.hybrid_school else None,
+            },
+            {
+                "name": "seed",
+                "title": "Seed",
+                "type": "dropdown",
+                "source": seed_source,
+                "python_type": "int",
+                "valid_values": [choice["id"] for choice in seed_source],
+                "required": True,
+            },
+            {
+                "name": "checked_in",
+                "title": "Checked In",
+                "type": "checkbox",
+                "python_type": "bool",
+            },
+            {
+                "name": "team_code",
+                "title": "Code",
+                "type": "text",
+            },
+            {
+                "name": "debater_1",
+                "title": "Debater 1",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda team: team.debaters.all()[0].name if team.debaters.count() > 0 else None,
+            },
+            {
+                "name": "debater_2",
+                "title": "Debater 2",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda team: team.debaters.all()[1].name if team.debaters.count() > 1 else None,
+            },
+            {
+                "name": "break_preference",
+                "title": "Break Preference",
+                "type": "dropdown",
+                "source": break_pref_source,
+                "python_type": "int",
+                "valid_values": [choice["id"] for choice in break_pref_source],
+                "required": True,
+            },
+            {
+                "name": "ranking_public",
+                "title": "Ranking Public",
+                "type": "checkbox",
+                "python_type": "bool",
+            },
+        ],
+        "allow_create": False,
+    }
+    return spreadsheet_view(request, config)
 
 
 def view_team(request, team_id):

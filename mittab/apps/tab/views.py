@@ -18,9 +18,9 @@ from mittab.apps.tab.models import *
 from mittab.apps.tab.outround_pairing_views import create_forum_view_data
 from mittab.apps.tab.team_views import get_team_rankings
 from mittab.libs import cache_logic
-from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.apps.tab.spreadsheet_utils import spreadsheet_view
 
 
 def index(request):
@@ -94,14 +94,35 @@ def add_scratch(request):
 #### BEGIN SCHOOL ###
 # Three views for entering, viewing, and editing schools
 def view_schools(request):
-    # Get a list of (id,school_name) tuples
-    c_schools = [(s.pk, s.name, 0, "") for s in School.objects.all()]
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "school",
-            "title": "Viewing All Schools",
-            "item_list": c_schools
-        })
+    config = {
+        "title": "Manage Schools",
+        "model": School,
+        "queryset": lambda: School.objects.all().order_by("name"),
+        "columns": [
+            {
+                "name": "id",
+                "title": "ID",
+                "type": "text",
+                "width": 70,
+                "read_only": True,
+            },
+            {
+                "name": "name",
+                "title": "Name",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "apda_id",
+                "title": "APDA ID",
+                "type": "numeric",
+                "mask": "#,##0",
+                "python_type": "int",
+            },
+        ],
+        "allow_create": True,
+    }
+    return spreadsheet_view(request, config)
 
 
 def view_school(request, school_id):
@@ -191,27 +212,44 @@ def delete_school(request, school_id):
 
 #### BEGIN ROOM ###
 def view_rooms(request):
-    def flags(room):
-        result = 0
-        if room.rank == 0:
-            result |= TabFlags.ROOM_ZERO_RANK
-        else:
-            result |= TabFlags.ROOM_NON_ZERO_RANK
-        return result
-
-    all_flags = [[TabFlags.ROOM_ZERO_RANK, TabFlags.ROOM_NON_ZERO_RANK]]
-    all_rooms = [(room.pk, room.name, flags(room),
-                  TabFlags.flags_to_symbols(flags(room)))
-                 for room in Room.objects.all()]
-    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "room",
-            "title": "Viewing All Rooms",
-            "item_list": all_rooms,
-            "symbol_text": symbol_text,
-            "filters": filters
-        })
+    config = {
+        "title": "Manage Rooms",
+        "model": Room,
+        "queryset": lambda: Room.objects.all().prefetch_related("tags").order_by("name"),
+        "columns": [
+            {
+                "name": "id",
+                "title": "ID",
+                "type": "text",
+                "width": 70,
+                "read_only": True,
+            },
+            {
+                "name": "name",
+                "title": "Name",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "rank",
+                "title": "Rank",
+                "type": "numeric",
+                "mask": "0.00",
+                "python_type": "decimal",
+                "required": True,
+            },
+            {
+                "name": "tags",
+                "title": "Tags",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda room: ", ".join(sorted(tag.name for tag in room.tags.all())) or None,
+            },
+        ],
+        "allow_create": True,
+    }
+    return spreadsheet_view(request, config)
 
 
 def view_room(request, room_id):

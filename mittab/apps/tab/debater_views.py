@@ -7,18 +7,57 @@ from mittab.apps.tab.models import *
 from mittab.libs import tab_logic, cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
+from mittab.apps.tab.spreadsheet_utils import spreadsheet_view
 
 
 def view_debaters(request):
-    # Get a list of (id,debater_name) tuples
-    c_debaters = [(debater.pk, debater.display, 0, "")
-                  for debater in Debater.objects.all()]
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "debater",
-            "title": "Viewing All Debaters",
-            "item_list": c_debaters
-        })
+    novice_source = [
+        {"id": choice[0], "name": choice[1]}
+        for choice in Debater.NOVICE_CHOICES
+    ]
+    config = {
+        "title": "Manage Debaters",
+        "model": Debater,
+        "queryset": lambda: Debater.objects.all().order_by("name"),
+        "columns": [
+            {
+                "name": "id",
+                "title": "ID",
+                "type": "text",
+                "width": 70,
+                "read_only": True,
+            },
+            {
+                "name": "name",
+                "title": "Name",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "novice_status",
+                "title": "Division",
+                "type": "dropdown",
+                "source": novice_source,
+                "python_type": "int",
+                "required": True,
+                "valid_values": [choice["id"] for choice in novice_source],
+            },
+            {
+                "name": "tiebreaker",
+                "title": "Tiebreaker",
+                "type": "numeric",
+                "read_only": True,
+            },
+            {
+                "name": "apda_id",
+                "title": "APDA ID",
+                "type": "numeric",
+                "python_type": "int",
+            },
+        ],
+        "allow_create": True,
+    }
+    return spreadsheet_view(request, config)
 
 
 def view_debater(request, debater_id):

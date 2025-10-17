@@ -12,6 +12,7 @@ import ballotsInit from "./ballots";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
 import multiselectInit from "./multiselect";
+import "./spreadsheet";
 
 function initializeConfirms() {
   $("[confirm]").click(e => {

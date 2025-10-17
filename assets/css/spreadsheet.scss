@@ -1,0 +1,44 @@
+#spreadsheet-wrapper {
+  margin-top: 1rem;
+}
+
+#spreadsheet-status {
+  display: none;
+}
+
+.jss-cell-error {
+  background-color: #fdecea !important;
+  color: #a12622 !important;
+}
+
+.spreadsheet-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.spreadsheet-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.spreadsheet-table {
+  border: 1px solid #dee2e6;
+  overflow: auto;
+  max-width: 100%;
+}
+
+.spreadsheet-table .jss,
+.spreadsheet-table .jss td,
+.spreadsheet-table .jss th,
+.spreadsheet-table .jss_cell {
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+.spreadsheet-table .jss_cell {
+  line-height: 1.4;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

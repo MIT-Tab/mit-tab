@@ -6,6 +6,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.libs.tab_logic import TabFlags
+from mittab.apps.tab.spreadsheet_utils import spreadsheet_view
 
 
 def public_view_judges(request):
@@ -25,60 +26,96 @@ def public_view_judges(request):
 
 
 def view_judges(request):
-    # Get a list of (id,school_name) tuples
-    current_round = TabSettings.objects.get(key="cur_round").value - 1
+    current_round = TabSettings.get("cur_round", 1) - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
-    checked_in_judges = set([c.judge for c in checkins])
-    checked_in_judges_next = set([c.judge for c in checkins_next])
+    checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
+    checked_in_judges = {c.judge_id for c in checkins}
+    checked_in_judges_next = {c.judge_id for c in checkins_next}
 
-    def flags(judge):
-        result = 0
-        if judge in checked_in_judges:
-            result |= TabFlags.JUDGE_CHECKED_IN_CUR
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
-        if judge in checked_in_judges_next:
-            result |= TabFlags.JUDGE_CHECKED_IN_NEXT
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
+    def with_checkin_flags(judge):
+        return {
+            "current": judge.id in checked_in_judges,
+            "next": judge.id in checked_in_judges_next,
+        }
 
-        if judge.rank < 3.0:
-            result |= TabFlags.LOW_RANKED_JUDGE
-        if judge.rank >= 3.0 and judge.rank < 5.0:
-            result |= TabFlags.MID_RANKED_JUDGE
-        if judge.rank >= 5.0:
-            result |= TabFlags.HIGH_RANKED_JUDGE
-        return result
+    def checkin_label(flags, round_label):
+        return "Yes" if flags.get(round_label) else "No"
 
-    judges = sorted(Judge.objects.all(), key=lambda j: (-j.rank, j.name))
-
-    c_judge = [
-        (judge.pk, judge.name, flags(judge), f"({judge.ballot_code})", judge.rank)
-        for judge in judges
-    ]
-
-    all_flags = [
-        [
-            TabFlags.JUDGE_CHECKED_IN_CUR,
-            TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
-            TabFlags.JUDGE_CHECKED_IN_NEXT,
-            TabFlags.JUDGE_NOT_CHECKED_IN_NEXT,
+    judge_config = {
+        "title": "Manage Judges",
+        "model": Judge,
+        "queryset": lambda: Judge.objects.select_related("school").prefetch_related("schools").order_by("name"),
+        "columns": [
+            {
+                "name": "id",
+                "title": "ID",
+                "type": "text",
+                "width": 80,
+                "read_only": True,
+            },
+            {
+                "name": "name",
+                "title": "Name",
+                "type": "text",
+                "required": True,
+            },
+            {
+                "name": "rank",
+                "title": "Rank",
+                "type": "numeric",
+                "mask": "0",
+                "python_type": "int",
+                "required": True,
+                "min_value": 1,
+                "max_value": 99,
+            },
+            {
+                "name": "ballot_code",
+                "title": "Ballot Code",
+                "type": "text",
+                "required": False,
+            },
+            {
+                "name": "wing_only",
+                "title": "Wing Only",
+                "type": "checkbox",
+                "python_type": "bool",
+            },
+            {
+                "name": "is_dino",
+                "title": "Dino",
+                "type": "checkbox",
+                "python_type": "bool",
+            },
+            {
+                "name": "schools",
+                "title": "Schools",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda judge: ", ".join(sorted(school.name for school in judge.schools.all())) or None,
+            },
+            {
+                "name": "checked_in_current",
+                "title": "Checked In (Current)",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda judge: checkin_label(with_checkin_flags(judge), "current"),
+            },
+            {
+                "name": "checked_in_next",
+                "title": "Checked In (Next)",
+                "type": "text",
+                "read_only": True,
+                "skip_model_field": True,
+                "value_getter": lambda judge: checkin_label(with_checkin_flags(judge), "next"),
+            },
         ],
-        [
-            TabFlags.LOW_RANKED_JUDGE,
-            TabFlags.MID_RANKED_JUDGE,
-            TabFlags.HIGH_RANKED_JUDGE,
-        ]
-    ]
-    filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "judge",
-            "title": "Viewing All Judges",
-            "item_list": c_judge,
-            "filters": filters,
-        })
+        "allow_create": True,
+    }
+
+    return spreadsheet_view(request, judge_config)
 
 
 def view_judge(request, judge_id):
