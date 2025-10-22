@@ -374,12 +374,12 @@ def alternative_judges(request, round_id, judge_id=None):
         return any(s.team_id in scratched_team_ids for s in judge.scratches.all())
 
     excluded_judges = [
-        (j.name, j.id, float(j.rank))
+        (j.name, j.id, float(j.rank), j.wing_only)
         for j in excluded_judges
         if not has_team_scratch(j)
     ]
     included_judges = [
-        (j.name, j.id, float(j.rank))
+        (j.name, j.id, float(j.rank), j.wing_only)
         for j in included_judges
         if not has_team_scratch(j)
     ]
