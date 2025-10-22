@@ -89,16 +89,20 @@ def add_judges():
             "scratches",
         )
     )
-    # Separate chairs (non-wing-only judges) and wings (wing-only judges)
+
+    # Sort all_judges once before creating filtered subsets
+    random.seed(1337)
+    random.shuffle(all_judges)
+    all_judges = sorted(all_judges, key=lambda j: j.rank, reverse=True)
+
     chairs = [j for j in all_judges if not j.wing_only]
+
     pairings = tab_logic.sorted_pairings(round_number)
 
     random.seed(1337)
     random.shuffle(pairings)
 
-    chairs = sorted(chairs, key=lambda j: j.rank, reverse=True)
     chair_scores = construct_judge_scores(chairs, settings.mode)
-    all_judges = sorted(all_judges, key=lambda j: j.rank, reverse=True)
 
     bubble_priority = settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
     if bubble_priority and round_number > 1:
@@ -183,9 +187,7 @@ def add_judges():
             raise errors.JudgeAssignmentError()
 
     judge_round_joins, chair_by_pairing = [], [None] * num_rounds
-    assigned_judges = set()  # Track assigned judge indices in 'chairs' list
-    assigned_judge_objects = set()  # Track actual Judge objects
-    assigned_pairs = set()
+    assigned_judge_objects = set()  # Track actual Judge objects by ID
     for pairing_i, padded_chair_i in enumerate(judge_assignments[:num_rounds]):
         chair_i = padded_chair_i - num_rounds
 
@@ -194,9 +196,7 @@ def add_judges():
 
         round_obj.chair = chair
         chair_by_pairing[pairing_i] = chair_i
-        assigned_judges.add(chair_i)
         assigned_judge_objects.add(chair.id)  # Track by judge ID
-        assigned_pairs.add((pairing_i, chair_i))
         judge_round_joins.append(
             Round.judges.through(judge=chair, round=round_obj)
         )
