@@ -51,15 +51,5 @@ def judge_team_count(context, judge, pairing):
 
 @register.simple_tag
 def tournament_name():
-    try:
-        name = TabSettings.get("tournament_name", None)
-        if name:
-            return name
-    except (ValueError, Exception):
-        pass
-
-    name = os.environ.get("TOURNAMENT_NAME", "MIT Tab")
-    words = re.split(r"[-_]", name)
-    formatted = " ".join(word.title() for word in words if word)
-    return formatted
+    return TabSettings.get("tournament_name", "New Tournament")
     

@@ -875,6 +875,7 @@ def start_new_tourny(request):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
+        TabSettings.set("tournament_name", "New Tournament")
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(
@@ -885,7 +886,7 @@ def start_new_tourny(request):
 def clear_db():
     obj_types = [
         CheckIn, RoundStats, Round, Judge, Room, Scratch, TabSettings, Team,
-        School
+        School, Debater
     ]
     list(map(delete_obj, obj_types))
 
