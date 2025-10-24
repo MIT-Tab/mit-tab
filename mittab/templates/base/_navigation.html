@@ -41,6 +41,7 @@
 {% url "e_ballots" as public_eballot %}
 {% url "public_judges" as public_judges %}
 {% url "public_teams" as public_teams %}
+{% url "rank_teams_public" as public_team_rankings %}
 {% url "outround_pretty_pair" 0 as public_outround_varsity %}
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 
@@ -123,6 +124,7 @@
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot }}">Submit E-Ballot</a>
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges }}">Judge List</a>
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams }}">Team List</a>
+            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings }}">Team Rankings</a>
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity }}">Varsity Outrounds</a>
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice }}">Novice Outrounds</a>
           </div>
@@ -153,6 +155,9 @@
         </li>
         <li class="nav-item">
           <a class="nav-link {% active request public_teams %}" href="{{ public_teams }}">Team List</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings }}">Team Rankings</a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% active request public_outround_varsity %}" href="{{ public_outround_varsity }}">Varsity Outrounds</a>
