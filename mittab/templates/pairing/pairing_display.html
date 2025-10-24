@@ -5,8 +5,12 @@
 {% block title %}Pairings for Round {{ round_number }}{% endblock %}
 {% block banner %}
   Pairings for Round {{ round_number }}
-  {% if pairing_exists %}
-    <div class="page-subtitle">{{ team_count }} teams</div>
+{% if pairing_exists %}
+    <div class="float-right">
+        <span class="badge badge-secondary bg-secondary text-white">
+            {{ team_count }} teams
+        </span>
+    </div>
   {% endif %}
 {% endblock %}
 

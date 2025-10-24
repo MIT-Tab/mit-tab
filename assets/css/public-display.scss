@@ -119,26 +119,3 @@ content
 .hidden {
     display: none;
 }
-
-.nav-tabs {
-    margin-bottom: 1em;
-    margin-top: 0.5em;
-}
-
-.tab-content .tab-pane {
-    display: none;
-}
-
-.tab-content .tab-pane.active {
-    display: block;
-}
-
-body.bracket-view-active .list-view-only {
-    display: none !important;
-}
-
-.page-subtitle {
-    color: #666;
-    font-size: 0.9em;
-    margin-top: 0.3em;
-}

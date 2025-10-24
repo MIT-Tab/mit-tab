@@ -4,15 +4,6 @@
 
 body.match-modal-open { overflow: hidden; }
 
-.content .nav-link {
-  border: 1px solid #e6e6e6;
-  border-radius: 8px 8px 0 0;
-  color : #495057;
-  &.active {
-    border: 1px solid #a7a7a7;
-  }
-}
-
 #bracket-view {
   align-items: flex-start; box-sizing: border-box; display: none;
   height: 100%; justify-content: center; overflow: auto; padding: 1rem; width: 100%;
