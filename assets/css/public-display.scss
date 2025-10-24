@@ -15,16 +15,13 @@ content
     width:                  100%;
     min-width:              100%;
 
-
     border-collapse:        collapse;
 }
-
 
 .public_table tr:nth-child(even)
 {
     background:             #DEF;
 }
-
 
 .public_table th
 {
@@ -35,14 +32,12 @@ content
     font-weight: bold;
 }
 
-
 .public_table td
 {
     text-overflow:          ellipsis;
     border:                 1px solid #DDD;
     padding:                .5em;
 }
-
 
 .public_footer
 {
@@ -65,7 +60,6 @@ content
     align-items: center;
 }
 
-
 .public_footer .footer-content {
     width: 100%;
     display: flex;
@@ -73,7 +67,6 @@ content
     flex-wrap: wrap;
     gap: 0.8em;
 }
-
 
 .public_footer .footer-controls {
     margin-left: auto;
@@ -86,18 +79,15 @@ content
     flex: 0 0 auto;
 }
 
-
 .public_footer_spacer
 {
     height:                 3em;
 }
 
-
 .footer-label,
 .pairings_bye_label {
     font-weight: bold;
 }
-
 
 .footer-entry,
 .pairings_bye_entry {
@@ -106,57 +96,46 @@ content
     min-width: 15%;
 }
 
-
 .right-margin
 {
     margin-right: 1em;
 }
-
 
 .right
 {
     float: right;
 }
 
-
 .show-team-names .team-names { display: inline !important; }
 .show-team-names .member-names { display: none !important; }
 
-
 .team-names { display: none !important; }
 .member-names { display: inline !important; }
-
 
 .left {
     float: left;
 }
 
-
 .hidden {
     display: none;
 }
-
 
 .nav-tabs {
     margin-bottom: 1em;
     margin-top: 0.5em;
 }
 
-
 .tab-content .tab-pane {
     display: none;
 }
-
 
 .tab-content .tab-pane.active {
     display: block;
 }
 
-
 body.bracket-view-active .list-view-only {
     display: none !important;
 }
-
 
 .page-subtitle {
     color: #666;
