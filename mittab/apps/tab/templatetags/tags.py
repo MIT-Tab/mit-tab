@@ -1,6 +1,3 @@
-import os
-import re
-
 from django import template
 from django.forms.fields import FileField
 from mittab.apps.tab.models import TabSettings

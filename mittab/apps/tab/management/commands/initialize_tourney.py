@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 
 from django.core.management import call_command

@@ -647,7 +647,7 @@ def export_pairings_csv_view(request):
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.prefetch_related("gov_team", "opp_team",
-                                             "room", "chair") \
+                                            "room", "chair") \
         .filter(victor=Round.NONE, round_number=round_number)
     # need to do this to not reveal brackets
 

@@ -14,7 +14,7 @@ const adjustFloatingOffsets = () => {
 
   const navHeight = nav.offsetHeight;
   const adjustments = [
-    { header: ".pairings_header", spacer: ".pairings_header_spacer" },
+    { header: ".pairings_header", spacer: ".pairings_header_spacer" }
   ];
 
   adjustments.forEach(({ header, spacer }) => {

@@ -557,7 +557,6 @@ class SettingsForm(forms.Form):
         for setting in self.settings:
             field = "setting_%s" % (setting["name"],)
             key = setting["name"]
-            tab_setting = TabSettings.objects.filter(key=key).first()
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0

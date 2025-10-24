@@ -25,10 +25,8 @@ class TabSettings(models.Model):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
-                # Return string value if exists, otherwise integer value
                 return (setting.value_string if setting.value_string
                         is not None else setting.value)
-            print("Key not found:", key)
             return None
 
         result = cache_logic.cache_fxn_key(
@@ -58,7 +56,8 @@ class TabSettings(models.Model):
             obj.value_string = value_string
             obj.save()
         else:
-            obj = cls.objects.create(key=key, value=value_num, value_string=value_string)
+            obj = cls.objects.create(key=key, value=value_num,
+                                     value_string=value_string)
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache("tab_settings_%s" % self.key,
