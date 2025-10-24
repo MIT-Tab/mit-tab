@@ -32,9 +32,6 @@ setupScroll = () => {
 };
 
 $(document).ready(() => {
-  adjustFloatingOffsets();
-  $(window).on("resize", adjustFloatingOffsets);
-
   $("#autoscroll").change(function handleAutoscrollChange() {
     if ($(this).prop("checked")) {
       setupScroll();
