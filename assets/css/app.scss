@@ -1,4 +1,4 @@
-$body-bg: radial-gradient(circle, #fff 0%, #b0b0b0 80%, #888 100%);
+$body-bg: #BFD9FF;
 $font-size-base: 0.95rem !default;
 
 .form-control {
@@ -17,11 +17,6 @@ $font-size-base: 0.95rem !default;
 
 .no-nav {
   margin-left: auto;
-  margin-right: auto;
-}
-
-.navbar .navbar-left-align {
-  margin-left: 0;
   margin-right: auto;
 }
 
