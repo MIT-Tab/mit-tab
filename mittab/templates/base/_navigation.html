@@ -45,7 +45,7 @@
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-  <div class="container {% if not smaller_width %} w-95{% endif %}">
+  <div class="container w-95">
     <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{{ home }}">MIT-TAB</a>
 
     {% if user.is_authenticated %}
@@ -111,7 +111,8 @@
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>
         </li>
-
+      </ul>
+      <ul class="navbar-nav ml-auto">
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}">
             Public
@@ -126,9 +127,9 @@
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice }}">Novice Outrounds</a>
           </div>
         </li>
-	<li class="nav-item">
-        <a class="nav-link" href="{{ logout }}">Logout</a>
-	</li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ logout }}">Logout</a>
+        </li>
       </ul>
     </div>
     {% else %}

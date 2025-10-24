@@ -20,6 +20,11 @@ $font-size-base: 0.95rem !default;
   margin-right: auto;
 }
 
+.navbar .navbar-left-align {
+  margin-left: 0;
+  margin-right: auto;
+}
+
 .navbar-dark .nav-link {
   color: rgba(255, 255, 255, 0.75) !important;
 }

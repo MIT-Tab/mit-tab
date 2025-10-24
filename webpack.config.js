@@ -9,7 +9,7 @@ module.exports = {
   context: __dirname,
   entry: {
     main: "./assets/js/index",
-    public: "./assets/js/publicDisplay",
+    publicDisplay: "./assets/js/publicDisplay",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
   },

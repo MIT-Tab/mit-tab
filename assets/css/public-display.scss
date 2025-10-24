@@ -1,27 +1,32 @@
-content 
+content
 {
-font-family:            Helvetica, sans-serif;
+    font-family:            Helvetica, sans-serif;
     font-size:              20px;
     margin:                 0em;
     height:                 100%;
     width:                  100%;
 }
 
-/* Table styling - used by both public lists and pairings */
-.public_table 
+
+
+
+.public_table
 {
     width:                  100%;
     min-width:              100%;
 
+
     border-collapse:        collapse;
 }
+
 
 .public_table tr:nth-child(even)
 {
     background:             #DEF;
 }
 
-.public_table th 
+
+.public_table th
 {
     text-align:             left;
     padding: 0.5em;
@@ -30,14 +35,15 @@ font-family:            Helvetica, sans-serif;
     font-weight: bold;
 }
 
-.public_table td 
+
+.public_table td
 {
     text-overflow:          ellipsis;
     border:                 1px solid #DDD;
     padding:                .5em;
 }
 
-/* Footer styling - fixed at bottom */
+
 .public_footer
 {
     position:               fixed;
@@ -45,10 +51,12 @@ font-family:            Helvetica, sans-serif;
     left:                   0em;
     right:                  0em;
 
+
     height:                 auto;
-    min-height: 1.5em;
+    min-height:             1.5em;
     padding:                .5em;
     margin:                 0em;
+
 
     background:             #BDF;
     border-top:             .15em solid #000;
@@ -56,6 +64,7 @@ font-family:            Helvetica, sans-serif;
     display: flex;
     align-items: center;
 }
+
 
 .public_footer .footer-content {
     width: 100%;
@@ -65,78 +74,92 @@ font-family:            Helvetica, sans-serif;
     gap: 0.8em;
 }
 
+
 .public_footer .footer-controls {
     margin-left: auto;
+    margin-right: 0;
     display: flex;
     gap: 1em;
     align-items: center;
+    width: auto;
+    justify-content: flex-end;
+    flex: 0 0 auto;
 }
 
-.public_footer_spacer 
+
+.public_footer_spacer
 {
-    height: 3em;
+    height:                 3em;
 }
 
-/* Footer labels and entries */
+
 .footer-label,
 .pairings_bye_label {
     font-weight: bold;
 }
 
+
 .footer-entry,
 .pairings_bye_entry {
     display: inline;
+    margin-right: 1em;
+    min-width: 15%;
 }
 
 
-/* Utility classes */
-.right-margin 
+.right-margin
 {
     margin-right: 1em;
 }
 
-.right 
+
+.right
 {
     float: right;
 }
 
-.show-team-names .team-names { display: block !important; }
+
+.show-team-names .team-names { display: inline !important; }
 .show-team-names .member-names { display: none !important; }
 
+
 .team-names { display: none !important; }
-.member-names { display: block !important; }
+.member-names { display: inline !important; }
+
 
 .left {
     float: left;
 }
 
-/* Hidden scroll marker for auto-scroll script */
+
 .hidden {
     display: none;
 }
 
-/* Tab navigation for bracket/list view */
+
 .nav-tabs {
     margin-bottom: 1em;
     margin-top: 0.5em;
 }
 
+
 .tab-content .tab-pane {
     display: none;
 }
+
 
 .tab-content .tab-pane.active {
     display: block;
 }
 
+
 body.bracket-view-active .list-view-only {
     display: none !important;
 }
 
-/* Page title area */
+
 .page-subtitle {
     color: #666;
     font-size: 0.9em;
     margin-top: 0.3em;
 }
-

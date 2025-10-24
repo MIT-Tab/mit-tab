@@ -4,18 +4,12 @@
 
 body.match-modal-open { overflow: hidden; }
 
-.pairings_header .nav-tabs {
-  display: flex; flex-wrap: wrap; gap: .5rem;
-  list-style: none; margin: 0; padding: 10px; border-bottom: 0;
-  .nav-link {
-    background: #f4f7fb; border: 1px solid #9cf; border-radius: .35em;
-    color: #123; font-weight: 600; padding: .5em 1.2em;
-    &.active { background: #e8f4f8; }
-    &:not(.active) { background: #9cf; color: #fff; outline: 2px solid #fff; }
-  }
-  @media (max-width: 576px) {
-    gap: .3rem; padding: 5px;
-    .nav-link { font-size: .9em; padding: .35em .8em; }
+.content .nav-link {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px 8px 0 0;
+  color : #495057;
+  &.active {
+    border: 1px solid #a7a7a7;
   }
 }
 

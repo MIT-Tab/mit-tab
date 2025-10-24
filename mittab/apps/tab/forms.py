@@ -534,7 +534,7 @@ class SettingsForm(forms.Form):
                 )
             elif setting.get("type") == "text":
                 self.fields[field_name] = forms.CharField(
-                    label=setting["name"],
+                    label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
                     required=False,
@@ -561,15 +561,10 @@ class SettingsForm(forms.Form):
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
-            elif setting.get("type") == "text":
-                value_to_set = self.cleaned_data[field]
             else:
                 value_to_set = self.cleaned_data[field]
 
-            if not tab_setting:
-                TabSettings.set(key, value_to_set)
-            else:
-                TabSettings.set(key, value_to_set)
+            TabSettings.set(key, value_to_set)
 
 
 def validate_panel(result):

@@ -3,7 +3,7 @@
 <head>
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'main' %}
-
+    {% block extra_head %}{% endblock extra_head %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
     <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
@@ -12,7 +12,6 @@
         integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"
         crossorigin="anonymous">
     <title>{% block title %}{% endblock %}</title>
-    {% block extra_head %}{% endblock %}
 </head>
 <body>
   {% include "base/_navigation.html" %}

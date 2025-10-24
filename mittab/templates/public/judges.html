@@ -1,41 +1,45 @@
 {% extends "base/__wide.html" %}
+
 {% load tags %}
-{% load render_bundle from webpack_loader %}
+	{% load render_bundle from webpack_loader %}
 
 {% block title %}Judge List{% endblock %}
 {% block extra_head %}
-  {% render_bundle 'public' %}
+	{% render_bundle 'publicDisplay' %}
 {% endblock %}
 
 {% block content %}
 <div class="col-12">
-	<div id="scrollPage" class="hidden"></div>
-
-	<div class="public_header">
-		<h1>Judge List</h1>
-		<table class="public_table">
-			<tr>
-				<th style="width: 25%;">Name</th>
-				<th style="width: 40%;">Affiliations</th>
-				{% for round in rounds %}
-				<th>R{{ round }}</th>
-				{% endfor %}
-			</tr>
-		</table>
-	</div>
-
-	<table class="public_table">
-		{% for judge in judges %}
+        <div id="scrollPage" class="hidden"></div>	
+	    <h1>Judge List</h1>
+	    <table class="public_table">
+		<thead>
 		<tr>
-			<td style="width: 25%;">{{ judge.name }}</td>
-			<td style="width: 40%;">{{ judge.affiliations_display }}</td>
-			{% for round in rounds %}
-			<td>{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
-			{% endfor %}
+		    <th style="width: 25%;">Name</th>
+		    <th style="width: 40%;">Affiliations</th>
+		    {% for round in rounds %}
+			<th>R{{ round }}</th>
+		    {% endfor %}
 		</tr>
-		{% endfor %}
+	    </thead>
+	<tbody>
+	    {% for judge in judges %}
+		<tr>
+		    <td style="width: 25%;">{{ judge.name }}</td>
+		    <td style="width: 40%;">{{ judge.affiliations_display }}</td>
+		    {% for round in rounds %}
+			<td>{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
+		    {% endfor %}
+		</tr>
+	    {% endfor %}
 	</table>
-
-	{% include "public/_public_footer.html" with show_autoscroll=True show_autoscroll_checked=True %}
-</div>
+        <div class="pairings_footer_spacer"></div>
+	<div class="public_footer">
+            <span class="right footer-controls">
+		<label for="autoscroll">
+                    Autoscroll:
+                    <input type="checkbox" name="autoscroll" id="autoscroll"/>
+		</label>
+            </span>
+	</div>	
 {% endblock %}

@@ -3,7 +3,6 @@ import re
 
 from django import template
 from django.forms.fields import FileField
-
 from mittab.apps.tab.models import TabSettings
 
 register = template.Library()
@@ -52,8 +51,6 @@ def judge_team_count(context, judge, pairing):
 
 @register.simple_tag
 def tournament_name():
-    """Get tournament name from database, fallback to environment variable."""
-    # Try to get from database setting first
     try:
         name = TabSettings.get("tournament_name", None)
         if name:
@@ -61,11 +58,8 @@ def tournament_name():
     except (ValueError, Exception):
         pass
 
-    # Fallback to environment variable
     name = os.environ.get("TOURNAMENT_NAME", "MIT Tab")
-    # Split on both "-" and "_"
     words = re.split(r"[-_]", name)
-    # Title case each word
     formatted = " ".join(word.title() for word in words if word)
     return formatted
     

@@ -4,37 +4,35 @@
 {% block banner %}Missing Ballots{% endblock %}
 
 {% block content %}
-<div class="col-12">
-  <div class="mb-3">
-    <a href="/" class="btn btn-sm btn-primary">Back to Home</a>
-  </div>
 
-  {% if pairing_exists %}
-    {% if rounds %}
-      <h2 class="text-center">Missing Ballots</h2>
-      <p class="lead text-center">This list will refresh every 30 seconds</p>
-      <h3 class="text-center">Missing: {{ rounds|length }}</h3>
-      <ul class="missing-rounds list-group list-group-flush">
-        {% for r in rounds %}
-          <li class="missing-round-item list-group-item text-lg">
-            <h5 class="mb-1">
-              {{r.chair.name}}
-              <small class="text-muted">Round between {{r.gov_team.display}} and {{r.opp_team.display}}
-                <span class="text-danger">({{r.room.name}})</span></small>
-            </h5>
-          </li>
-        {% endfor %}
-      </ul>
+<div class="col-12 mb-3 text-left pl-3">
 
-      <script>
-        window.setTimeout(function() { location.reload(true) }, 30000);
-      </script>
-    {% else %}
-      <h3 class="text-center">All ballots entered!</h3>
-    {% endif %}
+{% if pairing_exists %}
+  {% if rounds %}
+    <h2 class="text-center">Missing Ballots</h2>
+    <p class="lead text-center">This list will refresh every 30 seconds</p>
+    <ul class="missing-rounds list-group list-group-flush">
+    <h3 class="text-center">Missing: {{ rounds|length }}</h1>
+    {% for r in rounds %}
+    <li class="missing-round-item list-group-item text-lg">
+      <h5>
+        {{r.chair.name}}
+        <small class="text-muted">Round between {{r.gov_team.display}} and {{r.opp_team.display}} 
+          <span class="text-danger">({{r.room.name}})</span></small>
+      </h5>
+    </li>
+    {% endfor %}
+    </ul>
+
+    <script>
+      window.setTimeout(function() { location.reload(true) }, 30000);
+    </script>
   {% else %}
-    <h3 class="text-center">Pairing not released</h3>
+    <h3 class="text-center">All ballots entered!</h3>
   {% endif %}
+{% else %}
+  <h3 class="text-center">Pairing not released</h3>
+{% endif %}
 <div class="col-2"></div>
 {% endblock %}
 </div>

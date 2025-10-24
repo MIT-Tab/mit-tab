@@ -28,6 +28,7 @@ class TabSettings(models.Model):
                 # Return string value if exists, otherwise integer value
                 return (setting.value_string if setting.value_string
                         is not None else setting.value)
+            print("Key not found:", key)
             return None
 
         result = cache_logic.cache_fxn_key(
@@ -44,22 +45,20 @@ class TabSettings(models.Model):
 
     @classmethod
     def set(cls, key, value):
+        if isinstance(value, str):
+            value_string = value
+            value_num = None
+        else:
+            value_num = value
+            value_string = None
+
         if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
-            # Determine if value is string or int and set appropriate field
-            if isinstance(value, str):
-                obj.value_string = value
-                obj.value = None
-            else:
-                obj.value = value
-                obj.value_string = None
+            obj.value = value_num
+            obj.value_string = value_string
             obj.save()
         else:
-            # Determine if value is string or int and set appropriate field
-            if isinstance(value, str):
-                obj = cls.objects.create(key=key, value_string=value, value=None)
-            else:
-                obj = cls.objects.create(key=key, value=value, value_string=None)
+            obj = cls.objects.create(key=key, value=value_num, value_string=value_string)
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache("tab_settings_%s" % self.key,

@@ -1,10 +1,10 @@
 {% extends "base/__normal.html" %}
 
 
-{% block extra_bundles %}
+{% block extra_head %}
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'batchCheckin' %}
-{% endblock extra_bundles %}
+{% endblock extra_head %}
 
 {% load tags %}
 

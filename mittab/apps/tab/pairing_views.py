@@ -1,6 +1,6 @@
+import random
 import datetime
 import os
-import random
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
@@ -646,16 +646,12 @@ def export_pairings_csv_view(request):
 
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
-    rounds = (
-        Round.objects.filter(victor=Round.NONE, round_number=round_number)
-        .prefetch_related("gov_team", "opp_team", "room", "chair")
-        .all()
-    )
+    rounds = Round.objects.prefetch_related("gov_team", "opp_team",
+                                             "room", "chair") \
+        .filter(victor=Round.NONE, round_number=round_number)
+    # need to do this to not reveal brackets
 
-    def get_chair_name(round_obj):
-        return round_obj.chair.name if round_obj.chair else ""
-
-    rounds = sorted(rounds, key=get_chair_name)
+    rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     return render(
         request,
@@ -665,6 +661,16 @@ def missing_ballots(request):
             "pairing_exists": pairing_exists,
         },
     )
+
+def view_rounds(request):
+    number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
+    rounds = [(i, "Round %i" % i, 0, "")
+              for i in range(1, number_of_rounds + 1)]
+    return render(request, "common/list_data.html", {
+        "item_type": "round",
+        "item_list": rounds,
+        "show_delete": True
+    })
 
 
 def e_ballot_search(request):
@@ -684,77 +690,56 @@ def e_ballot_search(request):
 def enter_e_ballot(request, ballot_code):
     if request.method == "POST":
         round_id = request.POST.get("round_instance")
+
         if round_id:
-            return enter_result(
-                request,
-                round_id,
-                form_class=EBallotForm,
-                ballot_code=ballot_code,
-                redirect_to="/",
-            )
-        message = (
-            "Missing necessary form data. Please go to tab if this error persists."
-        )
-        return redirect_and_flash_error(request, message, path="/e_ballots/")
+            return enter_result(request,
+                                round_id,
+                                EBallotForm,
+                                ballot_code,
+                                redirect_to="/")
+        else:
+            message = """
+                      Missing necessary form data. Please go to tab if this
+                      error persists
+                      """
 
-    current_round = TabSettings.get("cur_round") - 1
-    judge = (
-        Judge.objects.filter(ballot_code=ballot_code)
-        .prefetch_related("judges")
-        .first()
-    )
+    current_round = TabSettings.get(key="cur_round") - 1
 
-    rounds = []
-    if judge:
-        rounds = list(
-            judge.judges.prefetch_related("chair")
-            .filter(round_number=current_round)
-            .all()
-        )
+    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
+        # bad use of related_name in the model, this gets the rounds
+        "judges",
+    ).first()
+    # see above, judge.judges is rounds
+    rounds = list(judge.judges.prefetch_related("chair")
+                  .filter(round_number=current_round).all())
 
     if not judge:
-        message = (
-            "No judge matches the ballot code \"%s.\" "
-            "Try submitting again, or go to tab."
-            % ballot_code
-        )
+        message = """
+                    No judges with the ballot code "%s." Try submitting again, or
+                    go to tab to resolve the issue.
+                    """ % ballot_code
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
     elif len(rounds) > 1:
-        message = (
-            "Found more than one ballot for you this round. "
-            "Go to tab to resolve this error."
-        )
+        message = """
+                Found more than one ballot for you this round.
+                Go to tab to resolve this error.
+                """
     elif not rounds:
-        message = (
-            "Could not find a ballot for you this round. "
-            "Go to tab to resolve the issue."
-        )
+        message = """
+                Could not find a ballot for you this round. Go to tab
+                to resolve the issue if you believe you were paired in.
+                """
     elif rounds[0].chair != judge:
-        message = (
-            "You are not the chair of this round. "
-            "Only the chair can submit an e-ballot."
-        )
+        message = """
+                You are not the chair of this round. If you are on a panel,
+                only the chair can submit an e-ballot. If you are not on a
+                panel, go to tab and make sure the chair is properly set for
+                the round.
+                """
     else:
-        return enter_result(
-            request,
-            rounds[0].id,
-            form_class=EBallotForm,
-            ballot_code=ballot_code,
-            redirect_to="/",
-        )
-
-    return redirect_and_flash_error(request, message, path="/e_ballots/")
-
-def view_rounds(request):
-    number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
-    rounds = [(i, "Round %i" % i, 0, "")
-              for i in range(1, number_of_rounds + 1)]
-    return render(request, "common/list_data.html", {
-        "item_type": "round",
-        "item_list": rounds,
-        "show_delete": True
-    })
+        return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
+    return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
 def enter_result(request,

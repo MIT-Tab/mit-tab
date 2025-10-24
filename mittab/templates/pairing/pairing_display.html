@@ -1,6 +1,7 @@
 {% extends "base/__wide.html" %}
 {% load render_bundle from webpack_loader %}
 
+
 {% block title %}Pairings for Round {{ round_number }}{% endblock %}
 {% block banner %}
   Pairings for Round {{ round_number }}
@@ -8,78 +9,120 @@
     <div class="page-subtitle">{{ team_count }} teams</div>
   {% endif %}
 {% endblock %}
-{% block body_class %}show-team-names{% endblock %}
+
 
 {% block extra_head %}
-  {% render_bundle 'public' %}
+  {% render_bundle 'publicDisplay' %}
   <meta name="round-number" content="{{ round_number }}">
 {% endblock %}
 
+
 {% block content %}
 <div class="col-12">
-  {% if pairing_exists %}
+{% if pairing_exists %}
     <div id="scrollPage" class="hidden"></div>
 
 
-
-
-    <table class="public_table">
+      <table class="public_table">
       <thead>
-        <tr>
-          <th>
-            Government
-          </th> <th>
-            Opposition
-          </th> <th>
-            Judge
-          </th> <th>
-            Room
+          <tr>
+          <th style ="width: 30%;">
+              Government
+          </th> <th style="width: 30%;">
+              Opposition
+          </th> <th style="width: 20%;">
+              Judge
+          </th> <th style="width: 20%;">
+              Room
           </th>
-        </tr>
+          </tr>
       </thead>
       <tbody>
-      {% for pairing in round_pairing %}
+        {% for pairing in round_pairing %}
         <tr>
-          <td>
-            <div class="team-names">
-                {{pairing.gov_team.display}}
-            </div>
-            {% if debater_team_memberships_public %}
-            <div class="member-names">
-                {{pairing.gov_team.debaters_display}}
-            </div>
-            {% endif %}
-          </td>
-          <td>
-            <div class="team-names">
-                {{pairing.opp_team.display}}
-            </div>
-            {% if debater_team_memberships_public %}
-            <div class="member-names">
-                {{pairing.opp_team.debaters_display}}
-            </div>
-            {% endif %}
-          </td>
-          <td>
-            {% for judge in pairing.judges.all %}
-                {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
-                <b>{{judge.name}}</b><br>
-                {% else %}
-                {{judge.name}}<br>
+            <td>
+                <div class="team-names">
+                    {{pairing.gov_team.display}}
+                </div>
+                {% if debater_team_memberships_public %}
+                <div class="member-names">
+                    {{pairing.gov_team.debaters_display}}
+                </div>
                 {% endif %}
-            {% endfor %}
-          </td>
-          <td>{{pairing.room.name}}</td>
+            </td>
+            <td>
+                <div class="team-names">
+                    {{pairing.opp_team.display}}
+                </div>
+                {% if debater_team_memberships_public %}
+                <div class="member-names">
+                    {{pairing.opp_team.debaters_display}}
+                </div>
+                {% endif %}
+            </td>
+            <td>
+                {% for judge in pairing.judges.all %}
+                    {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+                    <b>{{judge.name}}</b><br>
+                    {% else %}
+                    {{judge.name}}<br>
+                    {% endif %}
+                {% endfor %}
+            </td>
+            <td>{{pairing.room.name}}</td>
         </tr>
-      {% endfor %}
+        {% endfor %}
       </tbody>
-    </table>
+        </table>
 
-    {% include "public/_public_footer.html" with show_byes=byes show_errors=errors show_member_names_toggle=debater_team_memberships_public show_autoscroll=True %}
-  {% else %}
-    <div class="alert alert-info">
-      Round {{ round_number }} does not yet have a released pairing. Please check back later.
+
+    <div class="public_footer_spacer"></div>
+
+
+    <!-- Floating bottom header -->
+    <div class="public_footer">
+        {% if byes %}
+            <span class="pairings_bye_entry">
+                <span class="pairings_bye_label">Giving the Bye to:</span>
+                <span class="team-names">{% for team in byes %}{{team.display}}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                {% if debater_team_memberships_public %}
+                    <span class="member-names">{% for team in byes %}{{team.debaters_display}}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                {% endif %}
+            </span>
+        {% endif %}
+        {% if errors %}
+            <span class="pairings_bye_entry">
+                <span class="pairings_bye_label">Teams not Paired in:</span>
+                <span class="team-names">{% for team in errors %}{{team.display}}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                {% if debater_team_memberships_public %}
+                    <span class="member-names">{% for team in errors %}{{team.debaters_display}}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                {% endif %}
+                </span>
+        {% endif %}
+        <div class="footer-controls right">
+        {% if debater_team_memberships_public %}
+        <span class="right">
+        <label for="Member Names">
+            Member Names:
+            <input type="checkbox" name="names" id="name_display_toggle"/>
+        </label>
+        </span>
+        {% endif %}
+        <span class="right">
+          <label for="autoscroll">
+            Autoscroll:
+            <input type="checkbox" name="autoscroll" id="autoscroll"/>
+          </label>
+        </span>
+        </div>  
     </div>
-  {% endif %}
+{% else %}
+
+
+    Round {{round_number}} does not yet have a valid pairing. Please wait until
+    your tournament directors release a valid pairing before viewing this page.
+
+
+{% endif %}
 </div>
 {% endblock %}
