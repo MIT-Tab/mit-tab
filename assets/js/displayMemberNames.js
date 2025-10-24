@@ -1,6 +1,5 @@
 import $ from "jquery";
 
-
 function changeDisplayNames() {
   const checkBox = document.getElementById("name_display_toggle");
   if (checkBox) {
@@ -8,7 +7,6 @@ function changeDisplayNames() {
     window.dispatchEvent(new Event("memberNamesToggled"));
   }
 }
-
 
 $(document).ready(() => {
   const checkBox = document.getElementById("name_display_toggle");
