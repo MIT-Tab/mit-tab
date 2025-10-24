@@ -1,0 +1,39 @@
+<div class="public_footer_spacer public_footer_spacer"></div>
+
+<div class="public_footer public_footer">
+  <div class="footer-content">
+    {% if show_byes %}
+      <span class="footer-label pairings_bye_label">Giving the Bye to:</span>
+      {% for team in show_byes %}
+        <span class="footer-entry pairings_bye_entry">{{ team.display }}</span>{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    {% endif %}
+    
+    {% if show_errors %}
+      <span class="footer-label pairings_bye_label">Teams not Paired in:</span>
+      {% for team in show_errors %}
+        <span class="footer-entry pairings_bye_entry">{{ team.display }}</span>{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    {% endif %}
+    
+    {% if extra_left_content %}
+      {{ extra_left_content|safe }}
+    {% endif %}
+    
+    <span class="footer-controls">
+      {% if show_member_names_toggle|default:False %}
+        <label>
+          Member Names:
+          <input type="checkbox" name="names" id="name_display_toggle"/>
+        </label>
+      {% endif %}
+      
+      {% if show_autoscroll|default:True %}
+        <label>
+          Autoscroll:
+          <input type="checkbox" name="autoscroll" id="autoscroll" {% if show_autoscroll_checked|default:False %}checked{% endif %}/>
+        </label>
+      {% endif %}
+    </span>
+  </div>
+</div>

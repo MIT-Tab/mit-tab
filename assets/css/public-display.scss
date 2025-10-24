@@ -1,50 +1,14 @@
-body
+content 
 {
-    font-family:            Helvetica, sans-serif;
+font-family:            Helvetica, sans-serif;
     font-size:              20px;
     margin:                 0em;
     height:                 100%;
     width:                  100%;
 }
 
-.public_header
-{
-    position:               fixed;
-    top:                    0em;
-    left:                   0em;
-    right:                  0em;
-
-    height:                 4.5em;
-    width:                  100%;
-    padding:                .5em;
-    margin:                 0em;
-
-    background:             #9CF;
-    border-bottom:          .1em solid #000;
-}
-
-.public_header h1
-{
-    margin:                 0em;
-    padding:                .25em;
-    display:                inline-block;
-    float:                  left;
-}
-
-.public_header h3
-{
-    margin:                 0em;
-    padding:                .5em;
-    display:                inline-block;
-    float:                  left;
-}
-
-.public_header_spacer
-{
-    height:                 5.5em;
-}
-
-.public_table
+/* Table styling - used by both public lists and pairings */
+.public_table 
 {
     width:                  100%;
     min-width:              100%;
@@ -57,18 +21,23 @@ body
     background:             #DEF;
 }
 
-.public_table th
+.public_table th 
 {
     text-align:             left;
+    padding: 0.5em;
+    background: #9CF;
+    border: 1px solid #888;
+    font-weight: bold;
 }
 
-.public_table td
+.public_table td 
 {
     text-overflow:          ellipsis;
     border:                 1px solid #DDD;
     padding:                .5em;
 }
 
+/* Footer styling - fixed at bottom */
 .public_footer
 {
     position:               fixed;
@@ -76,42 +45,57 @@ body
     left:                   0em;
     right:                  0em;
 
-    height:                 1.5em;
+    height:                 auto;
+    min-height: 1.5em;
     padding:                .5em;
     margin:                 0em;
 
     background:             #BDF;
     border-top:             .15em solid #000;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
 }
-.public_footer_printable
+
+.public_footer .footer-content {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.8em;
+}
+
+.public_footer .footer-controls {
+    margin-left: auto;
+    display: flex;
+    gap: 1em;
+    align-items: center;
+}
+
+.public_footer_spacer 
 {
-    white-space: nowrap;
-    height:                 1.5em;
-    width:                  100%;
-    padding:                .5em;
-    margin:                 0em;
-
-    background:             #BDF;
-    border:                 .15em solid #000;
+    height: 3em;
 }
 
-.public_footer_spacer
-{
-    height:                 2.5em;
+/* Footer labels and entries */
+.footer-label,
+.pairings_bye_label {
+    font-weight: bold;
 }
 
-.printable
-{
-    width: 7in;
-    white-space: nowrap;
+.footer-entry,
+.pairings_bye_entry {
+    display: inline;
 }
 
-.right-margin
+
+/* Utility classes */
+.right-margin 
 {
     margin-right: 1em;
 }
 
-.right
+.right 
 {
     float: right;
 }
@@ -122,22 +106,37 @@ body
 .team-names { display: none !important; }
 .member-names { display: block !important; }
 
-.home-link {
-    display: inline-block;
-    padding: 0.3em 0.7em;
-    background-color: #337ab7;
-    color: white;
-    text-decoration: none;
-    border-radius: 0.2em;
-    font-size: 0.7em;
-    margin-right: 0.8em;
-    transition: all 0.2s ease-in-out;
+.left {
+    float: left;
 }
 
-.home-link:hover {
-    background-color: #23527c;
-    color: white;
-    text-decoration: none;
-    transform: scale(1.05);
+/* Hidden scroll marker for auto-scroll script */
+.hidden {
+    display: none;
+}
+
+/* Tab navigation for bracket/list view */
+.nav-tabs {
+    margin-bottom: 1em;
+    margin-top: 0.5em;
+}
+
+.tab-content .tab-pane {
+    display: none;
+}
+
+.tab-content .tab-pane.active {
+    display: block;
+}
+
+body.bracket-view-active .list-view-only {
+    display: none !important;
+}
+
+/* Page title area */
+.page-subtitle {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 0.3em;
 }
 

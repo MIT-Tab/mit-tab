@@ -9,8 +9,7 @@ module.exports = {
   context: __dirname,
   entry: {
     main: "./assets/js/index",
-    pairingDisplay: "./assets/js/pairingDisplay",
-    publicDisplay: "./assets/js/publicDisplay",
+    public: "./assets/js/publicDisplay",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
   },

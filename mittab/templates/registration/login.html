@@ -1,87 +1,56 @@
-{% extends "base/__normal.html" %}
+{% extends "base/__wide.html" %}
+{% load tags %}
 
 {% block content %}
 
-<div class="col border-right pl-5 pr-5">
-  <h4 class="text-center">Tab Staff Login</h4>
+<div class="col-lg-5 col-md-6 border-right pl-5 pr-5 d-flex align-items-center">
+  <div class="w-100">
+    <h3 class="text-center mb-4 font-weight-bold">Tab Staff Login</h3>
 
-  {% if form.errors %}
-    <div class="alert alert-danger" role="alert">
-      Sorry, that's not a valid username or password
-    </div>
-  {% endif %}
+    {% if form.errors %}
+      <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-circle"></i> Sorry, that's not a valid username or password
+      </div>
+    {% endif %}
 
-  <form action="" method="post">
-    {% csrf_token %}
-    <div class="form-group">
-      <label for="username">Username</label>
-      <input type="text" class="form-control" name="username" value="" id="username" placeholder="Username">
-    </div>
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" class="form-control" name="password" value="" id="password" placeholder="Password">
-    </div>
-    <button type="submit" class="btn btn-success btn-block">Sign in</button>
-    <input type="hidden" name="next" value="{{ next|escape }}" />
-  </form>
+    <form action="" method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="username" class="font-weight-semibold">Username</label>
+        <input type="text" 
+               class="form-control form-control-lg" 
+               name="username" 
+               value="" 
+               id="username" 
+               placeholder="Enter your username"
+               autofocus>
+      </div>
+      <div class="form-group">
+        <label for="password" class="font-weight-semibold">Password</label>
+        <input type="password" 
+               class="form-control form-control-lg" 
+               name="password" 
+               value="" 
+               id="password" 
+               placeholder="Enter your password">
+      </div>
+      <button type="submit" class="btn btn-success btn-lg btn-block mt-4">
+        <i class="fas fa-sign-in-alt"></i> Sign in
+      </button>
+      <input type="hidden" name="next" value="{{ next|escape }}" />
+    </form>
+  </div>
 </div>
 
-<div class="col pl-5 pr-5">
-  <h4 class="text-center">Participant Access</h4>
-
-  <br/>
-
-  <a class="btn btn-large btn-info btn-block" href="/pairings/pairinglist/">
-    Released Pairings
-  </a>
-
-  <a class="btn btn-large btn-info btn-block" href="/pairings/missing_ballots/">
-    Missing Ballots
-  </a>
-
-  <a class="btn btn-large btn-info btn-block content-reveal"
-    href="/e_ballots/"
-    data-to-reveal="e-ballot-search">
-    Submit an E-Ballot
-  </a>
-
-  <form action="/e_ballots/" class="hidden mt-2" method="post" class="form-inline"
-    id="e-ballot-search" enctyp="multipate/form-data">
-    {% csrf_token %}
-
-    <div class="input-group">
-      <input placeholder="Ballot code (get yours from tab)"
-             id="e_ballot_search" class="form-control"
-             name="ballot_code">
-      <div class="input-group-append">
-        <input class="btn btn-info" type="submit" value="Get Ballot"/>
-      </div>
+<div class="col-lg-7 col-md-6 pl-5 pr-5 d-flex align-items-center justify-content-center">
+  <div class="text-center py-5">
+    <h1 class="display-4 mb-4 font-weight-bold">Welcome to {% tournament_name %}</h1>
+    <p class="lead text-muted mb-4">
+      Use the navigation bar above to access public tournament information
+    </p>
+    <div class="mt-5">
+      <i class="fas fa-gavel fa-3x text-primary mb-3"></i>
     </div>
-  </form>
-
-  <a class="btn btn-info btn-large btn-block mt-2"
-     href="{% url 'public_judges' %}">
-      Judge List
-  </a>
-
-  <a class="btn btn-info btn-large btn-block"
-     href="{% url 'public_teams' %}">
-      Team List
-  </a>
-
-  <a class="btn btn-info btn-large btn-block"
-     href="{% url 'rank_teams_public' %}">
-      Public Rankings
-  </a>
-
-  <a class="btn btn-info btn-large btn-block"
-     href="{% url 'outround_pretty_pair' 0 %}">
-      Varsity Outrounds
-  </a>
-
-  <a class="btn btn-info btn-large btn-block"
-     href="{% url 'outround_pretty_pair' 1 %}">
-      Novice Outrounds
-  </a>
+  </div>
 </div>
 {% endblock %}

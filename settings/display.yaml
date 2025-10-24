@@ -5,6 +5,11 @@ category:
   order: 1
 
 settings:
+  - tournament_name:
+    name: tournament_name
+    description: "The name of the tournament to display on the login page and throughout the site"
+    value: ""
+    type: text
   - teams_public:
     name: teams_public
     description: "Check this box to make the team list publicly visible"

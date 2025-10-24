@@ -1,54 +1,41 @@
-<!DOCTYPE html>
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
 
-<html>
-    <head>
-        {% load render_bundle from webpack_loader %}
-        {% render_bundle 'publicDisplay' %}
+{% block title %}Team List{% endblock %}
+{% block extra_head %}
+  {% render_bundle 'public' %}
+{% endblock %}
 
-        <title>Team List</title>
-    </head>
+{% block content %}
+<div class="col-12">
+	<div id="scrollPage" class="hidden"></div>
 
-    <body>
-        <div id="scrollPage" class="hidden"></div>
-
-        <div class="public_header">
-            <h1>Team List</h1>
-            <h3>({{ num_checked_in }} checked in)</h3>
-            <table class="public_table">
-                <tr>
-                    <th style="width: 25%;">Team Name</th>
-                    <th style="width: 15%;">School</th>
-                    <th style="width: 15%;">Hybrid School</th>
-                    <th style="width: 30%;">Debaters</th>
-                    <th style="width: 15%;">Checked In</th>
-                </tr>
-            </table>
-        </div>
-
-        <div class="public_header_spacer"></div>
-
+	<div class="public_header">
+		<h1>Team List</h1>
+		<h3>({{ num_checked_in }} of {{ teams|length }} teams checked in)</h3>
 		<table class="public_table">
-			{% for team in teams %}
 			<tr>
-				<td style="width: 25%;">{{ team.display }}</td>
-				<td style="width: 15%;">{{ team.school.display }}</td>
-				<td style="width: 15%;">{{ team.hybrid_school.name }}</td>
-				<td style="width: 30%;">{{ team.debaters_display }}</td>
-				<td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
+				<th style="width: 25%;">Team Name</th>
+				<th style="width: 15%;">School</th>
+				<th style="width: 15%;">Hybrid School</th>
+				<th style="width: 30%;">Debaters</th>
+				<th style="width: 15%;">Checked In</th>
 			</tr>
-			{% endfor %}
 		</table>
+	</div>
 
-        <div class="pairings_footer_spacer"></div>
+	<table class="public_table">
+		{% for team in teams %}
+		<tr>
+			<td style="width: 25%;">{{ team.display }}</td>
+			<td style="width: 15%;">{{ team.school.display }}</td>
+			<td style="width: 15%;">{{ team.hybrid_school.name }}</td>
+			<td style="width: 30%;">{{ team.debaters_display }}</td>
+			<td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
+		</tr>
+		{% endfor %}
+	</table>
 
-		<div class="public_footer">
-            <a href="/" class="home-link">Home</a>
-            <span class="right">
-				<label for="autoscroll">
-					Autoscroll:
-					<input type="checkbox" name="autoscroll" id="autoscroll" checked/>
-				</label>
-			</span>
-		</div>
-    </body>
-</html>
+	{% include "public/_public_footer.html" with show_autoscroll=True show_autoscroll_checked=True %}
+</div>
+{% endblock %}

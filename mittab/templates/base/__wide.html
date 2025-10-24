@@ -12,13 +12,14 @@
         integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"
         crossorigin="anonymous">
     <title>{% block title %}{% endblock %}</title>
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
   {% include "base/_navigation.html" %}
 
   <div class="container-fluid text-left">
 
-    <div id="container-main" class="container p-3 w-95 rounded shadow-sm">
+    <div id="container-main" class="container p-3 w-95 rounded shadow-lg">
       <div class="row">
         <div class="col">
           {% if messages %}
@@ -37,7 +38,7 @@
         </div>
       </div>
 
-      <div class="row mt-2">
+      <div class="row mt-2 content">
         {% block content %}{% endblock %}
       </div>
 

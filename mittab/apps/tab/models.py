@@ -8,20 +8,27 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=25)
-    value = models.IntegerField()
+    key = models.CharField(max_length=50)
+    value = models.IntegerField(null=True, blank=True)
+    value_string = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         verbose_name_plural = "tab settings"
 
     def __str__(self):
-        return "%s => %s" % (self.key, self.value)
+        display_value = (self.value_string if self.value_string is not None
+                         else self.value)
+        return "%s => %s" % (self.key, display_value)
 
     @classmethod
     def get(cls, key, default=None):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
-            return setting.value if setting is not None else None
+            if setting is not None:
+                # Return string value if exists, otherwise integer value
+                return (setting.value_string if setting.value_string
+                        is not None else setting.value)
+            return None
 
         result = cache_logic.cache_fxn_key(
             safe_get,
@@ -39,10 +46,20 @@ class TabSettings(models.Model):
     def set(cls, key, value):
         if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
-            obj.value = value
+            # Determine if value is string or int and set appropriate field
+            if isinstance(value, str):
+                obj.value_string = value
+                obj.value = None
+            else:
+                obj.value = value
+                obj.value_string = None
             obj.save()
         else:
-            obj = cls.objects.create(key=key, value=value)
+            # Determine if value is string or int and set appropriate field
+            if isinstance(value, str):
+                obj = cls.objects.create(key=key, value_string=value, value=None)
+            else:
+                obj = cls.objects.create(key=key, value=value, value_string=None)
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache("tab_settings_%s" % self.key,
