@@ -1,5 +1,4 @@
 import random
-import time
 import datetime
 import os
 
@@ -17,7 +16,8 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from mittab.apps.tab.models import *
 from mittab.libs import assign_rooms
 from mittab.libs.errors import *
-from mittab.apps.tab.forms import ResultEntryForm, UploadBackupForm, score_panel, \
+from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
+    UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
 import mittab.libs.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -36,8 +36,7 @@ def pair_round(request):
         # We should pair the round
         try:
             TabSettings.set("pairing_released", 0)
-            backup.backup_round("round_%i_before_pairing" %
-                                (current_round_number))
+            backup.backup_round(btype=backup.BEFORE_PAIRING)
 
             with transaction.atomic():
                 tab_logic.pair_round()
@@ -161,8 +160,9 @@ def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
         try:
-            backup.backup_round("round_%s_before_judge_assignment" %
-                                current_round_number)
+            backup.backup_round(
+                round_number=current_round_number,
+                btype=backup.BEFORE_JUDGE_ASSIGN)
             assign_judges.add_judges()
         except JudgeAssignmentError as e:
             return redirect_and_flash_error(request, str(e).replace("'", ""))
@@ -178,8 +178,9 @@ def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
         try:
-            backup.backup_round("round_%s_before_room_assignment" %
-                                current_round_number)
+            backup.backup_round(
+                round_number=current_round_number,
+                btype=backup.BEFORE_ROOM_ASSIGN)
             assign_rooms.add_rooms()
         except Exception:
             emit_current_exception()
@@ -189,7 +190,11 @@ def assign_rooms_to_pairing(request):
 
 
 def alternative_rooms(request, round_id, current_room_id=None):
-    round_obj = Round.objects.get(id=int(round_id))
+    round_obj = Round.objects.prefetch_related(
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags",
+        "judges__required_room_tags"
+    ).get(id=int(round_id))
     round_number = round_obj.round_number
 
     current_room_obj = None
@@ -200,14 +205,19 @@ def alternative_rooms(request, round_id, current_room_id=None):
             pass
 
     # Fetch all rooms checked in for the given round, ordered by rank
-    rooms = set(Room.objects.filter(
+    rooms = Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
-    ).order_by("-rank"))
+    ).order_by("-rank").prefetch_related("tags")
 
-    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
-    viable_paired_rooms = list(filter(lambda room: room.has_round, rooms))
+    required_tags = assign_rooms.get_required_tags(round_obj)
+
+    viable_rooms = set(room for room in rooms if
+                       set(room.tags.all()).issuperset(required_tags))
+
+    viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
+    viable_paired_rooms = list(filter(lambda room: room.has_round, viable_rooms))
     return render(request, "pairing/room_dropdown.html", {
         "current_room": current_room_obj,
         "round_obj": round_obj,
@@ -241,11 +251,10 @@ def assign_room(request, round_id, new_room_id, outround=False):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backup(request, filename):
-    backups = backup.list_backups()
-    item_list = []
-    item_type = "backup"
-    title = "Viewing Backup: {}".format(filename)
-    item_manip = "restore from that backup"
+    metadata = backup.get_metadata(filename)
+    # metadata format: [filename, name, type, round_num, timestamp, scratches]
+    name = metadata[1] if len(metadata) > 1 else "Unknown"
+    title = "Viewing Backup: {}".format(name)
     links = [("/backup/download/{}/".format(filename), "Download Backup"),
              ("/backup/restore/{}/".format(filename), "Restore From Backup")]
     return render(request, "common/list_data.html", locals())
@@ -256,7 +265,8 @@ def download_backup(request, key):
     print("Trying to download {}".format(key))
     data = backup.get_backup_content(key)
     response = HttpResponse(data, content_type="text/plain")
-    response["Content-Disposition"] = "attachment; filename=%s" % key
+    filename = key.split("_")[0]
+    response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
 
@@ -268,42 +278,92 @@ def upload_backup(request):
             backup.upload_backup(request.FILES["file"])
             return redirect_and_flash_success(
                 request, "Backup {} uploaded successfully".format(
-                    request.FILES["file"].name))
-    else:
-        form = UploadBackupForm()
-    return render(request, "common/data_entry.html", {
-        "form": form,
-        "title": "Upload a Backup"
-    })
+                    request.FILES["file"].name),
+                path="/pairing/view_backups/")
+        else:
+            return redirect_and_flash_error(
+                request, "Error uploading backup",
+                path="/pairing/view_backups/")
+    return redirect("/pairing/view_backups/")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def manual_backup(request, include_scratches=True):
+def manual_backup(request):
+    if request.method != "POST":
+        return redirect("view_backups")
+
+    form = BackupForm(request.POST)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Error creating backup: invalid submission.",
+            path="/pairing/view_backups/"
+        )
+
+    backup_name = form.cleaned_data["backup_name"]
+    include_scratches = form.cleaned_data["include_scratches"]
+
     try:
-        cur_round, btime = TabSettings.objects.get(key="cur_round").value, int(
-            time.time())
-        now = datetime.datetime.fromtimestamp(btime).strftime("%Y-%m-%d_%I:%M")
-        backup_name = f"manual_backup_round_{cur_round}_{btime}_{now}"
-        message = f"Backup created for round {cur_round} at timestamp {btime}"
-        if not include_scratches:
-            backup_name = "no_scratches_" + backup_name
-            message += " (scratches not included)"
-        backup.backup_round(backup_name, include_scratches=include_scratches)
+        backup.backup_round(
+            name=backup_name,
+            btype=backup.MANUAL,
+            include_scratches=include_scratches
+        )
     except Exception:
         emit_current_exception()
-        return redirect_and_flash_error(request, "Error creating backup")
-    return redirect_and_flash_success(request, message)
+        return redirect_and_flash_error(
+            request,
+            "Error creating backup",
+            path="/pairing/view_backups/"
+        )
+
+    cur_round = TabSettings.objects.get(key="cur_round").value
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    message = (
+        f"Backup {backup_name} created for round {cur_round} at {timestamp}"
+    )
+    return redirect_and_flash_success(
+        request,
+        message,
+        path="/pairing/view_backups/"
+    )
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def view_backups(request):
     backups = backup.list_backups()
-    item_list = [(i, i, 0, "") for i in sorted(backups)]
-    item_type = "backup"
-    title = "Viewing All Backups"
-    item_manip = "restore from that backup"
-    links = [("/upload_backup/", "Upload Backup")]
-    return render(request, "common/list_data.html", locals())
+    backups.sort(key=lambda x: x[3])
+
+    types = sorted(set(b[2] for b in backups if b[2] != "Unknown"))
+
+    round_values = {str(b[3]) for b in backups}
+    rounds = sorted(
+        round_values,
+        key=lambda value: (
+            not value.isdigit(),
+            int(value) if value.isdigit() else value.lower()
+        )
+    )
+
+    create_form = BackupForm()
+    upload_form = UploadBackupForm()
+
+    headers = ["Name", "Type", "Round", "Timestamp", "Scratches"]
+
+    filters = [
+        {"id": "type", "label": "Type", "options": types},
+        {"id": "round", "label": "Round", "options": rounds},
+        {"id": "scratches", "label": "Scratches", "options": ["Yes", "No", "Unknown"]},
+    ]
+
+    return render(request, "tab/backup_list.html", {
+        "backups": backups,
+        "create_form": create_form,
+        "upload_form": upload_form,
+        "headers": headers,
+        "title": "Backup List",
+        "filters": filters,
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -326,7 +386,27 @@ def view_round(request, round_number):
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
 
-    round_pairing = tab_logic.sorted_pairings(round_number)
+    round_pairing = tab_logic.sorted_pairings(
+        round_number
+    )
+    warnings = []
+    for pairing in round_pairing:
+        if pairing.room is None:
+            continue
+        required_tags = assign_rooms.get_required_tags(pairing)
+        actual_tags = set(pairing.room.tags.all())
+
+        if not required_tags <= actual_tags:
+            missing_tags = required_tags - actual_tags
+            plural = "s" if len(missing_tags) > 1 else ""
+            missing_tags_str = ", ".join(str(tag) for tag in missing_tags)
+
+            warnings.append(
+                f"{pairing.gov_team} vs {pairing.opp_team} "
+                f"requires tag{plural} {missing_tags_str} "
+                f"that are not assigned to room {pairing.room}"
+            )
+
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
 
@@ -413,10 +493,10 @@ def alternative_judges(request, round_id, judge_id=None):
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges")
+                                   .prefetch_related("judges", "scratches")
 
     excluded_judges_list = assign_judges.can_judge_teams(
         excluded_judges, round_gov, round_opp)
@@ -427,7 +507,7 @@ def alternative_judges(request, round_id, judge_id=None):
     try:
         current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related(
-            "judges").get(id=current_judge_id)
+            "judges", "scratches").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
@@ -457,11 +537,11 @@ def alternative_judges(request, round_id, judge_id=None):
     )
 
     excluded_judges = [
-        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id), j.wing_only)
         for j in excluded_judges_list
     ]
     included_judges = [
-        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id), j.wing_only)
         for j in included_judges_list
     ]
     included_judges = sorted(included_judges, key=lambda x: -x[2])
@@ -613,7 +693,6 @@ def pretty_pair(request):
     for present_team in Team.objects.filter(checked_in=True):
         if present_team not in paired_teams:
             if present_team not in byes:
-                print("got error for", present_team)
                 errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1

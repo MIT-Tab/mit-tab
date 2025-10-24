@@ -94,3 +94,28 @@ $font-size-base: 0.95rem !default;
 .form-inline .input-group {
   width: 100%;
 }
+
+.warning-container {
+  width: 500px;
+}
+
+.warning-popup {
+  display: none;
+  position: absolute;
+  padding: 10px;
+  border-radius: 5px;
+  width: 500px;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.warning-container:hover .warning-popup {
+  display: block;
+}
+
+.badge-wing-only {
+  font-size: 0.6rem;
+}

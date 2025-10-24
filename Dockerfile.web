@@ -21,4 +21,4 @@ COPY manage.py ./
 COPY setup.py ./
 COPY ./mittab ./mittab
 COPY ./assets ./assets
-COPY settings.yaml ./
+COPY ./settings ./settings

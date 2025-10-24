@@ -1,6 +1,6 @@
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -388,36 +388,46 @@ def rank_teams_ajax(request):
     return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
 
-def get_team_rankings(request):
-    ranked_teams = tab_logic.rankings.rank_teams()
+def get_team_rankings(request, public=False):
+    exclude_round = None
+    if public:
+        exclude_round = TabSettings.get("cur_round", 0) - 1
+    ranked_teams = tab_logic.rankings.rank_teams(exclude_round=exclude_round)
     teams = []
     for i, team_stat in enumerate(ranked_teams):
-        tiebreaker = "N/A"
-        if i != len(ranked_teams) - 1:
-            next_team_stat = ranked_teams[i + 1]
-            tiebreaker_stat = team_stat.get_tiebreaker(next_team_stat)
-            if tiebreaker_stat is not None:
-                tiebreaker = tiebreaker_stat.name
-            else:
-                tiebreaker = "Tie not broken"
-        teams.append((team_stat.team, team_stat[rankings.WINS],
-                      team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
-                      tiebreaker))
-
-    nov_teams = list(filter(
-        lambda ts: all(
-            map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
-                all())), teams))
-
-    return teams, nov_teams
+        if public:
+            if not team_stat.team.ranking_public:
+                continue
+            teams.append((team_stat.team, team_stat[rankings.WINS],
+                          team_stat[rankings.SPEAKS], team_stat[rankings.RANKS]))
+        else:
+            tiebreaker = "N/A"
+            if i != len(ranked_teams) - 1:
+                next_team_stat = ranked_teams[i + 1]
+                tiebreaker_stat = team_stat.get_tiebreaker(next_team_stat)
+                if tiebreaker_stat is not None:
+                    tiebreaker = tiebreaker_stat.name
+                else:
+                    tiebreaker = "Tie not broken"
+            teams.append((team_stat.team, team_stat[rankings.WINS],
+                          team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
+                          tiebreaker))
+    if not public:
+        nov_teams = list(filter(
+            lambda ts: all(
+                map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
+                    all())), teams))
+        return teams, nov_teams
+    return teams
 
 
 def rank_teams(request):
     teams, nov_teams = cache_logic.cache_fxn_key(
         get_team_rankings,
-        "team_rankings",
+        f"team_rankings_private",
         cache_logic.DEFAULT,
-        request
+        request,
+        public=False
     )
 
     return render(request, "tab/rank_teams_component.html", {
@@ -426,11 +436,21 @@ def rank_teams(request):
         "title": "Team Rankings"
     })
 
+def rank_teams_public(request):
+    display_rankings = TabSettings.get("rankings_public", 0)
 
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def team_check_in(request, team_id):
-    team_id = int(team_id)
-    team = get_object_or_404(Team, pk=team_id)
-    team.checked_in = not team.checked_in
-    team.save()
-    return JsonResponse({"success": True})
+    if not display_rankings:
+        return redirect_and_flash_error(request, "This view is not public", path="/")
+
+    teams = cache_logic.cache_fxn_key(
+        get_team_rankings,
+        "team_rankings_public",
+        cache_logic.DEFAULT,
+        request,
+        public=True
+    )
+
+    return render(request, "public/public_team_rankings.html", {
+        "teams": teams,
+        "title": "Team Rankings"
+    })
