@@ -20,6 +20,9 @@
   {% if pairing_exists %}
     <div id="scrollPage" class="hidden"></div>
 
+
+
+
     <table class="public_table">
       <thead>
         <tr>
@@ -39,21 +42,21 @@
           <tr>
             <td>
               <div class="team-names">
-                    {{pairing.gov_team.display}}
+                {{pairing.gov_team.display}}
               </div>
               {% if debater_team_memberships_public %}
                 <div class="member-names">
-                    {{pairing.gov_team.debaters_display}}
+                  {{pairing.gov_team.debaters_display}}
                 </div>
               {% endif %}
             </td>
             <td>
               <div class="team-names">
-                    {{pairing.opp_team.display}}
+                {{pairing.opp_team.display}}
               </div>
               {% if debater_team_memberships_public %}
                 <div class="member-names">
-                    {{pairing.opp_team.debaters_display}}
+                  {{pairing.opp_team.debaters_display}}
                 </div>
               {% endif %}
             </td>
