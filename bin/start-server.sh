@@ -11,10 +11,11 @@ fi
 host="${MYSQL_HOST:-127.0.0.1}"
 do_token="${DIGITALOCEAN_ACCESS_TOKEN:-${DO_API_TOKEN:-${DOCTL_ACCESS_TOKEN:-}}}"
 db_id="${DIGITALOCEAN_DATABASE_ID:-${DO_DATABASE_ID:-${DATABASE_ID:-}}}"
+doctl_bin="${DOCTL_BIN:-/usr/local/bin/doctl}"
 
 mkdir -p "$(dirname "$MYSQL_SSL_CA")"
 tmp_ca="${MYSQL_SSL_CA}.doctl"
-DOCTL_ACCESS_TOKEN="$do_token" doctl databases ca get "$db_id" > "$tmp_ca"
+DOCTL_ACCESS_TOKEN="$do_token" "$doctl_bin" databases ca get "$db_id" > "$tmp_ca"
 mv "$tmp_ca" "$MYSQL_SSL_CA"
 
 if [[ -z "$TAB_PASSWORD" ]]; then
