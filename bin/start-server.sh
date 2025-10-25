@@ -2,21 +2,20 @@
 set -e
 set +x
 
-log() {
-  printf '[start-server] %s\n' "$1" >&2
-}
-
 cd /var/www/tab
 
 if [[ -z "$MYSQL_SSL_CA" ]]; then
   export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
-  log "MYSQL_SSL_CA unset; defaulting to ${MYSQL_SSL_CA}."
-else
-  log "MYSQL_SSL_CA already defined at ${MYSQL_SSL_CA}; leaving as-is."
 fi
 
-log "Invoking ensure_mysql_ca.py with MYSQL_HOST=${MYSQL_HOST:-unset} MYSQL_PORT=${MYSQL_PORT:-unset}."
-python -m mittab.scripts.ensure_mysql_ca
+host="${MYSQL_HOST:-127.0.0.1}"
+do_token="${DIGITALOCEAN_ACCESS_TOKEN:-${DO_API_TOKEN:-${DOCTL_ACCESS_TOKEN:-}}}"
+db_id="${DIGITALOCEAN_DATABASE_ID:-${DO_DATABASE_ID:-${DATABASE_ID:-}}}"
+
+mkdir -p "$(dirname "$MYSQL_SSL_CA")"
+tmp_ca="${MYSQL_SSL_CA}.doctl"
+DOCTL_ACCESS_TOKEN="$do_token" doctl databases ca get "$db_id" > "$tmp_ca"
+mv "$tmp_ca" "$MYSQL_SSL_CA"
 
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2
