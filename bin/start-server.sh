@@ -2,13 +2,29 @@
 set -e
 set +x
 
+log() {
+  printf '[start-server] %s\n' "$1" >&2
+}
+
 cd /var/www/tab
 
 if [[ -z "$MYSQL_SSL_CA" ]]; then
-  export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
+  if [[ -n "$DATABASE_CA_CERT" && -f "$DATABASE_CA_CERT" ]]; then
+    export MYSQL_SSL_CA="$DATABASE_CA_CERT"
+    log "Adopting DATABASE_CA_CERT at ${MYSQL_SSL_CA} as MYSQL_SSL_CA."
+  elif [[ -n "$MYSQL_CA_CERT" && -f "$MYSQL_CA_CERT" ]]; then
+    export MYSQL_SSL_CA="$MYSQL_CA_CERT"
+    log "Falling back to MYSQL_CA_CERT at ${MYSQL_SSL_CA}."
+  else
+    export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
+    log "Defaulting MYSQL_SSL_CA to ${MYSQL_SSL_CA} (no provider env vars set)."
+  fi
+else
+  log "MYSQL_SSL_CA already defined at ${MYSQL_SSL_CA}; skipping overrides."
 fi
 
-# python -m mittab.scripts.ensure_mysql_ca
+log "Invoking ensure_mysql_ca.py with MYSQL_HOST=${MYSQL_HOST:-unset} MYSQL_PORT=${MYSQL_PORT:-unset}."
+python -m mittab.scripts.ensure_mysql_ca
 
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2
