@@ -4,9 +4,9 @@ set +x
 
 cd /var/www/tab
 
-# if [[ -z "$MYSQL_SSL_CA" ]]; then
-#   export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
-# fi
+if [[ -z "$MYSQL_SSL_CA" ]]; then
+  export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
+fi
 
 # python -m mittab.scripts.ensure_mysql_ca
 
