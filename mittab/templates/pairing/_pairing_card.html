@@ -140,5 +140,50 @@
         </a>
       </div>
     </div>
+    {% if pairing.mwm_penalties %}
+    <div class="row mt-2">
+      <div class="col">
+        <div class="text-muted small">
+          <strong>MWM Components:</strong>
+          <ul class="list-unstyled mb-0">
+            {% for label, value in pairing.mwm_penalties %}
+              <li>{{ label }}: {{ value|floatformat:"-2" }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if pairing.mwm_gov_index is not None or pairing.mwm_opp_index is not None %}
+    <div class="row mt-2">
+      <div class="col">
+        <div class="text-muted small">
+          <strong>MWM Positions:</strong>
+          <ul class="list-unstyled mb-0">
+            {% if pairing.mwm_gov_index is not None %}
+              <li>
+                Gov index {{ pairing.mwm_gov_index }}
+                {% if pairing.mwm_gov_opt %}
+                  (optimal: {{ pairing.mwm_gov_opt.display_backend }} @ {{ pairing.mwm_gov_opt_index }})
+                {% else %}
+                  (optimal: N/A)
+                {% endif %}
+              </li>
+            {% endif %}
+            {% if pairing.mwm_opp_index is not None %}
+              <li>
+                Opp index {{ pairing.mwm_opp_index }}
+                {% if pairing.mwm_opp_opt %}
+                  (optimal: {{ pairing.mwm_opp_opt.display_backend }} @ {{ pairing.mwm_opp_opt_index }})
+                {% else %}
+                  (optimal: N/A)
+                {% endif %}
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     </div>
   </div>

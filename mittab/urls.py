@@ -148,6 +148,7 @@ urlpatterns = [
             pairing_views.assign_judge,
             name="swap_judge"),
     path("pairing/pair_round/", pairing_views.pair_round, name="pair_round"),
+    path("pairing/what_if/", pairing_views.pairing_hypothetical, name="pairing_what_if"),
     path("pairing/assign_judges/",
          pairing_views.assign_judges_to_pairing,
          name="assign_judges"),

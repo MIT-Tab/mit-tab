@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import *
 import itertools
 import random
+from collections import defaultdict
 
 from django.db.models import *
 
@@ -88,7 +89,10 @@ def pair_round():
 
         team_buckets = [(tot_wins(team), team) for team in normal_pairing_teams]
         list_of_teams = [
-            rank_teams_except_record([team for (w, team) in team_buckets if w == i])
+            rank_teams_except_record(
+                [team for (w, team) in team_buckets if w == i],
+                exclude_round=current_round,
+            )
             for i in range(current_round)
         ]
 
@@ -170,7 +174,8 @@ def pair_round():
                             removed_teams += [team]
                             list_of_teams[bracket].remove(team)
                     list_of_teams[bracket] = rank_teams_except_record(
-                        list_of_teams[bracket]
+                        list_of_teams[bracket],
+                        exclude_round=current_round,
                     )
                     for team in removed_teams:
                         list_of_teams[bracket].insert(
@@ -315,11 +320,15 @@ def highest_seed(team1, team2):
 
 
 # Check if two teams have hit before
-def hit_before(team1, team2):
+def hit_before(team1, team2, exclude_round=None):
     for round_obj in team1.gov_team.all():
+        if exclude_round is not None and round_obj.round_number == exclude_round:
+            continue
         if round_obj.opp_team == team2:
             return True
     for round_obj in team1.opp_team.all():
+        if exclude_round is not None and round_obj.round_number == exclude_round:
+            continue
         if round_obj.gov_team == team2:
             return True
     return False
@@ -423,14 +432,14 @@ def team_comp(pairing, round_number):
         )
 
 
-def team_score_except_record(team):
-    team_score = TeamScore(team)
+def team_score_except_record(team, exclude_round=None):
+    team_score = TeamScore(team, exclude_round)
     team_score.wins = 0
     return team_score.scoring_tuple()
 
 
-def rank_teams_except_record(teams):
-    return sorted(teams, key=team_score_except_record)
+def rank_teams_except_record(teams, exclude_round=None):
+    return sorted(teams, key=lambda t: team_score_except_record(t, exclude_round))
 
 
 class TabFlags:
@@ -511,6 +520,7 @@ def perfect_pairing(list_of_teams):
     """Uses the mwmatching library to assign teams in a pairing"""
     graph_edges = []
     weights = get_weights()
+    current_round = TabSettings.get("cur_round", 1)
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
@@ -524,8 +534,9 @@ def perfect_pairing(list_of_teams):
                     len(list_of_teams) - i - 1,
                     len(list_of_teams) - j - 1,
                     weights,
-                    TabSettings.get("cur_round", 1),
+                    current_round,
                     TabSettings.get("tot_rounds", 5),
+                    exclude_round=current_round,
                 )
                 graph_edges += [(i, j, weight)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
@@ -569,6 +580,8 @@ def calc_weight(
         weights,
         current_round,
         tot_rounds,
+        exclude_round=None,
+        components=None,
 ):
     """
     Calculate the penalty for a given pairing
@@ -583,41 +596,47 @@ def calc_weight(
         team_a_opt_ind - the position in the pairing of team_a_opt
         team_b_opt_ind - the position in the pairing of team_b_opt
     """
-    if current_round == 1:
-        weight = (
-            weights["power_pairing_multiple"]
-            * (abs(team_a_opt.seed - team_b.seed) + abs(team_b_opt.seed - team_a.seed))
-            / 2.0
-        )
-    else:
-        weight = (
-            weights["power_pairing_multiple"]
-            * (abs(team_a_opt_ind - team_b_ind) + abs(team_b_opt_ind - team_a_ind))
-            / 2.0
-        )
+    def record(label, value):
+        if components is not None:
+            components.append((label, value))
+        return value
+
+    index_gap = abs(team_a_ind - team_b_ind)
+    weight = weights["power_pairing_multiple"] * index_gap
+    total = record("Index distance weight", weight)
+
+    if exclude_round is None:
+        exclude_round = current_round
 
     half = int(tot_rounds // 2) + 1
-    if num_opps(team_a) >= half and num_opps(team_b) >= half:
-        weight += weights["high_opp_penalty"]
+    if num_opps(team_a, exclude_round) >= half and num_opps(team_b, exclude_round) >= half:
+        total += record("High opp penalty", weights["high_opp_penalty"])
 
-    if num_opps(team_a) >= half + 1 and num_opps(team_b) >= half + 1:
-        weight += weights["high_high_opp_penalty"]
+    if (
+        num_opps(team_a, exclude_round) >= half + 1
+        and num_opps(team_b, exclude_round) >= half + 1
+    ):
+        total += record("High-high opp penalty", weights["high_high_opp_penalty"])
 
-    if num_govs(team_a) >= half and num_govs(team_b) >= half:
-        weight += weights["high_gov_penalty"]
+    if num_govs(team_a, exclude_round) >= half and num_govs(team_b, exclude_round) >= half:
+        total += record("High gov penalty", weights["high_gov_penalty"])
 
     if team_a.school_id == team_b.school_id:
-        weight += weights["same_school_penalty"]
+        total += record("Same school penalty", weights["same_school_penalty"])
 
-    if (hit_pull_up(team_a) and tot_wins(team_b) < tot_wins(team_a)) or (
-            hit_pull_up(team_b) and tot_wins(team_a) < tot_wins(team_b)
+    if (
+        hit_pull_up(team_a, exclude_round)
+        and tot_wins(team_b, exclude_round) < tot_wins(team_a, exclude_round)
+    ) or (
+        hit_pull_up(team_b, exclude_round)
+        and tot_wins(team_a, exclude_round) < tot_wins(team_b, exclude_round)
     ):
-        weight += weights["hit_pull_up_before"]
+        total += record("Pulled-up mismatch penalty", weights["hit_pull_up_before"])
 
-    if hit_before(team_a, team_b):
-        weight += weights["hit_team_before"]
+    if hit_before(team_a, team_b, exclude_round):
+        total += record("Repeat matchup penalty", weights["hit_team_before"])
 
-    return weight
+    return total
 
 
 def determine_gov_opp(all_pairs):
@@ -640,3 +659,369 @@ def determine_gov_opp(all_pairs):
         else:
             final_pairings += [[team2, team1]]
     return final_pairings
+
+
+def _middle_teams_for_round(all_teams, round_number):
+    """Replicates middle-of-bracket logic for a specific round."""
+    teams = list(all_teams)
+    rng = random.Random(0xBEEF)
+    rng.shuffle(teams)
+    round_count = max(round_number - 1, 0)
+
+    middle = []
+    for team in teams:
+        avg_speaks_rounds = num_byes(team, exclude_round=round_number)
+        avg_speaks_rounds += sum(
+            1
+            for no_show in team.no_shows.all()
+            if no_show.lenient_late and no_show.round_number != round_number
+        )
+        avg_speaks_rounds += num_forfeit_wins(team, exclude_round=round_number)
+
+        if round_count == avg_speaks_rounds:
+            middle.append(team)
+
+    return middle
+
+
+def _round_bracket_state(round_number):
+    if round_number is None or round_number <= 0:
+        return None
+
+    rounds = list(
+        Round.objects.filter(round_number=round_number)
+        .select_related("gov_team", "opp_team")
+    )
+    if not rounds:
+        return None
+
+    all_teams = Team.with_preloaded_relations_for_tabbing().filter(checked_in=True)
+    team_lookup = {team.id: team for team in all_teams}
+
+    middle_by_bracket = defaultdict(list)
+    for team in _middle_teams_for_round(all_teams, round_number):
+        wins = tot_wins(team, exclude_round=round_number)
+        middle_by_bracket[wins].append(team)
+
+    bracket_members = defaultdict(set)
+    for round_obj in rounds:
+        gov = team_lookup.get(round_obj.gov_team_id, round_obj.gov_team)
+        opp = team_lookup.get(round_obj.opp_team_id, round_obj.opp_team)
+
+        gov_wins = tot_wins(gov, exclude_round=round_number)
+        opp_wins = tot_wins(opp, exclude_round=round_number)
+        bracket_index = max(gov_wins, opp_wins)
+
+        bracket_members[bracket_index].update({gov, opp})
+
+    if not bracket_members:
+        return None
+
+    ordered_brackets = {}
+    team_positions = {}
+    for bracket_index, members in bracket_members.items():
+        if not members:
+            continue
+
+        middle_candidates = [
+            team for team in middle_by_bracket.get(bracket_index, []) if team in members
+        ]
+        middle_set = set(middle_candidates)
+        non_middle_members = [team for team in members if team not in middle_set]
+        bracket_list = rank_teams_except_record(
+            non_middle_members, exclude_round=round_number
+        )
+
+        for team in middle_candidates:
+            insert_index = len(bracket_list) // 2
+            bracket_list.insert(insert_index, team)
+
+        ordered_brackets[bracket_index] = bracket_list
+        for idx, team in enumerate(bracket_list):
+            team_positions[team.id] = (bracket_index, idx)
+
+    return {
+        "rounds": rounds,
+        "ordered_brackets": ordered_brackets,
+        "team_positions": team_positions,
+        "team_lookup": team_lookup,
+        "weights": get_weights(),
+        "tot_rounds": TabSettings.get("tot_rounds", 5),
+    }
+
+
+def _pairing_weight_context(round_number):
+    state = _round_bracket_state(round_number)
+    if state is None:
+        return None
+
+    rounds = state["rounds"]
+    ordered_brackets = state["ordered_brackets"]
+    team_positions = state["team_positions"]
+    team_lookup = state["team_lookup"]
+    weights = state["weights"]
+    tot_rounds = state["tot_rounds"]
+
+    total_weight = 0
+    per_pair_details = {}
+
+    for round_obj in rounds:
+        gov = team_lookup.get(round_obj.gov_team_id, round_obj.gov_team)
+        opp = team_lookup.get(round_obj.opp_team_id, round_obj.opp_team)
+
+        gov_pos = team_positions.get(gov.id)
+        opp_pos = team_positions.get(opp.id)
+        if gov_pos is None or opp_pos is None:
+            per_pair_details[round_obj.id] = {
+                "components": [],
+                "gov_index": None,
+                "opp_index": None,
+                "gov_opt": None,
+                "opp_opt": None,
+                "gov_opt_index": None,
+                "opp_opt_index": None,
+                "pair_weight": 0,
+            }
+            continue
+
+        bracket_index = gov_pos[0]
+        bracket_list = ordered_brackets.get(bracket_index)
+        if not bracket_list:
+            per_pair_details[round_obj.id] = {
+                "components": [],
+                "gov_index": None,
+                "opp_index": None,
+                "gov_opt": None,
+                "opp_opt": None,
+                "gov_opt_index": None,
+                "opp_opt_index": None,
+                "pair_weight": 0,
+            }
+            continue
+
+        gov_index = gov_pos[1]
+        opp_index = opp_pos[1]
+        gov_opt_index = len(bracket_list) - gov_index - 1
+        opp_opt_index = len(bracket_list) - opp_index - 1
+        gov_opt = bracket_list[gov_opt_index]
+        opp_opt = bracket_list[opp_opt_index]
+
+        components = []
+        pair_weight = calc_weight(
+            gov,
+            opp,
+            gov_index,
+            opp_index,
+            gov_opt,
+            opp_opt,
+            gov_opt_index,
+            opp_opt_index,
+            weights,
+            round_number,
+            tot_rounds,
+            exclude_round=round_number,
+            components=components,
+        )
+        total_weight += pair_weight
+        per_pair_details[round_obj.id] = {
+            "components": components,
+            "gov_index": gov_index,
+            "opp_index": opp_index,
+            "gov_opt": gov_opt,
+            "opp_opt": opp_opt,
+            "gov_opt_index": gov_opt_index,
+            "opp_opt_index": opp_opt_index,
+            "pair_weight": pair_weight,
+        }
+
+    return total_weight, per_pair_details
+
+
+def pairing_weight(round_number):
+    """Compute the total matching weight for the current in-round pairing."""
+    context = _pairing_weight_context(round_number)
+    if context is None:
+        return None
+    return context[0]
+
+
+def pairing_weight_details(round_number):
+    """Return both the pairing weight total and per-pair breakdowns."""
+    context = _pairing_weight_context(round_number)
+    if context is None:
+        return None, {}
+    return context
+
+
+def evaluate_hypothetical_pairings(round_number, forced_pairings):
+    """Evaluate a hypothetical set of forced pairings for a round.
+
+    Args:
+        round_number: The round to evaluate.
+        forced_pairings: iterable of (gov_team, opp_team) tuples to lock in.
+
+    Returns:
+        (result_dict, errors)
+        result_dict contains:
+            total_weight: numeric total
+            pair_details: list of per-pair dictionaries matching pairing_weight_details
+            forced_pairs: set of frozenset team id pairs that were forced
+    """
+
+    state = _round_bracket_state(round_number)
+    if state is None:
+        return None, ["No complete pairing exists for this round."]
+
+    ordered_brackets = state["ordered_brackets"]
+    team_positions = state["team_positions"]
+    weights = state["weights"]
+    tot_rounds = state["tot_rounds"]
+
+    errors = []
+    forced_pairs_info = []
+    forced_team_ids = set()
+    forced_pair_keys = set()
+
+    original_positions = {
+        idx: {team.id: pos for pos, team in enumerate(bracket)}
+        for idx, bracket in ordered_brackets.items()
+    }
+
+    for gov_team, opp_team in forced_pairings:
+        if gov_team.id == opp_team.id:
+            errors.append(f"Team {gov_team} cannot debate itself.")
+            continue
+
+        if gov_team.id in forced_team_ids or opp_team.id in forced_team_ids:
+            errors.append("A team may only appear in one hypothetical pairing.")
+            continue
+
+        gov_pos = team_positions.get(gov_team.id)
+        opp_pos = team_positions.get(opp_team.id)
+        if gov_pos is None or opp_pos is None:
+            errors.append(
+                f"Both teams must be in the current round to be paired: {gov_team} vs {opp_team}."
+            )
+            continue
+
+        if gov_pos[0] != opp_pos[0]:
+            errors.append(
+                f"{gov_team} and {opp_team} are not in the same bracket for this round."
+            )
+            continue
+
+        bracket_index = gov_pos[0]
+        forced_pairs_info.append((bracket_index, gov_team, opp_team))
+        forced_team_ids.update({gov_team.id, opp_team.id})
+        forced_pair_keys.add(frozenset((gov_team.id, opp_team.id)))
+
+    if errors:
+        return None, errors
+
+    remaining_by_bracket = {
+        idx: [team for team in list(bracket) if team.id not in forced_team_ids]
+        for idx, bracket in ordered_brackets.items()
+    }
+
+    for idx, members in remaining_by_bracket.items():
+        if len(members) % 2 != 0:
+            errors.append(
+                "Forced pairings leave an odd number of teams in bracket {0}.".format(
+                    idx
+                )
+            )
+
+    if errors:
+        return None, errors
+
+    remaining_positions = {
+        idx: {team.id: pos for pos, team in enumerate(members)}
+        for idx, members in remaining_by_bracket.items()
+    }
+
+    generated_pairs = []
+    for idx, members in remaining_by_bracket.items():
+        if not members:
+            continue
+        bracket_pairings = perfect_pairing(members)
+        for gov_team, opp_team in bracket_pairings:
+            generated_pairs.append((idx, gov_team, opp_team))
+
+    total_weight = 0
+    pair_details = []
+
+    def build_detail(bracket_list, positions, bracket_index, gov_team, opp_team, forced):
+        nonlocal total_weight
+        gov_index = positions.get(gov_team.id)
+        opp_index = positions.get(opp_team.id)
+        if gov_index is None or opp_index is None:
+            return {
+                "gov": gov_team,
+                "opp": opp_team,
+                "components": [],
+                "gov_index": None,
+                "opp_index": None,
+                "gov_opt": None,
+                "opp_opt": None,
+                "gov_opt_index": None,
+                "opp_opt_index": None,
+                "pair_weight": 0,
+                "forced": forced,
+            }
+
+        gov_opt_index = len(bracket_list) - gov_index - 1
+        opp_opt_index = len(bracket_list) - opp_index - 1
+        gov_opt = bracket_list[gov_opt_index] if 0 <= gov_opt_index < len(bracket_list) else None
+        opp_opt = bracket_list[opp_opt_index] if 0 <= opp_opt_index < len(bracket_list) else None
+
+        components = []
+        pair_weight = calc_weight(
+            gov_team,
+            opp_team,
+            gov_index,
+            opp_index,
+            gov_opt,
+            opp_opt,
+            gov_opt_index,
+            opp_opt_index,
+            weights,
+            round_number,
+            tot_rounds,
+            exclude_round=round_number,
+            components=components,
+        )
+        total_weight += pair_weight
+        return {
+            "gov": gov_team,
+            "opp": opp_team,
+            "components": components,
+            "gov_index": gov_index,
+            "opp_index": opp_index,
+            "gov_opt": gov_opt,
+            "opp_opt": opp_opt,
+            "gov_opt_index": gov_opt_index,
+            "opp_opt_index": opp_opt_index,
+            "pair_weight": pair_weight,
+            "forced": forced,
+            "bracket_index": bracket_index,
+        }
+
+    for bracket_index, gov_team, opp_team in forced_pairs_info:
+        bracket_list = ordered_brackets.get(bracket_index, [])
+        positions = original_positions.get(bracket_index, {})
+        pair_details.append(
+            build_detail(bracket_list, positions, bracket_index, gov_team, opp_team, True)
+        )
+
+    for bracket_index, gov_team, opp_team in generated_pairs:
+        bracket_list = remaining_by_bracket.get(bracket_index, [])
+        positions = remaining_positions.get(bracket_index, {})
+        pair_details.append(
+            build_detail(bracket_list, positions, bracket_index, gov_team, opp_team, False)
+        )
+
+    return {
+        "total_weight": total_weight,
+        "pair_details": pair_details,
+        "forced_pairs": forced_pair_keys,
+    }, []

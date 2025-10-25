@@ -64,9 +64,22 @@ def forfeited_round(round_obj, team):
     return False
 
 
-def hit_pull_up(team):
-    return any(r.pullup == Round.OPP for r in team.gov_team.all()) or \
-        any(r.pullup == Round.GOV for r in team.opp_team.all())
+def hit_pull_up(team, exclude_round=None):
+    def _eligible_round(round_obj):
+        return exclude_round is None or round_obj.round_number != exclude_round
+
+    gov_pullups = any(
+        round_obj.pullup == Round.OPP
+        for round_obj in team.gov_team.all()
+        if _eligible_round(round_obj)
+    )
+    opp_pullups = any(
+        round_obj.pullup == Round.GOV
+        for round_obj in team.opp_team.all()
+        if _eligible_round(round_obj)
+    )
+
+    return gov_pullups or opp_pullups
 
 
 def pull_up_count(team):
@@ -82,12 +95,18 @@ def pull_up_count(team):
     return count
 
 
-def num_opps(team):
-    return len(team.opp_team.all()) + len(team.opp_team_outround.all())
+def num_opps(team, exclude_round=None):
+    opp_rounds = list(team.opp_team.all())
+    if exclude_round is not None:
+        opp_rounds = [r for r in opp_rounds if r.round_number != exclude_round]
+    return len(opp_rounds) + len(team.opp_team_outround.all())
 
 
-def num_govs(team):
-    return len(team.gov_team.all()) + len(team.gov_team_outround.all())
+def num_govs(team, exclude_round=None):
+    gov_rounds = list(team.gov_team.all())
+    if exclude_round is not None:
+        gov_rounds = [r for r in gov_rounds if r.round_number != exclude_round]
+    return len(gov_rounds) + len(team.gov_team_outround.all())
 
 
 def had_bye(team, round_number=None):

@@ -15,6 +15,14 @@
             {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
           </small>
         </h3>
+        <div class="text-muted small">
+          MWM Weight:
+          {% if mwm_weight is not None %}
+            {{ mwm_weight|floatformat:"-2" }}
+          {% else %}
+            N/A
+          {% endif %}
+        </div>
       </div>
     </div> <!-- end heading row -->
 
@@ -85,6 +93,9 @@
           {% else %}
           <a class="btn btn-sm btn-info" href="/pairing/pair_round" title="Pair the next round of debate">
             <i class="fas fa-arrow-right"></i> Prepare Next Round
+          </a>
+          <a class="btn btn-sm btn-secondary" href="{% url "pairing_what_if" %}" title="Run a what-if analysis on this round">
+            <i class="fas fa-question-circle"></i> Pairing What-If
           </a>
           {% endif %}
         </div>

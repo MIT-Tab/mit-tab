@@ -329,6 +329,7 @@ def view_round(request, round_number):
     round_pairing = tab_logic.sorted_pairings(
         round_number
     )
+    mwm_weight, mwm_pair_details = tab_logic.pairing_weight_details(round_number)
     warnings = []
     for pairing in round_pairing:
         if pairing.room is None:
@@ -349,6 +350,16 @@ def view_round(request, round_number):
 
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
+
+    for pairing in round_info:
+        detail = (mwm_pair_details or {}).get(pairing.id, {})
+        pairing.mwm_penalties = detail.get("components", [])
+        pairing.mwm_gov_index = detail.get("gov_index")
+        pairing.mwm_opp_index = detail.get("opp_index")
+        pairing.mwm_gov_opt_index = detail.get("gov_opt_index")
+        pairing.mwm_opp_opt_index = detail.get("opp_opt_index")
+        pairing.mwm_gov_opt = detail.get("gov_opt")
+        pairing.mwm_opp_opt = detail.get("opp_opt")
 
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
 
@@ -426,6 +437,140 @@ def view_round(request, round_number):
 
     return render(request, "pairing/pairing_control.html", locals())
 
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def pairing_hypothetical(request):
+    round_number = TabSettings.get("cur_round") - 1
+    round_info = tab_logic.sorted_pairings(round_number)
+    actual_weight, actual_detail_map = tab_logic.pairing_weight_details(round_number)
+
+    actual_pairs = []
+    for pairing in round_info:
+        detail = actual_detail_map.get(pairing.id, {})
+        actual_pairs.append({
+            "gov": pairing.gov_team,
+            "opp": pairing.opp_team,
+            "components": detail.get("components", []),
+            "pair_weight": detail.get("pair_weight", 0),
+            "gov_index": detail.get("gov_index"),
+            "opp_index": detail.get("opp_index"),
+        })
+
+    teams_for_display = Team.objects.filter(checked_in=True).order_by("name")
+    errors = []
+    hypothetical_input = ""
+    hypothetical_result = None
+    penalty_deltas = []
+    changed_pairs = []
+
+    if request.method == "POST":
+        hypothetical_input = request.POST.get("hypothetical_pairs", "")
+        forced_pairs = []
+
+        for raw_line in hypothetical_input.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            separators = [",", " ", "\t", ";"]
+            for sep in separators:
+                if sep in line:
+                    parts = [p for p in line.replace(";", sep).split(sep) if p]
+                    break
+            else:
+                parts = [line]
+
+            if len(parts) != 2:
+                errors.append(f"Unable to parse pairing line: '{line}'. Expected two team ids.")
+                continue
+
+            try:
+                gov_id = int(parts[0])
+                opp_id = int(parts[1])
+            except ValueError:
+                errors.append(f"Pairing line must contain numeric team ids: '{line}'.")
+                continue
+
+            try:
+                gov_team = Team.objects.get(id=gov_id)
+            except Team.DoesNotExist:
+                errors.append(f"No team found with id {gov_id}.")
+                continue
+
+            try:
+                opp_team = Team.objects.get(id=opp_id)
+            except Team.DoesNotExist:
+                errors.append(f"No team found with id {opp_id}.")
+                continue
+
+            forced_pairs.append((gov_team, opp_team))
+
+        if not forced_pairs and not errors:
+            errors.append("Enter at least one hypothetical pairing to compare.")
+
+        if not errors and forced_pairs:
+            hypothetical_result, hypo_errors = tab_logic.evaluate_hypothetical_pairings(
+                round_number, forced_pairs
+            )
+            if hypo_errors:
+                errors.extend(hypo_errors)
+
+        if not errors and forced_pairs:
+            forced_keys = hypothetical_result.get("forced_pairs", set())
+            hyp_pairs = hypothetical_result.get("pair_details", [])
+            hyp_total = hypothetical_result.get("total_weight", 0)
+
+            def build_penalty_map(pairs):
+                data = {}
+                for detail in pairs:
+                    key = frozenset((detail["gov"].id, detail["opp"].id))
+                    labels = {label for label, _ in detail.get("components", [])}
+                    data[key] = {
+                        "labels": labels,
+                        "detail": detail,
+                    }
+                return data
+
+            actual_penalty_map = build_penalty_map(actual_pairs)
+            hypothetical_penalty_map = build_penalty_map(hyp_pairs)
+
+            all_keys = set(actual_penalty_map.keys()) | set(hypothetical_penalty_map.keys())
+            for key in all_keys:
+                actual_labels = actual_penalty_map.get(key, {}).get("labels", set())
+                hypo_labels = hypothetical_penalty_map.get(key, {}).get("labels", set())
+                if actual_labels == hypo_labels:
+                    continue
+                detail = actual_penalty_map.get(key, {}).get("detail") or \
+                    hypothetical_penalty_map.get(key, {}).get("detail")
+                penalty_deltas.append({
+                    "teams": detail,
+                    "actual_only": sorted(actual_labels - hypo_labels),
+                    "hypo_only": sorted(hypo_labels - actual_labels),
+                })
+
+            comparison_keys = (set(actual_penalty_map.keys()) ^ set(hypothetical_penalty_map.keys())) - forced_keys
+            for key in comparison_keys:
+                changed_pairs.append({
+                    "actual": actual_penalty_map.get(key, {}).get("detail"),
+                    "hypo": hypothetical_penalty_map.get(key, {}).get("detail"),
+                })
+
+            hypothetical_result["total_weight"] = hyp_total
+        else:
+            hypothetical_result = None
+
+    context = {
+        "round_number": round_number,
+        "actual_pairs": actual_pairs,
+        "actual_weight": actual_weight,
+        "teams_for_display": teams_for_display,
+        "errors": errors,
+        "hypothetical_input": hypothetical_input,
+        "hypothetical_result": hypothetical_result,
+        "penalty_deltas": penalty_deltas,
+        "changed_pairs": changed_pairs,
+    }
+
+    return render(request, "pairing/hypothetical.html", context)
 
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))

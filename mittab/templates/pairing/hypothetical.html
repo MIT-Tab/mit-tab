@@ -1,0 +1,176 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Pairing What-If{% endblock %}
+
+{% block content %}
+<div class="col">
+  <h3>Pairing What-If for Round {{ round_number }}</h3>
+
+  <p class="text-muted">Select sample hits you wish to lock in, then compare the resulting pairing penalties.</p>
+
+  {% if errors %}
+  <div class="alert alert-danger">
+    <ul class="mb-0">
+      {% for error in errors %}
+        <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="row">
+    <div class="col-md-6">
+      <form method="post" class="mb-3">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="hypo-input">Hypothetical pairings</label>
+          <textarea class="form-control" id="hypo-input" name="hypothetical_pairs" rows="6"
+            placeholder="e.g. 12,34\n56,78">{{ hypothetical_input }}</textarea>
+          <small class="form-text text-muted">
+            Enter one pairing per line as <code>gov_id,opp_id</code>. IDs must match checked-in teams for round {{ round_number }}.
+          </small>
+        </div>
+        <button type="submit" class="btn btn-primary">Run What-If</button>
+      </form>
+    </div>
+    <div class="col-md-6">
+      <h5>Checked-In Teams</h5>
+      <div class="border p-2" style="max-height: 240px; overflow-y: auto;">
+        <ul class="list-unstyled mb-0">
+          {% for team in teams_for_display %}
+            <li><code>{{ team.id }}</code> &mdash; {{ team.display_backend }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h5 class="mt-4">Current Pairings</h5>
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr>
+        <th>Gov (ID)</th>
+        <th>Opp (ID)</th>
+        <th>Weight</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pairing in actual_pairs %}
+        <tr>
+          <td>{{ pairing.gov.display_backend }} <small class="text-muted">({{ pairing.gov.id }})</small></td>
+          <td>{{ pairing.opp.display_backend }} <small class="text-muted">({{ pairing.opp.id }})</small></td>
+          <td>{{ pairing.pair_weight|floatformat:"-2" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="text-center text-muted">No pairings found for this round.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if hypothetical_result %}
+  <h4 class="mt-4">Comparison</h4>
+  <table class="table table-bordered w-auto">
+    <tr>
+      <th>Scenario</th>
+      <th>Total Weight</th>
+    </tr>
+    <tr>
+      <td>Actual</td>
+      <td>
+        {% if actual_weight is not None %}
+          {{ actual_weight|floatformat:"-2" }}
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Hypothetical</td>
+      <td>{{ hypothetical_result.total_weight|floatformat:"-2" }}</td>
+    </tr>
+  </table>
+
+  <h5>Hypothetical Pairings</h5>
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr>
+        <th>Gov (ID)</th>
+        <th>Opp (ID)</th>
+        <th>Weight</th>
+        <th>Components</th>
+        <th>Positions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for detail in hypothetical_result.pair_details %}
+        <tr class="{% if detail.forced %}table-info{% endif %}">
+          <td>{{ detail.gov.display_backend }} <small class="text-muted">({{ detail.gov.id }})</small></td>
+          <td>{{ detail.opp.display_backend }} <small class="text-muted">({{ detail.opp.id }})</small></td>
+          <td>{{ detail.pair_weight|floatformat:"-2" }}</td>
+          <td>
+            <ul class="list-unstyled mb-0">
+              {% for label, value in detail.components %}
+                <li>{{ label }}: {{ value|floatformat:"-2" }}</li>
+              {% empty %}
+                <li class="text-muted">None</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <small>
+              Gov idx {{ detail.gov_index }}
+              {% if detail.gov_opt %}
+                (opt {{ detail.gov_opt.display_backend }} @ {{ detail.gov_opt_index }})
+              {% endif %}
+              <br>
+              Opp idx {{ detail.opp_index }}
+              {% if detail.opp_opt %}
+                (opt {{ detail.opp_opt.display_backend }} @ {{ detail.opp_opt_index }})
+              {% endif %}
+            </small>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="text-muted"><small>Forced pairings are highlighted.</small></p>
+
+  {% if penalty_deltas %}
+  <h5>Penalty Differences</h5>
+  <div class="mb-3">
+    {% for delta in penalty_deltas %}
+      {% with teams=delta.teams %}
+      <div class="border rounded p-2 mb-2">
+        <strong>{{ teams.gov.display_backend }} vs {{ teams.opp.display_backend }}</strong>
+        <ul class="mb-0">
+          {% if delta.actual_only %}
+            <li>Only in actual: {{ delta.actual_only|join:", " }}</li>
+          {% endif %}
+          {% if delta.hypo_only %}
+            <li>Only in hypothetical: {{ delta.hypo_only|join:", " }}</li>
+          {% endif %}
+        </ul>
+      </div>
+      {% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if changed_pairs %}
+  <h5>Other Pairing Changes</h5>
+  <div class="mb-3">
+    {% for change in changed_pairs %}
+      <div class="border rounded p-2 mb-2">
+        {% if change.actual %}
+          <div><strong>Actual:</strong> {{ change.actual.gov.display_backend }} vs {{ change.actual.opp.display_backend }}</div>
+        {% endif %}
+        {% if change.hypo %}
+          <div><strong>Hypothetical:</strong> {{ change.hypo.gov.display_backend }} vs {{ change.hypo.opp.display_backend }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
