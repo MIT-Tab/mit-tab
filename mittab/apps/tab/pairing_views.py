@@ -122,7 +122,11 @@ def re_pair_round(request):
             backup_name = (
                 f"round_{current_round_number}_before_repairing"
             )
-            backup.backup_round(backup_name)
+            backup.backup_round(
+                btype=backup.OTHER,
+                round_number=current_round_number,
+                name=backup_name,
+            )
 
             with transaction.atomic():
                 tab_logic.clear_current_round_pairing()
