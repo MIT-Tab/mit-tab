@@ -20,6 +20,7 @@ if [[ "$host" != "127.0.0.1" && "$host" != "localhost" && -n "$host" ]]; then
   if [[ -s "$tmp_ca" ]]; then
     mv "$tmp_ca" "$MYSQL_SSL_CA"
   fi
+  touch "$MYSQL_SSL_CA"
 fi
 
 if [[ -z "$TAB_PASSWORD" ]]; then
