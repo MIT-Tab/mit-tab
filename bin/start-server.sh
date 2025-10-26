@@ -4,10 +4,12 @@ set +x
 
 cd /var/www/tab
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck disable=SC1090
-source "${SCRIPT_DIR}/lib/mysql_ssl.sh"
-ensure_mysql_ssl_cert
+if [[ "${MYSQL_HOST:-127.0.0.1}" != "127.0.0.1" && "${MYSQL_HOST:-127.0.0.1}" != "localhost" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/mysql_ssl.sh"
+  ensure_mysql_ssl_cert
+fi
 
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2
