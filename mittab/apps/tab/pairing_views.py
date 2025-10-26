@@ -477,11 +477,11 @@ def alternative_judges(request, round_id, judge_id=None):
     )
 
     excluded_judges = [
-        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id), j.wing_only)
         for j in excluded_judges_list
     ]
     included_judges = [
-        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id))
+        (j.name, j.id, float(j.rank), rejudge_display_counts.get(j.id), j.wing_only)
         for j in included_judges_list
     ]
     included_judges = sorted(included_judges, key=lambda x: -x[2])
