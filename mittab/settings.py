@@ -57,16 +57,18 @@ MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
 DB_OPTIONS = {"charset": "utf8mb4"}
 
 if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
-    SSL_CA = os.environ.get("MYSQL_SSL_CA")
-    if not SSL_CA:
-        raise ImproperlyConfigured(
-            "MYSQL_SSL_CA must be set when connecting to a remote MySQL host."
-        )
+    DEFAULT_SSL_CA_PATH = os.path.join(
+        BASE_DIR,
+        "tmp",
+        os.environ.get("MYSQL_SSL_FILENAME", "digitalocean-db-ca.pem"),
+    )
+    SSL_CA = os.environ.get("MYSQL_SSL_CA", DEFAULT_SSL_CA_PATH)
     if not os.path.exists(SSL_CA):
         raise ImproperlyConfigured(
             f"Configured MYSQL_SSL_CA path '{SSL_CA}' could not be found."
         )
 
+    os.environ.setdefault("MYSQL_SSL_CA", SSL_CA)
     DB_OPTIONS["ssl"] = {"ca": SSL_CA}
 
 DATABASES = {
