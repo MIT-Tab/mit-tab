@@ -9,18 +9,16 @@ if [[ -z "$MYSQL_SSL_CA" ]]; then
 fi
 
 host="${MYSQL_HOST:-127.0.0.1}"
-do_token="${DIGITALOCEAN_ACCESS_TOKEN:-${DO_API_TOKEN:-${DOCTL_ACCESS_TOKEN:-}}}"
-db_id="${DIGITALOCEAN_DATABASE_ID:-${DO_DATABASE_ID:-${DATABASE_ID:-}}}"
-doctl_bin="${DOCTL_BIN:-/usr/local/bin/doctl}"
 
 if [[ "$host" != "127.0.0.1" && "$host" != "localhost" && -n "$host" ]]; then
   mkdir -p "$(dirname "$MYSQL_SSL_CA")"
-  tmp_ca="${MYSQL_SSL_CA}.doctl"
-  DOCTL_ACCESS_TOKEN="$do_token" "$doctl_bin" databases get-ca "$db_id" --format Certificate --no-header > "$tmp_ca" 2>/dev/null || rm -f "$tmp_ca"
-  if [[ -s "$tmp_ca" ]]; then
-    mv "$tmp_ca" "$MYSQL_SSL_CA"
-  fi
-  touch "$MYSQL_SSL_CA"
+  openssl s_client \
+    -starttls mysql \
+    -showcerts \
+    -servername "$host" \
+    -connect "${host}:${MYSQL_PORT:-3306}" </dev/null \
+    | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
+    | openssl pkcs7 -print_certs -out "$MYSQL_SSL_CA"
 fi
 
 if [[ -z "$TAB_PASSWORD" ]]; then
