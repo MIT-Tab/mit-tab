@@ -22,7 +22,9 @@ class Command(BaseCommand):
         entry_password = options.get("entry_password")
 
         if not tab_password:
-            raise CommandError("--tab-password is required to initialize the tournament.")
+            raise CommandError(
+                "--tab-password is required to initialize the tournament."
+            )
 
         if self._tournament_exists():
             self.stdout.write("Tournament already initialized, skipping setup.")

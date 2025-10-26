@@ -1,5 +1,6 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+
 import sentry_sdk
 from django.core.exceptions import ImproperlyConfigured
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -53,25 +54,25 @@ MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
 
-db_options = {"charset": "utf8mb4"}
+DB_OPTIONS = {"charset": "utf8mb4"}
 
 if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
-    ssl_ca = os.environ.get("MYSQL_SSL_CA")
-    if not ssl_ca:
+    SSL_CA = os.environ.get("MYSQL_SSL_CA")
+    if not SSL_CA:
         raise ImproperlyConfigured(
             "MYSQL_SSL_CA must be set when connecting to a remote MySQL host."
         )
-    if not os.path.exists(ssl_ca):
+    if not os.path.exists(SSL_CA):
         raise ImproperlyConfigured(
-            f"Configured MYSQL_SSL_CA path '{ssl_ca}' could not be found."
+            f"Configured MYSQL_SSL_CA path '{SSL_CA}' could not be found."
         )
 
-    db_options["ssl"] = {"ca": ssl_ca}
+    DB_OPTIONS["ssl"] = {"ca": SSL_CA}
 
 DATABASES = {
     "default": {
         "ENGINE":   "django.db.backends.mysql",
-        "OPTIONS":  db_options,
+        "OPTIONS":  DB_OPTIONS,
         "NAME":     MYSQL_DATABASE,
         "USER":     MYSQL_USER,
         "PASSWORD": MYSQL_PASSWORD,
