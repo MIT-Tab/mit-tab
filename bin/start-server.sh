@@ -10,16 +10,14 @@ fi
 
 host="${MYSQL_HOST:-127.0.0.1}"
 
-if [[ "$host" != "127.0.0.1" && "$host" != "localhost" && -n "$host" ]]; then
-  mkdir -p "$(dirname "$MYSQL_SSL_CA")"
-  openssl s_client \
-    -starttls mysql \
-    -showcerts \
-    -servername "$host" \
-    -connect "${host}:${MYSQL_PORT:-3306}" </dev/null \
-    | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
-    | openssl pkcs7 -print_certs -out "$MYSQL_SSL_CA"
-fi
+mkdir -p "$(dirname "$MYSQL_SSL_CA")"
+openssl s_client \
+  -starttls mysql \
+  -showcerts \
+  -servername "$host" \
+  -connect "${host}:${MYSQL_PORT:-3306}" </dev/null \
+  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
+  | openssl pkcs7 -print_certs -out "$MYSQL_SSL_CA"
 
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2
