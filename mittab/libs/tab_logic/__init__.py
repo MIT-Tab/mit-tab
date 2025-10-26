@@ -190,7 +190,7 @@ def pair_round():
             pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
-        random.shuffle(pairings, random=random.random)
+        random.shuffle(pairings)
         pairings = sorted(
             pairings, key=lambda team: highest_seed(team[0], team[1]), reverse=True
         )
