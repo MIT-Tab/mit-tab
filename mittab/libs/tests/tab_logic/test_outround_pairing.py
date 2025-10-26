@@ -89,4 +89,3 @@ class TestOutroundPairingLogic(TestCase):
             self.enter_results(BreakingTeam.VARSITY)
 
             var_teams_to_break /= 2
-    

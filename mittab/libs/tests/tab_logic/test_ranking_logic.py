@@ -55,4 +55,3 @@ class TestRankingLogic(TestCase):
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)
             ]
-    

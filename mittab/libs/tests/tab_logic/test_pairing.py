@@ -28,7 +28,7 @@ class TestPairingLogic(TestCase):
 
         judges = list(Judge.objects.all())
         rooms = list(Room.objects.all())
-        checkins =[
+        checkins = [
             CheckIn(judge=j, round_number=round_number)
             for round_number in range(0, last_round + 1)
             for j in judges
