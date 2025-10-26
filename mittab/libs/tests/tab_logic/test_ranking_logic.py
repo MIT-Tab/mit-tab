@@ -1,5 +1,4 @@
 from django.test import TestCase
-from django.core.cache import cache
 import pytest
 
 from mittab.apps.tab.models import Debater, TabSettings, Team
@@ -57,4 +56,3 @@ class TestRankingLogic(TestCase):
                 for pair in zip(left, right)
             ]
     
-

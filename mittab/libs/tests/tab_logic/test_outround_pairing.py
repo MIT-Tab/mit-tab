@@ -1,7 +1,6 @@
 import random
 
 from django.test import TestCase
-from django.core.cache import cache
 import pytest
 
 from mittab.apps.tab.models import *
@@ -91,4 +90,3 @@ class TestOutroundPairingLogic(TestCase):
 
             var_teams_to_break /= 2
     
-

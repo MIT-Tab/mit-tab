@@ -4,20 +4,10 @@ set +x
 
 cd /var/www/tab
 
-if [[ -z "$MYSQL_SSL_CA" ]]; then
-  export MYSQL_SSL_CA="/var/www/tab/tmp/digitalocean-db-ca.pem"
-fi
-
-host="${MYSQL_HOST:-127.0.0.1}"
-
-mkdir -p "$(dirname "$MYSQL_SSL_CA")"
-openssl s_client \
-  -starttls mysql \
-  -showcerts \
-  -servername "$host" \
-  -connect "${host}:${MYSQL_PORT:-3306}" </dev/null \
-  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
-  | openssl pkcs7 -print_certs -out "$MYSQL_SSL_CA"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/mysql_ssl.sh"
+ensure_mysql_ssl_cert
 
 if [[ -z "$TAB_PASSWORD" ]]; then
   echo "TAB_PASSWORD must be set." >&2

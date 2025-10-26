@@ -2,6 +2,12 @@
 set -e
 set +x
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/mysql_ssl.sh"
+
+ensure_mysql_ssl_cert
+
 printenv
 if [ -x "$(command -v mysqladmin)" ]; then
   mysqladmin ping -h $MITTAB_DB_HOST -u root --password=$MYSQL_ROOT_PASSWORD --wait=30

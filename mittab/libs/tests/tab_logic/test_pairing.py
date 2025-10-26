@@ -1,11 +1,7 @@
-import random
-
 from django.test import TestCase
-from django.core.cache import cache
 import pytest
 
-from mittab.apps.tab.models import CheckIn, Judge, Room, RoomCheckIn,\
-    TabSettings, Round, Team
+from mittab.apps.tab.models import CheckIn, Judge, Room, RoomCheckIn, TabSettings, Round
 from mittab.libs import assign_judges, assign_rooms
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
