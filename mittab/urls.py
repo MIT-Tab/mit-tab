@@ -188,7 +188,7 @@ urlpatterns = [
          name="view_backups"),
     path("e_ballots/", pairing_views.e_ballot_search,
          name="e_ballot_search"),
-    re_path(r"e_ballots/(\S+)/$",
+    path("e_ballots/<str:ballot_code>/",
             pairing_views.enter_e_ballot,
             name="enter_e_ballot"),
     path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),

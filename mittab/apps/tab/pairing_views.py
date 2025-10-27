@@ -709,9 +709,6 @@ def enter_e_ballot(request, ballot_code):
         # bad use of related_name in the model, this gets the rounds
         "judges",
     ).first()
-    # see above, judge.judges is rounds
-    rounds = list(judge.judges.prefetch_related("chair")
-                  .filter(round_number=current_round).all())
 
     if not judge:
         message = """
@@ -720,25 +717,29 @@ def enter_e_ballot(request, ballot_code):
                     """ % ballot_code
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
-    elif len(rounds) > 1:
-        message = """
-                Found more than one ballot for you this round.
-                Go to tab to resolve this error.
-                """
-    elif not rounds:
-        message = """
-                Could not find a ballot for you this round. Go to tab
-                to resolve the issue if you believe you were paired in.
-                """
-    elif rounds[0].chair != judge:
-        message = """
-                You are not the chair of this round. If you are on a panel,
-                only the chair can submit an e-ballot. If you are not on a
-                panel, go to tab and make sure the chair is properly set for
-                the round.
-                """
     else:
-        return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
+        # see above, judge.judges is rounds
+        rounds = list(judge.judges.prefetch_related("chair")
+                    .filter(round_number=current_round).all())
+        if len(rounds) > 1:
+            message = """
+                    Found more than one ballot for you this round.
+                    Go to tab to resolve this error.
+                    """
+        elif not rounds:
+            message = """
+                    Could not find a ballot for you this round. Go to tab
+                    to resolve the issue if you believe you were paired in.
+                    """
+        elif rounds[0].chair != judge:
+            message = """
+                    You are not the chair of this round. If you are on a panel,
+                    only the chair can submit an e-ballot. If you are not on a
+                    panel, go to tab and make sure the chair is properly set for
+                    the round.
+                    """
+        else:
+            return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
     return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
