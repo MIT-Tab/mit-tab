@@ -22,7 +22,7 @@
 		    {% endfor %}
 		</tr>
 	    </thead>
-	<tbody>
+	    <tbody>
 	    {% for judge in judges %}
 		<tr>
 		    <td style="width: 25%;">{{ judge.name }}</td>
@@ -32,8 +32,9 @@
 		    {% endfor %}
 		</tr>
 	    {% endfor %}
+	    </tbody>
 	</table>
-        <div class="pairings_footer_spacer"></div>
+        <div class="public_footer_spacer"></div>
 	<div class="public_footer">
             <span class="right footer-controls">
 		<label for="autoscroll">
@@ -42,4 +43,6 @@
 		</label>
             </span>
 	</div>	
+</div>
+{% endblock %}
 {% endblock %}
