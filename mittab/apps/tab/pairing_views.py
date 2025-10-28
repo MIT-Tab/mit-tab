@@ -720,7 +720,7 @@ def enter_e_ballot(request, ballot_code):
     else:
         # see above, judge.judges is rounds
         rounds = list(judge.judges.prefetch_related("chair")
-                    .filter(round_number=current_round).all())
+                      .filter(round_number=current_round).all())
         if len(rounds) > 1:
             message = """
                     Found more than one ballot for you this round.
