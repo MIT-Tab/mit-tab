@@ -54,10 +54,6 @@ class TournamentStatusCheck:
         if not request.path.startswith("/api/"):
             return self.get_response(request)
 
-        finals = Outround.objects.filter(num_teams=2)
-        if not finals.exists() or finals.filter(victor=Outround.UNKNOWN).exists():
-            return JsonResponse({"error": "Tournament incomplete"}, status=409)
-
         if not TabSettings.get("results_published", False):
             return JsonResponse({"error": "Results not published"}, status=423)
 
