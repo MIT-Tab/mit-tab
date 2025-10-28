@@ -50,7 +50,6 @@ def index(request):
         "room_list": room_list,
         "expected_finals": expected_finals,
         "completed_finals": completed_finals,
-        "publish_ready": publish_ready,
         "results_published": results_published,
         "number_teams": number_teams,
         "number_judges": number_judges,
