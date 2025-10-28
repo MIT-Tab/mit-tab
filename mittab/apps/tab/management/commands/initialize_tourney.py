@@ -58,7 +58,7 @@ class Command(BaseCommand):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-
+        TabSettings.set("tournament_name", "New Tournament")
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")

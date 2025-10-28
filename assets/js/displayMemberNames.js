@@ -8,4 +8,11 @@ function changeDisplayNames() {
   }
 }
 
-$(document).ready(() => $("#name_display_toggle").click(changeDisplayNames));
+$(document).ready(() => {
+  const checkBox = document.getElementById("name_display_toggle");
+  if (checkBox) {
+    document.body.classList.add("show-team-names");
+    checkBox.checked = false;
+    $("#name_display_toggle").click(changeDisplayNames);
+  }
+});

@@ -369,7 +369,7 @@ def get_settings_from_yaml():
 
     if all_settings:
         stored_settings = {
-            ts.key: ts.value
+            ts.key: ts.value if ts.value_string is None else ts.value_string
             for ts in TabSettings.objects.filter(
                 key__in=(setting["name"] for setting in all_settings)
             )

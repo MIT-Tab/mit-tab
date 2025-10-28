@@ -646,14 +646,21 @@ def export_pairings_csv_view(request):
 
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
-    rounds = Round.objects.prefetch_related("gov_team", "opp_team") \
+    rounds = Round.objects.prefetch_related("gov_team", "opp_team",
+                                            "room", "chair") \
         .filter(victor=Round.NONE, round_number=round_number)
     # need to do this to not reveal brackets
 
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    return render(request, "ballots/missing_ballots.html", locals())
-
+    return render(
+        request,
+        "ballots/missing_ballots.html",
+        {
+            "rounds": rounds,
+            "pairing_exists": pairing_exists,
+        },
+    )
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -668,9 +675,16 @@ def view_rounds(request):
 
 def e_ballot_search(request):
     if request.method == "POST":
-        return redirect("/e_ballots/%s" % request.POST.get("ballot_code"))
-    else:
-        return redirect("/404")
+        ballot_code = (request.POST.get("ballot_code") or "").strip()
+        if ballot_code:
+            return redirect("enter_e_ballot", ballot_code=ballot_code)
+        return redirect_and_flash_error(
+            request,
+            "Please enter the ballot code provided by tab.",
+            path="/e_ballots/",
+        )
+
+    return render(request, "public/e_ballot_search.html")
 
 
 def enter_e_ballot(request, ballot_code):
@@ -695,9 +709,6 @@ def enter_e_ballot(request, ballot_code):
         # bad use of related_name in the model, this gets the rounds
         "judges",
     ).first()
-    # see above, judge.judges is rounds
-    rounds = list(judge.judges.prefetch_related("chair")
-                  .filter(round_number=current_round).all())
 
     if not judge:
         message = """
@@ -706,25 +717,29 @@ def enter_e_ballot(request, ballot_code):
                     """ % ballot_code
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
-    elif len(rounds) > 1:
-        message = """
-                Found more than one ballot for you this round.
-                Go to tab to resolve this error.
-                """
-    elif not rounds:
-        message = """
-                Could not find a ballot for you this round. Go to tab
-                to resolve the issue if you believe you were paired in.
-                """
-    elif rounds[0].chair != judge:
-        message = """
-                You are not the chair of this round. If you are on a panel,
-                only the chair can submit an e-ballot. If you are not on a
-                panel, go to tab and make sure the chair is properly set for
-                the round.
-                """
     else:
-        return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
+        # see above, judge.judges is rounds
+        rounds = list(judge.judges.prefetch_related("chair")
+                      .filter(round_number=current_round).all())
+        if len(rounds) > 1:
+            message = """
+                    Found more than one ballot for you this round.
+                    Go to tab to resolve this error.
+                    """
+        elif not rounds:
+            message = """
+                    Could not find a ballot for you this round. Go to tab
+                    to resolve the issue if you believe you were paired in.
+                    """
+        elif rounds[0].chair != judge:
+            message = """
+                    You are not the chair of this round. If you are on a panel,
+                    only the chair can submit an e-ballot. If you are not on a
+                    panel, go to tab and make sure the chair is properly set for
+                    the round.
+                    """
+        else:
+            return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
     return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
@@ -767,7 +782,8 @@ def enter_result(request,
             "title": "Entering Ballot for {}".format(round_obj),
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team,
-            "ballot_code": ballot_code
+            "ballot_code": ballot_code,
+            "action": request.path,
         })
 
 
@@ -860,6 +876,7 @@ def start_new_tourny(request):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
+        TabSettings.set("tournament_name", "New Tournament")
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(
@@ -870,7 +887,7 @@ def start_new_tourny(request):
 def clear_db():
     obj_types = [
         CheckIn, RoundStats, Round, Judge, Room, Scratch, TabSettings, Team,
-        School
+        School, Debater
     ]
     list(map(delete_obj, obj_types))
 
