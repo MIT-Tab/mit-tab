@@ -34,7 +34,6 @@ def index(request):
     completed_finals = Outround.objects.filter(num_teams=2).exclude(
         victor=Outround.UNKNOWN
     ).count()
-    publish_ready = completed_finals == expected_finals
     results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
