@@ -571,7 +571,9 @@ def alternative_teams(request, round_id, current_team_id, position):
     context = {
         "round_obj": round_obj,
         "current_team": current_team,
+        "current_team_id": current_team_id,
         "round_number": round_number,
+        "round_id": round_id,
         "excluded_teams": excluded_teams,
         "included_teams": included_teams,
         "position": position,
