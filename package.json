@@ -43,7 +43,7 @@
     "style-loader": ">=0.23.1",
     "terser-webpack-plugin": "^5.3.9",
     "webpack": ">=5.0.0",
-    "webpack-bundle-tracker": ">=0.4.2-beta",
+    "webpack-bundle-tracker": "3.2.1",
     "webpack-cli": ">=3.3.2"
   },
   "dependencies": {
