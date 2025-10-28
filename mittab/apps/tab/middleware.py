@@ -4,7 +4,7 @@ from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
-from mittab.apps.tab.models import Outround, TabSettings
+from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
@@ -53,10 +53,6 @@ class TournamentStatusCheck:
     def __call__(self, request):
         if not request.path.startswith("/api/"):
             return self.get_response(request)
-
-        finals = Outround.objects.filter(num_teams=2)
-        if not finals.exists() or finals.filter(victor=Outround.UNKNOWN).exists():
-            return JsonResponse({"error": "Tournament incomplete"}, status=409)
 
         if not TabSettings.get("results_published", False):
             return JsonResponse({"error": "Results not published"}, status=423)
