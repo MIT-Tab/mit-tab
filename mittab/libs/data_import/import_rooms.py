@@ -19,7 +19,7 @@ class RoomImporter(WorkbookImporter):
             room_rank = float(room_rank)
         except ValueError:
             self.error(
-                "Room %s has invalid rank '%s'" % (room_name, room_rank),
+                f"Room {room_name} has invalid rank '{room_rank}'",
                 row_number)
             return
 
@@ -29,4 +29,4 @@ class RoomImporter(WorkbookImporter):
         else:
             for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (room_name, error_msg), row_number)
+                    self.error(f"{room_name} - {error_msg}", row_number)

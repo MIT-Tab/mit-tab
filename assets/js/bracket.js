@@ -4,19 +4,19 @@ import $ from "jquery";
 const SELECTOR = "#brackets-viewer-container";
 const TAB_CONFIG = [
   ["list-view-tab", "list-view"],
-  ["bracket-view-tab", "bracket-view"]
+  ["bracket-view-tab", "bracket-view"],
 ];
 
 let matchMetadata = {};
 
-const reshapeParticipants = (participants = [], useTeamNames) =>
-  participants.map(entry => {
+const reshapeParticipants = (useTeamNames, participants = []) =>
+  participants.map((entry) => {
     const name = entry.team_name;
     const debaters = entry.debaters_names || "";
     return { ...entry, name: useTeamNames ? name : debaters.trim() || name };
   });
 
-const updateTeam = (teamKey, info = {}, fallbackLabel) => {
+const updateTeam = (teamKey, fallbackLabel, info = {}) => {
   const $team = $(`#match-metadata-modal [data-team="${teamKey}"]`);
   if (!$team.length) return;
 
@@ -53,7 +53,7 @@ const renderJudges = ($modal, judges) => {
   const hasJudges = Array.isArray(judges) && judges.length;
   const lineup = hasJudges ? judges : [{ name: "TBD" }];
 
-  lineup.forEach(judge => {
+  lineup.forEach((judge) => {
     const name =
       judge && typeof judge.name === "string" && judge.name.trim()
         ? judge.name.trim()
@@ -66,7 +66,7 @@ const renderJudges = ($modal, judges) => {
 
     if (judge && judge.is_chair) {
       $("<span/>", { class: "judge-pill__badge", text: "Chair" }).appendTo(
-        $item
+        $item,
       );
     }
 
@@ -86,7 +86,7 @@ const renderBracket = () => {
   const useTeamNames = $("body").hasClass("show-team-names");
   const data = {
     ...payload,
-    participants: reshapeParticipants(payload.participants, useTeamNames)
+    participants: reshapeParticipants(useTeamNames, payload.participants),
   };
   viewer.render(data, { selector: SELECTOR, clear: true });
   matchMetadata = payload.match_metadata || {};
@@ -109,13 +109,13 @@ const activateTab = (targetPane, { render = false } = {}) => {
   if (showBracket && render) renderBracket();
 };
 
-const openModal = metadata => {
+const openModal = (metadata) => {
   const $modal = $("#match-metadata-modal");
   const $backdrop = $("#match-modal-backdrop");
   if (!$modal.length || !$backdrop.length || !metadata) return;
 
-  updateTeam("gov", metadata.gov_team || {}, "Team 1");
-  updateTeam("opp", metadata.opp_team || {}, "Team 2");
+  updateTeam("gov", "Team 1", metadata.gov_team || {});
+  updateTeam("opp", "Team 2", metadata.opp_team || {});
 
   $modal.find("[data-room]").text(metadata.room || "TBD");
   renderJudges($modal, metadata.judges);
@@ -140,13 +140,13 @@ const closeModal = () => {
 
 const initTabs = () => {
   TAB_CONFIG.forEach(([tabId, pane]) => {
-    $(`#${tabId}`).on("click", evt => {
+    $(`#${tabId}`).on("click", (evt) => {
       evt.preventDefault();
       activateTab(pane, { render: pane === "bracket-view" });
     });
   });
 
-  $("#name_display_toggle").on("change", evt => {
+  $("#name_display_toggle").on("change", (evt) => {
     const useTeamNames = !evt.target.checked;
     $("body").toggleClass("show-team-names", useTeamNames);
     if ($("body").hasClass("bracket-view-active")) renderBracket();
@@ -160,12 +160,12 @@ const initTabs = () => {
 
 $(document).ready(initTabs);
 
-$(document).on("click", "#close-modal", evt => {
+$(document).on("click", "#close-modal", (evt) => {
   evt.preventDefault();
   closeModal();
 });
 
-$(document).on("click", "#match-modal-backdrop", evt => {
+$(document).on("click", "#match-modal-backdrop", (evt) => {
   evt.preventDefault();
   closeModal();
 });
@@ -177,6 +177,6 @@ $(document).on("click", `${SELECTOR} .match`, function handleMatchClick(evt) {
   if (metadata) openModal(metadata);
 });
 
-$(document).on("keydown", evt => {
+$(document).on("keydown", (evt) => {
   if (evt.key === "Escape" && modalIsOpen()) closeModal();
 });

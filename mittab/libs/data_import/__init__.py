@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 from django.forms import ModelForm
 import xlrd
+from xlrd.biffh import XLRDError
 
 
 class InvalidWorkbookException(Exception):
@@ -19,8 +20,8 @@ class Workbook:
             self.sheet = xlrd.open_workbook(
                 filename=None,
                 file_contents=file_to_import.read()).sheet_by_index(0)
-        except:
-            raise InvalidWorkbookException("Could not open workbook")
+        except (XLRDError, TypeError) as exc:
+            raise InvalidWorkbookException("Could not open workbook") from exc
 
     def get(self, row, col):
         try:
@@ -76,6 +77,6 @@ class WorkbookImporter(ABC):
 
     def error(self, msg, row_number=None):
         if row_number is not None:
-            self.errors.append("Row %d: %s" % (row_number + 1, msg))
+            self.errors.append(f"Row {row_number + 1}: {msg}")
         else:
             self.errors.append(msg)

@@ -14,7 +14,7 @@ import quickSearchInit from "./quickSearch";
 import multiselectInit from "./multiselect";
 
 function initializeConfirms() {
-  $("[confirm]").click(e => {
+  $("[confirm]").click((e) => {
     if (!window.confirm($(e.target).attr("confirm"))) {
       e.preventDefault();
     }
@@ -22,7 +22,7 @@ function initializeConfirms() {
 }
 
 function initializeRevealButtons() {
-  $(".content-reveal").click(e => {
+  $(".content-reveal").click((e) => {
     e.preventDefault();
     $(e.target).slideUp(250);
     $(`#${$(e.target).data("to-reveal")}`).slideDown(250);
@@ -35,7 +35,7 @@ function loadTabCards() {
       url: `/team/card/${$(value).data("team-id")}`,
       success(result) {
         $(value).html(result);
-      }
+      },
     });
   });
 }
@@ -54,7 +54,7 @@ function initializeSettingsForm() {
       } else {
         label.text("Disabled");
       }
-    }
+    },
   );
 }
 

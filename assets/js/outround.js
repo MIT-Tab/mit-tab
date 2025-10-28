@@ -11,7 +11,7 @@ function cycleChoice(event) {
     url: `/outround_choice/${outroundId}`,
     success(result) {
       button.html(result.data);
-    }
+    },
   });
 }
 
@@ -32,17 +32,17 @@ function populateTabCards() {
           stats.total_speaks.toFixed(2),
           stats.govs,
           stats.opps,
-          stats.seed
+          stats.seed,
         ].join(" / ");
         tabCardElement.attr(
           "title",
           "Effective Seed / Outround Seed / In-round Wins" +
-            " / Speaks / Govs / Opps / Seed"
+            " / Speaks / Govs / Opps / Seed",
         );
         tabCardElement.attr("href", `/team/card/${teamId}`);
         tabCardElement.text(text);
       });
-    }
+    },
   });
 }
 
@@ -80,7 +80,7 @@ function assignTeam(e) {
     },
     failure() {
       window.alert(alertMsg);
-    }
+    },
   });
 }
 
@@ -95,13 +95,10 @@ function populateAlternativeTeams() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
-        .find(".team-assign")
-        .click(assignTeam);
+      $parent.find(".dropdown-menu").find(".team-assign").click(assignTeam);
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
-    }
+    },
   });
 }
 
@@ -110,8 +107,9 @@ function assignJudge(e) {
   const roundId = $(e.target).attr("round-id");
   const judgeId = $(e.target).attr("judge-id");
   const curJudgeId = $(e.target).attr("current-judge-id");
-  const url = `/outround/${roundId}/assign_judge/${judgeId}/${curJudgeId ||
-    ""}`;
+  const url = `/outround/${roundId}/assign_judge/${judgeId}/${
+    curJudgeId || ""
+  }`;
 
   let $buttonWrapper;
   if (curJudgeId) {
@@ -134,7 +132,7 @@ function assignJudge(e) {
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
     .judge-toggle`).addClass("chair");
-    }
+    },
   });
 }
 
@@ -148,13 +146,10 @@ function populateAlternativeJudges() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
-        .find(".judge-assign")
-        .click(assignJudge);
+      $parent.find(".dropdown-menu").find(".judge-assign").click(assignJudge);
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
-    }
+    },
   });
 }
 
@@ -174,7 +169,7 @@ function togglePairingRelease(event) {
         $("#close-pairings").addClass("d-none");
         $("#release-pairings").removeClass("d-none");
       }
-    }
+    },
   });
 }
 

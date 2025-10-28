@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         cur_round = TabSettings.get("cur_round") - 1
-        print(("Simulating round %s..." % cur_round))
+        print(f"Simulating round {cur_round}...")
         rounds_to_simulate = Round.objects.filter(round_number=cur_round,
                                                   victor=Round.NONE)
 

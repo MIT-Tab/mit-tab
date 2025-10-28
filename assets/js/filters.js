@@ -4,7 +4,7 @@ function filterOnFlags(flags) {
   $("li.filterable").each((index, element) => {
     let show = 1;
     const flagGroups = Object.keys(flags);
-    flagGroups.forEach(flagGroup => {
+    flagGroups.forEach((flagGroup) => {
       show &= ($(element).data("filters") & flags[flagGroup]) > 0;
     });
 
@@ -52,7 +52,7 @@ function applyDropdownFilters() {
 
   $("tr.filterable-row").each((index, row) => {
     let show = true;
-    Object.keys(filters).forEach(key => {
+    Object.keys(filters).forEach((key) => {
       const rowValue = $(row).data(key);
       if (String(rowValue) !== String(filters[key])) {
         show = false;

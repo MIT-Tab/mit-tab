@@ -14,5 +14,5 @@ if (document.readyState === "loading") {
 
 window.addEventListener("resize", adjustFooterSpacer);
 window.addEventListener("memberNamesToggled", () =>
-  setTimeout(adjustFooterSpacer, 0)
+  setTimeout(adjustFooterSpacer, 0),
 );

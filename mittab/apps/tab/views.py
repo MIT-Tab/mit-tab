@@ -43,7 +43,24 @@ def index(request):
     number_debaters = len(debater_list)
     number_rooms = len(room_list)
 
-    return render(request, "common/index.html", locals())
+    context = {
+        "school_list": school_list,
+        "judge_list": judge_list,
+        "team_list": team_list,
+        "debater_list": debater_list,
+        "room_list": room_list,
+        "expected_finals": expected_finals,
+        "completed_finals": completed_finals,
+        "publish_ready": publish_ready,
+        "results_published": results_published,
+        "number_teams": number_teams,
+        "number_judges": number_judges,
+        "number_schools": number_schools,
+        "number_debaters": number_debaters,
+        "number_rooms": number_rooms,
+    }
+
+    return render(request, "common/index.html", context)
 
 
 def tab_logout(request, *args):
@@ -120,9 +137,9 @@ def view_school(request, school_id):
                     request,
                     "School name cannot be validated, most likely a non-existent school"
                 )
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "School {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"School {updated_name} updated successfully")
     else:
         form = SchoolForm(instance=school)
         links = [(f"/school/{school_id}/delete/", "Delete")]
@@ -155,10 +172,10 @@ def enter_school(request):
                     request,
                     "School name cannot be validated, most likely a duplicate school"
                 )
+            created_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
                 request,
-                "School {} created successfully".format(
-                    form.cleaned_data["name"]),
+                f"School {created_name} created successfully",
                 path="/")
     else:
         form = SchoolForm()
@@ -215,6 +232,8 @@ def view_rooms(request):
 
 
 def view_room(request, room_id):
+    rounds = []
+    outrounds = []
     room_id = int(room_id)
     try:
         room = Room.objects.get(pk=room_id)
@@ -230,9 +249,9 @@ def view_room(request, room_id):
                     request,
                     "Room name cannot be validated, most likely a non-existent room"
                 )
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "School {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"School {updated_name} updated successfully")
     else:
         form = RoomForm(instance=room)
 
@@ -264,10 +283,10 @@ def enter_room(request):
                     request,
                     "Room name cannot be validated, most likely a duplicate room"
                 )
+            created_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
                 request,
-                "Room {} created successfully".format(
-                    form.cleaned_data["name"]),
+                f"Room {created_name} created successfully",
                 path="/")
     else:
         form = RoomForm()
@@ -289,7 +308,7 @@ def bulk_check_in(request):
 
     # Teams have a simple boolean field
     if entity_type == "team":
-        Team.objects.filter(pk__in=entity_ids).update(checked_in=(action == "check_in"))
+        Team.objects.filter(pk__in=entity_ids).update(checked_in=action == "check_in")
         return JsonResponse({"success": True})
 
     # Judges and rooms use check-in records per round
@@ -317,7 +336,7 @@ def bulk_check_in(request):
 
 
 @permission_required("tab.scratch.can_delete", login_url="/403/")
-def delete_scratch(request, item_id, scratch_id):
+def delete_scratch(request, _item_id, scratch_id):
     try:
         scratch_id = int(scratch_id)
         scratch = Scratch.objects.get(pk=scratch_id)
@@ -352,7 +371,7 @@ def get_settings_from_yaml():
     for filename in sorted(os.listdir(settings_dir)):
         yaml_file = os.path.join(settings_dir, filename)
 
-        with open(yaml_file, "r") as stream:
+        with open(yaml_file, "r", encoding="utf-8") as stream:
             data = yaml.safe_load(stream)
 
         category_info = data["category"]
@@ -488,7 +507,7 @@ def generate_archive(request):
 
     response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
     response["Content-Length"] = len(xml)
-    response["Content-Disposition"] = "attachment; filename=%s" % filename
+    response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
 
