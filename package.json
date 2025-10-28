@@ -37,7 +37,7 @@
     "file-loader": ">=3.0.1",
     "mini-css-extract-plugin": ">=0.6.0",
     "node-sass": "^8.0.0",
-    "prettier": "^3.6.2",
+    "prettier": "3.6.2",
     "sass": "^1.93.2",
     "sass-loader": "^16.0.6",
     "style-loader": ">=0.23.1",
