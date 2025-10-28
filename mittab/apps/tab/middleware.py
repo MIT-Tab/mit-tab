@@ -4,7 +4,7 @@ from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
-from mittab.apps.tab.models import Outround, TabSettings
+from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
