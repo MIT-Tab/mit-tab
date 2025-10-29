@@ -398,6 +398,70 @@ class Scratch(models.Model):
         s_type = ("Team", "Tab")[self.scratch_type]
         return f"{self.team} <={s_type}=> {self.judge}"
 
+class JudgeJudgeScratch(models.Model):
+    judge_one = models.ForeignKey(
+        "Judge",
+        related_name="judge_scratch_primary",
+        on_delete=models.CASCADE,
+    )
+    judge_two = models.ForeignKey(
+        "Judge",
+        related_name="judge_scratch_secondary",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("judge_one", "judge_two")
+        verbose_name_plural = "judge scratches"
+
+    def __str__(self):
+        return f"{self.judge_one} <=> {self.judge_two}"
+
+    def clean(self):
+        if self.judge_one and self.judge_two and self.judge_one == self.judge_two:
+            raise ValidationError("Judge scratches must involve two distinct judges")
+
+    def save(self, *args, **kwargs):
+        if self.judge_one and self.judge_two:
+            if self.judge_one == self.judge_two:
+                raise ValidationError(
+                    "Judge scratches must involve two distinct judges")
+            if self.judge_one.id > self.judge_two.id:
+                self.judge_one, self.judge_two = self.judge_two, self.judge_one
+        super().save(*args, **kwargs)
+
+
+class TeamTeamScratch(models.Model):
+    team_one = models.ForeignKey(
+        "Team",
+        related_name="team_scratch_primary",
+        on_delete=models.CASCADE,
+    )
+    team_two = models.ForeignKey(
+        "Team",
+        related_name="team_scratch_secondary",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("team_one", "team_two")
+        verbose_name_plural = "team scratches"
+
+    def __str__(self):
+        return f"{self.team_one} <=> {self.team_two}"
+
+    def clean(self):
+        if self.team_one and self.team_two and self.team_one == self.team_two:
+            raise ValidationError("Team scratches must involve two distinct teams")
+
+    def save(self, *args, **kwargs):
+        if self.team_one and self.team_two:
+            if self.team_one == self.team_two:
+                raise ValidationError("Team scratches must involve two distinct teams")
+            if self.team_one.id > self.team_two.id:
+                self.team_one, self.team_two = self.team_two, self.team_one
+        super().save(*args, **kwargs)
+
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)

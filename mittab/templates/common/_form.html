@@ -14,5 +14,9 @@
   {% csrf_token %}
   {% buttons %}
     <input type="submit" value="Save" class="btn btn-primary"/>
+    {% if delete_link %}
+      <a href="{{ delete_link }}" class="btn btn-danger"
+         onclick="return confirm('Are you sure you want to delete this?');">Delete</a>
+  {% endif %}
   {% endbuttons %}
 </form>

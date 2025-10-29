@@ -1,0 +1,59 @@
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+
+{% block title %}Adding Scratches{% endblock %}
+{% block banner %}Adding Scratches{% endblock %}
+
+{% block content %}
+<div class="col-md-8">
+  <ul class="nav nav-tabs mb-3" role="tablist">
+    {% for key, label in tabs %}
+      <li class="nav-item" role="presentation">
+        <a
+          class="nav-link {% if key == active_tab %}active{% endif %}"
+          id="{{ key }}-tab"
+          data-toggle="tab"
+          href="#{{ key }}"
+          role="tab"
+          aria-controls="{{ key }}"
+          aria-selected="{% if key == active_tab %}true{% else %}false{% endif %}"
+        >
+          {{ label }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="tab-content">
+    {% for tab in forms_context %}
+      {% with key=tab.key %}
+      <div
+        class="tab-pane fade {% if key == active_tab %}show active{% endif %}"
+        id="{{ key }}"
+        role="tabpanel"
+        aria-labelledby="{{ key }}-tab"
+      >
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="{{ key }}"/>
+          <input type="hidden" name="count" value="{{ tab.count }}"/>
+          {% for form in tab.forms %}
+            <div class="card mb-3">
+              <div class="card-header">
+                <h5 class="mb-0">
+                  {{ tab.label }} #{{ forloop.counter }}
+                </h5>
+              </div>
+              <div class="card-body">
+                {% bootstrap_form form %}
+              </div>
+            </div>
+          {% endfor %}
+          <input type="submit" class="btn btn-primary" value="Submit"/>
+        </form>
+      </div>
+      {% endwith %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
