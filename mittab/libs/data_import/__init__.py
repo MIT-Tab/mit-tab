@@ -20,7 +20,7 @@ class Workbook:
             self.sheet = xlrd.open_workbook(
                 filename=None,
                 file_contents=file_to_import.read()).sheet_by_index(0)
-        except (XLRDError, TypeError) as exc:
+        except (XLRDError, TypeError, IndexError) as exc:
             raise InvalidWorkbookException("Could not open workbook") from exc
 
     def get(self, row, col):

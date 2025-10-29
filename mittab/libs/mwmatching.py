@@ -350,12 +350,13 @@ def maxWeightMatching(edges, maxcardinality=False):
             if bestedge[b] == -1 or slack(k) < slack(bestedge[b]):
                 bestedge[b] = k
         if DEBUG:
-            DEBUG(f"blossomchilds[{b}]=" + repr(blossomchilds[b]))
+            DEBUG('blossomchilds[%d]=' % b + repr(blossomchilds[b]))
 
     # Expand the given top-level blossom.
     def expandBlossom(b, endstage):
         if DEBUG:
-            DEBUG(f"expandBlossom({b},{endstage}) {repr(blossomchilds[b])}")
+            DEBUG('expandBlossom(%d,%d) %s' %
+                  (b, endstage, repr(blossomchilds[b])))
         # Convert sub-blossoms into top-level blossoms.
         for s in blossomchilds[b]:
             blossomparent[s] = -1
@@ -629,7 +630,7 @@ def maxWeightMatching(edges, maxcardinality=False):
                         tbk = bestedge[b]
                         tbd = slack(bestedge[b])
         if DEBUG and bd != tbd:
-            DEBUG(f"bk={bk} tbk={tbk} bd={repr(bd)} tbd={repr(tbd)}")
+            DEBUG('bk=%d tbk=%d bd=%s tbd=%s' % (bk, tbk, repr(bd), repr(tbd)))
         assert bd == tbd
 
     # Main loop: continue until no further improvement is possible.
