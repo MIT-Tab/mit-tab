@@ -52,8 +52,10 @@ def pair_next_outround(request, num_teams, type_of_round):
     judges = outround_tab_logic.have_enough_judges_type(type_of_round)
     rooms = outround_tab_logic.have_enough_rooms_type(type_of_round)
 
-    msg = "Enough judges checked in for Out-rounds? Need {0}, have {1}".format(
-        judges[1][1], judges[1][0])
+    msg = (
+        "Enough judges checked in for Out-rounds? "
+        f"Need {judges[1][1]}, have {judges[1][0]}"
+    )
 
     if num_teams <= 2:
         check_status.append(("Have more rounds?", "No", "Not enough teams"))
@@ -65,17 +67,17 @@ def pair_next_outround(request, num_teams, type_of_round):
     else:
         check_status.append((msg, "No", "Not enough judges"))
 
-    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
-        rooms[1][1], rooms[1][0])
+    msg = (
+        "N/2 Rooms available Round Out-rounds? "
+        f"Need {rooms[1][1]}, have {rooms[1][0]}"
+    )
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
     else:
         check_status.append((msg, "No", "Not enough rooms"))
 
-    round_label = "[%s] Ro%s" % ("N" if type_of_round else "V",
-                                 num_teams)
-    msg = "All Rounds properly entered for Round %s" % (
-        round_label)
+    round_label = f"[{'N' if type_of_round else 'V'}] Ro{num_teams}"
+    msg = f"All Rounds properly entered for Round {round_label}"
     ready_to_pair = "Yes"
     ready_to_pair_alt = "Checks passed!"
     try:
@@ -85,9 +87,22 @@ def pair_next_outround(request, num_teams, type_of_round):
         ready_to_pair = "No"
         ready_to_pair_alt = str(e)
         check_status.append(
-            (msg, "No", "Not all rounds are entered. %s" % str(e)))
+            (msg, "No", f"Not all rounds are entered. {e}"))
 
-    return render(request, "pairing/pair_round.html", locals())
+    context = {
+        "title": title,
+        "current_round_number": current_round_number,
+        "previous_round_number": previous_round_number,
+        "check_status": check_status,
+        "judges": judges,
+        "rooms": rooms,
+        "ready_to_pair": ready_to_pair,
+        "ready_to_pair_alt": ready_to_pair_alt,
+        "num_teams": num_teams,
+        "type_of_round": type_of_round,
+        "round_label": round_label,
+    }
+    return render(request, "pairing/pair_round.html", context)
 
 
 def get_outround_options(var_teams_to_break,
@@ -107,7 +122,7 @@ def get_outround_options(var_teams_to_break,
                 (reverse("outround_pairing_view", kwargs={
                     "type_of_round": BreakingTeam.VARSITY,
                     "num_teams": int(var_teams_to_break)}),
-                 "[V] Ro%s" % (int(var_teams_to_break),))
+                 f"[V] Ro{int(var_teams_to_break)}")
             )
         var_teams_to_break /= 2
 
@@ -118,7 +133,7 @@ def get_outround_options(var_teams_to_break,
                 (reverse("outround_pairing_view", kwargs={
                     "type_of_round": BreakingTeam.NOVICE,
                     "num_teams": int(nov_teams_to_break)}),
-                 "[N] Ro%s" % (int(nov_teams_to_break),))
+                 f"[N] Ro{int(nov_teams_to_break)}")
             )
         nov_teams_to_break /= 2
 
@@ -149,8 +164,7 @@ def break_teams(request):
 
     check_status = []
 
-    msg = "All Rounds properly entered for Round %s" % (
-        previous_round_number)
+    msg = f"All Rounds properly entered for Round {previous_round_number}"
 
     ready_to_pair = "Yes"
     ready_to_pair_alt = "Checks passed!"
@@ -161,27 +175,38 @@ def break_teams(request):
         ready_to_pair = "No"
         ready_to_pair_alt = str(e)
         check_status.append(
-            (msg, "No", "Not all rounds are entered. %s" % str(e)))
+            (msg, "No", f"Not all rounds are entered. {e}"))
     except ByeAssignmentError as e:
         ready_to_pair = "No"
         ready_to_pair_alt = str(e)
         check_status.append(
-            (msg, "No", "You have a bye and results. %s" % str(e)))
+            (msg, "No", f"You have a bye and results. {e}"))
     except NoShowAssignmentError as e:
         ready_to_pair = "No"
         ready_to_pair_alt = str(e)
         check_status.append(
-            (msg, "No", "You have a noshow and results. %s" % str(e)))
+            (msg, "No", f"You have a noshow and results. {e}"))
 
     rooms = outround_tab_logic.have_enough_rooms_before_break()
-    msg = "N/2 Rooms available Round Out-rounds? Need {0}, have {1}".format(
-        rooms[1][1], rooms[1][0])
+    msg = (
+        "N/2 Rooms available Round Out-rounds? "
+        f"Need {rooms[1][1]}, have {rooms[1][0]}"
+    )
     if rooms[0]:
         check_status.append((msg, "Yes", "Rooms are checked in"))
     else:
         check_status.append((msg, "No", "Not enough rooms"))
 
-    return render(request, "pairing/pair_round.html", locals())
+    context = {
+        "title": title,
+        "current_round_number": current_round_number,
+        "previous_round_number": previous_round_number,
+        "check_status": check_status,
+        "ready_to_pair": ready_to_pair,
+        "ready_to_pair_alt": ready_to_pair_alt,
+        "rooms": rooms,
+    }
+    return render(request, "pairing/pair_round.html", context)
 
 
 def outround_pairing_view(request,
@@ -207,8 +232,9 @@ def outround_pairing_view(request,
     elif type_of_round == BreakingTeam.NOVICE:
         pairing_released = TabSettings.get("nov_teams_visible", 256) <= num_teams
 
-    label = "[%s] Ro%s" % ("V" if type_of_round == BreakingTeam.VARSITY else "N",
-                           num_teams)
+    label = (
+        f"[{'V' if type_of_round == BreakingTeam.VARSITY else 'N'}] Ro{num_teams}"
+    )
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
@@ -312,9 +338,34 @@ def outround_pairing_view(request,
             ]
         ]))
 
-    return render(request,
-                  "outrounds/pairing_base.html",
-                  locals())
+    context = {
+        "choice": choice,
+        "type_of_round": type_of_round,
+        "num_teams": num_teams,
+        "pairing_released": pairing_released,
+        "label": label,
+        "outround_options": outround_options,
+        "outrounds": outrounds,
+        "judges_per_panel": judges_per_panel,
+        "judge_slots": judge_slots,
+        "var_to_nov": var_to_nov,
+        "other_round_num": other_round_num,
+        "other_round_type": other_round_type,
+        "pairing_exists": pairing_exists,
+        "excluded_teams": excluded_teams,
+        "excluded_judges": excluded_judges,
+        "non_checkins": non_checkins,
+        "available_rooms": available_rooms,
+        "size": size,
+        "warning": warning,
+        "excluded_people": excluded_people,
+    }
+
+    return render(
+        request,
+        "outrounds/pairing_base.html",
+        context,
+    )
 
 
 def alternative_judges(request, round_id, judge_id=None):
@@ -388,7 +439,22 @@ def alternative_judges(request, round_id, judge_id=None):
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
     is_outround = True
 
-    return render(request, "pairing/judge_dropdown.html", locals())
+    context = {
+        "round_obj": round_obj,
+        "round_gov": round_gov,
+        "round_opp": round_opp,
+        "current_judge_id": current_judge_id,
+        "current_judge_obj": current_judge_obj,
+        "current_judge_name": current_judge_name,
+        "current_judge_rank": current_judge_rank,
+        "var_to_nov": var_to_nov,
+        "other_round_num": other_round_num,
+        "other_round_type": other_round_type,
+        "excluded_judges": excluded_judges,
+        "included_judges": included_judges,
+        "is_outround": is_outround,
+    }
+    return render(request, "pairing/judge_dropdown.html", context)
 
 
 def alternative_teams(request, round_id, current_team_id, position):
@@ -414,7 +480,19 @@ def alternative_teams(request, round_id, current_team_id, position):
         pk__in=excluded_teams
     )
 
-    return render(request, "pairing/team_dropdown.html", locals())
+    context = {
+        "round_obj": round_obj,
+        "current_team": current_team,
+        "current_team_id": current_team_id,
+        "round_id": round_id,
+        "breaking_teams_by_type": breaking_teams_by_type,
+        "excluded_teams": excluded_teams,
+        "included_teams": included_teams,
+        "position": position,
+        "is_outround": True,
+    }
+
+    return render(request, "pairing/team_dropdown.html", context)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -505,7 +583,7 @@ def enter_result(request,
     return render(
         request, "outrounds/ballot.html", {
             "form": form,
-            "title": "Entering Ballot for {}".format(round_obj),
+            "title": f"Entering Ballot for {round_obj}",
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team,
         })
@@ -556,13 +634,13 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         ).exists()]
 
         outround_pairings.append({
-            "label": "[%s] Ro%s" % ("N" if type_of_round else "V", value),
+            "label": f"[{'N' if type_of_round else 'V'}] Ro{value}",
             "rounds": Outround.objects.filter(num_teams=value,
                                               type_of_round=type_of_round),
             "excluded": excluded_teams
         })
 
-    label = "%s Outrounds Pairings" % ("Novice" if type_of_round else "Varsity",)
+    label = f"{'Novice' if type_of_round else 'Varsity'} Outrounds Pairings"
 
     round_pairing = list(round_pairing)
 
@@ -586,7 +664,24 @@ def pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)
 
-    return render(request, "outrounds/pretty_pairing.html", locals())
+    context = {
+        "gov_opp_display": gov_opp_display,
+        "round_number": round_number,
+        "type_of_round": type_of_round,
+        "round_pairing": round_pairing,
+        "outround_pairings": outround_pairings,
+        "label": label,
+        "paired_teams": paired_teams,
+        "team_count": team_count,
+        "pairing_exists": pairing_exists,
+        "sidelock": sidelock,
+        "choice": choice,
+        "debater_team_memberships_public": debater_team_memberships_public,
+        "show_outrounds_bracket": show_outrounds_bracket,
+        "bracket_data_json": bracket_data_json,
+    }
+
+    return render(request, "outrounds/pretty_pairing.html", context)
 
 
 def export_outround_pairings_csv_view(request, type_of_round=BreakingTeam.VARSITY):
@@ -624,10 +719,10 @@ def update_choice(request, outround_id):
         outround.choice = 0
 
     outround.save()
-    data = {"success": True,
-            "data": "%s choice" % (
-                outround.get_choice_display(),
-            )}
+    data = {
+        "success": True,
+        "data": f"{outround.get_choice_display()} choice",
+    }
 
     return JsonResponse(data)
 
@@ -650,34 +745,36 @@ def create_forum_view_data(type_of_round):
         to_add = {}
         to_display = outrounds.filter(num_teams=_round)
 
-        to_add["label"] = "[%s] Ro%s" % ("N" if type_of_round else "V", _round)
+        to_add["label"] = f"[{'N' if type_of_round else 'V'}] Ro{_round}"
         to_add["results"] = []
 
         for outround in to_display:
-            to_add["results"] += [
-                """[%s] %s (%s, %s) from %s%s (%s) drops to
-                [%s] %s (%s, %s) from %s%s (%s)""" % (
-                    outround.loser.breaking_team.seed,
-                    outround.loser.display,
-                    outround.loser.debaters.first().name,
-                    outround.loser.debaters.last().name,
-                    outround.loser.school.name,
-                    " / " + outround.loser.hybrid_school.name
-                    if outround.loser.hybrid_school else "",
-                    "GOV" if outround.loser == outround.gov_team else "OPP",
-                    outround.winner.breaking_team.seed,
-                    outround.winner.display,
-                    outround.winner.debaters.first().name,
-                    outround.winner.debaters.last().name,
-                    outround.winner.school.name,
-                    " / " + outround.winner.hybrid_school.name
-                    if outround.winner.hybrid_school else "",
-                    "GOV" if outround.winner == outround.gov_team else "OPP",
-                )
-            ]
+            loser = outround.loser
+            winner = outround.winner
+            loser_hybrid = (
+                f" / {loser.hybrid_school.name}" if loser.hybrid_school else ""
+            )
+            winner_hybrid = (
+                f" / {winner.hybrid_school.name}" if winner.hybrid_school else ""
+            )
+            loser_role = "GOV" if loser == outround.gov_team else "OPP"
+            winner_role = "GOV" if winner == outround.gov_team else "OPP"
+            result_str = (
+                f"[{loser.breaking_team.seed}] {loser.display} "
+                f"({loser.debaters.first().name}, {loser.debaters.last().name}) "
+                f"from {loser.school.name}{loser_hybrid} ({loser_role}) drops to\n"
+                f"[{winner.breaking_team.seed}] {winner.display} "
+                f"({winner.debaters.first().name}, {winner.debaters.last().name}) "
+                f"from {winner.school.name}{winner_hybrid} ({winner_role})"
+            )
+            to_add["results"].append(result_str)
 
         results.append(to_add)
-    return locals()
+    return {
+        "rounds": rounds,
+        "results": results,
+        "type_of_round": type_of_round,
+    }
 
 
 def forum_view(request, type_of_round):
@@ -714,7 +811,8 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
-    if round_type not in dict(Outround.TYPE_OF_ROUND_CHOICES).keys():
+    valid_round_types = dict(Outround.TYPE_OF_ROUND_CHOICES)
+    if round_type not in valid_round_types:
         return redirect_and_flash_error(request, "Invalid round type specified.")
     num_teams = Outround.objects.filter(type_of_round=round_type
                                         ).aggregate(Min("num_teams"))["num_teams__min"]

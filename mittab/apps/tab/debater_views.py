@@ -37,9 +37,9 @@ def view_debater(request, debater_id):
                     request,
                     "Debater name can't be validated. Probably a non-existent debater"
                 )
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "Debater {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"Debater {updated_name} updated successfully")
     else:
         rounds = RoundStats.objects.filter(debater=debater).select_related(
             "round__room", "round__chair").prefetch_related("round__judges")
@@ -83,10 +83,10 @@ def enter_debater(request):
                     request,
                     "Debater name cannot be validated, most likely a duplicate debater"
                 )
+            created_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
                 request,
-                "Debater {} created successfully".format(
-                    form.cleaned_data["name"]),
+                f"Debater {created_name} created successfully",
                 path="/")
     else:
         form = DebaterForm()

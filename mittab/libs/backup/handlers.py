@@ -54,13 +54,13 @@ class MysqlDumpRestorer:
         cmd = [
             "mysql",
             DB_NAME,
-            "--port={}".format(DB_PORT),
-            "--host={}".format(DB_HOST),
-            "--user={}".format(DB_USER),
+            f"--port={DB_PORT}",
+            f"--host={DB_HOST}",
+            f"--user={DB_USER}",
         ]
 
         if DB_PASS:
-            cmd.append("--password={}".format(DB_PASS))
+            cmd.append(f"--password={DB_PASS}")
 
         cmd.extend(_ssl_cmd_args())
 
@@ -73,17 +73,17 @@ class MysqlDumpRestorer:
             "--quick",
             "--lock-all-tables",
             "--complete-insert",
-            "--port={}".format(DB_PORT),
-            "--host={}".format(DB_HOST),
-            "--user={}".format(DB_USER),
+            f"--port={DB_PORT}",
+            f"--host={DB_HOST}",
+            f"--user={DB_USER}",
         ]
 
         if DB_PASS:
-            cmd.append("--password={}".format(DB_PASS))
+            cmd.append(f"--password={DB_PASS}")
 
         cmd.extend(_ssl_cmd_args())
 
         if not include_scratches:
-            cmd.append("--ignore-table={}.tab_scratch".format(DB_NAME))
+            cmd.append(f"--ignore-table={DB_NAME}.tab_scratch")
 
         return cmd

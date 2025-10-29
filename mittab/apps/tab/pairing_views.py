@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import random
 import datetime
 import os
@@ -45,32 +46,35 @@ def pair_round(request):
             emit_current_exception()
             return redirect_and_flash_error(
                 request,
-                "Could not pair next round, got error: {}".format(exp))
+                f"Could not pair next round, got error: {exp}")
         return view_status(request)
     else:
         # See if we can pair the round
-        title = "Pairing Round %s" % (current_round_number)
+        title = f"Pairing Round {current_round_number}"
         check_status = []
 
         judges = tab_logic.have_enough_judges(current_round_number)
         rooms = tab_logic.have_enough_rooms(current_round_number)
 
-        msg = "N/2 Judges checked in for Round {0}? Need {1}, have {2}".format(
-            current_round_number, judges[1][1], judges[1][0])
+        msg = (
+            f"N/2 Judges checked in for Round {current_round_number}? "
+            f"Need {judges[1][1]}, have {judges[1][0]}"
+        )
         if judges[0]:
             check_status.append((msg, "Yes", "Judges are checked in"))
         else:
             check_status.append((msg, "No", "Not enough judges"))
 
-        msg = "N/2 Rooms available Round {0}? Need {1}, have {2}".format(
-            current_round_number, rooms[1][1], rooms[1][0])
+        msg = (
+            f"N/2 Rooms available Round {current_round_number}? "
+            f"Need {rooms[1][1]}, have {rooms[1][0]}"
+        )
         if rooms[0]:
             check_status.append((msg, "Yes", "Rooms are checked in"))
         else:
             check_status.append((msg, "No", "Not enough rooms"))
 
-        msg = "All Rounds properly entered for Round %s" % (
-            current_round_number - 1)
+        msg = f"All Rounds properly entered for Round {current_round_number - 1}"
         ready_to_pair = "Yes"
         ready_to_pair_alt = "Checks passed!"
         try:
@@ -80,19 +84,30 @@ def pair_round(request):
             ready_to_pair = "No"
             ready_to_pair_alt = str(e)
             check_status.append(
-                (msg, "No", "Not all rounds are entered. %s" % str(e)))
+                (msg, "No", f"Not all rounds are entered. {e}"))
         except ByeAssignmentError as e:
             ready_to_pair = "No"
             ready_to_pair_alt = str(e)
             check_status.append(
-                (msg, "No", "You have a bye and results. %s" % str(e)))
+                (msg, "No", f"You have a bye and results. {e}"))
         except NoShowAssignmentError as e:
             ready_to_pair = "No"
             ready_to_pair_alt = str(e)
             check_status.append(
-                (msg, "No", "You have a noshow and results. %s" % str(e)))
+                (msg, "No", f"You have a noshow and results. {e}"))
 
-        return render(request, "pairing/pair_round.html", locals())
+        context = {
+            "title": title,
+            "check_status": check_status,
+            "judges": judges,
+            "rooms": rooms,
+            "ready_to_pair": ready_to_pair,
+            "ready_to_pair_alt": ready_to_pair_alt,
+            "current_round_number": current_round_number,
+            "current_round": current_round,
+        }
+
+        return render(request, "pairing/pair_round.html", context)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -194,15 +209,24 @@ def view_backup(request, filename):
     metadata = backup.get_metadata(filename)
     # metadata format: [filename, name, type, round_num, timestamp, scratches]
     name = metadata[1] if len(metadata) > 1 else "Unknown"
-    title = "Viewing Backup: {}".format(name)
-    links = [("/backup/download/{}/".format(filename), "Download Backup"),
-             ("/backup/restore/{}/".format(filename), "Restore From Backup")]
-    return render(request, "common/list_data.html", locals())
+    title = f"Viewing Backup: {name}"
+    links = [
+        (f"/backup/download/{filename}/", "Download Backup"),
+        (f"/backup/restore/{filename}/", "Restore From Backup"),
+    ]
+    context = {
+        "metadata": metadata,
+        "name": name,
+        "title": title,
+        "links": links,
+        "filename": filename,
+    }
+    return render(request, "common/list_data.html", context)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def download_backup(request, key):
-    print("Trying to download {}".format(key))
+    print(f"Trying to download {key}")
     data = backup.get_backup_content(key)
     response = HttpResponse(data, content_type="text/plain")
     filename = key.split("_")[0]
@@ -216,10 +240,12 @@ def upload_backup(request):
         form = UploadBackupForm(request.POST, request.FILES)
         if form.is_valid():
             backup.upload_backup(request.FILES["file"])
+            uploaded_name = request.FILES["file"].name
             return redirect_and_flash_success(
-                request, "Backup {} uploaded successfully".format(
-                    request.FILES["file"].name),
-                path="/pairing/view_backups/")
+                request,
+                f"Backup {uploaded_name} uploaded successfully",
+                path="/pairing/view_backups/"
+            )
         else:
             return redirect_and_flash_error(
                 request, "Error uploading backup",
@@ -424,7 +450,34 @@ def view_round(request, round_number):
             ]
         ]))
 
-    return render(request, "pairing/pairing_control.html", locals())
+    context = {
+        "errors": errors,
+        "excluded_teams": excluded_teams,
+        "tot_rounds": tot_rounds,
+        "round_pairing": round_pairing,
+        "warnings": warnings,
+        "round_info": round_info,
+        "all_judges_in_round": all_judges_in_round,
+        "judge_rejudge_counts": judge_rejudge_counts,
+        "round_number": round_number,
+        "excluded_teams_no_bye": excluded_teams_no_bye,
+        "num_excluded": num_excluded,
+        "simulate_round_button": simulate_round_button,
+        "pairing_exists": pairing_exists,
+        "pairing_released": pairing_released,
+        "judges_assigned": judges_assigned,
+        "rooms_assigned": rooms_assigned,
+        "excluded_judges": excluded_judges,
+        "non_checkins": non_checkins,
+        "available_rooms": available_rooms,
+        "size": size,
+        "warning": warning,
+        "judge_slots": judge_slots,
+        "excluded_people": excluded_people,
+        "n_over_two": n_over_two,
+        "paired_teams": paired_teams,
+    }
+    return render(request, "pairing/pairing_control.html", context)
 
 
 def alternative_judges(request, round_id, judge_id=None):
@@ -487,7 +540,23 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = sorted(included_judges, key=lambda x: -x[2])
     excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
 
-    return render(request, "pairing/judge_dropdown.html", locals())
+    context = {
+        "round_obj": round_obj,
+        "round_number": round_number,
+        "round_gov": round_gov,
+        "round_opp": round_opp,
+        "excluded_judges": excluded_judges,
+        "included_judges": included_judges,
+        "current_judge_obj": current_judge_obj,
+        "current_judge_id": current_judge_id,
+        "current_judge_rank": current_judge_rank,
+        "current_judge_name": current_judge_name,
+        "current_judge_rejudge_display": current_judge_rejudge_display,
+        "rejudge_display_counts": rejudge_display_counts,
+        "display_counts": display_counts,
+        "all_judges": all_judges,
+    }
+    return render(request, "pairing/judge_dropdown.html", context)
 
 
 def alternative_teams(request, round_id, current_team_id, position):
@@ -499,7 +568,17 @@ def alternative_teams(request, round_id, current_team_id, position):
         .exclude(pk=current_team_id)
     included_teams = Team.objects.exclude(pk__in=excluded_teams) \
         .exclude(pk=current_team_id)
-    return render(request, "pairing/team_dropdown.html", locals())
+    context = {
+        "round_obj": round_obj,
+        "current_team": current_team,
+        "current_team_id": current_team_id,
+        "round_number": round_number,
+        "round_id": round_id,
+        "excluded_teams": excluded_teams,
+        "included_teams": included_teams,
+        "position": position,
+    }
+    return render(request, "pairing/team_dropdown.html", context)
 
 
 def team_stats(request, round_number, outround=False):
@@ -637,7 +716,17 @@ def pretty_pair(request):
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    return render(request, "pairing/pairing_display.html", locals())
+    context = {
+        "errors": errors,
+        "byes": byes,
+        "round_number": round_number,
+        "round_pairing": round_pairing,
+        "paired_teams": paired_teams,
+        "team_count": team_count,
+        "pairing_exists": pairing_exists,
+        "debater_team_memberships_public": debater_team_memberships_public,
+    }
+    return render(request, "pairing/pairing_display.html", context)
 
 
 def export_pairings_csv_view(request):
@@ -664,7 +753,7 @@ def missing_ballots(request):
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
-    rounds = [(i, "Round %i" % i, 0, "")
+    rounds = [(i, f"Round {i}", 0, "")
               for i in range(1, number_of_rounds + 1)]
     return render(request, "common/list_data.html", {
         "item_type": "round",
@@ -711,10 +800,10 @@ def enter_e_ballot(request, ballot_code):
     ).first()
 
     if not judge:
-        message = """
-                    No judges with the ballot code "%s." Try submitting again, or
+        message = f"""
+                    No judges with the ballot code "{ballot_code}." Try submitting again, or
                     go to tab to resolve the issue.
-                    """ % ballot_code
+                    """
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
     else:
@@ -779,7 +868,7 @@ def enter_result(request,
     return render(
         request, "ballots/round_entry.html", {
             "form": form,
-            "title": "Entering Ballot for {}".format(round_obj),
+            "title": f"Entering Ballot for {round_obj}",
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team,
             "ballot_code": ballot_code,
@@ -819,11 +908,10 @@ def enter_multiple_results(request, round_id, num_entered):
                     if old_stats:
                         old_stats.delete()
                     debater_obj = Debater.objects.get(
-                        pk=cleaned_data["%s_debater" % (debater)])
+                        pk=cleaned_data[f"{debater}_debater"])
                     debater_role_obj = debater
-                    speaks_obj, ranks_obj = float(
-                        cleaned_data["%s_speaks" % (debater)]), int(
-                            cleaned_data["%s_ranks" % (debater)])
+                    speaks_obj = float(cleaned_data[f"{debater}_speaks"])
+                    ranks_obj = int(cleaned_data[f"{debater}_ranks"])
                     result[winner][-1].append(
                         (debater_obj, debater_role_obj, speaks_obj, ranks_obj))
             # Validate the extracted data and return it
@@ -853,7 +941,7 @@ def enter_multiple_results(request, round_id, num_entered):
     return render(
         request, "ballots/round_entry_multiple.html", {
             "forms": forms,
-            "title": "Entering Ballots for {}".format(str(round_obj)),
+            "title": f"Entering Ballots for {round_obj}",
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team
         })

@@ -28,7 +28,8 @@ limit-inference-results=100
 
  # List of plugins (as comma separated values of python modules names) to load,
 # usually to register additional checkers.
-load-plugins=pylint_django,pylint_quotes
+load-plugins=pylint_django
+django-settings-module=mittab.settings
 
  # Pickle collected data for later comparisons.
 persistent=yes
@@ -43,11 +44,6 @@ suggestion-mode=yes
  # Allow loading of arbitrary C extensions. Extensions are imported into the
 # active Python interpreter and may run arbitrary code.
 unsafe-load-any-extension=no
-
-string-quote=double
-triple-quote=double
-docstring-quote=double
-
 
 [MESSAGES CONTROL]
 
@@ -69,11 +65,7 @@ disable=print-statement,
         unpacking-in-except,
         old-raise-syntax,
         backtick,
-        long-suffix,
-        old-ne-operator,
-        old-octal-literal,
         import-star-module-level,
-        non-ascii-bytes-literal,
         raw-checker-failed,
         bad-inline-option,
         locally-disabled,
@@ -121,7 +113,6 @@ disable=print-statement,
         range-builtin-not-iterating,
         filter-builtin-not-iterating,
         using-cmp-argument,
-        eq-without-hash,
         div-method,
         idiv-method,
         rdiv-method,
@@ -144,9 +135,8 @@ disable=print-statement,
         exception-escape,
         comprehension-escape,
         missing-docstring,
-        modelform-uses-exclude,
-        possibly-unused-variable, # because some views use locals(), should also change
         broad-except,
+        modelform-uses-exclude,
         R,
         wildcard-import,       # should add back eventually, after everything else is good
         unused-wildcard-import # should add back eventually, after everything else is good
@@ -335,13 +325,6 @@ max-line-length=88
 
  # Maximum number of lines in a module.
 max-module-lines=1000
-
- # List of optional constructs for which whitespace checking is disabled. `dict-
-# separator` is used to allow tabulation in dicts, etc.: {1  : 1,\n222: 2}.
-# `trailing-comma` allows a space between comma and closing bracket: (a, ).
-# `empty-line` allows space-only lines.
-no-space-check=trailing-comma,
-               dict-separator
 
  # Allow the body of a class to be on the same line as the declaration if body
 # contains single statement.
@@ -575,11 +558,3 @@ max-statements=50
 
  # Minimum number of public methods for a class (see R0903).
 min-public-methods=2
-
-
-[EXCEPTIONS]
-
- # Exceptions that will emit a warning when being caught. Defaults to
-# "BaseException, Exception".
-overgeneral-exceptions=BaseException,
-                       Exception

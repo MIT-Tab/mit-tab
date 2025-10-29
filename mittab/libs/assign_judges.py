@@ -108,9 +108,12 @@ def add_judges():
     if bubble_priority and round_number > 1:
         bubble_rounds = [p for p in pairings if is_bubble_round(p, round_number)]
         non_bubble_rounds = [p for p in pairings if p not in bubble_rounds]
-        sort_key = lambda pairing: tab_logic.team_comp(pairing, round_number)
-        bubble_rounds.sort(key=sort_key, reverse=True)
-        non_bubble_rounds.sort(key=sort_key, reverse=True)
+
+        def pairing_sort_key(pairing):
+            return tab_logic.team_comp(pairing, round_number)
+
+        bubble_rounds.sort(key=pairing_sort_key, reverse=True)
+        non_bubble_rounds.sort(key=pairing_sort_key, reverse=True)
         pairings = bubble_rounds + non_bubble_rounds
     else:
         pairings.sort(
@@ -181,7 +184,7 @@ def add_judges():
                 )
             else:
                 raise errors.JudgeAssignmentError(
-                    "Could not find a judge for: %s" % str(bad_pairing)
+                    f"Could not find a judge for: {bad_pairing}"
                 )
         else:
             raise errors.JudgeAssignmentError()

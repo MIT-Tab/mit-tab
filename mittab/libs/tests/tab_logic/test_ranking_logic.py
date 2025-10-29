@@ -31,7 +31,7 @@ class TestRankingLogic(TestCase):
         assert len(expected_scores) == len(actual_scores)
         for name, actual_score in actual_scores.items():
             left, right = actual_score, expected_scores[name]
-            msg = "{} - actual: {}, expected {}".format(name, left, right)
+            msg = f"{name} - actual: {left}, expected {right}"
             [
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)
@@ -49,8 +49,7 @@ class TestRankingLogic(TestCase):
         assert len(actual_scores) == len(expected_scores)
         for team_name, actual_score in actual_scores.items():
             left, right = actual_score, expected_scores[team_name]
-            msg = "{} - actual: {}, expected: {}".format(
-                team_name, left, right)
+            msg = f"{team_name} - actual: {left}, expected: {right}"
             [
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)

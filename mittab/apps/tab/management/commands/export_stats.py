@@ -50,7 +50,7 @@ class Command(BaseCommand):
                 tab_logic.tot_ranks_deb(debater))
 
     def write_to_csv(self, filename, headers, rows):
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(headers)
             writer.writerows(rows)
