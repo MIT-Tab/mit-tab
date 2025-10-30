@@ -33,22 +33,22 @@ class PairingARoundTestCase(BaseWebTestCase):
             winner="OPP",
             pm={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 1
             },
             mg={
                 "first": False,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 2
             },
             lo={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 3
             },
             mo={
                 "first": False,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 4
             },
         )
@@ -59,22 +59,22 @@ class PairingARoundTestCase(BaseWebTestCase):
             winner="GOV",
             pm={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 1
             },
             mg={
                 "first": False,
-                "speaks": 25,
+                "speaks": 27,
                 "ranks": 4
             },
             lo={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 2
             },
             mo={
                 "first": False,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 3
             },
         )
@@ -85,22 +85,22 @@ class PairingARoundTestCase(BaseWebTestCase):
             winner="GOV",
             pm={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 1
             },
             mg={
                 "first": False,
-                "speaks": 25,
+                "speaks": 27,
                 "ranks": 2
             },
             lo={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 3
             },
             mo={
                 "first": False,
-                "speaks": 25,
+                "speaks": 27,
                 "ranks": 4
             },
         )
@@ -138,28 +138,103 @@ class PairingARoundTestCase(BaseWebTestCase):
             winner="GOV",
             pm={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 1
             },
             mg={
                 "first": False,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 2
             },
             lo={
                 "first": True,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 3
             },
             mo={
                 "first": False,
-                "speaks": 26,
+                "speaks": 28,
                 "ranks": 4
             },
         )
 
         assert self._wait_for_text("Result entered successfully")
         assert self._wait_for_text("GOV win")
+
+    def test_speaks_warnings(self):
+        """Test that high and low speaks trigger warnings via JavaScript"""
+        self._login()
+        self._visit("/pairings/status")
+
+        self.browser.find_by_xpath("//a[contains(normalize-space(), 'Prepare Next Round')]").first.click()
+        self.browser.find_by_xpath("//*[@value='Pair This Round']").first.click()
+
+        time.sleep(10)
+        self.browser.find_by_xpath("//*[@id='assign-judges']").first.click()
+        self._accept_confirm()
+
+        assert self._wait_for_text("Round Status for Round 1")
+        self.browser.find_by_xpath("//*[text()='Enter Ballot']").first.click()
+
+        # Test high speaks warning (34 and above)
+        self._wait()
+        self.browser.find_by_xpath("//option[text()='GOV']").first.click()
+        
+        # Fill in debaters
+        self.browser.find_by_xpath('//select[@name="pm_debater"]/option[2]').first.click()
+        self.browser.find_by_xpath('//select[@name="mg_debater"]/option[3]').first.click()
+        self.browser.find_by_xpath('//select[@name="lo_debater"]/option[2]').first.click()
+        self.browser.find_by_xpath('//select[@name="mo_debater"]/option[3]').first.click()
+        
+        # Enter very high speaks (should trigger warning)
+        self.browser.select("pm_ranks", 1)
+        self.browser.fill("pm_speaks", 35)
+        self.browser.select("mg_ranks", 2)
+        self.browser.fill("mg_speaks", 28)
+        self.browser.select("lo_ranks", 3)
+        self.browser.fill("lo_speaks", 28)
+        self.browser.select("mo_ranks", 4)
+        self.browser.fill("mo_speaks", 28)
+        
+        self.browser.find_by_xpath("//*[@value='Save']").first.click()
+        
+        # Should get a JavaScript confirm dialog about high speaks
+        # Accept it to proceed
+        self._accept_confirm()
+        
+        assert self._wait_for_text("Result entered successfully")
+        assert self._wait_for_text("GOV win")
+        
+        # Enter another ballot to test low speaks
+        self.browser.find_by_xpath("//*[text()='Enter Ballot']")[1].click()
+        
+        self._wait()
+        self.browser.find_by_xpath("//option[text()='OPP']").first.click()
+        
+        # Fill in debaters
+        self.browser.find_by_xpath('//select[@name="pm_debater"]/option[2]').first.click()
+        self.browser.find_by_xpath('//select[@name="mg_debater"]/option[3]').first.click()
+        self.browser.find_by_xpath('//select[@name="lo_debater"]/option[2]').first.click()
+        self.browser.find_by_xpath('//select[@name="mo_debater"]/option[3]').first.click()
+        
+        # Enter very low speaks (should trigger warning)
+        self.browser.select("pm_ranks", 4)
+        self.browser.fill("pm_speaks", 28)
+        self.browser.select("mg_ranks", 3)
+        self.browser.fill("mg_speaks", 28)
+        self.browser.select("lo_ranks", 1)
+        self.browser.fill("lo_speaks", 24)
+        self.browser.select("mo_ranks", 2)
+        self.browser.fill("mo_speaks", 28)
+        
+        self.browser.find_by_xpath("//*[@value='Save']").first.click()
+        
+        # Should get a JavaScript confirm dialog about low speaks
+        # Accept it to proceed
+        self._accept_confirm()
+        
+        assert self._wait_for_text("Result entered successfully")
+        assert self._wait_for_text("OPP win")
 
     def _enter_results(self, **results):
         """
