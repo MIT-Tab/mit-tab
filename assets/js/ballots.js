@@ -11,7 +11,7 @@ function checkSpeaksWarnings(form) {
   const settings = window.speakSettings || {
     warnJudgesAboutSpeaks: true,
     lowSpeakWarningThreshold: 25,
-    highSpeakWarningThreshold: 34
+    highSpeakWarningThreshold: 34,
   };
 
   // If warnings are disabled, proceed
@@ -20,26 +20,35 @@ function checkSpeaksWarnings(form) {
   }
 
   // Check the four hardcoded speaker fields
-  const pmSpeaks = parseFloat($(form).find('#id_pm_speaks').val());
-  const mgSpeaks = parseFloat($(form).find('#id_mg_speaks').val());
-  const loSpeaks = parseFloat($(form).find('#id_lo_speaks').val());
-  const moSpeaks = parseFloat($(form).find('#id_mo_speaks').val());
+  const pmSpeaks = parseFloat($(form).find("#id_pm_speaks").val());
+  const mgSpeaks = parseFloat($(form).find("#id_mg_speaks").val());
+  const loSpeaks = parseFloat($(form).find("#id_lo_speaks").val());
+  const moSpeaks = parseFloat($(form).find("#id_mo_speaks").val());
 
   const speaks = [pmSpeaks, mgSpeaks, loSpeaks, moSpeaks];
-  
-  const highSpeaks = speaks.filter(s => s >= settings.highSpeakWarningThreshold);
-  const lowSpeaks = speaks.filter(s => s <= settings.lowSpeakWarningThreshold);
+
+  const highSpeaks = speaks.filter(
+    (s) => s >= settings.highSpeakWarningThreshold,
+  );
+  const lowSpeaks = speaks.filter(
+    (s) => s <= settings.lowSpeakWarningThreshold,
+  );
 
   if (highSpeaks.length > 0 || lowSpeaks.length > 0) {
-    let message = '';
+    let message = "";
     if (highSpeaks.length > 0) {
-      message += 'Please note: you have entered some very high speaks (' + highSpeaks.join(', ') + ').\n\n';
+      message += `Please note: you have entered some very high speaks (${highSpeaks.join(
+        ", ",
+      )}).\n\n`;
     }
     if (lowSpeaks.length > 0) {
-      message += 'Please note: you have entered some very low speaks (' + lowSpeaks.join(', ') + ').\n\n';
+      message += `Please note: you have entered some very low speaks (${lowSpeaks.join(
+        ", ",
+      )}).\n\n`;
     }
-    message += 'If you are confident in these scores, you may proceed with submission. Otherwise, please review the speaker scale guide.\n\nProceed with ballot?';
-    
+    message +=
+      "If you are confident in these scores, you may proceed with submission. Otherwise, please review the speaker scale guide.\n\nProceed with ballot?";
+
     return window.confirm(message);
   }
 
@@ -57,9 +66,9 @@ function ballotsInit() {
 
     if (pmDebater && mgDebater && loDebater && moDebater) {
       if (pmDebater === mgDebater || loDebater === moDebater) {
-        if (!window.confirm(
-          "You appear to have an iron man, is this correct?",
-        )) {
+        if (
+          !window.confirm("You appear to have an iron man, is this correct?")
+        ) {
           return false;
         }
       }
