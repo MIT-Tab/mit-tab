@@ -1,7 +1,7 @@
 from django.http import HttpResponse
 from django.shortcuts import render
 
-from mittab.apps.tab.forms import JudgeForm, ScratchForm
+from mittab.apps.tab.forms import JudgeForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
@@ -103,8 +103,7 @@ def view_judge(request, judge_id):
         form = JudgeForm(instance=judge)
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
             "gov_team", "opp_team", "room"))
-    base_url = f"/judge/{judge_id}/"
-    scratch_url = f"{base_url}scratches/view/"
+    scratch_url = f"/scratches/judge/{judge_id}/"
     links = [(scratch_url, f"Scratches for {judge.name}")]
     return render(
         request, "tab/judge_detail.html", {
@@ -136,105 +135,6 @@ def enter_judge(request):
         "title": "Create Judge"
     })
 
-
-def add_scratches(request, judge_id, number_scratches):
-    try:
-        judge_id, number_scratches = int(judge_id), int(number_scratches)
-    except ValueError:
-        return redirect_and_flash_error(request, "Got invalid data")
-    try:
-        judge = Judge.objects.get(pk=judge_id)
-    except Judge.DoesNotExist:
-        return redirect_and_flash_error(request, "No such judge")
-
-    if request.method == "POST":
-        forms = [
-            ScratchForm(request.POST, prefix=str(i))
-            for i in range(1, number_scratches + 1)
-        ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
-            for form in forms:
-                form.save()
-            return redirect_and_flash_success(
-                request, "Scratches created successfully")
-    else:
-        forms = [
-            ScratchForm(
-                prefix=str(i),
-                initial={
-                    "judge": judge_id,
-                    "scratch_type": 0
-                }
-            )
-            for i in range(1, number_scratches + 1)
-        ]
-    return render(
-        request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, [None] * len(forms))),
-            "data_type": "Scratch",
-            "title": f"Adding Scratch(es) for {judge.name}"
-        })
-
-
-def view_scratches(request, judge_id):
-    try:
-        judge_id = int(judge_id)
-    except ValueError:
-        return redirect_and_flash_error(request, "Received invalid data")
-
-    judge = Judge.objects.prefetch_related(
-        "scratches", "scratches__judge", "scratches__team"
-    ).get(pk=judge_id)
-    scratches = judge.scratches.all()
-
-    all_teams = Team.objects.all()
-    all_judges = Judge.objects.all()
-
-    if request.method == "POST":
-        forms = [
-            ScratchForm(
-                request.POST,
-                prefix=str(i + 1),
-                instance=scratches[i],
-                team_queryset=all_teams,
-                judge_queryset=all_judges
-            )
-            for i in range(len(scratches))
-        ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
-            for form in forms:
-                form.save()
-            return redirect_and_flash_success(
-                request, "Scratches created successfully")
-    else:
-        forms = [
-            ScratchForm(
-                prefix=str(i + 1),
-                instance=scratches[i],
-                team_queryset=all_teams,
-                judge_queryset=all_judges
-            )
-            for i in range(len(scratches))
-        ]
-    delete_links = [
-        f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
-    ]
-    links = [(f"/judge/{judge_id}/scratches/add/1/", "Add Scratch")]
-
-    return render(
-        request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, delete_links)),
-            "data_type": "Scratch",
-            "links": links,
-            "title": f"Viewing Scratch Information for {judge.name}"
-        })
 
 def download_judge_codes(request):
     codes = [

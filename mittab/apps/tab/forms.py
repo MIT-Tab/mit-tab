@@ -231,6 +231,46 @@ class ScratchForm(forms.ModelForm):
         exclude = ["team", "judge"]
 
 
+class JudgeJudgeScratchForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        judge_queryset = kwargs.pop("judge_queryset", Judge.objects.all())
+        super().__init__(*args, **kwargs)
+        self.fields["judge_one"].queryset = judge_queryset
+        self.fields["judge_two"].queryset = judge_queryset
+
+    def clean(self):
+        cleaned_data = super().clean()
+        judge_one = cleaned_data.get("judge_one")
+        judge_two = cleaned_data.get("judge_two")
+        if judge_one and judge_two and judge_one == judge_two:
+            raise forms.ValidationError("Pick two different judges")
+        return cleaned_data
+
+    class Meta:
+        model = JudgeJudgeScratch
+        fields = "__all__"
+
+
+class TeamTeamScratchForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        team_queryset = kwargs.pop("team_queryset", Team.objects.all())
+        super().__init__(*args, **kwargs)
+        self.fields["team_one"].queryset = team_queryset
+        self.fields["team_two"].queryset = team_queryset
+
+    def clean(self):
+        cleaned_data = super().clean()
+        team_one = cleaned_data.get("team_one")
+        team_two = cleaned_data.get("team_two")
+        if team_one and team_two and team_one == team_two:
+            raise forms.ValidationError("Pick two different teams")
+        return cleaned_data
+
+    class Meta:
+        model = TeamTeamScratch
+        fields = "__all__"
+
+
 class DebaterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(DebaterForm, self).__init__(*args, **kwargs)

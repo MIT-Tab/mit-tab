@@ -90,6 +90,15 @@ def add_judges():
         )
     )
 
+    judge_pair_blocks = {}
+    for judge_one_id, judge_two_id in JudgeJudgeScratch.objects.values_list(
+        "judge_one_id", "judge_two_id"
+    ):
+        judge_pair_blocks.setdefault(judge_one_id, set()).add(judge_two_id)
+        judge_pair_blocks.setdefault(judge_two_id, set()).add(judge_one_id)
+    for judge in all_judges:
+        judge.panel_scratch_ids = judge_pair_blocks.get(judge.id, set())
+
     # Sort all_judges once before creating filtered subsets
     random.seed(1337)
     random.shuffle(all_judges)
@@ -128,6 +137,7 @@ def add_judges():
     if settings.allow_rejudges:
         rejudge_counts = judge_team_rejudge_counts(chairs, all_teams)
 
+    panel_members_by_pair = [set() for _ in range(num_rounds)]
     graph_edges = []
     for chair_i, chair in enumerate(chairs):
         chair_score = chair_scores[chair_i]
@@ -200,6 +210,7 @@ def add_judges():
         round_obj.chair = chair
         chair_by_pairing[pairing_i] = chair_i
         assigned_judge_objects.add(chair.id)  # Track by judge ID
+        panel_members_by_pair[pairing_i].add(chair.id)
         judge_round_joins.append(
             Round.judges.through(judge=chair, round=round_obj)
         )
@@ -226,6 +237,11 @@ def add_judges():
                 judge_score = wing_judge_scores[wing_judge_i]
                 for pairing_i in pairing_indices:
                     pairing = pairings[pairing_i]
+                    if judge.panel_scratch_ids and any(
+                        blocked_id in panel_members_by_pair[pairing_i]
+                        for blocked_id in judge.panel_scratch_ids
+                    ):
+                        continue
                     has_conflict = judge_conflict(
                         judge,
                         pairing.gov_team,
@@ -269,6 +285,11 @@ def add_judges():
                 judge = wing_judges[wing_judge_i]
                 if judge.id in assigned_judge_objects:
                     continue
+                if judge.panel_scratch_ids and any(
+                    blocked_id in panel_members_by_pair[pairing_i]
+                    for blocked_id in judge.panel_scratch_ids
+                ):
+                    continue
                 judge_round_joins.append(
                     Round.judges.through(
                         judge=judge,
@@ -276,6 +297,7 @@ def add_judges():
                     )
                 )
                 assigned_judge_objects.add(judge.id)
+                panel_members_by_pair[pairing_i].add(judge.id)
 
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
@@ -300,6 +322,14 @@ def add_outround_judges(round_type=Outround.VARSITY):
             "scratches",
         )
     )
+    judge_pair_blocks = {}
+    for judge_one_id, judge_two_id in JudgeJudgeScratch.objects.values_list(
+        "judge_one_id", "judge_two_id"
+    ):
+        judge_pair_blocks.setdefault(judge_one_id, set()).add(judge_two_id)
+        judge_pair_blocks.setdefault(judge_two_id, set()).add(judge_one_id)
+    for judge in judges:
+        judge.panel_scratch_ids = judge_pair_blocks.get(judge.id, set())
     pairings = tab_logic.sorted_pairings(num_teams, outround=True)
     pairings = [p for p in pairings if p.type_of_round == round_type]
     # Try to have consistent ordering with the round display
@@ -326,6 +356,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
     num_rounds = len(pairings)
     judge_round_joins, available_indices = [], list(range(len(judges)))
     snake_draft_mode = settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
+    panel_members_by_pair = [set() for _ in range(num_rounds)]
 
     # Iterate once for each member of the panel
     for panel_member in range(settings.panel_size):
@@ -333,6 +364,11 @@ def add_outround_judges(round_type=Outround.VARSITY):
         for judge_i in available_indices:
             judge = judges[judge_i]
             for pairing_i, pairing in enumerate(pairings):
+                if judge.panel_scratch_ids and any(
+                    blocked_id in panel_members_by_pair[pairing_i]
+                    for blocked_id in judge.panel_scratch_ids
+                ):
+                    continue
                 has_conflict = judge_conflict(
                     judge,
                     pairing.gov_team,
@@ -380,6 +416,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
             if panel_member == 0:
                 round_obj.chair = judge
 
+            panel_members_by_pair[pairing_i].add(judge.id)
             judge_round_joins.append(link_outround(judge=judge, outround=round_obj))
             available_indices.remove(judge_i)
 

@@ -511,9 +511,19 @@ def perfect_pairing(list_of_teams):
     """Uses the mwmatching library to assign teams in a pairing"""
     graph_edges = []
     weights = get_weights()
+    scratched_pairs = {
+        (team_one, team_two)
+        for team_one, team_two in TeamTeamScratch.objects.values_list(
+            "team_one_id", "team_two_id"
+        )
+    }
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
+                if team1.id and team2.id:
+                    pair_key = (min(team1.id, team2.id), max(team1.id, team2.id))
+                    if pair_key in scratched_pairs:
+                        continue
                 weight = calc_weight(
                     team1,
                     team2,

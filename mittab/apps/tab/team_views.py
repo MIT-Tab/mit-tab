@@ -1,8 +1,11 @@
+from urllib.parse import urlencode
+
 from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
+from django.urls import reverse
 
-from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.apps.tab.forms import TeamForm, TeamEntryForm
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -113,9 +116,12 @@ def enter_team(request):
                 )
             num_forms = form.cleaned_data["number_scratches"]
             if num_forms > 0:
-                return HttpResponseRedirect(
-                    f"/team/{team.pk}/scratches/add/{num_forms}"
-                )
+                query = urlencode({
+                    "team_id": team.pk,
+                    "tab": "judge_team",
+                    "count": num_forms,
+                })
+                return HttpResponseRedirect(f"{reverse('add_scratch')}?{query}")
             else:
                 team_name = team.display_backend
                 return redirect_and_flash_success(
@@ -128,109 +134,6 @@ def enter_team(request):
         "form": form,
         "title": "Create Team"
     })
-
-
-def add_scratches(request, team_id, number_scratches):
-    try:
-        team_id, number_scratches = int(team_id), int(number_scratches)
-    except ValueError:
-        return redirect_and_flash_error(request, "Received invalid data")
-    try:
-        team = Team.objects.get(pk=team_id)
-    except Team.DoesNotExist:
-        return redirect_and_flash_error(request,
-                                        "The selected team does not exist")
-    all_teams = Team.objects.all()
-    all_judges = Judge.objects.all()
-    if request.method == "POST":
-        forms = [
-            ScratchForm(
-                request.POST,
-                prefix=str(
-                    i + 1),
-                team_queryset=all_teams,
-                judge_queryset=all_judges)
-            for i in range(number_scratches)
-        ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
-            for form in forms:
-                form.save()
-            return redirect_and_flash_success(
-                request, "Scratches created successfully")
-    else:
-        forms = [
-            ScratchForm(
-                prefix=str(i),
-                initial={
-                    "team": team_id,
-                    "scratch_type": 0
-                },
-                team_queryset=all_teams,
-                judge_queryset=all_judges
-            ) for i in range(1, number_scratches + 1)
-        ]
-    return render(
-        request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, [None] * len(forms))),
-            "data_type": "Scratch",
-            "title": f"Adding Scratch(es) for {team.display_backend}"
-        })
-
-
-def view_scratches(request, team_id):
-    try:
-        team_id = int(team_id)
-    except ValueError:
-        return redirect_and_flash_error(request, "Received invalid data")
-    scratches = Scratch.objects.filter(team=team_id)
-    number_scratches = len(scratches)
-    team = Team.objects.get(pk=team_id)
-    all_teams = Team.objects.all()
-    all_judges = Judge.objects.all()
-    if request.method == "POST":
-        forms = [
-            ScratchForm(
-                request.POST,
-                prefix=str(i + 1),
-                instance=scratches[i],
-                team_queryset=all_teams,
-                judge_queryset=all_judges
-            )
-            for i in range(number_scratches)
-        ]
-        all_good = True
-        for form in forms:
-            all_good = all_good and form.is_valid()
-        if all_good:
-            for form in forms:
-                form.save()
-            return redirect_and_flash_success(
-                request, "Scratches successfully modified")
-    else:
-        forms = [
-            ScratchForm(
-                prefix=str(i + 1),
-                instance=scratches[i],
-                team_queryset=all_teams,
-                judge_queryset=all_judges
-            )
-            for i in range(len(scratches))
-        ]
-    delete_links = [
-        f"/team/{team_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
-    ]
-    links = [(f"/team/{team_id}/scratches/add/1/", "Add Scratch")]
-    return render(
-        request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, delete_links)),
-            "data_type": "Scratch",
-            "links": links,
-            "title": f"Viewing Scratch Information for {team.display_backend}"
-        })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
