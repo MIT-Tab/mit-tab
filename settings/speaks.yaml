@@ -1,0 +1,36 @@
+category:
+  name: "Speaker Points"
+  description: "Configure speaker point scales, thresholds, and warnings"
+  id: "speaks"
+  order: 4
+
+settings:
+  - min_speak:
+    name: min_speak
+    description: "The absolute minimum speaker score allowed in the tournament even with justification (used for validation)"
+    value: 0
+  - max_speak:
+    name: max_speak
+    description: "The absolute maximum speaker score allowed in the tournament, even with justification (used for validation)"
+    value: 50
+  - min_eballot_speak:
+    name: min_eballot_speak
+    description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
+    value: 15
+  - max_eballot_speak:
+    name: max_eballot_speak
+    description: "The maximum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 35, a 35 does not have to be justified to tab staff but a 36 does"
+    value: 35
+  - low_speak_warning_threshold:
+    name: low_speak_warning_threshold
+    description: "The threshold for low speaker scores. Judges will be warned when submitting speaks at or below this value"
+    value: 25
+  - high_speak_warning_threshold:
+    name: high_speak_warning_threshold
+    description: "The threshold for high speaker scores. Judges will be warned when submitting speaks at or above this value"
+    value: 34
+  - warn_judges_about_speaks:
+    name: warn_judges_about_speaks
+    description: "When enabled, judges will receive a warning popup when submitting speaks above the high threshold or below the low threshold, and must confirm before proceeding"
+    value: true
+    type: boolean

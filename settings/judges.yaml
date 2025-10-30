@@ -10,14 +10,6 @@ settings:
     description: "Toggle to indicate whether or not rejudges are allowed. When enabled, assign judges will try to assign judges without rejudging, but will allow for rejudges if necessary."
     value: false
     type: boolean
-  - max_eballot_speak:
-    name: max_eballot_speak
-    description: "The maximum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 35, a 35 does not have to be justified to tab staff but a 36 does"
-    value: 35
-  - min_eballot_speak:
-    name: min_eballot_speak
-    description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
-    value: 15
   - judge_pairing_mode:
     name: judge_pairing_mode
     description: "Choose the judge pairing method. 'Default' assigns top judges to the highest-ranked rounds. 'Classic' uses the traditional weighting used from 2019-September 2025."
