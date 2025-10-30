@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
+from django.contrib import messages
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
@@ -108,6 +109,69 @@ def pair_round(request):
         }
 
         return render(request, "pairing/pair_round.html", context)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def re_pair_round(request):
+    """
+    Re-pair the current round by clearing existing pairings and
+    re-running the pairing algorithm.
+    This is a safe operation that:
+    1. Backs up the current state
+    2. Clears Round, Bye, and NoShow objects for the current round
+    3. Decrements cur_round temporarily
+    4. Re-runs the pairing algorithm which will re-increment cur_round
+    """
+    cache_logic.clear_cache()
+    current_round_obj = TabSettings.objects.get(key="cur_round")
+    current_round_number = current_round_obj.value - 1
+
+    if current_round_number < 1:
+        return redirect_and_flash_error(
+            request,
+            "No round has been paired yet to re-pair"
+        )
+
+    if request.method == "POST":
+        try:
+            backup_name = (
+                f"round_{current_round_number}_before_repairing"
+            )
+            backup.backup_round(
+                btype=backup.OTHER,
+                round_number=current_round_number,
+                name=backup_name,
+            )
+
+            with transaction.atomic():
+                tab_logic.clear_current_round_pairing()
+
+                # Decrement cur_round so pair_round() will pair for same round
+                current_round_obj.value = current_round_number
+                current_round_obj.save()
+
+                # Re-run the pairing algorithm
+                tab_logic.pair_round()
+                current_round_obj.value = current_round_obj.value + 1
+                current_round_obj.save()
+
+            # Add success message and redirect to view_status
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                f"Successfully re-paired round {current_round_number}"
+            )
+            return view_status(request)
+        except Exception as exp:
+            emit_current_exception()
+            return redirect_and_flash_error(
+                request,
+                f"Could not re-pair round, got error: {exp}"
+            )
+
+    return render(request, "pairing/confirm_re_pair.html", {
+        "round_number": current_round_number,
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
