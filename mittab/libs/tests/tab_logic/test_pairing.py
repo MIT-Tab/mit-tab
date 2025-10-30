@@ -1,5 +1,3 @@
-import random
-
 from django.db import transaction
 from django.test import TestCase
 import pytest
@@ -36,9 +34,6 @@ class TestPairingLogic(TestCase):
         current_round = TabSettings.objects.get(key="cur_round")
         round_to_pair = current_round.value
 
-        # Ensure we have enough judges/rooms checked in for the upcoming round
-        self.generate_checkins(round_number=round_to_pair)
-
         cache_logic.clear_cache()
         tab_logic.pair_round()
 
@@ -47,38 +42,26 @@ class TestPairingLogic(TestCase):
         current_round.save()
         return round_to_pair
 
-    def generate_checkins(self, round_number=None):
-        if round_number is None:
-            round_number = self.round_number()
+    def generate_checkins(self, round_number):
+        CheckIn.objects.all().delete()
+        RoomCheckIn.objects.all().delete()
 
-        teams_checked_in = Team.objects.filter(checked_in=True).count()
-        desired_pairings = max(1, teams_checked_in // 2) if teams_checked_in else 0
-        desired_judges = desired_pairings
-        checkin_count = CheckIn.objects.filter(round_number=round_number).count()
-
-        available = Judge.objects.exclude(judges__round_number=round_number)
-        available = available.exclude(checkin__round_number=round_number)
-        available = list(available)
-        random.shuffle(available)
-        if checkin_count < desired_judges:
-            num_to_checkin = desired_judges - checkin_count
-            judges_to_checkin = available[:num_to_checkin]
-            for judge in judges_to_checkin:
-                CheckIn.objects.get_or_create(
-                    judge=judge, round_number=round_number)
-
-        room_checkins = RoomCheckIn.objects.filter(round_number=round_number).count()
-        if room_checkins < desired_pairings:
-            rooms_needed = desired_pairings - room_checkins
-            available_rooms = (
-                Room.objects.exclude(roomcheckin__round_number=round_number)
-                .order_by("-rank", "id")
-            )[:rooms_needed]
-            for room in available_rooms:
-                RoomCheckIn.objects.create(room=room, round_number=round_number)
+        judges = list(Judge.objects.all())
+        rooms = list(Room.objects.all())
+        checkins = [
+            CheckIn(judge=j, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for j in judges
+        ]
+        room_checkins = [
+            RoomCheckIn(room=r, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for r in rooms
+        ]
+        CheckIn.objects.bulk_create(checkins)
+        RoomCheckIn.objects.bulk_create(room_checkins)
 
     def assign_judges_to_pairing(self):
-        self.generate_checkins()
         assign_judges.add_judges()
 
     def assign_rooms_to_pairing(self):
@@ -107,8 +90,11 @@ class TestPairingLogic(TestCase):
         data.
         """
         last_round = 6
+        TabSettings.set("cur_round", 1)
+        self.generate_checkins(last_round)
         for _ in range(1, last_round):
-            self.check_pairing(self.round_number(), last_round)
+            round_number = self.round_number()
+            self.check_pairing(round_number, last_round)
 
     # --- Re-pair workflow helpers/tests ---
 

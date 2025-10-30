@@ -94,7 +94,7 @@ def pair_round():
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print(("Pairing %s into the middle of the %s-win bracket" % (team, wins)))
+            print(f"Pairing {team} into the middle of the {wins}-win bracket")
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
@@ -185,12 +185,12 @@ def pair_round():
             temp = perfect_pairing(list_of_teams)
         else:
             temp = perfect_pairing(list_of_teams[bracket])
-            print("Pairing bracket %i of size %i" % (bracket, len(temp)))
+            print(f"Pairing bracket {bracket} of size {len(temp)}")
         for pair in temp:
             pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
-        random.shuffle(pairings, random=random.random)
+        random.shuffle(pairings)
         pairings = sorted(
             pairings, key=lambda team: highest_seed(team[0], team[1]), reverse=True
         )
@@ -257,11 +257,11 @@ def have_properly_entered_data(round_to_check):
         for team in gov_team, opp_team:
             if team.id in prev_round_byes:
                 raise errors.ByeAssignmentError(
-                    "{} both had a bye and debated last round".format(team)
+                    f"{team} both had a bye and debated last round"
                 )
             if team.id in prev_round_noshows:
                 raise errors.NoShowAssignmentError(
-                    "{} both debated and had a no show".format(team)
+                    f"{team} both debated and had a no show"
                 )
 
 

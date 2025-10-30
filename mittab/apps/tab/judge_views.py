@@ -28,7 +28,7 @@ def view_judges(request):
     # Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
+    checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
     checked_in_judges = set([c.judge for c in checkins])
     checked_in_judges_next = set([c.judge for c in checkins_next])
 
@@ -96,9 +96,9 @@ def view_judge(request, judge_id):
             except ValueError:
                 return redirect_and_flash_error(
                     request, "Judge information cannot be validated")
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "Judge {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"Judge {updated_name} updated successfully")
     else:
         form = JudgeForm(instance=judge)
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
@@ -124,10 +124,10 @@ def enter_judge(request):
             except ValueError:
                 return redirect_and_flash_error(request,
                                                 "Judge cannot be validated")
+            created_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
                 request,
-                "Judge {} created successfully".format(
-                    form.cleaned_data["name"]),
+                f"Judge {created_name} created successfully",
                 path="/")
     else:
         form = JudgeForm(first_entry=True)
@@ -175,7 +175,7 @@ def add_scratches(request, judge_id, number_scratches):
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, [None] * len(forms))),
             "data_type": "Scratch",
-            "title": "Adding Scratch(es) for %s" % (judge.name)
+            "title": f"Adding Scratch(es) for {judge.name}"
         })
 
 
@@ -223,17 +223,17 @@ def view_scratches(request, judge_id):
             for i in range(len(scratches))
         ]
     delete_links = [
-        "/judge/" + str(judge_id) + "/scratches/delete/" + str(scratches[i].id)
+        f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
         for i in range(len(scratches))
     ]
-    links = [("/judge/" + str(judge_id) + "/scratches/add/1/", "Add Scratch")]
+    links = [(f"/judge/{judge_id}/scratches/add/1/", "Add Scratch")]
 
     return render(
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, delete_links)),
             "data_type": "Scratch",
             "links": links,
-            "title": "Viewing Scratch Information for %s" % (judge.name)
+            "title": f"Viewing Scratch Information for {judge.name}"
         })
 
 def download_judge_codes(request):

@@ -1,12 +1,7 @@
 import $ from "jquery";
 
 $.expr[":"].Contains = (a, i, m) => {
-  return (
-    $(a)
-      .text()
-      .toUpperCase()
-      .indexOf(m[3].toUpperCase()) >= 0
-  );
+  return $(a).text().toUpperCase().indexOf(m[3].toUpperCase()) >= 0;
 };
 
 function filter(matchingText) {
@@ -22,7 +17,7 @@ function quickSearchInit(elem) {
 
   $(searchElem)
     .off("keyup")
-    .on("keyup", e => {
+    .on("keyup", (e) => {
       if ($(e.target).val()) {
         filter($(e.target).val());
       } else {

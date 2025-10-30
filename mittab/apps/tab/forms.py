@@ -47,10 +47,11 @@ class RoomForm(forms.ModelForm):
                 ]
                 for i in range(-1, num_rounds):
                     # 0 is included as zero represents outrounds
-                    label = "Checked in for round %s?" % (i + 1)
+                    label = f"Checked in for round {i + 1}?"
                     if i == -1:
                         label = "Checked in for outrounds?"
-                    self.fields["checkin_%s" % i] = forms.BooleanField(
+                    field_name = f"checkin_{i}"
+                    self.fields[field_name] = forms.BooleanField(
                         label=label,
                         initial=i + 1 in checkins,
                         required=False)
@@ -61,8 +62,9 @@ class RoomForm(forms.ModelForm):
         room = super(RoomForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(num_rounds):
-            if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
+            field_name = f"checkin_{i}"
+            if field_name in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data[field_name]
                 checked_in = RoomCheckIn.objects.filter(room=room,
                                                         round_number=i + 1)
                 # Two cases, either the room is not checked in and the user says he is,
@@ -98,10 +100,11 @@ class JudgeForm(forms.ModelForm):
                 ]
                 for i in range(-1, num_rounds):
                     # 0 is included as zero represents outrounds
-                    label = "Checked in for round %s?" % (i + 1)
+                    label = f"Checked in for round {i + 1}?"
                     if i == -1:
                         label = "Checked in for outrounds?"
-                    self.fields["checkin_%s" % i] = forms.BooleanField(
+                    field_name = f"checkin_{i}"
+                    self.fields[field_name] = forms.BooleanField(
                         label=label,
                         initial=i + 1 in checkins,
                         required=False)
@@ -112,8 +115,9 @@ class JudgeForm(forms.ModelForm):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(-1, num_rounds):
-            if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
+            field_name = f"checkin_{i}"
+            if field_name in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data[field_name]
                 checked_in = CheckIn.objects.filter(judge=judge,
                                                     round_number=i + 1)
                 # Two cases, either the judge is not checked in and the user says he is,
@@ -240,7 +244,7 @@ def validate_speaks(value):
     if not (TabSettings.get("min_speak", 0) <= value <= TabSettings.get(
             "max_speak", 50)):
         raise ValidationError(
-            "%s is an entirely invalid speaker score, try again." % value)
+            f"{value} is an entirely invalid speaker score, try again.")
 
 
 class ResultEntryForm(forms.Form):
@@ -291,15 +295,16 @@ class ResultEntryForm(forms.Form):
         for deb in self.DEBATERS:
             debater_choices = gov_debaters if deb in self.GOV else opp_debaters
             self.fields[self.deb_attr_name(
-                deb, "debater")] = forms.ChoiceField(label="Who was %s?" %
-                                                     (self.NAMES[deb]),
-                                                     choices=debater_choices)
+                deb, "debater")] = forms.ChoiceField(
+                    label=f"Who was {self.NAMES[deb]}?",
+                    choices=debater_choices
+                )
             self.fields[self.deb_attr_name(
                 deb, "speaks")] = forms.DecimalField(
-                    label="%s Speaks" % (self.NAMES[deb]),
+                    label=f"{self.NAMES[deb]} Speaks",
                     validators=[validate_speaks])
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
-                label="%s Rank" % (self.NAMES[deb]), choices=self.RANKS)
+                label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
 
         if round_object.victor == 0 or no_fill:
             return
@@ -427,7 +432,7 @@ class ResultEntryForm(forms.Form):
             return val
 
     def deb_attr_name(self, position, attr):
-        return "%s_%s" % (position, attr)
+        return f"{position}_{attr}"
 
     def has_invalid_ranks(self):
         ranks = [int(self.deb_attr_val(d, "ranks")) for d in self.DEBATERS]
@@ -459,20 +464,21 @@ class EBallotForm(ResultEntryForm):
                 msg = "Incorrect ballot code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
             elif round_obj.round_number != cur_round:
-                msg = """
-                      This ballot is for round %d, but the current round is %d.
-                      Go to tab to submit this result.
-                      """ % (round_obj.round_number, cur_round)
+                msg = (
+                    f"This ballot is for round {round_obj.round_number}, "
+                    f"but the current round is {cur_round}. "
+                    "Go to tab to submit this result."
+                )
                 self._errors["winner"] = self.error_class([msg])
             else:
                 if round_obj.chair.ballot_code != judge.ballot_code:
                     msg = "You are not judging the round, or you are not the chair"
                     self._errors["ballot_code"] = self.error_class([msg])
                 elif RoundStats.objects.filter(round=round_obj).first():
-                    msg = """
-                          A ballot has already been completed for this round.
-                          Go to tab if you need to change the results.
-                          """
+                    msg = (
+                        "A ballot has already been completed for this round. "
+                        "Go to tab if you need to change the results."
+                    )
                     self._errors["ballot_code"] = self.error_class([msg])
 
             if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
@@ -492,7 +498,7 @@ class EBallotForm(ResultEntryForm):
                     self._errors[key] = self.error_class([msg])
 
         except Exception as e:
-            print(("Caught error %s" % e))
+            print(f"Caught error {e}")
             self._errors["winner"] = self.error_class(
                 ["Non handled error, preventing data contamination"])
 
@@ -507,7 +513,7 @@ class SettingsForm(forms.Form):
         super(SettingsForm, self).__init__(*args, **kwargs)
 
         for setting in self.settings:
-            field_name = "setting_%s" % (setting["name"],)
+            field_name = f"setting_{setting['name']}"
             label = setting["name"].replace("_", " ").title()
 
             if setting.get("type") == "boolean":
@@ -532,6 +538,17 @@ class SettingsForm(forms.Form):
                         "class": "form-control"
                     })
                 )
+            elif setting.get("type") == "text":
+                self.fields[field_name] = forms.CharField(
+                    label=label,
+                    help_text=setting["description"],
+                    initial=setting["value"],
+                    required=False,
+                    widget=forms.TextInput(attrs={
+                        "class": "form-control",
+                        "style": "min-width: 300px;"
+                    })
+                )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
@@ -544,20 +561,15 @@ class SettingsForm(forms.Form):
 
     def save(self):
         for setting in self.settings:
-            field = "setting_%s" % (setting["name"],)
+            field = f"setting_{setting['name']}"
             key = setting["name"]
-            tab_setting = TabSettings.objects.filter(key=key).first()
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
             else:
                 value_to_set = self.cleaned_data[field]
 
-            if not tab_setting:
-                TabSettings.objects.create(key=key, value=value_to_set)
-            else:
-                tab_setting.value = value_to_set
-                tab_setting.save()
+            TabSettings.set(key, value_to_set)
 
 
 def validate_panel(result):

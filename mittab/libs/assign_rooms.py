@@ -62,7 +62,7 @@ def add_rooms():
         pairing_list = room_assignments[: len(pairings)]
         bad_pairing = pairings[pairing_list.index(-1)]
         raise errors.RoomAssignmentError(
-            "Could not find a room for: %s" % str(bad_pairing)
+            f"Could not find a room for: {bad_pairing}"
         )
 
     updated_pairings = []
