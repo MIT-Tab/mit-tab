@@ -21,4 +21,12 @@
   </div>
 </div>
 
+<script>
+  window.speakSettings = {
+    warnJudgesAboutSpeaks: {{ warn_judges_about_speaks|lower }},
+    lowSpeakWarningThreshold: {{ low_speak_warning_threshold }},
+    highSpeakWarningThreshold: {{ high_speak_warning_threshold }}
+  };
+</script>
+
 {% endblock %}
