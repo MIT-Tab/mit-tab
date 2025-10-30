@@ -4,30 +4,78 @@ import $ from "jquery";
 const SELECTOR = "#brackets-viewer-container";
 const TAB_CONFIG = [
   ["list-view-tab", "list-view"],
-  ["bracket-view-tab", "bracket-view"]
+  ["bracket-view-tab", "bracket-view"],
 ];
 
 let matchMetadata = {};
 
-const reshapeParticipants = (participants = [], useTeamNames) =>
-  participants.map(entry => {
+const reshapeParticipants = (useTeamNames, participants = []) =>
+  participants.map((entry) => {
     const name = entry.team_name;
     const debaters = entry.debaters_names || "";
     return { ...entry, name: useTeamNames ? name : debaters.trim() || name };
   });
 
-const renderTeamBlock = (label, info) => {
-  const name = info && info.display ? info.display : "TBD";
+const updateTeam = (teamKey, fallbackLabel, info = {}) => {
+  const $team = $(`#match-metadata-modal [data-team="${teamKey}"]`);
+  if (!$team.length) return;
+
+  const $label = $team.find("[data-team-label]");
+  if ($label.length) {
+    const seed = info && info.seed != null ? info.seed : null;
+    const labelText =
+      seed != null ? `Seed ${seed}` : info.label || fallbackLabel;
+    $label.text(labelText || fallbackLabel);
+  }
+
+  const name = typeof info.name === "string" ? info.name.trim() : "";
+  const displayName =
+    name || (typeof info.display === "string" ? info.display.trim() : "");
+  $team.find("[data-team-name]").text(displayName || "TBD");
+
+  const rawMembers =
+    typeof info.debaters_plain === "string" ? info.debaters_plain.trim() : "";
   const members =
-    info && info.debaters
-      ? `<div class="team-members text-muted small mt-1">${info.debaters}</div>`
-      : "";
-  return (
-    `<div class="match-team mb-3"><strong>${label}</strong>` +
-    `<span class="team-name d-block font-weight-bold">${name}</span>` +
-    `${members}</div>`
-  );
+    rawMembers ||
+    (typeof info.debaters === "string" ? info.debaters.trim() : "");
+  const $members = $team.find("[data-team-members]");
+  if ($members.length) {
+    $members.text(members);
+    $members.toggleClass("d-none", !members);
+  }
 };
+
+const renderJudges = ($modal, judges) => {
+  const $list = $modal.find("[data-judges]");
+  if (!$list.length) return;
+
+  $list.empty();
+  const hasJudges = Array.isArray(judges) && judges.length;
+  const lineup = hasJudges ? judges : [{ name: "TBD" }];
+
+  lineup.forEach((judge) => {
+    const name =
+      judge && typeof judge.name === "string" && judge.name.trim()
+        ? judge.name.trim()
+        : "TBD";
+
+    const $item = $("<li/>", { class: "judge-pill" });
+    if (judge && judge.is_chair) $item.addClass("is-chair");
+
+    $("<span/>", { class: "judge-pill__name", text: name }).appendTo($item);
+
+    if (judge && judge.is_chair) {
+      $("<span/>", { class: "judge-pill__badge", text: "Chair" }).appendTo(
+        $item,
+      );
+    }
+
+    if (!hasJudges) $item.addClass("text-muted");
+    $list.append($item);
+  });
+};
+
+const modalIsOpen = () => !$("#match-metadata-modal").prop("hidden");
 
 const renderBracket = () => {
   const viewer = window.bracketsViewer;
@@ -38,7 +86,7 @@ const renderBracket = () => {
   const useTeamNames = $("body").hasClass("show-team-names");
   const data = {
     ...payload,
-    participants: reshapeParticipants(payload.participants, useTeamNames)
+    participants: reshapeParticipants(useTeamNames, payload.participants),
   };
   viewer.render(data, { selector: SELECTOR, clear: true });
   matchMetadata = payload.match_metadata || {};
@@ -61,59 +109,44 @@ const activateTab = (targetPane, { render = false } = {}) => {
   if (showBracket && render) renderBracket();
 };
 
-const openModal = metadata => {
+const openModal = (metadata) => {
   const $modal = $("#match-metadata-modal");
   const $backdrop = $("#match-modal-backdrop");
-  const $content = $("#modal-content");
-  if (!$modal.length || !$backdrop.length || !$content.length) return;
+  if (!$modal.length || !$backdrop.length || !metadata) return;
 
-  const judges =
-    metadata.judges && metadata.judges.length
-      ? metadata.judges
-          .map(judge => {
-            const name = judge.is_chair
-              ? `<strong>${judge.name}</strong>`
-              : judge.name;
-            const cls = judge.is_chair ? "judge-name is-chair" : "judge-name";
-            return `<div class="${cls}">${name}</div>`;
-          })
-          .join("")
-      : '<span class="text-muted">TBD</span>';
+  updateTeam("gov", "Team 1", metadata.gov_team || {});
+  updateTeam("opp", "Team 2", metadata.opp_team || {});
 
-  $content.html(`
-    <button id="close-modal" class="close text-muted position-absolute"
-            style="right: 0;" aria-label="Close">
-      <span aria-hidden="true">&times;</span>
-    </button>
-    <div class="match-teams mb-3">
-      ${renderTeamBlock("Team 1: ", metadata.gov_team)}
-      ${renderTeamBlock("Team 2: ", metadata.opp_team)}
-    </div>
-    <div class="match-room mb-3"><strong>Room:</strong> ${metadata.room ||
-      "TBD"}</div>
-    <div class="match-judges">
-      <strong>Judges:</strong>
-      <div class="judge-list mt-2">${judges}</div>
-    </div>`);
+  $modal.find("[data-room]").text(metadata.room || "TBD");
+  renderJudges($modal, metadata.judges);
 
-  $modal.show();
-  $backdrop.show();
+  $modal.removeAttr("hidden").attr("aria-hidden", "false");
+  $backdrop.removeAttr("hidden");
+  document.body.classList.add("match-modal-open");
+
+  const closeButton = document.getElementById("close-modal");
+  if (closeButton) closeButton.focus();
 };
 
 const closeModal = () => {
-  $("#match-metadata-modal").hide();
-  $("#match-modal-backdrop").hide();
+  const $modal = $("#match-metadata-modal");
+  const $backdrop = $("#match-modal-backdrop");
+  if (!$modal.length || !$backdrop.length || $modal.prop("hidden")) return;
+
+  $modal.attr("hidden", true).attr("aria-hidden", "true");
+  $backdrop.attr("hidden", true);
+  document.body.classList.remove("match-modal-open");
 };
 
 const initTabs = () => {
   TAB_CONFIG.forEach(([tabId, pane]) => {
-    $(`#${tabId}`).on("click", evt => {
+    $(`#${tabId}`).on("click", (evt) => {
       evt.preventDefault();
       activateTab(pane, { render: pane === "bracket-view" });
     });
   });
 
-  $("#name_display_toggle").on("change", evt => {
+  $("#name_display_toggle").on("change", (evt) => {
     const useTeamNames = !evt.target.checked;
     $("body").toggleClass("show-team-names", useTeamNames);
     if ($("body").hasClass("bracket-view-active")) renderBracket();
@@ -127,26 +160,23 @@ const initTabs = () => {
 
 $(document).ready(initTabs);
 
-$(document).on("click", evt => {
-  const $target = $(evt.target);
-  const $backdropHit = $target.closest("#match-modal-backdrop");
-
-  if (evt.target.id === "close-modal" || $backdropHit.length) {
-    evt.preventDefault();
-    closeModal();
-    return;
-  }
-
-  const $matchNode = $target.closest(`${SELECTOR} .match`);
-  if (!$matchNode.length) return;
-
+$(document).on("click", "#close-modal", (evt) => {
   evt.preventDefault();
-  const matchId =
-    $matchNode.data("match-id") || $matchNode.attr("data-match-id");
+  closeModal();
+});
+
+$(document).on("click", "#match-modal-backdrop", (evt) => {
+  evt.preventDefault();
+  closeModal();
+});
+
+$(document).on("click", `${SELECTOR} .match`, function handleMatchClick(evt) {
+  evt.preventDefault();
+  const matchId = this.dataset.matchId || $(this).attr("data-match-id");
   const metadata = matchMetadata[matchId];
   if (metadata) openModal(metadata);
 });
 
-$(document).on("keydown", evt => {
-  if (evt.key === "Escape") closeModal();
+$(document).on("keydown", (evt) => {
+  if (evt.key === "Escape" && modalIsOpen()) closeModal();
 });

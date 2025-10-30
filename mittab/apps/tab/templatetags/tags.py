@@ -1,5 +1,6 @@
 from django import template
 from django.forms.fields import FileField
+from mittab.apps.tab.models import TabSettings
 
 register = template.Library()
 
@@ -44,4 +45,8 @@ def judge_team_count(context, judge, pairing):
     if judge_rejudge_counts and judge.id in judge_rejudge_counts:
         return judge_rejudge_counts[judge.id].get(pairing.id)
     return None
+
+@register.simple_tag
+def tournament_name():
+    return TabSettings.get("tournament_name", "New Tournament")
     

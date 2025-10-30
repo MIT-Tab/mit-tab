@@ -1,10 +1,18 @@
-import random
-
+from django.db import transaction
 from django.test import TestCase
 import pytest
 
-from mittab.apps.tab.models import CheckIn, Judge, TabSettings, Round
-from mittab.libs import assign_judges, assign_rooms
+from mittab.apps.tab.models import (
+    CheckIn,
+    Judge,
+    Room,
+    RoomCheckIn,
+    Round,
+    School,
+    TabSettings,
+    Team,
+)
+from mittab.libs import assign_judges, assign_rooms, cache_logic
 from mittab.libs import tab_logic
 from mittab.libs.tests.helpers import generate_results
 
@@ -18,36 +26,44 @@ class TestPairingLogic(TestCase):
     fixtures = ["testing_db"]
     pytestmark = pytest.mark.django_db
 
+    def setUp(self):
+        super().setUp()
+        TabSettings.set("cur_round", 1)
+
     def pair_round(self):
-        tab_logic.pair_round()
         current_round = TabSettings.objects.get(key="cur_round")
-        current_round.value = current_round.value + 1
+        round_to_pair = current_round.value
+
+        cache_logic.clear_cache()
+        tab_logic.pair_round()
+
+        current_round.refresh_from_db()
+        current_round.value = round_to_pair + 1
         current_round.save()
+        return round_to_pair
 
-    def generate_checkins(self):
-        cur_round = self.round_number()
-        round_count = Round.objects.filter(round_number=cur_round).count()
-        desired_judges = int(round(round_count * 1.2))
-        checkin_count = CheckIn.objects.filter(round_number=cur_round).count()
+    def generate_checkins(self, round_number):
+        CheckIn.objects.all().delete()
+        RoomCheckIn.objects.all().delete()
 
-        available = Judge.objects.exclude(judges__round_number=cur_round)
-        available = available.filter(checkin__round_number=cur_round)
-        available = list(available)
-        random.shuffle(available)
-        if checkin_count < desired_judges:
-            num_to_checkin = desired_judges - checkin_count
-            judges_to_checkin = available[:num_to_checkin]
-            checkins = [
-                CheckIn(judge=judge, round_number=cur_round)
-                for judge in judges_to_checkin
-            ]
-            for checkin in checkins:
-                checkin.save()
+        judges = list(Judge.objects.all())
+        rooms = list(Room.objects.all())
+        checkins = [
+            CheckIn(judge=j, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for j in judges
+        ]
+        room_checkins = [
+            RoomCheckIn(room=r, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for r in rooms
+        ]
+        CheckIn.objects.bulk_create(checkins)
+        RoomCheckIn.objects.bulk_create(room_checkins)
 
     def assign_judges_to_pairing(self):
-        self.generate_checkins()
         assign_judges.add_judges()
-    
+
     def assign_rooms_to_pairing(self):
         assign_rooms.add_rooms()
 
@@ -74,5 +90,74 @@ class TestPairingLogic(TestCase):
         data.
         """
         last_round = 6
+        TabSettings.set("cur_round", 1)
+        self.generate_checkins(last_round)
         for _ in range(1, last_round):
-            self.check_pairing(self.round_number(), last_round)
+            round_number = self.round_number()
+            self.check_pairing(round_number, last_round)
+
+    # --- Re-pair workflow helpers/tests ---
+
+    def re_pair_latest_round(self):
+        cleared_round = tab_logic.clear_current_round_pairing()
+        current_round = TabSettings.objects.get(key="cur_round")
+        current_round.value = cleared_round
+        current_round.save()
+
+        self.pair_round()
+        return cleared_round
+
+    def pairings_for(self, round_number):
+        return list(
+            Round.objects.filter(round_number=round_number)
+            .order_by("gov_team_id", "opp_team_id")
+            .values_list("gov_team_id", "opp_team_id")
+        )
+
+    def mutate_tournament_state(self, previous_round_number):
+        teams_to_toggle = Team.objects.filter(checked_in=True).order_by("id")[:2]
+        for team in teams_to_toggle:
+            team.checked_in = False
+            team.save()
+
+        for round_obj in Round.objects.filter(round_number=previous_round_number):
+            if round_obj.victor in (Round.GOV, Round.GOV_VIA_FORFEIT):
+                round_obj.victor = Round.OPP
+            else:
+                round_obj.victor = Round.GOV
+            round_obj.save()
+
+        school_team = Team.objects.exclude(school=None).order_by("id").first()
+        if school_team and School.objects.exclude(id=school_team.school_id).exists():
+            new_school = (
+                School.objects.exclude(id=school_team.school_id)
+                .order_by("id")
+                .first()
+            )
+            school_team.school = new_school
+            school_team.save()
+
+    def test_repair_is_deterministic(self):
+        paired_round = self.pair_round()
+        baseline_pairings = self.pairings_for(paired_round)
+
+        for _ in range(3):
+            self.re_pair_latest_round()
+            self.assertEqual(self.pairings_for(paired_round), baseline_pairings)
+
+    def test_repair_recovers_after_data_mutations(self):
+        first_round = self.pair_round()
+        generate_results(first_round, seed="repair")
+
+        second_round = self.pair_round()
+        baseline_pairings = self.pairings_for(second_round)
+
+        with transaction.atomic():
+            self.mutate_tournament_state(previous_round_number=first_round)
+            self.re_pair_latest_round()
+            mutated_pairings = self.pairings_for(second_round)
+            self.assertNotEqual(mutated_pairings, baseline_pairings)
+            transaction.set_rollback(True)
+
+        self.re_pair_latest_round()
+        self.assertEqual(self.pairings_for(second_round), baseline_pairings)

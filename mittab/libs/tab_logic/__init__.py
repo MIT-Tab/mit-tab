@@ -93,7 +93,7 @@ def pair_round():
 
         for team in middle_of_bracket:
             wins = tot_wins(team)
-            print(("Pairing %s into the middle of the %s-win bracket" % (team, wins)))
+            print(f"Pairing {team} into the middle of the {wins}-win bracket")
             bracket_size = len(list_of_teams[wins])
             bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
@@ -162,7 +162,7 @@ def pair_round():
                     # sort again by speaks making sure to leave any first
                     # round bye in the correct spot
                     removed_teams = []
-                    for team in list(Team.objects.filter(checked_in=True)):
+                    for team in all_checked_in_teams:
                         # They have all wins and they haven't forfeited so
                         # they need to get paired in
                         if team in middle_of_bracket and tot_wins(team) == bracket:
@@ -184,12 +184,12 @@ def pair_round():
             temp = perfect_pairing(list_of_teams)
         else:
             temp = perfect_pairing(list_of_teams[bracket])
-            print("Pairing bracket %i of size %i" % (bracket, len(temp)))
+            print(f"Pairing bracket {bracket} of size {len(temp)}")
         for pair in temp:
             pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
-        random.shuffle(pairings, random=random.random)
+        random.shuffle(pairings)
         pairings = sorted(
             pairings, key=lambda team: highest_seed(team[0], team[1]), reverse=True
         )
@@ -256,11 +256,11 @@ def have_properly_entered_data(round_to_check):
         for team in gov_team, opp_team:
             if team.id in prev_round_byes:
                 raise errors.ByeAssignmentError(
-                    "{} both had a bye and debated last round".format(team)
+                    f"{team} both had a bye and debated last round"
                 )
             if team.id in prev_round_noshows:
                 raise errors.NoShowAssignmentError(
-                    "{} both debated and had a no show".format(team)
+                    f"{team} both debated and had a no show"
                 )
 
 
@@ -381,6 +381,8 @@ def sorted_pairings(round_number, outround=False):
         "gov_team__debaters__team_set__no_shows",
         "gov_team__debaters__roundstats_set",
         "gov_team__debaters__roundstats_set__round",
+        "gov_team__gov_team_outround",
+        "gov_team__opp_team_outround",
         "opp_team__breaking_team",
         "opp_team__gov_team",  # poorly named relation, points to rounds as gov
         "opp_team__opp_team",  # poorly named relation, points to rounds as gov
@@ -391,6 +393,11 @@ def sorted_pairings(round_number, outround=False):
         "opp_team__debaters__team_set__no_shows",
         "opp_team__debaters__roundstats_set",
         "opp_team__debaters__roundstats_set__round",
+        "opp_team__gov_team_outround",
+        "opp_team__opp_team_outround",
+        "room__tags", "judges__required_room_tags",
+        "gov_team__required_room_tags",
+        "opp_team__required_room_tags"
     ]
     model = Outround if outround else Round
     filter_field = "num_teams" if outround else "round_number"
@@ -632,3 +639,26 @@ def determine_gov_opp(all_pairs):
         else:
             final_pairings += [[team2, team1]]
     return final_pairings
+
+
+def clear_current_round_pairing():
+    """
+    Safely clear all pairing data for the current round.
+    This removes Rounds, Byes, and NoShows for the current round number.
+
+    This is used when re-pairing a round to ensure a clean slate.
+    The current round number is NOT decremented - it stays the same.
+
+    Returns the round number that was cleared.
+    """
+    current_round = TabSettings.get("cur_round") - 1
+
+    if current_round < 1:
+        raise ValueError("No round has been paired yet")
+
+    Round.objects.filter(round_number=current_round).delete()
+    Bye.objects.filter(round_number=current_round).delete()
+    NoShow.objects.filter(round_number=current_round).delete()
+    TabSettings.set("pairing_released", 0)
+
+    return current_round

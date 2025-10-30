@@ -95,4 +95,4 @@ class ObjectStorage:
             return f.read()
 
     def _object_path(self, key):
-        return "%s/%s%s" % (BACKUP_PREFIX, key, SUFFIX)
+        return f"{BACKUP_PREFIX}/{key}{SUFFIX}"

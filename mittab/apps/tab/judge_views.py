@@ -1,6 +1,5 @@
-from django.contrib.auth.decorators import permission_required
-from django.http import Http404, JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
@@ -29,7 +28,7 @@ def view_judges(request):
     # Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
     checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=(current_round + 1))
+    checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
     checked_in_judges = set([c.judge for c in checkins])
     checked_in_judges_next = set([c.judge for c in checkins_next])
 
@@ -52,8 +51,12 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    c_judge = [(judge.pk, judge.name, flags(judge), "(%s)" % judge.ballot_code)
-               for judge in Judge.objects.all()]
+    judges = sorted(Judge.objects.all(), key=lambda j: (-j.rank, j.name))
+
+    c_judge = [
+        (judge.pk, judge.name, flags(judge), f"({judge.ballot_code})", judge.rank)
+        for judge in judges
+    ]
 
     all_flags = [
         [
@@ -80,6 +83,7 @@ def view_judges(request):
 
 def view_judge(request, judge_id):
     judge_id = int(judge_id)
+    judging_rounds = []
     try:
         judge = Judge.objects.get(pk=judge_id)
     except Judge.DoesNotExist:
@@ -92,9 +96,9 @@ def view_judge(request, judge_id):
             except ValueError:
                 return redirect_and_flash_error(
                     request, "Judge information cannot be validated")
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "Judge {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"Judge {updated_name} updated successfully")
     else:
         form = JudgeForm(instance=judge)
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
@@ -120,10 +124,10 @@ def enter_judge(request):
             except ValueError:
                 return redirect_and_flash_error(request,
                                                 "Judge cannot be validated")
+            created_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
                 request,
-                "Judge {} created successfully".format(
-                    form.cleaned_data["name"]),
+                f"Judge {created_name} created successfully",
                 path="/")
     else:
         form = JudgeForm(first_entry=True)
@@ -171,7 +175,7 @@ def add_scratches(request, judge_id, number_scratches):
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, [None] * len(forms))),
             "data_type": "Scratch",
-            "title": "Adding Scratch(es) for %s" % (judge.name)
+            "title": f"Adding Scratch(es) for {judge.name}"
         })
 
 
@@ -219,39 +223,25 @@ def view_scratches(request, judge_id):
             for i in range(len(scratches))
         ]
     delete_links = [
-        "/judge/" + str(judge_id) + "/scratches/delete/" + str(scratches[i].id)
+        f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
         for i in range(len(scratches))
     ]
-    links = [("/judge/" + str(judge_id) + "/scratches/add/1/", "Add Scratch")]
+    links = [(f"/judge/{judge_id}/scratches/add/1/", "Add Scratch")]
 
     return render(
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, delete_links)),
             "data_type": "Scratch",
             "links": links,
-            "title": "Viewing Scratch Information for %s" % (judge.name)
+            "title": f"Viewing Scratch Information for {judge.name}"
         })
 
-
-
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def judge_check_in(request, judge_id, round_number):
-    judge_id, round_number = int(judge_id), int(round_number)
-
-    if round_number < 0 or round_number > TabSettings.get("tot_rounds"):
-        # This is so that outrounds don't throw an error
-        raise Http404("Round does not exist")
-
-    judge = get_object_or_404(Judge, pk=judge_id)
-    if request.method == "POST":
-        if not judge.is_checked_in_for_round(round_number):
-            check_in = CheckIn(judge=judge, round_number=round_number)
-            check_in.save()
-    elif request.method == "DELETE":
-        if judge.is_checked_in_for_round(round_number):
-            check_ins = CheckIn.objects.filter(judge=judge,
-                                               round_number=round_number)
-            check_ins.delete()
-    else:
-        raise Http404("Must be POST or DELETE")
-    return JsonResponse({"success": True})
+def download_judge_codes(request):
+    codes = [
+        f"{getattr(judge, 'name', 'Unknown')}: {getattr(judge, 'ballot_code', 'N/A')}"
+        for judge in Judge.objects.all()
+    ]
+    response_content = "\n".join(codes)
+    response = HttpResponse(response_content, content_type="text/plain")
+    response["Content-Disposition"] = "attachment; filename=judge_codes.txt"
+    return response

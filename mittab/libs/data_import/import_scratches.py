@@ -22,10 +22,10 @@ class ScratchImporter(WorkbookImporter):
 
         got_error = False
         if not Team.objects.filter(name=team_name).exists():
-            self.error("Team '%s' does not exist" % team_name, row_number)
+            self.error(f"Team '{team_name}' does not exist", row_number)
             got_error = True
         if not Judge.objects.filter(name=judge_name).exists():
-            self.error("Judge '%s' does not exist" % judge_name, row_number)
+            self.error(f"Judge '{judge_name}' does not exist", row_number)
             got_error = True
 
         if scratch_type.strip().lower() in self.team_scratch_values:
@@ -34,7 +34,7 @@ class ScratchImporter(WorkbookImporter):
             scratch_type = Scratch.TAB_SCRATCH
         else:
             got_error = True
-            self.error("'%s' is not a valid scratch type" % scratch_type,
+            self.error(f"'{scratch_type}' is not a valid scratch type",
                        row_number)
         if got_error:
             return
@@ -51,5 +51,5 @@ class ScratchImporter(WorkbookImporter):
             for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
                     self.error(
-                        "%s x %s - %s" % (team_name, judge_name, error_msg),
+                        f"{team_name} x {judge_name} - {error_msg}",
                         row_number)

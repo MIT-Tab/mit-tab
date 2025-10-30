@@ -4,26 +4,31 @@ set +x
 
 cd /var/www/tab
 
-function execute-mysql() {
-  mysql -u $MYSQL_USER \
-    -h $MYSQL_HOST \
-    -D $MYSQL_DATABASE \
-    -P $MYSQL_PORT \
-    --password="$MYSQL_PASSWORD" \
-    -e "$1"
-}
+host="${MYSQL_HOST:-127.0.0.1}"
+cert_path="${MYSQL_SSL_CA:-/var/www/tab/tmp/digitalocean-db-ca.pem}"
+mkdir -p "$(dirname "$cert_path")"
+openssl s_client \
+  -starttls mysql \
+  -showcerts \
+  -servername "$host" \
+  -connect "${host}:${MYSQL_PORT:-3306}" </dev/null \
+  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
+  | openssl pkcs7 -print_certs -out "$cert_path"
+export MYSQL_SSL_CA="$cert_path"
+
+if [[ -z "$TAB_PASSWORD" ]]; then
+  echo "TAB_PASSWORD must be set." >&2
+  exit 1
+fi
 
 python manage.py migrate --noinput
 
-# Create a table tournament_intialized to use as a flag indicating the
-# tournament has been initialzed
-if [[ $(execute-mysql "show tables like 'tournament_initialized'") ]]; then
-  echo "Tournament already initialized, skipping init phase";
-else
-  echo "Initializing tournament";
-  python manage.py initialize_tourney --tab-password $TAB_PASSWORD --first-init;
-  execute-mysql "CREATE TABLE tournament_initialized(id int not null, PRIMARY KEY (id));"
+ensure_args=(--tab-password "$TAB_PASSWORD")
+if [[ -n "$ENTRY_PASSWORD" ]]; then
+  ensure_args+=(--entry-password "$ENTRY_PASSWORD")
 fi
+
+python manage.py ensure_tournament_initialized "${ensure_args[@]}"
 
 if [[ $TOURNAMENT_NAME == *-test ]]; then
   python manage.py loaddata testing_db;

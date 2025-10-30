@@ -12,97 +12,54 @@
 
 MIT-Tab is a web application to manage APDA debate tournaments.
 
-Looking to learn how to use mit-tab? [Check out the docs!](https://mit-tab.readthedocs.io/en/latest/)
-It has articles on everything you need to know to run tournaments efficiently.
-This README is for people who intend to develop features for the software,
-**refer to the documentation linked above for non-development-related
-information**
+## For Tournament Directors & Tab Staff
 
-## Local Installation + Running
+Looking to learn how to use MIT-Tab to run a tournament? **[Check out the documentation!](https://mit-tab.readthedocs.io/en/latest/)**
 
-Currently the installation consists of downloading the code, installing
-requirements and then manually running the server.
+The documentation has everything you need to know to run tournaments efficiently, including:
+- Setting up your server
+- Adding teams, judges, and rooms
+- Running preliminary rounds
+- Managing outrounds
+- And much more
 
-### Pre-Requisite: Install MySQL
+## For Developers
 
-Instructions for this will vary by platform. On Mac OS X, it comes
-pre-installed.
+Want to contribute to MIT-Tab? Great! Check out **[CONTRIBUTING.md](CONTRIBUTING.md)** for:
+- Development environment setup (macOS, Windows, Linux)
+- Code quality guidelines
+- Development best practices
+- How to submit pull requests
 
-Otherwise, check [here](https://dev.mysql.com/doc/mysql/en/windows-installation.html) for Windows
-and [here](https://dev.mysql.com/doc/refman/8.0/en/linux-installation.html) for Linux
+### Quick Start for Developers
 
-Before running, you need to install MySQL and create a database called `mittab`
-
-The database login credentials can be configured through the following env vars:
- * `MYSQL_USER` (default `root`)
- * `MYSQL_PASSWORD` (default `""`, if you use the default make sure you allow empty root passwords in your mysql settings)
- * `MITTAB_DB_HOST` (default `127.0.0.1`, you probably have no need to change this)
- * `MITTAB_PORT` (default `3306`, the default mysql port)
-
-### Running the server
-
-```
-git clone <mit-tab repo>
+```bash
+# Clone the repository
+git clone https://github.com/MIT-Tab/mit-tab.git
 cd mit-tab
 
-# make sure to use python3 for the virtualenv
-pip install pipenv
-pipenv install
-
-# set-up webpack assets
-npm install
-
-# load test data. username: tab password: password
-pipenv run python manage.py loaddata testing_db
-
-# Simultaneously runs webpack and the python server
-pipenv run ./bin/dev-server
+# Follow the setup guide for your platform in CONTRIBUTING.md
 ```
 
-**Note**: the `bin/dev-server` script is new and not tested on many set-ups. If you
-have any issues, you can accomplish the same thing by running:
+### Technology Stack
 
-```
-# build the assets:
-/node_modules/.bin/webpack --config webpack.config.js
-
-# ...or, instead, open another terminal tab and watch the
-# assets to auto-update with changes
-/node_modules/.bin/webpack --config webpack.config.js --watch
-
-# run the Django server:
-pipenv run python manage.py runserver
-```
+- **Backend**: Django (Python)
+- **Frontend**: JavaScript with Webpack
+- **Database**: MySQL
+- **Deployment**: Docker
 
 ### Testing
 
-To run the tests, you will need to have chrome's headless driver installed and
-in your `$PATH`. [Info here](http://chromedriver.chromium.org/getting-started)
+Tests require Chrome's headless driver in your `$PATH`. [Info here](http://chromedriver.chromium.org/getting-started)
 
-### Optional: Running with Docker
+## Production Deployment
 
-If you'd like, you can also run the application with Docker. The docker
-configuration is meant to simulate a production server, so it's not ideal for
-debugging or general development. You must have docker-compose 1.14.0+ installed to run.
+Production deployment is managed through [benmusch/mittab-deploy](https://github.com/benmusch/mittab-deploy).
 
-To run on localhost
-Since it uses nginx, it doesn't need a port in the url. Just go to http://localhost
+The production environment uses the Dockerfiles in this repository, and tournaments automatically pull code from the master branch.
 
+Legacy production setup documentation is available in the [`mittab/production_setup`](mittab/production_setup) directory.
 
-```
-docker-compose build
-docker-compose up
+## License
 
-# sets up the static files
-docker-compose run --rm web ./bin/setup password
-```
-
-## Production Setup & Deployment
-
-Deployment to production is controlled by
-[benmusch/mittab-deploy](https://github.com/benmusch/mittab-deploy). The
-production environment is built using the dockerfiles in this repo, and the
-tournaments automatically pull the code that is currently on the master branch.
-
-
-Older versions of the production setup are documented [here.](mittab/production_setup)
+MIT-Tab is open source software. See [LICENSE](LICENSE) for details.
