@@ -1,20 +1,19 @@
-<!DOCTYPE html>
-
-<html>
-    <head>
+{% extends "base/__wide.html" %}
         {% load render_bundle from webpack_loader %}
+
+{% block title %}Team List{% endblock %}
+{% block extra_head %}
         {% render_bundle 'publicDisplay' %}
+{% endblock %}
 
-        <title>Team List</title>
-    </head>
-
-    <body>
+{% block content %}
+<div class="col-12">
         <div id="scrollPage" class="hidden"></div>
 
-        <div class="public_header">
             <h1>Team List</h1>
-            <h3>({{ num_checked_in }} checked in)</h3>
+            <h3>({{ num_checked_in }} of {{ teams|length }} teams checked in)</h3>
             <table class="public_table">
+                <thead>
                 <tr>
                     <th style="width: 25%;">Team Name</th>
                     <th style="width: 15%;">School</th>
@@ -22,12 +21,8 @@
                     <th style="width: 30%;">Debaters</th>
                     <th style="width: 15%;">Checked In</th>
                 </tr>
-            </table>
-        </div>
-
-        <div class="public_header_spacer"></div>
-
-		<table class="public_table">
+            </thead>
+            <tbody>
 			{% for team in teams %}
 			<tr>
 				<td style="width: 25%;">{{ team.display }}</td>
@@ -37,18 +32,18 @@
 				<td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
 			</tr>
 			{% endfor %}
+            </tbody>
 		</table>
 
-        <div class="pairings_footer_spacer"></div>
+        <div class="public_footer_spacer"></div>
 
 		<div class="public_footer">
-            <a href="/" class="home-link">Home</a>
-            <span class="right">
+            <span class="right footer-controls">
 				<label for="autoscroll">
 					Autoscroll:
-					<input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+					<input type="checkbox" name="autoscroll" id="autoscroll"/>
 				</label>
 			</span>
 		</div>
-    </body>
-</html>
+</div>
+{% endblock %}

@@ -19,7 +19,11 @@
     </a>
     {% endif %}
   </h4>
-
+  {% if model_name == "Rooms" %}
+    <h4 class="text-center font-weight-normal">  
+     <a href = {% url "manage_room_tags" %} class = "btn btn-sm btn-light"> Manage Room Tags</a>
+      </h4>
+     {% endif %}
   <ol id="{{ html_id }}">
     {% for id, name in list_data %}
       <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>

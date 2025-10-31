@@ -8,28 +8,34 @@ from mittab.libs import cache_logic
 
 
 class TabSettings(models.Model):
-    key = models.CharField(max_length=25)
-    value = models.IntegerField()
+    key = models.CharField(max_length=50)
+    value = models.IntegerField(null=True, blank=True)
+    value_string = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         verbose_name_plural = "tab settings"
 
     def __str__(self):
-        return "%s => %s" % (self.key, self.value)
+        display_value = (self.value_string if self.value_string is not None
+                         else self.value)
+        return f"{self.key} => {display_value}"
 
     @classmethod
     def get(cls, key, default=None):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
-            return setting.value if setting is not None else None
+            if setting is not None:
+                return (setting.value_string if setting.value_string
+                        is not None else setting.value)
+            return None
 
         result = cache_logic.cache_fxn_key(
             safe_get,
-            "tab_settings_%s" % key,
+            f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
         if result is None and default is None:
-            raise ValueError("No TabSetting with key '%s'" % key)
+            raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default
         else:
@@ -37,15 +43,24 @@ class TabSettings(models.Model):
 
     @classmethod
     def set(cls, key, value):
+        if isinstance(value, str):
+            value_string = value
+            value_num = None
+        else:
+            value_num = value
+            value_string = None
+
         if cls.objects.filter(key=key).exists():
             obj = cls.objects.get(key=key)
-            obj.value = value
+            obj.value = value_num
+            obj.value_string = value_string
             obj.save()
         else:
-            obj = cls.objects.create(key=key, value=value)
+            obj = cls.objects.create(key=key, value=value_num,
+                                     value_string=value_string)
 
     def delete(self, using=None, keep_parents=False):
-        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
+        cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
         super(TabSettings, self).delete(using, keep_parents)
 
@@ -54,7 +69,7 @@ class TabSettings(models.Model):
              force_update=False,
              using=None,
              update_fields=None):
-        cache_logic.invalidate_cache("tab_settings_%s" % self.key,
+        cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
@@ -70,11 +85,11 @@ class School(models.Model):
         team_check = Team.objects.filter(school=self)
         judge_check = Judge.objects.filter(schools=self)
         if team_check.exists() or judge_check.exists():
-            raise Exception(
-                "School in use: [teams => %s,judges => %s]" %
-                ([t.name for t in team_check], [j.name for j in judge_check]))
-        else:
-            super(School, self).delete(using, keep_parents)
+            teams = [t.name for t in team_check]
+            judges = [j.name for j in judge_check]
+            message = f"School in use: [teams => {teams},judges => {judges}]"
+            raise ValidationError(message)
+        super(School, self).delete(using, keep_parents)
 
     @property
     def display(self):
@@ -127,9 +142,8 @@ class Debater(models.Model):
     def delete(self, using=None, keep_parents=False):
         teams = Team.objects.filter(debaters=self)
         if teams.exists():
-            raise Exception("Debater on teams: %s" % ([t.name for t in teams]))
-        else:
-            super(Debater, self).delete(using, keep_parents)
+            raise ValidationError(f"Debater on teams: {[t.name for t in teams]}")
+        super(Debater, self).delete(using, keep_parents)
 
     class Meta:
         ordering = ["name"]
@@ -168,9 +182,11 @@ class Team(models.Model):
         (NOVICE, "Novice")
     )
 
+    required_room_tags = models.ManyToManyField("RoomTag", blank=True)
     break_preference = models.IntegerField(default=0,
                                            choices=BREAK_PREFERENCE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
+    ranking_public = models.BooleanField(default=True)
 
     @classmethod
     def with_preloaded_relations_for_tab_card(cls):
@@ -193,6 +209,8 @@ class Team(models.Model):
         return cls.objects.prefetch_related(
             "gov_team",  # poorly named relation, gets rounds as gov team
             "opp_team",  # poorly named relation, rounds as opp team
+            "gov_team_outround",  # outround data for gov team
+            "opp_team_outround",  # outround data for opp team
             # for all gov rounds, load the opp team's gov+opp rounds (opp-strength)
             # and team record
             "gov_team__opp_team__gov_team",
@@ -315,7 +333,9 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True)
+    is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
+    required_room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
@@ -376,12 +396,13 @@ class Scratch(models.Model):
 
     def __str__(self):
         s_type = ("Team", "Tab")[self.scratch_type]
-        return "{} <={}=> {}".format(self.team, s_type, self.judge)
+        return f"{self.team} <={s_type}=> {self.judge}"
 
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    tags = models.ManyToManyField("RoomTag", blank=True)
 
     def __str__(self):
         return self.name
@@ -389,10 +410,8 @@ class Room(models.Model):
     def delete(self, using=None, keep_parents=False):
         rounds = Round.objects.filter(room=self)
         if rounds.exists():
-            raise Exception("Room is in round: %s" % ([str(r)
-                                                       for r in rounds]))
-        else:
-            super(Room, self).delete(using, keep_parents)
+            raise ValidationError(f"Room is in round: {[str(r) for r in rounds]}")
+        super(Room, self).delete(using, keep_parents)
 
     def is_checked_in_for_round(self, round_number):
         return RoomCheckIn.objects.filter(room=self,
@@ -455,9 +474,9 @@ class Outround(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
-        return "Outround {} between {} and {}".format(self.num_teams,
-                                                      self.gov_team,
-                                                      self.opp_team)
+        return (
+            f"Outround {self.num_teams} between {self.gov_team} and {self.opp_team}"
+        )
 
     @property
     def winner(self):
@@ -521,9 +540,9 @@ class Round(models.Model):
             raise ValidationError("Chair must be a judge in the round")
 
     def __str__(self):
-        return "Round {} between {} and {}".format(self.round_number,
-                                                   self.gov_team,
-                                                   self.opp_team)
+        return (
+            f"Round {self.round_number} between {self.gov_team} and {self.opp_team}"
+        )
 
     def save(self,
              force_insert=False,
@@ -580,8 +599,7 @@ class RoundStats(models.Model):
         verbose_name_plural = "round stats"
 
     def __str__(self):
-        return "Results for %s in round %s" % (self.debater,
-                                               self.round.round_number)
+        return f"Results for {self.debater} in round {self.round.round_number}"
 
 
 class CheckIn(models.Model):
@@ -589,8 +607,15 @@ class CheckIn(models.Model):
     round_number = models.IntegerField()
 
     def __str__(self):
-        return "Judge %s is checked in for round %s" % (self.judge,
-                                                        self.round_number)
+        return f"Judge {self.judge} is checked in for round {self.round_number}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["judge", "round_number"],
+                name="unique_judge_checkin_per_round",
+            )
+        ]
 
 
 class RoomCheckIn(models.Model):
@@ -598,5 +623,20 @@ class RoomCheckIn(models.Model):
     round_number = models.IntegerField()
 
     def __str__(self):
-        return "Room %s is checked in for round %s" % (self.room,
-                                                       self.round_number)
+        return f"Room {self.room} is checked in for round {self.round_number}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "round_number"],
+                name="unique_room_checkin_per_round",
+            )
+        ]
+
+
+class RoomTag(models.Model):
+    tag = models.CharField(max_length=255)
+    priority = models.DecimalField(max_digits=4, decimal_places=2)
+
+    def __str__(self):
+        return self.tag

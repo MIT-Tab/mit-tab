@@ -1,7 +1,7 @@
 from django.test import TestCase
 import pytest
 
-from mittab.apps.tab.models import Debater, Team
+from mittab.apps.tab.models import Debater, TabSettings, Team
 from mittab.libs.tests.assertion import assert_nearly_equal
 from mittab.libs.tests.data.load_data import load_debater_rankings
 from mittab.libs.tests.data.load_data import load_team_rankings
@@ -14,13 +14,14 @@ class TestRankingLogic(TestCase):
     expected"""
 
     fixtures = ["testing_finished_db"]
-    pytestmark = pytest.mark.django_db
+    pytestmark = pytest.mark.django_db(transaction=True)
 
     def test_debater_score(self):
         """ Comprehensive test of ranking calculations, done on real world
         data that has real world problems (e.g. teams not paired in, ironmen,
         etc ...)
         """
+        TabSettings.set("cur_round", 6)
         debaters = Debater.objects.order_by("pk")
         actual_scores = [(debater.name,
                           DebaterScore(debater).scoring_tuple()[:6])
@@ -30,7 +31,7 @@ class TestRankingLogic(TestCase):
         assert len(expected_scores) == len(actual_scores)
         for name, actual_score in actual_scores.items():
             left, right = actual_score, expected_scores[name]
-            msg = "{} - actual: {}, expected {}".format(name, left, right)
+            msg = f"{name} - actual: {left}, expected {right}"
             [
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)
@@ -39,6 +40,7 @@ class TestRankingLogic(TestCase):
     def test_team_score(self):
         """ Comprehensive test of team scoring calculations, done on real
         world data that has real world inaccuracies """
+        TabSettings.set("cur_round", 6)
         teams = Team.objects.order_by("pk")
         actual_scores = [(team.name, TeamScore(team).scoring_tuple()[:8])
                          for team in teams]
@@ -47,8 +49,7 @@ class TestRankingLogic(TestCase):
         assert len(actual_scores) == len(expected_scores)
         for team_name, actual_score in actual_scores.items():
             left, right = actual_score, expected_scores[team_name]
-            msg = "{} - actual: {}, expected: {}".format(
-                team_name, left, right)
+            msg = f"{team_name} - actual: {left}, expected: {right}"
             [
                 assert_nearly_equal(*pair, message=msg)
                 for pair in zip(left, right)

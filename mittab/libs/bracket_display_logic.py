@@ -187,15 +187,27 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
                     break
             if None in seeds or not match:
                 continue
+
+            # Determine which team won (before any slot assignments)
+            winning_team = None
+            if matchup.victor in WINNER_SIDES:
+                winning_team = teams[WINNER_SIDES[matchup.victor]]
+
+            # Fill bracket slots with teams (reversing order if needed)
             slots = match["slots"]
-            if invert:
-                slots, teams, seeds = slots[::-1], teams[::-1], seeds[::-1]
-            for slot, team, seed in zip(slots, teams, seeds):
+            teams_to_assign = reversed(teams) if invert else teams
+            seeds_to_assign = reversed(seeds) if invert else seeds
+            for slot, team, seed in zip(slots, teams_to_assign, seeds_to_assign):
                 fill_slot(slot, team, seed)
+
             match["outround"] = matchup
-            side = WINNER_SIDES.get(matchup.victor, None)
-            # Apply XOR to flip winner side if teams were inverted
-            match["winner_side"] = side ^ invert if side is not None else None
+
+            # Set winner based on which slot has the winning team
+            match["winner_side"] = (
+                0 if winning_team and slots[0]["team"] == winning_team else
+                1 if winning_team and slots[1]["team"] == winning_team else
+                None
+            )
 
     # Propagate wins up the bracket tree
     last_round = len(rounds) - 1

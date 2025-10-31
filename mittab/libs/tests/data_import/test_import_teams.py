@@ -8,7 +8,7 @@ from mittab.libs.data_import.import_teams import TeamImporter
 
 @pytest.mark.django_db
 class TestImportingTeams(TestCase):
-    pytestmark = pytest.mark.django_db
+    pytestmark = pytest.mark.django_db(transaction=True)
     fixtures = ["testing_empty"]
 
     def test_valid_teams(self):
