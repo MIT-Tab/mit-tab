@@ -5,8 +5,6 @@ $font-size-base: 0.95rem !default;
   background-image: none !important;
 }
 
-@import "~bootstrap/scss/bootstrap";
-
 .bg-dark {
   background-color: #00438A !important;
 }
@@ -80,22 +78,15 @@ $font-size-base: 0.95rem !default;
   line-height: 2.5;
 }
 
+.chair small::after {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  content: " \f6c0";
+}
 
 .dropdown-menu {
   max-height: 500px;
   overflow-y: auto;
-}
-
-.data-list {
-  column-count: 4;
-  
-  ul {
-    list-style-type: none;
-  }
-
-  .list-group-item {
-    text-overflow: clip;
-  }
 }
 
 .form-inline .input-group {

@@ -2,78 +2,53 @@
 
 {% block detail_content %}
 {% if room_rounds or room_outrounds %}
-<div class="col-lg-6 col-md-12">
+<div class="col-md-1"></div>
+<div class="col-md-5">
   {% if room_rounds %}
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-body p-4">
-      <h5 class="card-title fw-semibold mb-3">Rounds in this Room</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Round #</th>
-              <th>Gov Team</th>
-              <th>Opp Team</th>
-              <th>Judges</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for round in room_rounds %}
-            <tr>
-              <td><a href='/round/{{ round.id }}/result/' class="text-primary text-decoration-none">{{ round.round_number }}</a></td>
-              <td><a href='/team/{{ round.gov_team.id }}/' class="text-primary text-decoration-none">{{ round.gov_team.name }}</a></td>
-              <td><a href='/team/{{ round.opp_team.id }}/' class="text-primary text-decoration-none">{{ round.opp_team.name }}</a></td>
-              <td class="small">
-                {% if round.chair %}<a href='/judge/{{ round.chair.id }}/' class="text-primary text-decoration-none">{{ round.chair.name }}</a>{% if round.judges.all|length > 1 %}, {% endif %}{% endif %}
-                {% for judge in round.judges.all %}
-                  {% if judge != round.chair %}
-                    <a href='/judge/{{ judge.id }}/' class="text-primary text-decoration-none">{{ judge.name }}</a>{% if not forloop.last and not forloop.first %}, {% endif %}
-                  {% endif %}
-                {% endfor %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <div class="team-record">
+    <h5>Rounds in this Room</h5>
+    <table class="table table-striped">
+      <thead><th>Round #</th><th>Gov Team</th><th>Opp Team</th><th>Judges</th></thead>
+      {% for round in room_rounds %}
+      <tr>
+        <td><a href='/round/{{ round.id }}/result/'>{{ round.round_number }}</a></td>
+        <td><a href='/team/{{ round.gov_team.id }}/'>{{ round.gov_team.name }}</a></td>
+        <td><a href='/team/{{ round.opp_team.id }}/'>{{ round.opp_team.name }}</a></td>
+        <td>
+          {% if round.chair %}<a href='/judge/{{ round.chair.id }}/'>{{ round.chair.name }}</a>{% if round.judges.all|length > 1 %}, {% endif %}{% endif %}
+          {% for judge in round.judges.all %}
+            {% if judge != round.chair %}
+              <a href='/judge/{{ judge.id }}/'>{{ judge.name }}</a>{% if not forloop.last and not forloop.first %}, {% endif %}
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
   </div>
   {% endif %}
   
   {% if room_outrounds %}
-  <div class="card border-0 shadow-sm">
-    <div class="card-body p-4">
-      <h5 class="card-title fw-semibold mb-3">Outrounds in this Room</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Type</th>
-              <th>Gov Team</th>
-              <th>Opp Team</th>
-              <th>Judges</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for outround in room_outrounds %}
-            <tr>
-              <td>{{ outround.num_teams }}</td>
-              <td><a href='/team/{{ outround.gov_team.id }}/' class="text-primary text-decoration-none">{{ outround.gov_team.name }}</a></td>
-              <td><a href='/team/{{ outround.opp_team.id }}/' class="text-primary text-decoration-none">{{ outround.opp_team.name }}</a></td>
-              <td class="small">
-                {% if outround.chair %}<a href='/judge/{{ outround.chair.id }}/' class="text-primary text-decoration-none">{{ outround.chair.name }}</a>{% if outround.judges.all|length > 1 %}, {% endif %}{% endif %}
-                {% for judge in outround.judges.all %}
-                  {% if judge != outround.chair %}
-                    <a href='/judge/{{ judge.id }}/' class="text-primary text-decoration-none">{{ judge.name }}</a>{% if not forloop.last and not forloop.first %}, {% endif %}
-                  {% endif %}
-                {% endfor %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <div class="team-record mt-4">
+    <h5>Outrounds in this Room</h5>
+    <table class="table table-striped">
+      <thead><th>Type</th><th>Gov Team</th><th>Opp Team</th><th>Judges</th></thead>
+      {% for outround in room_outrounds %}
+      <tr>
+        <td>{{ outround.num_teams }}</td>
+        <td><a href='/team/{{ outround.gov_team.id }}/'>{{ outround.gov_team.name }}</a></td>
+        <td><a href='/team/{{ outround.opp_team.id }}/'>{{ outround.opp_team.name }}</a></td>
+        <td>
+          {% if outround.chair %}<a href='/judge/{{ outround.chair.id }}/'>{{ outround.chair.name }}</a>{% if outround.judges.all|length > 1 %}, {% endif %}{% endif %}
+          {% for judge in outround.judges.all %}
+            {% if judge != outround.chair %}
+              <a href='/judge/{{ judge.id }}/'>{{ judge.name }}</a>{% if not forloop.last and not forloop.first %}, {% endif %}
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
   </div>
   {% endif %}
 </div>

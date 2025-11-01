@@ -4,6 +4,9 @@ import "./outround";
 
 import $ from "jquery";
 
+import "popper.js";
+import "bootstrap";
+
 import bsCustomFileInput from "bs-custom-file-input";
 import ballotsInit from "./ballots";
 import filtersInit from "./filters";
@@ -38,13 +41,7 @@ function loadTabCards() {
 }
 
 function initializeTooltips() {
-  // Bootstrap 5: Initialize all tooltips
-  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-  [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
-  
-  // Also support legacy data-toggle for backwards compatibility
-  const legacyTooltips = document.querySelectorAll('[data-toggle="tooltip"]');
-  [...legacyTooltips].map(el => new bootstrap.Tooltip(el));
+  $('[data-toggle="tooltip"]').tooltip();
 }
 
 function initializeSettingsForm() {

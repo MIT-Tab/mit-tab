@@ -34,23 +34,6 @@ def is_file_field(field):
     return isinstance(field.field, FileField)
 
 
-@register.filter("is_select_field")
-def is_select_field(field):
-    """Check if a field is a select/dropdown field"""
-    if not hasattr(field, "field"):
-        return False
-    widget_name = field.field.widget.__class__.__name__
-    return 'Select' in widget_name or getattr(field.field.widget, 'input_type', None) == 'select'
-
-
-@register.filter("is_checkbox_field")
-def is_checkbox_field(field):
-    """Check if a field is a checkbox field"""
-    if not hasattr(field, "field"):
-        return False
-    return getattr(field.field.widget, 'input_type', None) == 'checkbox'
-
-
 @register.filter("is_checked_in")
 def is_checked_in(judge, round_value):
     return judge.is_checked_in_for_round(round_value)

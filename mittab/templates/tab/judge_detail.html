@@ -2,33 +2,21 @@
 
 {% block detail_content %}
 {% if judge_rounds %}
-<div class="col-lg-6 col-md-12">
-  <div class="card border-0 shadow-sm">
-    <div class="card-body p-4">
-      <h5 class="card-title fw-semibold mb-3">Rounds Judged</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Round #</th>
-              <th>Gov Team</th>
-              <th>Opp Team</th>
-              <th>Room</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for round in judge_rounds %}
-            <tr>
-              <td><a href='/round/{{ round.id }}/result/' class="text-primary text-decoration-none">{{ round.round_number }}</a></td>
-              <td><a href='/team/{{ round.gov_team.id }}/' class="text-primary text-decoration-none">{{ round.gov_team.name }}</a></td>
-              <td><a href='/team/{{ round.opp_team.id }}/' class="text-primary text-decoration-none">{{ round.opp_team.name }}</a></td>
-              <td>{% if round.room %}<a href='/room/{{ round.room.id }}/' class="text-primary text-decoration-none">{{ round.room.name }}</a>{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+<div class="col-md-1"></div>
+<div class="col-md-5">
+  <div class="team-record">
+    <h5>Rounds Judged</h5>
+    <table class="table table-striped">
+      <thead><th>Round #</th><th>Gov Team</th><th>Opp Team</th><th>Room</th></thead>
+      {% for round in judge_rounds %}
+      <tr>
+        <td><a href='/round/{{ round.id }}/result/'>{{ round.round_number }}</a></td>
+        <td><a href='/team/{{ round.gov_team.id }}/'>{{ round.gov_team.name }}</a></td>
+        <td><a href='/team/{{ round.opp_team.id }}/'>{{ round.opp_team.name }}</a></td>
+        <td>{% if round.room %}<a href='/room/{{ round.room.id }}/'>{{ round.room.name }}</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
   </div>
 </div>
 {% endif %}

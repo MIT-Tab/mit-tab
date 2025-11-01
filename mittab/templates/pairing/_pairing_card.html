@@ -1,24 +1,24 @@
-<div class="card bg-white border border-secondary shadow pairing-card mb-3">
-  <div class="card-body container-fluid p-3">
+<div class="card bg-light pairing-card mb-3">
+  <div class="card-body container-fluid">
     <div class="row" round-id="{{pairing.id}}">
 
       <div class="col-5">
         <table class="table table-borderless table-sm mb-0 team-table">
           <tr>
             <td>
-              <h6 class="fw-semibold text-dark mb-0">
-                <a href="/team/{{pairing.gov_team.id}}" class="text-dark text-decoration-none team-link">
+              <h6 class="gov-team">
+                <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
                   {{pairing.gov_team.display_backend}}
                 </a>
-                <small class="fw-normal text-secondary">
-                  <abbr title="Gov Team" class="attribute text-uppercase text-secondary small" style="letter-spacing: 0.05em;">GOV</abbr>
+                <small>
+                  <abbr title="Gov Team" class="attribute">GOV</abbr>
 
                   <span class="team-assign-button"
                     round-id={{pairing.id}}
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
-                    <a class="dropdown-toggle team-toggle text-dark text-decoration-none"
-                        data-bs-toggle="dropdown"
+                    <a class="dropdown-toggle team-toggle text-dark"
+                        data-toggle="dropdown"
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -26,7 +26,7 @@
                     <ul class="dropdown-menu"></ul>
                   </span>
                   <br/>
-                  <a class="text-muted text-decoration-none team tabcard pt-1" team-id={{pairing.gov_team.id}}>
+                  <a class="text-muted team tabcard pt-1" team-id={{pairing.gov_team.id}}>
                     Loading results...
                   </a>
                 </small>
@@ -35,19 +35,19 @@
           </tr>
           <tr>
             <td>
-              <h6 class="fw-semibold text-dark mb-0">
-                <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark text-decoration-none">
+              <h6 class="opp-team">
+                <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark">
                   {{pairing.opp_team.display_backend}}
                 </a>
-                <small class="fw-normal text-secondary">
-                  <abbr title="Opp Team" class="attribute text-uppercase text-secondary small" style="letter-spacing: 0.05em;">OPP</abbr>
+                <small>
+                  <abbr title="Opp Team" class="attribute">OPP</abbr>
 
                   <span class="team-assign-button"
                     round-id={{pairing.id}}
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
-                    <a class="dropdown-toggle team-toggle text-dark text-decoration-none"
-                        data-bs-toggle="dropdown"
+                    <a class="dropdown-toggle team-toggle text-dark"
+                        data-toggle="dropdown"
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -56,7 +56,7 @@
                   </span>
 
                   <br/>
-                  <a class="text-muted text-decoration-none team tabcard pt-1"
+                  <a class="text-muted team tabcard pt-1"
                       team-id={{pairing.opp_team.id}}>
                     Loading results...
                   </a>
@@ -72,12 +72,12 @@
         {% load tags %}
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
-          <a class="btn btn-sm btn-light judge-toggle dropdown-toggle fw-semibold{% if pairing.chair == judge %} chair{% endif %}"
-             data-bs-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
+             data-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
             {% judge_team_count judge pairing as rejudge_count %}
             {% if rejudge_count > 1 %}
-              <span class="badge bg-warning text-dark ms-1">({{rejudge_count}})</span>
+              <span class="badge badge-warning ml-1">({{rejudge_count}})</span>
             {% endif %}
             {% if judge.wing_only %}
               <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
@@ -90,7 +90,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn btn-sm btn-light judge-toggle dropdown-toggle" data-bs-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
@@ -102,22 +102,22 @@
 
       <div class="col-3 text-center">
         {% if pairing.victor == 1 %}
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV win</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV win</a>
         {% elif pairing.victor == 2 %} 
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP win</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP win</a>
         {% elif pairing.victor == 3 %}
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV via Forfeit</a>
         {% elif pairing.victor == 4 %}
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">OPP via Forfeit</a>
         {% elif pairing.victor == 5 %}
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Drop</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Drop</a>
         {% elif pairing.victor == 6 %}
-        <a class="btn btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Win</a>
+        <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">All Win</a>
         {% else %}
-        <a class="btn btn-sm btn-block btn-warning text-white" href="/round/{{pairing.id}}/result/">Enter Ballot</a>
+        <a class="btn-sm btn-block btn-warning" href="/round/{{pairing.id}}/result/">Enter Ballot</a>
         {%endif%}
         {% if pairing.judges.all|length > 1 %}
-        <a class="btn btn-sm btn-block btn-warning text-white" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a>
+        <a class="btn-sm btn-block btn-warning" href="/round/{{pairing.id}}/result/{{pairing.judges.all|length}}/">Enter Panel</a>
         {% endif %}
         <div class="dropdown room">
           <span 
@@ -125,11 +125,11 @@
             round-id="{{pairing.id}}"
             outround="false">
             <a 
-              class="btn btn-sm btn-block btn-light room-toggle dropdown-toggle text-wrap text-decoration-none" 
+              class="btn-sm btn-block btn-light room-toggle dropdown-toggle text-wrap" 
               href="#" 
               role="button" 
               id="roomDropdown-{{pairing.id}}" 
-              data-bs-toggle="dropdown" 
+              data-toggle="dropdown" 
               aria-haspopup="true" 
               aria-expanded="false" 
               style="white-space: normal;">
@@ -138,7 +138,7 @@
             <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
           </span>
         </div>
-        <a class="btn btn-sm btn-block btn-light text-decoration-none" href="/admin/tab/round/{{pairing.id}}/change/">
+        <a class="btn-sm btn-block btn-light" href="/admin/tab/round/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>
       </div>

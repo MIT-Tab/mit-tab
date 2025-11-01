@@ -1,34 +1,9 @@
+{% load bootstrap4 %}
 {% load tags %}
 
 {{ form.media }}
-<form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">
-  {% csrf_token %}
-  
-  {% for field in form %}
-    {% if not field|is_file_field %}
-      <div class="mb-3{% if field.field.widget.input_type == 'checkbox' %} form-check{% endif %}">
-        {% if field.field.widget.input_type == 'checkbox' %}
-          {{ field }}
-          <label class="form-check-label" for="{{ field.id_for_label }}">
-            {{ field.label }}
-          </label>
-        {% else %}
-          <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
-          {{ field }}
-        {% endif %}
-        
-        {% if field.help_text %}
-          <div class="form-text text-secondary small">{{ field.help_text }}</div>
-        {% endif %}
-        
-        {% if field.errors %}
-          <div class="invalid-feedback d-block">
-            {% for error in field.errors %}{{ error }}{% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    {% endif %}
-  {% endfor %}
+<form action="{{ action }}" method="post" id="data-entry-form" enctype="multipart/form-data">{% csrf_token %}
+  {% bootstrap_form form exclude='file,team_file,judge_file,room_file,scratch_file' %}
 
   {% for field in form %}
     {% if field|is_file_field %}
@@ -36,14 +11,8 @@
     {% endif %}
   {% endfor %}
 
-  <div class="mt-4 d-flex gap-2">
-    <button type="submit" class="btn btn-primary px-4">
-      <i class="fas fa-save me-1"></i> Save
-    </button>
-    {% if form.instance.pk %}
-      <a href="{{ form.instance.get_absolute_url }}" class="btn btn-outline-secondary">
-        <i class="fas fa-times me-1"></i> Cancel
-      </a>
-    {% endif %}
-  </div>
+  {% csrf_token %}
+  {% buttons %}
+    <input type="submit" value="Save" class="btn btn-primary"/>
+  {% endbuttons %}
 </form>

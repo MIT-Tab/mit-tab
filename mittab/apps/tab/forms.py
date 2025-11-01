@@ -12,50 +12,18 @@ from mittab.libs import errors, cache_logic
 from mittab import settings
 
 
-class Bootstrap5FormMixin:
-    """Mixin to automatically add Bootstrap 5 classes to form widgets"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            widget = field.widget
-            attrs = widget.attrs.copy()
-            
-            # Get existing classes
-            existing_classes = attrs.get('class', '')
-            
-            # Add appropriate Bootstrap class based on widget type
-            if isinstance(widget, forms.CheckboxInput):
-                if 'form-check-input' not in existing_classes:
-                    attrs['class'] = f"{existing_classes} form-check-input".strip()
-            elif isinstance(widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_classes:
-                    attrs['class'] = f"{existing_classes} form-select".strip()
-            elif isinstance(widget, forms.RadioSelect):
-                if 'form-check-input' not in existing_classes:
-                    attrs['class'] = f"{existing_classes} form-check-input".strip()
-            elif isinstance(widget, (forms.FileInput,)):
-                if 'form-control' not in existing_classes:
-                    attrs['class'] = f"{existing_classes} form-control".strip()
-            elif not isinstance(widget, (forms.CheckboxSelectMultiple, forms.RadioSelect)):
-                # Default to form-control for text inputs, textareas, etc.
-                if 'form-control' not in existing_classes and 'form-select' not in existing_classes:
-                    attrs['class'] = f"{existing_classes} form-control".strip()
-            
-            widget.attrs = attrs
-
-
-class UploadBackupForm(Bootstrap5FormMixin, forms.Form):
+class UploadBackupForm(forms.Form):
     file = forms.FileField(label="Your Backup File")
 
 
-class UploadDataForm(Bootstrap5FormMixin, forms.Form):
+class UploadDataForm(forms.Form):
     team_file = forms.FileField(label="Teams Data File", required=False)
     judge_file = forms.FileField(label="Judge Data File", required=False)
     room_file = forms.FileField(label="Room Data File", required=False)
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
 
 
-class SchoolForm(Bootstrap5FormMixin, forms.ModelForm):
+class SchoolForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(SchoolForm, self).__init__(*args, **kwargs)
 
@@ -64,7 +32,7 @@ class SchoolForm(Bootstrap5FormMixin, forms.ModelForm):
         fields = "__all__"
 
 
-class RoomForm(Bootstrap5FormMixin, forms.ModelForm):
+class RoomForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         entry = "first_entry" in kwargs
         if entry:
@@ -114,7 +82,7 @@ class RoomForm(Bootstrap5FormMixin, forms.ModelForm):
         fields = "__all__"
 
 
-class JudgeForm(Bootstrap5FormMixin, forms.ModelForm):
+class JudgeForm(forms.ModelForm):
     schools = forms.ModelMultipleChoiceField(queryset=School.objects.all(),
                                              required=False)
 
@@ -174,7 +142,7 @@ class JudgeForm(Bootstrap5FormMixin, forms.ModelForm):
         js = ("/admin/jsi18n"),
 
 
-class TeamForm(Bootstrap5FormMixin, forms.ModelForm):
+class TeamForm(forms.ModelForm):
     debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
                                               required=False)
 
@@ -225,7 +193,7 @@ class TeamEntryForm(TeamForm):
         exclude = ["tiebreaker"]
 
 
-class ScratchForm(Bootstrap5FormMixin, forms.ModelForm):
+class ScratchForm(forms.ModelForm):
     team = forms.ChoiceField(choices=[])
     judge = forms.ChoiceField(choices=[])
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
@@ -263,7 +231,7 @@ class ScratchForm(Bootstrap5FormMixin, forms.ModelForm):
         exclude = ["team", "judge"]
 
 
-class DebaterForm(Bootstrap5FormMixin, forms.ModelForm):
+class DebaterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(DebaterForm, self).__init__(*args, **kwargs)
 
@@ -279,7 +247,7 @@ def validate_speaks(value):
             f"{value} is an entirely invalid speaker score, try again.")
 
 
-class ResultEntryForm(Bootstrap5FormMixin, forms.Form):
+class ResultEntryForm(forms.Form):
 
     NAMES = {
         "pm": "Prime Minister",
@@ -537,7 +505,7 @@ class EBallotForm(ResultEntryForm):
         return super(EBallotForm, self).clean()
 
 
-class SettingsForm(Bootstrap5FormMixin, forms.Form):
+class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
         self.settings = settings_to_import
@@ -690,7 +658,7 @@ def score_panel(result, discard_minority):
     return ranked, final_winner
 
 
-class OutroundResultEntryForm(Bootstrap5FormMixin, forms.Form):
+class OutroundResultEntryForm(forms.Form):
     winner = forms.ChoiceField(label="Which team won the round?",
                                choices=Outround.VICTOR_CHOICES)
 

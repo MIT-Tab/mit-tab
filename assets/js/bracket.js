@@ -95,14 +95,14 @@ const renderBracket = () => {
 window.renderBracket = renderBracket;
 
 const activateTab = (targetPane, { render = false } = {}) => {
-  // Bootstrap 5: Use Bootstrap's Tab API
-  const targetTab = targetPane === "list-view" ? "list-view-tab" : "bracket-view-tab";
-  const tabElement = document.getElementById(targetTab);
-  
-  if (tabElement) {
-    const tab = new bootstrap.Tab(tabElement);
-    tab.show();
-  }
+  TAB_CONFIG.forEach(([tab, pane]) => {
+    const $tab = $(`#${tab}`);
+    const $pane = $(`#${pane}`);
+    const active = pane === targetPane;
+
+    $tab.toggleClass("active", active).attr("aria-selected", active);
+    $pane.toggleClass("active", active);
+  });
 
   const showBracket = targetPane === "bracket-view";
   $("body").toggleClass("bracket-view-active", showBracket);
@@ -139,7 +139,6 @@ const closeModal = () => {
 };
 
 const initTabs = () => {
-  // Bootstrap 5: Listen for tab events
   TAB_CONFIG.forEach(([tabId, pane]) => {
     $(`#${tabId}`).on("click", (evt) => {
       evt.preventDefault();
