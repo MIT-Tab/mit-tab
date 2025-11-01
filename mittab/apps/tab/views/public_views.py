@@ -1,7 +1,9 @@
 import random
+from functools import wraps
 
 from django.shortcuts import render, redirect
 from django.urls import reverse
+from django.core.cache import caches
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
@@ -12,6 +14,33 @@ from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.apps.tab.views.pairing_views import enter_result
 
+
+def cache_public_view(timeout=60, settings_keys=None):
+    """
+    Cache a public view, invalidating when specified TabSettings change.
+    """
+    if settings_keys is None:
+        settings_keys = []
+    
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Include settings values in cache key so it invalidates when they change
+            settings_vals = tuple(TabSettings.get(k, None) for k in settings_keys) if settings_keys else ()
+            cache_key = f"pv_{view_func.__name__}_{kwargs}_{settings_vals}_{request.user.is_authenticated}"
+            
+            cached = caches[cache_logic.DEFAULT].get(cache_key)
+            if cached is not None:
+                return cached
+            
+            response = view_func(request, *args, **kwargs)
+            caches[cache_logic.DEFAULT].set(cache_key, response, timeout)
+            return response
+        
+        return wrapper
+    return decorator
+
+@cache_public_view(timeout=60, settings_keys=["judges_public"])
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
@@ -27,6 +56,7 @@ def public_view_judges(request):
             "rounds": rounds
         })
 
+@cache_public_view(timeout=60, settings_keys=["teams_public"])
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
@@ -43,25 +73,21 @@ def public_view_teams(request):
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
+@cache_public_view(timeout=60, settings_keys=["rankings_public"])
 def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
     if not display_rankings:
         return redirect_and_flash_error(request, "This view is not public", path=reverse("index"))
 
-    teams = cache_logic.cache_fxn_key(
-        rankings.get_team_rankings,
-        "team_rankings_public",
-        cache_logic.DEFAULT,
-        request,
-        public=True
-    )
+    teams = rankings.get_team_rankings(request, public=True)
 
     return render(request, "public/public_team_rankings.html", {
         "teams": teams,
         "title": "Team Rankings"
     })
 
+@cache_public_view(timeout=60, settings_keys=["cur_round", "pairing_released", "debaters_public"])
 def pretty_pair(request):
     errors, byes = [], []
 
@@ -111,6 +137,7 @@ def pretty_pair(request):
 
 
 
+@cache_public_view(timeout=30, settings_keys=["cur_round", "pairing_released"])
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.prefetch_related("gov_team", "opp_team",
@@ -130,6 +157,12 @@ def missing_ballots(request):
     )
 
 
+@cache_public_view(timeout=60, settings_keys=[])
+def e_ballot_search_page(request):
+    """Cached helper for rendering the e-ballot search template."""
+    return render(request, "public/e_ballot_search.html")
+
+
 def e_ballot_search(request):
     if request.method == "POST":
         ballot_code = (request.POST.get("ballot_code") or "").strip()
@@ -141,7 +174,7 @@ def e_ballot_search(request):
             path=reverse("e_ballot_search"),
         )
 
-    return render(request, "public/e_ballot_search.html")
+    return e_ballot_search_page(request)
 
 
 def enter_e_ballot(request, ballot_code):
@@ -200,6 +233,8 @@ def enter_e_ballot(request, ballot_code):
     return redirect_and_flash_error(request, message, path=reverse("tab_login"))
 
 
+@cache_public_view(timeout=60, settings_keys=["gov_opp_display", "var_teams_visible", "nov_teams_visible",
+                                               "sidelock", "choice", "debaters_public", "show_outs_bracket"])
 def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 

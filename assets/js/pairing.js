@@ -185,7 +185,7 @@ function lazyLoad(element, url) {
       element.html(result);
       element.removeClass("loading");
     },
-    failure() {
+    error() {
       element.html("Error received from server");
       element.removeClass("loading");
     },
