@@ -7,18 +7,19 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
-LOGIN_WHITELIST = ("/accounts/login/", "/pairings/pairinglist/",
-                   "/pairings/missing_ballots/", "/e_ballots/", "/404/",
-                   "/403/", "/500/", "/teams/", "/judges/",
-                   "/rank_teams_public/",
-                   "/outround_pairings/pairinglist/0/",
-                   "/outround_pairings/pairinglist/1/",
+LOGIN_WHITELIST = ("/public/login/", "/public/pairings/",
+                   "/public/missing-ballots/","/public/e-ballots/",
+                   "/404/", "/403/", "/500/",
+                   "/public/teams/",
+                   "/public/judges/",
+                   "/public/team-rankings/",
+                   "/public/outrounds/0/", "/public/outrounds/1/",
                    "/json", "/api/varsity-speaker-awards",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools")
 
-EBALLOT_REGEX = re.compile(r"/e_ballots/\S+")
+EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 
 
 class Login:
@@ -33,13 +34,13 @@ class Login:
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                view = LoginView.as_view(template_name="registration/login.html")
+                view = LoginView.as_view(template_name="public/login.html")
                 return view(request)
             else:
                 return redirect_and_flash_info(
                     request,
                     "You must be logged in to view that page",
-                    path=f"/accounts/login/?next={request.path}")
+                    path=f"/public/login/?next={request.path}")
         else:
             return self.get_response(request)
 

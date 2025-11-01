@@ -132,3 +132,35 @@ class TeamScore(Score):
         self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(team, exclude_round)
         self.stats[OPP_STRENGTH] = opp_strength(team, exclude_round)
         self.stats[COIN_FLIP] = team.tiebreaker
+
+def get_team_rankings(request, public=False):
+    exclude_round = None
+    if public:
+        exclude_round = TabSettings.get("cur_round", 0) - 1
+    ranked_teams = rank_teams(exclude_round=exclude_round)
+    teams = []
+    for i, team_stat in enumerate(ranked_teams):
+        if public:
+            if not team_stat.team.ranking_public:
+                continue
+            teams.append((team_stat.team, team_stat[WINS],
+                          team_stat[SPEAKS], team_stat[RANKS]))
+        else:
+            tiebreaker = "N/A"
+            if i != len(ranked_teams) - 1:
+                next_team_stat = ranked_teams[i + 1]
+                tiebreaker_stat = team_stat.get_tiebreaker(next_team_stat)
+                if tiebreaker_stat is not None:
+                    tiebreaker = tiebreaker_stat.name
+                else:
+                    tiebreaker = "Tie not broken"
+            teams.append((team_stat.team, team_stat[WINS],
+                          team_stat[SPEAKS], team_stat[RANKS],
+                          tiebreaker))
+    if not public:
+        nov_teams = list(filter(
+            lambda ts: all(
+                map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
+                    all())), teams))
+        return teams, nov_teams
+    return teams

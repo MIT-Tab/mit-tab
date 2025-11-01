@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.db.models import Count
 
-from mittab.apps.tab.debater_views import get_speaker_rankings
+from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.models import Debater, Team, Outround
 from mittab.libs.tab_logic.stats import tot_wins
 

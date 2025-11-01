@@ -9,18 +9,18 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.debater_views import get_speaker_rankings
+from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
     UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.apps.tab.outround_pairing_views import create_forum_view_data
-from mittab.apps.tab.team_views import get_team_rankings
+from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
 def index(request):
