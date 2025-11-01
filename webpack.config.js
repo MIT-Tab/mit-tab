@@ -6,6 +6,7 @@ const TerserPlugin = require("terser-webpack-plugin");
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
 module.exports = {
+  mode: process.env.NODE_ENV === 'development' ? 'development' : 'production',
   context: __dirname,
   entry: {
     main: "./assets/js/index",
@@ -57,10 +58,13 @@ module.exports = {
     ],
   },
   resolve: {
-    alias: {
-      jquery: "jquery/src/jquery",
-    },
     extensions: [".js", ".scss", ".css"],
+  },
+
+  externals: {
+    jquery: "jQuery",
+    bootstrap: "bootstrap",
+    "popper.js": "Popper",
   },
 
   plugins: [
@@ -78,7 +82,6 @@ module.exports = {
       $: "jquery",
       jQuery: "jquery",
       "window.jQuery": "jquery",
-      Tether: "tether",
     }),
   ],
 };

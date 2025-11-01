@@ -35,4 +35,10 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
 fi
 
 /usr/local/bin/gunicorn --worker-tmp-dir /dev/shm \
-  mittab.wsgi:application -w 2 --bind 0.0.0.0:8000 -t 300
+  --worker-class sync \
+  --workers 2 \
+  --threads 2 \
+  --max-requests 1000 \
+  --max-requests-jitter 50 \
+  --keep-alive 5 \
+  mittab.wsgi:application --bind 0.0.0.0:8000 -t 300

@@ -80,6 +80,7 @@ DATABASES = {
         "PASSWORD": MYSQL_PASSWORD,
         "HOST":     MYSQL_HOST,
         "PORT":     MYSQL_PORT,
+        "CONN_MAX_AGE": 60,  # Keep connections alive for 60 seconds (reuse across requests)
     }
 }
 
