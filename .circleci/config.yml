@@ -37,7 +37,7 @@ jobs:
             python -m pip install --user pipenv
             rm -rf .venv
             pipenv --python 3.10.16
-            pipenv install
+            pipenv install --dev
             npm install
 
       - save_cache:
