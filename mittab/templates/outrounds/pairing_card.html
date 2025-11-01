@@ -74,6 +74,9 @@
           <a class="btn btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
              data-bs-toggle="dropdown" href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
+            {% if judge.wing_only %}
+              <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
+            {% endif %}
           </a>
           <ul class="dropdown-menu"></ul>
         </span>

@@ -1,4 +1,11 @@
 {% extends "base/__normal.html" %}
+
+
+{% block extra_head %}
+    {% load render_bundle from webpack_loader %}
+    {% render_bundle 'batchCheckin' %}
+{% endblock extra_head %}
+
 {% load tags %}
 
 {% block title %}Check-In{% endblock %}
@@ -22,14 +29,14 @@
                     </ul>
                 
                     <div class="tab-content">
-                    <div class="tab-pane fade show active" id="team" role="tabpanel" aria-labelledby="team-tab">
-                           {% include "batch_check_in/_team.html" %}
+                    <div class="tab-pane fade show active" id="team" role="tabpanel" data-entity-type="team" aria-labelledby="team-tab">
+                           {% include "batch_check_in/_checkin_pane.html" with entity_type='team' data=team_data headers=team_headers %}
                        </div>
-                  <div class="tab-pane fade" id="judge" role="tabpanel" aria-labelledby="judge-tab">
-                           {% include "batch_check_in/_judge.html" %}
+                  <div class="tab-pane fade" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
+                           {% include "batch_check_in/_checkin_pane.html" with entity_type='judge' data=judge_data headers=judge_headers round_numbers=round_numbers %}
                    </div>
-                       <div class="tab-pane fade" id="room" role="tabpanel" aria-labelledby="room-tab">
-                            {% include "batch_check_in/_room.html" %}
+                       <div class="tab-pane fade" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
+                            {% include "batch_check_in/_checkin_pane.html" with entity_type='room' data=room_data headers=room_headers round_numbers=round_numbers %}
                         </div>
 
                         {% endblock %}

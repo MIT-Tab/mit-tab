@@ -1,0 +1,70 @@
+category:
+  name: "Judges"
+  description: "Configure judge assignment and room seeding settings"
+  id: "judges"
+  order: 2
+
+settings:
+  - allow_rejudges:
+    name: allow_rejudges
+    description: "Toggle to indicate whether or not rejudges are allowed. When enabled, assign judges will try to assign judges without rejudging, but will allow for rejudges if necessary."
+    value: false
+    type: boolean
+  - max_eballot_speak:
+    name: max_eballot_speak
+    description: "The maximum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 35, a 35 does not have to be justified to tab staff but a 36 does"
+    value: 35
+  - min_eballot_speak:
+    name: min_eballot_speak
+    description: "The minimum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 15, a 15 does not have to be justified to tab staff but a 14 does"
+    value: 15
+  - judge_pairing_mode:
+    name: judge_pairing_mode
+    description: "Choose the judge pairing method. 'Default' assigns top judges to the highest-ranked rounds. 'Classic' uses the traditional weighting used from 2019-September 2025."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Default"]
+      - [1, "Classic"]
+  - rejudge_penalty:
+    name: rejudge_penalty
+    description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
+    value: 100
+  - pair_wings:
+    name: pair_wings
+    description: "Toggle to enable wing pairing. When enabled, assign judges will continue assigning judges beyond just chairs to fill panels with wing judges."
+    value: true
+    type: boolean
+  - inround_round_priority:
+    name: inround_round_priority
+    description: "Choose which inrounds are prioritized when assigning judges. 'Standard' assigns judges based on team strength (wins and speaks). 'Bubble Rounds' prioritizes rounds where exactly one team has exactly one loss, giving them the best available judges."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Standard"]
+      - [1, "Bubble Rounds"]
+  - wing_pairing_mode:
+    name: wing_pairing_mode
+    description: "Choose the wing pairing method. 'Help Chairs' pairs high-ranked wings with low-ranked chairs to support less experienced chairs. 'Wing Learning' pairs high-ranked wings with high-ranked rounds for optimal learning opportunities. 'Random' assigns wings randomly without regard to rank."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Help Chairs"]
+      - [1, "Wing Learning"]
+      - [2, "Random"]
+  - outs_judge_pairing_mode:
+    name: outs_judge_pairing_mode
+    description: "Choose the outround judge pairing method. 'Straight' assigns judges in order from highest ranked to lowest ranked. 'Snake Draft' assigns judges in a snake draft order, where the first panelist is assigned normally, then the second panelist is assigned in reverse order, and so on."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Snake Draft"]
+      - [1, "Straight"]
+  - outs_round_priority:
+    name: outs_round_priority
+    description: "Choose which outround is prioritized when assigning judges. 'Top of Bracket' assigns the best panel to the round highest in the bracket (i.e. 1 seed vs 8 seed). 'Middle of Bracket' assigns the best panel to the closest seeded rounds in the middle of the bracket (i.e. 4 seed vs 5 seed)."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Top of Bracket"]
+      - [1, "Middle of Bracket"]

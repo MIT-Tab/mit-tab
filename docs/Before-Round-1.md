@@ -1,13 +1,11 @@
-Before Round 1
-==============
+# Before Round 1
 
 Before Round 1 on your tournament day you need to enter scratches as teams
 check in, check in judges and teams, adjust registration as needed, and pair the
 first round.  All of this can be done very quickly if you split up the tasks and
 have multiple people working on them (i.e. multiple people entering scratches).
 
-Entering Scratches
-------------------
+## Entering Scratches
 
 School Scratch: Navigate to the judge page in question, and then add an
 affiliation with the school you would like them to be scratched from.
@@ -27,25 +25,33 @@ Then click "Add Scratch" at the bottom of the page
 
 ![](img/judge_add_scratch.png)
 
-Judge/Team Check Ins
---------------------
+## Judge/Team/Rooms Check Ins
 
 For judges, you should check them in for the rounds that they can judge during.
 Some tab staffs like to make judges check in every round, others take them down
 at the start.  Either way, the judge will only be paired into the round if they
 are checked into the round.
 
-The easiest way to check-in judges is via the batch check-in page ("Admin >
-Batch Judge Check In"), pictured below:
+The easiest way to check-in judges is via the batch check-in page (accessible via
+Admin > Batch Judge Check In in the navigation menu), pictured below:
 
 ![](img/judge_batch_checkin.png)
+
+The batch check-in interface allows you to:
+- Check judges in or out for specific rounds (including outrounds - round 0)
+- Check teams in or out for the entire tournament
+- Check rooms in or out for specific rounds
+- Use quick search to filter entities by name or school
+- Changes save immediately via AJAX
+
+**Pro tip**: Use the quick search box at the top to quickly find judges, teams, or rooms by typing their name or school. The interface auto-saves changes as you make them, so there's no need to click a "Save" button.
 
 Alternatively, you can check a judge in individually on the page for that
 specific judge:
 
 ![](img/judge_view_checkins.png)
 
-Unlike judges you cannot check a team into certain rounds but not others ahead
+Unlike judges, you cannot check a team into certain rounds but not others ahead
 of time. Every time you pair a round, teams that are "Checked in" will be paired
 in and any that are not "Checked in" will be given a "No Show" loss. For the
 purposes of tabbing this is a loss, with both speakers receiving 0s for speaks
@@ -53,8 +59,7 @@ and ranks of 7.  If you want to give a team that you had checked out a Bye
 because they should have been checked in, give them a Bye via the admin
 interface and **remove the No Show** loss.
 
-Pairing the First Round
------------------------
+## Pairing the First Round
 
 To pair the first round, click "Prepare Next Pairing", check that all of the
 sanity checks are green, and click "Pair This Round".  While the program is

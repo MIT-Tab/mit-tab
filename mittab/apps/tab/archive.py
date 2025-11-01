@@ -38,7 +38,7 @@ class ArchiveExporter:
         for debate in qs:
             if debate.round_number != cur_round:
                 r_tag = SubElement(self.root, "round", {
-                    "name": "Round %s" % debate.round_number
+                    "name": f"Round {debate.round_number}"
                 })
                 cur_round = debate.round_number
 

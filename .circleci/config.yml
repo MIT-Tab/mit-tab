@@ -1,16 +1,17 @@
 version: 2.1
 orbs:
   codecov: codecov/codecov@1.0.4
+  browser-tools: circleci/browser-tools@1.5.3
 jobs:
   build:
     docker:
-      - image: circleci/python:3.7.10-node-browsers
+      - image: cimg/python:3.10.16-node
         environment:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
-      - image: circleci/mysql:5.7
+      - image: cimg/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
           MYSQL_DATABASE: mittab
@@ -23,28 +24,26 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps-v2-{{ checksum "Pipfile.lock" }}
-      - run:
-          name: Fix EOL Debian Buster APT sources
-          command: |
-            sudo sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list
-            sudo sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list
-            echo 'Acquire::Check-Valid-Until "false";' | sudo tee /etc/apt/apt.conf.d/99no-check-valid
-            sudo apt-get -o Acquire::Check-Valid-Until=false update
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
+      
+      - browser-tools/install-chrome
+      - browser-tools/install-chromedriver
       - run:
           name: install dependencies
           command: |
             sudo apt-get update
-            sudo apt-get upgrade -y
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
-            pipenv install
+            python -m pip install --upgrade pip
+            python -m pip install --user pipenv
+            rm -rf .venv
+            pipenv --python 3.10.16
+            pipenv install --dev
             npm install
 
       - save_cache:
           paths:
             - .venv
-          key: deps-v2-{{ checksum "Pipfile.lock" }}
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
 
       - run:
           # Our primary container isn't MYSQL so run a sleep command until it's ready.
@@ -80,33 +79,29 @@ jobs:
           file: ./cov.xml
   lint:
     docker:
-      - image: circleci/python:3.7.10-node-browsers
+      - image: cimg/python:3.10.16-node
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
       - checkout
       - restore_cache:
-          key: deps-v2-{{ checksum "Pipfile.lock" }}
-      - run:
-          name: Fix EOL Debian Buster APT sources
-          command: |
-            sudo sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list
-            sudo sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list
-            echo 'Acquire::Check-Valid-Until "false";' | sudo tee /etc/apt/apt.conf.d/99no-check-valid
-            sudo apt-get -o Acquire::Check-Valid-Until=false update
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
       - run:
           name: install dependencies
           command: |
             sudo apt-get update
-            sudo apt-get upgrade -y
             sudo apt-get install -y default-mysql-client
-            sudo pip install pipenv
-            pipenv install
+            python -m pip install --upgrade pip
+            python -m pip install --user pipenv
+            # Remove .venv if it exists from cache to avoid version mismatch
+            rm -rf .venv
+            pipenv --python 3.10.16
+            pipenv install --dev
             npm install
       - save_cache:
           paths:
             - .venv
-          key: deps-v2-{{ checksum "Pipfile.lock" }}
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
       - run:
           name: Lint -- Python
           command: |
@@ -116,29 +111,31 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: circleci/python:3.8
+      - image: cimg/python:3.10
     steps:
       - checkout
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "docs/requirements.txt" }}
-            - v1-dependencies-
+            - v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
+            - v2-docs-dependencies-
       - run:
           name: install dependencies
           command: |
+            sudo apt-get update
+            sudo apt-get install -y python3.10-venv
             python3 -m venv venv
             . venv/bin/activate
             pip install -r docs/requirements.txt
       - save_cache:
           paths:
             - ./venv
-          key: v1-dependencies-{{ checksum "docs/requirements.txt" }}
+          key: v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
       - run:
           name: Build docs
           command: |
             . venv/bin/activate
             cd docs
-            mkdir _static
+            mkdir -p _static
             make html
       - run:
           name: Check links

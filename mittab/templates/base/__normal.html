@@ -19,7 +19,7 @@
     
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'main' %}
-
+    {% block extra_head %}{% endblock extra_head %}
     <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
     <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
     <link rel="stylesheet"
@@ -29,13 +29,11 @@
     <title>{% block title %}{% endblock %}</title>
 </head>
 <body>
-  {% with smaller_width=True %}
   {% include "base/_navigation.html" %}
-  {% endwith %}
 
   <div class="container-fluid text-start">
 
-    <div id="container-main" class="container my-4 p-4">
+    <div id="container-main" class="container p-3 rounded shadow-lg">
       <div class="row">
         <div class="col">
           {% if messages %}
@@ -54,7 +52,7 @@
         </div>
       </div>
 
-      <div class="row mt-2">
+      <div class="row mt-2 content">
         {% block content %}{% endblock %}
       </div>
 

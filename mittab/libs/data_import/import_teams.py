@@ -29,7 +29,7 @@ class TeamImporter(WorkbookImporter):
             try:
                 self.create(school)
             except Exception:
-                self.error("Invalid school '%s'" % school_name, row_number)
+                self.error(f"Invalid school '{school_name}'", row_number)
                 return
 
         hybrid_school_name = row[2]
@@ -45,7 +45,7 @@ class TeamImporter(WorkbookImporter):
                     self.create(hybrid_school)
                 except Exception:
                     self.error(
-                        "Invalid hybrid school '%s'" % hybrid_school_name,
+                        f"Invalid hybrid school '{hybrid_school_name}'",
                         row_number)
                     return
 
@@ -59,7 +59,7 @@ class TeamImporter(WorkbookImporter):
         elif team_seed in self.unseeded_values:
             team_seed = Team.UNSEEDED
         else:
-            self.error("Invalid seed value for team %s" % team_name,
+            self.error(f"Invalid seed value for team {team_name}",
                        row_number)
             return
 
@@ -88,7 +88,7 @@ class TeamImporter(WorkbookImporter):
         else:
             for _field, error_msgs in deb1_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb1_name, error_msg), row_number)
+                    self.error(f"{deb1_name} - {error_msg}", row_number)
             return
 
         deb2_form = DebaterForm(data={
@@ -101,7 +101,7 @@ class TeamImporter(WorkbookImporter):
         else:
             for _field, error_msgs in deb2_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb2_name, error_msg), row_number)
+                    self.error(f"{deb2_name} - {error_msg}", row_number)
             return
 
         team_form = TeamForm(
@@ -119,5 +119,5 @@ class TeamImporter(WorkbookImporter):
         else:
             for _field, error_msgs in team_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb2_name, error_msg), row_number)
+                    self.error(f"{deb2_name} - {error_msg}", row_number)
             return

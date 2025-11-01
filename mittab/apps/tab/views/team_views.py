@@ -1,6 +1,6 @@
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.errors import *
@@ -13,21 +13,6 @@ from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
 from mittab.libs.tab_logic import rankings
 
 
-def public_view_teams(request):
-    display_teams = TabSettings.get("teams_public", 0)
-
-    if not request.user.is_authenticated and not display_teams:
-        return redirect_and_flash_error(
-            request, "This view is not public", path="/")
-
-    return render(
-        request, "public/teams.html", {
-            "teams": Team.objects
-                     .order_by("-checked_in", "school__name")
-                     .prefetch_related("debaters", "school", "hybrid_school")
-                     .all(),
-            "num_checked_in": Team.objects.filter(checked_in=True).count()
-        })
 
 
 def view_teams(request):
@@ -77,16 +62,20 @@ def view_team(request, team_id):
                 return redirect_and_flash_error(
                     request,
                     "An error occured, most likely a non-existent team")
+            updated_name = form.cleaned_data["name"]
             return redirect_and_flash_success(
-                request, "Team {} updated successfully".format(
-                    form.cleaned_data["name"]))
+                request, f"Team {updated_name} updated successfully")
     else:
         form = TeamForm(instance=team)
-        links = [("/team/" + str(team_id) + "/scratches/view/",
-                  "Scratches for {}".format(team.display_backend))]
+        links = [
+            (
+                f"/team/{team_id}/scratches/view/",
+                f"Scratches for {team.display_backend}",
+            )
+        ]
         return render(
             request, "tab/team_detail.html", {
-                "title": "Viewing Team: %s" % (team.display_backend),
+                "title": f"Viewing Team: {team.display_backend}",
                 "form": form,
                 "links": links,
                 "team_obj": team,
@@ -109,13 +98,14 @@ def enter_team(request):
                 )
             num_forms = form.cleaned_data["number_scratches"]
             if num_forms > 0:
-                return HttpResponseRedirect("/team/" + str(team.pk) +
-                                            "/scratches/add/" + str(num_forms))
+                return HttpResponseRedirect(
+                    f"/team/{team.pk}/scratches/add/{num_forms}"
+                )
             else:
+                team_name = team.display_backend
                 return redirect_and_flash_success(
                     request,
-                    "Team {} created successfully".format(
-                        team.display_backend),
+                    f"Team {team_name} created successfully",
                     path="/")
     else:
         form = TeamEntryForm()
@@ -171,7 +161,7 @@ def add_scratches(request, team_id, number_scratches):
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, [None] * len(forms))),
             "data_type": "Scratch",
-            "title": "Adding Scratch(es) for %s" % (team.display_backend)
+            "title": f"Adding Scratch(es) for {team.display_backend}"
         })
 
 
@@ -215,23 +205,23 @@ def view_scratches(request, team_id):
             for i in range(len(scratches))
         ]
     delete_links = [
-        "/team/" + str(team_id) + "/scratches/delete/" + str(scratches[i].id)
+        f"/team/{team_id}/scratches/delete/{scratches[i].id}"
         for i in range(len(scratches))
     ]
-    links = [("/team/" + str(team_id) + "/scratches/add/1/", "Add Scratch")]
+    links = [(f"/team/{team_id}/scratches/add/1/", "Add Scratch")]
     return render(
         request, "common/data_entry_multiple.html", {
             "forms": list(zip(forms, delete_links)),
             "data_type": "Scratch",
             "links": links,
-            "title": "Viewing Scratch Information for %s" % (team.display_backend)
+            "title": f"Viewing Scratch Information for {team.display_backend}"
         })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def all_tab_cards(request):
     all_teams = Team.objects.all()
-    return render(request, "tab/all_tab_cards.html", locals())
+    return render(request, "tab/all_tab_cards.html", {"all_teams": all_teams})
 
 
 def pretty_tab_card(request, team_id):
@@ -261,8 +251,7 @@ def tab_card(request, team_id):
         iron_man = True
 
     deb1 = debaters[0]
-    if not iron_man:
-        deb2 = debaters[1]
+    deb2 = debaters[0] if iron_man else debaters[1]
 
     round_stats = []
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -363,8 +352,6 @@ def tab_card(request, team_id):
         bye_round = None
 
     # Duplicates Debater 1 for display if Ironman team
-    if iron_man:
-        deb2 = deb1
     return render(
         request, "tab/tab_card.html", {
             "team_name": team.display_backend,
@@ -387,37 +374,13 @@ def tab_card(request, team_id):
 def rank_teams_ajax(request):
     return render(request, "tab/rank_teams.html", {"title": "Team Rankings"})
 
-
-def get_team_rankings(request):
-    ranked_teams = tab_logic.rankings.rank_teams()
-    teams = []
-    for i, team_stat in enumerate(ranked_teams):
-        tiebreaker = "N/A"
-        if i != len(ranked_teams) - 1:
-            next_team_stat = ranked_teams[i + 1]
-            tiebreaker_stat = team_stat.get_tiebreaker(next_team_stat)
-            if tiebreaker_stat is not None:
-                tiebreaker = tiebreaker_stat.name
-            else:
-                tiebreaker = "Tie not broken"
-        teams.append((team_stat.team, team_stat[rankings.WINS],
-                      team_stat[rankings.SPEAKS], team_stat[rankings.RANKS],
-                      tiebreaker))
-
-    nov_teams = list(filter(
-        lambda ts: all(
-            map(lambda d: d.novice_status == Debater.NOVICE, ts[0].debaters.
-                all())), teams))
-
-    return teams, nov_teams
-
-
 def rank_teams(request):
     teams, nov_teams = cache_logic.cache_fxn_key(
-        get_team_rankings,
-        "team_rankings",
+        rankings.get_team_rankings,
+        "team_rankings_private",
         cache_logic.DEFAULT,
-        request
+        request,
+        public=False
     )
 
     return render(request, "tab/rank_teams_component.html", {
@@ -426,11 +389,3 @@ def rank_teams(request):
         "title": "Team Rankings"
     })
 
-
-@permission_required("tab.tab_settings.can_change", login_url="/403")
-def team_check_in(request, team_id):
-    team_id = int(team_id)
-    team = get_object_or_404(Team, pk=team_id)
-    team.checked_in = not team.checked_in
-    team.save()
-    return JsonResponse({"success": True})

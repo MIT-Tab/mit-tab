@@ -79,6 +79,9 @@
             {% if rejudge_count > 1 %}
               <span class="badge bg-warning text-dark ms-1">({{rejudge_count}})</span>
             {% endif %}
+            {% if judge.wing_only %}
+              <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
+            {% endif %}
           </a>
           <ul class="dropdown-menu"></ul>
         </span>

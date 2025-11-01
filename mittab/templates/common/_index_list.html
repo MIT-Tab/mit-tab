@@ -13,9 +13,18 @@
         <i class="fas fa-plus"></i>
       </a>
     </div>
+    {% if view_path_prefix == "judge" %}
+    <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
+      Download Judge Codes
+    </a>
+    {% endif %}
   </h4>
-
-  <ol id="{{ html_id }}" class="ps-3 mb-0" style="max-height: 400px; overflow-y: auto;">
+  {% if model_name == "Rooms" %}
+    <h4 class="text-center font-weight-normal">  
+     <a href = {% url "manage_room_tags" %} class = "btn btn-sm btn-light"> Manage Room Tags</a>
+      </h4>
+     {% endif %}
+  <ol id="{{ html_id }}">
     {% for id, name in list_data %}
       <li class="searchable py-1">
         <a href="/{{ view_path_prefix }}/{{ id }}/" class="text-primary">{{ name }}</a>

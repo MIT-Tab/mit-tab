@@ -9,39 +9,39 @@ module.exports = {
   context: __dirname,
   entry: {
     main: "./assets/js/index",
-    pairingDisplay: "./assets/js/pairingDisplay",
     publicDisplay: "./assets/js/publicDisplay",
     bracket : "./assets/js/bracket",
+    batchCheckin: "./assets/js/batchCheckin",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],
   },
   output: {
-    path: path.resolve("./assets/webpack_bundles/"),
+    path: path.resolve(__dirname, "assets/webpack_bundles/"),
     publicPath: "/static/webpack_bundles/",
     filename: "[name]-[hash].js",
   },
   module: {
     rules: [
       {
-        test: /\.css/,
+        test: /\.css$/,
         use: [MiniCssExtractPlugin.loader, "css-loader"],
       },
       {
-        test: /\.(png|jpe?g|gif)$/,
-        use: [
-          {
-            loader: "file-loader",
-            options: {},
-          },
-        ],
+        test: /\.(png|jpe?g|gif)$/i,
+        type: "asset/resource",
       },
       {
         test: /\.scss$/,
         use: [
           MiniCssExtractPlugin.loader,
-          "css-loader", // translates CSS into CommonJS
-          "sass-loader", // compiles Sass to CSS, using Node Sass by default
+          "css-loader",
+          {
+            loader: "sass-loader",
+            options: {
+              implementation: require("sass"),
+            },
+          },
         ],
       },
       {
@@ -67,7 +67,11 @@ module.exports = {
   },
 
   plugins: [
-    new BundleTracker({ filename: "./webpack-stats.json" }),
+    new BundleTracker({
+      path: __dirname,
+      filename: "webpack-stats.json",
+    }),
+
     new MiniCssExtractPlugin({
       filename: "[name].css",
       chunkFilename: "[id].css",

@@ -1,6 +1,6 @@
 {
     "python.testing.pytestArgs": [
-        "mittab/libs/tests"
+        "mittab"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true
