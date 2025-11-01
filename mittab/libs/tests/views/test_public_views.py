@@ -28,7 +28,13 @@ class TestPublicViews(TestCase):
             type_of_round=Outround.VARSITY,
             room=Room.objects.last(),
         ).save()
-        Round.objects.filter(round_number=1).update(victor=0)
+
+        # Find one round and set it to have no victor (missing ballot)
+        # Save the original state to restore in tearDown
+        self.test_round = Round.objects.filter(round_number=1).first()
+        self.original_victor = self.test_round.victor
+        self.test_round.victor = Round.NONE
+        self.test_round.save()
 
         TabSettings.set("cur_round", 2)
         TabSettings.set("pairing_released", 1)
@@ -39,8 +45,14 @@ class TestPublicViews(TestCase):
         TabSettings.set("var_teams_visible", 2)  # Show finals and above
         TabSettings.set("nov_teams_visible", 2)  # Show finals and above
 
+    def tearDown(self):
+        # Restore the original victor value to avoid polluting other tests
+        self.test_round.victor = self.original_victor
+        self.test_round.save()
+        super().tearDown()
+
     def get_test_objects(self):
-        judge = Round.objects.filter(round_number=1, victor=0).first().chair
+        judge = Round.objects.filter(round_number=1, victor=Round.NONE).first().chair
         team = Team.objects.first()
         round_obj = Round.objects.filter(round_number=1, gov_team__isnull=False).first()
         v_out = Outround.objects.filter(type_of_round=0).first()
