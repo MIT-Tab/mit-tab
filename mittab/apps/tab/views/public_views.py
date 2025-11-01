@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import *
-from mittab.libs import cache_logic, tab_logic
+from mittab.libs import cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
