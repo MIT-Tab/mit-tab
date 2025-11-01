@@ -359,8 +359,8 @@ class Judge(models.Model):
                                 update_fields)
 
     def is_checked_in_for_round(self, round_number):
-        return CheckIn.objects.filter(judge=self,
-                                      round_number=round_number).exists()
+        return any(checkin.round_number == round_number
+                   for checkin in self.checkin_set.all())
 
     def __str__(self):
         return self.name

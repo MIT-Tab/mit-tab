@@ -6,13 +6,14 @@ from django.contrib.auth.views import LoginView
 from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
-import mittab.apps.tab.views as views
-import mittab.apps.tab.api_views as api_views
-import mittab.apps.tab.judge_views as judge_views
-import mittab.apps.tab.team_views as team_views
-import mittab.apps.tab.debater_views as debater_views
-import mittab.apps.tab.pairing_views as pairing_views
-import mittab.apps.tab.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.views as views
+import mittab.apps.tab.views.public_views as public_views
+import mittab.apps.tab.views.api_views as api_views
+import mittab.apps.tab.views.judge_views as judge_views
+import mittab.apps.tab.views.team_views as team_views
+import mittab.apps.tab.views.debater_views as debater_views
+import mittab.apps.tab.views.pairing_views as pairing_views
+import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()
@@ -30,13 +31,8 @@ urlpatterns = [
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),
 
-    # Account related
-    path("accounts/login/",
-         LoginView.as_view(template_name="registration/login.html"),
-         name="tab_login"),
 
     # Judge related
-    re_path(r"^judges/", judge_views.public_view_judges, name="public_judges"),
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
     re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
             judge_views.add_scratches,
@@ -78,7 +74,6 @@ urlpatterns = [
     re_path(r"^enter_scratch/", views.add_scratch, name="add_scratch"),
 
     # Team related
-    re_path(r"^teams/", team_views.public_view_teams, name="public_teams"),
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
     re_path(r"^team/(\d+)/scratches/add/(\d+)/",
             team_views.add_scratches,
@@ -96,8 +91,6 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    path("rank_teams_public/", team_views.rank_teams_public,
-         name="rank_teams_public"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
@@ -169,12 +162,6 @@ urlpatterns = [
     path("pairing/start_tourny/",
          pairing_views.start_new_tourny,
          name="start_tourny"),
-    path("pairings/pairinglist/",
-         pairing_views.pretty_pair,
-         name="pretty_pair"),
-    path("pairings/missing_ballots/",
-         pairing_views.missing_ballots,
-         name="missing_ballots"),
     path("pairings/export_csv/",
          pairing_views.export_pairings_csv_view,
          name="export_pairings_csv"),
@@ -187,11 +174,6 @@ urlpatterns = [
     path("pairing/view_backups/",
          pairing_views.view_backups,
          name="view_backups"),
-    path("e_ballots/", pairing_views.e_ballot_search,
-         name="e_ballot_search"),
-    path("e_ballots/<str:ballot_code>/",
-         pairing_views.enter_e_ballot,
-         name="enter_e_ballot"),
     path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),
     path("batch_checkin/", views.batch_checkin, name="batch_checkin"),
     path("round/<int:round_id>/alternative_rooms/",
@@ -246,9 +228,6 @@ urlpatterns = [
     path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
          outround_pairing_views.pair_next_outround,
          name="next_outround"),
-    path("outround_pairings/pairinglist/<int:type_of_round>/",
-         outround_pairing_views.pretty_pair,
-         name="outround_pretty_pair"),
     path("outround_pairings/export_csv/<int:type_of_round>/",
          outround_pairing_views.export_outround_pairings_csv_view,
          name="export_outround_pairings_csv"),
@@ -323,6 +302,35 @@ urlpatterns = [
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # Public views
+    path("public/login/",
+         LoginView.as_view(template_name="public/login.html"),
+         name="tab_login"),
+    path("public/pairings/",
+         public_views.pretty_pair,
+         name="pretty_pair"),
+    path("public/missing-ballots/",
+         public_views.missing_ballots,
+         name="missing_ballots"),
+    path("public/e-ballots/",
+         public_views.e_ballot_search,
+         name="e_ballot_search"),
+    path("public/e-ballots/<str:ballot_code>/",
+         public_views.enter_e_ballot,
+         name="enter_e_ballot"),
+    path("public/judges/",
+         public_views.public_view_judges,
+         name="public_judges"),
+    path("public/teams/",
+         public_views.public_view_teams,
+         name="public_teams"),
+    path("public/team-rankings/",
+         public_views.rank_teams_public,
+         name="rank_teams_public"),
+    path("public/outrounds/<int:type_of_round>/",
+         public_views.outround_pretty_pair,
+         name="outround_pretty_pair"),
 ]
 
 if settings.SILK_ENABLED:
@@ -331,6 +339,6 @@ if settings.SILK_ENABLED:
         path("silk/", include("silk.urls", namespace="silk"))
     ]
 
-handler403 = "mittab.apps.tab.views.render_403"
-handler404 = "mittab.apps.tab.views.render_404"
-handler500 = "mittab.apps.tab.views.render_500"
+handler403 = "mittab.apps.tab.views.views.render_403"
+handler404 = "mittab.apps.tab.views.views.render_404"
+handler500 = "mittab.apps.tab.views.views.render_500"
