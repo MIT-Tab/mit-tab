@@ -339,6 +339,6 @@ if settings.SILK_ENABLED:
         path("silk/", include("silk.urls", namespace="silk"))
     ]
 
-handler403 = "mittab.apps.tab.views.render_403"
-handler404 = "mittab.apps.tab.views.render_404"
-handler500 = "mittab.apps.tab.views.render_500"
+handler403 = "mittab.apps.tab.views.views.render_403"
+handler404 = "mittab.apps.tab.views.views.render_404"
+handler500 = "mittab.apps.tab.views.views.render_500"
