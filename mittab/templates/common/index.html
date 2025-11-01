@@ -72,4 +72,34 @@
     {% endwith %}
   </div>
 </div>
+
+<script>
+// Mobile accordion behavior for index lists
+(function() {
+  if (window.innerWidth < 768) {
+    // On mobile, collapse all sections initially
+    const allContents = document.querySelectorAll('.index_container .collapse');
+    allContents.forEach(content => {
+      content.classList.remove('show');
+    });
+    
+    const headers = document.querySelectorAll('.index_container h4[data-toggle="collapse"]');
+    
+    headers.forEach(header => {
+      header.addEventListener('click', function(e) {
+        // Get the target content
+        const targetId = this.getAttribute('data-target');
+        const target = document.querySelector(targetId);
+        
+        // Close all other sections
+        allContents.forEach(content => {
+          if (content !== target && content.classList.contains('show')) {
+            $(content).collapse('hide');
+          }
+        });
+      });
+    });
+  }
+})();
+</script>
 {% endblock %}

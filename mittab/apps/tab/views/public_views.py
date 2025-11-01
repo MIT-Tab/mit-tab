@@ -12,6 +12,71 @@ from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.apps.tab.views.pairing_views import enter_result
 
+
+def public_home(request):
+    # Get current round and tournament status
+    cur_round = TabSettings.get("cur_round", 1)
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+    pairing_released = TabSettings.get("pairing_released", 0) == 1
+    tournament_start_time = TabSettings.get("tournament_start_time", "")
+    
+    # Calculate missing ballots if in a round
+    missing_ballots_count = 0
+    if cur_round > 1:
+        round_number = cur_round - 1
+        missing_ballots_count = Round.objects.filter(
+            victor=Round.NONE, 
+            round_number=round_number
+        ).count()
+    
+    # Check if we're in outrounds
+    in_outrounds = False
+    current_outround_label = ""
+    outround_missing_ballots = 0
+    
+    if cur_round > tot_rounds:
+        in_outrounds = True
+        # Get the smallest num_teams from outrounds (most recent round)
+        varsity_outrounds = Outround.objects.filter(
+            type_of_round=BreakingTeam.VARSITY
+        ).order_by('num_teams').first()
+        
+        novice_outrounds = Outround.objects.filter(
+            type_of_round=BreakingTeam.NOVICE
+        ).order_by('num_teams').first()
+        
+        # Build label for current outround
+        labels = []
+        if varsity_outrounds:
+            labels.append(f"[V] Ro{varsity_outrounds.num_teams}")
+            outround_missing_ballots += Outround.objects.filter(
+                type_of_round=BreakingTeam.VARSITY,
+                num_teams=varsity_outrounds.num_teams,
+                victor=0
+            ).count()
+        
+        if novice_outrounds:
+            labels.append(f"[N] Ro{novice_outrounds.num_teams}")
+            outround_missing_ballots += Outround.objects.filter(
+                type_of_round=BreakingTeam.NOVICE,
+                num_teams=novice_outrounds.num_teams,
+                victor=0
+            ).count()
+        
+        current_outround_label = " & ".join(labels) if labels else ""
+        missing_ballots_count = outround_missing_ballots
+    
+    context = {
+        "cur_round": cur_round,
+        "tot_rounds": tot_rounds,
+        "pairing_released": pairing_released,
+        "missing_ballots_count": missing_ballots_count,
+        "tournament_start_time": tournament_start_time,
+        "in_outrounds": in_outrounds,
+        "current_outround_label": current_outround_label,
+    }
+    return render(request, "public/home.html", context)
+
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 

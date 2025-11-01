@@ -3,48 +3,39 @@
 
 
 {% block title %}Pairings for Round {{ round_number }}{% endblock %}
-{% block banner %}
-  Pairings for Round {{ round_number }}
-{% if pairing_exists %}
-    <div class="float-right">
-        <span class="badge badge-secondary bg-secondary text-white">
-            {{ team_count }} teams
-        </span>
-    </div>
-  {% endif %}
-{% endblock %}
-
 
 {% block extra_head %}
   {% render_bundle 'publicDisplay' %}
   <meta name="round-number" content="{{ round_number }}">
 {% endblock %}
 
+{% block banner %}{% endblock %}
 
 {% block content %}
-<div class="col-12">
+<div class="col-12 public-table-root">
+  <div class="public-table-header">
+    <h1>Pairings for Round {{ round_number }}</h1>
+    <span class="badge badge-secondary bg-secondary text-white public-table-header__badge">
+      {{ team_count }} teams
+    </span>
+  </div>
 {% if pairing_exists %}
     <div id="scrollPage" class="hidden"></div>
 
-
+    <div class="public-table-wrap">
       <table class="public_table">
       <thead>
           <tr>
-          <th style ="width: 30%;">
-              Government
-          </th> <th style="width: 30%;">
-              Opposition
-          </th> <th style="width: 20%;">
-              Judge
-          </th> <th style="width: 20%;">
-              Room
-          </th>
+          <th>Government</th>
+          <th>Opposition</th>
+          <th>Judge</th>
+          <th>Room</th>
           </tr>
       </thead>
       <tbody>
         {% for pairing in round_pairing %}
         <tr>
-            <td>
+            <td data-label="Government">
                 <div class="team-names">
                     {{pairing.gov_team.display}}
                 </div>
@@ -54,7 +45,7 @@
                 </div>
                 {% endif %}
             </td>
-            <td>
+            <td data-label="Opposition">
                 <div class="team-names">
                     {{pairing.opp_team.display}}
                 </div>
@@ -64,7 +55,7 @@
                 </div>
                 {% endif %}
             </td>
-            <td>
+            <td data-label="Judge">
                 {% for judge in pairing.judges.all %}
                     {% if pairing.judges.all|length > 1 and judge == pairing.chair %}
                     <b>{{judge.name}}</b><br>
@@ -73,11 +64,12 @@
                     {% endif %}
                 {% endfor %}
             </td>
-            <td>{{pairing.room.name}}</td>
+            <td data-label="Room">{{pairing.room.name}}</td>
         </tr>
         {% endfor %}
       </tbody>
         </table>
+    </div>
 
 
     <div class="public_footer_spacer"></div>

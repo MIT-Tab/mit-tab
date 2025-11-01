@@ -1,6 +1,9 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'main' %}
     {% block extra_head %}{% endblock extra_head %}

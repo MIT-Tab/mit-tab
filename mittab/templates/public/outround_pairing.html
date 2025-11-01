@@ -13,11 +13,14 @@
 {% endif %}
 {% endblock %}
 
+{% block banner %}{% endblock %}
+
 {% block content %}
-<div class="col-12">
+<div class="col-12 public-table-root">
     <div id="scrollPage" class="hidden"></div>
+    <div class="public-table-header">
       <h1>{{ label }}</h1>
-      <!--<h3>({{team_count}} teams)</h3>-->
+    </div>
 		{% if show_outrounds_bracket %}
       <ul class="nav nav-tabs" role="tablist">
               <li class="nav-item" role="presentation">
@@ -33,6 +36,8 @@
         <div id="list-view" class="tab-pane active" role="tabpanel" aria-labelledby="list-view-tab">
 	{% for outround in outround_pairings %}
 	    <center><h4><b>{{ outround.label }}</b></h4></center>
+        <div class="public-table-wrap">
+        <div class="public-table-wrap">
 	    <table class="public_table">
 		<thead>
           <tr>
@@ -51,7 +56,7 @@
 		{% for pairing in outround.rounds %}
 		    
 		    <tr>
-			<td>
+			<td data-label="{% if gov_opp_display %}Government{% else %}Team 1{% endif %}">
 			    {% if sidelock and pairing.sidelock %}<b>{% endif %}
 			    {% if choice and pairing.choice == 1 %}<b>{% endif %}
 				<div class="team-names">
@@ -65,7 +70,7 @@
 			    {% if choice and pairing.choice == 1 %}</b>{% endif %}
 			    {% if sidelock and pairing.sidelock %}</b>{% endif %}
 			</td>
-			<td>
+			<td data-label="{% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}">
 			    {% if choice and pairing.choice == 2 %}<b>{% endif %}
 				<div class="team-names">
 					{{pairing.opp_team.display}}
@@ -77,7 +82,7 @@
 				{% endif %}
 			    {% if choice and pairing.choice == 2 %}</b>{% endif %}
 			</td>
-			<td>
+			<td data-label="Judge">
 			    {% for judge in pairing.judges.all %}
 				{% if pairing.judges.all|length > 1 and judge == pairing.chair %}
 				    <b>{{judge.name}}</b><br>
@@ -86,7 +91,7 @@
 				{% endif %}
 			    {% endfor %}
 			</td>
-			<td>{{pairing.room.name}}</td>
+			<td data-label="Room">{{pairing.room.name}}</td>
 		    </tr>
 		{% endfor %}
 		{% if outround.excluded|length > 0 %}
@@ -101,6 +106,8 @@
 		{% endif %}
 		</tbody>
 	    </table>
+        </div>
+        </div>
 	{% empty %}
 	    <div style="padding: 20px;">Nothing is visible.</div>
 	{% endfor %}

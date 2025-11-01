@@ -1,32 +1,60 @@
-<div class="col-sm" id="school_list">
-  <h4 class="text-center font-weight-normal">
-    {{count}} {{model_name}}
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-sm btn-light" href="{{ list_path }}"
-        title="List {{model_name|lower}}"
-        id="{{ html_id }}-btn-list">
-        <i class="fas fa-list"></i>
-      </a>
-      <a class="btn btn-sm btn-light" href="{{ enter_path }}"
-        title="Add {{model_name|lower}}"
-        id="{{ html_id }}-btn-add">
-        <i class="fas fa-plus"></i>
-      </a>
-    </div>
-    {% if view_path_prefix == "judge" %}
-    <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
-      Download Judge Codes
-    </a>
-    {% endif %}
+<div class="col-sm index-section" id="school_list">
+  <h4 class="text-center font-weight-normal index-section-header" data-toggle="collapse" data-target="#{{ html_id }}-content" aria-expanded="false">
+    <span class="section-title">{{count}} {{model_name}}</span>
+    <span class="section-actions">
+      <span class="btn-group btn-group-sm">
+        <a class="btn btn-sm btn-light" href="{{ list_path }}"
+          title="List {{model_name|lower}}"
+          id="{{ html_id }}-btn-list"
+          onclick="event.stopPropagation();">
+          <i class="fas fa-list"></i>
+        </a>
+        <a class="btn btn-sm btn-light" href="{{ enter_path }}"
+          title="Add {{model_name|lower}}"
+          id="{{ html_id }}-btn-add"
+          onclick="event.stopPropagation();">
+          <i class="fas fa-plus"></i>
+        </a>
+      </span>
+    </span>
   </h4>
   {% if model_name == "Rooms" %}
-    <h4 class="text-center font-weight-normal">  
-     <a href = {% url "manage_room_tags" %} class = "btn btn-sm btn-light"> Manage Room Tags</a>
-      </h4>
-     {% endif %}
-  <ol id="{{ html_id }}">
-    {% for id, name in list_data %}
-      <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
-    {% endfor %}
-  </ol>
+    <div class="collapse show" id="{{ html_id }}-content">
+      <div class="index-section-content">
+        <div class="text-center mb-2">  
+          <a href="{% url 'manage_room_tags' %}" class="btn btn-sm btn-light">Manage Room Tags</a>
+        </div>
+        <ol id="{{ html_id }}">
+          {% for id, name in list_data %}
+            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+  {% elif view_path_prefix == "judge" %}
+    <div class="collapse show" id="{{ html_id }}-content">
+      <div class="index-section-content">
+        <div class="text-center mb-2">
+          <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
+            Download Judge Codes
+          </a>
+        </div>
+        <ol id="{{ html_id }}">
+          {% for id, name in list_data %}
+            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+  {% else %}
+    <div class="collapse show" id="{{ html_id }}-content">
+      <div class="index-section-content">
+        <ol id="{{ html_id }}">
+          {% for id, name in list_data %}
+            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+  {% endif %}
 </div>

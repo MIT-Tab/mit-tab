@@ -82,3 +82,201 @@ th.drag-selecting {
     }
   }
 }
+
+// Mobile-specific improvements
+@media (max-width: 768px) {
+  #container-main {
+    padding: 0;
+  }
+  
+  .tab-content {
+    padding: 0;
+    
+    .col {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+  
+  .table {
+    font-size: 0.7rem;
+    
+    th, td {
+      padding: 0.3rem 0.4rem !important;
+      font-size: 0.7rem;
+      max-width: none; // Remove max-width constraint
+    }
+    
+    // First column with bulk toggle
+    tbody tr td:first-child {
+      padding: 0.2rem 0.25rem !important;
+      min-width: 2.5rem;
+      
+      .d-flex .btn {
+        padding: 0.1rem 0.25rem !important;
+        font-size: 0.6rem !important;
+        line-height: 1;
+      }
+    }
+    
+    // Regular data columns - allow natural width
+    td:nth-child(2), td:nth-child(3), td:nth-child(4) {
+      white-space: normal; // Allow wrapping
+      word-break: break-word;
+      min-width: 5rem;
+    }
+    
+    // Round header columns
+    th.round-header {
+      width: auto;
+      min-width: 3rem; // Much narrower - just fit the switch
+      max-width: 3rem;
+      padding: 0.3rem 0.2rem !important;
+      
+      .mb-1 {
+        margin-bottom: 0.2rem !important;
+        font-size: 0.75rem;
+      }
+      
+      .d-flex {
+        gap: 0.15rem;
+      }
+      
+      .d-flex .btn {
+        padding: 0.15rem 0.3rem !important;
+        font-size: 0.6rem !important;
+        line-height: 1.1;
+      }
+    }
+    
+    // "Checked In?" header for teams
+    th.round-header:not(:has(.short-text)) {
+      min-width: 5rem;
+      max-width: none;
+    }
+    
+    // Round columns - match header width
+    td:has(.custom-switch) {
+      padding: 0.2rem 0.2rem !important;
+      min-width: 3rem;
+      max-width: 3rem;
+      text-align: center;
+    }
+    
+    // Custom switches
+    .custom-control {
+      padding-left: 1.8rem;
+      min-height: 1rem;
+    }
+    
+    .custom-switch {
+      .custom-control-label::before {
+        width: 1.4rem;
+        height: 0.85rem;
+        left: -1.8rem;
+        top: 0.05rem;
+      }
+      
+      .custom-control-label::after {
+        width: calc(0.85rem - 4px);
+        height: calc(0.85rem - 4px);
+        left: calc(-1.8rem + 2px);
+        top: calc(0.05rem + 2px);
+      }
+      
+      .custom-control-input:checked ~ .custom-control-label::after {
+        transform: translateX(0.55rem);
+      }
+    }
+  }
+  
+  // Judge and Room tabs - make rows thinner for more density
+  #judge, #room {
+    .table {
+      tbody tr {
+        td {
+          padding: 0.2rem 0.3rem !important;
+          line-height: 1.2;
+        }
+        
+        // First column bulk toggle - even more compact
+        td:first-child {
+          padding: 0.15rem 0.2rem !important;
+        }
+        
+        // Round columns with switches - reduce padding even more
+        td:has(.custom-switch) {
+          padding: 0.15rem 0.15rem !important;
+          min-width: 2.5rem !important;
+          max-width: 2.5rem !important;
+        }
+      }
+      
+      // Make round headers narrower too
+      th.round-header {
+        min-width: 2.5rem !important;
+        max-width: 2.5rem !important;
+        padding: 0.25rem 0.15rem !important;
+      }
+      
+      // Make switches smaller on judge/room tabs
+      .custom-switch {
+        .custom-control-label::before {
+          width: 1.2rem;
+          height: 0.75rem;
+          left: -1.6rem;
+          top: 0;
+        }
+        
+        .custom-control-label::after {
+          width: calc(0.75rem - 4px);
+          height: calc(0.75rem - 4px);
+          left: calc(-1.6rem + 2px);
+          top: 2px;
+        }
+        
+        .custom-control-input:checked ~ .custom-control-label::after {
+          transform: translateX(0.45rem);
+        }
+      }
+      
+      .custom-control {
+        padding-left: 1.6rem;
+        min-height: 0.75rem;
+        margin: 0 auto; // Center the switch
+      }
+    }
+  }
+  
+  // Nav tabs - make more compact
+  .nav-tabs {
+    .nav-link {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.85rem;
+    }
+  }
+}
+
+// Extra small mobile
+@media (max-width: 576px) {
+  .table {
+    th.round-header {
+      min-width: 4rem;
+      
+      .d-flex {
+        flex-direction: column !important;
+        gap: 0.1rem;
+      }
+      
+      .d-flex .btn {
+        font-size: 0.55rem !important;
+        padding: 0.1rem 0.25rem !important;
+      }
+    }
+    
+    tbody tr td:first-child .d-flex .btn {
+      font-size: 0.55rem !important;
+      padding: 0.05rem 0.2rem !important;
+    }
+  }
+}
