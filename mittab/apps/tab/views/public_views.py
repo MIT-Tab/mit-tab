@@ -26,7 +26,7 @@ def cache_public_view(timeout=60, settings_keys=None):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             # Include settings values in cache key so it invalidates when they change
-            settings_vals = tuple(TabSettings.get(k, None) for k in settings_keys) if settings_keys else ()
+            settings_vals = tuple(TabSettings.get(k, "") for k in settings_keys) if settings_keys else ()
             cache_key = f"pv_{view_func.__name__}_{kwargs}_{settings_vals}_{request.user.is_authenticated}"
             
             cached = caches[cache_logic.DEFAULT].get(cache_key)
