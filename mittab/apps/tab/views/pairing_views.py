@@ -480,7 +480,6 @@ def view_round(request, round_number):
     simulate_round_button = os.environ.get("MITTAB_ENV") in (
         "development", "test-deployment"
     )
-    print(os.environ.get("MITTAB_ENV"))
     pairing_exists = len(round_pairing) > 0
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))

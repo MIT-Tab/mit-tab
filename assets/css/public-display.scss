@@ -31,11 +31,11 @@ $mittab-display-blue: #003a74;
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   line-height: 1.5;
 
   @media (min-width: 992px) {
-    font-size: 1rem;
+    font-size: 0.95rem;
     line-height: 1.6;
   }
 
@@ -53,10 +53,10 @@ $mittab-display-blue: #003a74;
   th {
     background: #9cf;
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 
     @media (min-width: 992px) {
-      font-size: 0.95rem;
+      font-size: 0.85rem;
     }
   }
 
@@ -70,6 +70,16 @@ $mittab-display-blue: #003a74;
   background: #fff;
   border-radius: 0.9rem;
   box-shadow: 0 14px 28px -26px rgba(12, 42, 92, 0.28);
+}
+
+@media (max-width: 767.98px) {
+  .public-table-root {
+    max-width: 100%;
+    margin: 0.25rem;
+    padding: 0.25rem;
+  }
+
+  .public-table-shell { padding: 0 0.25rem; }
 }
 
 .public-table-header {

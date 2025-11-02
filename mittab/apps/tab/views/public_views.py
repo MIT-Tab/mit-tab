@@ -18,53 +18,64 @@ def public_home(request):
     cur_round = TabSettings.get("cur_round", 1)
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released = TabSettings.get("pairing_released", 0) == 1
-    
+
     # Calculate missing ballots if in a round
     missing_ballots_count = 0
     if cur_round > 1:
         round_number = cur_round - 1
         missing_ballots_count = Round.objects.filter(
-            victor=Round.NONE, 
+            victor=Round.NONE,
             round_number=round_number
         ).count()
-    
+
     # Check if we're in outrounds
     in_outrounds = False
     current_outround_label = ""
     outround_missing_ballots = 0
-    
+
     if cur_round > tot_rounds:
         in_outrounds = True
         # Get the smallest num_teams from outrounds (most recent round)
         varsity_outrounds = Outround.objects.filter(
             type_of_round=BreakingTeam.VARSITY
-        ).order_by('num_teams').first()
-        
+        ).order_by("num_teams").first()
+
         novice_outrounds = Outround.objects.filter(
             type_of_round=BreakingTeam.NOVICE
-        ).order_by('num_teams').first()
-        
+        ).order_by("num_teams").first()
+
         # Build label for current outround
         labels = []
+        release_flags = []
+
         if varsity_outrounds:
             labels.append(f"[V] Ro{varsity_outrounds.num_teams}")
             outround_missing_ballots += Outround.objects.filter(
                 type_of_round=BreakingTeam.VARSITY,
                 num_teams=varsity_outrounds.num_teams,
-                victor=0
+                victor=Outround.UNKNOWN
             ).count()
-        
+            release_flags.append(
+                TabSettings.get("var_teams_visible", 256) <= varsity_outrounds.num_teams
+            )
+
         if novice_outrounds:
             labels.append(f"[N] Ro{novice_outrounds.num_teams}")
             outround_missing_ballots += Outround.objects.filter(
                 type_of_round=BreakingTeam.NOVICE,
                 num_teams=novice_outrounds.num_teams,
-                victor=0
+                victor=Outround.UNKNOWN
             ).count()
-        
+            release_flags.append(
+                TabSettings.get("nov_teams_visible", 256) <= novice_outrounds.num_teams
+            )
+
         current_outround_label = " & ".join(labels) if labels else ""
         missing_ballots_count = outround_missing_ballots
-    
+
+        if release_flags:
+            pairing_released = all(release_flags)
+
     context = {
         "cur_round": cur_round,
         "tot_rounds": tot_rounds,
