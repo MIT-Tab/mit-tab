@@ -16,7 +16,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches

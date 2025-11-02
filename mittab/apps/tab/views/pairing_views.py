@@ -20,12 +20,15 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
-import mittab.libs.cache_logic as cache_logic
+import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
+from mittab.libs.cacheing.public_cache import (
+    invalidate_inround_public_pairings_cache,
+)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -740,8 +743,13 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
-    TabSettings.set("pairing_released", int(not old))
-    data = {"success": True, "pairing_released": int(not old) == 1}
+    new_value = int(not old)
+    TabSettings.set("pairing_released", new_value)
+
+    if old == 1:
+        invalidate_inround_public_pairings_cache()
+
+    data = {"success": True, "pairing_released": new_value == 1}
     return JsonResponse(data)
 
 

@@ -13,7 +13,7 @@ from mittab.libs.tab_logic import (
 from mittab.libs.tab_logic.rankings import get_team_rankings
 from mittab.libs.tab_logic.stats import num_govs
 from mittab.libs import errors
-import mittab.libs.cache_logic as cache_logic
+import mittab.libs.cacheing.cache_logic as cache_logic
 
 
 

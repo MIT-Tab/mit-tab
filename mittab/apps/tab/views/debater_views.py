@@ -4,7 +4,8 @@ from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import tab_logic, cache_logic
+from mittab.libs import tab_logic
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
 

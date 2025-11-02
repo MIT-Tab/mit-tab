@@ -3,11 +3,12 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import tab_logic, cache_logic
+from mittab.libs import tab_logic
 from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
     tot_ranks_deb, tot_speaks, tot_ranks
 from mittab.libs.tab_logic import rankings

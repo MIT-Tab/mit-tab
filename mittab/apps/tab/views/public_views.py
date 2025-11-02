@@ -8,37 +8,11 @@ from django.core.cache import caches
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
                                     TabSettings, Judge, Team, Round)
-from mittab.libs import cache_logic
+from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.apps.tab.views.pairing_views import enter_result
-
-
-def cache_public_view(timeout=60, settings_keys=None):
-    """
-    Cache a public view, invalidating when specified TabSettings change.
-    """
-    if settings_keys is None:
-        settings_keys = []
-    
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            # Include settings values in cache key so it invalidates when they change
-            settings_vals = tuple(TabSettings.get(k, "") for k in settings_keys) if settings_keys else ()
-            cache_key = f"pv_{view_func.__name__}_{kwargs}_{settings_vals}_{request.user.is_authenticated}"
-            
-            cached = caches[cache_logic.DEFAULT].get(cache_key)
-            if cached is not None:
-                return cached
-            
-            response = view_func(request, *args, **kwargs)
-            caches[cache_logic.DEFAULT].set(cache_key, response, timeout)
-            return response
-        
-        return wrapper
-    return decorator
 
 @cache_public_view(timeout=60, settings_keys=["judges_public"])
 def public_view_judges(request):

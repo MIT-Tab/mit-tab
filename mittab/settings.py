@@ -80,7 +80,7 @@ DATABASES = {
         "PASSWORD": MYSQL_PASSWORD,
         "HOST":     MYSQL_HOST,
         "PORT":     MYSQL_PORT,
-        "CONN_MAX_AGE": 60,  # Keep connections alive for 60 seconds (reuse across requests)
+        "CONN_MAX_AGE": 60,  # Keep connections alive for 60 seconds
     }
 }
 
@@ -161,7 +161,11 @@ CACHES = {
     "filesystem": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": "/var/tmp/django_cache",
-    }
+    },
+    "public": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "public-pairings-cache",
+    },
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"

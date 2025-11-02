@@ -4,7 +4,7 @@ from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
 
 
 class TabSettings(models.Model):

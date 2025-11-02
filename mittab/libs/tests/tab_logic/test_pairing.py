@@ -12,8 +12,9 @@ from mittab.apps.tab.models import (
     TabSettings,
     Team,
 )
-from mittab.libs import assign_judges, assign_rooms, cache_logic
+from mittab.libs import assign_judges, assign_rooms
 from mittab.libs import tab_logic
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tests.helpers import generate_results
 
 
