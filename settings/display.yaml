@@ -10,11 +10,6 @@ settings:
     description: "The name of the tournament to display on the login page and throughout the site"
     value: ""
     type: text
-  - tournament_start_time:
-    name: tournament_start_time
-    description: "Tournament start time in ISO 8601 format (e.g., 2025-11-01T09:00:00). Used for countdown on the public home page."
-    value: ""
-    type: text
   - teams_public:
     name: teams_public
     description: "Check this box to make the team list publicly visible"

@@ -8,15 +8,15 @@
 {% block content %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
   <div class="public-home">
-    <div class="public-home__grid">
-      <aside class="public-home__sidebar">
-        <div class="public-sidebar-card public-sidebar-card--status">
-          <h3 class="public-sidebar-card__title">{% tournament_name %}</h3>
-          <div class="public-sidebar-card__content">
+    <div class="grid">
+      <aside class="sidebar">
+        <div class="public-sidebar-card status">
+          <h3 class="title">{% tournament_name %}</h3>
+          <div class="content">
             <div id="tournament-status">
               <!-- Status will be dynamically updated by JavaScript -->
-              <div class="status-icon">
-                <i class="fas fa-clock"></i>
+              <div class="status-icon" aria-hidden="true">
+                <i class="fas fa-clipboard-check"></i>
               </div>
               <div class="status-text">
                 <div class="status-primary" id="status-primary">Loading...</div>
@@ -24,43 +24,43 @@
               </div>
             </div>
             
-            <div class="public-sidebar-card__divider"></div>
+            <div class="divider"></div>
             
-            <div class="public-sidebar-card__item">
-              <div class="public-sidebar-card__icon">
+            <div class="item">
+              <div class="icon">
                 <i class="fas fa-info-circle"></i>
               </div>
-              <div class="public-sidebar-card__text">
+              <div class="text">
                 <strong>Tournament Updates</strong>
                 <p>Check back regularly for updated pairings, results, and standings throughout the tournament.</p>
               </div>
             </div>
             
-            <div class="public-sidebar-card__item">
-              <div class="public-sidebar-card__icon public-sidebar-card__icon--warning">
+            <div class="item">
+              <div class="icon warning">
                 <i class="fas fa-gavel"></i>
               </div>
-              <div class="public-sidebar-card__text">
+              <div class="text">
                 <strong>For Judges</strong>
                 <p>Use your ballot code to submit results electronically via the E-Ballot link.</p>
               </div>
             </div>
             
-            <div class="public-sidebar-card__item">
-              <div class="public-sidebar-card__icon public-sidebar-card__icon--success">
+            <div class="item">
+              <div class="icon success">
                 <i class="fas fa-users"></i>
               </div>
-              <div class="public-sidebar-card__text">
+              <div class="text">
                 <strong>For Teams</strong>
                 <p>View your matchups in Released Pairings and track your progress in Team Rankings.</p>
               </div>
             </div>
             
-            <div class="public-sidebar-card__item">
-              <div class="public-sidebar-card__icon public-sidebar-card__icon--info">
+            <div class="item">
+              <div class="icon info">
                 <i class="fas fa-sign-in-alt"></i>
               </div>
-              <div class="public-sidebar-card__text">
+              <div class="text">
                 <strong>Staff Login</strong>
                 <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
               </div>
@@ -69,63 +69,63 @@
         </div>
       </aside>
       
-      <aside class="public-home__links" aria-labelledby="public-home-quick-links">
-        <header class="public-home__header public-home__header--mobile-only">
-          <span class="public-home__label public-home__label--accent">Tournament</span>
-          <h1 class="public-home__title" id="public-home-quick-links">{% tournament_name %}</h1>
+      <aside class="links" aria-labelledby="public-home-quick-links">
+        <header class="header mobile-only">
+          <span class="label accent">Tournament</span>
+          <h1 class="title" id="public-home-quick-links">{% tournament_name %}</h1>
         </header>
-        <p class="public-home__lede">
+        <p class="lede">
           Live updates for pairings, ballots, and standings. Tab staff post here the moment information is released.
         </p>
 
         <nav class="public-links" aria-label="Quick links">
-          <a class="public-links__tile public-links__tile--primary" href="{% url 'pretty_pair' %}">
-            <span class="public-links__icon"><i class="fas fa-th-large"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Released Pairings</span>
-              <span class="public-links__subtitle">Latest rounds and room assignments.</span>
+          <a class="tile primary" href="{% url 'pretty_pair' %}">
+            <span class="icon"><i class="fas fa-th-large"></i></span>
+            <span class="body">
+              <span class="title">Released Pairings</span>
+              <span class="subtitle">Latest rounds and room assignments.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="public-links__tile public-links__tile--warning" href="{% url 'missing_ballots' %}">
-            <span class="public-links__icon"><i class="fas fa-clipboard-check"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Missing Ballots</span>
-              <span class="public-links__subtitle">Outstanding ballots that need attention.</span>
+          <a class="tile warning" href="{% url 'missing_ballots' %}">
+            <span class="icon"><i class="fas fa-clipboard-check"></i></span>
+            <span class="body">
+              <span class="title">Missing Ballots</span>
+              <span class="subtitle">Outstanding ballots that need attention.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="public-links__tile public-links__tile--success" href="{% url 'rank_teams_public' %}">
-            <span class="public-links__icon"><i class="fas fa-trophy"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Team Rankings</span>
-              <span class="public-links__subtitle">Current standings and performance.</span>
+          <a class="tile success" href="{% url 'rank_teams_public' %}">
+            <span class="icon"><i class="fas fa-trophy"></i></span>
+            <span class="body">
+              <span class="title">Team Rankings</span>
+              <span class="subtitle">Current standings and performance.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="public-links__tile public-links__tile--info" href="{% url 'e_ballot_search' %}">
-            <span class="public-links__icon"><i class="fas fa-tablet-alt"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Submit E-Ballot</span>
-              <span class="public-links__subtitle">Judges enter ballot codes to file results.</span>
+          <a class="tile info" href="{% url 'e_ballot_search' %}">
+            <span class="icon"><i class="fas fa-tablet-alt"></i></span>
+            <span class="body">
+              <span class="title">Submit E-Ballot</span>
+              <span class="subtitle">Judges enter ballot codes to file results.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="public-links__tile public-links__tile--success" href="{% url 'public_judges' %}">
-            <span class="public-links__icon"><i class="fas fa-balance-scale"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Judge List</span>
-              <span class="public-links__subtitle">Roster and check-in status.</span>
+          <a class="tile success" href="{% url 'public_judges' %}">
+            <span class="icon"><i class="fas fa-balance-scale"></i></span>
+            <span class="body">
+              <span class="title">Judge List</span>
+              <span class="subtitle">Roster and check-in status.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="public-links__tile public-links__tile--neutral" href="{% url 'public_teams' %}">
-            <span class="public-links__icon"><i class="fas fa-users"></i></span>
-            <span class="public-links__body">
-              <span class="public-links__title">Team List</span>
-              <span class="public-links__subtitle">Registered teams and schools.</span>
+          <a class="tile neutral" href="{% url 'public_teams' %}">
+            <span class="icon"><i class="fas fa-users"></i></span>
+            <span class="body">
+              <span class="title">Team List</span>
+              <span class="subtitle">Registered teams and schools.</span>
             </span>
-            <span class="public-links__chevron"><i class="fas fa-arrow-right"></i></span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
         </nav>
       </aside>
@@ -139,50 +139,26 @@
   const totRounds = {{ tot_rounds }};
   const pairingReleased = {{ pairing_released|yesno:"true,false" }};
   const missingBallots = {{ missing_ballots_count }};
-  const tournamentStartTime = "{{ tournament_start_time|escapejs }}";
   const inOutrounds = {{ in_outrounds|yesno:"true,false" }};
   const currentOutroundLabel = "{{ current_outround_label|escapejs }}";
 
-  const statusIcon = document.querySelector('.status-icon i');
+  const statusShell = document.querySelector('.status-icon');
   const statusPrimary = document.getElementById('status-primary');
   const statusSecondary = document.getElementById('status-secondary');
 
+  if (!statusShell || !statusPrimary || !statusSecondary) {
+    return;
+  }
+
+  function setStatusState() {
+    statusShell.className = 'status-icon';
+  }
+
   function updateStatus() {
-    // Before round 1 (cur_round == 1)
-    if (curRound === 1 && tournamentStartTime) {
-      const startTime = new Date(tournamentStartTime);
-      const now = new Date();
-      
-      if (now < startTime) {
-        // Show countdown
-        const diff = startTime - now;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        
-        statusIcon.className = 'fas fa-clock';
-        statusIcon.parentElement.className = 'status-icon status-icon--info';
-        statusPrimary.textContent = 'Tournament Starts In';
-        
-        if (days > 0) {
-          statusSecondary.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-        } else if (hours > 0) {
-          statusSecondary.textContent = `${hours}h ${minutes}m ${seconds}s`;
-        } else if (minutes > 0) {
-          statusSecondary.textContent = `${minutes}m ${seconds}s`;
-        } else {
-          statusSecondary.textContent = `${seconds}s`;
-        }
-        return;
-      }
-    }
-    
     // During outrounds
     if (inOutrounds && currentOutroundLabel) {
       if (pairingReleased) {
-        statusIcon.className = 'fas fa-clipboard-check';
-        statusIcon.parentElement.className = 'status-icon status-icon--warning';
+        setStatusState();
         statusPrimary.textContent = currentOutroundLabel;
         if (missingBallots > 0) {
           statusSecondary.textContent = `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`;
@@ -190,8 +166,7 @@
           statusSecondary.textContent = 'All ballots in';
         }
       } else {
-        statusIcon.className = 'fas fa-cog fa-spin';
-        statusIcon.parentElement.className = 'status-icon status-icon--primary';
+        setStatusState();
         statusPrimary.textContent = currentOutroundLabel;
         statusSecondary.textContent = 'Pairing in progress';
       }
@@ -202,8 +177,7 @@
     if (curRound > 1 && curRound <= totRounds + 1) {
       const displayRound = curRound - 1;
       if (pairingReleased) {
-        statusIcon.className = 'fas fa-clipboard-check';
-        statusIcon.parentElement.className = 'status-icon status-icon--warning';
+        setStatusState();
         statusPrimary.textContent = `Round ${displayRound}`;
         if (missingBallots > 0) {
           statusSecondary.textContent = `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`;
@@ -211,8 +185,7 @@
           statusSecondary.textContent = 'All ballots in';
         }
       } else {
-        statusIcon.className = 'fas fa-cog fa-spin';
-        statusIcon.parentElement.className = 'status-icon status-icon--primary';
+        setStatusState();
         statusPrimary.textContent = `Round ${displayRound}`;
         statusSecondary.textContent = 'Pairing in progress';
       }
@@ -220,8 +193,7 @@
     }
     
     // Default state
-    statusIcon.className = 'fas fa-info-circle';
-    statusIcon.parentElement.className = 'status-icon status-icon--info';
+    setStatusState();
     statusPrimary.textContent = 'Tournament';
     statusSecondary.textContent = 'Check back for updates';
   }

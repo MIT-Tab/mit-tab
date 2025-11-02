@@ -18,7 +18,6 @@ def public_home(request):
     cur_round = TabSettings.get("cur_round", 1)
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released = TabSettings.get("pairing_released", 0) == 1
-    tournament_start_time = TabSettings.get("tournament_start_time", "")
     
     # Calculate missing ballots if in a round
     missing_ballots_count = 0
@@ -71,7 +70,6 @@ def public_home(request):
         "tot_rounds": tot_rounds,
         "pairing_released": pairing_released,
         "missing_ballots_count": missing_ballots_count,
-        "tournament_start_time": tournament_start_time,
         "in_outrounds": in_outrounds,
         "current_outround_label": current_outround_label,
     }
