@@ -73,16 +73,31 @@ $mittab-display-blue: #003a74;
 }
 
 @media (max-width: 767.98px) {
+  #container-main,
+  .container-fluid {
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    display: block;
+  }
+
+  .public_table {
+    th,
+    td {
+      padding: 0.2rem 0.2rem;
+      vertical-align: middle;
+    }
+  }
+
   .public-table-root {
     flex: 0 0 calc(100% - 0.5rem);
-    max-width: calc(100% - 0.5rem);
-    margin: 0.25rem auto;
-    padding: 0.25rem;
+    max-width: min(99vw, 1520px);
+    margin: .1rem auto;
+    padding: .1rem;
   }
 
   .public-table-wrap {
     margin: 0 auto;
-    max-width: calc(100vw - 0.5rem);
+    max-width: 100%;
   }
 
   .public-table-shell { padding: 0 0.25rem; }
