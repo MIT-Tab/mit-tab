@@ -1,6 +1,11 @@
 {% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Missing Ballots{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicDisplay' %}
+{% endblock %}
 
 {% block content %}
 

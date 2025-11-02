@@ -24,10 +24,6 @@
   box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
 }
 
-.public-home-shell {
-  background: linear-gradient(180deg, #f5f7fb 0%, #ffffff 60%);
-}
-
 .public-home-wrapper {
   width: 100%;
   padding: 0;
@@ -56,35 +52,49 @@
     margin-bottom: 1.25rem;
 
     &.mobile-only {
+      align-items: center;
+      text-align: center;
+
+      .title {
+        text-align: inherit;
+        width: 100%;
+        position: relative;
+      }
+
+      .status-block {
+        width: auto;
+      }
+
+      .status-block--inline {
+        justify-content: center;
+        text-align: center;
+        width: auto;
+
+        .status-text {
+          align-items: center;
+          text-align: center;
+        }
+
+        .status-divider {
+          width: 1px;
+          height: 2.5rem;
+          background: rgba(31, 47, 74, 0.18);
+        }
+      }
+
       @media (min-width: 992px) {
         display: none;
       }
     }
-
-    &.desktop-only {
-      display: none;
-      
-      @media (min-width: 992px) {
-        display: flex;
-      }
-    }
-  }
-
-  .label {
-    display: inline-block;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(15, 32, 56, 0.55);
-
-    &.accent {
-      color: rgba(39, 109, 214, 0.85);
+    .status-title {
+      margin: 0;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(31, 47, 74, 0.6);
     }
 
-    &.invert {
-      color: rgba(26, 62, 120, 0.6);
-    }
   }
 
   .title {
@@ -102,45 +112,20 @@
       line-height: 1.1;
     }
   }
-
-  .lede {
-    margin: 0 0 1.5rem 0;
-    font-size: 0.95rem;
-    line-height: 1.65;
-    color: rgba(12, 38, 72, 0.78);
-
-    &.muted {
-      color: rgba(12, 38, 72, 0.68);
-    }
-  }
-
-  .hero .lede {
-    max-width: 28rem;
-  }
-
   .divider {
     margin: 1.6rem 0;
     border: 0;
     border-top: 1px solid rgba(0, 44, 92, 0.08);
   }
-
-  .quick-heading {
-    margin: 0;
-    font-size: 1.35rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: #0b3463;
-  }
-
   .links {
     @include card-shell;
     padding: 2rem 2.5rem;
     color: #1d2b44;
 
-    // Hide header and lede on desktop (they only show on mobile)
+
+    // Hide header on desktop (they only show on mobile)
     @media (min-width: 992px) {
-      .header,
-      .lede {
+      .header {
         display: none;
       }
     }
@@ -151,11 +136,6 @@
 
     .title {
       color: #1d2b44;
-    }
-
-    .lede {
-      color: rgba(26, 47, 78, 0.7);
-      margin-bottom: 0;
     }
   }
 
@@ -183,8 +163,6 @@
     --tile-accent: #2a66c4;
     --tile-bg-tint: rgba(88, 174, 238, 0.22);
     border-left: 3px solid var(--tile-accent);
-    background: linear-gradient(135deg, var(--tile-bg-tint), rgba(255, 255, 255, 0.97));
-    box-shadow: 0 14px 30px -26px rgba(16, 34, 63, 0.28);
     color: inherit;
     text-decoration: none;
     transition: all 140ms ease;
@@ -209,10 +187,6 @@
     &.neutral {
       --tile-accent: #2a66c4;
       --tile-bg-tint: rgba(88, 174, 238, 0.22);
-    }
-
-    .icon {
-      display: none;
     }
 
     .body {
@@ -274,18 +248,10 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-
-    &.center {
-      align-items: center;
-      justify-content: center;
-    }
   }
 
   .item {
     display: block;
-    .icon {
-      display: none;
-    }
 
     .text {
       flex: 1;
@@ -329,64 +295,88 @@
       gap: 1.5rem;
     }
     
-    #tournament-status {
+    .status-block {
       padding: 1.5rem 0;
     }
   }
 }
 
-#tournament-status {
+.status-block {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.25rem;
   text-align: center;
   width: 100%;
+}
 
-  .status-icon {
-    width: 3.75rem;
-    height: 3.75rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(88, 174, 238, 0.16);
-    color: #2a66c4;
-    transition: background 0.3s ease, color 0.3s ease;
-
-    i {
-      font-size: 1.6rem;
-    }
-  }
+.status-block--inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 1rem;
+  width: 100%;
 
   .status-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    align-items: flex-start;
+    text-align: left;
+    gap: 0.35rem;
   }
 
-  .status-primary {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #1f2f4a;
-    line-height: 1.25;
-  }
-
-  .status-secondary {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: rgba(28, 45, 70, 0.72);
-    line-height: 1.3;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.02em;
+  .status-icon {
+    width: 3.25rem;
+    height: 3.25rem;
   }
 }
 
-#quick-search {
-  height: auto;
+.status-icon {
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(88, 174, 238, 0.16);
+  color: #2a66c4;
+  transition: background 0.3s ease, color 0.3s ease;
+
+  i {
+    font-size: 1.6rem;
+  }
+}
+
+.status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-primary {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1f2f4a;
+  line-height: 1.25;
+}
+
+.status-secondary {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(28, 45, 70, 0.72);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 767.98px) {
+    #container-main, .content {
+        text-wrap: balance;
+    }
+    body {
+    background-color: #f4f9ff !important;
+    background-image: url("https://www.transparenttextures.com/patterns/az-subtle.png") !important;
+    background-blend-mode: multiply;
+    }
   .public-home {
     padding: 1.5rem 0.75rem;
   }
@@ -397,12 +387,24 @@
   }
 
   .public-links {
-    gap: 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
   }
 
   .public-links .tile {
-    padding: 0.85rem 0.95rem;
-    border-radius: 0.55rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.25rem;
+    border: 2px solid var(--tile-accent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background-color: white;
+    text-align: center;
+  }
+
+  .public-links .tile:first-child {
+    grid-column: 1 / -1;
   }
 
   .public-links .body {

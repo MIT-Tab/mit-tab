@@ -1,6 +1,11 @@
 {% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Staff Login{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicDisplay' %}
+{% endblock %}
 
 {% block content %}
 <div class="col-12 col-lg-6 mx-auto">

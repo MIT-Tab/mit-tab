@@ -172,6 +172,9 @@
     .nav-link { white-space: nowrap; padding: 0.5rem 0.8rem; }
   }
 
+  .footer { padding: 0.85rem 0.4rem; text-align: center; }
+  .footer small { font-size: 0.78rem; line-height: 1.35; display: inline-block; }
+
 }
 
 @include respond-max(767.98px) {
@@ -225,6 +228,8 @@
   .public-links__chevron { display: none; }
   .public-links__body { gap: 0.25rem; }
   .public-links__icon { width: 2.3rem; height: 2.3rem; }
+
+  .footer small { font-size: 0.76rem; }
 }
 
 @include respond-max(575.98px) {
@@ -274,4 +279,7 @@
 
   .public-home { padding: 1.15rem 0.75rem; }
   .public-links__tile { padding: 0.85rem 0.9rem; border-left-width: 3px; }
+
+  .footer { padding: 0.95rem 0.35rem; }
+  .footer small { font-size: 0.74rem; }
 }

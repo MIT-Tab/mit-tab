@@ -1,7 +1,12 @@
 {% extends "base/__wide.html" %}
 {% load tags %}
+{% load render_bundle from webpack_loader %}
 
-{% block title %}{% tournament_name %} • Public Hub{% endblock %}
+{% block title %}{% tournament_name %}{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicDisplay' %}
+{% endblock %}
 
 {% block banner %}{% endblock %}
 
@@ -11,25 +16,22 @@
     <div class="grid">
       <aside class="sidebar">
         <div class="public-sidebar-card status">
-          <h3 class="title">{% tournament_name %}</h3>
+          <h3 class="title">Welcome to {% tournament_name %}!</h3>
           <div class="content">
-            <div id="tournament-status">
+            <div class="status-block" data-status>
               <!-- Status will be dynamically updated by JavaScript -->
-              <div class="status-icon" aria-hidden="true">
+              <div class="status-icon" aria-hidden="true" data-status-icon>
                 <i class="fas fa-clipboard-check"></i>
               </div>
-              <div class="status-text">
-                <div class="status-primary" id="status-primary">Loading...</div>
-                <div class="status-secondary" id="status-secondary"></div>
+              <div class="status-text" aria-live="polite">
+                <div class="status-primary" data-status-primary>Loading...</div>
+                <div class="status-secondary" data-status-secondary></div>
               </div>
             </div>
             
             <div class="divider"></div>
             
             <div class="item">
-              <div class="icon">
-                <i class="fas fa-info-circle"></i>
-              </div>
               <div class="text">
                 <strong>Tournament Updates</strong>
                 <p>Check back regularly for updated pairings, results, and standings throughout the tournament.</p>
@@ -37,9 +39,6 @@
             </div>
             
             <div class="item">
-              <div class="icon warning">
-                <i class="fas fa-gavel"></i>
-              </div>
               <div class="text">
                 <strong>For Judges</strong>
                 <p>Use your ballot code to submit results electronically via the E-Ballot link.</p>
@@ -47,9 +46,6 @@
             </div>
             
             <div class="item">
-              <div class="icon success">
-                <i class="fas fa-users"></i>
-              </div>
               <div class="text">
                 <strong>For Teams</strong>
                 <p>View your matchups in Released Pairings and track your progress in Team Rankings.</p>
@@ -57,9 +53,6 @@
             </div>
             
             <div class="item">
-              <div class="icon info">
-                <i class="fas fa-sign-in-alt"></i>
-              </div>
               <div class="text">
                 <strong>Staff Login</strong>
                 <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
@@ -71,67 +64,67 @@
       
       <aside class="links" aria-labelledby="public-home-quick-links">
         <header class="header mobile-only">
-          <span class="label accent">Tournament</span>
-          <h1 class="title" id="public-home-quick-links">{% tournament_name %}</h1>
+          <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
+          <h2 class="status-title mb-2">Status:</h2>
+          <div class="status-block status-block--inline" data-status>
+            <div class="status-icon" aria-hidden="true" data-status-icon>
+              <i class="fas fa-clipboard-check"></i>
+            </div>
+            <span class="status-divider" aria-hidden="true"></span>
+            <div class="status-text" aria-live="polite">
+              <div class="status-primary" data-status-primary>Loading...</div>
+              <div class="status-secondary" data-status-secondary></div>
+            </div>
+          </div>
         </header>
-        <p class="lede">
-          Live updates for pairings, ballots, and standings. Tab staff post here the moment information is released.
-        </p>
 
         <nav class="public-links" aria-label="Quick links">
-          <a class="tile primary" href="{% url 'pretty_pair' %}">
-            <span class="icon"><i class="fas fa-th-large"></i></span>
+          <a class="tile shadow-sm" href="{% url 'pretty_pair' %}">
             <span class="body">
               <span class="title">Released Pairings</span>
               <span class="subtitle">Latest rounds and room assignments.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="tile warning" href="{% url 'missing_ballots' %}">
-            <span class="icon"><i class="fas fa-clipboard-check"></i></span>
+          <a class="tile shadow-sm" href="{% url 'missing_ballots' %}">
             <span class="body">
               <span class="title">Missing Ballots</span>
               <span class="subtitle">Outstanding ballots that need attention.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="tile success" href="{% url 'outround_pretty_pair' 0 %}">
-            <span class="icon"><i class="fas fa-chess-king"></i></span>
-            <span class="body">
-              <span class="title">Varsity Outrounds</span>
-              <span class="subtitle">Varsity elimination brackets and pairings.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile success" href="{% url 'outround_pretty_pair' 1 %}">
-            <span class="icon"><i class="fas fa-chess-knight"></i></span>
-            <span class="body">
-              <span class="title">Novice Outrounds</span>
-              <span class="subtitle">Novice elimination brackets and pairings.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile info" href="{% url 'e_ballot_search' %}">
-            <span class="icon"><i class="fas fa-tablet-alt"></i></span>
+                    <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
             <span class="body">
               <span class="title">Submit E-Ballot</span>
               <span class="subtitle">Judges enter ballot codes to file results.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="tile success" href="{% url 'public_judges' %}">
-            <span class="icon"><i class="fas fa-balance-scale"></i></span>
+          <a class="tile shadow-sm" href="{% url 'public_judges' %}">
             <span class="body">
               <span class="title">Judge List</span>
               <span class="subtitle">Roster and check-in status.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="tile neutral" href="{% url 'public_teams' %}">
-            <span class="icon"><i class="fas fa-users"></i></span>
+          <a class="tile shadow-sm" href="{% url 'public_teams' %}">
             <span class="body">
               <span class="title">Team List</span>
               <span class="subtitle">Registered teams and schools.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 0 %}">
+            <span class="body">
+              <span class="title">Varsity Outrounds</span>
+              <span class="subtitle">Varsity elimination brackets and pairings.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 1 %}">
+            <span class="body">
+              <span class="title">Novice Outrounds</span>
+              <span class="subtitle">Novice elimination brackets and pairings.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
@@ -150,33 +143,45 @@
   const inOutrounds = {{ in_outrounds|yesno:"true,false" }};
   const currentOutroundLabel = "{{ current_outround_label|escapejs }}";
 
-  const statusShell = document.querySelector('.status-icon');
-  const statusPrimary = document.getElementById('status-primary');
-  const statusSecondary = document.getElementById('status-secondary');
+  const statusBlocks = Array.from(document.querySelectorAll('[data-status]'))
+    .map((block) => ({
+      shell: block.querySelector('[data-status-icon]'),
+      primary: block.querySelector('[data-status-primary]'),
+      secondary: block.querySelector('[data-status-secondary]'),
+    }))
+    .filter(({ shell, primary, secondary }) => shell && primary && secondary);
 
-  if (!statusShell || !statusPrimary || !statusSecondary) {
+  if (!statusBlocks.length) {
     return;
   }
 
   function setStatusState() {
-    statusShell.className = 'status-icon';
+    statusBlocks.forEach(({ shell }) => {
+      shell.className = 'status-icon';
+    });
   }
 
   function updateStatus() {
+    function applyTexts(primaryText, secondaryText) {
+      statusBlocks.forEach(({ primary, secondary }) => {
+        primary.textContent = primaryText;
+        secondary.textContent = secondaryText;
+      });
+    }
+
     // During outrounds
     if (inOutrounds && currentOutroundLabel) {
       if (pairingReleased) {
         setStatusState();
-        statusPrimary.textContent = currentOutroundLabel;
-        if (missingBallots > 0) {
-          statusSecondary.textContent = `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`;
-        } else {
-          statusSecondary.textContent = 'All ballots in';
-        }
+        applyTexts(
+          currentOutroundLabel,
+          missingBallots > 0
+            ? `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`
+            : 'All ballots in'
+        );
       } else {
         setStatusState();
-        statusPrimary.textContent = currentOutroundLabel;
-        statusSecondary.textContent = 'Pairing in progress';
+        applyTexts(currentOutroundLabel, 'Pairing in progress');
       }
       return;
     }
@@ -186,24 +191,22 @@
       const displayRound = curRound - 1;
       if (pairingReleased) {
         setStatusState();
-        statusPrimary.textContent = `Round ${displayRound}`;
-        if (missingBallots > 0) {
-          statusSecondary.textContent = `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`;
-        } else {
-          statusSecondary.textContent = 'All ballots in';
-        }
+        applyTexts(
+          `Round ${displayRound}`,
+          missingBallots > 0
+            ? `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`
+            : 'All ballots in'
+        );
       } else {
         setStatusState();
-        statusPrimary.textContent = `Round ${displayRound}`;
-        statusSecondary.textContent = 'Pairing in progress';
+        applyTexts(`Round ${displayRound}`, 'Pairing in progress');
       }
       return;
     }
     
     // Default state
     setStatusState();
-    statusPrimary.textContent = 'Tournament';
-    statusSecondary.textContent = 'Check back for updates';
+    applyTexts('Tournament', 'Check back for updates');
   }
 
   // Update immediately
