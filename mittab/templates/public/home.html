@@ -95,11 +95,19 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <a class="tile success" href="{% url 'rank_teams_public' %}">
-            <span class="icon"><i class="fas fa-trophy"></i></span>
+          <a class="tile success" href="{% url 'outround_pretty_pair' 0 %}">
+            <span class="icon"><i class="fas fa-chess-king"></i></span>
             <span class="body">
-              <span class="title">Team Rankings</span>
-              <span class="subtitle">Current standings and performance.</span>
+              <span class="title">Varsity Outrounds</span>
+              <span class="subtitle">Varsity elimination brackets and pairings.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile success" href="{% url 'outround_pretty_pair' 1 %}">
+            <span class="icon"><i class="fas fa-chess-knight"></i></span>
+            <span class="body">
+              <span class="title">Novice Outrounds</span>
+              <span class="subtitle">Novice elimination brackets and pairings.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
