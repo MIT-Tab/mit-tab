@@ -18,10 +18,9 @@ def public_home(request):
     cur_round = TabSettings.get("cur_round", 1)
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released = TabSettings.get("pairing_released", 0) == 1
-
-    # Calculate missing ballots if in a round
+    
     missing_ballots_count = 0
-    if cur_round > 1:
+    if pairing_released and cur_round > 1:
         round_number = cur_round - 1
         missing_ballots_count = Round.objects.filter(
             victor=Round.NONE,

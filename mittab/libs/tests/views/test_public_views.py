@@ -80,6 +80,7 @@ class TestPublicViews(TestCase):
             (reverse("e_ballot_search"), ["Submit E-Ballot"]),
             (reverse("outround_pretty_pair", args=[0]), [v_out.gov_team.name]),
             (reverse("outround_pretty_pair", args=[1]), [n_out.gov_team.name]),
+            (reverse("public_home"), ["Released Pairings"]),
         ]
 
         for url, expected_content in view_content_tests:
@@ -116,6 +117,7 @@ class TestPublicViews(TestCase):
             reverse("missing_ballots"),
             reverse("outround_pretty_pair", args=[0]),
             reverse("outround_pretty_pair", args=[1]),
+            reverse("public_home"),
         ]
 
         # Setting name, allowed value, denied value
@@ -127,6 +129,7 @@ class TestPublicViews(TestCase):
             ("pairing_released", 1, 0),
             ("var_teams_visible", 2, 16),
             ("nov_teams_visible", 2, 16),
+            ("pairing_released", 1, 0),
         ]
 
         # content, status when allowed, status when denied
@@ -138,6 +141,7 @@ class TestPublicViews(TestCase):
             (round_obj.gov_team.display_backend, 200, 200),
             (v_out.gov_team.name, 200, 200),
             (n_out.gov_team.name, 200, 200),
+            ("const missingBallots = 1;", 200, 200),
         ]
 
         for url, setting, value in zip(urls, settings, values):
@@ -150,7 +154,7 @@ class TestPublicViews(TestCase):
                 f"Expected {status_allowed} for {url} "
                 f"when {setting_name}={allowed_value}")
             self.assertIn(expected_content, response.content.decode(),
-                f"Expected '{expected_content}' to be"
+                f"Expected '{expected_content}' to be "
                 f"visible when {setting_name}={allowed_value}")
 
             # Test when permission is denied / content hidden
@@ -175,6 +179,7 @@ class TestPublicViews(TestCase):
             (("missing_ballots",), None),
             (("outround_pretty_pair",), [0]),
             (("outround_pretty_pair",), [1]),
+            (("public_home",), None),
         ]
 
         for view_name, url_args in views_to_test:
