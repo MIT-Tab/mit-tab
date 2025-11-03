@@ -34,11 +34,13 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
   python manage.py loaddata testing_db;
 fi
 
-/usr/local/bin/gunicorn --worker-tmp-dir /dev/shm \
-  --worker-class sync \
+/usr/local/bin/gunicorn mittab.wsgi:application \
+  --worker-class gevent \
   --workers 2 \
-  --threads 2 \
-  --max-requests 1000 \
-  --max-requests-jitter 50 \
+  --worker-connections 512 \
+  --max-requests 2000 \
+  --max-requests-jitter 200 \
   --keep-alive 5 \
-  mittab.wsgi:application --bind 0.0.0.0:8000 -t 300
+  --graceful-timeout 30 \
+  --timeout 120 \
+  --bind 0.0.0.0:8000

@@ -36,9 +36,7 @@ def cache_public_view(timeout=60, settings_keys=None):
 
             cached = caches[PUBLIC_CACHE_ALIAS].get(cache_key)
             if cached is not None:
-                print("Public cache hit for key:", cache_key)
                 return cached
-            print("Public cache miss for key:", cache_key)
 
             response = view_func(request, *args, **kwargs)
             caches[PUBLIC_CACHE_ALIAS].set(cache_key, response, timeout)
