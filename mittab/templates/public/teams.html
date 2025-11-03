@@ -26,11 +26,11 @@
             <tbody>
 			{% for team in teams %}
 			<tr>
-				<td style="width: 25%;" data-label="Team Name">{{ team.display }}</td>
-				<td style="width: 15%;" data-label="School">{{ team.school.display }}</td>
-				<td style="width: 15%;" data-label="Hybrid School">{{ team.hybrid_school.name }}</td>
-				<td style="width: 30%;" data-label="Debaters">{{ team.debaters_display }}</td>
-				<td style="width: 15%;" data-label="Checked In">{{ team.checked_in|yesno:"Yes,No" }}</td>
+				<td>{{ team.display }}</td>
+				<td>{{ team.school.display }}</td>
+				<td>{{ team.hybrid_school.name }}</td>
+				<td>{{ team.debaters_display }}</td>
+				<td>{{ team.checked_in|yesno:"Yes,No" }}</td>
 			</tr>
 			{% endfor %}
             </tbody>
