@@ -2,7 +2,6 @@ from django.views import i18n
 from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
-from django.contrib.auth.views import LoginView
 from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
@@ -304,8 +303,11 @@ urlpatterns = [
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
 
     # Public views
+    path("public/",
+         public_views.public_home,
+         name="public_home"),
     path("public/login/",
-         LoginView.as_view(template_name="public/login.html"),
+         public_views.public_login,
          name="tab_login"),
     path("public/pairings/",
          public_views.pretty_pair,

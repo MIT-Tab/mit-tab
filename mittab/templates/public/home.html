@@ -1,0 +1,79 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Welcome to {{ tournament_name }}{% endblock %}
+
+{% block content %}
+<div class="col-12">
+  <div class="jumbotron text-center py-5">
+    <h1 class="display-4 mb-3">{{ tournament_name }}</h1>
+    <p class="lead text-muted">
+      Follow live pairings, team lists, and judge assignments as they are released by tab staff.
+    </p>
+    <div class="mt-4">
+      <a class="btn btn-primary btn-lg mr-2" href="{% url 'pretty_pair' %}">
+        View Pairings
+      </a>
+      <a class="btn btn-outline-secondary btn-lg" href="{% url 'tab_login' %}">
+        Tab Staff Login
+      </a>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Tournament Status</h5>
+          <p class="card-text">
+            {% if pairings_released %}
+              Round pairings are currently <strong>released</strong> to the public.
+            {% else %}
+              Pairings are not yet public. Check back soon once tab releases the round.
+            {% endif %}
+          </p>
+          <p class="card-text">
+            {% if results_published %}
+              Preliminary results have been published.
+            {% else %}
+              Results will be posted here once the tournament announces them.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Public Resources</h5>
+          <ul class="list-unstyled mb-0">
+            <li><a href="{% url 'public_teams' %}">Team List</a></li>
+            <li><a href="{% url 'public_judges' %}">Judge List</a></li>
+            <li><a href="{% url 'rank_teams_public' %}">Team Rankings</a></li>
+            <li><a href="{% url 'outround_pretty_pair' 0 %}">Varsity Outrounds</a></li>
+            <li><a href="{% url 'outround_pretty_pair' 1 %}">Novice Outrounds</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Need Assistance?</h5>
+          <p class="card-text">
+            Debaters and judges can submit ballots online using their assigned code.
+          </p>
+          <a class="btn btn-outline-primary btn-block" href="{% url 'e_ballot_search' %}">
+            Submit E-Ballot
+          </a>
+          <p class="card-text mt-3 mb-0">
+            Questions? Visit the tab room staff or refer to the tournament communications sent during announcements.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

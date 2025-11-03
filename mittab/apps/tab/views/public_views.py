@@ -1,18 +1,41 @@
 import random
 from functools import wraps
 
+from django.contrib.auth.views import LoginView
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from django.core.cache import caches
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
-from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
-                                    TabSettings, Judge, Team, Round)
+from mittab.apps.tab.models import (
+    BreakingTeam,
+    Bye,
+    Outround,
+    TabSettings,
+    Judge,
+    Team,
+    Round,
+)
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.apps.tab.views.pairing_views import enter_result
+
+public_login = LoginView.as_view(template_name="public/login.html")
+
+
+@cache_public_view(timeout=60, settings_keys=["tournament_name", "pairing_released", "results_published"])
+def public_home(request):
+    tournament_name = TabSettings.get("tournament_name", "MIT-TAB Tournament")
+    pairings_released = TabSettings.get("pairing_released", 0) == 1
+    results_published = TabSettings.get("results_published", False)
+
+    context = {
+        "tournament_name": tournament_name,
+        "pairings_released": pairings_released,
+        "results_published": results_published,
+    }
+    return render(request, "public/home.html", context)
 
 @cache_public_view(timeout=60, settings_keys=["judges_public"])
 def public_view_judges(request):

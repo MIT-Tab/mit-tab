@@ -7,7 +7,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
-LOGIN_WHITELIST = ("/public/login/", "/public/pairings/",
+LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/public/missing-ballots/","/public/e-ballots/",
                    "/404/", "/403/", "/500/",
                    "/public/teams/",
