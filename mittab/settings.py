@@ -163,8 +163,9 @@ CACHES = {
         "LOCATION": "/var/tmp/django_cache",
     },
     "public": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "public-pairings-cache",
+        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+        "LOCATION": os.environ.get("MEMCACHED_LOCATION", "127.0.0.1:11211"),
+        "TIMEOUT": 60,
     },
 }
 
