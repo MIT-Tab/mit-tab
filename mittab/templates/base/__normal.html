@@ -4,31 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
-    <!-- jQuery 3.5.1 (full build) - must load BEFORE webpack bundles -->
-    <script
-        src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"
-        integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2"
-        crossorigin="anonymous"></script>
-    <!-- Bootstrap 4.6.2 CSS -->
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
-          integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N"
-          crossorigin="anonymous">
     {% load render_bundle from webpack_loader %}
-    {% render_bundle 'main' 'css' %}
+    {% render_bundle 'main' %}
     {% block extra_head %}{% endblock extra_head %}
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
+    <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
     <link rel="stylesheet"
         href="https://use.fontawesome.com/releases/v5.8.2/css/all.css"
         integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay"
         crossorigin="anonymous">
-    <!-- Bootstrap 4.6.2 JS Bundle (includes Popper) -->
-    <script
-        src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"
-        crossorigin="anonymous"></script>
-    <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
-    <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
-    {% render_bundle 'main' 'js' %}
     <title>{% block title %}{% endblock %}</title>
 </head>
 <body>
@@ -37,10 +22,9 @@
   <div class="container-fluid text-left">
 
     <div id="container-main" class="container p-3 rounded shadow-lg">
-      {% block messages %}
       <div class="row">
         <div class="col">
-          {% if messages and request.user.is_authenticated %}
+          {% if messages %}
             {% for message in messages %}
             <div class="alert {% if message.tags %}alert-{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}danger{% else %}{{ message.tags }}{% endif %}{% endif %}">
               {{ message }}
@@ -49,7 +33,6 @@
           {% endif %}
         </div>
       </div>
-      {% endblock %}
 
       <div class="row">
         <div class="col">
@@ -84,6 +67,5 @@
       </small>
     </div>
   </div>
-
 </body>
 </html>

@@ -1,8 +1,14 @@
 import "../css/app.scss";
+import "../css/mobile.scss"
+import "../css/navigation.scss"
+
 import "./pairing";
 import "./outround";
 
 import $ from "jquery";
+
+import "popper.js";
+import "bootstrap";
 
 import bsCustomFileInput from "bs-custom-file-input";
 import ballotsInit from "./ballots";

@@ -1,6 +1,6 @@
 import $ from "jquery";
 
-$.expr.pseudos.Contains = (a, i, m) => {
+$.expr[":"].Contains = (a, i, m) => {
   return $(a).text().toUpperCase().indexOf(m[3].toUpperCase()) >= 0;
 };
 

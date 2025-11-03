@@ -8,10 +8,7 @@ $font-size-base: 0.95rem !default;
 .form-control {
   background-image: none !important;
 }
-
-@import "navigation";
-@import "mobile";
-
+@import "bootstrap/scss/bootstrap";
 // Overrides
 .bg-dark {
   background-color: #00438A !important;
