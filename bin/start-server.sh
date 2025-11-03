@@ -4,6 +4,20 @@ set +x
 
 cd /var/www/tab
 
+# Ensure memcached is running for shared caching
+if command -v memcached >/dev/null 2>&1; then
+  MEMCACHED_PORT="${MEMCACHED_PORT:-11211}"
+  MEMCACHED_HOST="${MEMCACHED_HOST:-127.0.0.1}"
+  MEMCACHED_MEMORY="${MEMCACHED_MEMORY:-64}"
+
+  memcached -u nobody -m "$MEMCACHED_MEMORY" -p "$MEMCACHED_PORT" -l "$MEMCACHED_HOST" &
+  MEMCACHED_PID=$!
+  trap 'kill "$MEMCACHED_PID"' EXIT
+  export MEMCACHED_LOCATION="${MEMCACHED_HOST}:${MEMCACHED_PORT}"
+else
+  echo "memcached binary not found; public cache will run in local memory only." >&2
+fi
+
 host="${MYSQL_HOST:-127.0.0.1}"
 cert_path="${MYSQL_SSL_CA:-/var/www/tab/tmp/digitalocean-db-ca.pem}"
 mkdir -p "$(dirname "$cert_path")"
