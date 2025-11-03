@@ -1,11 +1,12 @@
 import random
 
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
                                     TabSettings, Judge, Team, Round)
+from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
