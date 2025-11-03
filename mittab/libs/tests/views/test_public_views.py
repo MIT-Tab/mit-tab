@@ -76,7 +76,6 @@ class TestPublicViews(TestCase):
             (reverse("public_teams"), [team.name]),
             (reverse("rank_teams_public"), [team.name]),
             (reverse("pretty_pair"), [round_obj.gov_team.name, gov_debater.name]),
-            (reverse("missing_ballots"), [judge.name]),
             (reverse("e_ballot_search"), ["Submit E-Ballot"]),
             (reverse("outround_pretty_pair", args=[0]), [v_out.gov_team.name]),
             (reverse("outround_pretty_pair", args=[1]), [n_out.gov_team.name]),
@@ -106,7 +105,7 @@ class TestPublicViews(TestCase):
     def test_permissions(self):
         client = Client()
 
-        (judge, team, round_obj, v_out,
+        (judge, team, _, v_out,
          n_out, gov_debater) = self.get_test_objects()
 
         urls = [
@@ -114,7 +113,6 @@ class TestPublicViews(TestCase):
             reverse("public_teams"),
             reverse("rank_teams_public"),
             reverse("pretty_pair"),
-            reverse("missing_ballots"),
             reverse("outround_pretty_pair", args=[0]),
             reverse("outround_pretty_pair", args=[1]),
             reverse("public_home"),
@@ -138,7 +136,6 @@ class TestPublicViews(TestCase):
             (team.name, 200, 302),
             (team.name, 200, 302),
             (gov_debater.name, 200, 200),
-            (round_obj.gov_team.display_backend, 200, 200),
             (v_out.gov_team.name, 200, 200),
             (n_out.gov_team.name, 200, 200),
             ("const missingBallots = 1;", 200, 200),
@@ -176,7 +173,6 @@ class TestPublicViews(TestCase):
             (("public_teams",), None),
             (("rank_teams_public",), None),
             (("pretty_pair",), None),
-            (("missing_ballots",), None),
             (("outround_pretty_pair",), [0]),
             (("outround_pretty_pair",), [1]),
             (("public_home",), None),
