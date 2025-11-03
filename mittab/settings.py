@@ -1,6 +1,7 @@
-# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
-
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from django.core.exceptions import ImproperlyConfigured
 
 def env_bool(name, default=False):
     value = os.environ.get(name)
@@ -8,9 +9,6 @@ def env_bool(name, default=False):
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 ENVIRONMENT = os.environ.get("DJANGO_ENV", "").strip().lower() or "development"
@@ -127,7 +125,8 @@ USE_TZ = True
 
 CDN_STATIC_URL = os.environ.get("CDN_STATIC_URL")
 if CDN_STATIC_URL:
-    STATIC_URL = CDN_STATIC_URL if CDN_STATIC_URL.endswith("/") else f"{CDN_STATIC_URL}/"
+    STATIC_URL = (CDN_STATIC_URL if CDN_STATIC_URL.endswith("/")
+                  else f"{CDN_STATIC_URL}/")
 else:
     STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")

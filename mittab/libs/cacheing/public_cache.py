@@ -37,7 +37,8 @@ def cache_public_view(timeout=60):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             cache = caches[PUBLIC_CACHE_ALIAS]
-            cache_key = _build_cache_key(view_func.__name__, kwargs, request.user.is_authenticated)
+            cache_key = _build_cache_key(view_func.__name__, kwargs,
+                                         request.user.is_authenticated)
             cached_entry = cache.get(cache_key)
             now = time.time()
 
@@ -45,7 +46,8 @@ def cache_public_view(timeout=60):
                 response = cached_entry.get("response")
                 expires_at = cached_entry.get("expires_at", 0)
                 if response is not None:
-                    if hasattr(response, "__setitem__") and "Cache-Control" not in response:
+                    if hasattr(response, "__setitem__"
+                               ) and "Cache-Control" not in response:
                         response["Cache-Control"] = cache_control_header
                     if expires_at > now:
                         return response
@@ -56,7 +58,8 @@ def cache_public_view(timeout=60):
                             fresh_response = view_func(request, *args, **kwargs)
                             cache.set(
                                 cache_key,
-                                {"response": fresh_response, "expires_at": now + timeout},
+                                {"response": fresh_response,
+                                 "expires_at": now + timeout},
                                 timeout + stale_extension,
                             )
                             return fresh_response

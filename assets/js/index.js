@@ -1,6 +1,6 @@
 import "../css/app.scss";
-import "../css/mobile.scss"
-import "../css/navigation.scss"
+import "../css/mobile.scss";
+import "../css/navigation.scss";
 
 import "./pairing";
 import "./outround";
