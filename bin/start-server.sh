@@ -35,9 +35,9 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
 fi
 
 /usr/local/bin/gunicorn mittab.wsgi:application \
-  --worker-class gevent \
+  --worker-class gthread \
   --workers 2 \
-  --worker-connections 512 \
+  --threads 10 \
   --max-requests 2000 \
   --max-requests-jitter 200 \
   --keep-alive 5 \
