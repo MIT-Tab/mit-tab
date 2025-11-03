@@ -1,5 +1,8 @@
-<div class="col-sm index-section" id="school_list">
-  <h4 class="text-center font-weight-normal index-section-header" data-toggle="collapse" data-target="#{{ html_id }}-content" aria-expanded="false">
+<div class="col-sm index-section" id="{{ html_id }}-section">
+  <h4 class="text-center font-weight-normal index-section-header"
+      data-toggle="collapse"
+      data-target="#{{ html_id }}-content"
+      aria-expanded="true">
     <span class="section-title">{{count}} {{model_name}}</span>
     <span class="section-actions">
       <span class="btn-group btn-group-sm">
@@ -18,43 +21,24 @@
       </span>
     </span>
   </h4>
-  {% if model_name == "Rooms" %}
-    <div class="collapse show" id="{{ html_id }}-content">
-      <div class="index-section-content">
-        <div class="text-center mb-2">  
+  <div class="collapse show" id="{{ html_id }}-content">
+    <div class="index-section-content">
+      {% if model_name == "Rooms" %}
+        <div class="text-center mb-2">
           <a href="{% url 'manage_room_tags' %}" class="btn btn-sm btn-light">Manage Room Tags</a>
         </div>
-        <ol id="{{ html_id }}">
-          {% for id, name in list_data %}
-            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
-          {% endfor %}
-        </ol>
-      </div>
-    </div>
-  {% elif view_path_prefix == "judge" %}
-    <div class="collapse show" id="{{ html_id }}-content">
-      <div class="index-section-content">
+      {% elif view_path_prefix == "judge" %}
         <div class="text-center mb-2">
           <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
             Download Judge Codes
           </a>
         </div>
-        <ol id="{{ html_id }}">
-          {% for id, name in list_data %}
-            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
-          {% endfor %}
-        </ol>
-      </div>
+      {% endif %}
+      <ol id="{{ html_id }}">
+        {% for id, name in list_data %}
+          <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+        {% endfor %}
+      </ol>
     </div>
-  {% else %}
-    <div class="collapse show" id="{{ html_id }}-content">
-      <div class="index-section-content">
-        <ol id="{{ html_id }}">
-          {% for id, name in list_data %}
-            <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
-          {% endfor %}
-        </ol>
-      </div>
-    </div>
-  {% endif %}
+  </div>
 </div>

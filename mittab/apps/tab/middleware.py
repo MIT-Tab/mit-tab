@@ -7,7 +7,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
-LOGIN_WHITELIST = ("/", "/public", "/public/", "/public/login/", "/public/pairings/",
+LOGIN_WHITELIST = ("/", "/public/login/", "/public/pairings/",
                    "/public/missing-ballots/","/public/e-ballots/",
                    "/404/", "/403/", "/500/",
                    "/public/teams/",
@@ -18,8 +18,6 @@ LOGIN_WHITELIST = ("/", "/public", "/public/", "/public/login/", "/public/pairin
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools")
-
-LOGIN_PREFIX_WHITELIST = ("/public/",)
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 
@@ -34,7 +32,7 @@ class Login:
         path = request.path
         whitelisted = (
             path in LOGIN_WHITELIST
-            or any(path.startswith(prefix) for prefix in LOGIN_PREFIX_WHITELIST)
+            or path.startswith("/public/")
             or EBALLOT_REGEX.match(path)
         )
 

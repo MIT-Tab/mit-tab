@@ -1,6 +1,6 @@
 import random
 
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.urls import reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
@@ -10,29 +10,28 @@ from mittab.libs import cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
-from mittab.apps.tab.views.pairing_views import enter_result
 
 
 def public_home(request):
-    # Get current round and tournament status
-    cur_round_setting = TabSettings.get("cur_round", 1)
+    cur_round_setting = TabSettings.get("cur_round", 1) - 1
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
     pairing_released = pairing_released_inround
     in_outrounds = False
     current_outround_label = ""
 
-    # Before round 1 begins, keep the status neutral
-    if cur_round_setting <= 1:
+    if cur_round_setting < 1:
         pairing_released = False
-        context = {
-            "cur_round": cur_round_setting,
-            "tot_rounds": tot_rounds,
-            "pairing_released": pairing_released,
-            "in_outrounds": in_outrounds,
-            "current_outround_label": current_outround_label,
-        }
-        return render(request, "public/home.html", context)
+        status_primary = "Tournament"
+        status_secondary = "Starting soon"
+        return render(
+            request,
+            "public/home.html",
+            {
+                "status_primary": status_primary,
+                "status_secondary": status_secondary,
+            },
+        )
 
     outround_qs = Outround.objects.order_by("num_teams")
 
@@ -69,14 +68,26 @@ def public_home(request):
         else:
             pairing_released = pairing_released_inround
 
-    context = {
-        "cur_round": cur_round_setting,
-        "tot_rounds": tot_rounds,
-        "pairing_released": pairing_released,
-        "in_outrounds": in_outrounds,
-        "current_outround_label": current_outround_label,
-    }
-    return render(request, "public/home.html", context)
+    pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
+
+    if in_outrounds:
+        status_primary = current_outround_label or "Elimination rounds"
+        status_secondary = pairing_text
+    elif cur_round_setting <= tot_rounds:
+        status_primary = f"Round {cur_round_setting}"
+        status_secondary = pairing_text
+    else:
+        status_primary = "Tournament"
+        status_secondary = pairing_text
+
+    return render(
+        request,
+        "public/home.html",
+        {
+            "status_primary": status_primary,
+            "status_secondary": status_secondary,
+        },
+    )
 
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
