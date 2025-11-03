@@ -15,71 +15,64 @@ from mittab.apps.tab.views.pairing_views import enter_result
 
 def public_home(request):
     # Get current round and tournament status
-    cur_round = TabSettings.get("cur_round", 1)
+    cur_round_setting = TabSettings.get("cur_round", 1)
     tot_rounds = TabSettings.get("tot_rounds", 5)
-    pairing_released = TabSettings.get("pairing_released", 0) == 1
-    
-    missing_ballots_count = 0
-    if pairing_released and cur_round > 1:
-        round_number = cur_round - 1
-        missing_ballots_count = Round.objects.filter(
-            victor=Round.NONE,
-            round_number=round_number
-        ).count()
-
-    # Check if we're in outrounds
+    pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
+    pairing_released = pairing_released_inround
     in_outrounds = False
     current_outround_label = ""
-    outround_missing_ballots = 0
 
-    if cur_round > tot_rounds:
-        in_outrounds = True
-        # Get the smallest num_teams from outrounds (most recent round)
-        varsity_outrounds = Outround.objects.filter(
-            type_of_round=BreakingTeam.VARSITY
-        ).order_by("num_teams").first()
+    # Before round 1 begins, keep the status neutral
+    if cur_round_setting <= 1:
+        pairing_released = False
+        context = {
+            "cur_round": cur_round_setting,
+            "tot_rounds": tot_rounds,
+            "pairing_released": pairing_released,
+            "in_outrounds": in_outrounds,
+            "current_outround_label": current_outround_label,
+        }
+        return render(request, "public/home.html", context)
 
-        novice_outrounds = Outround.objects.filter(
-            type_of_round=BreakingTeam.NOVICE
-        ).order_by("num_teams").first()
+    outround_qs = Outround.objects.order_by("num_teams")
 
-        # Build label for current outround
+    if outround_qs.exists():
+        varsity = (
+            outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
+            .order_by("num_teams")
+            .first()
+        )
+        novice = (
+            outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
+            .order_by("num_teams")
+            .first()
+        )
+
         labels = []
         release_flags = []
 
-        if varsity_outrounds:
-            labels.append(f"[V] Ro{varsity_outrounds.num_teams}")
-            outround_missing_ballots += Outround.objects.filter(
-                type_of_round=BreakingTeam.VARSITY,
-                num_teams=varsity_outrounds.num_teams,
-                victor=Outround.UNKNOWN
-            ).count()
+        if varsity:
+            labels.append(f"[V] Ro{varsity.num_teams}")
             release_flags.append(
-                TabSettings.get("var_teams_visible", 256) <= varsity_outrounds.num_teams
+                TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
+            )
+        if novice:
+            labels.append(f"[N] Ro{novice.num_teams}")
+            release_flags.append(
+                TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
             )
 
-        if novice_outrounds:
-            labels.append(f"[N] Ro{novice_outrounds.num_teams}")
-            outround_missing_ballots += Outround.objects.filter(
-                type_of_round=BreakingTeam.NOVICE,
-                num_teams=novice_outrounds.num_teams,
-                victor=Outround.UNKNOWN
-            ).count()
-            release_flags.append(
-                TabSettings.get("nov_teams_visible", 256) <= novice_outrounds.num_teams
-            )
-
-        current_outround_label = " & ".join(labels) if labels else ""
-        missing_ballots_count = outround_missing_ballots
-
-        if release_flags:
-            pairing_released = all(release_flags)
+        if labels:
+            in_outrounds = True
+            current_outround_label = " & ".join(labels)
+            pairing_released = bool(release_flags and all(release_flags))
+        else:
+            pairing_released = pairing_released_inround
 
     context = {
-        "cur_round": cur_round,
+        "cur_round": cur_round_setting,
         "tot_rounds": tot_rounds,
         "pairing_released": pairing_released,
-        "missing_ballots_count": missing_ballots_count,
         "in_outrounds": in_outrounds,
         "current_outround_label": current_outround_label,
     }

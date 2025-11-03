@@ -5,14 +5,21 @@
 {% block title %}{% tournament_name %}{% endblock %}
 
 {% block extra_head %}
-  {% render_bundle 'publicDisplay' %}
+  {% render_bundle 'publicHome' %}
+
 {% endblock %}
 
 {% block banner %}{% endblock %}
 
 {% block content %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
-  <div class="public-home">
+  <div class="public-home"
+       data-public-home
+       data-cur-round="{{ cur_round }}"
+       data-total-rounds="{{ tot_rounds }}"
+       data-pairing-released="{{ pairing_released|yesno:'true,false' }}"
+       data-in-outrounds="{{ in_outrounds|yesno:'true,false' }}"
+       data-current-outround-label="{{ current_outround_label|escape }}">
     <div class="grid">
       <aside class="sidebar">
         <div class="public-sidebar-card status">
@@ -134,86 +141,4 @@
   </div>
 </div>
 
-<script>
-(function() {
-  const curRound = {{ cur_round }};
-  const totRounds = {{ tot_rounds }};
-  const pairingReleased = {{ pairing_released|yesno:"true,false" }};
-  const missingBallots = {{ missing_ballots_count }};
-  const inOutrounds = {{ in_outrounds|yesno:"true,false" }};
-  const currentOutroundLabel = "{{ current_outround_label|escapejs }}";
-
-  const statusBlocks = Array.from(document.querySelectorAll('[data-status]'))
-    .map((block) => ({
-      shell: block.querySelector('[data-status-icon]'),
-      primary: block.querySelector('[data-status-primary]'),
-      secondary: block.querySelector('[data-status-secondary]'),
-    }))
-    .filter(({ shell, primary, secondary }) => shell && primary && secondary);
-
-  if (!statusBlocks.length) {
-    return;
-  }
-
-  function setStatusState() {
-    statusBlocks.forEach(({ shell }) => {
-      shell.className = 'status-icon';
-    });
-  }
-
-  function updateStatus() {
-    function applyTexts(primaryText, secondaryText) {
-      statusBlocks.forEach(({ primary, secondary }) => {
-        primary.textContent = primaryText;
-        secondary.textContent = secondaryText;
-      });
-    }
-
-    // During outrounds
-    if (inOutrounds && currentOutroundLabel) {
-      if (pairingReleased) {
-        setStatusState();
-        applyTexts(
-          currentOutroundLabel,
-          missingBallots > 0
-            ? `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`
-            : 'All ballots in'
-        );
-      } else {
-        setStatusState();
-        applyTexts(currentOutroundLabel, 'Pairing in progress');
-      }
-      return;
-    }
-    
-    // During inrounds
-    if (curRound > 1 && curRound <= totRounds + 1) {
-      const displayRound = curRound - 1;
-      if (pairingReleased) {
-        setStatusState();
-        applyTexts(
-          `Round ${displayRound}`,
-          missingBallots > 0
-            ? `${missingBallots} ballot${missingBallots !== 1 ? 's' : ''} missing`
-            : 'All ballots in'
-        );
-      } else {
-        setStatusState();
-        applyTexts(`Round ${displayRound}`, 'Pairing in progress');
-      }
-      return;
-    }
-    
-    // Default state
-    setStatusState();
-    applyTexts('Tournament', 'Check back for updates');
-  }
-
-  // Update immediately
-  updateStatus();
-  
-  // Update every second for countdown
-  setInterval(updateStatus, 1000);
-})();
-</script>
 {% endblock %}
