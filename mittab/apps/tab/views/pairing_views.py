@@ -44,6 +44,7 @@ def pair_round(request):
 
             with transaction.atomic():
                 tab_logic.pair_round()
+                invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
         except Exception as exp:

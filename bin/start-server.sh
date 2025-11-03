@@ -48,10 +48,13 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
   python manage.py loaddata testing_db;
 fi
 
+GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+GUNICORN_CONNECTIONS=${GUNICORN_CONNECTIONS:-512}
+
 /usr/local/bin/gunicorn mittab.wsgi:application \
-  --worker-class gthread \
-  --workers 2 \
-  --threads 10 \
+  --worker-class gevent \
+  --workers "$GUNICORN_WORKERS" \
+  --worker-connections "$GUNICORN_CONNECTIONS" \
   --max-requests 2000 \
   --max-requests-jitter 200 \
   --keep-alive 5 \

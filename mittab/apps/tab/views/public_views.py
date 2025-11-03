@@ -24,7 +24,7 @@ from mittab.apps.tab.views.pairing_views import enter_result
 public_login = LoginView.as_view(template_name="public/login.html")
 
 
-@cache_public_view(timeout=60, settings_keys=["tournament_name", "pairing_released", "results_published"])
+@cache_public_view(timeout=60)
 def public_home(request):
     tournament_name = TabSettings.get("tournament_name", "MIT-TAB Tournament")
     pairings_released = TabSettings.get("pairing_released", 0) == 1
@@ -37,7 +37,7 @@ def public_home(request):
     }
     return render(request, "public/home.html", context)
 
-@cache_public_view(timeout=60, settings_keys=["judges_public"])
+@cache_public_view(timeout=60)
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
@@ -53,7 +53,7 @@ def public_view_judges(request):
             "rounds": rounds
         })
 
-@cache_public_view(timeout=60, settings_keys=["teams_public"])
+@cache_public_view(timeout=60)
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
@@ -70,7 +70,7 @@ def public_view_teams(request):
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
-@cache_public_view(timeout=60, settings_keys=["rankings_public"])
+@cache_public_view(timeout=60)
 def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
@@ -84,7 +84,7 @@ def rank_teams_public(request):
         "title": "Team Rankings"
     })
 
-@cache_public_view(timeout=60, settings_keys=["cur_round", "pairing_released", "debaters_public"])
+@cache_public_view(timeout=60)
 def pretty_pair(request):
     errors, byes = [], []
 
@@ -134,7 +134,7 @@ def pretty_pair(request):
 
 
 
-@cache_public_view(timeout=30, settings_keys=["cur_round", "pairing_released"])
+@cache_public_view(timeout=30)
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.prefetch_related("gov_team", "opp_team",
@@ -154,7 +154,7 @@ def missing_ballots(request):
     )
 
 
-@cache_public_view(timeout=60, settings_keys=[])
+@cache_public_view(timeout=60)
 def e_ballot_search_page(request):
     """Cached helper for rendering the e-ballot search template."""
     return render(request, "public/e_ballot_search.html")
@@ -230,8 +230,7 @@ def enter_e_ballot(request, ballot_code):
     return redirect_and_flash_error(request, message, path=reverse("tab_login"))
 
 
-@cache_public_view(timeout=60, settings_keys=["gov_opp_display", "var_teams_visible", "nov_teams_visible",
-                                               "sidelock", "choice", "debaters_public", "show_outs_bracket"])
+@cache_public_view(timeout=60)
 def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 

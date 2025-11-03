@@ -36,6 +36,7 @@ def pair_next_outround(request, num_teams, type_of_round):
                                 type_of_round=type_of_round).delete()
 
         outround_tab_logic.pair(type_of_round)
+        invalidate_outround_public_pairings_cache(type_of_round)
 
         return redirect_and_flash_success(
             request, "Success!", path=reverse("outround_pairing_view",
