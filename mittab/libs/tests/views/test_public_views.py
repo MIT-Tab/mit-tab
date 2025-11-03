@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import caches
 from django.test import TestCase, Client
 from django.urls import reverse
 from nplusone.core import profiler
@@ -13,6 +14,7 @@ class TestPublicViews(TestCase):
 
     def setUp(self):
         super().setUp()
+        caches["public"].clear()
 
         Outround(
             gov_team=Team.objects.first(),
@@ -49,6 +51,7 @@ class TestPublicViews(TestCase):
         # Restore the original victor value to avoid polluting other tests
         self.test_round.victor = self.original_victor
         self.test_round.save()
+        caches["public"].clear()
         super().tearDown()
 
     def get_test_objects(self):
@@ -156,6 +159,7 @@ class TestPublicViews(TestCase):
 
             # Test when permission is denied / content hidden
             TabSettings.set(setting_name, denied_value)
+            caches["public"].clear()
             response = client.get(url)
             self.assertEqual(response.status_code, status_denied,
                 f"Expected {status_denied} for {url} "

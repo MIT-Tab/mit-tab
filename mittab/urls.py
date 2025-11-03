@@ -2,6 +2,7 @@ from django.views import i18n
 from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
+from django.contrib.auth.views import LoginView
 from django.views.generic.base import RedirectView
 
 import mittab.settings as settings

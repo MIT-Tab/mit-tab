@@ -15,7 +15,7 @@ from mittab.apps.tab.models import (
     Round,
 )
 from mittab.apps.tab.views.pairing_views import enter_result
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings

@@ -1,10 +1,19 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+ENVIRONMENT = os.environ.get("DJANGO_ENV", "").strip().lower() or "development"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
@@ -13,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 SECRET_KEY = "=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DEBUG")
+DEBUG = env_bool("DEBUG", default=ENVIRONMENT != "production")
 
 ALLOWED_HOSTS = ["*"]
 
@@ -116,7 +125,11 @@ USE_L10N = True
 
 USE_TZ = True
 
-STATIC_URL = "/static/"
+CDN_STATIC_URL = os.environ.get("CDN_STATIC_URL")
+if CDN_STATIC_URL:
+    STATIC_URL = CDN_STATIC_URL if CDN_STATIC_URL.endswith("/") else f"{CDN_STATIC_URL}/"
+else:
+    STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 STATICFILES_DIRS = (os.path.join(BASE_DIR, "assets"), )
@@ -166,12 +179,21 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": "/var/tmp/django_cache",
     },
-    "public": {
-        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
-        "LOCATION": os.environ.get("MEMCACHED_LOCATION", "127.0.0.1:11211"),
-        "TIMEOUT": 60,
-    },
 }
+
+MEMCACHED_LOCATION = os.environ.get("MEMCACHED_LOCATION")
+
+if MEMCACHED_LOCATION or ENVIRONMENT == "production":
+    location = MEMCACHED_LOCATION or "127.0.0.1:11211"
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+        "LOCATION": location,
+        "TIMEOUT": 60,
+    }
+else:
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
