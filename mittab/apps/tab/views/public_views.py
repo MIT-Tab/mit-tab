@@ -21,6 +21,11 @@ from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
 
 
+@cache_public_view(timeout=300)
+def public_access_error(request):
+    return render(request, "public/access_error.html")
+
+
 @cache_public_view(timeout=60)
 def public_home(request):
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
@@ -98,10 +103,8 @@ def public_home(request):
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
-    if not request.user.is_authenticated and not display_judges:
-        return redirect_and_flash_error(
-            request, "This view is not public", path=reverse("index")
-        )
+    if not display_judges:
+        return redirect("public_access_error")
 
     num_rounds = TabSettings.get("tot_rounds", 5)
     rounds = [num for num in range(1, num_rounds + 1)]
@@ -122,10 +125,8 @@ def public_view_judges(request):
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
-    if not request.user.is_authenticated and not display_teams:
-        return redirect_and_flash_error(
-            request, "This view is not public", path=reverse("index")
-        )
+    if not display_teams:
+        return redirect("public_access_error")
 
     return render(
         request,
@@ -144,9 +145,7 @@ def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
     if not display_rankings:
-        return redirect_and_flash_error(
-            request, "This view is not public", path=reverse("index")
-        )
+        return redirect("public_access_error")
 
     teams = cache_logic.cache_fxn_key(
         rankings.get_team_rankings,
@@ -240,7 +239,6 @@ def missing_ballots(request):
     )
 
 
-@cache_public_view(timeout=60)
 def e_ballot_search_page(request):
     return render(request, "public/e_ballot_search.html")
 

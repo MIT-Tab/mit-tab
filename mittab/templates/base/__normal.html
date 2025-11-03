@@ -37,9 +37,10 @@
   <div class="container-fluid text-left">
 
     <div id="container-main" class="container p-3 rounded shadow-lg">
+      {% block messages %}
       <div class="row">
         <div class="col">
-          {% if messages %}
+          {% if messages and request.user.is_authenticated %}
             {% for message in messages %}
             <div class="alert {% if message.tags %}alert-{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}danger{% else %}{{ message.tags }}{% endif %}{% endif %}">
               {{ message }}
@@ -48,6 +49,7 @@
           {% endif %}
         </div>
       </div>
+      {% endblock %}
 
       <div class="row">
         <div class="col">

@@ -22,35 +22,6 @@ def _build_cache_key(view_name, kwargs, is_authenticated):
     return f"pv:{view_name}:{digest}"
 
 
-def _request_has_messages(request):
-    storage = getattr(request, "_messages", None)
-    if storage is not None:
-        queued = getattr(storage, "_queued_messages", None)
-        if queued:
-            return True
-        loaded = getattr(storage, "_loaded_data", None)
-        if loaded:
-            return True
-    session = getattr(request, "session", None)
-    if session is not None:
-        if session.get("_messages"):
-            return True
-    return False
-
-
-def _should_skip_cache(request):
-    if request.method and request.method.upper() != "GET":
-        return True
-
-    if _request_has_messages(request):
-        return True
-
-    if request.META.get("CSRF_COOKIE_USED"):
-        return True
-
-    return False
-
-
 def cache_public_view(timeout=60):
     """Cache a public view and serve stale content while one request refreshes it."""
 
@@ -62,41 +33,36 @@ def cache_public_view(timeout=60):
         def wrapper(request, *args, **kwargs):
             cache = caches[PUBLIC_CACHE_ALIAS]
             cache_key = _build_cache_key(view_func.__name__, kwargs, request.user.is_authenticated)
-            skip_cache = _should_skip_cache(request)
+            cached_entry = cache.get(cache_key)
+            now = time.time()
 
-            if not skip_cache:
-                cached_entry = cache.get(cache_key)
-                now = time.time()
-
-                if isinstance(cached_entry, dict):
-                    response = cached_entry.get("response")
-                    expires_at = cached_entry.get("expires_at", 0)
-                    if response is not None:
-                        if expires_at > now:
-                            return response
-
-                        lock_key = f"{cache_key}:lock"
-                        if cache.add(lock_key, True, lock_timeout):
-                            try:
-                                fresh_response = view_func(request, *args, **kwargs)
-                                cache.set(
-                                    cache_key,
-                                    {"response": fresh_response, "expires_at": now + timeout},
-                                    timeout + stale_extension,
-                                )
-                                return fresh_response
-                            finally:
-                                cache.delete(lock_key)
+            if isinstance(cached_entry, dict):
+                response = cached_entry.get("response")
+                expires_at = cached_entry.get("expires_at", 0)
+                if response is not None:
+                    if expires_at > now:
                         return response
 
+                    lock_key = f"{cache_key}:lock"
+                    if cache.add(lock_key, True, lock_timeout):
+                        try:
+                            fresh_response = view_func(request, *args, **kwargs)
+                            cache.set(
+                                cache_key,
+                                {"response": fresh_response, "expires_at": now + timeout},
+                                timeout + stale_extension,
+                            )
+                            return fresh_response
+                        finally:
+                            cache.delete(lock_key)
+                    return response
+
             fresh_response = view_func(request, *args, **kwargs)
-            if not skip_cache:
-                now = time.time()
-                cache.set(
-                    cache_key,
-                    {"response": fresh_response, "expires_at": now + timeout},
-                    timeout + stale_extension,
-                )
+            cache.set(
+                cache_key,
+                {"response": fresh_response, "expires_at": now + timeout},
+                timeout + stale_extension,
+            )
             return fresh_response
 
         return wrapper
