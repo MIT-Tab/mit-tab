@@ -6,6 +6,8 @@ from functools import wraps
 from django.conf import settings
 from django.core.cache import caches
 
+from mittab.libs.cdn import purge_cdn_paths
+
 PUBLIC_CACHE_ALIAS = getattr(settings, "PUBLIC_VIEW_CACHE_ALIAS", "public")
 AUTH_STATES = (False, True)
 
@@ -27,6 +29,9 @@ def cache_public_view(timeout=60):
 
     stale_extension = max(timeout, 30)
     lock_timeout = max(30, timeout // 2 or 1)
+    cache_control_header = (
+        f"public, max-age={timeout}, stale-while-revalidate={stale_extension}"
+    )
 
     def decorator(view_func):
         @wraps(view_func)
@@ -40,6 +45,8 @@ def cache_public_view(timeout=60):
                 response = cached_entry.get("response")
                 expires_at = cached_entry.get("expires_at", 0)
                 if response is not None:
+                    if hasattr(response, "__setitem__") and "Cache-Control" not in response:
+                        response["Cache-Control"] = cache_control_header
                     if expires_at > now:
                         return response
 
@@ -58,6 +65,8 @@ def cache_public_view(timeout=60):
                     return response
 
             fresh_response = view_func(request, *args, **kwargs)
+            if hasattr(fresh_response, "__setitem__"):
+                fresh_response["Cache-Control"] = cache_control_header
             cache.set(
                 cache_key,
                 {"response": fresh_response, "expires_at": now + timeout},
@@ -83,6 +92,15 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("missing_ballots")
     _delete_key_for_all_auth_states("public_home")
 
+    purge_cdn_paths([
+        "/public/",
+        "/public/pairings/",
+        "/public/missing-ballots/",
+        "/public/judges/",
+        "/public/teams/",
+        "/public/team-rankings/",
+    ])
+
 
 def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     """Invalidate cached outround public pages for the provided division."""
@@ -90,14 +108,22 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     kwargs = {"type_of_round": type_of_round}
     _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
 
+    purge_cdn_paths([
+        f"/public/outrounds/{type_of_round}/",
+    ])
+
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
     """Invalidate cached public judges view."""
 
     _delete_key_for_all_auth_states("public_view_judges")
 
+    purge_cdn_paths(["/public/judges/"])
+
 
 def invalidate_public_teams_cache(*_args, **_kwargs):
     """Invalidate cached public teams view."""
 
     _delete_key_for_all_auth_states("public_view_teams")
+
+    purge_cdn_paths(["/public/teams/"])
