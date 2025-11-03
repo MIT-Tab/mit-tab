@@ -1,10 +1,9 @@
 import random
-from functools import wraps
 
-from django.contrib.auth.views import LoginView
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from mittab.apps.tab.forms import EBallotForm
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (
     BreakingTeam,
@@ -15,43 +14,109 @@ from mittab.apps.tab.models import (
     Team,
     Round,
 )
+from mittab.apps.tab.views.pairing_views import enter_result
+from mittab.libs import cache_logic
+from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
-from mittab.apps.tab.forms import EBallotForm
-from mittab.libs.bracket_display_logic import get_bracket_data_json
-from mittab.apps.tab.views.pairing_views import enter_result
-
-public_login = LoginView.as_view(template_name="public/login.html")
 
 
 @cache_public_view(timeout=60)
 def public_home(request):
-    tournament_name = TabSettings.get("tournament_name", "MIT-TAB Tournament")
-    pairings_released = TabSettings.get("pairing_released", 0) == 1
-    results_published = TabSettings.get("results_published", False)
+    cur_round_setting = TabSettings.get("cur_round", 1) - 1
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+    pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
+    pairing_released = pairing_released_inround
+    in_outrounds = False
+    current_outround_label = ""
+    status_primary = "Tournament"
+    status_secondary = "Starting soon"
+
+    if cur_round_setting >= 1:
+        outround_qs = Outround.objects.order_by("num_teams")
+
+        if outround_qs.exists():
+            varsity = (
+                outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
+                .order_by("num_teams")
+                .first()
+            )
+            novice = (
+                outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
+                .order_by("num_teams")
+                .first()
+            )
+
+            labels = []
+            release_flags = []
+
+            if varsity:
+                labels.append(f"[V] Ro{varsity.num_teams}")
+                release_flags.append(
+                    TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
+                )
+            if novice:
+                labels.append(f"[N] Ro{novice.num_teams}")
+                release_flags.append(
+                    TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
+                )
+
+            if labels:
+                in_outrounds = True
+                current_outround_label = " & ".join(labels)
+                pairing_released = bool(release_flags and all(release_flags))
+            else:
+                pairing_released = pairing_released_inround
+
+        pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
+
+        if in_outrounds:
+            status_primary = current_outround_label or "Elimination rounds"
+            status_secondary = pairing_text
+        elif cur_round_setting <= tot_rounds:
+            status_primary = f"Round {cur_round_setting}"
+            status_secondary = pairing_text
+        else:
+            status_primary = "Tournament"
+            status_secondary = pairing_text
+    else:
+        pairing_released = False
 
     context = {
-        "tournament_name": tournament_name,
-        "pairings_released": pairings_released,
-        "results_published": results_published,
+        "status_primary": status_primary,
+        "status_secondary": status_secondary,
+        "cur_round": cur_round_setting,
+        "tot_rounds": tot_rounds,
+        "pairing_released": pairing_released,
+        "in_outrounds": in_outrounds,
+        "current_outround_label": current_outround_label,
     }
     return render(request, "public/home.html", context)
+
 
 @cache_public_view(timeout=60)
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
     if not request.user.is_authenticated and not display_judges:
-        return redirect_and_flash_error(request, "This view is not public", path=reverse("index"))
+        return redirect_and_flash_error(
+            request, "This view is not public", path=reverse("index")
+        )
 
     num_rounds = TabSettings.get("tot_rounds", 5)
     rounds = [num for num in range(1, num_rounds + 1)]
 
     return render(
-        request, "public/judges.html", {
-            "judges": Judge.objects.order_by("name").prefetch_related("schools", "checkin_set").all(),
-            "rounds": rounds
-        })
+        request,
+        "public/judges.html",
+        {
+            "judges": Judge.objects.order_by("name")
+            .prefetch_related("schools", "checkin_set")
+            .all(),
+            "rounds": rounds,
+        },
+    )
+
 
 @cache_public_view(timeout=60)
 def public_view_teams(request):
@@ -59,30 +124,47 @@ def public_view_teams(request):
 
     if not request.user.is_authenticated and not display_teams:
         return redirect_and_flash_error(
-            request, "This view is not public", path=reverse("index"))
+            request, "This view is not public", path=reverse("index")
+        )
 
     return render(
-        request, "public/teams.html", {
-            "teams": Team.objects
-                     .order_by("-checked_in", "school__name")
-                     .prefetch_related("debaters", "school", "hybrid_school")
-                     .all(),
-            "num_checked_in": Team.objects.filter(checked_in=True).count()
-        })
+        request,
+        "public/teams.html",
+        {
+            "teams": Team.objects.order_by("-checked_in", "school__name")
+            .prefetch_related("debaters", "school", "hybrid_school")
+            .all(),
+            "num_checked_in": Team.objects.filter(checked_in=True).count(),
+        },
+    )
+
 
 @cache_public_view(timeout=60)
 def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
     if not display_rankings:
-        return redirect_and_flash_error(request, "This view is not public", path=reverse("index"))
+        return redirect_and_flash_error(
+            request, "This view is not public", path=reverse("index")
+        )
 
-    teams = rankings.get_team_rankings(request, public=True)
+    teams = cache_logic.cache_fxn_key(
+        rankings.get_team_rankings,
+        "team_rankings_public",
+        cache_logic.DEFAULT,
+        request,
+        public=True,
+    )
 
-    return render(request, "public/public_team_rankings.html", {
-        "teams": teams,
-        "title": "Team Rankings"
-    })
+    return render(
+        request,
+        "public/public_team_rankings.html",
+        {
+            "teams": teams,
+            "title": "Team Rankings",
+        },
+    )
+
 
 @cache_public_view(timeout=60)
 def pretty_pair(request):
@@ -101,22 +183,26 @@ def pretty_pair(request):
         )
     )
 
-    # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
     random.shuffle(round_pairing)
     round_pairing.sort(key=lambda r: r.gov_team.name)
-    paired_teams = [team.gov_team for team in round_pairing
-                    ] + [team.opp_team for team in round_pairing]
+    paired_teams = [team.gov_team for team in round_pairing] + [
+        team.opp_team for team in round_pairing
+    ]
 
     byes = [
-        bye.bye_team for bye in Bye.objects.filter(round_number=round_number).select_related('bye_team')
+        bye.bye_team
+        for bye in Bye.objects.filter(round_number=round_number).select_related(
+            "bye_team"
+        )
     ]
     team_count = len(paired_teams) + len(byes)
 
-    for present_team in Team.objects.filter(checked_in=True).prefetch_related('debaters'):
-        if present_team not in paired_teams:
-            if present_team not in byes:
-                errors.append(present_team)
+    for present_team in Team.objects.filter(checked_in=True).prefetch_related(
+        "debaters"
+    ):
+        if present_team not in paired_teams and present_team not in byes:
+            errors.append(present_team)
 
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
@@ -133,14 +219,14 @@ def pretty_pair(request):
     return render(request, "public/pairing_display.html", context)
 
 
-
 @cache_public_view(timeout=30)
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
-    rounds = Round.objects.prefetch_related("gov_team", "opp_team",
-                                            "room", "chair") \
+    rounds = (
+        Round.objects.prefetch_related("gov_team", "opp_team", "room", "chair")
         .filter(victor=Round.NONE, round_number=round_number)
-    # need to do this to not reveal brackets
+        .all()
+    )
 
     rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")
     pairing_exists = TabSettings.get("pairing_released", 0) == 1
@@ -156,7 +242,6 @@ def missing_ballots(request):
 
 @cache_public_view(timeout=60)
 def e_ballot_search_page(request):
-    """Cached helper for rendering the e-ballot search template."""
     return render(request, "public/e_ballot_search.html")
 
 
@@ -179,23 +264,25 @@ def enter_e_ballot(request, ballot_code):
         round_id = request.POST.get("round_instance")
 
         if round_id:
-            return enter_result(request,
-                                round_id,
-                                EBallotForm,
-                                ballot_code,
-                                redirect_to="/")
-        else:
-            message = """
-                      Missing necessary form data. Please go to tab if this
-                      error persists
-                      """
+            return enter_result(
+                request,
+                round_id,
+                EBallotForm,
+                ballot_code,
+                redirect_to="/",
+            )
+        message = """
+                  Missing necessary form data. Please go to tab if this
+                  error persists
+                  """
 
     current_round = TabSettings.get(key="cur_round") - 1
 
-    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
-        # bad use of related_name in the model, this gets the rounds
-        "judges",
-    ).first()
+    judge = (
+        Judge.objects.filter(ballot_code=ballot_code)
+        .prefetch_related("judges")
+        .first()
+    )
 
     if not judge:
         message = f"""
@@ -205,9 +292,11 @@ def enter_e_ballot(request, ballot_code):
     elif TabSettings.get("pairing_released", 0) != 1:
         message = "Pairings for this round have not been released."
     else:
-        # see above, judge.judges is rounds
-        rounds = list(judge.judges.prefetch_related("chair")
-                      .filter(round_number=current_round).all())
+        rounds = list(
+            judge.judges.prefetch_related("chair").filter(
+                round_number=current_round
+            )
+        )
         if len(rounds) > 1:
             message = """
                     Found more than one ballot for you this round.
@@ -243,7 +332,7 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
 
     round_pairing = Outround.objects.filter(
         num_teams__gte=round_number,
-        type_of_round=type_of_round
+        type_of_round=type_of_round,
     )
 
     unique_values = round_pairing.values_list("num_teams")
@@ -286,7 +375,6 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
 
     round_pairing = list(round_pairing)
 
-    # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
     random.shuffle(round_pairing)
     round_pairing.sort(key=lambda r: r.gov_team.name)
@@ -296,7 +384,6 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     team_count = len(paired_teams)
 
     pairing_exists = True
-    #pairing_exists = TabSettings.get("pairing_released", 0) == 1
 
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
@@ -310,9 +397,9 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         "gov_opp_display": gov_opp_display,
         "round_number": round_number,
         "type_of_round": type_of_round,
+        "label": label,
         "round_pairing": round_pairing,
         "outround_pairings": outround_pairings,
-        "label": label,
         "paired_teams": paired_teams,
         "team_count": team_count,
         "pairing_exists": pairing_exists,
@@ -322,5 +409,4 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         "show_outrounds_bracket": show_outrounds_bracket,
         "bracket_data_json": bracket_data_json,
     }
-
     return render(request, "public/outround_pairing.html", context)

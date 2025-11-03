@@ -1,79 +1,144 @@
 {% extends "base/__wide.html" %}
 {% load tags %}
+{% load render_bundle from webpack_loader %}
 
-{% block title %}Welcome to {{ tournament_name }}{% endblock %}
+{% block title %}{% tournament_name %}{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicHome' %}
+
+{% endblock %}
+
+{% block banner %}{% endblock %}
 
 {% block content %}
-<div class="col-12">
-  <div class="jumbotron text-center py-5">
-    <h1 class="display-4 mb-3">{{ tournament_name }}</h1>
-    <p class="lead text-muted">
-      Follow live pairings, team lists, and judge assignments as they are released by tab staff.
-    </p>
-    <div class="mt-4">
-      <a class="btn btn-primary btn-lg mr-2" href="{% url 'pretty_pair' %}">
-        View Pairings
-      </a>
-      <a class="btn btn-outline-secondary btn-lg" href="{% url 'tab_login' %}">
-        Tab Staff Login
-      </a>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="col-md-4 mb-4">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Tournament Status</h5>
-          <p class="card-text">
-            {% if pairings_released %}
-              Round pairings are currently <strong>released</strong> to the public.
-            {% else %}
-              Pairings are not yet public. Check back soon once tab releases the round.
-            {% endif %}
-          </p>
-          <p class="card-text">
-            {% if results_published %}
-              Preliminary results have been published.
-            {% else %}
-              Results will be posted here once the tournament announces them.
-            {% endif %}
-          </p>
+<div class="col-12 d-flex justify-content-center public-home-wrapper">
+  <div class="public-home"
+       data-public-home
+       data-cur-round="{{ cur_round }}"
+       data-total-rounds="{{ tot_rounds }}"
+       data-pairing-released="{{ pairing_released|yesno:'true,false' }}"
+       data-in-outrounds="{{ in_outrounds|yesno:'true,false' }}"
+       data-current-outround-label="{{ current_outround_label|escape }}">
+    <div class="grid">
+      <aside class="sidebar">
+        <div class="public-sidebar-card status">
+          <h3 class="title">Welcome to {% tournament_name %}!</h3>
+          <div class="content">
+            <div class="status-block" data-status>
+              <!-- Status will be dynamically updated by JavaScript -->
+              <div class="status-icon" aria-hidden="true" data-status-icon>
+                <i class="fas fa-clipboard-check"></i>
+              </div>
+              <div class="status-text" aria-live="polite">
+                <div class="status-primary" data-status-primary>{{ status_primary }}</div>
+                <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
+              </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="item">
+              <div class="text">
+                <strong>Tournament Updates</strong>
+                <p>Check back regularly for updated pairings, results, and standings throughout the tournament.</p>
+              </div>
+            </div>
+            
+            <div class="item">
+              <div class="text">
+                <strong>For Judges</strong>
+                <p>Use your ballot code to submit results electronically via the E-Ballot link.</p>
+              </div>
+            </div>
+            
+            <div class="item">
+              <div class="text">
+                <strong>For Teams</strong>
+                <p>View your matchups in Released Pairings and track your progress in Team Rankings.</p>
+              </div>
+            </div>
+            
+            <div class="item">
+              <div class="text">
+                <strong>Staff Login</strong>
+                <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </aside>
+      
+      <aside class="links" aria-labelledby="public-home-quick-links">
+        <header class="header mobile-only">
+          <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
+          <h2 class="status-title mb-2">Status:</h2>
+          <div class="status-block status-block--inline" data-status>
+            <div class="status-icon" aria-hidden="true" data-status-icon>
+              <i class="fas fa-clipboard-check"></i>
+            </div>
+            <span class="status-divider" aria-hidden="true"></span>
+            <div class="status-text" aria-live="polite">
+              <div class="status-primary" data-status-primary>{{ status_primary }}</div>
+              <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
+            </div>
+          </div>
+        </header>
 
-    <div class="col-md-4 mb-4">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Public Resources</h5>
-          <ul class="list-unstyled mb-0">
-            <li><a href="{% url 'public_teams' %}">Team List</a></li>
-            <li><a href="{% url 'public_judges' %}">Judge List</a></li>
-            <li><a href="{% url 'rank_teams_public' %}">Team Rankings</a></li>
-            <li><a href="{% url 'outround_pretty_pair' 0 %}">Varsity Outrounds</a></li>
-            <li><a href="{% url 'outround_pretty_pair' 1 %}">Novice Outrounds</a></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-4 mb-4">
-      <div class="card h-100 shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title">Need Assistance?</h5>
-          <p class="card-text">
-            Debaters and judges can submit ballots online using their assigned code.
-          </p>
-          <a class="btn btn-outline-primary btn-block" href="{% url 'e_ballot_search' %}">
-            Submit E-Ballot
+        <nav class="public-links" aria-label="Quick links">
+          <a class="tile shadow-sm" href="{% url 'pretty_pair' %}">
+            <span class="body">
+              <span class="title">Released Pairings</span>
+              <span class="subtitle">Latest rounds and room assignments.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-          <p class="card-text mt-3 mb-0">
-            Questions? Visit the tab room staff or refer to the tournament communications sent during announcements.
-          </p>
-        </div>
-      </div>
+          <a class="tile shadow-sm" href="{% url 'missing_ballots' %}">
+            <span class="body">
+              <span class="title">Missing Ballots</span>
+              <span class="subtitle">Outstanding ballots that need attention.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
+            <span class="body">
+              <span class="title">Submit E-Ballot</span>
+              <span class="subtitle">Judges enter ballot codes to file results.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'public_judges' %}">
+            <span class="body">
+              <span class="title">Judge List</span>
+              <span class="subtitle">Roster and check-in status.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'public_teams' %}">
+            <span class="body">
+              <span class="title">Team List</span>
+              <span class="subtitle">Registered teams and schools.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 0 %}">
+            <span class="body">
+              <span class="title">Varsity Outrounds</span>
+              <span class="subtitle">Varsity elimination brackets and pairings.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 1 %}">
+            <span class="body">
+              <span class="title">Novice Outrounds</span>
+              <span class="subtitle">Novice elimination brackets and pairings.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+        </nav>
+      </aside>
     </div>
   </div>
 </div>
+
 {% endblock %}

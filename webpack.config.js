@@ -11,6 +11,7 @@ module.exports = {
   entry: {
     main: "./assets/js/index",
     publicDisplay: "./assets/js/publicDisplay",
+    publicHome: "./assets/js/publicHome",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
   },

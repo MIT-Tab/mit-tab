@@ -44,10 +44,10 @@
 {% url "rank_teams_public" as public_team_rankings %}
 {% url "outround_pretty_pair" 0 as public_outround_varsity %}
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
-{% url "tab_login" as staff_login %}
 {% url "public_home" as public_home %}
+{% url "tab_login" as staff_login %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
     <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{{ home }}{% else %}{{ public_home }}{% endif %}">MIT-TAB</a>
 
@@ -171,8 +171,14 @@
           <a class="nav-link {% active request staff_login %}" href="{{ staff_login }}">Tab Staff Login</a>
         </li>
       </ul>
+      <ul class="navbar-nav ml-auto order-1">
+        <li class="nav-item">
+          <a class="nav-link {% active request staff_login %}" href="{{ staff_login }}">
+            <i class="fas fa-sign-in-alt"></i> Staff Login
+          </a>
+        </li>
+      </ul>
     </div>
     {% endif %}
   </div>
-  <br>
 </nav>

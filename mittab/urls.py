@@ -307,7 +307,7 @@ urlpatterns = [
          public_views.public_home,
          name="public_home"),
     path("public/login/",
-         public_views.public_login,
+         LoginView.as_view(template_name="public/staff_login.html"),
          name="tab_login"),
     path("public/pairings/",
          public_views.pretty_pair,

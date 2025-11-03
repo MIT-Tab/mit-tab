@@ -152,6 +152,10 @@ TEMPLATES = [
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
+# Login/Logout redirects
+LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = "/public/login/"
+
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
 CACHES = {
