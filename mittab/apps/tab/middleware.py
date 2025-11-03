@@ -7,7 +7,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.models import TabSettings
 from mittab.libs.backup import is_backup_active
 
-LOGIN_WHITELIST = ("/public/login/", "/public/pairings/",
+LOGIN_WHITELIST = ("/", "/public/login/", "/public/pairings/",
                    "/public/missing-ballots/","/public/e-ballots/",
                    "/404/", "/403/", "/500/",
                    "/public/teams/",
@@ -29,12 +29,16 @@ class Login:
         self.get_response = get_response
 
     def __call__(self, request):
-        whitelisted = (request.path in LOGIN_WHITELIST) or \
-            EBALLOT_REGEX.match(request.path)
+        path = request.path
+        whitelisted = (
+            path in LOGIN_WHITELIST
+            or path.startswith("/public/")
+            or EBALLOT_REGEX.match(path)
+        )
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                view = LoginView.as_view(template_name="public/login.html")
+                view = LoginView.as_view(template_name="public/staff_login.html")
                 return view(request)
             else:
                 return redirect_and_flash_info(

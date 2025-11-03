@@ -1,16 +1,94 @@
 import random
 
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
                                     TabSettings, Judge, Team, Round)
+from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs import cache_logic
 from mittab.libs.tab_logic import rankings
 from mittab.apps.tab.forms import EBallotForm
 from mittab.libs.bracket_display_logic import get_bracket_data_json
-from mittab.apps.tab.views.pairing_views import enter_result
+
+
+def public_home(request):
+    cur_round_setting = TabSettings.get("cur_round", 1) - 1
+    tot_rounds = TabSettings.get("tot_rounds", 5)
+    pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
+    pairing_released = pairing_released_inround
+    in_outrounds = False
+    current_outround_label = ""
+
+    if cur_round_setting < 1:
+        pairing_released = False
+        status_primary = "Tournament"
+        status_secondary = "Starting soon"
+        return render(
+            request,
+            "public/home.html",
+            {
+                "status_primary": status_primary,
+                "status_secondary": status_secondary,
+            },
+        )
+
+    outround_qs = Outround.objects.order_by("num_teams")
+
+    if outround_qs.exists():
+        varsity = (
+            outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
+            .order_by("num_teams")
+            .first()
+        )
+        novice = (
+            outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
+            .order_by("num_teams")
+            .first()
+        )
+
+        labels = []
+        release_flags = []
+
+        if varsity:
+            labels.append(f"[V] Ro{varsity.num_teams}")
+            release_flags.append(
+                TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
+            )
+        if novice:
+            labels.append(f"[N] Ro{novice.num_teams}")
+            release_flags.append(
+                TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
+            )
+
+        if labels:
+            in_outrounds = True
+            current_outround_label = " & ".join(labels)
+            pairing_released = bool(release_flags and all(release_flags))
+        else:
+            pairing_released = pairing_released_inround
+
+    pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
+
+    if in_outrounds:
+        status_primary = current_outround_label or "Elimination rounds"
+        status_secondary = pairing_text
+    elif cur_round_setting <= tot_rounds:
+        status_primary = f"Round {cur_round_setting}"
+        status_secondary = pairing_text
+    else:
+        status_primary = "Tournament"
+        status_secondary = pairing_text
+
+    return render(
+        request,
+        "public/home.html",
+        {
+            "status_primary": status_primary,
+            "status_secondary": status_secondary,
+        },
+    )
 
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
