@@ -2,7 +2,6 @@
 import random
 import datetime
 import os
-import logging
 
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
@@ -21,8 +20,6 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
-
-logger = logging.getLogger(__name__)
 
 import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -747,42 +744,15 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
 
 def toggle_pairing_released(request):
-    import time
-    start_time = time.time()
-    
     old = TabSettings.get("pairing_released", 0)
     new_value = int(not old)
-    
-    logger.info(f"[PAIRING RELEASE] Toggle requested: {old} -> {new_value}")
-    
-    db_start = time.time()
     TabSettings.set("pairing_released", new_value)
-    db_duration = (time.time() - db_start) * 1000
-    logger.info(f"[PAIRING RELEASE] TabSettings updated to {new_value} in {db_duration:.0f}ms")
-    
-    # Always invalidate cache when pairing release status changes
-    # This ensures CDN serves fresh content immediately
-    cache_start = time.time()
-    cache_info = invalidate_inround_public_pairings_cache()
-    cache_duration = (time.time() - cache_start) * 1000
-    
-    logger.info(f"[PAIRING RELEASE] Cache invalidation completed in {cache_duration:.0f}ms")
-    
-    total_duration = (time.time() - start_time) * 1000
-    logger.info(f"[PAIRING RELEASE] Total request time: {total_duration:.0f}ms")
 
-    data = {
-        "success": True,
-        "pairing_released": new_value == 1,
-        "debug": {
-            "old_value": old,
-            "new_value": new_value,
-            "db_update_ms": round(db_duration, 2),
-            "cache_invalidation_ms": round(cache_duration, 2),
-            "total_ms": round(total_duration, 2),
-            "cache_info": cache_info or {},
-        }
-    }
+    # Always invalidate cache when pairing release status changes
+    # Origin cache is cleared immediately, CDN refreshes within 10s
+    invalidate_inround_public_pairings_cache()
+
+    data = {"success": True, "pairing_released": new_value == 1}
     return JsonResponse(data)
 
 

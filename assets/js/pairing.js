@@ -199,68 +199,16 @@ function alertLink() {
 
 function togglePairingRelease(event) {
   event.preventDefault();
-  
-  const startTime = performance.now();
-  const buttonClicked = $(event.target).closest('.release').attr('id');
-  
-  console.log('[PAIRING RELEASE] ========================================');
-  console.log('[PAIRING RELEASE] Button clicked:', buttonClicked);
-  console.log('[PAIRING RELEASE] Sending request to /pairing/release');
-  
   $.ajax({
     url: "/pairing/release",
     success(result) {
-      const endTime = performance.now();
-      const duration = (endTime - startTime).toFixed(0);
-      
-      console.log('[PAIRING RELEASE] ========================================');
-      console.log('[PAIRING RELEASE] Response received in', duration, 'ms');
-      console.log('[PAIRING RELEASE] Full result:', result);
-      
-      if (result.debug) {
-        console.log('[PAIRING RELEASE] --- Server Diagnostics ---');
-        console.log('[PAIRING RELEASE] Old value:', result.debug.old_value);
-        console.log('[PAIRING RELEASE] New value:', result.debug.new_value);
-        console.log('[PAIRING RELEASE] DB update took:', result.debug.db_update_ms, 'ms');
-        console.log('[PAIRING RELEASE] Cache invalidation took:', result.debug.cache_invalidation_ms, 'ms');
-        console.log('[PAIRING RELEASE] Server total time:', result.debug.total_ms, 'ms');
-        
-        if (result.debug.cache_info) {
-          console.log('[PAIRING RELEASE] --- Cache Info ---');
-          console.log('[PAIRING RELEASE] Cache keys deleted:', result.debug.cache_info.cache_keys_deleted);
-          console.log('[PAIRING RELEASE] CDN paths purged:', result.debug.cache_info.cdn_paths_purged);
-          console.log('[PAIRING RELEASE] CDN purge took:', result.debug.cache_info.cdn_purge_ms, 'ms');
-          console.log('[PAIRING RELEASE] CDN result:', result.debug.cache_info.cdn_result);
-        }
-      }
-      
-      console.log('[PAIRING RELEASE] pairing_released:', result.pairing_released);
-      
       if (result.pairing_released) {
-        console.log('[PAIRING RELEASE] Showing "Close Pairings" button, hiding "Release Pairings"');
         $("#close-pairings").removeClass("d-none");
         $("#release-pairings").addClass("d-none");
       } else {
-        console.log('[PAIRING RELEASE] Showing "Release Pairings" button, hiding "Close Pairings"');
         $("#close-pairings").addClass("d-none");
         $("#release-pairings").removeClass("d-none");
       }
-      
-      console.log('[PAIRING RELEASE] UI updated successfully');
-      console.log('[PAIRING RELEASE] ========================================');
-    },
-    error(xhr, status, error) {
-      const endTime = performance.now();
-      const duration = (endTime - startTime).toFixed(0);
-      
-      console.error('[PAIRING RELEASE] ========================================');
-      console.error('[PAIRING RELEASE] Request failed after', duration, 'ms');
-      console.error('[PAIRING RELEASE] Status:', status);
-      console.error('[PAIRING RELEASE] Error:', error);
-      console.error('[PAIRING RELEASE] Response:', xhr.responseText);
-      console.error('[PAIRING RELEASE] ========================================');
-      
-      alert('Failed to toggle pairing release. Check console for details.');
     },
   });
 }

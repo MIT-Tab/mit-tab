@@ -1,15 +1,10 @@
 import hashlib
 import json
-import logging
 import time
 from functools import wraps
 
 from django.conf import settings
 from django.core.cache import caches
-
-from mittab.libs.cdn import purge_cdn_paths
-
-logger = logging.getLogger(__name__)
 
 PUBLIC_CACHE_ALIAS = getattr(settings, "PUBLIC_VIEW_CACHE_ALIAS", "public")
 AUTH_STATES = (False, True)
@@ -28,28 +23,23 @@ def build_cache_key(view_name, kwargs, is_authenticated):
 
 
 def cache_public_view(timeout=60):
-    """Cache a public view and serve stale content while one request refreshes it."""
+    """
+    Cache a public view with short CDN TTL and longer origin cache.
+    
+    The CDN is configured with a 10-second TTL, so changes propagate quickly.
+    The origin cache uses the specified timeout for better performance.
+    When invalidated, both origin cache and response are cleared immediately.
+    """
 
     stale_extension = max(timeout, 30)
     lock_timeout = max(30, timeout // 2 or 1)
     
-    # If CDN credentials aren't configured, use much shorter cache times
-    # to ensure content refreshes quickly even without purging
-    from mittab.libs.cdn import _CDN_ENDPOINT_ID, _CDN_API_TOKEN
-    if not (_CDN_ENDPOINT_ID and _CDN_API_TOKEN):
-        # Without CDN purge capability, use 30s max-age for permission-sensitive pages
-        # This ensures CDN refreshes within 30 seconds of changes
-        timeout = min(timeout, 30)
-        stale_extension = 15
-        logger.warning(
-            "CDN credentials not configured - using short cache timeout (%ds) "
-            "for cache invalidation. Set DIGITALOCEAN_CDN_ENDPOINT_ID and "
-            "DIGITALOCEAN_API_TOKEN for instant cache purging.",
-            timeout
-        )
-    
+    # Set CDN cache to 10 seconds for quick propagation of permission changes
+    # Origin cache uses the full timeout for performance
+    cdn_max_age = 10
     cache_control_header = (
-        f"public, max-age={timeout}, stale-while-revalidate={stale_extension}"
+        f"public, max-age={cdn_max_age}, s-maxage={cdn_max_age}, "
+        f"stale-while-revalidate={cdn_max_age}"
     )
 
     def decorator(view_func):
@@ -108,101 +98,61 @@ def _delete_key_for_all_auth_states(view_name, kwargs=None):
 
 
 def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
-    """Invalidate cached in-round public pages."""
-
-    logger.info("[CACHE INVALIDATION] Starting in-round public pairings cache invalidation")
+    """
+    Invalidate cached in-round public pages.
     
-    cache_keys = ["pretty_pair", "missing_ballots", "public_home"]
-    for view_name in cache_keys:
-        _delete_key_for_all_auth_states(view_name)
-        logger.info(f"[CACHE INVALIDATION] Deleted cache keys for view: {view_name}")
-
-    cdn_paths = [
-        "/public/",
-        "/public/pairings/",
-        "/public/missing-ballots/",
-        "/public/judges/",
-        "/public/teams/",
-        "/public/team-rankings/",
-    ]
-    
-    # Check if CDN credentials are available
-    from mittab.libs.cdn import _CDN_ENDPOINT_ID, _CDN_API_TOKEN
-    has_cdn_creds = bool(_CDN_ENDPOINT_ID and _CDN_API_TOKEN)
-    
-    if has_cdn_creds:
-        logger.info(f"[CACHE INVALIDATION] Starting CDN purge (blocking=True) for {len(cdn_paths)} paths")
-        cdn_start = time.time()
-        
-        # Use blocking=True for permission changes to ensure CDN purges immediately
-        cdn_result = purge_cdn_paths(cdn_paths, blocking=True)
-        
-        cdn_duration = (time.time() - cdn_start) * 1000
-        logger.info(f"[CACHE INVALIDATION] CDN purge completed in {cdn_duration:.0f}ms")
-    else:
-        logger.warning(
-            "[CACHE INVALIDATION] CDN credentials not configured - skipping CDN purge. "
-            "Content will refresh within 30s based on cache timeout. "
-            "For instant updates, set DIGITALOCEAN_CDN_ENDPOINT_ID and DIGITALOCEAN_API_TOKEN."
-        )
-        cdn_result = {"status": "skipped", "reason": "no_credentials"}
-        cdn_duration = 0
-    
-    return {
-        "cache_keys_deleted": cache_keys,
-        "cdn_paths_purged": cdn_paths if has_cdn_creds else [],
-        "cdn_purge_ms": round(cdn_duration, 2),
-        "cdn_result": cdn_result,
-    }
+    Clears origin cache immediately. CDN will refresh within 10 seconds
+    based on the short TTL configured in cache_public_view.
+    """
+    _delete_key_for_all_auth_states("pretty_pair")
+    _delete_key_for_all_auth_states("missing_ballots")
+    _delete_key_for_all_auth_states("public_home")
 
 
 def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
-    """Invalidate cached outround public pages for the provided division."""
-
+    """
+    Invalidate cached outround public pages for the provided division.
+    
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
     kwargs = {"type_of_round": type_of_round}
     _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
 
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    purge_cdn_paths([
-        f"/public/outrounds/{type_of_round}/",
-    ], blocking=True)
-
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
-    """Invalidate cached public judges view."""
-
+    """
+    Invalidate cached public judges view.
+    
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
     _delete_key_for_all_auth_states("public_view_judges")
-
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    purge_cdn_paths(["/public/judges/"], blocking=True)
 
 
 def invalidate_public_teams_cache(*_args, **_kwargs):
-    """Invalidate cached public teams view."""
-
+    """
+    Invalidate cached public teams view.
+    
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
     _delete_key_for_all_auth_states("public_view_teams")
-
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    purge_cdn_paths(["/public/teams/"], blocking=True)
 
 
 def invalidate_public_rankings_cache(*_args, **_kwargs):
-    """Invalidate cached public rankings view."""
-
+    """
+    Invalidate cached public rankings view.
+    
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
     _delete_key_for_all_auth_states("rank_teams_public")
-
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    purge_cdn_paths(["/public/team-rankings/"], blocking=True)
 
 
 def invalidate_all_public_caches(*_args, **_kwargs):
     """
     Invalidate all public view caches.
     
-    Use this when settings change that could affect multiple public views,
-    ensuring the CDN immediately stops serving stale content.
+    Use this when settings change that could affect multiple public views.
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
-
     # Invalidate all view-specific caches
     _delete_key_for_all_auth_states("pretty_pair")
     _delete_key_for_all_auth_states("missing_ballots")
@@ -216,17 +166,3 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1
         kwargs = {"type_of_round": type_of_round}
         _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
-
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    # This prevents users from seeing stale content after settings changes
-    purge_cdn_paths([
-        "/public/",
-        "/public/pairings/",
-        "/public/missing-ballots/",
-        "/public/judges/",
-        "/public/teams/",
-        "/public/team-rankings/",
-        "/public/outrounds/0/",
-        "/public/outrounds/1/",
-        "/public/e-ballot/",
-    ], blocking=True)
