@@ -12,7 +12,7 @@ PUBLIC_CACHE_ALIAS = getattr(settings, "PUBLIC_VIEW_CACHE_ALIAS", "public")
 AUTH_STATES = (False, True)
 
 
-def _build_cache_key(view_name, kwargs, is_authenticated):
+def build_cache_key(view_name, kwargs, is_authenticated):
     normalized_kwargs = tuple(sorted((kwargs or {}).items()))
     payload = {
         "view": view_name,
@@ -37,7 +37,7 @@ def cache_public_view(timeout=60):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             cache = caches[PUBLIC_CACHE_ALIAS]
-            cache_key = _build_cache_key(view_func.__name__, kwargs,
+            cache_key = build_cache_key(view_func.__name__, kwargs,
                                          request.user.is_authenticated)
             cached_entry = cache.get(cache_key)
             now = time.time()
@@ -85,7 +85,7 @@ def cache_public_view(timeout=60):
 def _delete_key_for_all_auth_states(view_name, kwargs=None):
     cache = caches[PUBLIC_CACHE_ALIAS]
     for is_authenticated in AUTH_STATES:
-        cache.delete(_build_cache_key(view_name, kwargs or {}, is_authenticated))
+        cache.delete(build_cache_key(view_name, kwargs or {}, is_authenticated))
 
 
 def invalidate_inround_public_pairings_cache(*_args, **_kwargs):

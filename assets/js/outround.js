@@ -78,7 +78,7 @@ function assignTeam(e) {
         window.alert(alertMsg);
       }
     },
-    error() {
+    failure() {
       window.alert(alertMsg);
     },
   });

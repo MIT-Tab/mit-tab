@@ -8,7 +8,9 @@ $font-size-base: 0.95rem !default;
 .form-control {
   background-image: none !important;
 }
-@import "bootstrap/scss/bootstrap";
+
+@import "~bootstrap/scss/bootstrap";
+
 // Overrides
 .bg-dark {
   background-color: #00438A !important;
@@ -169,3 +171,4 @@ $font-size-base: 0.95rem !default;
 .font-weight-semibold {
   font-weight: 600;
 }
+
