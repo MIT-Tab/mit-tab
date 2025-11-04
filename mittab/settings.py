@@ -169,7 +169,9 @@ CACHES = {
 }
 
 
-if os.environ.get("mittab_env") != "development":
+# Use memcached in production, but fall back to local memory cache in development or CI
+if os.environ.get("mittab_env") not in [
+    "development", None] and not os.environ.get("CI"):
     CACHES["public"] = {
         "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
         "LOCATION": "127.0.0.1:11211",
