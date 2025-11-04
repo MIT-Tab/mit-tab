@@ -32,6 +32,22 @@ def cache_public_view(timeout=60):
 
     stale_extension = max(timeout, 30)
     lock_timeout = max(30, timeout // 2 or 1)
+    
+    # If CDN credentials aren't configured, use much shorter cache times
+    # to ensure content refreshes quickly even without purging
+    from mittab.libs.cdn import _CDN_ENDPOINT_ID, _CDN_API_TOKEN
+    if not (_CDN_ENDPOINT_ID and _CDN_API_TOKEN):
+        # Without CDN purge capability, use 30s max-age for permission-sensitive pages
+        # This ensures CDN refreshes within 30 seconds of changes
+        timeout = min(timeout, 30)
+        stale_extension = 15
+        logger.warning(
+            "CDN credentials not configured - using short cache timeout (%ds) "
+            "for cache invalidation. Set DIGITALOCEAN_CDN_ENDPOINT_ID and "
+            "DIGITALOCEAN_API_TOKEN for instant cache purging.",
+            timeout
+        )
+    
     cache_control_header = (
         f"public, max-age={timeout}, stale-while-revalidate={stale_extension}"
     )
@@ -110,18 +126,31 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
         "/public/team-rankings/",
     ]
     
-    logger.info(f"[CACHE INVALIDATION] Starting CDN purge (blocking=True) for {len(cdn_paths)} paths")
-    cdn_start = time.time()
+    # Check if CDN credentials are available
+    from mittab.libs.cdn import _CDN_ENDPOINT_ID, _CDN_API_TOKEN
+    has_cdn_creds = bool(_CDN_ENDPOINT_ID and _CDN_API_TOKEN)
     
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    cdn_result = purge_cdn_paths(cdn_paths, blocking=True)
-    
-    cdn_duration = (time.time() - cdn_start) * 1000
-    logger.info(f"[CACHE INVALIDATION] CDN purge completed in {cdn_duration:.0f}ms")
+    if has_cdn_creds:
+        logger.info(f"[CACHE INVALIDATION] Starting CDN purge (blocking=True) for {len(cdn_paths)} paths")
+        cdn_start = time.time()
+        
+        # Use blocking=True for permission changes to ensure CDN purges immediately
+        cdn_result = purge_cdn_paths(cdn_paths, blocking=True)
+        
+        cdn_duration = (time.time() - cdn_start) * 1000
+        logger.info(f"[CACHE INVALIDATION] CDN purge completed in {cdn_duration:.0f}ms")
+    else:
+        logger.warning(
+            "[CACHE INVALIDATION] CDN credentials not configured - skipping CDN purge. "
+            "Content will refresh within 30s based on cache timeout. "
+            "For instant updates, set DIGITALOCEAN_CDN_ENDPOINT_ID and DIGITALOCEAN_API_TOKEN."
+        )
+        cdn_result = {"status": "skipped", "reason": "no_credentials"}
+        cdn_duration = 0
     
     return {
         "cache_keys_deleted": cache_keys,
-        "cdn_paths_purged": cdn_paths,
+        "cdn_paths_purged": cdn_paths if has_cdn_creds else [],
         "cdn_purge_ms": round(cdn_duration, 2),
         "cdn_result": cdn_result,
     }

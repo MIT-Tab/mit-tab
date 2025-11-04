@@ -1,17 +1,48 @@
 import json
 import logging
 import os
+import re
 import threading
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-_CDN_ENDPOINT_ID = os.environ.get("DIGITALOCEAN_CDN_ENDPOINT_ID")
-_CDN_API_TOKEN = os.environ.get("DIGITALOCEAN_API_TOKEN")
+# For DigitalOcean Spaces CDN purging:
+# The CDN endpoint ID can be derived from the bucket name
+# The API token can be the same as AWS_SECRET_ACCESS_KEY if it's a DO Personal Access Token
+# 
+# Using existing environment variables:
+# - AWS_SECRET_ACCESS_KEY as the DigitalOcean API token
+# - BACKUP_BUCKET as the CDN endpoint identifier
+# - BACKUP_S3_ENDPOINT to derive the CDN URL
+
+# Try to use AWS_SECRET_ACCESS_KEY as DO API token (if it's a Personal Access Token)
+_CDN_API_TOKEN = os.environ.get("DIGITALOCEAN_API_TOKEN") or os.environ.get("AWS_SECRET_ACCESS_KEY")
+
+# Try to use BACKUP_BUCKET as endpoint ID, or fall back to explicit setting
+_BACKUP_BUCKET = os.environ.get("BACKUP_BUCKET", "")
+_CDN_ENDPOINT_ID = os.environ.get("DIGITALOCEAN_CDN_ENDPOINT_ID") or _BACKUP_BUCKET
+
 _CDN_API_URL_TEMPLATE = (
     "https://api.digitalocean.com/v2/cdn/endpoints/{endpoint_id}/cache"
 )
+
+# Derive CDN URL from S3 endpoint
+_S3_ENDPOINT = os.environ.get("BACKUP_S3_ENDPOINT", "")
+_CDN_ENDPOINT = _S3_ENDPOINT.replace(
+    ".digitaloceanspaces.com",
+    ".cdn.digitaloceanspaces.com"
+) if _S3_ENDPOINT else None
+
+if _CDN_ENDPOINT:
+    logger.info(f"CDN endpoint derived: {_CDN_ENDPOINT}")
+if _CDN_ENDPOINT_ID:
+    logger.info(f"CDN endpoint ID: {_CDN_ENDPOINT_ID}")
+if _CDN_API_TOKEN:
+    logger.info(f"CDN API token configured: {_CDN_API_TOKEN[:20]}..." if len(_CDN_API_TOKEN) > 20 else "***")
+
+
 
 
 def _purge(paths):
