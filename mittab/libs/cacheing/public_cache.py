@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import time
 from functools import wraps
 
@@ -7,6 +8,8 @@ from django.conf import settings
 from django.core.cache import caches
 
 from mittab.libs.cdn import purge_cdn_paths
+
+logger = logging.getLogger(__name__)
 
 PUBLIC_CACHE_ALIAS = getattr(settings, "PUBLIC_VIEW_CACHE_ALIAS", "public")
 AUTH_STATES = (False, True)
@@ -91,19 +94,37 @@ def _delete_key_for_all_auth_states(view_name, kwargs=None):
 def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     """Invalidate cached in-round public pages."""
 
-    _delete_key_for_all_auth_states("pretty_pair")
-    _delete_key_for_all_auth_states("missing_ballots")
-    _delete_key_for_all_auth_states("public_home")
+    logger.info("[CACHE INVALIDATION] Starting in-round public pairings cache invalidation")
+    
+    cache_keys = ["pretty_pair", "missing_ballots", "public_home"]
+    for view_name in cache_keys:
+        _delete_key_for_all_auth_states(view_name)
+        logger.info(f"[CACHE INVALIDATION] Deleted cache keys for view: {view_name}")
 
-    # Use blocking=True for permission changes to ensure CDN purges immediately
-    purge_cdn_paths([
+    cdn_paths = [
         "/public/",
         "/public/pairings/",
         "/public/missing-ballots/",
         "/public/judges/",
         "/public/teams/",
         "/public/team-rankings/",
-    ], blocking=True)
+    ]
+    
+    logger.info(f"[CACHE INVALIDATION] Starting CDN purge (blocking=True) for {len(cdn_paths)} paths")
+    cdn_start = time.time()
+    
+    # Use blocking=True for permission changes to ensure CDN purges immediately
+    cdn_result = purge_cdn_paths(cdn_paths, blocking=True)
+    
+    cdn_duration = (time.time() - cdn_start) * 1000
+    logger.info(f"[CACHE INVALIDATION] CDN purge completed in {cdn_duration:.0f}ms")
+    
+    return {
+        "cache_keys_deleted": cache_keys,
+        "cdn_paths_purged": cdn_paths,
+        "cdn_purge_ms": round(cdn_duration, 2),
+        "cdn_result": cdn_result,
+    }
 
 
 def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
