@@ -95,6 +95,7 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("missing_ballots")
     _delete_key_for_all_auth_states("public_home")
 
+    # Use blocking=True for permission changes to ensure CDN purges immediately
     purge_cdn_paths([
         "/public/",
         "/public/pairings/",
@@ -102,7 +103,7 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
         "/public/judges/",
         "/public/teams/",
         "/public/team-rankings/",
-    ])
+    ], blocking=True)
 
 
 def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
@@ -111,9 +112,10 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     kwargs = {"type_of_round": type_of_round}
     _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
 
+    # Use blocking=True for permission changes to ensure CDN purges immediately
     purge_cdn_paths([
         f"/public/outrounds/{type_of_round}/",
-    ])
+    ], blocking=True)
 
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
@@ -121,7 +123,8 @@ def invalidate_public_judges_cache(*_args, **_kwargs):
 
     _delete_key_for_all_auth_states("public_view_judges")
 
-    purge_cdn_paths(["/public/judges/"])
+    # Use blocking=True for permission changes to ensure CDN purges immediately
+    purge_cdn_paths(["/public/judges/"], blocking=True)
 
 
 def invalidate_public_teams_cache(*_args, **_kwargs):
@@ -129,7 +132,8 @@ def invalidate_public_teams_cache(*_args, **_kwargs):
 
     _delete_key_for_all_auth_states("public_view_teams")
 
-    purge_cdn_paths(["/public/teams/"])
+    # Use blocking=True for permission changes to ensure CDN purges immediately
+    purge_cdn_paths(["/public/teams/"], blocking=True)
 
 
 def invalidate_public_rankings_cache(*_args, **_kwargs):
@@ -137,7 +141,8 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
 
     _delete_key_for_all_auth_states("rank_teams_public")
 
-    purge_cdn_paths(["/public/team-rankings/"])
+    # Use blocking=True for permission changes to ensure CDN purges immediately
+    purge_cdn_paths(["/public/team-rankings/"], blocking=True)
 
 
 def invalidate_all_public_caches(*_args, **_kwargs):
@@ -162,7 +167,8 @@ def invalidate_all_public_caches(*_args, **_kwargs):
         kwargs = {"type_of_round": type_of_round}
         _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
 
-    # Purge all public CDN paths
+    # Use blocking=True for permission changes to ensure CDN purges immediately
+    # This prevents users from seeing stale content after settings changes
     purge_cdn_paths([
         "/public/",
         "/public/pairings/",
@@ -173,4 +179,4 @@ def invalidate_all_public_caches(*_args, **_kwargs):
         "/public/outrounds/0/",
         "/public/outrounds/1/",
         "/public/e-ballot/",
-    ])
+    ], blocking=True)

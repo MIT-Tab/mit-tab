@@ -37,9 +37,15 @@ def _purge(paths):
         logger.warning("DigitalOcean CDN purge failed: %s", exc)
 
 
-def purge_cdn_paths(paths):
+def purge_cdn_paths(paths, blocking=False):
     """
-    Issue an asynchronous purge for the provided list of CDN paths.
+    Issue a purge for the provided list of CDN paths.
+
+    Args:
+        paths: List of URL paths to purge from the CDN
+        blocking: If True, wait for purge to complete before returning.
+                 Use True for critical permission changes to ensure immediate updates.
+                 If False (default), purge happens in background thread.
 
     Silently no-ops if CDN credentials are not configured.
     """
@@ -50,5 +56,10 @@ def purge_cdn_paths(paths):
     if not (_CDN_ENDPOINT_ID and _CDN_API_TOKEN):
         return
 
-    thread = threading.Thread(target=_purge, args=(paths,), daemon=True)
-    thread.start()
+    if blocking:
+        # Synchronous purge - wait for completion
+        _purge(paths)
+    else:
+        # Asynchronous purge - fire and forget
+        thread = threading.Thread(target=_purge, args=(paths,), daemon=True)
+        thread.start()
