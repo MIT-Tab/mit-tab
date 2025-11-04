@@ -747,8 +747,9 @@ def toggle_pairing_released(request):
     new_value = int(not old)
     TabSettings.set("pairing_released", new_value)
 
-    if old == 1:
-        invalidate_inround_public_pairings_cache()
+    # Always invalidate cache when pairing release status changes
+    # This ensures CDN serves fresh content immediately
+    invalidate_inround_public_pairings_cache()
 
     data = {"success": True, "pairing_released": new_value == 1}
     return JsonResponse(data)

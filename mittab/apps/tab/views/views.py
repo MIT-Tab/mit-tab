@@ -18,8 +18,7 @@ from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import (
-    invalidate_public_judges_cache,
-    invalidate_public_teams_cache,
+    invalidate_all_public_caches
 )
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
@@ -423,8 +422,9 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
-            invalidate_public_judges_cache()
-            invalidate_public_teams_cache()
+            # Invalidate all public caches when any settings change
+            # This ensures CDN immediately stops serving stale content
+            invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",

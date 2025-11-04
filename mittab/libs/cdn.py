@@ -16,6 +16,7 @@ _CDN_API_URL_TEMPLATE = (
 
 def _purge(paths):
     if not (_CDN_ENDPOINT_ID and _CDN_API_TOKEN):
+        logger.info("CDN purge skipped (no credentials): %s", paths)
         return
 
     url = _CDN_API_URL_TEMPLATE.format(endpoint_id=_CDN_ENDPOINT_ID)
@@ -26,10 +27,12 @@ def _purge(paths):
     payload = {"files": sorted(set(paths))}
 
     try:
+        logger.info("Purging CDN paths: %s", paths)
         response = requests.post(
             url, headers=headers, data=json.dumps(payload), timeout=10
         )
         response.raise_for_status()
+        logger.info("CDN purge successful for %d paths", len(paths))
     except requests.RequestException as exc:  # pragma: no cover - network call
         logger.warning("DigitalOcean CDN purge failed: %s", exc)
 

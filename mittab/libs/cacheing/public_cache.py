@@ -130,3 +130,47 @@ def invalidate_public_teams_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_view_teams")
 
     purge_cdn_paths(["/public/teams/"])
+
+
+def invalidate_public_rankings_cache(*_args, **_kwargs):
+    """Invalidate cached public rankings view."""
+
+    _delete_key_for_all_auth_states("rank_teams_public")
+
+    purge_cdn_paths(["/public/team-rankings/"])
+
+
+def invalidate_all_public_caches(*_args, **_kwargs):
+    """
+    Invalidate all public view caches.
+    
+    Use this when settings change that could affect multiple public views,
+    ensuring the CDN immediately stops serving stale content.
+    """
+
+    # Invalidate all view-specific caches
+    _delete_key_for_all_auth_states("pretty_pair")
+    _delete_key_for_all_auth_states("missing_ballots")
+    _delete_key_for_all_auth_states("public_home")
+    _delete_key_for_all_auth_states("public_view_judges")
+    _delete_key_for_all_auth_states("public_view_teams")
+    _delete_key_for_all_auth_states("rank_teams_public")
+    _delete_key_for_all_auth_states("e_ballot_search_page")
+    
+    # Invalidate outrounds for both divisions
+    for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1
+        kwargs = {"type_of_round": type_of_round}
+        _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
+
+    # Purge all public CDN paths
+    purge_cdn_paths([
+        "/public/",
+        "/public/pairings/",
+        "/public/missing-ballots/",
+        "/public/judges/",
+        "/public/teams/",
+        "/public/team-rankings/",
+        "/public/outrounds/0/",
+        "/public/outrounds/1/",
+        "/public/e-ballot/",
+    ])

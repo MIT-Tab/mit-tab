@@ -607,9 +607,6 @@ def toggle_pairing_released(request, type_of_round, num_teams):
 
         if old == num_teams:
             TabSettings.set("var_teams_visible", num_teams * 2)
-            invalidate_outround_public_pairings_cache(
-                type_of_round, released_visible_value=old
-            )
         else:
             TabSettings.set("var_teams_visible", num_teams)
     else:
@@ -617,11 +614,12 @@ def toggle_pairing_released(request, type_of_round, num_teams):
 
         if old == num_teams:
             TabSettings.set("nov_teams_visible", num_teams * 2)
-            invalidate_outround_public_pairings_cache(
-                type_of_round, released_visible_value=old
-            )
         else:
             TabSettings.set("nov_teams_visible", num_teams)
+
+    # Always invalidate cache when outround visibility changes
+    # This ensures CDN serves fresh content immediately
+    invalidate_outround_public_pairings_cache(type_of_round)
 
     data = {"success": True, "pairing_released": not old == num_teams}
     return JsonResponse(data)
