@@ -541,11 +541,12 @@ def tot_ranks_deb(debater, average_ironmen=True, exclude_round=None):
 
 def collect_speaks_from_rounds(rounds):
     all_speaks = []
-    for round_obj in rounds:
-        round_stats = RoundStats.objects.filter(round=round_obj)
-        for round_stat in round_stats:
-            if round_stat.speaks is not None:
-                all_speaks.append(float(round_stat.speaks))
+    if not rounds:
+        return all_speaks
+    round_stats = RoundStats.objects.filter(round__in=rounds)
+    for round_stat in round_stats:
+        if round_stat.speaks is not None:
+            all_speaks.append(float(round_stat.speaks))
     return all_speaks
 
 
