@@ -7,6 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
+from django.contrib import messages
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
@@ -19,12 +20,16 @@ from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
     validate_panel, EBallotForm
-import mittab.libs.cache_logic as cache_logic
+
+import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
+from mittab.libs.cacheing.public_cache import (
+    invalidate_inround_public_pairings_cache,
+)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -40,6 +45,7 @@ def pair_round(request):
 
             with transaction.atomic():
                 tab_logic.pair_round()
+                invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
         except Exception as exp:
@@ -108,6 +114,69 @@ def pair_round(request):
         }
 
         return render(request, "pairing/pair_round.html", context)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def re_pair_round(request):
+    """
+    Re-pair the current round by clearing existing pairings and
+    re-running the pairing algorithm.
+    This is a safe operation that:
+    1. Backs up the current state
+    2. Clears Round, Bye, and NoShow objects for the current round
+    3. Decrements cur_round temporarily
+    4. Re-runs the pairing algorithm which will re-increment cur_round
+    """
+    cache_logic.clear_cache()
+    current_round_obj = TabSettings.objects.get(key="cur_round")
+    current_round_number = current_round_obj.value - 1
+
+    if current_round_number < 1:
+        return redirect_and_flash_error(
+            request,
+            "No round has been paired yet to re-pair"
+        )
+
+    if request.method == "POST":
+        try:
+            backup_name = (
+                f"round_{current_round_number}_before_repairing"
+            )
+            backup.backup_round(
+                btype=backup.OTHER,
+                round_number=current_round_number,
+                name=backup_name,
+            )
+
+            with transaction.atomic():
+                tab_logic.clear_current_round_pairing()
+
+                # Decrement cur_round so pair_round() will pair for same round
+                current_round_obj.value = current_round_number
+                current_round_obj.save()
+
+                # Re-run the pairing algorithm
+                tab_logic.pair_round()
+                current_round_obj.value = current_round_obj.value + 1
+                current_round_obj.save()
+
+            # Add success message and redirect to view_status
+            messages.add_message(
+                request,
+                messages.SUCCESS,
+                f"Successfully re-paired round {current_round_number}"
+            )
+            return view_status(request)
+        except Exception as exp:
+            emit_current_exception()
+            return redirect_and_flash_error(
+                request,
+                f"Could not re-pair round, got error: {exp}"
+            )
+
+    return render(request, "pairing/confirm_re_pair.html", {
+        "round_number": current_round_number,
+    })
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -676,80 +745,18 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
 
 def toggle_pairing_released(request):
     old = TabSettings.get("pairing_released", 0)
-    TabSettings.set("pairing_released", int(not old))
-    data = {"success": True, "pairing_released": int(not old) == 1}
+    new_value = int(not old)
+    TabSettings.set("pairing_released", new_value)
+
+    invalidate_inround_public_pairings_cache()
+
+    data = {"success": True, "pairing_released": new_value == 1}
     return JsonResponse(data)
-
-
-def pretty_pair(request):
-    errors, byes = [], []
-
-    round_number = TabSettings.get("cur_round") - 1
-    round_pairing = list(
-        Round.objects.filter(round_number=round_number).prefetch_related(
-            "gov_team",
-            "opp_team",
-            "chair",
-            "judges",
-            "room",
-            "gov_team__debaters",
-            "opp_team__debaters",
-        )
-    )
-
-    # We want a random looking, but constant ordering of the rounds
-    random.seed(0xBEEF)
-    random.shuffle(round_pairing)
-    round_pairing.sort(key=lambda r: r.gov_team.name)
-    paired_teams = [team.gov_team for team in round_pairing
-                    ] + [team.opp_team for team in round_pairing]
-
-    byes = [
-        bye.bye_team for bye in Bye.objects.filter(round_number=round_number)
-    ]
-    team_count = len(paired_teams) + len(byes)
-
-    for present_team in Team.objects.filter(checked_in=True):
-        if present_team not in paired_teams:
-            if present_team not in byes:
-                errors.append(present_team)
-
-    pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    context = {
-        "errors": errors,
-        "byes": byes,
-        "round_number": round_number,
-        "round_pairing": round_pairing,
-        "paired_teams": paired_teams,
-        "team_count": team_count,
-        "pairing_exists": pairing_exists,
-        "debater_team_memberships_public": debater_team_memberships_public,
-    }
-    return render(request, "pairing/pairing_display.html", context)
 
 
 def export_pairings_csv_view(request):
     return export_pairings_csv(is_outround=False)
 
-
-def missing_ballots(request):
-    round_number = TabSettings.get("cur_round") - 1
-    rounds = Round.objects.prefetch_related("gov_team", "opp_team",
-                                            "room", "chair") \
-        .filter(victor=Round.NONE, round_number=round_number)
-    # need to do this to not reveal brackets
-
-    rounds = sorted(rounds, key=lambda r: r.chair.name if r.chair else "")
-    pairing_exists = TabSettings.get("pairing_released", 0) == 1
-    return render(
-        request,
-        "ballots/missing_ballots.html",
-        {
-            "rounds": rounds,
-            "pairing_exists": pairing_exists,
-        },
-    )
 
 def view_rounds(request):
     number_of_rounds = TabSettings.objects.get(key="tot_rounds").value
@@ -762,74 +769,6 @@ def view_rounds(request):
     })
 
 
-def e_ballot_search(request):
-    if request.method == "POST":
-        ballot_code = (request.POST.get("ballot_code") or "").strip()
-        if ballot_code:
-            return redirect("enter_e_ballot", ballot_code=ballot_code)
-        return redirect_and_flash_error(
-            request,
-            "Please enter the ballot code provided by tab.",
-            path="/e_ballots/",
-        )
-
-    return render(request, "public/e_ballot_search.html")
-
-
-def enter_e_ballot(request, ballot_code):
-    if request.method == "POST":
-        round_id = request.POST.get("round_instance")
-
-        if round_id:
-            return enter_result(request,
-                                round_id,
-                                EBallotForm,
-                                ballot_code,
-                                redirect_to="/")
-        else:
-            message = """
-                      Missing necessary form data. Please go to tab if this
-                      error persists
-                      """
-
-    current_round = TabSettings.get(key="cur_round") - 1
-
-    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
-        # bad use of related_name in the model, this gets the rounds
-        "judges",
-    ).first()
-
-    if not judge:
-        message = f"""
-                    No judges with the ballot code "{ballot_code}." Try submitting again, or
-                    go to tab to resolve the issue.
-                    """
-    elif TabSettings.get("pairing_released", 0) != 1:
-        message = "Pairings for this round have not been released."
-    else:
-        # see above, judge.judges is rounds
-        rounds = list(judge.judges.prefetch_related("chair")
-                      .filter(round_number=current_round).all())
-        if len(rounds) > 1:
-            message = """
-                    Found more than one ballot for you this round.
-                    Go to tab to resolve this error.
-                    """
-        elif not rounds:
-            message = """
-                    Could not find a ballot for you this round. Go to tab
-                    to resolve the issue if you believe you were paired in.
-                    """
-        elif rounds[0].chair != judge:
-            message = """
-                    You are not the chair of this round. If you are on a panel,
-                    only the chair can submit an e-ballot. If you are not on a
-                    panel, go to tab and make sure the chair is properly set for
-                    the round.
-                    """
-        else:
-            return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
-    return redirect_and_flash_error(request, message, path="/accounts/login")
 
 
 def enter_result(request,

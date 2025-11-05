@@ -4,26 +4,32 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, reverse
+from django.shortcuts import render, redirect, reverse
 from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.debater_views import get_speaker_rankings
+from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
     UploadDataForm, ScratchForm, SettingsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.apps.tab.outround_pairing_views import create_forum_view_data
-from mittab.apps.tab.team_views import get_team_rankings
-from mittab.libs import cache_logic
+from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
+from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import (
+    invalidate_all_public_caches
+)
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
 def index(request):
+    if not request.user.is_authenticated:
+        return redirect("public_home")
+
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
     team_list = [(team.pk, team.display_backend) for team in Team.objects.all()]
@@ -416,6 +422,7 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
+            invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",

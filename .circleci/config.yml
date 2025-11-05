@@ -37,7 +37,7 @@ jobs:
             python -m pip install --user pipenv
             rm -rf .venv
             pipenv --python 3.10.16
-            pipenv install
+            pipenv install --dev
             npm install
 
       - save_cache:
@@ -96,7 +96,7 @@ jobs:
             # Remove .venv if it exists from cache to avoid version mismatch
             rm -rf .venv
             pipenv --python 3.10.16
-            pipenv install
+            pipenv install --dev
             npm install
       - save_cache:
           paths:

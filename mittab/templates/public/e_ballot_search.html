@@ -1,7 +1,12 @@
 {% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Submit E-Ballot{% endblock %}
 {% block banner %}Submit E-Ballot{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicDisplay' %}
+{% endblock %}
 
 {% block content %}
 <div class="col-lg-6 col-md-8">

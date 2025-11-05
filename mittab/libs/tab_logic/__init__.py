@@ -47,9 +47,8 @@ def pair_round():
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for team in forfeit_teams:
-        lenient_late = TabSettings.get("lenient_late", 0) >= current_round
         no_show = NoShow(
-            no_show_team=team, round_number=current_round, lenient_late=lenient_late
+            no_show_team=team, round_number=current_round
         )
         no_show.save()
 
@@ -640,3 +639,26 @@ def determine_gov_opp(all_pairs):
         else:
             final_pairings += [[team2, team1]]
     return final_pairings
+
+
+def clear_current_round_pairing():
+    """
+    Safely clear all pairing data for the current round.
+    This removes Rounds, Byes, and NoShows for the current round number.
+
+    This is used when re-pairing a round to ensure a clean slate.
+    The current round number is NOT decremented - it stays the same.
+
+    Returns the round number that was cleared.
+    """
+    current_round = TabSettings.get("cur_round") - 1
+
+    if current_round < 1:
+        raise ValueError("No round has been paired yet")
+
+    Round.objects.filter(round_number=current_round).delete()
+    Bye.objects.filter(round_number=current_round).delete()
+    NoShow.objects.filter(round_number=current_round).delete()
+    TabSettings.set("pairing_released", 0)
+
+    return current_round

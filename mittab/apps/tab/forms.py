@@ -8,8 +8,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors, cache_logic
+from mittab.libs import errors
 from mittab import settings
+from mittab.libs.cacheing import cache_logic
 
 
 class UploadBackupForm(forms.Form):

@@ -4,6 +4,7 @@ import tempfile
 
 from django.test import LiveServerTestCase
 from django.core.cache import cache
+from django.urls import reverse
 from selenium import webdriver
 from selenium.common.exceptions import NoAlertPresentException
 from selenium.webdriver.common.by import By
@@ -53,7 +54,7 @@ class BaseWebTestCase(LiveServerTestCase):
         time.sleep(self.wait_seconds)
 
     def _login(self):
-        self._visit("")
+        self._visit(reverse("tab_login"))
         self.browser.fill("username", self.username)
         self.browser.fill("password", self.password)
         self.browser.find_by_text("Sign in").first.click()
