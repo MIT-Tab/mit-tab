@@ -1,0 +1,133 @@
+#container-main { min-width: fit-content; }
+
+.table {
+  th.round-header {
+    width: 16ch;
+    min-width: 16ch;
+  }
+
+  th,
+  td {
+    max-width: 11vw;
+  }
+
+  tbody tr td:first-child .d-flex,
+  .round-header .d-flex {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.2rem;
+    width: fit-content !important;
+    margin: 0 auto !important;
+
+    .btn {
+      margin-left: 0 !important;
+      width: 100% !important;
+      white-space: nowrap;
+    }
+  }
+}
+
+.round-header {
+  .full-text { display: inline; }
+  .short-text { display: none; }
+}
+
+td.drag-selecting,
+th.drag-selecting {
+  background-color: rgba(0, 123, 255, 0.15) !important;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(0, 123, 255, 0.5);
+    pointer-events: none;
+  }
+}
+
+.tab-pane.dragging table td,
+.tab-pane.dragging table th {
+  user-select: none;
+}
+
+@media (max-width: 1200px) {
+  .checkin-label {
+    font-size: 0;
+    text-indent: -9999px;
+
+    &::before,
+    &::after {
+      font-size: 1rem;
+      text-indent: 0;
+    }
+  }
+
+  .round-header {
+    .full-text { display: none; }
+    .short-text { display: inline; }
+  }
+
+  .table {
+    th.round-header { width: 3ch; min-width: 3ch; }
+
+    th,
+    td {
+      font-size: 0.85rem;
+      padding: 0.25rem !important;
+    }
+
+    .d-flex .btn {
+      padding: 0.15rem 0.3rem !important;
+      font-size: 0.75rem !important;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  #container-main { padding: 0; }
+
+  .tab-content {
+    padding: 0;
+
+    .col {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
+  .table {
+    font-size: 0.7rem;
+
+    th,
+    td {
+      padding: 0.3rem 0.4rem !important;
+      max-width: none;
+      white-space: normal;
+    }
+
+    tbody tr td:first-child {
+      padding: 0.2rem 0.25rem !important;
+      min-width: 2.5rem;
+
+      .btn {
+        padding: 0.1rem 0.25rem !important;
+        font-size: 0.6rem !important;
+        line-height: 1.1;
+      }
+    }
+
+    th.round-header {
+      min-width: 3rem;
+      max-width: 3rem;
+      padding: 0.3rem 0.2rem !important;
+    }
+
+    .custom-control { padding-left: 1.8rem; }
+  }
+
+  #judge,
+  #room {
+    .table td { padding: 0.2rem 0.3rem !important; line-height: 1.2; }
+  }
+}

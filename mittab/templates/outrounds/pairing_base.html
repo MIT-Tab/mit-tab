@@ -69,7 +69,7 @@
     <div class="col-4">
         <h6>Display Options</h6>
         <div class="btn-group btn-group-sm">
-      <a class="btn btn-secondary" href="/outround_pairings/pairinglist/{{ type_of_round }}/" title="To display in GA">
+      <a class="btn btn-secondary" href="{% url 'outround_pretty_pair' type_of_round %}" title="To display in GA">
           <i class="fas fa-tv"></i> Announcement View
       </a>
       <a class="btn btn-secondary" href="/outround_pairings/export_csv/{{ type_of_round }}/" title="Export pairings as CSV">

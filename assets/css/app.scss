@@ -1,35 +1,47 @@
-$body-bg: #BFD9FF;
+body {
+    background-color: #f4f9ff !important;
+    background-image: url("../img/az-subtle.png") !important;
+    background-blend-mode: multiply;
+}
 $font-size-base: 0.95rem !default;
 
 .form-control {
   background-image: none !important;
 }
 
-@import "node_modules/bootstrap/scss/bootstrap";
+@import "~bootstrap/scss/bootstrap";
 
+// Overrides
 .bg-dark {
   background-color: #00438A !important;
 }
 
 .navbar-brand {
   font-size: 1.5rem;
-}
-
-.no-nav {
-  margin-left: auto;
-  margin-right: auto;
+  font-weight: 500;
 }
 
 .navbar-dark .nav-link {
-  color: rgba(255, 255, 255, 0.75) !important;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+// Layout utilities
+.no-nav {
+  margin: 0 auto;
 }
 
 .w-95 {
   max-width: 95%;
 }
 
+.hidden {
+  display: none;
+}
+
+// Data lists
 .data-list {
   column-count: 4;
+
   ul {
     list-style-type: none;
   }
@@ -39,21 +51,34 @@ $font-size-base: 0.95rem !default;
   }
 }
 
+// Main container
 #container-main {
+  width: 100%;
+  max-width: min(95vw, 1820px);
+  padding: 0 1.2rem;
   background: #fff;
   margin-top: 10px;
+
+  &.public-table-shell {
+    max-width: min(96vw, 1960px);
+    padding: 0 0.4rem;
+    background: transparent;
+    box-shadow: none;
+    margin-top: 0;
+  }
+
+  // Remove excessive padding for home page
+  .public-home-wrapper & {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    max-width: 100%;
+  }
 }
 
-.navbar-brand {
-  font-weight: 500;
-}
-
+// Component styles
 .footer {
   opacity: 0.75;
-}
-
-.hidden {
-  display: none;
 }
 
 .ballot-form {
@@ -64,12 +89,12 @@ $font-size-base: 0.95rem !default;
   height: 20em !important;
 }
 
-.pairing-card .card-body {
-  padding: 1em !important;
-}
-
 .pairing-card {
   height: 90%;
+
+  .card-body {
+    padding: 1em !important;
+  }
 }
 
 .tabcard abbr {
@@ -120,3 +145,56 @@ $font-size-base: 0.95rem !default;
   font-weight: bold;
   font-size: 12px;
 }
+
+.index .input-group .input-group-text,
+.index .input-group .form-control,
+.index .input-group .btn {
+  font-size: 0.95rem;
+}
+
+.index .input-group .input-group-text,
+.index .input-group .btn {
+  font-weight: 500;
+}
+
+.index .input-group .input-group-text,
+.index .input-group .form-control,
+.index .input-group .btn {
+  height: 38px;
+}
+
+// Warning popups
+.warning-container {
+  width: 500px;
+
+  &:hover .warning-popup {
+    display: block;
+  }
+}
+
+.warning-popup {
+  display: none;
+  position: absolute;
+  padding: 10px;
+  border-radius: 5px;
+  width: 500px;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+// Utility classes
+.badge-wing-only {
+  font-size: 0.6rem;
+}
+
+.letter-spacing-wide {
+  letter-spacing: 0.12em;
+}
+
+.font-weight-semibold {
+  font-weight: 600;
+}
+

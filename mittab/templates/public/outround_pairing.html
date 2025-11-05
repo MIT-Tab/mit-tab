@@ -1,0 +1,190 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}{{ label }}{% endblock %}
+{% block body_class %}show-team-names{% endblock %}
+
+{% block extra_head %}
+    {% render_bundle 'publicDisplay' %}
+{% if show_outrounds_bracket %}
+{% render_bundle 'bracket' %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+{% endif %}
+{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block content %}
+<div class="col-12 public-table-root">
+    <div id="scrollPage" class="hidden"></div>
+    <div class="public-table-header">
+      <h1>{{ label }}</h1>
+    </div>
+		{% if show_outrounds_bracket %}
+      <ul class="nav nav-tabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                  <a class="nav-link active" id="list-view-tab" href="#list-view" role="tab" aria-controls="list-view" aria-selected="true">List View</a>
+              </li>
+              <li class="nav-item" role="presentation">
+                  <a class="nav-link" id="bracket-view-tab" href="#bracket-view" role="tab" aria-controls="bracket-view" aria-selected="false">Bracket View</a>
+              </li>
+          </ul>
+		{% endif %}
+
+        <div class="tab-content">
+        <div id="list-view" class="tab-pane active" role="tabpanel" aria-labelledby="list-view-tab">
+	{% for outround in outround_pairings %}
+	    <center><h4><b>{{ outround.label }}</b></h4></center>
+        <div class="public-table-wrap">
+        <div class="public-table-wrap">
+	    <table class="public_table">
+		<thead>
+          <tr>
+          <th style="width: 25%;">
+              {% if gov_opp_display %}Government{% else %}Team 1{% endif %}
+          </th> <th style="width: 25%;">
+              {% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}
+          </th> <th style="width: 25%;">
+              Judge
+          </th> <th style="width: 25%;">
+              Room
+          </th>
+          </tr>
+		</thead>
+		<tbody>
+		{% for pairing in outround.rounds %}
+		    
+		    <tr>
+			<td data-label="{% if gov_opp_display %}Government{% else %}Team 1{% endif %}">
+			    {% if sidelock and pairing.sidelock %}<b>{% endif %}
+			    {% if choice and pairing.choice == 1 %}<b>{% endif %}
+				<div class="team-names">
+					{{pairing.gov_team.display}}
+				</div>
+				{% if debater_team_memberships_public %}
+				<div class="member-names">
+					{{pairing.gov_team.debaters_display}}
+				</div>
+				{% endif %}
+			    {% if choice and pairing.choice == 1 %}</b>{% endif %}
+			    {% if sidelock and pairing.sidelock %}</b>{% endif %}
+			</td>
+			<td data-label="{% if gov_opp_display %}Opposition{% else %}Team 2{% endif %}">
+			    {% if choice and pairing.choice == 2 %}<b>{% endif %}
+				<div class="team-names">
+					{{pairing.opp_team.display}}
+				</div>
+				{% if debater_team_memberships_public %}
+				<div class="member-names">
+					{{pairing.opp_team.debaters_display}}
+				</div>
+				{% endif %}
+			    {% if choice and pairing.choice == 2 %}</b>{% endif %}
+			</td>
+			<td data-label="Judge">
+			    {% for judge in pairing.judges.all %}
+				{% if pairing.judges.all|length > 1 and judge == pairing.chair %}
+				    <b>{{judge.name}}</b><br>
+				{% else %}
+				    {{judge.name}}<br>
+				{% endif %}
+			    {% endfor %}
+			</td>
+			<td data-label="Room">{{pairing.room.name}}</td>
+		    </tr>
+		{% endfor %}
+		{% if outround.excluded|length > 0 %}
+		    <tr>
+			<td><b>Advancing Teams:</b></td>
+			<td colspan="3">
+			    {% for team in outround.excluded %}
+				{{ team.display }}{% if not forloop.last %}, {% endif %}
+			    {% endfor %}
+			</td>
+		    </tr>
+		{% endif %}
+		</tbody>
+	    </table>
+        </div>
+        </div>
+	{% empty %}
+	    <div style="padding: 20px;">Nothing is visible.</div>
+	{% endfor %}
+        </div>
+
+        {% if show_outrounds_bracket %}
+        <div id="bracket-view" class="tab-pane" role="tabpanel" aria-labelledby="bracket-view-tab">
+            {% if bracket_data_json %}
+                <div class="brackets-viewer" id="brackets-viewer-container"></div>
+                <div id="match-modal-backdrop" class="match-modal__backdrop" hidden></div>
+                <div id="match-metadata-modal" class="match-modal" role="dialog" aria-modal="true" aria-labelledby="match-modal-title" hidden>
+                    <div class="match-modal__content card shadow-lg border border-primary">
+                        <button type="button" class="match-modal__close close text-muted" id="close-modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="card-body match-modal__body">
+                            <h2 id="match-modal-title" class="h5 mb-3">Match Details</h2>
+                            <div class="match-teams">
+                                <div class="match-team" data-team="gov">
+                                    <span class="match-team__label" data-team-label="gov">Team 1</span>
+                                    <span class="match-team__name" data-team-name="gov">TBD</span>
+                                    <span class="match-team__members d-none" data-team-members="gov"></span>
+                                </div>
+                                <div class="match-team" data-team="opp">
+                                    <span class="match-team__label" data-team-label="opp">Team 2</span>
+                                    <span class="match-team__name" data-team-name="opp">TBD</span>
+                                    <span class="match-team__members d-none" data-team-members="opp"></span>
+                                </div>
+                            </div>
+                            <div class="match-section match-room">
+                                <span class="match-section__label">Room</span>
+                                <span class="room-name" data-room>TBD</span>
+                            </div>
+                            <div class="match-section match-judges">
+                                <span class="match-section__label">Judges</span>
+                                <ul class="match-section__value judge-list list-unstyled mb-0" data-judges></ul>
+                            </div>
+                            <p class="match-error text-danger small d-none" id="match-modal-error"></p>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                window.bracketViewerData = JSON.parse('{{ bracket_data_json|escapejs }}');
+                </script>
+            {% else %}
+                <div class="bracket-empty">No bracket data available.</div>
+            {% endif %}
+        </div>
+        {% endif %}
+        </div>
+    <div class="public_footer_spacer"></div>
+    <!-- Floating bottom header -->
+    <div class="public_footer">
+	{% if sidelock %}
+	    <span class="left">
+		* Bold indicates sidelock.
+	    </span>
+	{% endif %}
+	{% if choice %}
+	    <span class="left">
+		* Bold indicates choice.
+	{% endif %}
+	<div class="footer-controls">
+	    {% if debater_team_memberships_public %}
+	    <span class="right">
+	    <label for="Member Names">
+		    Member Names:
+		    <input type="checkbox" name="names" id="name_display_toggle"/>
+	    </label>
+	    </span>
+	{% endif %}
+	<span class="right">
+	    <label for="autoscroll">
+		Autoscroll:
+		<input type="checkbox" name="autoscroll" id="autoscroll"/>
+	    </label>
+	</span>
+	</div>
+    </div>
+{% endblock %}

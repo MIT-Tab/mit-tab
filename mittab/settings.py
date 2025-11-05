@@ -1,7 +1,9 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
+from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development settings - unsuitable for production
@@ -46,15 +48,39 @@ ROOT_URLCONF = "mittab.urls"
 
 WSGI_APPLICATION = "mittab.wsgi.application"
 
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "mittab")
+MYSQL_USER = os.environ.get("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
+MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
+MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
+
+DB_OPTIONS = {"charset": "utf8mb4"}
+
+if MYSQL_HOST not in ["127.0.0.1", "localhost"]:
+    DEFAULT_SSL_CA_PATH = os.path.join(
+        BASE_DIR,
+        "tmp",
+        os.environ.get("MYSQL_SSL_FILENAME", "digitalocean-db-ca.pem"),
+    )
+    SSL_CA = os.environ.get("MYSQL_SSL_CA", DEFAULT_SSL_CA_PATH)
+    if not os.path.exists(SSL_CA):
+        raise ImproperlyConfigured(
+            f"Configured MYSQL_SSL_CA path '{SSL_CA}' could not be found."
+        )
+
+    os.environ.setdefault("MYSQL_SSL_CA", SSL_CA)
+    DB_OPTIONS["ssl"] = {"ca": SSL_CA}
+
 DATABASES = {
     "default": {
         "ENGINE":   "django.db.backends.mysql",
-        "OPTIONS":  {"charset": "utf8mb4"},
-        "NAME":     os.environ.get("MYSQL_DATABASE", "mittab"),
-        "USER":     os.environ.get("MYSQL_USER", "root"),
-        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
-        "HOST":     os.environ.get("MYSQL_HOST", "127.0.0.1"),
-        "PORT":     os.environ.get("MYSQL_PORT", "3306"),
+        "OPTIONS":  DB_OPTIONS,
+        "NAME":     MYSQL_DATABASE,
+        "USER":     MYSQL_USER,
+        "PASSWORD": MYSQL_PASSWORD,
+        "HOST":     MYSQL_HOST,
+        "PORT":     MYSQL_PORT,
+        "CONN_MAX_AGE": 60,
     }
 }
 
@@ -126,6 +152,10 @@ TEMPLATES = [
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
+# Login/Logout redirects
+LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = "/public/login/"
+
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
 CACHES = {
@@ -137,6 +167,20 @@ CACHES = {
         "LOCATION": "/var/tmp/django_cache",
     }
 }
+
+
+# Use memcached in production, but fall back to local memory cache in development or CI
+if os.environ.get("mittab_env") not in [
+    "development", None] and not os.environ.get("CI"):
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+        "LOCATION": "127.0.0.1:11211",
+        "TIMEOUT": 60,
+    }
+else:
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 

@@ -1,7 +1,7 @@
 import json
 
 from mittab.apps.tab.models import BreakingTeam, Outround
-from mittab.libs.cache_logic import cache
+from mittab.libs.cacheing.cache_logic import cache
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 
 LOCKED, WAITING, READY, COMPLETED = 0, 1, 2, 4
@@ -91,9 +91,16 @@ def _serialize_bracket(rounds):
                 slots = match["slots"]
 
                 def get_fallback_display(slot):
-                    seeds_display = " / ".join(f"Seed {seed}"
-                                               for seed in sorted(slot["seeds"]))
-                    return {"display": seeds_display or "TBD", "debaters": ""}
+                    seeds_sorted = sorted(slot["seeds"])
+                    seeds_display = " / ".join(f"Seed {seed}" for seed in seeds_sorted)
+                    seed_value = seeds_sorted[0] if seeds_sorted else None
+                    return {
+                        "display": seeds_display or "TBD",
+                        "debaters": "",
+                        "seed": seed_value,
+                        "name": seeds_display or "TBD",
+                        "debaters_plain": "",
+                    }
 
                 metadata[match_id] = {
                     "id": matchup.id,
@@ -139,7 +146,10 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
         participant = participants_by_team_id[team.id]
         slot["display_info"] = {
             "display": participant["name"],
-            "debaters": participant["debaters_names"]
+            "debaters": participant["debaters_names"],
+            "seed": seed,
+            "name": str(team),
+            "debaters_plain": team.debaters_display(),
         }
 
     for match in rounds[0]:
@@ -177,15 +187,27 @@ def _build_bracket_payload(bracket_size, seed_to_team, outround_pairings):
                     break
             if None in seeds or not match:
                 continue
+
+            # Determine which team won (before any slot assignments)
+            winning_team = None
+            if matchup.victor in WINNER_SIDES:
+                winning_team = teams[WINNER_SIDES[matchup.victor]]
+
+            # Fill bracket slots with teams (reversing order if needed)
             slots = match["slots"]
-            if invert:
-                slots, teams, seeds = slots[::-1], teams[::-1], seeds[::-1]
-            for slot, team, seed in zip(slots, teams, seeds):
+            teams_to_assign = reversed(teams) if invert else teams
+            seeds_to_assign = reversed(seeds) if invert else seeds
+            for slot, team, seed in zip(slots, teams_to_assign, seeds_to_assign):
                 fill_slot(slot, team, seed)
+
             match["outround"] = matchup
-            side = WINNER_SIDES.get(matchup.victor, None)
-            # Apply XOR to flip winner side if teams were inverted
-            match["winner_side"] = side ^ invert if side is not None else None
+
+            # Set winner based on which slot has the winning team
+            match["winner_side"] = (
+                0 if winning_team and slots[0]["team"] == winning_team else
+                1 if winning_team and slots[1]["team"] == winning_team else
+                None
+            )
 
     # Propagate wins up the bracket tree
     last_round = len(rounds) - 1
