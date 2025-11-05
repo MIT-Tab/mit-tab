@@ -219,13 +219,13 @@ class PairingARoundTestCase(BaseWebTestCase):
         
         # Enter very low speaks (should trigger warning)
         self.browser.select("pm_ranks", 4)
-        self.browser.fill("pm_speaks", 28)
+        self.browser.fill("pm_speaks", 24)
         self.browser.select("mg_ranks", 3)
-        self.browser.fill("mg_speaks", 28)
+        self.browser.fill("mg_speaks", 24)
         self.browser.select("lo_ranks", 1)
         self.browser.fill("lo_speaks", 24)
         self.browser.select("mo_ranks", 2)
-        self.browser.fill("mo_speaks", 28)
+        self.browser.fill("mo_speaks", 24)
         
         self.browser.find_by_xpath("//*[@value='Save']").first.click()
         
