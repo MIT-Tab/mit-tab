@@ -422,8 +422,6 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
-            # Invalidate all public caches when any settings change
-            # This ensures CDN immediately stops serving stale content
             invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,

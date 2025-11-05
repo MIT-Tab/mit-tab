@@ -748,8 +748,6 @@ def toggle_pairing_released(request):
     new_value = int(not old)
     TabSettings.set("pairing_released", new_value)
 
-    # Always invalidate cache when pairing release status changes
-    # Origin cache is cleared immediately, CDN refreshes within 10s
     invalidate_inround_public_pairings_cache()
 
     data = {"success": True, "pairing_released": new_value == 1}

@@ -25,7 +25,7 @@ def build_cache_key(view_name, kwargs, is_authenticated):
 def cache_public_view(timeout=60):
     """
     Cache a public view with short CDN TTL and longer origin cache.
-    
+
     The CDN is configured with a 10-second TTL, so changes propagate quickly.
     The origin cache uses the specified timeout for better performance.
     When invalidated, both origin cache and response are cleared immediately.
@@ -33,7 +33,7 @@ def cache_public_view(timeout=60):
 
     stale_extension = max(timeout, 30)
     lock_timeout = max(30, timeout // 2 or 1)
-    
+
     # Set CDN cache to 10 seconds for quick propagation of permission changes
     # Origin cache uses the full timeout for performance
     cdn_max_age = 10
@@ -100,7 +100,7 @@ def _delete_key_for_all_auth_states(view_name, kwargs=None):
 def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     """
     Invalidate cached in-round public pages.
-    
+
     Clears origin cache immediately. CDN will refresh within 10 seconds
     based on the short TTL configured in cache_public_view.
     """
@@ -112,7 +112,7 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
 def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     """
     Invalidate cached outround public pages for the provided division.
-    
+
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     kwargs = {"type_of_round": type_of_round}
@@ -122,7 +122,7 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
 def invalidate_public_judges_cache(*_args, **_kwargs):
     """
     Invalidate cached public judges view.
-    
+
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     _delete_key_for_all_auth_states("public_view_judges")
@@ -131,7 +131,7 @@ def invalidate_public_judges_cache(*_args, **_kwargs):
 def invalidate_public_teams_cache(*_args, **_kwargs):
     """
     Invalidate cached public teams view.
-    
+
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     _delete_key_for_all_auth_states("public_view_teams")
@@ -140,7 +140,7 @@ def invalidate_public_teams_cache(*_args, **_kwargs):
 def invalidate_public_rankings_cache(*_args, **_kwargs):
     """
     Invalidate cached public rankings view.
-    
+
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     _delete_key_for_all_auth_states("rank_teams_public")
@@ -149,7 +149,7 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
 def invalidate_all_public_caches(*_args, **_kwargs):
     """
     Invalidate all public view caches.
-    
+
     Use this when settings change that could affect multiple public views.
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
@@ -161,7 +161,7 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_view_teams")
     _delete_key_for_all_auth_states("rank_teams_public")
     _delete_key_for_all_auth_states("e_ballot_search_page")
-    
+
     # Invalidate outrounds for both divisions
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1
         kwargs = {"type_of_round": type_of_round}
