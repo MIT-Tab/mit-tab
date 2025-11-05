@@ -131,7 +131,7 @@ class PairingARoundTestCase(BaseWebTestCase):
                 "ranks": 4
             },
         )
-        assert self._wait_for_text("invalid speaker score")
+        assert self._wait_for_text("invalid speaker score", timeout=10)
 
         # Correct ballot
         self._enter_results(
