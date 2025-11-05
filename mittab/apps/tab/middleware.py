@@ -9,7 +9,7 @@ from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/public/missing-ballots/","/public/e-ballots/",
-                   "/404/", "/403/", "/500/",
+                   "/public/access-error/", "/404/", "/403/", "/500/",
                    "/public/teams/",
                    "/public/judges/",
                    "/public/team-rankings/",
