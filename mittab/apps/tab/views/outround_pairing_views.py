@@ -19,6 +19,9 @@ from mittab.libs.outround_tab_logic import offset_to_quotient
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 from mittab.libs.data_export.pairings_export import export_pairings_csv
+from mittab.libs.cacheing.public_cache import (
+    invalidate_outround_public_pairings_cache,
+)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -33,6 +36,7 @@ def pair_next_outround(request, num_teams, type_of_round):
                                 type_of_round=type_of_round).delete()
 
         outround_tab_logic.pair(type_of_round)
+        invalidate_outround_public_pairings_cache(type_of_round)
 
         return redirect_and_flash_success(
             request, "Success!", path=reverse("outround_pairing_view",
@@ -612,6 +616,8 @@ def toggle_pairing_released(request, type_of_round, num_teams):
             TabSettings.set("nov_teams_visible", num_teams * 2)
         else:
             TabSettings.set("nov_teams_visible", num_teams)
+
+    invalidate_outround_public_pairings_cache(type_of_round)
 
     data = {"success": True, "pairing_released": not old == num_teams}
     return JsonResponse(data)

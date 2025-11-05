@@ -7,6 +7,20 @@
   {% render_bundle 'publicDisplay' %}
 {% endblock %}
 
+{% block messages %}
+<div class="row">
+  <div class="col">
+    {% if messages %}
+      {% for message in messages %}
+      <div class="alert {% if message.tags %}alert-{% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}danger{% else %}{{ message.tags }}{% endif %}{% endif %}">
+        {{ message }}
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="col-12 col-lg-6 mx-auto">
   <div class="card shadow-sm border-0">

@@ -16,7 +16,10 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import (
+    invalidate_all_public_caches
+)
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
@@ -419,6 +422,7 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
+            invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
                 "Tab settings updated!",

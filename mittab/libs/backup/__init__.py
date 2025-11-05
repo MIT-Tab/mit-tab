@@ -7,10 +7,11 @@ from wsgiref.util import FileWrapper
 
 
 from mittab.apps.tab.models import TabSettings
-from mittab.libs import errors, cache_logic
+from mittab.libs import errors
 from mittab.libs.backup.handlers import MysqlDumpRestorer
 from mittab.libs.backup.storage import LocalFilesystem, ObjectStorage
 from mittab import settings
+from mittab.libs.cacheing import cache_logic
 
 ACTIVE_BACKUP_KEY = "MITTAB_ACTIVE_BACKUP"
 ACTIVE_BACKUP_VAL = "1"

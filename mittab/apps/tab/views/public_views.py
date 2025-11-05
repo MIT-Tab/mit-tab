@@ -3,16 +3,23 @@ import random
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from mittab.apps.tab.forms import EBallotForm
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (BreakingTeam, Bye, Outround,
                                     TabSettings, Judge, Team, Round)
 from mittab.apps.tab.views.pairing_views import enter_result
-from mittab.libs import cache_logic
-from mittab.libs.tab_logic import rankings
-from mittab.apps.tab.forms import EBallotForm
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.bracket_display_logic import get_bracket_data_json
+from mittab.libs.cacheing.public_cache import cache_public_view
+from mittab.libs.tab_logic import rankings
 
 
+@cache_public_view(timeout=300)
+def public_access_error(request):
+    return render(request, "public/access_error.html")
+
+
+@cache_public_view(timeout=60)
 def public_home(request):
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
     tot_rounds = TabSettings.get("tot_rounds", 5)
@@ -90,11 +97,12 @@ def public_home(request):
         },
     )
 
+@cache_public_view(timeout=60)
 def public_view_judges(request):
     display_judges = TabSettings.get("judges_public", 0)
 
-    if not request.user.is_authenticated and not display_judges:
-        return redirect_and_flash_error(request, "This view is not public", path=reverse("index"))
+    if not display_judges:
+        return redirect("public_access_error")
 
     num_rounds = TabSettings.get("tot_rounds", 5)
     rounds = [num for num in range(1, num_rounds + 1)]
@@ -105,6 +113,8 @@ def public_view_judges(request):
             "rounds": rounds
         })
 
+
+@cache_public_view(timeout=60)
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
@@ -121,11 +131,13 @@ def public_view_teams(request):
             "num_checked_in": Team.objects.filter(checked_in=True).count()
         })
 
+
+@cache_public_view(timeout=60)
 def rank_teams_public(request):
     display_rankings = TabSettings.get("rankings_public", 0)
 
     if not display_rankings:
-        return redirect_and_flash_error(request, "This view is not public", path=reverse("index"))
+        return redirect("public_access_error")
 
     teams = cache_logic.cache_fxn_key(
         rankings.get_team_rankings,
@@ -140,6 +152,7 @@ def rank_teams_public(request):
         "title": "Team Rankings"
     })
 
+@cache_public_view(timeout=60)
 def pretty_pair(request):
     errors, byes = [], []
 
@@ -188,7 +201,7 @@ def pretty_pair(request):
     return render(request, "public/pairing_display.html", context)
 
 
-
+@cache_public_view(timeout=30)
 def missing_ballots(request):
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.prefetch_related("gov_team", "opp_team",
@@ -207,6 +220,10 @@ def missing_ballots(request):
         },
     )
 
+@cache_public_view(timeout=60)
+def e_ballot_search_page(request):
+    return render(request, "public/e_ballot_search.html")
+
 
 def e_ballot_search(request):
     if request.method == "POST":
@@ -219,7 +236,7 @@ def e_ballot_search(request):
             path=reverse("e_ballot_search"),
         )
 
-    return render(request, "public/e_ballot_search.html")
+    return e_ballot_search_page(request)
 
 
 def enter_e_ballot(request, ballot_code):
@@ -278,6 +295,7 @@ def enter_e_ballot(request, ballot_code):
     return redirect_and_flash_error(request, message, path=reverse("tab_login"))
 
 
+@cache_public_view(timeout=60)
 def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 
