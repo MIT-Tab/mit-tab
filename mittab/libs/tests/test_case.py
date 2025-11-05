@@ -34,7 +34,7 @@ class BaseWebTestCase(LiveServerTestCase):
             temp_dir = tempfile.mkdtemp()
             chrome_options.add_argument("--user-data-dir=" + temp_dir)
             self.browser = Browser("chrome",
-                                   headless=False,
+                                   headless=True,
                                    wait_time=30,
                                    options=chrome_options)
         else:
