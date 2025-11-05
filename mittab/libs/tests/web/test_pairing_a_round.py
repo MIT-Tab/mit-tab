@@ -107,7 +107,8 @@ class PairingARoundTestCase(BaseWebTestCase):
         assert self._wait_for_text(
             "These speaks are too high for the rank")
 
-        # Invalid speaks
+        # Invalid speaks (55 > max_speak of 50)
+        # This will also trigger JavaScript warning (55 >= 34), so we need to accept that first
         self._enter_results(
             winner="GOV",
             pm={
@@ -131,6 +132,9 @@ class PairingARoundTestCase(BaseWebTestCase):
                 "ranks": 4
             },
         )
+        # Accept the JavaScript warning dialog about high speaks
+        self._accept_confirm()
+        # Then check for the server-side validation error
         assert self._wait_for_text("invalid speaker score", timeout=10)
 
         # Correct ballot
