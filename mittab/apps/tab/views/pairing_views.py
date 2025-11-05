@@ -812,6 +812,12 @@ def enter_result(request,
             "opp_team": round_obj.opp_team,
             "ballot_code": ballot_code,
             "action": request.path,
+            "warn_judges_about_speaks": TabSettings.get(
+                "warn_judges_about_speaks", True),
+            "low_speak_warning_threshold": TabSettings.get(
+                "low_speak_warning_threshold", 25),
+            "high_speak_warning_threshold": TabSettings.get(
+                "high_speak_warning_threshold", 34),
         })
 
 
@@ -882,7 +888,13 @@ def enter_multiple_results(request, round_id, num_entered):
             "forms": forms,
             "title": f"Entering Ballots for {round_obj}",
             "gov_team": round_obj.gov_team,
-            "opp_team": round_obj.opp_team
+            "opp_team": round_obj.opp_team,
+            "warn_judges_about_speaks": TabSettings.get(
+                "warn_judges_about_speaks", True),
+            "low_speak_warning_threshold": TabSettings.get(
+                "low_speak_warning_threshold", 25),
+            "high_speak_warning_threshold": TabSettings.get(
+                "high_speak_warning_threshold", 34),
         })
 
 
