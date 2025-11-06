@@ -54,7 +54,7 @@ def add_scratch(request):
 
     def make_form(form_cls, prefix, queryset_args, initial):
         data = (
-            request.POST if (is_post and active_tab == prefix.split("_")[0]) else None
+            request.POST if (is_post and active_tab == prefix) else None
         )
         return form_cls(
             data,
