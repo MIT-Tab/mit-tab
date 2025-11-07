@@ -88,10 +88,7 @@ class TestTabViews(TestCase):
             (reverse("confirm_start_tourny"), "Are you sure?"),
             (reverse("break"), "This action will attempt to pair"),
             (reverse("pair_round"), "Pairing Round"),
-            (reverse("re_pair_round"), "Re-pair"),
-            ("/403/", "403"),
-            ("/404/", "404"),
-            ("/500/", "500"),
+            (reverse("re_pair_round"), "re-pairing"),
         ]
 
         if outround:

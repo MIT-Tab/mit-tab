@@ -31,33 +31,47 @@ class TestPostOperations(TestCase):
         room = Room.objects.first()
 
         operations_to_test = [
-            (reverse("enter_school"), {"name": "Test University"}),
-            (reverse("enter_room"), {"name": "Test Room 101", "rank": 1.0}),
-            (reverse("enter_judge"),
+            ("enter_school", reverse("enter_school"),
+             {"name": "Test University"}),
+            ("enter_room", reverse("enter_room"),
+             {"name": "Test Room 101", "rank": 1.0}),
+            ("enter_judge", reverse("enter_judge"),
              {"name": "Test Judge", "rank": 2.0, "schools": [school.id]}),
-            (reverse("enter_debater"),
+            ("enter_debater", reverse("enter_debater"),
              {"name": "Test Debater", "novice_status": 0, "school": school.id}),
-            (reverse("enter_team"),
+            ("enter_team", reverse("enter_team"),
              {"name": "Test Team", "school": school.id,
               "debaters": [d.id for d in debaters], "seed": 5}),
-            (reverse("add_scratch"),
+            ("add_scratch", reverse("add_scratch"),
              {"judge": judge.id, "team": team.id, "scratch_type": 0}),
-            (reverse("toggle_pairing_released"), {}),
-            (reverse("enter_room"), {"name": room.name, "rank": 1.0}),
-            (reverse("enter_judge"), {"name": "", "rank": -1}),
-            (reverse("enter_debater"), {"name": ""}),
-            (reverse("enter_team"), {"name": ""}),
-            (reverse("settings_form"),
+            ("toggle_pairing_released",
+             reverse("toggle_pairing_released"), {}),
+            ("enter_room_duplicate", reverse("enter_room"),
+             {"name": room.name, "rank": 1.0}),
+            ("enter_judge_invalid", reverse("enter_judge"),
+             {"name": "", "rank": -1}),
+            ("enter_debater_invalid", reverse("enter_debater"),
+             {"name": ""}),
+            ("enter_team_invalid", reverse("enter_team"),
+             {"name": ""}),
+            ("settings_form", reverse("settings_form"),
              {"tot_rounds": 5, "lenient_late": 0, "cur_round": 2}),
-            (reverse("settings_form"),
+            ("settings_form_invalid", reverse("settings_form"),
              {"tot_rounds": -1}),
-            (reverse("upload_data"), {}),
+            ("upload_data_empty", reverse("upload_data"), {}),
         ]
 
-        for url, data in operations_to_test:
-            response = self.client.post(url, data)
-            self.assertIn(response.status_code, [200, 302, 400],
-                f"Unexpected status {response.status_code} for POST to {url}")
+        failures = []
+        for name, url, data in operations_to_test:
+            response = self.client.post(url, data, follow=True)
+            # Check final status after following redirects
+            if response.status_code != 200:
+                failures.append(
+                    f"{name}: {response.status_code} "
+                    f"(expected 200 after redirects) for POST to {url}")
+
+
+        self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
     def test_action_operations(self):
         TabSettings.set("cur_round", 3)
@@ -68,29 +82,39 @@ class TestPostOperations(TestCase):
         room = Room.objects.first()
 
         operations_to_test = [
-            ("POST", reverse("assign_judges"), {}),
-            ("POST", reverse("assign_rooms_to_pairing"), {}),
-            ("POST", reverse("re_pair_round"), {}),
-            ("POST", reverse("pair_round"), {}),
-            ("POST", reverse("delete_school", args=[school.id]), {}),
-            ("POST", reverse("delete_school", args=[99999]), {}),
-            ("POST", reverse("start_tourny"), {}),
-            ("POST", reverse("bulk_check_in"), {
+            ("assign_judges", "POST", reverse("assign_judges"), {}),
+            ("assign_rooms_to_pairing", "POST",
+             reverse("assign_rooms_to_pairing"), {}),
+            ("re_pair_round", "POST", reverse("re_pair_round"), {}),
+            ("pair_round", "POST", reverse("pair_round"), {}),
+            ("delete_school_valid", "POST",
+             reverse("delete_school", args=[school.id]), {}),
+            ("delete_school_invalid", "POST",
+             reverse("delete_school", args=[99999]), {}),
+            ("start_tourny", "POST", reverse("start_tourny"), {}),
+            ("bulk_check_in", "POST", reverse("bulk_check_in"), {
                 "judges": [str(j.id) for j in judges],
                 "teams": [str(t.id) for t in teams],
                 "rooms": [str(r.id) for r in rooms],
             }),
-            ("POST", reverse("manage_room_tags"),
+            ("manage_room_tags", "POST", reverse("manage_room_tags"),
              {f"room_{room.id}_tags": "test-tag,another-tag"}),
-            ("POST", reverse("toggle_pairing_released"), {}),
-            ("GET", reverse("manual_backup"), {}),
-            ("GET", reverse("export_pairings_csv"), {}),
+            ("toggle_pairing_released", "POST", reverse("toggle_pairing_released"), {}),
+            ("manual_backup", "GET", reverse("manual_backup"), {}),
+            ("export_pairings_csv", "GET", reverse("export_pairings_csv"), {}),
         ]
 
-        for method, url, data in operations_to_test:
+        failures = []
+        for name, method, url, data in operations_to_test:
             if method == "POST":
-                response = self.client.post(url, data)
+                response = self.client.post(url, data, follow=True)
             else:
-                response = self.client.get(url)
-            self.assertIn(response.status_code, [200, 302],
-                f"Unexpected status {response.status_code} for {method} to {url}")
+                response = self.client.get(url, follow=True)
+
+            # Check final status after following redirects
+            if response.status_code != 200:
+                failures.append(
+                    f"{name}: {response.status_code} "
+                    f"(expected 200 after redirects) for {method} to {url}")
+
+        self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
