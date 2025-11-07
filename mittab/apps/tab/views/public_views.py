@@ -220,7 +220,7 @@ def missing_ballots(request):
         },
     )
 
-@cache_public_view(timeout=60)
+
 def e_ballot_search_page(request):
     return render(request, "public/e_ballot_search.html")
 
