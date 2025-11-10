@@ -1,5 +1,7 @@
 from django import template
 from django.forms.fields import FileField
+
+from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab.models import TabSettings
 
 register = template.Library()
@@ -49,4 +51,16 @@ def judge_team_count(context, judge, pairing):
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
-    
+
+
+@register.simple_tag(takes_context=True)
+def return_to_value(context):
+    request = context.get("request")
+    if not request:
+        return ""
+    return get_redirect_target(request, fallback=None) or ""
+
+
+@register.inclusion_tag("common/_return_to_input.html", takes_context=True)
+def return_to_input(context):
+    return {"redirect_target": return_to_value(context)}

@@ -1,5 +1,48 @@
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
+
+
+def get_redirect_target(request, path=None, fallback="/"):
+    """
+    Resolve the best redirect target for mutating views.
+    Preference order:
+        1) Explicit path argument
+        2) Hidden form field (POST) named 'return_to'
+        3) Explicit GET parameters (?return_to= or ?next=)
+        4) HTTP referer header
+        5) Provided fallback (defaults to '/')
+    """
+    candidates = [
+        path,
+        request.POST.get("return_to"),
+        request.GET.get("return_to"),
+        request.GET.get("next"),
+        request.META.get("HTTP_REFERER"),
+    ]
+
+    allowed_hosts = {request.get_host()}
+    require_https = request.is_secure()
+
+    for candidate in candidates:
+        if candidate and url_has_allowed_host_and_scheme(
+            candidate,
+            allowed_hosts=allowed_hosts,
+            require_https=require_https,
+        ):
+            return candidate
+
+    if fallback and url_has_allowed_host_and_scheme(
+        fallback,
+        allowed_hosts=allowed_hosts,
+        require_https=require_https,
+    ):
+        return fallback
+
+    if fallback is None:
+        return None
+
+    return "/"
 
 
 def redirect_and_flash_info(request, message, **kwargs):
@@ -15,6 +58,6 @@ def redirect_and_flash_error(request, message, **kwargs):
 
 
 def redirect_and_flash(request, message, message_level, **kwargs):
-    path = kwargs.get("path", request.headers.get("referer", "/"))
+    path = get_redirect_target(request, kwargs.get("path"))
     messages.add_message(request, message_level, message)
     return redirect(path)
