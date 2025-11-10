@@ -17,13 +17,13 @@ function populateTabCards() {
           stats.total_speaks.toFixed(2),
           stats.govs,
           stats.opps,
-          stats.seed
+          stats.seed,
         ].join(" / ");
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
         tabCardElement.attr("href", `/team/card/${teamId}`);
         tabCardElement.text(`${text}`);
       });
-    }
+    },
   });
 }
 
@@ -55,15 +55,13 @@ function assignTeam(e) {
     },
     failure() {
       window.alert(alertMsg);
-    }
+    },
   });
 }
 
 function assignRoom(e) {
   e.preventDefault();
-  const $parent = $(this)
-    .parent()
-    .parent();
+  const $parent = $(this).parent().parent();
   const roundId = $(e.target).attr("round-id");
   const roomId = $(e.target).attr("room-id");
   const curRoomId = $(e.target).attr("current-room-id");
@@ -87,9 +85,9 @@ function assignRoom(e) {
       $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
       $(`.room span[round-id=${roundId}] .room-toggle`).css(
         "background-color",
-        result.room_color
+        result.room_color,
       );
-    }
+    },
   });
 }
 
@@ -105,13 +103,10 @@ function populateAlternativeRooms() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
-        .find(".room-assign")
-        .click(assignRoom);
+      $parent.find(".dropdown-menu").find(".room-assign").click(assignRoom);
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
-    }
+    },
   });
 }
 
@@ -126,13 +121,10 @@ function populateAlternativeTeams() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
-        .find(".team-assign")
-        .click(assignTeam);
+      $parent.find(".dropdown-menu").find(".team-assign").click(assignTeam);
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
-    }
+    },
   });
 }
 
@@ -164,7 +156,7 @@ function assignJudge(e) {
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
         .judge-toggle`).addClass("chair");
-    }
+    },
   });
 }
 
@@ -178,13 +170,10 @@ function populateAlternativeJudges() {
     url,
     success(result) {
       $parent.find(".dropdown-menu").html(result);
-      $parent
-        .find(".dropdown-menu")
-        .find(".judge-assign")
-        .click(assignJudge);
+      $parent.find(".dropdown-menu").find(".judge-assign").click(assignJudge);
       quickSearchInit($parent.find("#quick-search"));
       $parent.find("#quick-search").focus();
-    }
+    },
   });
 }
 
@@ -199,7 +188,7 @@ function lazyLoad(element, url) {
     failure() {
       element.html("Error received from server");
       element.removeClass("loading");
-    }
+    },
   });
 }
 
@@ -220,7 +209,7 @@ function togglePairingRelease(event) {
         $("#close-pairings").addClass("d-none");
         $("#release-pairings").removeClass("d-none");
       }
-    }
+    },
   });
 }
 
@@ -248,7 +237,7 @@ function handleJudgeRemoveClick(event) {
     url: `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
     dataType: "json",
     success: handleRemoveSuccess,
-    error: handleRemoveError
+    error: handleRemoveError,
   });
 }
 
@@ -276,7 +265,7 @@ function handleChairClick(event) {
     url: `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
     dataType: "json",
     success: handleAssignSuccess,
-    error: handleAssignError
+    error: handleAssignError,
   });
 }
 
@@ -297,12 +286,12 @@ $(document).ready(() => {
   $(document).on(
     "click",
     ".judge-chair, .outround-judge-chair",
-    handleChairClick
+    handleChairClick,
   );
 
   $(document).on(
     "click",
     ".judge-remove, .outround-judge-remove",
-    handleJudgeRemoveClick
+    handleJudgeRemoveClick,
   );
 });

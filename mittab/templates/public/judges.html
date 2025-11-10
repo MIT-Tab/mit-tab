@@ -1,49 +1,51 @@
-<!DOCTYPE html>
+{% extends "base/__wide.html" %}
 
 {% load tags %}
-
-<html>
-    <head>
 	{% load render_bundle from webpack_loader %}
-	{% render_bundle 'publicDisplay' %}
 
-	<title>Judge List</title>
-    </head>
-    <body>
+{% block title %}Judge List{% endblock %}
+{% block extra_head %}
+	{% render_bundle 'publicDisplay' %}
+{% endblock %}
+
+{% block container_classes %}container-fluid px-0 public-table-shell{% endblock %}
+
+{% block content %}
+<div class="col-12 public-table-root">
         <div id="scrollPage" class="hidden"></div>	
-	<div class="public_header">
 	    <h1>Judge List</h1>
-	    <table class="public_table">
+            <div class="public-table-wrap">
+            <table class="public_table">
+		<thead>
 		<tr>
 		    <th style="width: 25%;">Name</th>
-		    <th style="width: 40%;">Affiliations</th>
+		    <th style="width: 25%;">Affiliations</th>
 		    {% for round in rounds %}
 			<th>R{{ round }}</th>
 		    {% endfor %}
 		</tr>
-	    </table>
-	</div>
-	<div class="public_header_spacer"></div>
-	<table class="public_table">
+	    </thead>
+	    <tbody>
 	    {% for judge in judges %}
 		<tr>
-		    <td style="width: 25%;">{{ judge.name }}</td>
-		    <td style="width: 40%;">{{ judge.affiliations_display }}</td>
+		    <td style="width: 25%;" data-label="Name">{{ judge.name }}</td>
+		    <td style="width: 25%;" data-label="Affiliations">{{ judge.affiliations_display }}</td>
 		    {% for round in rounds %}
-			<td>{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
+			<td data-label="R{{ round }}">{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
 		    {% endfor %}
 		</tr>
 	    {% endfor %}
+	    </tbody>
 	</table>
-        <div class="pairings_footer_spacer"></div>
+            </div>
+        <div class="public_footer_spacer"></div>
 	<div class="public_footer">
-            <a href="/" class="home-link">Home</a>
-            <span class="right">
+            <span class="right footer-controls">
 		<label for="autoscroll">
                     Autoscroll:
-                    <input type="checkbox" name="autoscroll" id="autoscroll" checked/>
+                    <input type="checkbox" name="autoscroll" id="autoscroll"/>
 		</label>
             </span>
 	</div>	
-    </body>
-</html>
+</div>
+{% endblock %}

@@ -1,5 +1,4 @@
-Adding Teams, Judges, Rooms, and Debaters
-=========================================
+# Adding Teams, Judges, Rooms, and Debaters
 
 There are two ways to enter teams, judges, rooms, and debaters:
 [Manually entering individually](#manual-data-entry) or
@@ -8,8 +7,8 @@ import is probably easier. However, you may need to enter data manually to add
 one or two teams at a time, or to fix any errors that may have occurred when
 importing data in bulk.
 
-Batch Data Import
------------------
+(batch-data-import)=
+## Batch Data Import
 
 To import data in bulk: First, navigate to the "File Data Upload" link under
 the "Admin" section of the navigation menu:
@@ -32,58 +31,8 @@ similar
 **NOTE:** All data in the first row will be ignored. That row is assumed to be
 a header row.
 
-Here is the format of the .xlsx file:
-
-\* = required field
-
-### Teams (and Debaters)
-
-**NOTE:** Debaters will automatically be created from this sheet, too.
-
-```eval_rst
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-| Name* | School*                  | Hybrid School         | Seed              | Debater 1 Name* | Debater 1 Novice Status | Debater 2 Name*               | Debater 2 Novice Status |  |
-|       | (If hybrid, school whose | (If hybrid, school    | (“Half”, “Full”,  |                 | (“N” or blank)          |                               | (“N” or blank)          |  |
-|       | protection they take)    | whose protection they | “Free”, or empty) |                 |                         |                               |                         |  |
-|       |                          | don't take, otherwise |                   |                 |                         |                               |                         |  |
-|       |                          | leave empty)          |                   |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-|       |                          |                       |                   |                 |                         |                               |                         |  |
-+-------+--------------------------+-----------------------+-------------------+-----------------+-------------------------+-------------------------------+-------------------------+--+
-```
-
-### Judges
-
-```eval_rst
-+-------+-------+-----------------------------------+
-| Name* | Rank* | Affiliated Schools (1 per column) |
-+-------+-------+-----------------------------------+
-|       |       |                                   |
-+-------+-------+-----------------------------------+
-```
-
-### Rooms
-
-```eval_rst
-+-------+------------------------+
-| Name* | Rank* (Decimal, 0-100) |
-+-------+------------------------+
-|       |                        |
-+-------+------------------------+
-```
-
-### Scratches
-
-```eval_rst
-+------------+-------------+---------------------------------+--+
-| Team Name* | Judge Name* | Scratch Type ("tab" or "team")* |  |
-+------------+-------------+---------------------------------+--+
-|            |             |                                 |  |
-+------------+-------------+---------------------------------+--+
-```
-
-Manual Data Entry
------------------
+(manual-data-entry)=
+## Manual Data Entry
 
 From the home page, you can add and view all _Schools, Judges, Teams, Debaters,
 and Rooms_.  To enter information quickly, you should have multiple people
@@ -100,6 +49,12 @@ at any given moment.
 judge. Higher is a "better" judge.
 3. Affiliated Schools - A list of schools that this judge should be unable to
 judge. **Use this for team scratches as well as multiple affiliations**
+4. Wing Only - Check this box if the judge can only serve as a wing judge and not as a chair. Wing-only judges will be excluded from automatic chair assignment during both in-rounds and outrounds. This is useful for ensuring that less experienced judges are never assigned as the chair of a panel.
+
+**Note:** Judges automatically get assigned unique "ballot codes" (e.g., "wandering-tsunami", "icy-firefly") when created. These codes allow judges to submit e-ballots remotely. You can find a judge's ballot code:
+- In the judge list view (appears in parentheses after the name)
+- On the judge detail page
+- Ballot codes can be used for online ballot submission Enter e-ballots from the mit-tab homepage under E-Ballots.
 
 ### Teams
 1. Name - Name of the team, e.g. "Yale A"
@@ -113,12 +68,18 @@ you can add a debater directly (instead of having to enter them separately)
 using the button to the right of the selection box.  If you select one debater
 then the program will treat the team as an iron man team.
 5. Seed - The seed of the team, used during the first round pairing.
-6. Checked in - If this box is checked then any rounds you pair will include
+6. Break Preference - Whether this team prefers to break varsity or novice.
+This affects outround breaking if a novice team qualifies for the varsity break.
+7. Checked in - If this box is checked then any rounds you pair will include
 this team in the pairing. Uncheck this if you want the team to not be paired
 into the rounds.
-7. Scratch Count - Used for generating a form that allows you to immediately
+8. Scratch Count - Used for generating a form that allows you to immediately
 add scratches.  Feel free to put zero and add scratches later (they can be
 added from either the judge page or the team page at any time).
+
+**Note:** Teams automatically get assigned unique "team codes" (fun names like
+"Icy Firefly" or "Wandering Tsunami") that can be used for anonymous display on public views if
+enabled in settings. These codes are automatically generated and are unique to each team.
 
 ### Debaters
 1. Name - Name of the debater, e.g. "Matt Smith".

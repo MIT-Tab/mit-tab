@@ -10,11 +10,19 @@
   {% quick_search %}
   <div class="data-list">
     <ul class="list_item">
-      {% for id, item, flags, symbols in item_list%}
-        <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-          <a class="no_decoration" href="/{{item_type}}/{{id}}">{{item}} {{symbols}}</a>
-        </li>
-      {% endfor %}
+      {% if item_type == "judge" %}
+        {% for id, name, flags, symbols, rank in item_list %}
+            <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}" data-rank="{{rank}}">
+              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} <span class="item-detail" data-code="{{symbols}}" data-rank="({{rank}})">{{symbols}}</span></a>
+            </li>
+        {% endfor %}
+      {% else %}
+        {% for id, name, flags, symbols in item_list %}
+          <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} {{symbols}}</a>
+          </li>
+        {% endfor %}
+      {% endif %}
     </ul>
   </div>
 </div>
@@ -24,6 +32,11 @@
   <div class="card mb-2">
     <div class="card-header">Quick Filters</div>
     <div class="card-body">
+      {% if item_type == "judge" %}
+      <div class="mb-3">
+        <button class="btn btn-sm btn-primary" id="toggle-judge-display">Show Rank</button>
+      </div>
+      {% endif %}
       <ul class="list-group">
         {% for filter_group in filters %}
           {% for key, value in filter_group %}

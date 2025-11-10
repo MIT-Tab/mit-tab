@@ -1,0 +1,58 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Confirm Re-Pair Round {{ round_number }}{% endblock %}
+
+{% block content %}
+<div class="col">
+  <div class="container">
+    <div class="row">
+      <div class="col">
+        <h3>Confirm Re-Pairing Round {{ round_number }}</h3>
+      </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="col">
+        <div class="alert alert-warning">
+          <h5><i class="fas fa-exclamation-triangle"></i> Warning</h5>
+          <p>
+            You are about to re-pair Round {{ round_number }}. This will:
+          </p>
+          <ul>
+            <li><strong>Delete all current pairings</strong> for this round</li>
+            <li><strong>Delete all judge assignments</strong> for this round</li>
+            <li><strong>Delete all room assignments</strong> for this round</li>
+            <li><strong>Delete all byes</strong> assigned for this round</li>
+            <li><strong>Re-create the pairing</strong> using the current team check-in status</li>
+          </ul>
+          <p class="mb-0">
+            <strong>A backup will be created before re-pairing.</strong> You can restore it if needed.
+          </p>
+        </div>
+
+        <div class="alert alert-info">
+          <h5><i class="fas fa-info-circle"></i> Note</h5>
+          <p class="mb-0">
+            Team check-in status and no-shows will be recalculated based on current check-in data.
+            Make sure all teams that should be checked in are properly checked in before re-pairing.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="col">
+        <form action="{% url 're_pair_round' %}" method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-sync"></i> Yes, Re-Pair Round {{ round_number }}
+          </button>
+          <a href="{% url 'view_status' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancel
+          </a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

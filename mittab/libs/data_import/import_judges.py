@@ -31,7 +31,7 @@ class JudgeImporter(WorkbookImporter):
                 try:
                     self.create(school)
                 except Exception:
-                    self.error("Invalid school '%s'" % school_name, row_number)
+                    self.error(f"Invalid school '{school_name}'", row_number)
             schools.append(school.id)
 
         data = {"name": judge_name, "rank": judge_rank, "schools": schools}
@@ -41,4 +41,4 @@ class JudgeImporter(WorkbookImporter):
         else:
             for _field, error_msgs in form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (judge_name, error_msg), row_number)
+                    self.error(f"{judge_name} - {error_msg}", row_number)

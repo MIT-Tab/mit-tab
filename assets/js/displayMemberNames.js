@@ -2,10 +2,17 @@ import $ from "jquery";
 
 function changeDisplayNames() {
   const checkBox = document.getElementById("name_display_toggle");
-
-  document.body.classList.toggle("show-team-names", !checkBox.checked);
+  if (checkBox) {
+    document.body.classList.toggle("show-team-names", !checkBox.checked);
+    window.dispatchEvent(new Event("memberNamesToggled"));
+  }
 }
 
 $(document).ready(() => {
-  $("#name_display_toggle").click(changeDisplayNames);
+  const checkBox = document.getElementById("name_display_toggle");
+  if (checkBox) {
+    document.body.classList.add("show-team-names");
+    checkBox.checked = false;
+    $("#name_display_toggle").click(changeDisplayNames);
+  }
 });

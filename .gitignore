@@ -51,7 +51,10 @@ mittab/backups/
 *.sqlite3-journal
 
 # venv
-venv/
+venv*/
+
+# IDEs
+.vscode
 
 # doc stuff
 docs/_static/
@@ -122,3 +125,5 @@ typings/
 .env
 
 *.dump.sql
+.vscode/
+/loadtest/
