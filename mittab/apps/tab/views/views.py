@@ -39,6 +39,7 @@ from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
 from mittab.libs.tab_logic.rankings import get_team_rankings
+from mittab.libs.data_export.s3_connector import schedule_results_export
 
 
 def index(request):
@@ -684,11 +685,12 @@ def publish_results(request, new_setting):
     # Convert URL parameter: 0 = unpublish, 1 = publish
     new_setting = bool(new_setting)
     current_setting = TabSettings.get("results_published", False)
+    should_export = new_setting
 
     if new_setting != current_setting:
         TabSettings.set("results_published", new_setting)
         status = "published" if new_setting else "unpublished"
-        return redirect_and_flash_success(
+        response = redirect_and_flash_success(
             request,
             f"Results successfully {status}. Results are now "
             f"{'visible' if new_setting else 'hidden'}.",
@@ -696,11 +698,15 @@ def publish_results(request, new_setting):
         )
     else:
         status = "published" if current_setting else "unpublished"
-        return redirect_and_flash_success(
+        response = redirect_and_flash_success(
             request,
             f"Results are already {status}.",
             path="/",
         )
+    if should_export:
+        tournament_name = _get_tournament_name(request)
+        schedule_results_export(tournament_name)
+    return response
 
 
 def forum_post(request):

@@ -138,9 +138,9 @@ def json_get_round(round_obj, team, deb1, deb2):
 
     try:
         bye_round = Bye.objects.get(bye_team=team).round_number
-        json_round[bye_round - 1][bye_round] = "BYE"
+        json_round["bye_round"] = bye_round
     except Bye.DoesNotExist:
-        pass
+        json_round["bye_round"] = None
 
     return json_round
 
