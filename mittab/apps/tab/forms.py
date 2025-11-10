@@ -8,8 +8,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors, cache_logic
+from mittab.libs import errors
 from mittab import settings
+from mittab.libs.cacheing import cache_logic
 
 
 class UploadBackupForm(forms.Form):
@@ -24,6 +25,9 @@ class UploadDataForm(forms.Form):
 
 
 class SchoolForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(SchoolForm, self).__init__(*args, **kwargs)
+
     class Meta:
         model = School
         fields = "__all__"
@@ -44,10 +48,11 @@ class RoomForm(forms.ModelForm):
                 ]
                 for i in range(-1, num_rounds):
                     # 0 is included as zero represents outrounds
-                    label = "Checked in for round %s?" % (i + 1)
+                    label = f"Checked in for round {i + 1}?"
                     if i == -1:
                         label = "Checked in for outrounds?"
-                    self.fields["checkin_%s" % i] = forms.BooleanField(
+                    field_name = f"checkin_{i}"
+                    self.fields[field_name] = forms.BooleanField(
                         label=label,
                         initial=i + 1 in checkins,
                         required=False)
@@ -58,8 +63,9 @@ class RoomForm(forms.ModelForm):
         room = super(RoomForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(num_rounds):
-            if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
+            field_name = f"checkin_{i}"
+            if field_name in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data[field_name]
                 checked_in = RoomCheckIn.objects.filter(room=room,
                                                         round_number=i + 1)
                 # Two cases, either the room is not checked in and the user says he is,
@@ -95,10 +101,11 @@ class JudgeForm(forms.ModelForm):
                 ]
                 for i in range(-1, num_rounds):
                     # 0 is included as zero represents outrounds
-                    label = "Checked in for round %s?" % (i + 1)
+                    label = f"Checked in for round {i + 1}?"
                     if i == -1:
                         label = "Checked in for outrounds?"
-                    self.fields["checkin_%s" % i] = forms.BooleanField(
+                    field_name = f"checkin_{i}"
+                    self.fields[field_name] = forms.BooleanField(
                         label=label,
                         initial=i + 1 in checkins,
                         required=False)
@@ -109,8 +116,9 @@ class JudgeForm(forms.ModelForm):
         judge = super(JudgeForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(-1, num_rounds):
-            if "checkin_%s" % (i) in self.cleaned_data:
-                should_be_checked_in = self.cleaned_data["checkin_%s" % (i)]
+            field_name = f"checkin_{i}"
+            if field_name in self.cleaned_data:
+                should_be_checked_in = self.cleaned_data[field_name]
                 checked_in = CheckIn.objects.filter(judge=judge,
                                                     round_number=i + 1)
                 # Two cases, either the judge is not checked in and the user says he is,
@@ -187,16 +195,47 @@ class TeamEntryForm(TeamForm):
 
 
 class ScratchForm(forms.ModelForm):
-    team = forms.ModelChoiceField(queryset=Team.objects.all())
-    judge = forms.ModelChoiceField(queryset=Judge.objects.all())
+    team = forms.ChoiceField(choices=[])
+    judge = forms.ChoiceField(choices=[])
     scratch_type = forms.ChoiceField(choices=Scratch.TYPE_CHOICES)
+
+    def __init__(self, *args, **kwargs):
+        team_queryset = kwargs.pop("team_queryset", Team.objects.all())
+        judge_queryset = kwargs.pop("judge_queryset", Judge.objects.all())
+
+        super(ScratchForm, self).__init__(*args, **kwargs)
+
+        self.fields["team"].choices = [
+            (str(team.id), team.name) for team in team_queryset
+        ]
+        self.fields["judge"].choices = [
+            (str(judge.id), judge.name) for judge in judge_queryset
+        ]
+
+        # If we're editing an existing scratch, set initial values
+        if self.instance and self.instance.pk:
+            self.fields["team"].initial = str(self.instance.team.id)
+            self.fields["judge"].initial = str(self.instance.judge.id)
+
+    def save(self, commit=True):
+        instance = super(ScratchForm, self).save(commit=False)
+        # Convert string IDs to actual model instances
+        instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
+        instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
+        if commit:
+            instance.save()
+        return instance
 
     class Meta:
         model = Scratch
         fields = "__all__"
+        exclude = ["team", "judge"]
 
 
 class DebaterForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(DebaterForm, self).__init__(*args, **kwargs)
+
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
@@ -206,7 +245,7 @@ def validate_speaks(value):
     if not (TabSettings.get("min_speak", 0) <= value <= TabSettings.get(
             "max_speak", 50)):
         raise ValidationError(
-            "%s is an entirely invalid speaker score, try again." % value)
+            f"{value} is an entirely invalid speaker score, try again.")
 
 
 class ResultEntryForm(forms.Form):
@@ -257,15 +296,16 @@ class ResultEntryForm(forms.Form):
         for deb in self.DEBATERS:
             debater_choices = gov_debaters if deb in self.GOV else opp_debaters
             self.fields[self.deb_attr_name(
-                deb, "debater")] = forms.ChoiceField(label="Who was %s?" %
-                                                     (self.NAMES[deb]),
-                                                     choices=debater_choices)
+                deb, "debater")] = forms.ChoiceField(
+                    label=f"Who was {self.NAMES[deb]}?",
+                    choices=debater_choices
+                )
             self.fields[self.deb_attr_name(
                 deb, "speaks")] = forms.DecimalField(
-                    label="%s Speaks" % (self.NAMES[deb]),
+                    label=f"{self.NAMES[deb]} Speaks",
                     validators=[validate_speaks])
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
-                label="%s Rank" % (self.NAMES[deb]), choices=self.RANKS)
+                label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
 
         if round_object.victor == 0 or no_fill:
             return
@@ -393,7 +433,7 @@ class ResultEntryForm(forms.Form):
             return val
 
     def deb_attr_name(self, position, attr):
-        return "%s_%s" % (position, attr)
+        return f"{position}_{attr}"
 
     def has_invalid_ranks(self):
         ranks = [int(self.deb_attr_val(d, "ranks")) for d in self.DEBATERS]
@@ -425,20 +465,21 @@ class EBallotForm(ResultEntryForm):
                 msg = "Incorrect ballot code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
             elif round_obj.round_number != cur_round:
-                msg = """
-                      This ballot is for round %d, but the current round is %d.
-                      Go to tab to submit this result.
-                      """ % (round_obj.round_number, cur_round)
+                msg = (
+                    f"This ballot is for round {round_obj.round_number}, "
+                    f"but the current round is {cur_round}. "
+                    "Go to tab to submit this result."
+                )
                 self._errors["winner"] = self.error_class([msg])
             else:
                 if round_obj.chair.ballot_code != judge.ballot_code:
                     msg = "You are not judging the round, or you are not the chair"
                     self._errors["ballot_code"] = self.error_class([msg])
                 elif RoundStats.objects.filter(round=round_obj).first():
-                    msg = """
-                          A ballot has already been completed for this round.
-                          Go to tab if you need to change the results.
-                          """
+                    msg = (
+                        "A ballot has already been completed for this round. "
+                        "Go to tab if you need to change the results."
+                    )
                     self._errors["ballot_code"] = self.error_class([msg])
 
             if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
@@ -458,7 +499,7 @@ class EBallotForm(ResultEntryForm):
                     self._errors[key] = self.error_class([msg])
 
         except Exception as e:
-            print(("Caught error %s" % e))
+            print(f"Caught error {e}")
             self._errors["winner"] = self.error_class(
                 ["Non handled error, preventing data contamination"])
 
@@ -473,43 +514,63 @@ class SettingsForm(forms.Form):
         super(SettingsForm, self).__init__(*args, **kwargs)
 
         for setting in self.settings:
-            if "type" in setting and setting["type"] == "boolean":
-                self.fields["setting_%s" % (setting["name"],)] = forms.BooleanField(
-                    label=setting["name"],
+            field_name = f"setting_{setting['name']}"
+            label = setting["name"].replace("_", " ").title()
+
+            if setting.get("type") == "boolean":
+                self.fields[field_name] = forms.BooleanField(
+                    label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
-                    required=False
+                    required=False,
+                    widget=forms.CheckboxInput(attrs={
+                        "class": "form-check-input"
+                    })
+                )
+            elif setting.get("type") == "choice":
+                choices = [(c[0], c[1]) for c in setting.get("choices", [])]
+                self.fields[field_name] = forms.TypedChoiceField(
+                    label=label,
+                    help_text=setting["description"],
+                    choices=choices,
+                    initial=setting["value"],
+                    coerce=int,
+                    widget=forms.Select(attrs={
+                        "class": "form-control"
+                    })
+                )
+            elif setting.get("type") == "text":
+                self.fields[field_name] = forms.CharField(
+                    label=label,
+                    help_text=setting["description"],
+                    initial=setting["value"],
+                    required=False,
+                    widget=forms.TextInput(attrs={
+                        "class": "form-control",
+                        "style": "min-width: 300px;"
+                    })
                 )
             else:
-                self.fields["setting_%s" % (setting["name"],)] = forms.IntegerField(
-                    label=setting["name"],
+                self.fields[field_name] = forms.IntegerField(
+                    label=label,
                     help_text=setting["description"],
-                    initial=setting["value"]
+                    initial=setting["value"],
+                    widget=forms.NumberInput(attrs={
+                        "class": "form-control"
+                    })
                 )
 
     def save(self):
         for setting in self.settings:
-            field = "setting_%s" % (setting["name"],)
-            tab_setting = TabSettings.objects.filter(
-                key=self.fields[field].label
-            ).first()
-
-            value_to_set = setting["value"]
+            field = f"setting_{setting['name']}"
+            key = setting["name"]
 
             if "type" in setting and setting["type"] == "boolean":
-                if not self.cleaned_data[field]:
-                    value_to_set = 0
-                else:
-                    value_to_set = 1
+                value_to_set = 1 if self.cleaned_data[field] else 0
             else:
                 value_to_set = self.cleaned_data[field]
 
-            if not tab_setting:
-                tab_setting = TabSettings.objects.create(key=self.fields[field].label,
-                                                         value=value_to_set)
-            else:
-                tab_setting.value = value_to_set
-                tab_setting.save()
+            TabSettings.set(key, value_to_set)
 
 
 def validate_panel(result):
@@ -659,8 +720,6 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
-
-
 class ExportFormatForm(forms.Form):
     EXPORT_CHOICES = [
         ("csv", "CSV"),
@@ -668,3 +727,68 @@ class ExportFormatForm(forms.Form):
         ("json", "JSON"),
     ]
     format = forms.ChoiceField(choices=EXPORT_CHOICES, label="Export Format")
+
+class RoomTagForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    judges = forms.ModelMultipleChoiceField(
+        queryset=Judge.objects.all(),
+        required=False,
+    )
+    rooms = forms.ModelMultipleChoiceField(
+        queryset=Room.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.team_set.all()
+            self.fields["judges"].initial = self.instance.judge_set.all()
+            self.fields["rooms"].initial = self.instance.room_set.all()
+
+    def save(self, commit=True):
+        room_tag = super().save(commit=commit)
+
+        room_tag.team_set.set(self.cleaned_data.get("teams", []))
+        room_tag.judge_set.set(self.cleaned_data.get("judges", []))
+        room_tag.room_set.set(self.cleaned_data.get("rooms", []))
+
+        return room_tag
+
+    class Meta:
+        model = RoomTag
+        fields = ("tag", "priority", "teams", "judges", "rooms")
+
+
+class MiniRoomTagForm(RoomTagForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("judges")
+        self.fields.pop("rooms")
+
+
+class BackupForm(forms.Form):
+    backup_name = forms.CharField(
+        max_length=255,
+        label="Backup name",
+        widget=forms.TextInput(
+            attrs={"placeholder": "Enter backup name", "pattern": r"[^_]*"}
+        )
+    )
+    include_scratches = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Include scratches"
+    )
+
+    def clean_backup_name(self):
+        backup_name = self.cleaned_data["backup_name"]
+        if "_" in backup_name:
+            raise forms.ValidationError(
+                "Backup name cannot contain underscores (_)."
+            )
+        return backup_name

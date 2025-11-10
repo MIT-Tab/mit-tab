@@ -1,7 +1,7 @@
 import $ from "jquery";
 
 const increment = 50;
-const pause = 5000;
+const pause = 500;
 
 let timer;
 let dir = 1;
@@ -32,13 +32,11 @@ setupScroll = () => {
 };
 
 $(document).ready(() => {
-  $("#autoscroll").change(() => {
+  $("#autoscroll").change(function handleAutoscrollChange() {
     if ($(this).prop("checked")) {
       setupScroll();
     } else {
       window.clearInterval(timer);
     }
   });
-
-  setupScroll();
 });

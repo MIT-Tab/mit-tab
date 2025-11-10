@@ -8,12 +8,27 @@ DB_NAME = DB_SETTINGS["NAME"]
 DB_USER = DB_SETTINGS["USER"]
 DB_PASS = DB_SETTINGS["PASSWORD"]
 DB_PORT = DB_SETTINGS["PORT"]
+SSL_CONFIG = DB_SETTINGS.get("OPTIONS", {}).get("ssl", {})
+
+
+def _ssl_cmd_args():
+    args = []
+    ssl_ca = SSL_CONFIG.get("ca")
+
+    if DB_HOST not in ("127.0.0.1", "localhost"):
+        args.append("--ssl")
+
+    if ssl_ca:
+        args.append(f"--ssl-ca={ssl_ca}")
+
+    return args
 
 
 class MysqlDumpRestorer:
 
-    def dump(self):
-        return subprocess.check_output(self._dump_cmd())
+    def dump(self, include_scratches=True):
+        return subprocess.check_output(self._dump_cmd(
+            include_scratches=include_scratches))
 
     def restore(self, content):
         """
@@ -39,29 +54,36 @@ class MysqlDumpRestorer:
         cmd = [
             "mysql",
             DB_NAME,
-            "--port={}".format(DB_PORT),
-            "--host={}".format(DB_HOST),
-            "--user={}".format(DB_USER),
+            f"--port={DB_PORT}",
+            f"--host={DB_HOST}",
+            f"--user={DB_USER}",
         ]
 
         if DB_PASS:
-            cmd.append("--password={}".format(DB_PASS))
+            cmd.append(f"--password={DB_PASS}")
+
+        cmd.extend(_ssl_cmd_args())
 
         return cmd
 
-    def _dump_cmd(self):
+    def _dump_cmd(self, include_scratches=True):
         cmd = [
             "mysqldump",
             DB_NAME,
             "--quick",
             "--lock-all-tables",
             "--complete-insert",
-            "--port={}".format(DB_PORT),
-            "--host={}".format(DB_HOST),
-            "--user={}".format(DB_USER),
+            f"--port={DB_PORT}",
+            f"--host={DB_HOST}",
+            f"--user={DB_USER}",
         ]
 
         if DB_PASS:
-            cmd.append("--password={}".format(DB_PASS))
+            cmd.append(f"--password={DB_PASS}")
+
+        cmd.extend(_ssl_cmd_args())
+
+        if not include_scratches:
+            cmd.append(f"--ignore-table={DB_NAME}.tab_scratch")
 
         return cmd

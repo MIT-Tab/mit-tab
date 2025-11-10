@@ -72,7 +72,7 @@ class Command(BaseCommand):
             time.sleep(2)
 
         print("Done!")
-        print("Total errors: %s" % num_errors)
+        print(f"Total errors: {num_errors}")
 
 
 class SubmitResultThread(Thread):
@@ -97,9 +97,12 @@ class SubmitResultThread(Thread):
         result = utils.generate_random_results(self.round_obj, self.ballot_code)
         result["csrfmiddlewaretoken"] = self.csrf_token
 
-        resp = requests.post("http://%s/e_ballots/%s/" % (self.host, self.ballot_code),
-                             result,
-                             cookies={"csrftoken": self.csrf_token})
+        resp = requests.post(
+            f"http://{self.host}/e_ballots/{self.ballot_code}/",
+            result,
+            cookies={"csrftoken": self.csrf_token},
+            timeout=10,
+        )
         if resp.status_code > 299:
             self.num_errors += 1
             return self.get_resp()
@@ -130,7 +133,9 @@ class GetCsrfThread(Thread):
     def get_resp(self):
         if self.num_errors >= self.MAX_ERRORS:
             return None
-        resp = requests.get("http://%s/e_ballots/%s" % (self.host, self.ballot_code))
+        resp = requests.get(
+            f"http://{self.host}/e_ballots/{self.ballot_code}", timeout=10
+        )
         if resp.status_code > 299:
             self.num_errors += 1
             return self.get_resp()

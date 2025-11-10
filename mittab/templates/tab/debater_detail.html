@@ -1,0 +1,55 @@
+{% extends "common/data_entry.html" %}
+
+{% block detail_content %}
+{% if debater_obj %}
+
+<div class="col-md-6">
+  <div class="team-record">
+    <h5>Debater Rounds</h5>
+    <table class="table table-striped">
+      <thead><th>Round #</th><th>Speaks</th><th>Ranks</th><th>Room</th><th>Judges</th></thead>
+      {% for round in debater_rounds %}
+      <tr>
+        <td><a href='/round/{{ round.round.id }}/result/'>Round {{ round.round.round_number }}</a></td>
+        <td>{{round.speaks}}</td>
+        <td>{{round.ranks}}</td>
+        <td>{% if round.round.room %}<a href='/room/{{ round.round.room.id }}/'>{{ round.round.room.name }}</a>{% endif %}</td>
+        <td>
+          {% if round.round.chair %}<a href='/judge/{{ round.round.chair.id }}/'>{{ round.round.chair.name }}</a>{% if round.round.judges.all|length > 1 %}, {% endif %}{% endif %}
+          {% for judge in round.round.judges.all %}
+            {% if judge != round.round.chair %}
+              <a href='/judge/{{ judge.id }}/'>{{ judge.name }}</a>{% if not forloop.last and judge != round.round.chair %}, {% endif %}
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  
+  {% if team_schools %}
+  <div class="team-record mt-4">
+    <h5>Team Information</h5>
+    <table class="table table-striped">
+      <thead>
+        <th>Team</th>
+        <th>School</th>
+        {% if has_hybrid_school %}
+        <th>Hybrid School</th>
+        {% endif %}
+      </thead>
+      {% for team_school in team_schools %}
+      <tr>
+        <td><a href='/team/{{ team_school.team.id }}/'>{{ team_school.team }}</a></td>
+        <td><a href='/school/{{ team_school.school.id }}/'>{{ team_school.school }}</a></td>
+        {% if has_hybrid_school %}
+        <td>{% if team_school.hybrid_school %}<a href='/school/{{ team_school.hybrid_school.id }}/'>{{ team_school.hybrid_school }}</a>{% endif %}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

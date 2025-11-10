@@ -3,19 +3,25 @@ from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
+from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
-import mittab.apps.tab.views as views
-import mittab.apps.tab.judge_views as judge_views
-import mittab.apps.tab.team_views as team_views
-import mittab.apps.tab.debater_views as debater_views
-import mittab.apps.tab.pairing_views as pairing_views
-import mittab.apps.tab.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.views as views
+import mittab.apps.tab.views.public_views as public_views
+import mittab.apps.tab.views.api_views as api_views
+import mittab.apps.tab.views.judge_views as judge_views
+import mittab.apps.tab.views.team_views as team_views
+import mittab.apps.tab.views.debater_views as debater_views
+import mittab.apps.tab.views.pairing_views as pairing_views
+import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 
 
 admin.autodiscover()
 
 urlpatterns = [
+    path("favicon.ico",
+         RedirectView.as_view(url=settings.STATIC_URL +
+                              "img/favicon.ico", permanent=True)),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
@@ -25,13 +31,8 @@ urlpatterns = [
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),
 
-    # Account related
-    path("accounts/login/",
-         LoginView.as_view(template_name="registration/login.html"),
-         name="tab_login"),
 
     # Judge related
-    re_path(r"^judges/", judge_views.public_view_judges, name="public_judges"),
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
     re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
             judge_views.add_scratches,
@@ -39,11 +40,11 @@ urlpatterns = [
     re_path(r"^judge/(\d+)/scratches/view/",
             judge_views.view_scratches,
             name="view_scratches"),
-    re_path(r"^judge/(\d+)/check_ins/round/(\d+)/$",
-            judge_views.judge_check_in,
-            name="judge_check_in"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
+    path("download_judge_codes/",
+         judge_views.download_judge_codes,
+         name="download_judge_codes"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -55,9 +56,11 @@ urlpatterns = [
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
-    re_path(r"^room/(\d+)/check_ins/round/(\d+)/$",
-            views.room_check_in,
-            name="room_check_in"),
+
+    path("bulk_check_in/", views.bulk_check_in, name="bulk_check_in"),
+    path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
+    path("room-tag/", views.room_tag, name="room_tag"),
+    path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
 
 
     # Scratch related
@@ -71,7 +74,6 @@ urlpatterns = [
     re_path(r"^enter_scratch/", views.add_scratch, name="add_scratch"),
 
     # Team related
-    re_path(r"^teams/", team_views.public_view_teams, name="public_teams"),
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
     re_path(r"^team/(\d+)/scratches/add/(\d+)/",
             team_views.add_scratches,
@@ -92,9 +94,6 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    re_path(r"^team/(\d+)/check_ins/$",
-            team_views.team_check_in,
-            name="team_check_in"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
@@ -114,6 +113,8 @@ urlpatterns = [
          name="view_rounds"),
     re_path(r"^round/(\d+)/$", pairing_views.view_round, name="view_round"),
     re_path(r"^round/(\d+)/stats/$", pairing_views.team_stats, name="team_stats"),
+    re_path(r"^outround/(\d+)/stats/$", pairing_views.team_stats,
+            {"outround": True}, name="outround_team_stats"),
     re_path(r"^round/(\d+)/result/$",
             pairing_views.enter_result,
             name="enter_result"),
@@ -143,6 +144,7 @@ urlpatterns = [
             pairing_views.assign_judge,
             name="swap_judge"),
     path("pairing/pair_round/", pairing_views.pair_round, name="pair_round"),
+    path("pairing/re_pair_round/", pairing_views.re_pair_round, name="re_pair_round"),
     path("pairing/assign_judges/",
          pairing_views.assign_judges_to_pairing,
          name="assign_judges"),
@@ -163,15 +165,9 @@ urlpatterns = [
     path("pairing/start_tourny/",
          pairing_views.start_new_tourny,
          name="start_tourny"),
-    path("pairings/pairinglist/",
-         pairing_views.pretty_pair,
-         name="pretty_pair"),
-    path("pairings/missing_ballots/",
-         pairing_views.missing_ballots,
-         name="missing_ballots"),
-    path("pairings/pairinglist/printable/",
-         pairing_views.pretty_pair_print,
-         name="pretty_pair_print"),
+    path("pairings/export_csv/",
+         pairing_views.export_pairings_csv_view,
+         name="export_pairings_csv"),
     path("pairing/backup/",
          pairing_views.manual_backup,
          name="manual_backup"),
@@ -181,11 +177,6 @@ urlpatterns = [
     path("pairing/view_backups/",
          pairing_views.view_backups,
          name="view_backups"),
-    path("e_ballots/", pairing_views.e_ballot_search,
-         name="e_ballot_search"),
-    re_path(r"e_ballots/(\S+)/$",
-            pairing_views.enter_e_ballot,
-            name="enter_e_ballot"),
     path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),
     path("batch_checkin/", views.batch_checkin, name="batch_checkin"),
     path("round/<int:round_id>/alternative_rooms/",
@@ -231,18 +222,18 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_swap_judge"),
+    path("outround_pairing/assign_judges/<int:round_type>/",
+         outround_pairing_views.assign_judges_to_pairing,
+         name="outround_assign_judges"),
     re_path(r"^outround/(\d+)/result/$",
             outround_pairing_views.enter_result,
             name="enter_result"),
     path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
          outround_pairing_views.pair_next_outround,
          name="next_outround"),
-    path("outround_pairings/pairinglist/<int:type_of_round>/",
-         outround_pairing_views.pretty_pair,
-         name="outround_pretty_pair"),
-    path("outround_pairings/pairinglist/printable/<int:type_of_round>/",
-         outround_pairing_views.pretty_pair_print,
-         name="outround_pretty_pair_print"),
+    path("outround_pairings/export_csv/<int:type_of_round>/",
+         outround_pairing_views.export_outround_pairings_csv_view,
+         name="export_outround_pairings_csv"),
     path("outround_pairing/release/<int:num_teams>/<int:type_of_round>/",
          outround_pairing_views.toggle_pairing_released,
          name="toggle_outround_pairing_released"),
@@ -282,8 +273,73 @@ urlpatterns = [
     # Data Upload
     path("import_data/", views.upload_data, name="upload_data"),
 
+    # Tournament Archive
+    path("archive/download/", views.generate_archive, name="download_archive"),
+
+    # Standings API
+    path("forum_post", views.forum_post, name="forum_post"),
+    path("publish_results/<int:new_setting>/",
+         views.publish_results,
+         name="publish_results"),
+    path("api/varsity-speaker-awards",
+         api_views.varsity_speaker_awards_api,
+         name="varsity_speaker_awards_api"),
+    path("api/novice-speaker-awards",
+         api_views.novice_speaker_awards_api,
+         name="novice_speaker_awards_api"),
+    path("api/varsity-team-placements",
+         api_views.varsity_team_placements_api,
+         name="varsity_team_placements_api"),
+    path("api/novice-team-placements",
+         api_views.novice_team_placements_api,
+         name="novice_team_placements_api"),
+    path("api/non-placing-teams",
+         api_views.non_placing_teams_api,
+         name="non_placing_teams_api"),
+    path("api/new-debater-data",
+         api_views.new_debater_data_api,
+         name="new_debater_data_api"),
+    path("api/new-schools",
+         api_views.new_schools_api,
+         name="new_schools_api"),
+
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # Public views
+    path("public/",
+         public_views.public_home,
+         name="public_home"),
+    path("public/access-error/",
+         public_views.public_access_error,
+         name="public_access_error"),
+    path("public/login/",
+         LoginView.as_view(template_name="public/staff_login.html"),
+         name="tab_login"),
+    path("public/pairings/",
+         public_views.pretty_pair,
+         name="pretty_pair"),
+    path("public/missing-ballots/",
+         public_views.missing_ballots,
+         name="missing_ballots"),
+    path("public/e-ballots/",
+         public_views.e_ballot_search,
+         name="e_ballot_search"),
+    path("public/e-ballots/<str:ballot_code>/",
+         public_views.enter_e_ballot,
+         name="enter_e_ballot"),
+    path("public/judges/",
+         public_views.public_view_judges,
+         name="public_judges"),
+    path("public/teams/",
+         public_views.public_view_teams,
+         name="public_teams"),
+    path("public/team-rankings/",
+         public_views.rank_teams_public,
+         name="rank_teams_public"),
+    path("public/outrounds/<int:type_of_round>/",
+         public_views.outround_pretty_pair,
+         name="outround_pretty_pair"),
 ]
 
 if settings.SILK_ENABLED:
@@ -292,6 +348,6 @@ if settings.SILK_ENABLED:
         path("silk/", include("silk.urls", namespace="silk"))
     ]
 
-handler403 = "mittab.apps.tab.views.render_403"
-handler404 = "mittab.apps.tab.views.render_404"
-handler500 = "mittab.apps.tab.views.render_500"
+handler403 = "mittab.apps.tab.views.views.render_403"
+handler404 = "mittab.apps.tab.views.views.render_404"
+handler500 = "mittab.apps.tab.views.views.render_500"

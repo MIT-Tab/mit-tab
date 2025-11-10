@@ -1,0 +1,31 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Submit E-Ballot{% endblock %}
+{% block banner %}Submit E-Ballot{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'publicDisplay' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-6 col-md-8">
+  <p>
+    Enter the ballot code provided by the tab staff to open your electronic ballot.
+    Only the chair of a panel can submit the ballot.
+  </p>
+  <form method="post" action="">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="ballot_code">Ballot code</label>
+      <input type="text"
+             name="ballot_code"
+             id="ballot_code"
+             class="form-control"
+             placeholder="Example: ABCD1234"
+             autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary">Find Ballot</button>
+  </form>
+</div>
+{% endblock %}

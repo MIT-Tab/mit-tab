@@ -1,9 +1,12 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'main' %}
-
+    {% block extra_head %}{% endblock extra_head %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>
     <script type="text/javascript" src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
@@ -18,7 +21,7 @@
 
   <div class="container-fluid text-left">
 
-    <div id="container-main" class="container p-3 w-95 rounded shadow-sm">
+    <div id="container-main" class="container p-3 w-95 rounded shadow-lg">
       <div class="row">
         <div class="col">
           {% if messages %}
@@ -37,7 +40,7 @@
         </div>
       </div>
 
-      <div class="row mt-2">
+      <div class="row mt-2 content">
         {% block content %}{% endblock %}
       </div>
 

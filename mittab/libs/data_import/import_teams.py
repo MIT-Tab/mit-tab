@@ -29,7 +29,7 @@ class TeamImporter(WorkbookImporter):
             try:
                 self.create(school)
             except Exception:
-                self.error("Invalid school '%s'" % school_name, row_number)
+                self.error(f"Invalid school '{school_name}'", row_number)
                 return
 
         hybrid_school_name = row[2]
@@ -45,7 +45,7 @@ class TeamImporter(WorkbookImporter):
                     self.create(hybrid_school)
                 except Exception:
                     self.error(
-                        "Invalid hybrid school '%s'" % hybrid_school_name,
+                        f"Invalid hybrid school '{hybrid_school_name}'",
                         row_number)
                     return
 
@@ -59,7 +59,7 @@ class TeamImporter(WorkbookImporter):
         elif team_seed in self.unseeded_values:
             team_seed = Team.UNSEEDED
         else:
-            self.error("Invalid seed value for team %s" % team_name,
+            self.error(f"Invalid seed value for team {team_name}",
                        row_number)
             return
 
@@ -69,36 +69,39 @@ class TeamImporter(WorkbookImporter):
             deb1_status = Debater.NOVICE
         else:
             deb1_status = Debater.VARSITY
-
-        deb2_name = row[6]
-        deb2_status = row[7].strip().lower()
+        deb1_apda_id = row[6].strip() or -1
+        deb2_name = row[7]
+        deb2_status = row[8].strip().lower()
         if deb2_status in self.novice_values:
             deb2_status = Debater.NOVICE
         else:
             deb2_status = Debater.VARSITY
+        deb2_apda_id = row[9].strip() or -1
 
         deb1_form = DebaterForm(data={
             "name": deb1_name,
-            "novice_status": deb1_status
+            "novice_status": deb1_status,
+            "apda_id": deb1_apda_id
         })
         if deb1_form.is_valid():
             self.create(deb1_form)
         else:
             for _field, error_msgs in deb1_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb1_name, error_msg), row_number)
+                    self.error(f"{deb1_name} - {error_msg}", row_number)
             return
 
         deb2_form = DebaterForm(data={
             "name": deb2_name,
-            "novice_status": deb2_status
+            "novice_status": deb2_status,
+            "apda_id": deb2_apda_id
         })
         if deb2_form.is_valid():
             self.create(deb2_form)
         else:
             for _field, error_msgs in deb2_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb2_name, error_msg), row_number)
+                    self.error(f"{deb2_name} - {error_msg}", row_number)
             return
 
         team_form = TeamForm(
@@ -116,5 +119,5 @@ class TeamImporter(WorkbookImporter):
         else:
             for _field, error_msgs in team_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error("%s - %s" % (deb2_name, error_msg), row_number)
+                    self.error(f"{deb2_name} - {error_msg}", row_number)
             return

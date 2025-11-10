@@ -1,9 +1,13 @@
-FROM python:3.7
+FROM python:3.10
 
 # install dependenices
+ARG DOCTL_VERSION=1.120.0
+
 RUN apt-get update && \
   apt-get upgrade -y && \
-  apt-get install -y vim default-mysql-client
+  apt-get install -y vim default-mysql-client openssl curl memcached && \
+  curl -sSL https://github.com/digitalocean/doctl/releases/download/v${DOCTL_VERSION}/doctl-${DOCTL_VERSION}-linux-amd64.tar.gz \
+    | tar -xz -C /usr/local/bin doctl
 
 WORKDIR /var/www/tab
 
@@ -14,7 +18,7 @@ COPY package-lock.json ./
 COPY manage.py ./
 COPY setup.py ./
 COPY webpack.config.js ./
-COPY settings.yaml ./
+COPY ./settings ./settings
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets

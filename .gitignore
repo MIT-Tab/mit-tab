@@ -52,8 +52,12 @@ mittab/backups/
 *.sqlite3-journal
 
 # venv
+venv*/
 venv/
 .venv/
+
+# IDEs
+.vscode/
 
 # doc stuff
 docs/_static/
@@ -124,10 +128,11 @@ typings/
 .env
 
 *.dump.sql
-
 #webdriver
 google-chrome-stable_current_amd64.deb
 /chromedriver-linux64/
 
 #vscode
-.vscode/
+# (config directory ignored above)
+
+/loadtest/
