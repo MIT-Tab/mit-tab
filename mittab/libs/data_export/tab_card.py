@@ -15,6 +15,29 @@ GOV = "G"
 OPP = "O"
 
 
+def safe_name(obj):
+    return getattr(obj, "name", None) if obj else None
+
+
+def safe_school_name(team):
+    school = getattr(team, "school", None)
+    return safe_name(school)
+
+
+def get_debater_status(debater):
+    if not debater:
+        return None
+    try:
+        return Debater.NOVICE_CHOICES[debater.novice_status][1]
+    except (AttributeError, IndexError, TypeError):
+        return None
+
+
+def get_debater_status_short(debater):
+    status = get_debater_status(debater)
+    return status[0] if status else ""
+
+
 def get_victor_label(victor_code, side):
     side = 0 if side == GOV else 1
     victor_map = {
@@ -30,6 +53,8 @@ def get_victor_label(victor_code, side):
 
 
 def get_dstats(round_obj, deb1, deb2, iron_man):
+    if deb1 is None:
+        return None, None
     """Taken from original tab card function.
     Logic can probably be simplified, but keeping to
     prevent breaking
@@ -62,6 +87,12 @@ def get_dstats(round_obj, deb1, deb2, iron_man):
 
 def json_get_round(round_obj, team, deb1, deb2):
     chair = round_obj.chair
+    chair_name = safe_name(chair)
+    wings_queryset = (
+        round_obj.judges.exclude(pk=chair.pk)
+        if chair
+        else round_obj.judges.all()
+    )
     json_round = {
         "round_number": round_obj.round_number,
         "round_id": round_obj.pk,
@@ -69,8 +100,10 @@ def json_get_round(round_obj, team, deb1, deb2):
         "result": get_victor_label(
             round_obj.victor, GOV if round_obj.gov_team == team else OPP
         ),
-        "chair": chair.name,
-        "wings": [judge.name for judge in round_obj.judges.all() if judge != chair],
+        "chair": chair_name,
+        "wings": [
+            name for name in (safe_name(judge) for judge in wings_queryset) if name
+        ],
     }
 
     opponent = round_obj.opp_team if round_obj.gov_team == team else round_obj.gov_team
@@ -78,26 +111,30 @@ def json_get_round(round_obj, team, deb1, deb2):
         opponent_debaters = list(opponent.debaters.all())
         json_round["opponent"] = {
             "name": opponent.get_or_create_team_code(),
-            "school": opponent.school.name,
-            "debater1": opponent_debaters[0].name if opponent_debaters else None,
+            "school": safe_school_name(opponent),
+            "debater1": safe_name(opponent_debaters[0]) if opponent_debaters else None,
             "debater2": (
-                opponent_debaters[1].name if len(
-                    opponent_debaters) > 1 else None
+                safe_name(opponent_debaters[1])
+                if len(opponent_debaters) > 1
+                else None
             ),
         }
 
-    json_round["debater1"] = list(
-        (stat.speaks, stat.ranks)
-        for stat in RoundStats.objects.filter(debater=deb1, round=round_obj)
-    )
-    json_round["debater2"] = (
-        list(
+    if deb1:
+        json_round["debater1"] = list(
+            (stat.speaks, stat.ranks)
+            for stat in RoundStats.objects.filter(debater=deb1, round=round_obj)
+        )
+    else:
+        json_round["debater1"] = []
+
+    if deb2:
+        json_round["debater2"] = list(
             (stat.speaks, stat.ranks)
             for stat in RoundStats.objects.filter(debater=deb2, round=round_obj)
         )
-        if deb2
-        else []
-    )
+    else:
+        json_round["debater2"] = []
 
     try:
         bye_round = Bye.objects.get(bye_team=team).round_number
@@ -129,24 +166,20 @@ def get_all_json_data():
     for team in teams:
         tab_card_data = {
             "team_name": team.get_or_create_team_code(),
-            "team_school": team.school.name,
+            "team_school": safe_school_name(team),
         }
 
         debaters = list(team.debaters.all())
-        deb1 = debaters[0]
-        tab_card_data["debater_1"] = deb1.name
-        tab_card_data["debater_1_status"] = Debater.NOVICE_CHOICES[deb1.novice_status][
-            1
-        ]
+        deb1 = debaters[0] if debaters else None
+        tab_card_data["debater_1"] = safe_name(deb1)
+        tab_card_data["debater_1_status"] = get_debater_status(deb1)
 
         if len(debaters) > 1:
             deb2 = debaters[1]
-            tab_card_data["debater_2"] = deb2.name
-            tab_card_data["debater_2_status"] = Debater.NOVICE_CHOICES[
-                deb2.novice_status
-            ][1]
         else:
             deb2 = None
+        tab_card_data["debater_2"] = safe_name(deb2)
+        tab_card_data["debater_2_status"] = get_debater_status(deb2)
 
         rounds = list(team.gov_team.all()) + list(team.opp_team.all())
 
@@ -176,8 +209,13 @@ def get_tab_card_data(request, team_id):
     rounds.sort(key=lambda x: x.round_number)
     debaters = list(team.debaters.all())
     iron_man = len(debaters) == 1
-    deb1 = debaters[0]
-    deb2 = deb1 if iron_man else debaters[1]
+    deb1 = debaters[0] if debaters else None
+    if iron_man:
+        deb2 = debaters[0]
+    elif len(debaters) > 1:
+        deb2 = debaters[1]
+    else:
+        deb2 = None
 
     num_rounds = TabSettings.objects.get(key="tot_rounds").value
     cur_round = TabSettings.objects.get(key="cur_round").value
@@ -194,16 +232,34 @@ def get_tab_card_data(request, team_id):
             opponent = (
                 round_obj.opp_team if round_obj.gov_team == team else round_obj.gov_team
             )
-            speaks_rolling += float(dstat1.speaks + dstat2.speaks)
-            ranks_rolling += float(dstat1.ranks + dstat2.ranks)
+            opponent_name = (
+                opponent.display_backend if opponent else "BYE"
+            )
+            judge_names = " - ".join(
+                filter(None, (safe_name(j) for j in round_obj.judges.all()))
+            )
+            if dstat1:
+                deb1_stats = (float(dstat1.speaks), float(dstat1.ranks))
+            else:
+                deb1_stats = blank
+            if dstat2:
+                deb2_stats = (float(dstat2.speaks), float(dstat2.ranks))
+            else:
+                deb2_stats = blank
+            if dstat1 and dstat2:
+                speaks_rolling += float(dstat1.speaks + dstat2.speaks)
+                ranks_rolling += float(dstat1.ranks + dstat2.ranks)
+                totals = (float(speaks_rolling), float(ranks_rolling))
+            else:
+                totals = blank
             round_stats[round_obj.round_number - 1] = [
                 side,
                 get_victor_label(round_obj.victor, side),
-                opponent.display_backend,
-                " - ".join(j.name for j in round_obj.judges.all()),
-                (float(dstat1.speaks), float(dstat1.ranks)),
-                (float(dstat2.speaks), float(dstat2.ranks)),
-                (float(speaks_rolling), float(ranks_rolling)),
+                opponent_name,
+                judge_names,
+                deb1_stats,
+                deb2_stats,
+                totals,
             ]
 
     for i in range(cur_round - 1):
@@ -218,15 +274,15 @@ def get_tab_card_data(request, team_id):
 
     return {
         "team_school": team.school,
-        "debater_1": deb1.name,
-        "debater_1_status": Debater.NOVICE_CHOICES[deb1.novice_status][1],
-        "debater_2": deb2.name,
-        "debater_2_status": Debater.NOVICE_CHOICES[deb2.novice_status][1],
+        "debater_1": safe_name(deb1),
+        "debater_1_status": get_debater_status(deb1),
+        "debater_2": safe_name(deb2),
+        "debater_2_status": get_debater_status(deb2),
         "round_stats": round_stats,
-        "d1st": tot_speaks_deb(deb1),
-        "d1rt": tot_ranks_deb(deb1),
-        "d2st": tot_speaks_deb(deb2),
-        "d2rt": tot_ranks_deb(deb2),
+        "d1st": tot_speaks_deb(deb1) if deb1 else 0,
+        "d1rt": tot_ranks_deb(deb1) if deb1 else 0,
+        "d2st": tot_speaks_deb(deb2) if deb2 else 0,
+        "d2rt": tot_ranks_deb(deb2) if deb2 else 0,
         "ts": tot_speaks(team),
         "tr": tot_ranks(team),
         "bye_round": bye_round,
@@ -263,16 +319,17 @@ def csv_tab_cards(writer):
     total_rounds = TabSettings.objects.get(key="tot_rounds").value
 
     for team in teams:
+        team_school_name = safe_school_name(team) or ""
         debaters = list(team.debaters.all())
-        deb1 = debaters[0]
-        deb1_status = Debater.NOVICE_CHOICES[deb1.novice_status][1][0]
+        deb1 = debaters[0] if debaters else None
+        deb1_status = get_debater_status_short(deb1)
         iron_man = len(debaters) < 2
         if iron_man:
             deb2 = deb1
             deb2_status = deb1_status
         else:
-            deb2 = debaters[1]
-            deb2_status = Debater.NOVICE_CHOICES[deb2.novice_status][1][0]
+            deb2 = debaters[1] if len(debaters) > 1 else None
+            deb2_status = get_debater_status_short(deb2)
 
         rounds = list(team.gov_team.all()) + list(team.opp_team.all())
         round_data = [{}] * total_rounds
@@ -284,9 +341,14 @@ def csv_tab_cards(writer):
                 round_obj.opp_team if round_obj.gov_team == team else round_obj.gov_team
             )
             opponent_name = opponent.get_or_create_team_code() if opponent else "BYE"
-            chair = round_obj.chair.name
+            chair_name = safe_name(round_obj.chair) or ""
+            wings_queryset = (
+                round_obj.judges.exclude(pk=round_obj.chair.pk)
+                if round_obj.chair
+                else round_obj.judges.all()
+            )
             wings = " - ".join(
-                judge.name for judge in round_obj.judges.exclude(pk=round_obj.chair.pk)
+                filter(None, (safe_name(judge) for judge in wings_queryset))
             )
 
             dstat1, dstat2 = get_dstats(
@@ -297,13 +359,13 @@ def csv_tab_cards(writer):
                 side,
                 result,
                 opponent_name,
-                chair,
+                chair_name,
                 wings,
-                deb1.name,
+                safe_name(deb1) or "",
                 deb1_status,
                 float(dstat1.speaks) if dstat1 else 0,
                 float(dstat1.ranks) if dstat1 else 0,
-                deb2.name,
+                safe_name(deb2) or "",
                 deb2_status,
                 float(dstat2.speaks) if dstat2 else 0,
                 float(dstat2.ranks) if dstat2 else 0,
@@ -313,11 +375,11 @@ def csv_tab_cards(writer):
         for round_stat in round_data:
             if not round_stat:
                 writer.writerow(
-                    [team.get_or_create_team_code(), team.school.name])
+                    [team.get_or_create_team_code(), team_school_name])
             writer.writerow(
                 [
                     team.get_or_create_team_code(),
-                    team.school.name,
+                    team_school_name,
                     *round_stat,
                     # Round, Gov/Opp, Win/Loss, Opponent, Judges, Debater 1, N/V,
                     # Debater 1 S/R, Debater 2, N/V, Debater 2 S/R, Total
@@ -329,21 +391,21 @@ def csv_tab_cards(writer):
             [
                 "",
                 team.get_or_create_team_code(),
-                team.school.name,
+                team_school_name,
                 "Total",
                 "",
                 "",
                 "",
                 "",
                 "",
-                deb1.name,
+                safe_name(deb1) or "",
                 deb1_status,
-                tot_speaks_deb(deb1),
-                tot_ranks_deb(deb1),
-                deb2.name,
+                tot_speaks_deb(deb1) if deb1 else 0,
+                tot_ranks_deb(deb1) if deb1 else 0,
+                safe_name(deb2) or "",
                 deb2_status,
-                tot_speaks_deb(deb2),
-                tot_ranks_deb(deb2),
+                tot_speaks_deb(deb2) if deb2 else 0,
+                tot_ranks_deb(deb2) if deb2 else 0,
                 tot_speaks(team),
                 tot_ranks(team),
             ]
