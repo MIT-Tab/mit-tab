@@ -202,6 +202,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     @classmethod
@@ -232,6 +233,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     def set_unique_team_code(self):
@@ -648,3 +650,20 @@ class RoomTag(models.Model):
 
     def __str__(self):
         return self.tag
+
+
+class RankingGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    teams = models.ManyToManyField(
+        "Team",
+        blank=True,
+        related_name="ranking_groups",
+    )
+    debaters = models.ManyToManyField(
+        "Debater",
+        blank=True,
+        related_name="ranking_groups",
+    )
+
+    def __str__(self):
+        return self.name

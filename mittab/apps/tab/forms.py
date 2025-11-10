@@ -144,8 +144,19 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
-                                              required=False)
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False
+    )
+    ranking_groups = forms.ModelMultipleChoiceField(
+        queryset=RankingGroup.objects.all(),
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(TeamForm, self).__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["ranking_groups"].initial = self.instance.ranking_groups.all()
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -161,6 +172,24 @@ class TeamForm(forms.ModelForm):
                      or removing them from it before creating this one."""
                 )
         return data
+
+    def save(self, commit=True):
+        team = super(TeamForm, self).save(commit=commit)
+        ranking_groups = self.cleaned_data.get("ranking_groups", [])
+
+        def save_ranking_groups():
+            team.ranking_groups.set(ranking_groups)
+
+        if commit:
+            save_ranking_groups()
+        else:
+            self._save_ranking_groups = save_ranking_groups
+        return team
+
+    def save_m2m(self):
+        super(TeamForm, self).save_m2m()
+        if hasattr(self, "_save_ranking_groups"):
+            self._save_ranking_groups()
 
     class Meta:
         model = Team
@@ -233,8 +262,33 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
+    ranking_groups = forms.ModelMultipleChoiceField(
+        queryset=RankingGroup.objects.all(),
+        required=False
+    )
+
     def __init__(self, *args, **kwargs):
         super(DebaterForm, self).__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["ranking_groups"].initial = self.instance.ranking_groups.all()
+
+    def save(self, commit=True):
+        debater = super(DebaterForm, self).save(commit=commit)
+        ranking_groups = self.cleaned_data.get("ranking_groups", [])
+
+        def save_ranking_groups():
+            debater.ranking_groups.set(ranking_groups)
+
+        if commit:
+            save_ranking_groups()
+        else:
+            self._save_ranking_groups = save_ranking_groups
+        return debater
+
+    def save_m2m(self):
+        super(DebaterForm, self).save_m2m()
+        if hasattr(self, "_save_ranking_groups"):
+            self._save_ranking_groups()
 
     class Meta:
         model = Debater
@@ -762,6 +816,40 @@ class MiniRoomTagForm(RoomTagForm):
         self.fields.pop("teams")
         self.fields.pop("judges")
         self.fields.pop("rooms")
+
+
+class RankingGroupForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.teams.all()
+            self.fields["debaters"].initial = self.instance.debaters.all()
+
+    def save(self, commit=True):
+        ranking_group = super().save(commit=commit)
+        ranking_group.teams.set(self.cleaned_data.get("teams", []))
+        ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+        return ranking_group
+
+    class Meta:
+        model = RankingGroup
+        fields = ("name", "teams", "debaters")
+
+
+class MiniRankingGroupForm(RankingGroupForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("debaters")
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(

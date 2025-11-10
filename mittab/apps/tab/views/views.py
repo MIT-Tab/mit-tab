@@ -10,8 +10,17 @@ import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
-    UploadDataForm, ScratchForm, SettingsForm
+from mittab.apps.tab.forms import (
+    MiniRankingGroupForm,
+    MiniRoomTagForm,
+    RankingGroupForm,
+    RoomTagForm,
+    SchoolForm,
+    RoomForm,
+    UploadDataForm,
+    ScratchForm,
+    SettingsForm,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -570,6 +579,56 @@ def manage_room_tags(request):
     return render(request, "pairing/manage_room_tags.html",
                   {"room_tags": room_tags,
                    "form": form})
+
+
+def ranking_group(request, group_id=None):
+    group = None
+    if group_id is not None:
+        group = RankingGroup.objects.filter(pk=group_id).first()
+
+    if request.method == "POST":
+        if request.POST.get("_method") == "DELETE":
+            if group is not None:
+                group.delete()
+                return redirect_and_flash_success(
+                    request, "Ranking group deleted successfully"
+                )
+            return redirect_and_flash_error(request, "Ranking group does not exist")
+
+        form = RankingGroupForm(request.POST, instance=group)
+        if not form.is_valid():
+            return redirect_and_flash_error(request, "Error saving ranking group.")
+
+        ranking_group_instance = form.save()
+        path = reverse("manage_ranking_groups")
+        message = (
+            f"Ranking group {ranking_group_instance.name} "
+            f"{'updated' if group else 'created'} successfully"
+        )
+        return redirect_and_flash_success(request, message, path=path)
+
+    form = RankingGroupForm(instance=group)
+    return render(
+        request,
+        "common/data_entry.html",
+        {
+            "form": form,
+            "links": [],
+            "title": f"Viewing Ranking Group: {group.name}" if group else "Create Ranking Group",
+        },
+    )
+
+
+def manage_ranking_groups(request):
+    if request.method == "POST":
+        return ranking_group(request)
+    form = MiniRankingGroupForm(request.POST or None)
+    ranking_groups = RankingGroup.objects.all().order_by("name")
+    return render(
+        request,
+        "pairing/manage_ranking_groups.html",
+        {"ranking_groups": ranking_groups, "form": form},
+    )
 
 def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])

@@ -61,6 +61,9 @@ urlpatterns = [
     path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
     path("room-tag/", views.room_tag, name="room_tag"),
     path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
+    path("ranking-group/<group_id>/", views.ranking_group, name="ranking_group"),
+    path("ranking-group/", views.ranking_group, name="ranking_group"),
+    path("manage-ranking-groups", views.manage_ranking_groups, name="manage_ranking_groups"),
 
 
     # Scratch related

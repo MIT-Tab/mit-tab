@@ -17,10 +17,21 @@
             </li>
         {% endfor %}
       {% else %}
-        {% for id, name, flags, symbols in item_list %}
-          <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
-              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} {{symbols}}</a>
-          </li>
+        {% for item in item_list %}
+          {% with id=item.0 name=item.1 flags=item.2 symbols=item.3 %}
+            <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}">
+                <a class="no_decoration" href="/{{item_type}}/{{id}}">
+                  {{name}} {{symbols}}
+                  {% if item|length > 4 and item.4 %}
+                    <span class="ranking-badges ml-2">
+                      {% for badge in item.4 %}
+                        <span class="badge badge-secondary badge-pill mr-1">{{ badge }}</span>
+                      {% endfor %}
+                    </span>
+                  {% endif %}
+                </a>
+            </li>
+          {% endwith %}
         {% endfor %}
       {% endif %}
     </ul>
