@@ -17,7 +17,7 @@
   </p>
   <form method="post" action="">
     {% csrf_token %}
-    {% return_to_input %}
+    {% return_to_input request.path %}
     <div class="form-group">
       <label for="ballot_code">Ballot code</label>
       <input type="text"

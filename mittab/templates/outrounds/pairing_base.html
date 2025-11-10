@@ -38,7 +38,7 @@
             class="d-inline"
           >
             {% csrf_token %}
-            {% return_to_input %}
+            {% return_to_input request.path %}
             <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
