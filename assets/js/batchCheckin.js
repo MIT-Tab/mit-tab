@@ -35,7 +35,8 @@ const submitCheckIn = (checkboxes, checked) => {
     const current = $cb.prop("checked");
     if (current === checked) return;
     const roundIndex = $cb.data("round") == null ? -1 : $cb.data("round");
-    roundDeltas[roundIndex] = (roundDeltas[roundIndex] || 0) + (checked ? 1 : -1);
+    roundDeltas[roundIndex] =
+      (roundDeltas[roundIndex] || 0) + (checked ? 1 : -1);
   });
 
   $.post("/bulk_check_in/", {
