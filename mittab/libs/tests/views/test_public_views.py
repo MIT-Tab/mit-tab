@@ -6,6 +6,7 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (Room, TabSettings, Team,
                                     Round, Outround)
+from mittab.apps.tab.public_rankings import PublicRankingMode
 
 
 @pytest.mark.django_db(transaction=True)
@@ -42,7 +43,8 @@ class TestPublicViews(TestCase):
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
-        TabSettings.set("rankings_public", 1)
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
         TabSettings.set("debaters_public", 1)
         TabSettings.set("var_teams_visible", 2)  # Show finals and above
         TabSettings.set("nov_teams_visible", 2)  # Show finals and above
@@ -126,7 +128,7 @@ class TestPublicViews(TestCase):
         settings = [
             ("judges_public", 1, 0),
             ("teams_public", 1, 0),
-            ("rankings_public", 1, 0),
+            ("public_ranking_mode", PublicRankingMode.TEAM, PublicRankingMode.NONE),
             ("pairing_released", 1, 0),
             ("pairing_released", 1, 0),
             ("var_teams_visible", 2, 16),
@@ -167,6 +169,41 @@ class TestPublicViews(TestCase):
             self.assertNotIn(expected_content, response.content.decode(),
                 f"Expected '{expected_content}' to be "
                 f"hidden when {setting_name}={denied_value}")
+
+
+    def test_public_ballot_modes(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        caches["public"].clear()
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Last Round Ballots", content)
+        self.assertIn("Winner:", content)
+        self.assertIn("Speaks and ranks are hidden", content)
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.ALL_BALLOTS)
+        TabSettings.set("public_ballot_show_speaks", 1)
+        caches["public"].clear()
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("All Ballots", content)
+        self.assertNotIn("Speaks and ranks are hidden", content)
+
+    def test_team_rankings_without_speaks(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
+        caches["public"].clear()
+
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Speaks and ranks are hidden", content)
+        self.assertNotIn("<th>Speaks</th>", content)
 
 
     def test_n_plus_one(self):

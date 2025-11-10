@@ -30,8 +30,18 @@ settings:
     description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
     value: false
     type: boolean
-  - rankings_public:
-    name: rankings_public
-    description: "A toggle to indicate whether you would like to display the rankings of teams publicly. You can opt teams out by unchecking the 'ranking public' box on the team edit page."
+  - public_ranking_mode:
+    name: public_ranking_mode
+    description: "Select what, if anything, you would like to display publicly once ballots are entered. Team rankings respect team-level opt outs. Ballot views never show the current round."
+    value: 0
+    type: choice
+    choices:
+      - [0, "None"]
+      - [1, "Team Rankings"]
+      - [2, "Last Round Ballots"]
+      - [3, "All Ballots"]
+  - public_ballot_show_speaks:
+    name: public_ballot_show_speaks
+    description: "Toggle to include speaks and ranks when displaying ballots or team rankings publicly. Winners are always shown."
     value: false
     type: boolean

@@ -1,6 +1,7 @@
 from django import template
 from django.forms.fields import FileField
 from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.public_rankings import get_public_ranking_mode
 
 register = template.Library()
 
@@ -49,4 +50,8 @@ def judge_team_count(context, judge, pairing):
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
-    
+
+
+@register.simple_tag
+def public_ranking_mode_value():
+    return int(get_public_ranking_mode())
