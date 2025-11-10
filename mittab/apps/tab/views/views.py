@@ -595,6 +595,27 @@ def batch_checkin(request):
         for r in Room.objects.prefetch_related("roomcheckin_set")
     ]
 
+    def column_counts(rows):
+        counts = [0] * len(all_round_numbers)
+        for row in rows:
+            for idx, checked in enumerate(row["checkins"]):
+                if checked:
+                    counts[idx] += 1
+        return counts
+
+    judge_counts = column_counts(judge_data)
+    room_counts = column_counts(room_data)
+
+    def round_count_data(counts):
+        return [{
+            "index": idx + 1,
+            "round_number": round_numbers[idx],
+            "count": counts[idx + 1]
+        } for idx in range(len(round_numbers))]
+
+    judge_round_counts = round_count_data(judge_counts)
+    room_round_counts = round_count_data(room_counts)
+
     return render(request, "batch_check_in/check_in.html", {
         "team_data": team_data,
         "team_headers": ["School", "Team", "Debater Names"],
@@ -603,6 +624,14 @@ def batch_checkin(request):
         "room_data": room_data,
         "room_headers": ["Room"],
         "round_numbers": round_numbers,
+        "team_total_count": len(team_data),
+        "team_checked_in_count": sum(1 for t in team_data if t["checked_in"]),
+        "judge_total_count": len(judge_data),
+        "room_total_count": len(room_data),
+        "judge_round_counts": judge_round_counts,
+        "room_round_counts": room_round_counts,
+        "judge_outround_count": judge_counts[0] if judge_counts else 0,
+        "room_outround_count": room_counts[0] if room_counts else 0,
     })
 
 

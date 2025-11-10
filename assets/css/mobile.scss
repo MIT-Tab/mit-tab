@@ -39,7 +39,7 @@
     padding: 0.25rem 0.5rem;
     white-space: normal;
     line-height: 1.25;
-    height: 100%;
+    height: auto;
 
     i { margin-right: 0.2rem; }
   }
@@ -83,6 +83,9 @@
       align-items: center;
       justify-content: center;
       min-height: 2.4rem;
+
+      > .btn,
+      &.btn { height: 100%; }
 
       button { width: 100%; height: 100%; }
     }

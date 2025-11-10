@@ -40,7 +40,14 @@ def view_judges(request):
     judges = sorted(Judge.objects.all(), key=lambda j: (-j.rank, j.name))
 
     c_judge = [
-        (judge.pk, judge.name, flags(judge), f"({judge.ballot_code})", judge.rank)
+        (
+            judge.pk,
+            judge.name,
+            flags(judge),
+            f"({judge.ballot_code})",
+            judge.rank,
+            judge.wing_only,
+        )
         for judge in judges
     ]
 
