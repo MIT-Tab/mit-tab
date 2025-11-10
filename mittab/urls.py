@@ -90,7 +90,7 @@ urlpatterns = [
             name="pretty_tab_card"),
     path("export_tournament/", views.export_tournament, name="export_tournament"),
     re_path(r"^archive/download/(?P<format>json|csv|xml)/$",
-            views.export_tournament, name="export_tournament"),
+            views.export_tournament, name="export_tournament_format"),
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
