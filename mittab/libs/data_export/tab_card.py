@@ -363,7 +363,6 @@ def csv_tab_cards(writer):
         "Total Ranks",
     ]
     writer.writerow(header)
-    writer.writerow(header)
 
     round_queryset = (
         Round.objects.select_related(
