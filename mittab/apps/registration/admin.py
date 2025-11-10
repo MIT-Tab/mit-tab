@@ -4,6 +4,7 @@ from .models import (
     RegistrationConfig,
     Registration,
     RegistrationJudge,
+    RegistrationContent,
     RegistrationTeam,
     RegistrationTeamMember,
 )
@@ -33,7 +34,12 @@ class RegistrationAdmin(admin.ModelAdmin):
 
 @admin.register(RegistrationConfig)
 class RegistrationConfigAdmin(admin.ModelAdmin):
-    list_display = ("registration_open", "registration_close", "tournament_start")
+    list_display = ("allow_new_registrations", "allow_registration_edits", "updated_at")
+
+
+@admin.register(RegistrationContent)
+class RegistrationContentAdmin(admin.ModelAdmin):
+    list_display = ("updated_at",)
 
 
 @admin.register(RegistrationTeam)

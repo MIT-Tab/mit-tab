@@ -1,5 +1,6 @@
 {% extends "base/__wide.html" %}
 {% load render_bundle from webpack_loader %}
+{% load tags %}
 
 {% block title %}Tournament Registration{% endblock %}
 {% block banner %}Tournament Registration{% endblock %}
@@ -7,8 +8,31 @@
 {% block content %}
 {% render_bundle 'registrationPortal' %}
 <div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
-    {% if config and not config.is_open %}
-    <div class="alert alert-warning">Registration is currently closed.</div>
+    {% if content.description %}
+    <section class="registration-info-panel mb-3" data-collapsible>
+        <button type="button"
+                class="registration-info-panel__toggle"
+                data-collapse-toggle
+                aria-expanded="false"
+                aria-controls="registration-info-body">
+            <span class="registration-info-panel__text">
+                <span class="eyebrow">Tournament Information</span>
+                <span class="headline">Read before registering</span>
+            </span>
+            <span class="registration-info-panel__chevron" data-collapse-icon aria-hidden="true">
+                <i class="fas fa-chevron-down"></i>
+            </span>
+        </button>
+        <div id="registration-info-body"
+             class="registration-info-panel__body"
+             data-collapse-body
+             hidden>
+            {{ content.description|registration_text }}
+        </div>
+    </section>
+    {% endif %}
+    {% if registration_lock_message %}
+    <div class="alert alert-warning">{{ registration_lock_message }}</div>
     {% endif %}
     <!-- {% if config and config.extra_information %}
     <div class="alert alert-info">{{ config.extra_information }}</div>
@@ -30,7 +54,6 @@
                             </div>
                             {{ registration_form.school }}
                         </div>
-                        <small class="form-text text-muted d-block mb-2">Showing top 25 active schools. <a href="#" data-load-all-schools>See more schools</a></small>
                         {% if registration_form.school.errors %}
                         <div class="text-danger mb-2">{{ registration_form.school.errors }}</div>
                         {% endif %}
@@ -49,51 +72,46 @@
             
             <!-- Right half: Create forms -->
             <div class="col-md-6">
-                <div class="row">
+                <div class="registration-quick-actions">
                     <!-- Create New School -->
-                    <div class="col-md-6">
-                        <div class="border rounded p-2 h-100">
-                            <h6 class="mb-2">Create New School</h6>
-                            <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text">Name</span>
-                                </div>
-                                <input type="text" id="new-school-name" class="form-control form-control-sm" placeholder="Enter school name">
+                    <div class="registration-quick-actions__panel">
+                        <h6 class="mb-2">Create New School</h6>
+                        <div class="input-group input-group-sm mb-2">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">Name</span>
                             </div>
-                            <button type="button" class="btn btn-primary btn-sm btn-block" id="create-school-btn">Add School</button>
+                            <input type="text" id="new-school-name" class="form-control form-control-sm" placeholder="Enter school name">
                         </div>
+                        <button type="button" class="btn btn-primary btn-sm btn-block" id="create-school-btn">Add School</button>
                     </div>
                     
                     <!-- Create New Debater -->
-                    <div class="col-md-6">
-                        <div class="border rounded p-2 h-100">
-                            <h6 class="mb-2">Create New Debater</h6>
-                            <div class="input-group input-group-sm mb-1">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="font-size: 0.75rem;">School</span>
-                                </div>
-                                <select id="new-debater-school" class="form-control form-control-sm" data-school-select="new-debater">
-                                    <option value="">Select school</option>
-                                </select>
+                    <div class="registration-quick-actions__panel">
+                        <h6 class="mb-2">Create New Debater</h6>
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">School</span>
                             </div>
-                            <small class="form-text text-muted d-block mb-1" style="font-size: 0.7rem;">Showing top 25 active schools. <a href="#" data-load-all-schools>See more</a></small>
-                            <div class="input-group input-group-sm mb-1">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
-                                </div>
-                                <input type="text" id="new-debater-name" class="form-control form-control-sm" placeholder="Debater name">
-                            </div>
-                            <div class="input-group input-group-sm mb-2">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="font-size: 0.75rem;">Status</span>
-                                </div>
-                                <select id="new-debater-status" class="form-control form-control-sm">
-                                    <option value="0">Varsity</option>
-                                    <option value="1">Novice</option>
-                                </select>
-                            </div>
-                            <button type="button" class="btn btn-primary btn-sm btn-block" id="create-debater-btn">Add Debater</button>
+                            <select id="new-debater-school" class="form-control form-control-sm" data-school-select="new-debater">
+                                <option value="">Select school</option>
+                            </select>
                         </div>
+                        <div class="input-group input-group-sm mb-1">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
+                            </div>
+                            <input type="text" id="new-debater-name" class="form-control form-control-sm" placeholder="Debater name">
+                        </div>
+                        <div class="input-group input-group-sm mb-2">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" style="font-size: 0.75rem;">Status</span>
+                            </div>
+                            <select id="new-debater-status" class="form-control form-control-sm">
+                                <option value="0">Varsity</option>
+                                <option value="1">Novice</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm btn-block" id="create-debater-btn">Add Debater</button>
                     </div>
                 </div>
             </div>
@@ -142,7 +160,7 @@
             </div>
         </div>
         <div class="d-flex align-items-center mt-3">
-            <button type="submit" class="btn btn-primary">Submit Registration</button>
+            <button type="submit" class="btn btn-primary" {% if not can_submit_registration %}disabled{% endif %}>Submit Registration</button>
             {% if summary %}
             <span class="text-muted ml-3">Editing registration {{ summary.code }}</span>
             {% endif %}
@@ -183,12 +201,20 @@
                     {% for judge in summary.judges %}
                     <div class="border rounded p-3 mb-2">
                         <p class="mb-1">{{ judge.name }}{% if judge.code %} (Code: {{ judge.code }}){% endif %}</p>
+                        {% if judge.email %}
+                        <p class="mb-0 text-muted">Email: {{ judge.email }}</p>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
     </section>
+    {% if content.completion_message %}
+    <div class="alert alert-info mt-3">
+        {{ content.completion_message|registration_text }}
+    </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endblock %}

@@ -4,9 +4,6 @@
         {{ field.label_tag }}
         {{ field }}
         {{ field.errors }}
-        {% if show_see_more|default:True %}
-        <small class="form-text text-muted">Showing top 25 active schools. <a href="#" data-load-all-schools>See more schools</a></small>
-        {% endif %}
     </div>
     <div class="form-group col-auto">
         <label class="d-block">&nbsp;</label>
@@ -23,9 +20,6 @@
     {{ field.label_tag }}
     {{ field }}
     {{ field.errors }}
-    {% if show_see_more|default:True %}
-    <small class="form-text text-muted">Showing top 25 active schools. <a href="#" data-load-all-schools>See more schools</a></small>
-    {% endif %}
     <div data-new-school-container="{{ field.id_for_label }}" class="mt-2 {% if field.value != '__new__' %}d-none{% endif %}">
         {{ name_field.label_tag }}
         {{ name_field }}

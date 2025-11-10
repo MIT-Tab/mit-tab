@@ -1,28 +1,46 @@
 from haikunator import Haikunator
 from django.db import models
-from django.utils import timezone
-
 from mittab.apps.tab.models import School, Team, Judge, Debater
 
 
 class RegistrationConfig(models.Model):
-    registration_open = models.DateField(null=True, blank=True)
-    registration_close = models.DateField(null=True, blank=True)
-    tournament_start = models.DateField(null=True, blank=True)
-    extra_information = models.TextField(blank=True)
+    allow_new_registrations = models.BooleanField(default=True)
+    allow_registration_edits = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod
     def get_active(cls):
         return cls.objects.first()
 
-    def is_open(self):
-        today = timezone.now().date()
-        if self.registration_open and today < self.registration_open:
-            return False
-        if self.registration_close and today > self.registration_close:
-            return False
-        return True
+    @classmethod
+    def get_or_create_active(cls):
+        config = cls.get_active()
+        if config:
+            return config
+        return cls.objects.create()
+
+    def can_create(self):
+        return self.allow_new_registrations
+
+    def can_modify(self):
+        return self.allow_registration_edits
+
+
+class RegistrationContent(models.Model):
+    description = models.TextField(blank=True)
+    completion_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get_solo(cls):
+        instance = cls.objects.first()
+        if instance:
+            return instance
+        return cls.objects.create()
+
+    def __str__(self):
+        return "Registration Content"
 
 
 class Registration(models.Model):

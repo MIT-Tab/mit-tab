@@ -329,6 +329,7 @@ class BreakingTeam(models.Model):
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    email = models.EmailField(blank=True)
     schools = models.ManyToManyField(School)
     ballot_code = models.CharField(max_length=255,
                                    blank=True,

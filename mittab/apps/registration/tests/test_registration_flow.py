@@ -32,6 +32,7 @@ def test_registration_flow_creates_objects(client):
             "teams-0-team_id": "",
             "teams-0-name": "Registration U A",
             "teams-0-is_free_seed": "on",
+            "teams-0-seed_choice": str(Team.FULL_SEED),
             "teams-0-debater_one_id": "",
             "teams-0-debater_one_name": "Registration U Speaker 1",
             "teams-0-debater_one_apda_id": "1000",
@@ -48,6 +49,7 @@ def test_registration_flow_creates_objects(client):
             "judges-0-registration_judge_id": "",
             "judges-0-judge_id": "",
             "judges-0-name": "Reg Judge",
+            "judges-0-email": "judge@example.com",
             "judges-0-experience": "7",
             "judges-0-DELETE": "",
         }
@@ -71,6 +73,7 @@ def test_registration_flow_creates_objects(client):
     judge_relation = registration.judges.select_related("judge").first()
     assert judge_relation.judge.name == "Reg Judge"
     assert judge_relation.judge.rank == Decimal("7")
+    assert judge_relation.judge.email == "judge@example.com"
 
 
 @pytest.mark.django_db
@@ -87,6 +90,7 @@ def test_registration_requires_single_free_seed(client):
             "teams-0-registration_team_id": "",
             "teams-0-team_id": "",
             "teams-0-name": "Team One",
+            "teams-0-seed_choice": str(Team.UNSEEDED),
             "teams-0-debater_one_id": "",
             "teams-0-debater_one_name": "Speaker 1",
             "teams-0-debater_one_apda_id": "",
@@ -103,6 +107,7 @@ def test_registration_requires_single_free_seed(client):
             "teams-1-registration_team_id": "",
             "teams-1-team_id": "",
             "teams-1-name": "Team Two",
+            "teams-1-seed_choice": str(Team.UNSEEDED),
             "teams-1-debater_one_id": "",
             "teams-1-debater_one_name": "Speaker 3",
             "teams-1-debater_one_apda_id": "",
@@ -120,4 +125,4 @@ def test_registration_requires_single_free_seed(client):
     )
     response = client.post("/registration/", data=data)
     assert response.status_code == 200
-    assert b"Select exactly one free seed" in response.content
+    assert b"Select at most one free seed" in response.content

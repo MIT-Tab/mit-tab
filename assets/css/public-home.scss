@@ -153,6 +153,48 @@ body {
   }
 }
 
+.register-cta {
+  display: flex;
+  width: 100%;
+  border: 1px solid rgba(28, 54, 94, 0.16);
+  border-radius: 0.85rem;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, rgba(42, 102, 196, 0.09), rgba(25, 73, 154, 0.04));
+  align-items: center;
+  gap: 1.25rem;
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #16243a;
+
+    .eyebrow {
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(18, 42, 72, 0.7);
+    }
+
+    .headline {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .body {
+      margin-bottom: 0;
+      font-size: 0.95rem;
+      color: rgba(18, 34, 58, 0.85);
+    }
+  }
+
+  &__btn {
+    white-space: nowrap;
+    padding: 0.85rem 1.75rem;
+    font-size: 1rem;
+  }
+}
+
 .public-links {
   position: relative;
   @include flex-column(1rem);
@@ -229,6 +271,43 @@ body {
   }
 }
 
+.registration-info-card,
+.registration-mobile-card {
+  border: 1px solid rgba(28, 54, 94, 0.15);
+  border-radius: 0.65rem;
+  padding: 1rem;
+  background: rgba(42, 102, 196, 0.08);
+  color: #1f2f4a;
+  width: 100%;
+  box-sizing: border-box;
+
+  &__text {
+    font-size: 0.75rem;
+    line-height: 1.65;
+
+    a {
+      color: #1d68d2;
+      font-weight: 600;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+.registration-mobile-card {
+  @media (min-width: 992px) {
+    display: none;
+  }
+}
+
+.registration-mobile-cta {
+  margin-top: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
 .public-sidebar-card {
   @include card-shell;
   padding: 2rem 2.5rem;
@@ -297,6 +376,45 @@ body {
     border-top: 1px solid rgba(0, 44, 92, 0.08);
   }
 
+  .registration-panel {
+    border: 1px solid rgba(32, 60, 105, 0.18);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    background: rgba(42, 102, 196, 0.08);
+    text-align: left;
+
+    &__header {
+      margin-bottom: 0.9rem;
+
+      h4 {
+        margin: 0 0 0.35rem 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1f2f4a;
+      }
+    }
+
+    &__text {
+      font-size: 0.92rem;
+      line-height: 1.65;
+      color: rgba(28, 45, 70, 0.92);
+
+      a {
+        color: #1d68d2;
+        font-weight: 600;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+      }
+    }
+
+    .btn {
+      margin-top: 0.5rem;
+    }
+  }
+
   &.status {
     .content {
       gap: 1.5rem;
@@ -332,8 +450,8 @@ body {
   }
 
   .status-icon {
-    width: 3.25rem;
-    height: 3.25rem;
+    width: 2.75rem;
+    height: 2.75rem;
   }
 }
 

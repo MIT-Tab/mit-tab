@@ -1,5 +1,8 @@
 from django import template
 from django.forms.fields import FileField
+from django.utils.html import urlize
+from django.utils.safestring import mark_safe
+
 from mittab.apps.tab.models import TabSettings
 
 register = template.Library()
@@ -49,4 +52,11 @@ def judge_team_count(context, judge, pairing):
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
-    
+
+
+@register.filter(name="registration_text", needs_autoescape=True)
+def registration_text(value, autoescape=True):
+    if not value:
+        return ""
+    linked = urlize(value, nofollow=True, autoescape=autoescape)
+    return mark_safe(linked.replace("\n", "<br>"))
