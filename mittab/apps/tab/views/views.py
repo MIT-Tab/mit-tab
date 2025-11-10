@@ -512,20 +512,27 @@ def _get_tournament_name(request):
     return request.META["SERVER_NAME"].split(".")[0]
 
 
+def _dispatch_tournament_export(request, fmt):
+    tournament_name = _get_tournament_name(request)
+    if fmt == "json":
+        return tab_cards_json(request, tournament_name)
+    if fmt == "csv":
+        return tab_cards_csv(request, tournament_name)
+    if fmt == "xml":
+        return xml_archive(request, tournament_name)
+    return HttpResponseBadRequest("Invalid format.")
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def export_tournament(request):
+def export_tournament(request, format=None):
+    if format is not None:
+        return _dispatch_tournament_export(request, format.lower())
+
     if request.method == "POST":
         form = ExportFormatForm(request.POST)
         if form.is_valid():
             fmt = form.cleaned_data["format"]
-            tournament_name = _get_tournament_name(request)
-            if fmt == "json":
-                return tab_cards_json(request, tournament_name)
-            if fmt == "csv":
-                return tab_cards_csv(request, tournament_name)
-            if fmt == "xml":
-                return xml_archive(request, tournament_name)
-            return HttpResponseBadRequest("Invalid format.")
+            return _dispatch_tournament_export(request, fmt)
     else:
         form = ExportFormatForm(initial={"format": "csv"})
 

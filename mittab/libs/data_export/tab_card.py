@@ -13,6 +13,12 @@ from mittab.libs.tab_logic.stats import (
 
 GOV = "G"
 OPP = "O"
+
+def get_team_rounds(team):
+    rounds = list(team.gov_team.all()) + list(team.opp_team.all())
+    rounds.sort(key=lambda round_obj: (round_obj.round_number, round_obj.pk))
+    return rounds
+
 def round_stats_lookup(round_obj):
     lookup = getattr(round_obj, "round_stats_lookup_cache", None)
     if lookup is None:
@@ -225,7 +231,7 @@ def get_all_json_data():
         tab_card_data["debater_2"] = safe_name(deb2)
         tab_card_data["debater_2_status"] = get_debater_status(deb2)
 
-        rounds = list(team.gov_team.all()) + list(team.opp_team.all())
+        rounds = get_team_rounds(team)
 
         round_data = []
         for round_obj in rounds:
@@ -415,7 +421,7 @@ def csv_tab_cards(writer):
             deb2 = debaters[1] if len(debaters) > 1 else None
             deb2_status = get_debater_status_short(deb2)
 
-        rounds = list(team.gov_team.all()) + list(team.opp_team.all())
+        rounds = get_team_rounds(team)
         round_data = [tuple() for _ in range(total_rounds)]
 
         for round_obj in rounds:

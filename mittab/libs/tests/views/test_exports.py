@@ -34,6 +34,15 @@ class TestExports(TestCase):
         self.factory = RequestFactory()
         TabSettings.set("cur_round", 2)
         TabSettings.set("tot_rounds", 5)
+        self.permissive_user = type(
+            "PermissiveUser",
+            (),
+            {
+                "is_authenticated": True,
+                "is_active": True,
+                "has_perm": lambda self, perm: True,
+            },
+        )()
 
     def test_exports_with_standard_data(self):
         team = Team.with_preloaded_relations_for_tab_card().first()
