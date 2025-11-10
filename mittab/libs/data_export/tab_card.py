@@ -13,6 +13,21 @@ from mittab.libs.tab_logic.stats import (
 
 GOV = "G"
 OPP = "O"
+def round_stats_lookup(round_obj):
+    lookup = getattr(round_obj, "round_stats_lookup_cache", None)
+    if lookup is None:
+        stats = getattr(round_obj, "round_stats_cache", None)
+        if stats is None:
+            cache = getattr(round_obj, "_prefetched_objects_cache", {})
+            stats = cache.get("roundstats_set")
+            if stats is None:
+                stats = list(round_obj.roundstats_set.all())
+            setattr(round_obj, "round_stats_cache", stats)
+        lookup = {}
+        for stat in stats:
+            lookup.setdefault(stat.debater_id, []).append(stat)
+        setattr(round_obj, "round_stats_lookup_cache", lookup)
+    return lookup
 
 
 def safe_name(obj):
@@ -55,21 +70,12 @@ def get_victor_label(victor_code, side):
 def get_dstats(round_obj, deb1, deb2, iron_man):
     if deb1 is None:
         return None, None
-    """Taken from original tab card function.
-    Logic can probably be simplified, but keeping to
-    prevent breaking
-    """
-    dstat1 = [
-        k for k in RoundStats.objects.filter(debater=deb1).filter(round=round_obj).all()
-    ]
-    dstat2 = []
-    if not iron_man:
-        dstat2 = [
-            k
-            for k in RoundStats.objects.filter(debater=deb2)
-            .filter(round=round_obj)
-            .all()
-        ]
+    dstat_lookup = round_stats_lookup(round_obj)
+    dstat1 = list(dstat_lookup.get(deb1.pk, []))
+    if iron_man or deb2 is None:
+        dstat2 = []
+    else:
+        dstat2 = list(dstat_lookup.get(deb2.pk, []))
     blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
     while len(dstat1) + len(dstat2) < 2:
         # Something is wrong with our data, but we don't want to crash
@@ -85,14 +91,17 @@ def get_dstats(round_obj, deb1, deb2, iron_man):
     return dstat1, dstat2
 
 
-def json_get_round(round_obj, team, deb1, deb2):
+def json_get_round(round_obj, team, deb1, deb2, bye_lookup=None):
     chair = round_obj.chair
     chair_name = safe_name(chair)
-    wings_queryset = (
-        round_obj.judges.exclude(pk=chair.pk)
-        if chair
-        else round_obj.judges.all()
-    )
+    judges = list(round_obj.judges.all())
+    wings = [
+        safe_name(judge)
+        for judge in judges
+        if judge
+        and (not chair or judge.pk != chair.pk)
+        and safe_name(judge)
+    ]
     json_round = {
         "round_number": round_obj.round_number,
         "round_id": round_obj.pk,
@@ -101,9 +110,7 @@ def json_get_round(round_obj, team, deb1, deb2):
             round_obj.victor, GOV if round_obj.gov_team == team else OPP
         ),
         "chair": chair_name,
-        "wings": [
-            name for name in (safe_name(judge) for judge in wings_queryset) if name
-        ],
+        "wings": wings,
     }
 
     opponent = round_obj.opp_team if round_obj.gov_team == team else round_obj.gov_team
@@ -120,27 +127,31 @@ def json_get_round(round_obj, team, deb1, deb2):
             ),
         }
 
+    stats_lookup = round_stats_lookup(round_obj)
     if deb1:
-        json_round["debater1"] = list(
+        json_round["debater1"] = [
             (stat.speaks, stat.ranks)
-            for stat in RoundStats.objects.filter(debater=deb1, round=round_obj)
-        )
+            for stat in stats_lookup.get(deb1.pk, [])
+        ]
     else:
         json_round["debater1"] = []
 
     if deb2:
-        json_round["debater2"] = list(
+        json_round["debater2"] = [
             (stat.speaks, stat.ranks)
-            for stat in RoundStats.objects.filter(debater=deb2, round=round_obj)
-        )
+            for stat in stats_lookup.get(deb2.pk, [])
+        ]
     else:
         json_round["debater2"] = []
 
-    try:
-        bye_round = Bye.objects.get(bye_team=team).round_number
-        json_round["bye_round"] = bye_round
-    except Bye.DoesNotExist:
-        json_round["bye_round"] = None
+    if bye_lookup is not None:
+        json_round["bye_round"] = bye_lookup.get(team.pk)
+    else:
+        json_round["bye_round"] = (
+            Bye.objects.filter(bye_team=team)
+            .values_list("round_number", flat=True)
+            .first()
+        )
 
     return json_round
 
@@ -154,13 +165,46 @@ class JSONDecimalEncoder(json.JSONEncoder):
 
 def get_all_json_data():
     all_tab_cards_data = {}
+    bye_lookup = {}
+    for bye_team_id, round_number in Bye.objects.values_list(
+        "bye_team_id", "round_number"
+    ):
+        bye_lookup.setdefault(bye_team_id, round_number)
 
-    # Prefetch related data to reduce database queries
-    teams = Team.objects.prefetch_related(
-        "school",
-        Prefetch("debaters", queryset=Debater.objects.all()),
-        Prefetch("gov_team", queryset=Round.objects.all()),
-        Prefetch("opp_team", queryset=Round.objects.all()),
+    round_queryset = (
+        Round.objects.select_related(
+            "gov_team__school",
+            "opp_team__school",
+            "chair",
+        )
+        .prefetch_related(
+            "judges",
+            "gov_team__debaters",
+            "opp_team__debaters",
+            Prefetch("roundstats_set", queryset=RoundStats.objects.select_related("round")),
+        )
+        .order_by("round_number", "pk")
+    )
+
+    debater_queryset = Debater.objects.prefetch_related(
+        Prefetch(
+            "roundstats_set",
+            queryset=RoundStats.objects.select_related("round"),
+        ),
+        "team_set",
+        "team_set__no_shows",
+    )
+
+    teams = (
+        Team.objects.select_related("school")
+        .prefetch_related(
+            Prefetch("debaters", queryset=debater_queryset),
+            Prefetch("gov_team", queryset=round_queryset),
+            Prefetch("opp_team", queryset=round_queryset),
+            "no_shows",
+            "byes",
+        )
+        .order_by("pk")
     )
 
     for team in teams:
@@ -186,7 +230,9 @@ def get_all_json_data():
         round_data = []
         for round_obj in rounds:
             if round_obj.victor != 0:  # Don't include rounds without a result
-                round_data.append(json_get_round(round_obj, team, deb1, deb2))
+                round_data.append(
+                    json_get_round(round_obj, team, deb1, deb2, bye_lookup=bye_lookup)
+                )
         tab_card_data["rounds"] = round_data
 
         all_tab_cards_data[team.get_or_create_team_code()] = tab_card_data
@@ -217,8 +263,8 @@ def get_tab_card_data(request, team_id):
     else:
         deb2 = None
 
-    num_rounds = TabSettings.objects.get(key="tot_rounds").value
-    cur_round = TabSettings.objects.get(key="cur_round").value
+    num_rounds = TabSettings.get("tot_rounds", 0) or 0
+    cur_round = TabSettings.get("cur_round", 1) or 1
     blank = " "
     round_stats = [[blank] * 7 for _ in range(num_rounds)]
     speaks_rolling = 0
@@ -252,25 +298,29 @@ def get_tab_card_data(request, team_id):
                 totals = (float(speaks_rolling), float(ranks_rolling))
             else:
                 totals = blank
-            round_stats[round_obj.round_number - 1] = [
-                side,
-                get_victor_label(round_obj.victor, side),
-                opponent_name,
-                judge_names,
-                deb1_stats,
-                deb2_stats,
-                totals,
-            ]
+            index = round_obj.round_number - 1
+            if 0 <= index < len(round_stats):
+                round_stats[index] = [
+                    side,
+                    get_victor_label(round_obj.victor, side),
+                    opponent_name,
+                    judge_names,
+                    deb1_stats,
+                    deb2_stats,
+                    totals,
+                ]
 
-    for i in range(cur_round - 1):
+    max_index = min(cur_round - 1, len(round_stats))
+    for i in range(max_index):
         # Don't fill in totals for incomplete rounds
         if round_stats[i][6] == blank and len(round_stats)>=i+2 and blank not in round_stats[i + 1][:5]:
             round_stats[i][6] = (0, 0) if i == 0 else round_stats[i - 1][6]
 
-    try:
-        bye_round = Bye.objects.get(bye_team=team).round_number
-    except Bye.DoesNotExist:
-        bye_round = None
+    bye_round = (
+        Bye.objects.filter(bye_team=team)
+        .values_list("round_number", flat=True)
+        .first()
+    )
 
     return {
         "team_school": team.school,
@@ -313,12 +363,47 @@ def csv_tab_cards(writer):
         "Total Ranks",
     ]
     writer.writerow(header)
+    writer.writerow(header)
 
-    teams = Team.objects.prefetch_related(
-        "school", "debaters", "gov_team", "opp_team")
-    total_rounds = TabSettings.objects.get(key="tot_rounds").value
+    round_queryset = (
+        Round.objects.select_related(
+            "gov_team__school",
+            "opp_team__school",
+            "chair",
+        )
+        .prefetch_related(
+            "judges",
+            "gov_team__debaters",
+            "opp_team__debaters",
+            Prefetch("roundstats_set", queryset=RoundStats.objects.select_related("round")),
+        )
+        .order_by("round_number", "pk")
+    )
+
+    debater_queryset = Debater.objects.prefetch_related(
+        Prefetch(
+            "roundstats_set",
+            queryset=RoundStats.objects.select_related("round"),
+        ),
+        "team_set",
+        "team_set__no_shows",
+    )
+
+    teams = (
+        Team.objects.select_related("school")
+        .prefetch_related(
+            Prefetch("debaters", queryset=debater_queryset),
+            Prefetch("gov_team", queryset=round_queryset),
+            Prefetch("opp_team", queryset=round_queryset),
+            "no_shows",
+            "byes",
+        )
+        .order_by("pk")
+    )
+    total_rounds = TabSettings.get("tot_rounds", 0) or 0
 
     for team in teams:
+        team_code = team.get_or_create_team_code()
         team_school_name = safe_school_name(team) or ""
         debaters = list(team.debaters.all())
         deb1 = debaters[0] if debaters else None
@@ -332,7 +417,7 @@ def csv_tab_cards(writer):
             deb2_status = get_debater_status_short(deb2)
 
         rounds = list(team.gov_team.all()) + list(team.opp_team.all())
-        round_data = [{}] * total_rounds
+        round_data = [tuple() for _ in range(total_rounds)]
 
         for round_obj in rounds:
             side = GOV if round_obj.gov_team == team else OPP
@@ -342,43 +427,48 @@ def csv_tab_cards(writer):
             )
             opponent_name = opponent.get_or_create_team_code() if opponent else "BYE"
             chair_name = safe_name(round_obj.chair) or ""
-            wings_queryset = (
-                round_obj.judges.exclude(pk=round_obj.chair.pk)
-                if round_obj.chair
-                else round_obj.judges.all()
-            )
+            judges = list(round_obj.judges.all())
             wings = " - ".join(
-                filter(None, (safe_name(judge) for judge in wings_queryset))
+                filter(
+                    None,
+                    (
+                        safe_name(judge)
+                        for judge in judges
+                        if not round_obj.chair_id or judge.pk != round_obj.chair_id
+                    ),
+                )
             )
 
             dstat1, dstat2 = get_dstats(
                 round_obj, deb1, deb2, len(debaters) == 1)
-            round_data[round_obj.round_number - 1] = [
-                round_obj.pk,
-                round_obj.round_number,
-                side,
-                result,
-                opponent_name,
-                chair_name,
-                wings,
-                safe_name(deb1) or "",
-                deb1_status,
-                float(dstat1.speaks) if dstat1 else 0,
-                float(dstat1.ranks) if dstat1 else 0,
-                safe_name(deb2) or "",
-                deb2_status,
-                float(dstat2.speaks) if dstat2 else 0,
-                float(dstat2.ranks) if dstat2 else 0,
-            ]
+            index = round_obj.round_number - 1
+            if 0 <= index < len(round_data):
+                round_data[index] = [
+                    round_obj.pk,
+                    round_obj.round_number,
+                    side,
+                    result,
+                    opponent_name,
+                    chair_name,
+                    wings,
+                    safe_name(deb1) or "",
+                    deb1_status,
+                    float(dstat1.speaks) if dstat1 else 0,
+                    float(dstat1.ranks) if dstat1 else 0,
+                    safe_name(deb2) or "",
+                    deb2_status,
+                    float(dstat2.speaks) if dstat2 else 0,
+                    float(dstat2.ranks) if dstat2 else 0,
+                ]
 
         # Write round data for this team
         for round_stat in round_data:
             if not round_stat:
-                writer.writerow(
-                    [team.get_or_create_team_code(), team_school_name])
+                writer.writerow([team_code, team_school_name])
+                continue
             writer.writerow(
                 [
-                    team.get_or_create_team_code(),
+                    team_code,
                     team_school_name,
                     *round_stat,
                     # Round, Gov/Opp, Win/Loss, Opponent, Judges, Debater 1, N/V,
@@ -390,7 +480,7 @@ def csv_tab_cards(writer):
         writer.writerow(
             [
                 "",
-                team.get_or_create_team_code(),
+                team_code,
                 team_school_name,
                 "Total",
                 "",

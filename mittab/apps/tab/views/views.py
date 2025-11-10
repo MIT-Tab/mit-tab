@@ -1,6 +1,7 @@
 import os
 import csv
 import json
+import io
 from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
@@ -554,8 +555,10 @@ def tab_cards_json(request, tournament_name):
 def tab_cards_csv(request, tournament_name):
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f"attachment; filename={tournament_name}.csv"
-    writer = csv.writer(response)
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer)
     csv_tab_cards(writer)
+    response.write(buffer.getvalue())
     return response
 
 

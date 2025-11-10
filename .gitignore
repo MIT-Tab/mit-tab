@@ -33,7 +33,6 @@ pip-log.txt
 .coverage
 .tox
 nosetests.xml
-/htmlcov/
 
 # Translations
 *.mo
@@ -53,11 +52,9 @@ mittab/backups/
 
 # venv
 venv*/
-venv/
-.venv/
 
 # IDEs
-.vscode/
+.vscode
 
 # doc stuff
 docs/_static/
@@ -128,11 +125,5 @@ typings/
 .env
 
 *.dump.sql
-#webdriver
-google-chrome-stable_current_amd64.deb
-/chromedriver-linux64/
-
-#vscode
-# (config directory ignored above)
-
+.vscode/
 /loadtest/
