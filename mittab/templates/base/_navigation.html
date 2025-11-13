@@ -46,6 +46,7 @@
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 {% url "public_home" as public_home %}
 {% url "tab_login" as staff_login %}
+{% public_ranking_mode_value as public_ranking_mode %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
@@ -126,7 +127,9 @@
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
-            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Team Rankings</a>
+            {% if public_ranking_mode %}
+            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Results</a>
+            {% endif %}
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
           </div>
@@ -158,9 +161,11 @@
         <li class="nav-item">
           <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
         </li>
+        {% if public_ranking_mode %}
         <li class="nav-item">
-          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Team Rankings</a>
+          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Results</a>
         </li>
+        {% endif %}
         <li class="nav-item">
           <a class="nav-link {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
         </li>

@@ -5,6 +5,7 @@ from django.forms.fields import FileField
 
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.public_rankings import get_public_ranking_mode
 
 register = template.Library()
 
@@ -75,3 +76,8 @@ def with_return_to(url):
         return url
     separator = "&" if "?" in url else "?"
     return f"{url}{separator}{urlencode({'return_to': url})}"
+
+
+@register.simple_tag
+def public_ranking_mode_value():
+    return int(get_public_ranking_mode())
