@@ -89,6 +89,7 @@ class TestTabViews(TestCase):
             (reverse("break"), "This action will attempt to pair"),
             (reverse("pair_round"), "Pairing Round"),
             (reverse("re_pair_round"), "re-pairing"),
+            (reverse("round_stats"), "Tournament Overview")
         ]
 
         if outround:
@@ -122,6 +123,7 @@ class TestTabViews(TestCase):
             ("view_scratches",),
             ("view_backups",),
             ("break",),
+            ("round_stats",),
         ]
 
         for view_name_tuple in views_to_test:
