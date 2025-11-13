@@ -4,7 +4,7 @@ from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
 
 
 class TabSettings(models.Model):
@@ -359,8 +359,8 @@ class Judge(models.Model):
                                 update_fields)
 
     def is_checked_in_for_round(self, round_number):
-        return CheckIn.objects.filter(judge=self,
-                                      round_number=round_number).exists()
+        return any(checkin.round_number == round_number
+                   for checkin in self.checkin_set.all())
 
     def __str__(self):
         return self.name
@@ -580,7 +580,15 @@ class NoShow(models.Model):
                                      related_name="no_shows",
                                      on_delete=models.CASCADE)
     round_number = models.IntegerField()
-    lenient_late = models.BooleanField(default=False)
+
+    @property
+    def lenient_late(self):
+        """
+        Determines if this no-show should be treated leniently based on
+        the current tab setting. Returns True if the lenient_late setting
+        is greater than or equal to this round number.
+        """
+        return TabSettings.get("lenient_late", 0) >= self.round_number
 
     def __str__(self):
         return str(self.no_show_team) + " was no-show for round " + str(

@@ -20,7 +20,7 @@
 
 
     <div class="row mb-3">
-      <div class="col-8">
+      <div class="col-8 pairing-controls">
         <h6>Pairing Controls</h6>
 
           <a class="btn btn-sm btn-danger" href="{% url 're_pair_round' %}" 
@@ -98,7 +98,7 @@
         <h6>Display Options</h6>
 
         <div class="btn-group btn-group-sm">
-          <a class="btn btn-secondary" href="/pairings/pairinglist/" title="To display in GA">
+          <a class="btn btn-secondary" href="{% url 'pretty_pair' %}" title="To display in GA">
             <i class="fas fa-tv"></i> Announcement View
           </a>
 

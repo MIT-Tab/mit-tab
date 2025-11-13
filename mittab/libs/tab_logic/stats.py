@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from mittab.apps.tab.models import Round, TabSettings
-from mittab.libs.cache_logic import cache
+from mittab.libs.cacheing.cache_logic import cache
 
 MAXIMUM_DEBATER_RANKS = 3.5
 MINIMUM_DEBATER_SPEAKS = 0.0

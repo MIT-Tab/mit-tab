@@ -9,11 +9,11 @@ from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
 )
+from mittab.libs.tab_logic.rankings import get_team_rankings
 from mittab.libs.tab_logic.stats import num_govs
 from mittab.libs import errors
-import mittab.libs.cache_logic as cache_logic
+import mittab.libs.cacheing.cache_logic as cache_logic
 
-from mittab.apps.tab.team_views import get_team_rankings
 
 
 def perform_the_break():

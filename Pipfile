@@ -4,8 +4,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+nplusone = "*"
 
 [packages]
+gevent = "==24.10.3"
+pymemcache = "==4.0.0"
 haikunator = "==2.1"
 mock = "==1.0.1"
 boto3 = "==1.40.42"

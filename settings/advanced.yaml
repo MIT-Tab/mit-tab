@@ -33,14 +33,6 @@ settings:
     name: hit_team_before
     description: "Penalty for teams that have already debated each other being paired again (advanced pairing algorithm setting)"
     value: -100000
-  - min_speak:
-    name: min_speak
-    description: "The absolute minimum speaker score allowed in the tournament even with justification (used for validation)"
-    value: 0
-  - max_speak:
-    name: max_speak
-    description: "The absolute maximum speaker score allowed in the tournament, even with justification (used for validation)"
-    value: 50
   - fair_bye:
     name: fair_bye
     description: "Toggle to ensure fair distribution of byes across teams. When enabled, teams that have already received a bye are less likely to receive another one."

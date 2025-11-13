@@ -80,6 +80,7 @@ DATABASES = {
         "PASSWORD": MYSQL_PASSWORD,
         "HOST":     MYSQL_HOST,
         "PORT":     MYSQL_PORT,
+        "CONN_MAX_AGE": 60,
     }
 }
 
@@ -151,6 +152,10 @@ TEMPLATES = [
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
+# Login/Logout redirects
+LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = "/public/login/"
+
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
 CACHES = {
@@ -162,6 +167,20 @@ CACHES = {
         "LOCATION": "/var/tmp/django_cache",
     }
 }
+
+
+# Use memcached in production, but fall back to local memory cache in development or CI
+if os.environ.get("mittab_env") not in [
+    "development", None] and not os.environ.get("CI"):
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+        "LOCATION": "127.0.0.1:11211",
+        "TIMEOUT": 60,
+    }
+else:
+    CACHES["public"] = {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
