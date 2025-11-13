@@ -194,10 +194,13 @@ function assignJudge(e) {
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.addClass("judge-assignment manual-lay");
       $buttonWrapper.attr("judge-id", result.judge_id);
 
       const rank = result.judge_rank.toFixed(2);
-      $button.html(`${result.judge_name} <small>(${rank})</small>`);
+      $button
+        .html(`${result.judge_name} <small>(${rank})</small>`)
+        .attr("title", "Manually assigned judge");
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
         .judge-toggle`).addClass("chair");

@@ -1,5 +1,6 @@
 {% extends "base/__wide.html" %}
 {% load render_bundle from webpack_loader %}
+{% load tags %}
 
 {% block title %}Submit E-Ballot{% endblock %}
 {% block banner %}Submit E-Ballot{% endblock %}
@@ -16,6 +17,7 @@
   </p>
   <form method="post" action="">
     {% csrf_token %}
+    {% return_to_input request.path %}
     <div class="form-group">
       <label for="ballot_code">Ballot code</label>
       <input type="text"
