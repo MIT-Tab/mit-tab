@@ -264,6 +264,12 @@ class Team(models.Model):
 
         super(Team, self).save(force_insert, force_update, using, update_fields)
 
+    def get_or_create_team_code(self):
+        if not self.team_code:
+            self.set_unique_team_code()
+            self.save()
+        return self.team_code
+
     @property
     def display_backend(self):
         use_team_codes_backend = TabSettings.get("team_codes_backend", 0)

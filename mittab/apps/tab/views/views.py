@@ -1,17 +1,33 @@
 import os
+import csv
+import json
+import io
 from django.db import IntegrityError
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect, reverse
 from django.core.management import call_command
 import yaml
 
-from mittab.apps.tab.archive import ArchiveExporter
+from mittab.libs.data_export.tab_card import (
+    JSONDecimalEncoder,
+    csv_tab_cards,
+    get_all_json_data,
+)
+from mittab.libs.data_export.xml_archive import ArchiveExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
-    UploadDataForm, ScratchForm, SettingsForm
+from mittab.apps.tab.forms import (
+    ExportFormatForm,
+    MiniRoomTagForm,
+    RoomTagForm,
+    SchoolForm,
+    RoomForm,
+    UploadDataForm,
+    ScratchForm,
+    SettingsForm,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -24,6 +40,7 @@ from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
 from mittab.libs.tab_logic.rankings import get_team_rankings
+from mittab.libs.data_export.s3_connector import schedule_results_export
 
 
 def index(request):
@@ -491,6 +508,81 @@ def upload_data(request):
         })
 
 
+def _get_tournament_name(request):
+    return request.META["SERVER_NAME"].split(".")[0]
+
+
+def _dispatch_tournament_export(request, fmt):
+    tournament_name = _get_tournament_name(request)
+    if fmt == "json":
+        return tab_cards_json(request, tournament_name)
+    if fmt == "csv":
+        return tab_cards_csv(request, tournament_name)
+    if fmt == "xml":
+        return xml_archive(request, tournament_name)
+    return HttpResponseBadRequest("Invalid format.")
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def export_tournament(request, format=None):
+    if format is not None:
+        return _dispatch_tournament_export(request, format.lower())
+
+    if request.method == "POST":
+        form = ExportFormatForm(request.POST)
+        if form.is_valid():
+            fmt = form.cleaned_data["format"]
+            return _dispatch_tournament_export(request, fmt)
+    else:
+        form = ExportFormatForm(initial={"format": "csv"})
+
+    return render(
+        request,
+        "common/data_entry.html",
+        {
+            "form": form,
+            "title": "Export Tournament",
+            "custom_submit": "Export"
+        })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def tab_cards_json(request, tournament_name):
+    json_data = json.dumps(
+        {"tab_cards": get_all_json_data()},
+        indent=4,
+        cls=JSONDecimalEncoder,
+    )
+    response = HttpResponse(json_data, content_type="application/json")
+    response["Content-Disposition"] = f"attachment; filename={tournament_name}.json"
+    return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def tab_cards_csv(request, tournament_name):
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f"attachment; filename={tournament_name}.csv"
+    buffer = io.StringIO(newline="")
+    writer = csv.writer(buffer)
+    csv_tab_cards(writer)
+    response.write(buffer.getvalue())
+    return response
+
+
+def _xml_archive_response(tournament_name):
+    filename = f"{tournament_name}.xml"
+    xml = ArchiveExporter(tournament_name).export_tournament()
+    response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
+    response["Content-Length"] = len(xml)
+    response["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def xml_archive(request, tournament_name):
+    return _xml_archive_response(tournament_name)
+
+
 def force_cache_refresh(request):
     key = request.GET.get("key", "")
 
@@ -505,15 +597,8 @@ def force_cache_refresh(request):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def generate_archive(request):
-    tournament_name = request.META["SERVER_NAME"].split(".")[0]
-    filename = tournament_name + ".xml"
-
-    xml = ArchiveExporter(tournament_name).export_tournament()
-
-    response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
-    response["Content-Length"] = len(xml)
-    response["Content-Disposition"] = f"attachment; filename={filename}"
-    return response
+    tournament_name = _get_tournament_name(request)
+    return _xml_archive_response(tournament_name)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403")
@@ -639,11 +724,12 @@ def publish_results(request, new_setting):
     # Convert URL parameter: 0 = unpublish, 1 = publish
     new_setting = bool(new_setting)
     current_setting = TabSettings.get("results_published", False)
+    should_export = new_setting
 
     if new_setting != current_setting:
         TabSettings.set("results_published", new_setting)
         status = "published" if new_setting else "unpublished"
-        return redirect_and_flash_success(
+        response = redirect_and_flash_success(
             request,
             f"Results successfully {status}. Results are now "
             f"{'visible' if new_setting else 'hidden'}.",
@@ -651,11 +737,15 @@ def publish_results(request, new_setting):
         )
     else:
         status = "published" if current_setting else "unpublished"
-        return redirect_and_flash_success(
+        response = redirect_and_flash_success(
             request,
             f"Results are already {status}.",
             path="/",
         )
+    if should_export:
+        tournament_name = _get_tournament_name(request)
+        schedule_results_export(tournament_name)
+    return response
 
 
 def forum_post(request):

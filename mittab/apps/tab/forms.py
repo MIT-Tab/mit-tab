@@ -720,6 +720,13 @@ class OutroundResultEntryForm(forms.Form):
                 breaking_team.save()
 
         return round_obj
+class ExportFormatForm(forms.Form):
+    EXPORT_CHOICES = [
+        ("csv", "CSV"),
+        ("xml", "XML"),
+        ("json", "JSON"),
+    ]
+    format = forms.ChoiceField(choices=EXPORT_CHOICES, label="Export Format")
 
 class RoomTagForm(forms.ModelForm):
     teams = forms.ModelMultipleChoiceField(
@@ -762,6 +769,7 @@ class MiniRoomTagForm(RoomTagForm):
         self.fields.pop("teams")
         self.fields.pop("judges")
         self.fields.pop("rooms")
+
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(

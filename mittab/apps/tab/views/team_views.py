@@ -3,14 +3,14 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.libs.data_export.tab_card import get_tab_card_data
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs import tab_logic
-from mittab.libs.tab_logic import TabFlags, tot_speaks_deb, \
-    tot_ranks_deb, tot_speaks, tot_ranks
+from mittab.libs.tab_logic import TabFlags
 from mittab.libs.tab_logic import rankings
 
 
@@ -235,141 +235,7 @@ def pretty_tab_card(request, team_id):
 
 
 def tab_card(request, team_id):
-    try:
-        team_id = int(team_id)
-    except ValueError:
-        return redirect_and_flash_error(request, "Invalid team id")
-    team = Team.with_preloaded_relations_for_tab_card().get(pk=team_id)
-
-    rounds = ([r for r in team.gov_team.all()] +
-              [r for r in team.opp_team.all()])
-    rounds.sort(key=lambda x: x.round_number)
-
-    debaters = [d for d in team.debaters.all()]
-    iron_man = False
-
-    if len(debaters) == 1:
-        iron_man = True
-
-    deb1 = debaters[0]
-    deb2 = debaters[0] if iron_man else debaters[1]
-
-    round_stats = []
-    num_rounds = TabSettings.objects.get(key="tot_rounds").value
-    cur_round = TabSettings.objects.get(key="cur_round").value
-    blank = " "
-
-    for i in range(num_rounds):
-        round_stats.append([blank] * 7)
-
-    round_stats_by_round_and_debater_id = dict()
-
-    for debater in team.debaters.all():
-        for stat in debater.roundstats_set.all():
-            round_number = stat.round.round_number
-            debater_id = stat.debater.id
-
-            if round_number not in round_stats_by_round_and_debater_id:
-                round_stats_by_round_and_debater_id[round_number] = dict()
-
-            if debater_id not in round_stats_by_round_and_debater_id[round_number]:
-                round_stats_by_round_and_debater_id[round_number][debater_id] = []
-
-            round_stats_by_round_and_debater_id[round_number][debater_id].append(stat)
-
-    for round_obj in rounds:
-        round_number = round_obj.round_number
-        dstat1 = []
-        dstat2 = []
-        if round_number in round_stats_by_round_and_debater_id:
-            dstat1 = round_stats_by_round_and_debater_id[round_number].get(deb1.id, [])
-            dstat2 = round_stats_by_round_and_debater_id[round_number].get(deb2.id, [])
-
-        blank_rs = RoundStats(debater=deb1, round=round_obj, speaks=0, ranks=0)
-
-        while len(dstat1) + len(dstat2) < 2:
-            # Something is wrong with our data, but we don't want to crash
-            dstat1.append(blank_rs)
-
-        if not dstat2 and not dstat1:
-            break
-        if not dstat2:
-            dstat1, dstat2 = dstat1[0], dstat1[1]
-        elif not dstat1:
-            dstat1, dstat2 = dstat2[0], dstat2[1]
-        else:
-            dstat1, dstat2 = dstat1[0], dstat2[0]
-
-        index = round_obj.round_number - 1
-
-        round_stats[index][3] = " - ".join(
-            [j.name for j in round_obj.judges.all()])
-        round_stats[index][4] = (float(dstat1.speaks), float(dstat1.ranks))
-        round_stats[index][5] = (float(dstat2.speaks), float(dstat2.ranks))
-        round_stats[index][6] = (float(dstat1.speaks + dstat2.speaks),
-                                 float(dstat1.ranks + dstat2.ranks))
-
-        if round_obj.gov_team == team:
-            round_stats[index][2] = round_obj.opp_team
-            round_stats[index][0] = "G"
-            if round_obj.victor == 1:
-                round_stats[index][1] = "W"
-            elif round_obj.victor == 2:
-                round_stats[index][1] = "L"
-            elif round_obj.victor == 3:
-                round_stats[index][1] = "WF"
-            elif round_obj.victor == 4:
-                round_stats[index][1] = "LF"
-            elif round_obj.victor == 5:
-                round_stats[index][1] = "AD"
-            elif round_obj.victor == 6:
-                round_stats[index][1] = "AW"
-        elif round_obj.opp_team == team:
-            round_stats[index][2] = round_obj.gov_team
-            round_stats[index][0] = "O"
-            if round_obj.victor == 1:
-                round_stats[index][1] = "L"
-            elif round_obj.victor == 2:
-                round_stats[index][1] = "W"
-            elif round_obj.victor == 3:
-                round_stats[index][1] = "LF"
-            elif round_obj.victor == 4:
-                round_stats[index][1] = "WF"
-            elif round_obj.victor == 5:
-                round_stats[index][1] = "AD"
-            elif round_obj.victor == 6:
-                round_stats[index][1] = "AW"
-
-    for i in range(cur_round - 1):
-        if round_stats[i][6] == blank:
-            round_stats[i][6] = (0, 0)
-    for i in range(1, cur_round - 1):
-        round_stats[i][6] = (round_stats[i][6][0] + round_stats[i - 1][6][0],
-                             round_stats[i][6][1] + round_stats[i - 1][6][1])
-    # Error out if we don't have a bye
-    try:
-        bye_round = Bye.objects.get(bye_team=team).round_number
-    except Exception:
-        bye_round = None
-
-    # Duplicates Debater 1 for display if Ironman team
-    return render(
-        request, "tab/tab_card.html", {
-            "team_name": team.display_backend,
-            "team_school": team.school,
-            "debater_1": deb1.name,
-            "debater_1_status": Debater.NOVICE_CHOICES[deb1.novice_status][1],
-            "debater_2": deb2.name,
-            "debater_2_status": Debater.NOVICE_CHOICES[deb2.novice_status][1],
-            "round_stats": round_stats,
-            "d1st": tot_speaks_deb(deb1),
-            "d1rt": tot_ranks_deb(deb1),
-            "d2st": tot_speaks_deb(deb2),
-            "d2rt": tot_ranks_deb(deb2),
-            "ts": tot_speaks(team),
-            "tr": tot_ranks(team),
-            "bye_round": bye_round
-        })
+    return render(request, "tab/tab_card.html", get_tab_card_data(request, team_id))
 
 
 def rank_teams_ajax(request):
@@ -389,4 +255,3 @@ def rank_teams(request):
         "novice": nov_teams,
         "title": "Team Rankings"
     })
-
