@@ -1,6 +1,6 @@
 from haikunator import Haikunator
 from django.db import models
-from mittab.apps.tab.models import School, Team, Judge, Debater
+from mittab.apps.tab.models import School
 
 
 class RegistrationConfig(models.Model):
@@ -58,27 +58,3 @@ class Registration(models.Model):
                 code = haikunator.haikunate(token_length=0)
             self.herokunator_code = code
         super().save(*args, **kwargs)
-
-
-class RegistrationTeam(models.Model):
-    registration = models.ForeignKey(Registration,
-                                     related_name="teams",
-                                     on_delete=models.CASCADE)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE)
-    is_free_seed = models.BooleanField(default=False)
-
-
-class RegistrationJudge(models.Model):
-    registration = models.ForeignKey(Registration,
-                                     related_name="judges",
-                                     on_delete=models.CASCADE)
-    judge = models.ForeignKey(Judge, on_delete=models.CASCADE)
-
-
-class RegistrationTeamMember(models.Model):
-    registration_team = models.ForeignKey(RegistrationTeam,
-                                          related_name="members",
-                                          on_delete=models.CASCADE)
-    debater = models.ForeignKey(Debater, on_delete=models.CASCADE)
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
-    position = models.IntegerField(default=0)

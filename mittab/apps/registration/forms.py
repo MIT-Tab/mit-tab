@@ -4,7 +4,44 @@ from mittab.apps.registration.models import RegistrationConfig, RegistrationCont
 from mittab.apps.tab.models import Team
 
 NEW_CHOICE_VALUE = "__new__"
-NOVICE_CHOICES = ((0, "Varsity"), (1, "Novice"))
+DEBATER_PREFIXES = ("debater_one", "debater_two")
+
+
+def _build_debater_fields():
+    fields = {}
+    for prefix in DEBATER_PREFIXES:
+        fields[f"{prefix}_id"] = forms.IntegerField(
+            required=False, widget=forms.HiddenInput
+        )
+        fields[f"{prefix}_name"] = forms.CharField(max_length=30)
+        fields[f"{prefix}_apda_id"] = forms.IntegerField(
+            required=False, widget=forms.HiddenInput
+        )
+        fields[f"{prefix}_novice_status"] = forms.IntegerField(
+            required=False, widget=forms.HiddenInput
+        )
+        fields[f"{prefix}_qualified"] = forms.BooleanField(
+            required=False, widget=forms.HiddenInput
+        )
+        fields[f"{prefix}_school"] = forms.CharField()
+        fields[f"{prefix}_school_name"] = forms.CharField(
+            required=False, max_length=50
+        )
+    return fields
+
+
+class ValueMixin:
+    def _current_value(self, field_name):
+        if self.is_bound:
+            return self.data.get(self.add_prefix(field_name), "")
+        return self.initial.get(field_name, "")
+
+    @staticmethod
+    def _reveal_input(widget):
+        classes = widget.attrs.get("class", "")
+        widget.attrs["class"] = " ".join(
+            part for part in classes.split() if part != "d-none"
+        ).strip()
 
 
 def parse_school(value, name):
@@ -34,7 +71,7 @@ def parse_school(value, name):
     raise forms.ValidationError("Invalid school choice")
 
 
-class RegistrationForm(forms.Form):
+class RegistrationForm(ValueMixin, forms.Form):
     school = forms.CharField()
     school_name = forms.CharField(required=False, max_length=50)
     email = forms.EmailField(max_length=254)
@@ -69,116 +106,74 @@ class RegistrationForm(forms.Form):
             self._reveal_input(self.fields["school_name"].widget)
         self.fields["email"].widget.attrs.update({"class": "form-control"})
 
-    def _current_value(self, field_name):
-        if self.is_bound:
-            return self.data.get(self.add_prefix(field_name), "")
-        return self.initial.get(field_name, "")
-
-    def _reveal_input(self, widget):
-        classes = widget.attrs.get("class", "")
-        widget.attrs["class"] = " ".join(
-            part for part in classes.split() if part != "d-none"
-        ).strip()
-
     def get_school(self):
         value = self.cleaned_data["school"]
         label = self.cleaned_data.get("school_name") or self.choice_map.get(value)
         return parse_school(value, label)
 
 
-class TeamForm(forms.Form):
-    registration_team_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
+class TeamForm(ValueMixin, forms.Form):
     team_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     name = forms.CharField(max_length=30)
-    is_free_seed = forms.BooleanField(required=False)
     seed_choice = forms.TypedChoiceField(
         choices=[
             (Team.UNSEEDED, "Unseeded"),
+            (Team.FREE_SEED, "Free Seed"),
             (Team.HALF_SEED, "Half Seed"),
             (Team.FULL_SEED, "Full Seed"),
         ],
         coerce=int,
         initial=Team.UNSEEDED,
     )
-    debater_one_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
-    debater_one_name = forms.CharField(max_length=30)
-    debater_one_apda_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
-    debater_one_novice_status = forms.IntegerField(
-        required=False, widget=forms.HiddenInput
+    team_school_source = forms.ChoiceField(
+        choices=[("debater_one", "Debater One"), ("debater_two", "Debater Two")],
+        initial="debater_one",
     )
-    debater_one_qualified = forms.BooleanField(required=False, widget=forms.HiddenInput)
-    debater_one_school = forms.CharField()
-    debater_one_school_name = forms.CharField(required=False, max_length=50)
-    debater_two_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
-    debater_two_name = forms.CharField(max_length=30)
-    debater_two_apda_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
-    debater_two_novice_status = forms.IntegerField(
-        required=False, widget=forms.HiddenInput
+    hybrid_school_source = forms.ChoiceField(
+        choices=[
+            ("none", "No hybrid school"),
+            ("debater_one", "Debater One"),
+            ("debater_two", "Debater Two"),
+        ],
+        initial="none",
     )
-    debater_two_qualified = forms.BooleanField(required=False, widget=forms.HiddenInput)
-    debater_two_school = forms.CharField()
-    debater_two_school_name = forms.CharField(required=False, max_length=50)
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
+    locals().update(_build_debater_fields())
 
     def __init__(self, *args, school_choices=None, **kwargs):
         super().__init__(*args, **kwargs)
         school_choices = school_choices or []
         self.choice_map = dict(school_choices)
         base_choices = [("", "Select school")] + school_choices
-        control_fields = [
-            "name",
-        ]
-        for field in control_fields:
-            self.fields[field].widget.attrs.setdefault("class", "form-control")
+        self.fields["name"].widget.attrs.setdefault("class", "form-control")
         self.fields["seed_choice"].widget.attrs.update(
             {
                 "class": "form-control form-control-sm",
                 "data-team-seed": "true",
             }
         )
-
-        # Configure debater name fields as Select widgets
-        self.fields["debater_one_name"].widget = forms.Select(
-            choices=[("", "Select a school first")]
+        self.fields["team_school_source"].widget.attrs.update(
+            {"class": "form-control form-control-sm"}
         )
-        self.fields["debater_one_name"].widget.attrs.update(
-            {
-                "class": "form-control",
-            }
-        )
-        self.fields["debater_two_name"].widget = forms.Select(
-            choices=[("", "Select a school first")]
-        )
-        self.fields["debater_two_name"].widget.attrs.update(
-            {
-                "class": "form-control",
-            }
+        self.fields["hybrid_school_source"].widget.attrs.update(
+            {"class": "form-control form-control-sm"}
         )
 
-        self.fields["is_free_seed"].widget.attrs.setdefault("class", "form-check-input")
-        self.fields["debater_one_qualified"].widget.attrs.setdefault("value", "")
-        self.fields["debater_two_qualified"].widget.attrs.setdefault("value", "")
-        self.fields["debater_one_novice_status"].initial = 0
-        self.fields["debater_two_novice_status"].initial = 0
-
-        first_value = self._current_value("debater_one_school")
-        second_value = self._current_value("debater_two_school")
-
-        self._configure_school_field(
-            "debater_one_school",
-            first_value,
-            base_choices,
-            self.fields["debater_one_school_name"].widget,
-        )
-        self._configure_school_field(
-            "debater_two_school",
-            second_value,
-            base_choices,
-            self.fields["debater_two_school_name"].widget,
-        )
-
-        self._configure_debater_inputs("debater_one")
-        self._configure_debater_inputs("debater_two")
+        for prefix in DEBATER_PREFIXES:
+            name_field = f"{prefix}_name"
+            self.fields[name_field].widget = forms.Select(
+                choices=[("", "Select a school first")]
+            )
+            self.fields[name_field].widget.attrs["class"] = "form-control"
+            self.fields[f"{prefix}_qualified"].widget.attrs.setdefault("value", "")
+            self.fields[f"{prefix}_novice_status"].initial = 0
+            self._configure_school_field(
+                f"{prefix}_school",
+                self._current_value(f"{prefix}_school"),
+                base_choices,
+                self.fields[f"{prefix}_school_name"].widget,
+            )
+            self._configure_debater_inputs(prefix)
 
     def clean(self):
         data = super().clean()
@@ -186,50 +181,43 @@ class TeamForm(forms.Form):
             return data
         if not data.get("debater_one_name") or not data.get("debater_two_name"):
             raise forms.ValidationError("Each team needs two debaters")
+        primary = data.get("team_school_source") or "debater_one"
+        if not data.get(f"{primary}_school"):
+            raise forms.ValidationError("Select a school for the primary debater")
+        hybrid = data.get("hybrid_school_source") or "none"
+        if hybrid != "none" and not data.get(f"{hybrid}_school"):
+            raise forms.ValidationError("Select a school for the hybrid designation")
+        data["team_school_source"] = primary
+        data["hybrid_school_source"] = hybrid
         return data
 
+    def _member_payload(self, prefix):
+        school_value = self.cleaned_data[f"{prefix}_school"]
+        school_label = (
+            self.cleaned_data.get(f"{prefix}_school_name")
+            or self.choice_map.get(school_value)
+        )
+        return {
+            "id": self.cleaned_data.get(f"{prefix}_id"),
+            "name": self.cleaned_data[f"{prefix}_name"],
+            "apda_id": self.cleaned_data.get(f"{prefix}_apda_id"),
+            "novice_status": int(self.cleaned_data[f"{prefix}_novice_status"]),
+            "qualified": bool(self.cleaned_data.get(f"{prefix}_qualified")),
+            "school": parse_school(school_value, school_label),
+        }
+
     def get_members(self):
-        return [
-            {
-                "id": self.cleaned_data.get("debater_one_id"),
-                "name": self.cleaned_data["debater_one_name"],
-                "apda_id": self.cleaned_data.get("debater_one_apda_id"),
-                "novice_status": int(self.cleaned_data["debater_one_novice_status"]),
-                "qualified": bool(self.cleaned_data.get("debater_one_qualified")),
-                "school": parse_school(
-                    self.cleaned_data["debater_one_school"],
-                    self.cleaned_data.get("debater_one_school_name")
-                    or self.choice_map.get(self.cleaned_data["debater_one_school"]),
-                ),
-            },
-            {
-                "id": self.cleaned_data.get("debater_two_id"),
-                "name": self.cleaned_data["debater_two_name"],
-                "apda_id": self.cleaned_data.get("debater_two_apda_id"),
-                "novice_status": int(self.cleaned_data["debater_two_novice_status"]),
-                "qualified": bool(self.cleaned_data.get("debater_two_qualified")),
-                "school": parse_school(
-                    self.cleaned_data["debater_two_school"],
-                    self.cleaned_data.get("debater_two_school_name")
-                    or self.choice_map.get(self.cleaned_data["debater_two_school"]),
-                ),
-            },
-        ]
+        return [self._member_payload(prefix) for prefix in DEBATER_PREFIXES]
 
     def get_payload(self):
         return {
-            "registration_team_id": self.cleaned_data.get("registration_team_id"),
             "team_id": self.cleaned_data.get("team_id"),
             "name": self.cleaned_data["name"],
-            "is_free_seed": bool(self.cleaned_data.get("is_free_seed")),
             "seed_choice": int(self.cleaned_data["seed_choice"]),
             "members": self.get_members(),
+            "team_school_source": self.cleaned_data["team_school_source"],
+            "hybrid_school_source": self.cleaned_data["hybrid_school_source"],
         }
-
-    def _current_value(self, field_name):
-        if self.is_bound:
-            return self.data.get(self.add_prefix(field_name), "")
-        return self.initial.get(field_name, "")
 
     def _configure_school_field(self, field_name, current, base_choices, name_widget):
         field = self.fields[field_name]
@@ -249,8 +237,6 @@ class TeamForm(forms.Form):
                 "data-school-select": "team",
             }
         )
-        list_id = f"{self.prefix}-{field_name.replace('_school', '')}-options"
-        field.widget.attrs["data-list-id"] = list_id
         name_id = self[field_name.replace("_school", "_name")].auto_id
         field.widget.attrs["data-name-id"] = name_id
         name_widget.attrs.update(
@@ -268,25 +254,14 @@ class TeamForm(forms.Form):
     def _configure_debater_inputs(self, prefix):
         name_field = f"{prefix}_name"
         apda_field = f"{prefix}_apda_id"
-        list_id = f"{self.prefix}-{prefix.replace('_', '-')}-options"
         name_widget = self.fields[name_field].widget
-        # For select widgets we do not need autocomplete or list attributes for
-        # functionality, but we set them so the template can access the list ID.
         name_widget.attrs.update(
             {
                 "data-debater-input": prefix,
                 "data-apda-target": self[apda_field].auto_id,
-                "data-list": list_id,
-                "list": list_id,  # Also set without data- prefix for template access
             }
         )
         self.fields[apda_field].widget.attrs.setdefault("id", self[apda_field].auto_id)
-
-    def _reveal_input(self, widget):
-        classes = widget.attrs.get("class", "")
-        widget.attrs["class"] = " ".join(
-            part for part in classes.split() if part != "d-none"
-        ).strip()
 
 
 class JudgeForm(forms.Form):

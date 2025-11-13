@@ -1,0 +1,27 @@
+{% load tags %}
+{% with name_key=prefix|add:"_name" school_key=prefix|add:"_school" %}
+{% with name_field=form|get_field:name_key school_field=form|get_field:school_key %}
+<div class="col-md-4">
+    <div class="card h-100" data-debater="{{ slot }}">
+        <div class="card-body p-2">
+            {% if show_seed %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">{{ title }}</h6>
+                <div class="form-group mb-0 seed-select text-right">
+                    <label class="sr-only" for="{{ form.seed_choice.id_for_label }}">Team Seed</label>
+                    {{ form.seed_choice }}
+                    {% if form.seed_choice.errors %}
+                    <div class="text-danger small">{{ form.seed_choice.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <h6 class="mb-2">{{ title }}</h6>
+            {% endif %}
+            {% include "registration/_input_group.html" with field=name_field label="Name" errors=name_field.errors label_style="font-size: 0.75rem;" margin="mb-1" %}
+            {% include "registration/_input_group.html" with field=school_field label="School" errors=school_field.errors label_style="font-size: 0.75rem;" margin="mb-1" %}
+        </div>
+    </div>
+</div>
+{% endwith %}
+{% endwith %}

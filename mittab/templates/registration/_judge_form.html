@@ -3,31 +3,13 @@
         <div class="form-row align-items-center">
             {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
             <div class="form-group col-md-4 mb-0">
-                <div class="input-group input-group-sm">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">Name</span>
-                    </div>
-                    {{ form.name }}
-                </div>
-                {{ form.name.errors }}
+                {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors margin="" %}
             </div>
             <div class="form-group col-md-4 mb-0">
-                <div class="input-group input-group-sm">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">Email</span>
-                    </div>
-                    {{ form.email }}
-                </div>
-                {{ form.email.errors }}
+                {% include "registration/_input_group.html" with field=form.email label="Email" errors=form.email.errors margin="" %}
             </div>
             <div class="form-group col-md-3 mb-0">
-                <div class="input-group input-group-sm">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">Experience</span>
-                    </div>
-                    {{ form.experience }}
-                </div>
-                {{ form.experience.errors }}
+                {% include "registration/_input_group.html" with field=form.experience label="Experience" errors=form.experience.errors margin="" %}
             </div>
             <div class="col-auto d-flex align-items-center">
                 <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="judge">Remove</button>

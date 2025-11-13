@@ -1,28 +1,22 @@
 from django.contrib import admin
 
-from .models import (
-    RegistrationConfig,
-    Registration,
-    RegistrationJudge,
-    RegistrationContent,
-    RegistrationTeam,
-    RegistrationTeamMember,
-)
+from mittab.apps.tab.models import Judge, Team
+
+from .models import Registration, RegistrationConfig, RegistrationContent
 
 
 class RegistrationTeamInline(admin.TabularInline):
-    model = RegistrationTeam
+    model = Team
+    fk_name = "registration"
     extra = 0
+    fields = ("name", "seed", "school", "hybrid_school")
 
 
 class RegistrationJudgeInline(admin.TabularInline):
-    model = RegistrationJudge
+    model = Judge
+    fk_name = "registration"
     extra = 0
-
-
-class RegistrationTeamMemberInline(admin.TabularInline):
-    model = RegistrationTeamMember
-    extra = 0
+    fields = ("name", "rank", "email")
 
 
 @admin.register(Registration)
@@ -40,9 +34,3 @@ class RegistrationConfigAdmin(admin.ModelAdmin):
 @admin.register(RegistrationContent)
 class RegistrationContentAdmin(admin.ModelAdmin):
     list_display = ("updated_at",)
-
-
-@admin.register(RegistrationTeam)
-class RegistrationTeamAdmin(admin.ModelAdmin):
-    list_display = ("registration", "team", "is_free_seed")
-    inlines = (RegistrationTeamMemberInline,)

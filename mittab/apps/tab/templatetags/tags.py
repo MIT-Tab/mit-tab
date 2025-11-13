@@ -60,3 +60,12 @@ def registration_text(value, autoescape=True):
         return ""
     linked = urlize(value, nofollow=True, autoescape=autoescape)
     return mark_safe(linked.replace("\n", "<br>"))
+
+
+@register.filter(name="get_field")
+def get_field(form, field_name):
+    """Get a form field by name dynamically."""
+    try:
+        return form[field_name]
+    except (KeyError, TypeError):
+        return None

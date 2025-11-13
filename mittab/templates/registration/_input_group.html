@@ -1,0 +1,9 @@
+<div class="input-group {{ size|default:'input-group-sm' }} {{ margin|default:'mb-2' }}">
+    <div class="input-group-prepend">
+        <span class="input-group-text"{% if label_style %} style="{{ label_style }}"{% endif %}>{{ label }}</span>
+    </div>
+    {{ field }}
+</div>
+{% if errors %}
+<div class="text-danger small {{ error_class|default:'mb-1' }}">{{ errors }}</div>
+{% endif %}

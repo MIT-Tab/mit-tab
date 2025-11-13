@@ -14,51 +14,7 @@
             </p>
             <form method="post">
                 {% csrf_token %}
-                <div class="form-group">
-                    <div class="custom-control custom-switch">
-                        {{ form.allow_new_registrations }}
-                        <label class="custom-control-label" for="{{ form.allow_new_registrations.id_for_label }}">
-                            {{ form.allow_new_registrations.label }}
-                        </label>
-                    </div>
-                    {% if form.allow_new_registrations.help_text %}
-                    <small class="form-text text-muted">{{ form.allow_new_registrations.help_text }}</small>
-                    {% endif %}
-                    {{ form.allow_new_registrations.errors }}
-                </div>
-                <div class="form-group">
-                    <div class="custom-control custom-switch">
-                        {{ form.allow_registration_edits }}
-                        <label class="custom-control-label" for="{{ form.allow_registration_edits.id_for_label }}">
-                            {{ form.allow_registration_edits.label }}
-                        </label>
-                    </div>
-                    {% if form.allow_registration_edits.help_text %}
-                    <small class="form-text text-muted">{{ form.allow_registration_edits.help_text }}</small>
-                    {% endif %}
-                    {{ form.allow_registration_edits.errors }}
-                </div>
-                <hr>
-                <div class="form-group">
-                    <label for="{{ form.registration_description.id_for_label }}">
-                        {{ form.registration_description.label }}
-                    </label>
-                    {{ form.registration_description }}
-                    {% if form.registration_description.help_text %}
-                    <small class="form-text text-muted">{{ form.registration_description.help_text }}</small>
-                    {% endif %}
-                    {{ form.registration_description.errors }}
-                </div>
-                <div class="form-group">
-                    <label for="{{ form.registration_completion_message.id_for_label }}">
-                        {{ form.registration_completion_message.label }}
-                    </label>
-                    {{ form.registration_completion_message }}
-                    {% if form.registration_completion_message.help_text %}
-                    <small class="form-text text-muted">{{ form.registration_completion_message.help_text }}</small>
-                    {% endif %}
-                    {{ form.registration_completion_message.errors }}
-                </div>
+                {% bootstrap_form form layout='vertical' %}
                 <div class="text-right">
                     <button type="submit" class="btn btn-primary">Save Settings</button>
                 </div>

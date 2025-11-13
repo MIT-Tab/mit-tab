@@ -9,27 +9,20 @@
 {% render_bundle 'registrationPortal' %}
 <div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
     {% if content.description %}
-    <section class="registration-info-panel mb-3" data-collapsible>
-        <button type="button"
-                class="registration-info-panel__toggle"
-                data-collapse-toggle
-                aria-expanded="false"
-                aria-controls="registration-info-body">
+    <details class="registration-info-panel mb-3">
+        <summary class="registration-info-panel__toggle">
             <span class="registration-info-panel__text">
                 <span class="eyebrow">Tournament Information</span>
                 <span class="headline">Read before registering</span>
             </span>
-            <span class="registration-info-panel__chevron" data-collapse-icon aria-hidden="true">
+            <span class="registration-info-panel__chevron" aria-hidden="true">
                 <i class="fas fa-chevron-down"></i>
             </span>
-        </button>
-        <div id="registration-info-body"
-             class="registration-info-panel__body"
-             data-collapse-body
-             hidden>
+        </summary>
+        <div class="registration-info-panel__body">
             {{ content.description|registration_text }}
         </div>
-    </section>
+    </details>
     {% endif %}
     {% if registration_lock_message %}
     <div class="alert alert-warning">{{ registration_lock_message }}</div>
@@ -48,24 +41,8 @@
                         {% for error in registration_form.non_field_errors %}
                         <div class="alert alert-danger">{{ error }}</div>
                         {% endfor %}
-                        <div class="input-group mb-2">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text">School</span>
-                            </div>
-                            {{ registration_form.school }}
-                        </div>
-                        {% if registration_form.school.errors %}
-                        <div class="text-danger mb-2">{{ registration_form.school.errors }}</div>
-                        {% endif %}
-                        <div class="input-group mb-2">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text">Email</span>
-                            </div>
-                            {{ registration_form.email }}
-                        </div>
-                        {% if registration_form.email.errors %}
-                        <div class="text-danger mb-2">{{ registration_form.email.errors }}</div>
-                        {% endif %}
+                        {% include "registration/_input_group.html" with field=registration_form.school label="School" errors=registration_form.school.errors margin="mb-2" size="" %}
+                        {% include "registration/_input_group.html" with field=registration_form.email label="Email" errors=registration_form.email.errors margin="mb-2" size="" %}
                     </div>
                 </div>
             </div>
@@ -162,7 +139,7 @@
         <div class="d-flex align-items-center mt-3">
             <button type="submit" class="btn btn-primary" {% if not can_submit_registration %}disabled{% endif %}>Submit Registration</button>
             {% if summary %}
-            <span class="text-muted ml-3">Editing registration {{ summary.code }}</span>
+            <span class="text-muted ml-3">Editing registration {{ summary.herokunator_code }}</span>
             {% endif %}
         </div>
     </form>
@@ -177,20 +154,20 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Registration Saved</h5>
-                <p class="mb-2">Herokunator Code: <strong>{{ summary.code }}</strong></p>
-                <p class="mb-2">School: {{ summary.school }}</p>
+                <p class="mb-2">Herokunator Code: <strong>{{ summary.herokunator_code }}</strong></p>
+                <p class="mb-2">School: {{ summary.school.name }}</p>
                 <p class="mb-3">Email: {{ summary.email }}</p>
                 <h6>Teams</h6>
                 <div class="mb-3">
-                    {% for team in summary.teams %}
+                    {% for team in summary.teams.all %}
                     <div class="border rounded p-3 mb-2">
                         <strong>{{ team.name }}</strong>
-                        {% if team.is_free_seed %}
+                        {% if team.seed == team.FREE_SEED %}
                         <span class="badge badge-info ml-2">Free Seed</span>
                         {% endif %}
                         <ul class="mb-0">
-                            {% for debater in team.debaters %}
-                            <li>{{ debater }}</li>
+                            {% for debater in team.debaters.all %}
+                            <li>{{ debater.name }}</li>
                             {% endfor %}
                         </ul>
                     </div>
@@ -198,9 +175,9 @@
                 </div>
                 <h6>Judges</h6>
                 <div>
-                    {% for judge in summary.judges %}
+                    {% for judge in summary.judges.all %}
                     <div class="border rounded p-3 mb-2">
-                        <p class="mb-1">{{ judge.name }}{% if judge.code %} (Code: {{ judge.code }}){% endif %}</p>
+                        <p class="mb-1">{{ judge.name }}{% if judge.ballot_code %} (Code: {{ judge.ballot_code }}){% endif %}</p>
                         {% if judge.email %}
                         <p class="mb-0 text-muted">Email: {{ judge.email }}</p>
                         {% endif %}
