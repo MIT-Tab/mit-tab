@@ -6,7 +6,7 @@
 
 {% block extra_head %}
   {% render_bundle 'publicHome' %}
-
+  {% render_bundle 'publicDisplay' %}
 {% endblock %}
 
 {% block banner %}{% endblock %}
@@ -25,8 +25,8 @@
         <div class="public-sidebar-card status">
           <h3 class="title">Welcome to {% tournament_name %}!</h3>
           <div class="content">
+            {% if not registration_open %}
             <div class="status-block" data-status>
-              <!-- Status will be dynamically updated by JavaScript -->
               <div class="status-icon" aria-hidden="true" data-status-icon>
                 <i class="fas fa-clipboard-check"></i>
               </div>
@@ -35,36 +35,46 @@
                 <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
               </div>
             </div>
-            
             <div class="divider"></div>
-            
             <div class="item">
               <div class="text">
                 <strong>Tournament Updates</strong>
                 <p>Check back regularly for updated pairings, results, and standings throughout the tournament.</p>
               </div>
             </div>
-            
             <div class="item">
               <div class="text">
                 <strong>For Judges</strong>
                 <p>Use your ballot code to submit results electronically via the E-Ballot link.</p>
               </div>
             </div>
-            
             <div class="item">
               <div class="text">
                 <strong>For Teams</strong>
                 <p>View your matchups in Released Pairings and track your progress in Team Rankings.</p>
               </div>
             </div>
-            
             <div class="item">
               <div class="text">
                 <strong>Staff Login</strong>
                 <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
               </div>
             </div>
+            {% else %}
+            <div class="registration-panel">
+              <div class="registration-panel__header">
+                <h4>Registration Open</h4>
+              </div>
+              <div class="registration-panel__text">
+                {% if registration_description %}
+                  {{ registration_description|registration_text }}
+                {% else %}
+                  Registration is live! Please review the information below and complete the form to reserve your school’s slots.
+                {% endif %}
+              </div>
+              <a class="btn btn-primary btn-block mt-3" href="{{ registration_url }}">Register Now</a>
+            </div>
+            {% endif %}
           </div>
         </div>
       </aside>
@@ -72,6 +82,18 @@
       <aside class="links" aria-labelledby="public-home-quick-links">
         <header class="header mobile-only">
           <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
+          {% if registration_open %}
+          <a class="btn btn-primary btn-lg btn-block registration-mobile-cta" href="{{ registration_url }}">Register Here</a>
+          <div class="registration-mobile-card">
+            <div class="registration-mobile-card__text">
+              {% if registration_description %}
+                {{ registration_description|registration_text }}
+              {% else %}
+                Registration is now open. Complete the form to add teams and judges for your school.
+              {% endif %}
+            </div>
+          </div>
+          {% else %}
           <h2 class="status-title mb-2">Status:</h2>
           <div class="status-block status-block--inline" data-status>
             <div class="status-icon" aria-hidden="true" data-status-icon>
@@ -83,9 +105,22 @@
               <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
             </div>
           </div>
+          {% endif %}
         </header>
 
+        {% if registration_open %}
+        <div class="register-cta d-none d-lg-flex">
+          <div class="register-cta__text">
+            <span class="eyebrow">Registration Open</span>
+            <span class="headline">Reserve your slots today.</span>
+            <p class="body">Lock in your teams and judging obligations before pairings post.</p>
+          </div>
+          <a class="btn btn-primary btn-lg register-cta__btn" href="{{ registration_url }}">Register Here</a>
+        </div>
+        {% endif %}
+
         <nav class="public-links" aria-label="Quick links">
+          {% if not registration_open %}
           <a class="tile shadow-sm" href="{% url 'pretty_pair' %}">
             <span class="body">
               <span class="title">Released Pairings</span>
@@ -100,13 +135,14 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-                    <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
+          <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
             <span class="body">
               <span class="title">Submit E-Ballot</span>
               <span class="subtitle">Judges enter ballot codes to file results.</span>
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
+          {% endif %}
           <a class="tile shadow-sm" href="{% url 'public_judges' %}">
             <span class="body">
               <span class="title">Judge List</span>
@@ -121,6 +157,7 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
+          {% if not registration_open %}
           <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 0 %}">
             <span class="body">
               <span class="title">Varsity Outrounds</span>
@@ -135,6 +172,7 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
+          {% endif %}
         </nav>
       </aside>
     </div>

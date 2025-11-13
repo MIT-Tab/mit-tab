@@ -1,0 +1,161 @@
+.btn {
+    height : auto;
+}
+
+#registration-app {
+  .card {
+    box-shadow: 0 10px 30px -24px rgba(15, 33, 55, 0.45);
+    border: 1px solid rgba(12, 32, 54, 0.08);
+  }
+
+  .input-group-text {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .seed-select select {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+
+  .registration-info-panel {
+    border: 1px solid rgba(16, 46, 97, 0.18);
+    border-radius: 0.85rem;
+    overflow: hidden;
+    background: #f7fbff;
+
+    &__toggle {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      color: #12213b;
+      font-weight: 600;
+    }
+
+    &__text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.75rem;
+        color: rgba(18, 33, 59, 0.65);
+      }
+
+      .headline {
+        font-size: 1.05rem;
+        font-weight: 600;
+      }
+    }
+
+    &__chevron {
+      color: rgba(18, 33, 59, 0.55);
+      transition: transform 0.2s ease;
+    }
+
+    &__toggle.is-expanded &__chevron {
+      transform: rotate(180deg);
+    }
+
+    &__body {
+      border-top: 1px solid rgba(16, 46, 97, 0.12);
+      background: #fff;
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #1c2e46;
+    }
+  }
+
+  .registration-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+
+    &__panel {
+      border: 1px solid rgba(16, 38, 70, 0.15);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      background: #fff;
+      box-shadow: 0 14px 32px -28px rgba(10, 18, 32, 0.55);
+    }
+
+    .btn-block {
+      margin-top: 0.5rem;
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
+  #registration-app {
+    .form-row {
+      display: flex;
+      flex-direction: column;
+    }
+
+    [class*="col-md"] {
+      max-width: 100%;
+    }
+
+    .card {
+      margin-bottom: 1rem;
+    }
+
+    .input-group {
+      flex-direction: column;
+
+      .input-group-prepend {
+        width: 100%;
+
+        .input-group-text {
+          width: 100%;
+          justify-content: flex-start;
+          border-bottom-left-radius: 0.25rem;
+          border-bottom-right-radius: 0.25rem;
+        }
+      }
+
+      .form-control {
+        width: 100%;
+      }
+    }
+
+    .seed-select {
+      width: 100%;
+
+      select {
+        width: 100%;
+      }
+    }
+
+    .registration-summary .card {
+      margin-bottom: 0;
+    }
+
+    .registration-info-panel__toggle {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .registration-quick-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .registration-quick-actions__panel {
+      height: auto;
+    }
+
+    .h-100 {
+      height: auto !important;
+    }
+  }
+}

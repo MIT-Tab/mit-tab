@@ -35,6 +35,7 @@
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
 {% url "settings_form" as settings_form %}
+{% url "registration_setup" as registration_setup %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -110,6 +111,7 @@
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Checkin</a>
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
+            <a class="dropdown-item {% active request registration_setup %}" href="{{ registration_setup }}">Registration Setup</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>

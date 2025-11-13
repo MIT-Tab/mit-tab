@@ -22,7 +22,8 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
-                  "mittab.apps.tab", "sentry_sdk.integrations.django",
+                  "mittab.apps.tab", "mittab.apps.registration",
+                  "sentry_sdk.integrations.django",
                   "webpack_loader", "bootstrap4",)
 
 MIDDLEWARE = (

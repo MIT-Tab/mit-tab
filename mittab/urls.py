@@ -27,6 +27,7 @@ urlpatterns = [
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
+    path("registration/", include("mittab.apps.registration.urls")),
     re_path(r"^403/", views.render_403, name="403"),
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),

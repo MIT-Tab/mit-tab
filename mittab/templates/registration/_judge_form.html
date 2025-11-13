@@ -1,0 +1,19 @@
+<div class="card mb-2" data-form="judge">
+    <div class="card-body py-2">
+        <div class="form-row align-items-center">
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="form-group col-md-4 mb-0">
+                {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors margin="" %}
+            </div>
+            <div class="form-group col-md-4 mb-0">
+                {% include "registration/_input_group.html" with field=form.email label="Email" errors=form.email.errors margin="" %}
+            </div>
+            <div class="form-group col-md-3 mb-0">
+                {% include "registration/_input_group.html" with field=form.experience label="Experience" errors=form.experience.errors margin="" %}
+            </div>
+            <div class="col-auto d-flex align-items-center">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="judge">Remove</button>
+            </div>
+        </div>
+    </div>
+</div>

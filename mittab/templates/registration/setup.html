@@ -1,0 +1,28 @@
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+
+{% block title %}Registration Setup{% endblock %}
+{% block banner %}Registration Setup{% endblock %}
+
+{% block content %}
+<div class="col-md-8">
+    <div class="card mb-4">
+        <div class="card-body">
+            <h4 class="card-title mb-3">Portal Controls</h4>
+            <p class="text-muted mb-4">
+                Toggle who can access the public registration portal and update the helper text that appears on the homepage and confirmation screen.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                {% bootstrap_form form layout='vertical' %}
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="alert alert-info">
+        The homepage banner and registration portal copy support hyperlinks automatically. Use the toggles above to immediately open or close registrations without relying on calendar dates.
+    </div>
+</div>
+{% endblock %}
