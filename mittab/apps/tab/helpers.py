@@ -5,7 +5,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 def get_redirect_target(request, path=None, fallback="/"):
     """
-    Resolve the best redirect target for mutating views.
+    When we hit save on a form, this method helps us determine
+    where to redirect the user afterwards.
     Preference order:
         1) Explicit path argument
         2) Hidden form field (POST) named 'return_to'
