@@ -1,9 +1,13 @@
+from decimal import Decimal
+
 from django.test import TestCase
 import pytest
 
 from mittab.apps.tab.models import (
+    BreakingTeam,
     CheckIn,
     Judge,
+    Outround,
     Room,
     RoomCheckIn,
     Round,
@@ -14,6 +18,141 @@ from mittab.apps.tab.models import (
 )
 from mittab.libs import assign_judges, tab_logic
 from mittab.libs.assign_judges import judge_conflict
+
+
+@pytest.mark.django_db
+class TestMinimalSchoolConflictScenarios(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def make_team(self, name, school, hybrid_school=None):
+        return Team.objects.create(
+            name=name,
+            school=school,
+            hybrid_school=hybrid_school,
+            seed=Team.FULL_SEED,
+        )
+
+    def make_judge(self, name, rank=Decimal("5.00")):
+        return Judge.objects.create(name=name, rank=rank)
+
+    def test_judge_conflict_detects_primary_and_hybrid_schools(self):
+        school_primary = School.objects.create(name="Primary U")
+        school_other = School.objects.create(name="Other U")
+        hybrid_school = School.objects.create(name="Hybrid U")
+
+        gov_team = self.make_team("Gov Team", school_primary)
+        opp_team = self.make_team("Opp Team", school_other, hybrid_school=hybrid_school)
+
+        primary_judge = self.make_judge("Primary Judge", Decimal("4.10"))
+        primary_judge.schools.add(school_primary)
+
+        hybrid_judge = self.make_judge("Hybrid Judge", Decimal("4.20"))
+        hybrid_judge.schools.add(hybrid_school)
+
+        neutral_judge = self.make_judge("Neutral Judge", Decimal("4.30"))
+
+        self.assertTrue(
+            judge_conflict(primary_judge, gov_team, opp_team),
+            "Primary school affiliation should be treated as a scratch",
+        )
+        self.assertTrue(
+            judge_conflict(hybrid_judge, gov_team, opp_team),
+            "Hybrid school affiliation should be treated as a scratch",
+        )
+        self.assertFalse(
+            judge_conflict(neutral_judge, gov_team, opp_team),
+            "Judges without matching schools should be eligible",
+        )
+
+    def test_add_judges_skips_school_conflicts_in_inrounds(self):
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("pair_wings", 0)
+        TabSettings.set("allow_rejudges", 0)
+
+        school_primary = School.objects.create(name="Primary Inround")
+        school_other = School.objects.create(name="Other Inround")
+
+        gov_team = self.make_team("Inround Gov", school_primary)
+        opp_team = self.make_team("Inround Opp", school_other)
+
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        conflict_judge = self.make_judge("Conflict Inround Judge", Decimal("4.50"))
+        conflict_judge.schools.add(school_primary)
+        neutral_judge = self.make_judge("Neutral Inround Judge", Decimal("4.60"))
+
+        CheckIn.objects.create(judge=conflict_judge, round_number=1)
+        CheckIn.objects.create(judge=neutral_judge, round_number=1)
+
+        assign_judges.add_judges()
+        round_obj.refresh_from_db()
+
+        self.assertEqual(
+            round_obj.chair,
+            neutral_judge,
+            "Judges sharing a school's affiliation should never be assigned",
+        )
+        self.assertNotIn(
+            conflict_judge,
+            round_obj.judges.all(),
+            "Conflicted judges must not be added to the panel",
+        )
+
+    def test_add_outround_judges_skips_school_conflicts(self):
+        TabSettings.set("var_panel_size", 1)
+
+        school_primary = School.objects.create(name="Primary Outround")
+        school_other = School.objects.create(name="Other Outround")
+
+        gov_team = self.make_team("Gov Outround", school_primary)
+        opp_team = self.make_team("Opp Outround", school_other)
+
+        BreakingTeam.objects.create(
+            team=gov_team,
+            seed=1,
+            effective_seed=1,
+            type_of_team=BreakingTeam.VARSITY,
+        )
+        BreakingTeam.objects.create(
+            team=opp_team,
+            seed=2,
+            effective_seed=2,
+            type_of_team=BreakingTeam.VARSITY,
+        )
+
+        room = Room.objects.create(name="Outround Room", rank=Decimal("5.00"))
+        outround = Outround.objects.create(
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+        )
+
+        conflict_judge = self.make_judge("Conflict Outround Judge", Decimal("4.50"))
+        conflict_judge.schools.add(school_primary)
+        neutral_judge = self.make_judge("Neutral Outround Judge", Decimal("4.60"))
+
+        CheckIn.objects.create(judge=conflict_judge, round_number=0)
+        CheckIn.objects.create(judge=neutral_judge, round_number=0)
+
+        assign_judges.add_outround_judges(round_type=Outround.VARSITY)
+        outround.refresh_from_db()
+
+        self.assertEqual(
+            outround.chair,
+            neutral_judge,
+            "Outround assignments must skip judges with school conflicts",
+        )
+        self.assertNotIn(
+            conflict_judge,
+            outround.judges.all(),
+            "Conflicted judges should not be added to any outround panel",
+        )
 
 
 @pytest.mark.django_db
