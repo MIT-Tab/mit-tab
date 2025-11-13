@@ -3,6 +3,9 @@ body {
     background-image: url("../img/az-subtle.png") !important;
     background-blend-mode: multiply;
 }
+:root {
+  color-scheme: light;
+}
 $font-size-base: 0.95rem !default;
 
 .form-control {
@@ -197,4 +200,3 @@ $font-size-base: 0.95rem !default;
 .font-weight-semibold {
   font-weight: 600;
 }
-

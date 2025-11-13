@@ -6,6 +6,8 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (Room, TabSettings, Team,
                                     Round, Outround)
+from mittab.apps.tab.public_rankings import PublicRankingMode
+from mittab.libs.cacheing import cache_logic
 
 
 @pytest.mark.django_db(transaction=True)
@@ -15,6 +17,10 @@ class TestPublicViews(TestCase):
     def setUp(self):
         super().setUp()
         caches["public"].clear()
+        cache_logic.clear_cache()
+
+        # Ensure ballots are eligible for public display regardless of fixture defaults
+        Team.objects.update(ranking_public=True)
 
         Outround(
             gov_team=Team.objects.first(),
@@ -31,18 +37,21 @@ class TestPublicViews(TestCase):
             room=Room.objects.last(),
         ).save()
 
-        # Find one round and set it to have no victor (missing ballot)
-        # Save the original state to restore in tearDown
-        self.test_round = Round.objects.filter(round_number=1).first()
+        # Pairing for the next round (3) has started, so round 2 ballots may show
+        TabSettings.set("cur_round", 3)
+
+        # Mark the most recent round (cur_round - 1) as missing a ballot
+        self.test_round = Round.objects.filter(
+            round_number=TabSettings.get("cur_round") - 1
+        ).first()
         self.original_victor = self.test_round.victor
         self.test_round.victor = Round.NONE
         self.test_round.save()
-
-        TabSettings.set("cur_round", 2)
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
-        TabSettings.set("rankings_public", 1)
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
         TabSettings.set("debaters_public", 1)
         TabSettings.set("var_teams_visible", 2)  # Show finals and above
         TabSettings.set("nov_teams_visible", 2)  # Show finals and above
@@ -52,10 +61,11 @@ class TestPublicViews(TestCase):
         self.test_round.victor = self.original_victor
         self.test_round.save()
         caches["public"].clear()
+        cache_logic.clear_cache()
         super().tearDown()
 
     def get_test_objects(self):
-        judge = Round.objects.filter(round_number=1, victor=Round.NONE).first().chair
+        judge = self.test_round.chair
         team = Team.objects.first()
         round_obj = Round.objects.filter(round_number=1, gov_team__isnull=False).first()
         v_out = Outround.objects.filter(type_of_round=0).first()
@@ -79,7 +89,7 @@ class TestPublicViews(TestCase):
             (reverse("public_teams"), [team.name]),
             (reverse("rank_teams_public"), [team.name]),
             (reverse("pretty_pair"), [round_obj.gov_team.name, gov_debater.name]),
-            (reverse("missing_ballots"), [judge.name]),
+            (reverse("missing_ballots"), [self.test_round.chair.name]),
             (reverse("e_ballot_search"), ["Submit E-Ballot"]),
             (reverse("outround_pretty_pair", args=[0]), [v_out.gov_team.name]),
             (reverse("outround_pretty_pair", args=[1]), [n_out.gov_team.name]),
@@ -109,7 +119,7 @@ class TestPublicViews(TestCase):
     def test_permissions(self):
         client = Client()
 
-        (judge, team, round_obj, v_out,
+        (judge, team, _, v_out,
          n_out, gov_debater) = self.get_test_objects()
 
         urls = [
@@ -126,7 +136,7 @@ class TestPublicViews(TestCase):
         settings = [
             ("judges_public", 1, 0),
             ("teams_public", 1, 0),
-            ("rankings_public", 1, 0),
+            ("public_ranking_mode", PublicRankingMode.TEAM, PublicRankingMode.NONE),
             ("pairing_released", 1, 0),
             ("pairing_released", 1, 0),
             ("var_teams_visible", 2, 16),
@@ -139,7 +149,7 @@ class TestPublicViews(TestCase):
             (team.name, 200, 302),
             (team.name, 200, 302),
             (gov_debater.name, 200, 200),
-            (round_obj.gov_team.display_backend, 200, 200),
+            (self.test_round.gov_team.display_backend, 200, 200),
             (v_out.gov_team.name, 200, 200),
             (n_out.gov_team.name, 200, 200),
         ]
@@ -167,6 +177,62 @@ class TestPublicViews(TestCase):
             self.assertNotIn(expected_content, response.content.decode(),
                 f"Expected '{expected_content}' to be "
                 f"hidden when {setting_name}={denied_value}")
+
+
+    def test_public_ballot_modes(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        caches["public"].clear()
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Last Round Ballots", content)
+        self.assertIn("Winner:", content)
+        self.assertIn("Speaks and ranks are hidden", content)
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.ALL_BALLOTS)
+        TabSettings.set("public_ballot_show_speaks", 1)
+        caches["public"].clear()
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("All Ballots", content)
+        self.assertNotIn("Speaks and ranks are hidden", content)
+
+    def test_team_rankings_without_speaks(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
+        caches["public"].clear()
+
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Speaks and ranks are hidden", content)
+        self.assertNotIn("<th>Speaks</th>", content)
+
+    def test_public_ballots_hidden_until_next_round(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+
+        # With cur_round=2 no subsequent round has been paired, so nothing shows
+        TabSettings.set("cur_round", 2)
+        caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("No public ballots are available yet", response.content.decode())
+
+        # Once the next round is paired (cur_round=3), ballots become visible
+        TabSettings.set("cur_round", 3)
+        caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Winner:", response.content.decode())
 
 
     def test_n_plus_one(self):
