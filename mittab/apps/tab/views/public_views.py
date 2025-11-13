@@ -193,8 +193,9 @@ def _mode_slug(mode):
 
 
 def _build_public_ballots(include_all):
-    completed_round = max(int(TabSettings.get("cur_round", 1)) - 1, 0)
-    if completed_round <= 0:
+    # Only release ballots for rounds that have a subsequent round paired
+    latest_released_round = max(int(TabSettings.get("cur_round", 1)) - 2, 0)
+    if latest_released_round <= 0:
         return []
 
     completed_victors = (
@@ -205,14 +206,14 @@ def _build_public_ballots(include_all):
     )
 
     rounds = Round.objects.filter(
-        round_number__lte=completed_round,
+        round_number__lte=latest_released_round,
         victor__in=completed_victors,
         gov_team__ranking_public=True,
         opp_team__ranking_public=True,
     )
 
     if not include_all:
-        rounds = rounds.filter(round_number=completed_round)
+        rounds = rounds.filter(round_number=latest_released_round)
 
     rounds = rounds.select_related("gov_team", "opp_team").prefetch_related(
         "gov_team__debaters",

@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
 from mittab.apps.tab.public_rankings import PublicRankingMode
+from mittab.libs.cacheing import cache_logic
 
 
 @pytest.mark.django_db(transaction=True)
@@ -26,6 +27,8 @@ class TestPublicCache(TestCase):
         super().setUp()
         self.cache = caches["public"]
         self.cache.clear()
+        cache_logic.clear_cache()
+        Team.objects.update(ranking_public=True)
         self.client = Client()
 
         # Set up outrounds
@@ -51,7 +54,8 @@ class TestPublicCache(TestCase):
         self.test_round.save()
 
         # Enable all public views
-        TabSettings.set("cur_round", 2)
+        # Allow round 1 ballots to be public by ensuring round 2 pairing exists
+        TabSettings.set("cur_round", 3)
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
@@ -65,6 +69,7 @@ class TestPublicCache(TestCase):
         self.test_round.victor = self.original_victor
         self.test_round.save()
         self.cache.clear()
+        cache_logic.clear_cache()
         super().tearDown()
 
     def _get_cache_key_count(self):
