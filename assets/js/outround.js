@@ -184,3 +184,7 @@ $(document).ready(() => {
   $(".outround-team-toggle").click(populateAlternativeTeams);
   $(".btn.outround-release").click(togglePairingRelease);
 });
+
+$(document).on("outround:switch", () => {
+  populateTabCards();
+});

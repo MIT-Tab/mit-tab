@@ -59,6 +59,51 @@ function assignTeam(e) {
   });
 }
 
+function updateTeamSection(roundId, position, team) {
+  const $container = $(`.row[round-id=${roundId}] .${position}-team`);
+  $container.find(".team-assign-button").attr("team-id", team.id);
+  $container.find(".team-link").text(team.name);
+  $container.find(".team-link").attr("href", `/team/${team.id}`);
+  $container
+    .find(".tabcard, .outround-tabcard")
+    .attr("team-id", team.id)
+    .text("Loading results...");
+}
+
+function handleSwitchSides(event) {
+  event.preventDefault();
+  const $target = $(event.currentTarget);
+  const roundId = $target.attr("round-id");
+  const isOutround = Boolean($target.data("outround"));
+  const baseUrl = isOutround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/switch_sides/`;
+  const alertMsg = "Unable to switch sides. Refresh and try again.";
+
+  $.ajax({
+    url,
+    success(result) {
+      if (result.success) {
+        updateTeamSection(roundId, "gov", result.gov_team);
+        updateTeamSection(roundId, "opp", result.opp_team);
+        if (isOutround) {
+          $(document).trigger("outround:switch", {
+            roundId,
+            govTeam: result.gov_team,
+            oppTeam: result.opp_team,
+          });
+        } else {
+          populateTabCards();
+        }
+      } else {
+        window.alert(alertMsg);
+      }
+    },
+    error() {
+      window.alert(alertMsg);
+    },
+  });
+}
+
 function assignRoom(e) {
   e.preventDefault();
   const $parent = $(this).parent().parent();
@@ -294,4 +339,6 @@ $(document).ready(() => {
     ".judge-remove, .outround-judge-remove",
     handleJudgeRemoveClick,
   );
+
+  $(document).on("click", ".team-switch-sides", handleSwitchSides);
 });

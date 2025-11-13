@@ -527,6 +527,37 @@ def assign_team(request, round_id, position, team_id):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+def switch_sides(request, round_id):
+    try:
+        round_obj = Outround.objects.select_related("gov_team",
+                                                    "opp_team").get(id=int(round_id))
+        if not round_obj.gov_team or not round_obj.opp_team:
+            return JsonResponse({"success": False})
+        round_obj.gov_team, round_obj.opp_team = round_obj.opp_team, round_obj.gov_team
+        if round_obj.choice == Outround.GOV:
+            round_obj.choice = Outround.OPP
+        elif round_obj.choice == Outround.OPP:
+            round_obj.choice = Outround.GOV
+        round_obj.save()
+        data = {
+            "success": True,
+            "round_id": round_obj.id,
+            "gov_team": {
+                "id": round_obj.gov_team.id,
+                "name": round_obj.gov_team.name
+            },
+            "opp_team": {
+                "id": round_obj.opp_team.id,
+                "name": round_obj.opp_team.name
+            },
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def assign_judge(request, round_id, judge_id, remove_id=None):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
