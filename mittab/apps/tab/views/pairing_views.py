@@ -444,6 +444,14 @@ def view_round(request, round_number):
 
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
+    round_ids = [pair.id for pair in round_info]
+    manual_judge_assignments = {}
+    if round_ids:
+        manual_entries = ManualJudgeAssignment.objects.filter(
+            round_id__in=round_ids
+        ).values_list("round_id", "judge_id")
+        for round_id, judge_id in manual_entries:
+            manual_judge_assignments.setdefault(round_id, set()).add(judge_id)
 
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
 
@@ -545,6 +553,7 @@ def view_round(request, round_number):
         "excluded_people": excluded_people,
         "n_over_two": n_over_two,
         "paired_teams": paired_teams,
+        "manual_judge_assignments": manual_judge_assignments,
     }
     return render(request, "pairing/pairing_control.html", context)
 

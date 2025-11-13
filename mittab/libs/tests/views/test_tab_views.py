@@ -1,11 +1,21 @@
+import re
+
 import pytest
-from django.test import TestCase, Client
-from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.urls import reverse
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Round, Judge, School, Debater, Outround
+    Room,
+    TabSettings,
+    Team,
+    Round,
+    Judge,
+    School,
+    Debater,
+    Outround,
+    ManualJudgeAssignment,
 )
 
 
@@ -130,3 +140,42 @@ class TestTabViews(TestCase):
                 self.assertEqual(response.status_code, 200,
                                  f"Failed to render {reverse(*view_name_tuple)}, "
                                  f" got status {response.status_code}")
+
+    def test_manual_judge_indicator_visible(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.judges.clear()
+        judge = Judge.objects.first()
+        round_obj.judges.add(judge)
+
+        response = self.client.get(reverse("view_status"))
+
+        card_html = self._round_card_html(response, round_obj.id)
+        self.assertIn("manual-lay", card_html)
+        self.assertTrue(
+            ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
+        )
+
+    def test_manual_judge_indicator_removed_after_unassign(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.judges.clear()
+        judge = Judge.objects.first()
+        round_obj.judges.add(judge)
+        round_obj.judges.remove(judge)
+
+        response = self.client.get(reverse("view_status"))
+
+        card_html = self._round_card_html(response, round_obj.id)
+        self.assertNotIn("manual-lay", card_html)
+        self.assertFalse(
+            ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
+        )
+
+    def _round_card_html(self, response, round_id):
+        content = response.content.decode()
+        match = re.search(
+            rf'<div class="row" round-id="{round_id}".*?</div>\s*</div>',
+            content,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match, f"Round card for round {round_id} not found")
+        return match.group(0)

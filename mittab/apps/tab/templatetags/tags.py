@@ -47,6 +47,13 @@ def judge_team_count(context, judge, pairing):
         return judge_rejudge_counts[judge.id].get(pairing.id)
     return None
 
+
+@register.simple_tag(takes_context=True)
+def is_manual_judge_assignment(context, round_id, judge_id):
+    manual_assignments = context.get("manual_judge_assignments", {})
+    judges_for_round = manual_assignments.get(round_id, set())
+    return judge_id in judges_for_round
+
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
