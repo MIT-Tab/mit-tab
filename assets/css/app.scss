@@ -139,6 +139,32 @@ $font-size-base: 0.95rem !default;
   width: 100%;
 }
 
+.stats-bar-container {
+  height: 30px;
+  overflow: hidden;
+  display: flex;
+}
+
+.stats-bar-gov {
+  background-color: #28a745;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.stats-bar-opp {
+  background-color: #dc3545;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
 .index .input-group .input-group-text,
 .index .input-group .form-control,
 .index .input-group .btn {
