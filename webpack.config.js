@@ -13,6 +13,7 @@ module.exports = {
     publicHome: "./assets/js/publicHome",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
+    sendJudgeCodes: "./assets/js/sendJudgeCodes",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

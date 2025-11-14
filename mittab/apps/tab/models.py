@@ -3,6 +3,7 @@ import random
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 
 from mittab.libs.cacheing import cache_logic
 
@@ -325,14 +326,23 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
+BALLOT_CODE_MAX_LENGTH = 64
+ballot_code_validator = RegexValidator(
+    regex=r"^[A-Za-z]+-[A-Za-z]+$",
+    message="Ballot code must contain at least one letter on each side of a single hyphen.",
+)
+
+
 class Judge(models.Model):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
+    email = models.EmailField(max_length=254, blank=True, null=True)
     ballot_code = models.CharField(max_length=255,
                                    blank=True,
                                    null=True,
-                                   unique=True)
+                                   unique=True,
+                                   validators=[ballot_code_validator])
     is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
@@ -341,10 +351,32 @@ class Judge(models.Model):
         haikunator = Haikunator()
         code = haikunator.haikunate(token_length=0)
 
-        while Judge.objects.filter(ballot_code=code).first():
+        while (len(code) > BALLOT_CODE_MAX_LENGTH or
+               not self.is_valid_ballot_code(code, raise_error=False) or
+               Judge.objects.filter(ballot_code=code).first()):
             code = haikunator.haikunate(token_length=0)
 
         self.ballot_code = code
+
+    def is_valid_ballot_code(self, code=None, raise_error=True):
+        code = code or self.ballot_code
+        if not code:
+            return True
+
+        if len(code) > BALLOT_CODE_MAX_LENGTH:
+            if raise_error:
+                raise ValidationError(
+                    f"Ballot code must be at most {BALLOT_CODE_MAX_LENGTH} characters"
+                )
+            return False
+
+        try:
+            ballot_code_validator(code)
+        except ValidationError as exc:
+            if raise_error:
+                raise exc
+            return False
+        return True
 
     def save(self,
              force_insert=False,
@@ -354,6 +386,8 @@ class Judge(models.Model):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
             self.set_unique_ballot_code()
+
+        self.is_valid_ballot_code(self.ballot_code)
 
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
@@ -377,6 +411,19 @@ class Judge(models.Model):
 
     class Meta:
         ordering = ["name"]
+
+
+class JudgeCodeEmailLog(models.Model):
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE, related_name="code_email_logs")
+    email = models.EmailField()
+    ballot_code = models.CharField(max_length=BALLOT_CODE_MAX_LENGTH)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "sent_at"]),
+            models.Index(fields=["judge", "sent_at"]),
+        ]
 
 
 class Scratch(models.Model):

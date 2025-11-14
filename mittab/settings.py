@@ -202,3 +202,16 @@ if os.environ.get("MITTAB_LOG_QUERIES"):
             "handlers": ["console"],
         }
     }
+
+# Email / Amazon SES configuration
+AWS_SES_REGION = os.environ.get("AWS_SES_REGION", "us-east-1")
+AWS_SES_ACCESS_KEY_ID = os.environ.get("AWS_SES_ACCESS_KEY_ID")
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get("AWS_SES_SECRET_ACCESS_KEY")
+AWS_SES_CONFIGURATION_SET = os.environ.get("AWS_SES_CONFIGURATION_SET")
+
+AWS_MAILMANAGER_ADDRESS_LIST = os.environ.get("AWS_MAILMANAGER_ADDRESS_LIST")
+
+EMAIL_FROM_ADDRESS = os.environ.get("EMAIL_FROM_ADDRESS", "no-reply@example.com")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "MIT-TAB")
+DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>"
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO", EMAIL_FROM_ADDRESS)
