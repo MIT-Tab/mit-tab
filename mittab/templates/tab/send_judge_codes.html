@@ -1,0 +1,84 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Send Judge Codes{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  {% render_bundle 'sendJudgeCodes' 'js' %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+  <form method="post" class="w-100">
+    {% csrf_token %}
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3">
+      <div>
+        <h1 class="h3 mb-1">Send Judge Codes</h1>
+        <div class="text-muted small">
+          <strong>{{ sendable_count }}</strong> judge{{ sendable_count|pluralize }} ready to email.
+          {% if missing_email_count %}
+          <span class="ml-2">{{ missing_email_count }} missing email addresses.</span>
+          {% endif %}
+          <span class="ml-2">Rate limit: 1 email per judge/email every {{ rate_limit_hours }} hour{{ rate_limit_hours|pluralize }}.</span>
+        </div>
+      </div>
+      <div class="d-flex align-items-center mt-3 mt-md-0">
+        <button class="btn btn-primary" type="submit" {% if not sendable_count %}disabled{% endif %}>
+          Send Judge Codes
+        </button>
+        <a class="btn btn-link ml-2" href="/">Cancel</a>
+      </div>
+    </div>
+
+    <div class="table-responsive shadow-sm rounded bg-white">
+      <table class="table table-sm table-hover align-middle mb-0" id="judge-email-table">
+      <thead class="thead-light">
+        <tr>
+          <th scope="col" style="width: 40px;">
+            Send
+          </th>
+          <th scope="col" data-sort-key="name" class="sortable">Judge <span class="sort-arrow"></span></th>
+          <th scope="col" data-sort-key="email" class="sortable">Email <span class="sort-arrow"></span></th>
+          <th scope="col" data-sort-key="code" class="sortable">Ballot Code <span class="sort-arrow"></span></th>
+          <th scope="col" data-sort-key="status" class="sortable">Status <span class="sort-arrow"></span></th>
+          <th scope="col" data-sort-key="sent" class="sortable">Last Sent <span class="sort-arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in judge_rows %}
+        <tr class="{% if not row.can_send %}text-muted{% endif %}">
+          <td>
+            {% if row.can_send %}
+            <input type="checkbox" name="judge_ids" value="{{ row.judge.id }}" {% if row.checked %}checked{% endif %}>
+            {% else %}
+            <input type="checkbox" disabled>
+            {% endif %}
+          </td>
+          <td data-sort-value="{{ row.judge.name|lower }}">
+            <a href="/judge/{{ row.judge.id }}/" class="text-primary">{{ row.judge.name }}</a>
+          </td>
+          <td data-sort-value="{{ row.email|default:''|lower }}">{{ row.email|default:"—" }}</td>
+          <td data-sort-value="{{ row.ballot_code|default:'' }}">{{ row.ballot_code|default:"—" }}</td>
+          <td data-sort-value="{{ row.status|lower }}">
+            {% if row.can_send %}
+              <span class="text-success font-weight-semibold">Ready</span>
+            {% else %}
+              <span class="text-muted">{{ row.status }}</span>
+            {% endif %}
+          </td>
+          <td data-sort-value="{{ row.last_sent|date:'U'|default:0 }}">
+            {% if row.last_sent %}
+              {{ row.last_sent|date:"M j, g:i a" }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+{% endblock %}
