@@ -217,6 +217,7 @@ class TestPublicViews(TestCase):
         client = Client()
 
         TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        TabSettings.set("latest_ballots_released", 0)
 
         # With cur_round=2 no subsequent round has been paired, so nothing shows
         TabSettings.set("cur_round", 2)
@@ -228,11 +229,34 @@ class TestPublicViews(TestCase):
 
         # Once the next round is paired (cur_round=3), ballots become visible
         TabSettings.set("cur_round", 3)
+        TabSettings.set("latest_ballots_released", 1)
         caches["public"].clear()
         cache_logic.invalidate_cache("public_ballots_last")
         response = client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("Winner:", response.content.decode())
+
+    def test_manual_release_allows_current_round_ballots(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("latest_ballots_released", 0)
+        caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
+
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("No public ballots are available yet", response.content.decode())
+
+        TabSettings.set("latest_ballots_released", 1)
+        caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Winner:", response.content.decode())
+
+        TabSettings.set("latest_ballots_released", 0)
 
 
     def test_n_plus_one(self):
