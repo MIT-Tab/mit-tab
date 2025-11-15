@@ -44,6 +44,27 @@ def is_checked_in(judge, round_value):
     return judge.is_checked_in_for_round(round_value)
 
 
+@register.filter("is_expected")
+def is_expected(judge, round_value):
+    return judge.is_expected_for_round(round_value)
+
+
+@register.filter
+def lookup(sequence, index):
+    if sequence is None:
+        return None
+    if isinstance(sequence, str):
+        return None
+    try:
+        index = int(index)
+    except (TypeError, ValueError):
+        return None
+    try:
+        return sequence[index]
+    except (IndexError, TypeError, KeyError):
+        return None
+
+
 @register.simple_tag(takes_context=True)
 def judge_team_count(context, judge, pairing):
     judge_rejudge_counts = context.get("judge_rejudge_counts", {})

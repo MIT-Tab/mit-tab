@@ -115,10 +115,15 @@ def public_view_judges(request):
     rounds = [num for num in range(1, num_rounds + 1)]
 
     return render(
-        request, "public/judges.html", {
-            "judges": Judge.objects.order_by("name").prefetch_related("schools", "checkin_set").all(),
-            "rounds": rounds
-        })
+        request,
+        "public/judges.html",
+        {
+            "judges": Judge.objects.order_by("name")
+            .prefetch_related("schools", "checkin_set", "expected_checkins")
+            .all(),
+            "rounds": rounds,
+        },
+    )
 
 
 @cache_public_view(timeout=60)

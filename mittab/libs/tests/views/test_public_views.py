@@ -4,8 +4,16 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (Room, TabSettings, Team,
-                                    Round, Outround)
+from mittab.apps.tab.models import (
+    Room,
+    TabSettings,
+    Team,
+    Round,
+    Outround,
+    Judge,
+    School,
+    JudgeExpectedCheckIn,
+)
 from mittab.apps.tab.public_rankings import PublicRankingMode
 from mittab.libs.cacheing import cache_logic
 
@@ -178,6 +186,26 @@ class TestPublicViews(TestCase):
                 f"Expected '{expected_content}' to be "
                 f"hidden when {setting_name}={denied_value}")
 
+
+    def test_public_judges_use_expectations(self):
+        client = Client()
+        school = School.objects.first()
+        judge = Judge.objects.create(name="Expectation Judge", rank=2.0)
+        judge.schools.add(school)
+
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.get(reverse("public_judges"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        row_start = content.find(judge.name)
+        self.assertNotEqual(row_start, -1, "Judge row not rendered")
+        row_end = content.find("</tr>", row_start)
+        self.assertNotEqual(row_end, -1, "Judge row not properly closed")
+        row_html = content[row_start:row_end]
+        self.assertIn("&#10004;", row_html,
+                      "Expected attendance indicator not shown for judge")
 
     def test_public_ballot_modes(self):
         client = Client()

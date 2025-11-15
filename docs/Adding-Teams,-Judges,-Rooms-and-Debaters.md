@@ -25,6 +25,15 @@ file
 You can use [these templates](https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5?usp=sharing)
 for the teams, judges, and rooms files
 
+### Judge spreadsheet columns
+
+- Column A: Judge Name
+- Column B: Judge Rank
+- Columns C onward: Affiliated schools (one per column). Blank cells are ignored, so you can leave extra cells empty without creating phantom schools.
+- The final *N* columns (where *N* is the value of the **Total Rounds** setting) represent the rounds you expect the judge to attend (`R1` through `RN`). Use `Y`, `Yes`, `True`, `1`, `X`, or `In` to mark a judge as expected for that round; leave the cell empty (or anything else) if they are not expected.
+
+When the spreadsheet is imported, the expected-round columns populate the “Expected Judges” tab in batch check-in and the public judge list.
+
 **NOTE:** The files _must_ be `.xlsx` files. Not `.xls`, `.csv`, or anything
 similar
 

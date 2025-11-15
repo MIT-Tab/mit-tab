@@ -18,6 +18,30 @@ const updateCheckinCounts = (entityType, roundDeltas) => {
   });
 };
 
+const updateToggleLabel = ($cb, checked) => {
+  const prefix = $cb.data("labelPrefix") || "Checked";
+  const labelOn = $cb.data("labelOn") || "In";
+  const labelOff = $cb.data("labelOff") || "Out";
+  const status = checked ? labelOn : labelOff;
+  $cb.next("label").text(`${prefix} ${status}`);
+};
+
+const updateJudgeHighlights = (ids, rounds, expected) => {
+  ids.forEach((id) => {
+    rounds.forEach((round) => {
+      const selector = `#judge td.judge-checkin-cell[data-judge-id='${id}'][data-round='${round}']`;
+      const $cell = $(selector);
+      if (!$cell.length) return;
+      $cell.toggleClass("checkin-cell-expected table-success", expected);
+      if (expected) {
+        $cell.attr("title", "Expected this round");
+      } else {
+        $cell.removeAttr("title");
+      }
+    });
+  });
+};
+
 const submitCheckIn = (checkboxes, checked) => {
   const $boxes = $(checkboxes);
   if (!$boxes.length) return;
@@ -45,12 +69,16 @@ const submitCheckIn = (checkboxes, checked) => {
     action: checked ? "check_in" : "check_out",
     entity_ids: ids,
     rounds: [...new Set(rounds)].filter((r) => r != null),
-  })
+    })
     .done(() => {
-      const status = checked ? "In" : "Out";
-      $boxes.each((_, cb) =>
-        $(cb).prop("checked", checked).next("label").text(`Checked ${status}`),
-      );
+      $boxes.each((_, cb) => {
+        const $cb = $(cb);
+        $cb.prop("checked", checked);
+        updateToggleLabel($cb, checked);
+      });
+      if (entityType === "judge_expected") {
+        updateJudgeHighlights(ids, [...new Set(rounds)], checked);
+      }
       if (Object.keys(roundDeltas).length) {
         updateCheckinCounts(entityType, roundDeltas);
       }
