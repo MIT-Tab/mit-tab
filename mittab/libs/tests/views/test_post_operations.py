@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater
+    Room, TabSettings, Team, Judge, School, Debater, Round
 )
 
 
@@ -118,3 +118,34 @@ class TestPostOperations(TestCase):
                     f"(expected 200 after redirects) for {method} to {url}")
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
+
+    def test_toggle_current_round_ballots_view(self):
+        Round.objects.filter(round_number=1).update(victor=Round.GOV)
+
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "advance"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["current_round_ballots_released"])
+
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "revert"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertFalse(payload["current_round_ballots_released"])
+
+        Round.objects.filter(round_number=1).update(victor=Round.NONE)
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "advance"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["success"])
+        self.assertIn("ballots", payload["error"])

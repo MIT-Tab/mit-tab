@@ -193,8 +193,11 @@ def _mode_slug(mode):
 
 
 def _build_public_ballots(include_all):
-    # Only release ballots for rounds that have a subsequent round paired
-    latest_released_round = max(int(TabSettings.get("cur_round", 1)) - 2, 0)
+    latest_released_round = int(
+        TabSettings.get("latest_ballots_released", 0) or 0
+    )
+    max_visible_round = max(int(TabSettings.get("cur_round", 1)) - 1, 0)
+    latest_released_round = min(latest_released_round, max_visible_round)
     if latest_released_round <= 0:
         return []
 
