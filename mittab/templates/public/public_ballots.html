@@ -21,100 +21,64 @@
       {% else %}
       <div class="row">
         {% for ballot in round_result.ballots %}
-        <div class="col-12 col-lg-6 mb-4">
-          <div class="card shadow-sm h-100 public-ballot-card rounded-lg">
-            <div class="card-header rounded-top d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-              <div>
-                <div class="small text-muted">Round {{ ballot.round_number }}</div>
+          <div class="col-12 col-lg-6 mb-4">
+            <div class="card shadow-sm h-100 public-ballot-card rounded-lg">
+              <div class="card-header rounded-top d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                <div>
+                  <div class="small text-muted">Round {{ ballot.round_number }}</div>
+                </div>
+                {% if ballot.winner_name %}
+                  <div class="text-muted font-weight-semibold mt-2 mt-md-0">
+                    Winner: {{ ballot.winner_name }}{% if ballot.winner_side %} ({{ ballot.winner_side }}){% endif %}
+                  </div>
+                {% endif %}
               </div>
-              {% if ballot.winner_name %}
-                <div class="text-muted font-weight-semibold mt-2 mt-md-0">
-                  Winner: {{ ballot.winner_name }}{% if ballot.winner_side %} ({{ ballot.winner_side }}){% endif %}
-                </div>
-              {% endif %}
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-12 col-md-6 mb-3 mb-md-0">
-                  <div class="card h-100 border-0 public-ballot-side rounded-lg">
-                    <div class="card-header bg-transparent px-0 pb-1 pt-0 d-flex justify-content-between align-items-center">
-                      <span class="text-uppercase small text-muted">{{ ballot.gov_side }}</span>
-                      {% if ballot.winner_side == 'Gov' %}
-                        <span class="badge badge-secondary rounded-pill">Winner</span>
-                      {% endif %}
-                    </div>
-                    <div class="card-body px-0 pt-0">
-                      <h5 class="font-weight-bold">{{ ballot.gov_team }}</h5>
-                      <ul class="list-unstyled small mb-0">
-                        {% for debater in ballot.gov_debaters %}
-                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
-                          <span>{{ debater.name }}</span>
-                          {% if round_result.include_speaks or round_result.include_ranks %}
-                          <span class="text-nowrap">
-                            {% if round_result.include_speaks %}
-                              <span class="badge badge-light mr-1">
-                                {% if debater.speaks is not None %}
-                                  {{ debater.speaks|floatformat:2 }}
-                                {% else %}—{% endif %}
-                              </span>
-                            {% endif %}
-                            {% if round_result.include_ranks %}
-                              <span class="badge badge-light">
-                                {% if debater.ranks is not None %}
-                                  R {{ debater.ranks|floatformat:2 }}
-                                {% else %}R —{% endif %}
-                              </span>
-                            {% endif %}
-                          </span>
+              <div class="card-body">
+                <div class="row">
+                  {% for side in ballot.sides %}
+                    <div class="col-12 col-md-6 {% if not forloop.last %}mb-3 mb-md-0{% endif %}">
+                      <div class="card h-100 border-0 public-ballot-side rounded-lg">
+                        <div class="card-header bg-transparent px-0 pb-1 pt-0 d-flex justify-content-between align-items-center">
+                          <span class="text-uppercase small text-muted">{{ side.label }}</span>
+                          {% if side.is_winner %}
+                            <span class="badge badge-secondary rounded-pill">Winner</span>
                           {% endif %}
-                        </li>
-                        {% endfor %}
-                      </ul>
+                        </div>
+                        <div class="card-body px-0 pt-0">
+                          <h5 class="font-weight-bold">{{ side.team_name }}</h5>
+                          <ul class="list-unstyled small mb-0">
+                            {% for debater in side.debaters %}
+                              <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                                <span>{{ debater.name }}</span>
+                                {% if round_result.include_speaks or round_result.include_ranks %}
+                                  <span class="text-nowrap">
+                                    {% if round_result.include_speaks %}
+                                      <span class="badge badge-light mr-1">
+                                        {% if debater.speaks is not None %}
+                                          {{ debater.speaks|floatformat:2 }}
+                                        {% else %}—{% endif %}
+                                      </span>
+                                    {% endif %}
+                                    {% if round_result.include_ranks %}
+                                      <span class="badge badge-light">
+                                        {% if debater.ranks is not None %}
+                                          R {{ debater.ranks|floatformat:2 }}
+                                        {% else %}R —{% endif %}
+                                      </span>
+                                    {% endif %}
+                                  </span>
+                                {% endif %}
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-6">
-                  <div class="card h-100 border-0 public-ballot-side rounded-lg">
-                    <div class="card-header bg-transparent px-0 pb-1 pt-0 d-flex justify-content-between align-items-center">
-                      <span class="text-uppercase small text-muted">{{ ballot.opp_side }}</span>
-                      {% if ballot.winner_side == 'Opp' %}
-                        <span class="badge badge-secondary rounded-pill">Winner</span>
-                      {% endif %}
-                    </div>
-                    <div class="card-body px-0 pt-0">
-                      <h5 class="font-weight-bold">{{ ballot.opp_team }}</h5>
-                      <ul class="list-unstyled small mb-0">
-                        {% for debater in ballot.opp_debaters %}
-                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
-                          <span>{{ debater.name }}</span>
-                          {% if round_result.include_speaks or round_result.include_ranks %}
-                          <span class="text-nowrap">
-                            {% if round_result.include_speaks %}
-                              <span class="badge badge-light mr-1">
-                                {% if debater.speaks is not None %}
-                                  {{ debater.speaks|floatformat:2 }}
-                                {% else %}—{% endif %}
-                              </span>
-                            {% endif %}
-                            {% if round_result.include_ranks %}
-                              <span class="badge badge-light">
-                                {% if debater.ranks is not None %}
-                                  R {{ debater.ranks|floatformat:2 }}
-                                {% else %}R —{% endif %}
-                              </span>
-                            {% endif %}
-                          </span>
-                          {% endif %}
-                        </li>
-                        {% endfor %}
-                      </ul>
-                    </div>
-                  </div>
+                  {% endfor %}
                 </div>
               </div>
             </div>
           </div>
-        </div>
         {% endfor %}
       </div>
       {% endif %}

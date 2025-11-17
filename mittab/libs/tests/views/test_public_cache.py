@@ -4,8 +4,16 @@ from django.core.cache import caches
 from django.test import TestCase, Client
 from django.urls import reverse
 
-from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
+from mittab.apps.tab.models import (TabSettings, Team, Round, Outround)
+from mittab.apps.tab.public_rankings import (
+    set_ballot_round_settings,
+    set_ranking_settings,
+)
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.tests.views.public_test_utils import (
+    prepare_public_site_state,
+    reset_public_site_state,
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -27,63 +35,12 @@ class TestPublicCache(TestCase):
         self.cache = caches["public"]
         self.cache.clear()
         cache_logic.clear_cache()
-        Team.objects.update(ranking_public=True)
         self.client = Client()
-
-        # Set up outrounds
-        Outround(
-            gov_team=Team.objects.first(),
-            opp_team=Team.objects.last(),
-            num_teams=2,
-            type_of_round=Outround.NOVICE,
-            room=Room.objects.first(),
-        ).save()
-        Outround(
-            gov_team=Team.objects.first(),
-            opp_team=Team.objects.last(),
-            num_teams=2,
-            type_of_round=Outround.VARSITY,
-            room=Room.objects.last(),
-        ).save()
-
-        # Set up test round with missing ballot
-        self.test_round = Round.objects.filter(round_number=1).first()
-        self.original_victor = self.test_round.victor
-        self.test_round.victor = Round.NONE
-        self.test_round.save()
-
-        # Enable all public views
-        # Allow round 1 ballots to be public by ensuring round 2 pairing exists
-        TabSettings.set("cur_round", 3)
-        TabSettings.set("pairing_released", 1)
-        TabSettings.set("judges_public", 1)
-        TabSettings.set("teams_public", 1)
-        TabSettings.set("debaters_public", 1)
-        TabSettings.set("tot_rounds", 5)
-        TabSettings.set("var_teams_visible", 2)
-        TabSettings.set("nov_teams_visible", 2)
-
-        TabSettings.set("public_rankings_team_public", 1)
-        TabSettings.set("public_rankings_team_include_speaks", 0)
-        TabSettings.set("public_rankings_team_max_visible", 1000)
-
-        TabSettings.set("public_rankings_varsity_public", 1)
-        TabSettings.set("public_rankings_varsity_include_speaks", 1)
-        TabSettings.set("public_rankings_varsity_max_visible", 10)
-
-        TabSettings.set("public_rankings_novice_public", 1)
-        TabSettings.set("public_rankings_novice_include_speaks", 0)
-        TabSettings.set("public_rankings_novice_max_visible", 10)
-
-        TabSettings.set("public_ballots_round_1_visible", 1)
-        TabSettings.set("public_ballots_round_1_include_speaks", 0)
-        TabSettings.set("public_ballots_round_1_include_ranks", 0)
+        self.test_round, self.original_victor = prepare_public_site_state()
 
     def tearDown(self):
-        self.test_round.victor = self.original_victor
-        self.test_round.save()
+        reset_public_site_state(self.test_round, self.original_victor)
         self.cache.clear()
-        cache_logic.clear_cache()
         super().tearDown()
 
     def _get_cache_key_count(self):
@@ -248,20 +205,6 @@ class TestPublicCache(TestCase):
                 'enabled': 1,
                 'disabled': 0,
             },
-            {
-                'setting': 'public_rankings_team_public',
-                'url': reverse("rank_teams_public"),
-                'visible_content': team.name,
-                'enabled': 1,
-                'disabled': 0,
-            },
-            {
-                'setting': 'public_ballots_round_1_visible',
-                'url': reverse("public_ballots"),
-                'visible_content': "Public Ballots",
-                'enabled': 1,
-                'disabled': 0,
-            },
         ]
 
         for test in permission_tests:
@@ -282,17 +225,39 @@ class TestPublicCache(TestCase):
             self.assertEqual(response.status_code, 302,
                 f"Should redirect when {test['setting']}={disabled_value}")
 
+        # Team rankings public toggle
+        self.cache.clear()
+        set_ranking_settings("team", public=True, include_speaks=False, max_visible=1000)
+        response = self.client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(team.name, response.content.decode())
+        self.cache.clear()
+        set_ranking_settings("team", public=False, include_speaks=False, max_visible=1000)
+        response = self.client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 302)
+
+        # Ballots visibility toggle
+        self.cache.clear()
+        set_ballot_round_settings(1, visible=True, include_speaks=False, include_ranks=False)
+        response = self.client.get(reverse("public_ballots"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Public Ballots", response.content.decode())
+        self.cache.clear()
+        set_ballot_round_settings(1, visible=False, include_speaks=False, include_ranks=False)
+        response = self.client.get(reverse("public_ballots"))
+        self.assertEqual(response.status_code, 302)
+
         # Speaker results require at least one section to be public
         self.cache.clear()
         response = self.client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 200)
-        TabSettings.set("public_rankings_varsity_public", 0)
-        TabSettings.set("public_rankings_novice_public", 0)
+        set_ranking_settings("varsity", public=False, include_speaks=True, max_visible=10)
+        set_ranking_settings("novice", public=False, include_speaks=False, max_visible=10)
         self.cache.clear()
         response = self.client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 302)
-        TabSettings.set("public_rankings_varsity_public", 1)
-        TabSettings.set("public_rankings_novice_public", 1)
+        set_ranking_settings("varsity", public=True, include_speaks=True, max_visible=10)
+        set_ranking_settings("novice", public=True, include_speaks=False, max_visible=10)
         self.cache.clear()
 
         # Test outround visibility settings

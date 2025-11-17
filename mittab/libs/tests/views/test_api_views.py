@@ -7,6 +7,7 @@ from nplusone.core import profiler
 from mittab.apps.tab.models import (
     Room, TabSettings, Team, Outround, Round
 )
+from mittab.apps.tab.public_rankings import set_standings_publication_setting
 
 
 @pytest.mark.django_db(transaction=True)
@@ -24,8 +25,8 @@ class TestApiViews(TestCase):
         self.client.login(username='testuser', password='testpass123')
 
         TabSettings.set("cur_round", 2)
-        TabSettings.set("standings_speaker_results_published", 1)
-        TabSettings.set("standings_team_results_published", 1)
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", True)
 
         Outround(
             gov_team=Team.objects.first(),
@@ -112,7 +113,7 @@ class TestApiViews(TestCase):
                     f"Expected key '{item_key}' in team stats")
 
     def test_unpublished_results(self):
-        TabSettings.set("standings_speaker_results_published", 0)
+        set_standings_publication_setting("speaker_results", False)
         speaker_api_views = [
             reverse("varsity_speaker_awards_api"),
             reverse("novice_speaker_awards_api"),
@@ -143,8 +144,8 @@ class TestApiViews(TestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
 
-        TabSettings.set("standings_speaker_results_published", 1)
-        TabSettings.set("standings_team_results_published", 0)
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", False)
         for url in team_api_views:
             response = self.client.get(url)
             self.assertEqual(
@@ -160,7 +161,8 @@ class TestApiViews(TestCase):
             self.assertEqual(response.status_code, 200)
 
         # Disable both standings exports and ensure shared endpoints lock
-        TabSettings.set("standings_speaker_results_published", 0)
+        set_standings_publication_setting("speaker_results", False)
+        set_standings_publication_setting("team_results", False)
         for url in shared_api_views:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 423)

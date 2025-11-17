@@ -50,9 +50,7 @@
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 {% url "public_home" as public_home %}
 {% url "tab_login" as staff_login %}
-{% public_team_results_enabled as public_team_results_enabled %}
-{% public_speaker_results_enabled as public_speaker_results_enabled %}
-{% public_ballots_enabled as public_ballots_enabled %}
+{% public_display_flags as public_display_flags %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
@@ -135,13 +133,13 @@
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
-            {% if public_team_results_enabled %}
+            {% if public_display_flags.team_results %}
             <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
             {% endif %}
-            {% if public_speaker_results_enabled %}
+            {% if public_display_flags.speaker_results %}
             <a class="dropdown-item {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
             {% endif %}
-            {% if public_ballots_enabled %}
+            {% if public_display_flags.ballots %}
             <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
             {% endif %}
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
@@ -175,17 +173,17 @@
         <li class="nav-item">
           <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
         </li>
-        {% if public_team_results_enabled %}
+        {% if public_display_flags.team_results %}
         <li class="nav-item">
           <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
         </li>
         {% endif %}
-        {% if public_speaker_results_enabled %}
+        {% if public_display_flags.speaker_results %}
         <li class="nav-item">
           <a class="nav-link {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
         </li>
         {% endif %}
-        {% if public_ballots_enabled %}
+        {% if public_display_flags.ballots %}
         <li class="nav-item">
           <a class="nav-link {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
         </li>

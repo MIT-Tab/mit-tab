@@ -34,16 +34,7 @@
               <tr>
                 <td>{{ standing.label }}</td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="standings_{{ standing.slug }}"
-                           id="standings_{{ standing.slug }}"
-                           class="custom-control-input"
-                           {% if standing.published %}checked{% endif %}>
-                    <label class="custom-control-label" for="standings_{{ standing.slug }}">
-                      {{ standing.published|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name="standings_"|add:standing.slug switch_id="standings_"|add:standing.slug checked=standing.published label=standing.published|yesno:"Enabled,Disabled" %}
                 </td>
               </tr>
               {% endfor %}
@@ -69,28 +60,10 @@
               <tr>
                 <td>{{ ranking.label }}</td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="{{ ranking.slug }}_public"
-                           id="{{ ranking.slug }}_public"
-                           class="custom-control-input"
-                           {% if ranking.public %}checked{% endif %}>
-                    <label class="custom-control-label" for="{{ ranking.slug }}_public">
-                      {{ ranking.public|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name=ranking.slug|add:"_public" switch_id=ranking.slug|add:"_public" checked=ranking.public label=ranking.public|yesno:"Enabled,Disabled" %}
                 </td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="{{ ranking.slug }}_include_speaks"
-                           id="{{ ranking.slug }}_include_speaks"
-                           class="custom-control-input"
-                           {% if ranking.include_speaks %}checked{% endif %}>
-                    <label class="custom-control-label" for="{{ ranking.slug }}_include_speaks">
-                      {{ ranking.include_speaks|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name=ranking.slug|add:"_include_speaks" switch_id=ranking.slug|add:"_include_speaks" checked=ranking.include_speaks label=ranking.include_speaks|yesno:"Enabled,Disabled" %}
                 </td>
                 <td>
                   <input type="number"
@@ -123,45 +96,20 @@
             </thead>
             <tbody>
               {% for ballot in ballot_settings %}
+              {% with round_num=ballot.round_number|stringformat:"s" %}
               <tr>
                 <td>Round {{ ballot.round_number }}</td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="round_{{ ballot.round_number }}_visible"
-                           id="round_{{ ballot.round_number }}_visible"
-                           class="custom-control-input"
-                           {% if ballot.visible %}checked{% endif %}>
-                    <label class="custom-control-label" for="round_{{ ballot.round_number }}_visible">
-                      {{ ballot.visible|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_visible" switch_id="round_"|add:round_num|add:"_visible" checked=ballot.visible label=ballot.visible|yesno:"Enabled,Disabled" %}
                 </td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="round_{{ ballot.round_number }}_include_speaks"
-                           id="round_{{ ballot.round_number }}_include_speaks"
-                           class="custom-control-input"
-                           {% if ballot.include_speaks %}checked{% endif %}>
-                    <label class="custom-control-label" for="round_{{ ballot.round_number }}_include_speaks">
-                      {{ ballot.include_speaks|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_include_speaks" switch_id="round_"|add:round_num|add:"_include_speaks" checked=ballot.include_speaks label=ballot.include_speaks|yesno:"Enabled,Disabled" %}
                 </td>
                 <td class="align-middle">
-                  <div class="custom-control custom-switch mb-0">
-                    <input type="checkbox"
-                           name="round_{{ ballot.round_number }}_include_ranks"
-                           id="round_{{ ballot.round_number }}_include_ranks"
-                           class="custom-control-input"
-                           {% if ballot.include_ranks %}checked{% endif %}>
-                    <label class="custom-control-label" for="round_{{ ballot.round_number }}_include_ranks">
-                      {{ ballot.include_ranks|yesno:"Enabled,Disabled" }}
-                    </label>
-                  </div>
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_include_ranks" switch_id="round_"|add:round_num|add:"_include_ranks" checked=ballot.include_ranks label=ballot.include_ranks|yesno:"Enabled,Disabled" %}
                 </td>
               </tr>
+              {% endwith %}
               {% endfor %}
             </tbody>
           </table>

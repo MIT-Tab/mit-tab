@@ -169,38 +169,45 @@ def rank_teams_public(request):
 
 @cache_public_view(timeout=60)
 def public_speaker_rankings(request):
-    varsity_settings = get_ranking_settings("varsity")
-    novice_settings = get_ranking_settings("novice")
+    ranking_configs = {
+        "varsity": get_ranking_settings("varsity"),
+        "novice": get_ranking_settings("novice"),
+    }
 
-    if not (varsity_settings["public"] or novice_settings["public"]):
+    if not any(config["public"] for config in ranking_configs.values()):
         return redirect("public_access_error")
 
     varsity_speakers, novice_speakers = get_speaker_rankings(None)
-
-    varsity_rows = build_public_speaker_rows(
-        [
+    speaker_lists = {
+        "varsity": [
             entry for entry in varsity_speakers
             if entry[0].novice_status == Debater.VARSITY
         ],
-        varsity_settings["include_speaks"],
-        varsity_settings["max_visible"],
-    )
-    novice_rows = build_public_speaker_rows(
-        novice_speakers,
-        novice_settings["include_speaks"],
-        novice_settings["max_visible"],
-    )
+        "novice": novice_speakers,
+    }
+    rows = {
+        slug: build_public_speaker_rows(
+            speaker_lists[slug],
+            ranking_configs[slug]["include_speaks"],
+            ranking_configs[slug]["max_visible"],
+        )
+        for slug in ranking_configs
+    }
+    sections = [{
+        "title": "Varsity Speakers" if slug == "varsity" else "Novice Speakers",
+        "rows": rows[slug],
+        "show": ranking_configs[slug]["public"],
+        "show_scores": ranking_configs[slug]["include_speaks"],
+        "empty_message": "No varsity speakers are available yet."
+        if slug == "varsity"
+        else "No novice speakers are available yet.",
+    } for slug in ("varsity", "novice")]
 
     return render(
         request,
         "public/public_speaker_rankings.html",
         {
-            "show_varsity": varsity_settings["public"],
-            "show_novice": novice_settings["public"],
-            "varsity_rows": varsity_rows,
-            "novice_rows": novice_rows,
-            "varsity_show_scores": varsity_settings["include_speaks"],
-            "novice_show_scores": novice_settings["include_speaks"],
+            "speaker_sections": sections,
         },
     )
 
@@ -209,24 +216,21 @@ def public_speaker_rankings(request):
 def public_ballots(request):
     tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
     ballot_settings = get_all_ballot_round_settings(tot_rounds)
-    visible_rounds = sorted(
-        (setting for setting in ballot_settings if setting["visible"]),
-        key=lambda setting: setting["round_number"],
-        reverse=True,
-    )
+    visible_rounds = [setting for setting in ballot_settings if setting["visible"]]
 
     if not visible_rounds:
         return redirect("public_access_error")
 
-    round_results = []
-    for setting in visible_rounds:
-        ballots = build_public_ballots_for_round(setting["round_number"])
-        round_results.append({
-            "round_number": setting["round_number"],
-            "ballots": ballots,
-            "include_speaks": setting["include_speaks"],
-            "include_ranks": setting["include_ranks"],
-        })
+    round_results = [{
+        "round_number": setting["round_number"],
+        "ballots": build_public_ballots_for_round(setting["round_number"]),
+        "include_speaks": setting["include_speaks"],
+        "include_ranks": setting["include_ranks"],
+    } for setting in sorted(
+        visible_rounds,
+        key=lambda setting: setting["round_number"],
+        reverse=True,
+    )]
 
     return render(
         request,
@@ -298,15 +302,21 @@ def build_public_team_rows(teams, show_scores):
 
 
 def build_public_speaker_rows(speakers, show_scores, max_visible):
-    limited = speakers[:max_visible]
     rows = []
-    for idx, entry in enumerate(limited, start=1):
+    for idx, entry in enumerate(speakers[:max_visible], start=1):
+        # get_speaker_rankings now returns 5-tuples:
+        # (debater, speaks, ranks, team, tiebreaker). Older data may omit the
+        # tiebreaker, so gracefully handle either shape.
+        if len(entry) == 5:
+            debater, speaks, ranks, team, _tiebreaker = entry
+        else:
+            debater, speaks, ranks, team = entry
         rows.append({
             "place": idx,
-            "debater": entry[0],
-            "speaks": entry[1] if show_scores else None,
-            "ranks": entry[2] if show_scores else None,
-            "team": entry[3],
+            "debater": debater,
+            "speaks": speaks if show_scores else None,
+            "ranks": ranks if show_scores else None,
+            "team": team,
         })
     return rows
 
@@ -325,31 +335,34 @@ def serialize_round_for_public(round_obj):
         winner = round_obj.opp_team
         winner_side = "Opp"
 
+    sides = [{
+        "label": "Gov",
+        "team_name": round_obj.gov_team.display,
+        "is_winner": winner_side == "Gov",
+        "debaters": serialize_debaters(round_obj.gov_team, stats_by_debater),
+    }, {
+        "label": "Opp",
+        "team_name": round_obj.opp_team.display,
+        "is_winner": winner_side == "Opp",
+        "debaters": serialize_debaters(round_obj.opp_team, stats_by_debater),
+    }]
+
     return {
         "round_number": round_obj.round_number,
         "round_label": f"Round {round_obj.round_number}",
-        "gov_team": round_obj.gov_team.display,
-        "opp_team": round_obj.opp_team.display,
-        "gov_side": "Gov",
-        "opp_side": "Opp",
-        "gov_debaters": serialize_debaters(round_obj.gov_team, stats_by_debater),
-        "opp_debaters": serialize_debaters(round_obj.opp_team, stats_by_debater),
         "winner_name": winner.display if winner else None,
         "winner_side": winner_side,
         "victor_display": round_obj.get_victor_display(),
+        "sides": sides,
     }
 
 
 def serialize_debaters(team, stats_by_debater):
-    serialized = []
-    for debater in team.debaters.all():
-        stat = stats_by_debater.get(debater.id)
-        serialized.append({
-            "name": debater.name,
-            "speaks": getattr(stat, "speaks", None),
-            "ranks": getattr(stat, "ranks", None),
-        })
-    return serialized
+    return [{
+        "name": debater.name,
+        "speaks": getattr(stats_by_debater.get(debater.id), "speaks", None),
+        "ranks": getattr(stats_by_debater.get(debater.id), "ranks", None),
+    } for debater in team.debaters.all()]
 
 @cache_public_view(timeout=60)
 def pretty_pair(request):

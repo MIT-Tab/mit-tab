@@ -648,6 +648,7 @@ def public_rankings_control(request):
     tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
 
     if request.method == "POST":
+        validation_errors = []
         standings_settings = get_all_standings_publication_settings()
         for standing in standings_settings:
             slug = standing["slug"]
@@ -659,13 +660,19 @@ def public_rankings_control(request):
             slug = ranking["slug"]
             is_public = bool(request.POST.get(f"{slug}_public"))
             include_speaks = bool(request.POST.get(f"{slug}_include_speaks"))
-            max_visible_raw = request.POST.get(f"{slug}_max_visible")
-            if max_visible_raw is None:
-                max_visible_raw = ranking["max_visible"]
-            try:
-                max_visible = max(1, int(max_visible_raw))
-            except (TypeError, ValueError):
-                max_visible = ranking["max_visible"]
+            raw_max_visible = (request.POST.get(f"{slug}_max_visible") or "").strip()
+            if raw_max_visible:
+                try:
+                    parsed_max_visible = int(raw_max_visible)
+                except (TypeError, ValueError):
+                    parsed_max_visible = ranking["max_visible"]
+                    validation_errors.append(
+                        f"Invalid max visible value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+            else:
+                parsed_max_visible = ranking["max_visible"]
+            max_visible = max(1, parsed_max_visible)
             set_ranking_settings(
                 slug,
                 public=is_public,
@@ -674,21 +681,20 @@ def public_rankings_control(request):
             )
 
         for round_number in range(1, tot_rounds + 1):
-            visible = bool(request.POST.get(f"round_{round_number}_visible"))
-            include_speaks = bool(
-                request.POST.get(f"round_{round_number}_include_speaks")
-            )
-            include_ranks = bool(
-                request.POST.get(f"round_{round_number}_include_ranks")
-            )
             set_ballot_round_settings(
                 round_number,
-                visible=visible,
-                include_speaks=include_speaks,
-                include_ranks=include_ranks,
+                visible=bool(request.POST.get(f"round_{round_number}_visible")),
+                include_speaks=bool(
+                    request.POST.get(f"round_{round_number}_include_speaks")
+                ),
+                include_ranks=bool(
+                    request.POST.get(f"round_{round_number}_include_ranks")
+                ),
             )
 
         invalidate_public_rankings_cache()
+        for message_text in validation_errors:
+            messages.warning(request, message_text)
         messages.success(request, "Public rankings settings saved.")
         return redirect("public_rankings_control")
 

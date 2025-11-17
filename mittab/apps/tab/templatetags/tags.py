@@ -5,11 +5,7 @@ from django.forms.fields import FileField
 
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab.models import TabSettings
-from mittab.apps.tab.public_rankings import (
-    is_ballot_page_public,
-    is_speaker_results_public,
-    is_team_results_public,
-)
+from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
 
@@ -90,16 +86,5 @@ def with_return_to(url):
 
 
 @register.simple_tag
-def public_team_results_enabled():
-    return bool(is_team_results_public())
-
-
-@register.simple_tag
-def public_speaker_results_enabled():
-    return bool(is_speaker_results_public())
-
-
-@register.simple_tag
-def public_ballots_enabled():
-    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
-    return bool(is_ballot_page_public(tot_rounds))
+def public_display_flags():
+    return get_public_display_flags()

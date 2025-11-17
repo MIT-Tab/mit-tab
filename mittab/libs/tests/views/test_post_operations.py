@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from mittab.apps.tab.models import (
     Room, TabSettings, Team, Judge, School, Debater
 )
+from mittab.apps.tab.public_rankings import set_standings_publication_setting
 
 
 @pytest.mark.django_db(transaction=True)
@@ -22,8 +23,8 @@ class TestPostOperations(TestCase):
         )
         self.client.login(username='testuser', password='testpass123')
         TabSettings.set("cur_round", 2)
-        TabSettings.set("standings_speaker_results_published", 1)
-        TabSettings.set("standings_team_results_published", 1)
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", True)
 
     def test_create_operations(self):
         school = School.objects.first()
@@ -125,9 +126,9 @@ class TestPostOperations(TestCase):
         response = self.client.get(reverse("debater_counts_api"))
         self.assertEqual(response.status_code, 200)
 
-        TabSettings.set("standings_speaker_results_published", 0)
-        TabSettings.set("standings_team_results_published", 0)
+        set_standings_publication_setting("speaker_results", False)
+        set_standings_publication_setting("team_results", False)
         response = self.client.get(reverse("debater_counts_api"))
         self.assertEqual(response.status_code, 423)
-        TabSettings.set("standings_speaker_results_published", 1)
-        TabSettings.set("standings_team_results_published", 1)
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", True)
