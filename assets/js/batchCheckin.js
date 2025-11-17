@@ -69,7 +69,7 @@ const submitCheckIn = (checkboxes, checked) => {
     action: checked ? "check_in" : "check_out",
     entity_ids: ids,
     rounds: [...new Set(rounds)].filter((r) => r != null),
-    })
+  })
     .done(() => {
       $boxes.each((_, cb) => {
         const $cb = $(cb);
