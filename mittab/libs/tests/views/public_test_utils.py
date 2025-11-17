@@ -42,9 +42,19 @@ def prepare_public_site_state():
         ("varsity", True, 10),
         ("novice", False, 10),
     ):
-        set_ranking_settings(slug, public=True, include_speaks=include_speaks, max_visible=max_visible)
+        set_ranking_settings(
+            slug,
+            public=True,
+            include_speaks=include_speaks,
+            max_visible=max_visible,
+        )
 
-    set_ballot_round_settings(1, visible=True, include_speaks=False, include_ranks=False)
+    set_ballot_round_settings(
+        1,
+        visible=True,
+        include_speaks=False,
+        include_ranks=False,
+    )
 
     target_round_number = TabSettings.get("cur_round") - 1
     test_round = Round.objects.filter(round_number=target_round_number).first()

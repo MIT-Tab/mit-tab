@@ -5,7 +5,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (Room, TabSettings, Team,
+from mittab.apps.tab.models import (TabSettings, Team,
                                     Round, Outround)
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
@@ -117,33 +117,73 @@ class TestPublicViews(TestCase):
         # Team results page
         response = client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 200)
-        set_ranking_settings("team", public=False, include_speaks=False, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=False,
+            include_speaks=False,
+            max_visible=1000,
+        )
         caches["public"].clear()
         response = client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 302)
-        set_ranking_settings("team", public=True, include_speaks=False, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=True,
+            include_speaks=False,
+            max_visible=1000,
+        )
         caches["public"].clear()
 
         # Speaker results require either varsity or novice to be public
         response = client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 200)
-        set_ranking_settings("varsity", public=False, include_speaks=True, max_visible=10)
-        set_ranking_settings("novice", public=False, include_speaks=False, max_visible=10)
+        set_ranking_settings(
+            "varsity",
+            public=False,
+            include_speaks=True,
+            max_visible=10,
+        )
+        set_ranking_settings(
+            "novice",
+            public=False,
+            include_speaks=False,
+            max_visible=10,
+        )
         caches["public"].clear()
         response = client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 302)
-        set_ranking_settings("varsity", public=True, include_speaks=True, max_visible=10)
-        set_ranking_settings("novice", public=True, include_speaks=False, max_visible=10)
+        set_ranking_settings(
+            "varsity",
+            public=True,
+            include_speaks=True,
+            max_visible=10,
+        )
+        set_ranking_settings(
+            "novice",
+            public=True,
+            include_speaks=False,
+            max_visible=10,
+        )
         caches["public"].clear()
 
         # Ballots page requires at least one round to be visible
         response = client.get(reverse("public_ballots"))
         self.assertEqual(response.status_code, 200)
-        set_ballot_round_settings(1, visible=False, include_speaks=False, include_ranks=False)
+        set_ballot_round_settings(
+            1,
+            visible=False,
+            include_speaks=False,
+            include_ranks=False,
+        )
         caches["public"].clear()
         response = client.get(reverse("public_ballots"))
         self.assertEqual(response.status_code, 302)
-        set_ballot_round_settings(1, visible=True, include_speaks=False, include_ranks=False)
+        set_ballot_round_settings(
+            1,
+            visible=True,
+            include_speaks=False,
+            include_ranks=False,
+        )
         caches["public"].clear()
 
         # Pairings require release toggle
@@ -176,7 +216,12 @@ class TestPublicViews(TestCase):
     def test_team_rankings_without_speaks(self):
         client = Client()
 
-        set_ranking_settings("team", public=True, include_speaks=False, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=True,
+            include_speaks=False,
+            max_visible=1000,
+        )
         caches["public"].clear()
 
         response = client.get(reverse("rank_teams_public"))
@@ -185,7 +230,12 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaks and ranks are hidden", content)
         self.assertNotIn("<th>Speaks</th>", content)
 
-        set_ranking_settings("team", public=True, include_speaks=True, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=True,
+            include_speaks=True,
+            max_visible=1000,
+        )
         caches["public"].clear()
         response = client.get(reverse("rank_teams_public"))
         self.assertIn("<th>Speaks</th>", response.content.decode())
@@ -198,7 +248,12 @@ class TestPublicViews(TestCase):
         self.assertIn("Varsity Speakers", content)
         self.assertIn("Novice Speakers", content)
 
-        set_ranking_settings("varsity", public=False, include_speaks=True, max_visible=10)
+        set_ranking_settings(
+            "varsity",
+            public=False,
+            include_speaks=True,
+            max_visible=10,
+        )
         caches["public"].clear()
         response = client.get(reverse("public_speaker_rankings"))
         content = response.content.decode()
@@ -208,7 +263,12 @@ class TestPublicViews(TestCase):
     def test_public_ballots_include_scores(self):
         client = Client()
 
-        set_ballot_round_settings(1, visible=True, include_speaks=False, include_ranks=False)
+        set_ballot_round_settings(
+            1,
+            visible=True,
+            include_speaks=False,
+            include_ranks=False,
+        )
         caches["public"].clear()
         cache_logic.invalidate_cache("public_ballots_round_1")
 
@@ -216,7 +276,12 @@ class TestPublicViews(TestCase):
         content = response.content.decode()
         self.assertNotIn("badge badge-light", content)
 
-        set_ballot_round_settings(1, visible=True, include_speaks=True, include_ranks=True)
+        set_ballot_round_settings(
+            1,
+            visible=True,
+            include_speaks=True,
+            include_ranks=True,
+        )
         caches["public"].clear()
         cache_logic.invalidate_cache("public_ballots_round_1")
         response = client.get(reverse("public_ballots"))

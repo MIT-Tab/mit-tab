@@ -227,23 +227,43 @@ class TestPublicCache(TestCase):
 
         # Team rankings public toggle
         self.cache.clear()
-        set_ranking_settings("team", public=True, include_speaks=False, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=True,
+            include_speaks=False,
+            max_visible=1000,
+        )
         response = self.client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 200)
         self.assertIn(team.name, response.content.decode())
         self.cache.clear()
-        set_ranking_settings("team", public=False, include_speaks=False, max_visible=1000)
+        set_ranking_settings(
+            "team",
+            public=False,
+            include_speaks=False,
+            max_visible=1000,
+        )
         response = self.client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 302)
 
         # Ballots visibility toggle
         self.cache.clear()
-        set_ballot_round_settings(1, visible=True, include_speaks=False, include_ranks=False)
+        set_ballot_round_settings(
+            1,
+            visible=True,
+            include_speaks=False,
+            include_ranks=False,
+        )
         response = self.client.get(reverse("public_ballots"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("Public Ballots", response.content.decode())
         self.cache.clear()
-        set_ballot_round_settings(1, visible=False, include_speaks=False, include_ranks=False)
+        set_ballot_round_settings(
+            1,
+            visible=False,
+            include_speaks=False,
+            include_ranks=False,
+        )
         response = self.client.get(reverse("public_ballots"))
         self.assertEqual(response.status_code, 302)
 
@@ -251,13 +271,33 @@ class TestPublicCache(TestCase):
         self.cache.clear()
         response = self.client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 200)
-        set_ranking_settings("varsity", public=False, include_speaks=True, max_visible=10)
-        set_ranking_settings("novice", public=False, include_speaks=False, max_visible=10)
+        set_ranking_settings(
+            "varsity",
+            public=False,
+            include_speaks=True,
+            max_visible=10,
+        )
+        set_ranking_settings(
+            "novice",
+            public=False,
+            include_speaks=False,
+            max_visible=10,
+        )
         self.cache.clear()
         response = self.client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 302)
-        set_ranking_settings("varsity", public=True, include_speaks=True, max_visible=10)
-        set_ranking_settings("novice", public=True, include_speaks=False, max_visible=10)
+        set_ranking_settings(
+            "varsity",
+            public=True,
+            include_speaks=True,
+            max_visible=10,
+        )
+        set_ranking_settings(
+            "novice",
+            public=True,
+            include_speaks=False,
+            max_visible=10,
+        )
         self.cache.clear()
 
         # Test outround visibility settings
