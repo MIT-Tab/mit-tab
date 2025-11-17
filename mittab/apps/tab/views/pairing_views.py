@@ -34,8 +34,9 @@ from mittab.libs.cacheing.public_cache import (
 
 
 def invalidate_public_ballot_cache():
-    cache_logic.invalidate_cache("public_ballots_last")
-    cache_logic.invalidate_cache("public_ballots_all")
+    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
+    for round_number in range(1, tot_rounds + 1):
+        cache_logic.invalidate_cache(f"public_ballots_round_{round_number}")
     invalidate_public_rankings_cache()
 
 
@@ -55,8 +56,6 @@ def pair_round(request):
                 invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
-                latest_release_round = max(current_round.value - 2, 0)
-                TabSettings.set("latest_ballots_released", latest_release_round)
                 invalidate_public_ballot_cache()
         except Exception as exp:
             emit_current_exception()
@@ -511,13 +510,6 @@ def view_round(request, round_number):
         round_number=round_number,
         victor=Round.NONE
     ).exists()
-    all_ballots_in = pairing_exists and not outstanding_ballots
-    latest_ballots_released = int(
-        TabSettings.get("latest_ballots_released", 0) or 0
-    )
-    current_round_ballots_released = (
-        round_number > 0 and latest_ballots_released >= round_number
-    )
     excluded_judges = Judge.objects.exclude(
         judges__round_number=round_number).filter(
             checkin__round_number=round_number)
@@ -548,15 +540,6 @@ def view_round(request, round_number):
             ]
         ]))
 
-    if round_number > 0:
-        ballot_release_button_text = (
-            f"Stop showing round {round_number} ballots"
-            if current_round_ballots_released else
-            f"Show round {round_number} ballots"
-        )
-    else:
-        ballot_release_button_text = "Show ballots"
-
     context = {
         "errors": errors,
         "excluded_teams": excluded_teams,
@@ -567,10 +550,6 @@ def view_round(request, round_number):
         "all_judges_in_round": all_judges_in_round,
         "judge_rejudge_counts": judge_rejudge_counts,
         "round_number": round_number,
-        "all_ballots_in": all_ballots_in,
-        "latest_ballots_released": latest_ballots_released,
-        "current_round_ballots_released": current_round_ballots_released,
-        "ballot_release_button_text": ballot_release_button_text,
         "excluded_teams_no_bye": excluded_teams_no_bye,
         "num_excluded": num_excluded,
         "simulate_round_button": simulate_round_button,
@@ -826,49 +805,6 @@ def toggle_pairing_released(request):
     invalidate_inround_public_pairings_cache()
 
     data = {"success": True, "pairing_released": new_value == 1}
-    return JsonResponse(data)
-
-
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
-def toggle_current_round_ballots(request):
-    current_round_number = TabSettings.get("cur_round") - 1
-    action = request.GET.get("action", "advance")
-
-    outstanding_ballots = Round.objects.filter(
-        round_number=current_round_number,
-        victor=Round.NONE,
-    ).exists()
-
-    latest_ballots_released = int(
-        TabSettings.get("latest_ballots_released", 0) or 0
-    )
-    auto_release_round = max(TabSettings.get("cur_round", 1) - 2, 0)
-
-    if action == "advance":
-        if outstanding_ballots:
-            return JsonResponse({
-                "success": False,
-                "error": "please wait until all ballots are in",
-                "all_ballots_in": False,
-            })
-        latest_ballots_released = max(latest_ballots_released, current_round_number)
-    elif action == "revert":
-        latest_ballots_released = auto_release_round
-    else:
-        return JsonResponse({"success": False, "error": "Invalid action specified."})
-
-    TabSettings.set("latest_ballots_released", latest_ballots_released)
-    invalidate_public_ballot_cache()
-
-    data = {
-        "success": True,
-        "round_number": current_round_number,
-        "latest_ballots_released": latest_ballots_released,
-        "current_round_ballots_released": (
-            current_round_number > 0 and latest_ballots_released >= current_round_number
-        ),
-        "all_ballots_in": not outstanding_ballots,
-    }
     return JsonResponse(data)
 
 

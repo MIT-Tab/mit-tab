@@ -144,6 +144,8 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     _delete_key_for_all_auth_states("rank_teams_public")
+    _delete_key_for_all_auth_states("public_speaker_rankings")
+    _delete_key_for_all_auth_states("public_ballots")
 
 
 def invalidate_all_public_caches(*_args, **_kwargs):
@@ -160,6 +162,8 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_view_judges")
     _delete_key_for_all_auth_states("public_view_teams")
     _delete_key_for_all_auth_states("rank_teams_public")
+    _delete_key_for_all_auth_states("public_speaker_rankings")
+    _delete_key_for_all_auth_states("public_ballots")
     _delete_key_for_all_auth_states("e_ballot_search_page")
 
     # Invalidate outrounds for both divisions

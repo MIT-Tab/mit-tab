@@ -143,3 +143,24 @@ def new_schools_api(request):
             school_names.add(debater["team__school__name"])
 
     return JsonResponse({"new_schools": list(school_names)})
+
+
+def debater_counts_api(request):
+    teams_with_min_rounds = list(_get_teams_with_min_rounds())
+    team_count = Team.objects.filter(pk__in=teams_with_min_rounds).count()
+    novice_count = Debater.objects.filter(
+        team__pk__in=teams_with_min_rounds,
+        novice_status=Debater.NOVICE,
+    ).count()
+    varsity_count = Debater.objects.filter(
+        team__pk__in=teams_with_min_rounds,
+        novice_status=Debater.VARSITY,
+    ).count()
+
+    return JsonResponse({
+        "debater_counts": {
+            "varsity": varsity_count,
+            "novice": novice_count,
+            "teams": team_count,
+        },
+    })

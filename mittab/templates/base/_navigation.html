@@ -43,11 +43,16 @@
 {% url "public_judges" as public_judges %}
 {% url "public_teams" as public_teams %}
 {% url "rank_teams_public" as public_team_rankings %}
+{% url "public_rankings_control" as public_rankings_control %}
+{% url "public_speaker_rankings" as public_speaker_rankings %}
+{% url "public_ballots" as public_ballots %}
 {% url "outround_pretty_pair" 0 as public_outround_varsity %}
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 {% url "public_home" as public_home %}
 {% url "tab_login" as staff_login %}
-{% public_ranking_mode_value as public_ranking_mode %}
+{% public_team_results_enabled as public_team_results_enabled %}
+{% public_speaker_results_enabled as public_speaker_results_enabled %}
+{% public_ballots_enabled as public_ballots_enabled %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
@@ -80,6 +85,7 @@
             <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams|with_return_to }}">Team Ranking</a>
             <a class="dropdown-item {% active request round_stats %}" href="{{ round_stats }}">Round Stats</a>
             <a class="dropdown-item {% active request forum_post %}" href="{{ forum_post|with_return_to }}">Forum Post Results</a>
+            <a class="dropdown-item {% active request public_rankings_control %}" href="{{ public_rankings_control|with_return_to }}">Public Rankings Control</a>
           </div>
         </li>
 
@@ -129,8 +135,14 @@
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
-            {% if public_ranking_mode %}
-            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Results</a>
+            {% if public_team_results_enabled %}
+            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+            {% endif %}
+            {% if public_speaker_results_enabled %}
+            <a class="dropdown-item {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
+            {% endif %}
+            {% if public_ballots_enabled %}
+            <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
             {% endif %}
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
@@ -163,9 +175,19 @@
         <li class="nav-item">
           <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
         </li>
-        {% if public_ranking_mode %}
+        {% if public_team_results_enabled %}
         <li class="nav-item">
-          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Results</a>
+          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+        </li>
+        {% endif %}
+        {% if public_speaker_results_enabled %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
+        </li>
+        {% endif %}
+        {% if public_ballots_enabled %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
         </li>
         {% endif %}
         <li class="nav-item">

@@ -5,7 +5,6 @@ from django.test import TestCase, Client
 from django.urls import reverse
 
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
-from mittab.apps.tab.public_rankings import PublicRankingMode
 from mittab.libs.cacheing import cache_logic
 
 
@@ -59,11 +58,26 @@ class TestPublicCache(TestCase):
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
-        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
-        TabSettings.set("public_ballot_show_speaks", 0)
         TabSettings.set("debaters_public", 1)
+        TabSettings.set("tot_rounds", 5)
         TabSettings.set("var_teams_visible", 2)
         TabSettings.set("nov_teams_visible", 2)
+
+        TabSettings.set("public_rankings_team_public", 1)
+        TabSettings.set("public_rankings_team_include_speaks", 0)
+        TabSettings.set("public_rankings_team_max_visible", 1000)
+
+        TabSettings.set("public_rankings_varsity_public", 1)
+        TabSettings.set("public_rankings_varsity_include_speaks", 1)
+        TabSettings.set("public_rankings_varsity_max_visible", 10)
+
+        TabSettings.set("public_rankings_novice_public", 1)
+        TabSettings.set("public_rankings_novice_include_speaks", 0)
+        TabSettings.set("public_rankings_novice_max_visible", 10)
+
+        TabSettings.set("public_ballots_round_1_visible", 1)
+        TabSettings.set("public_ballots_round_1_include_speaks", 0)
+        TabSettings.set("public_ballots_round_1_include_ranks", 0)
 
     def tearDown(self):
         self.test_round.victor = self.original_victor
@@ -89,6 +103,8 @@ class TestPublicCache(TestCase):
             reverse("public_judges"),
             reverse("public_teams"),
             reverse("rank_teams_public"),
+            reverse("public_speaker_rankings"),
+            reverse("public_ballots"),
             reverse("pretty_pair"),
             reverse("missing_ballots"),
             reverse("public_home"),
@@ -181,6 +197,8 @@ class TestPublicCache(TestCase):
             reverse("public_judges"),
             reverse("public_teams"),
             reverse("rank_teams_public"),
+            reverse("public_speaker_rankings"),
+            reverse("public_ballots"),
             reverse("pretty_pair"),
             reverse("public_home"),
         ]
@@ -231,11 +249,18 @@ class TestPublicCache(TestCase):
                 'disabled': 0,
             },
             {
-                'setting': 'public_ranking_mode',
+                'setting': 'public_rankings_team_public',
                 'url': reverse("rank_teams_public"),
                 'visible_content': team.name,
-                'enabled': PublicRankingMode.TEAM,
-                'disabled': PublicRankingMode.NONE,
+                'enabled': 1,
+                'disabled': 0,
+            },
+            {
+                'setting': 'public_ballots_round_1_visible',
+                'url': reverse("public_ballots"),
+                'visible_content': "Public Ballots",
+                'enabled': 1,
+                'disabled': 0,
             },
         ]
 
@@ -256,6 +281,19 @@ class TestPublicCache(TestCase):
             response = self.client.get(test['url'])
             self.assertEqual(response.status_code, 302,
                 f"Should redirect when {test['setting']}={disabled_value}")
+
+        # Speaker results require at least one section to be public
+        self.cache.clear()
+        response = self.client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        TabSettings.set("public_rankings_varsity_public", 0)
+        TabSettings.set("public_rankings_novice_public", 0)
+        self.cache.clear()
+        response = self.client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 302)
+        TabSettings.set("public_rankings_varsity_public", 1)
+        TabSettings.set("public_rankings_novice_public", 1)
+        self.cache.clear()
 
         # Test outround visibility settings
         outround_tests = [

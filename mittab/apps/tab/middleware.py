@@ -4,7 +4,10 @@ from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.public_rankings import (
+    is_speaker_standings_published,
+    is_team_standings_published,
+)
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
@@ -13,13 +16,30 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/public/teams/",
                    "/public/judges/",
                    "/public/team-rankings/",
+                   "/public/speaker-rankings/",
+                   "/public/ballots/",
                    "/public/outrounds/0/", "/public/outrounds/1/",
                    "/json", "/api/varsity-speaker-awards",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
-                   "/api/new-debater-data", "/api/new-schools", "/favicon.ico")
+                   "/api/new-debater-data", "/api/new-schools",
+                   "/api/debater-counts", "/favicon.ico")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
+SPEAKER_API_PATHS = frozenset({
+    "/api/varsity-speaker-awards",
+    "/api/novice-speaker-awards",
+})
+TEAM_API_PATHS = frozenset({
+    "/api/varsity-team-placements",
+    "/api/novice-team-placements",
+    "/api/non-placing-teams",
+})
+SHARED_API_PATHS = frozenset({
+    "/api/new-debater-data",
+    "/api/new-schools",
+    "/api/debater-counts",
+})
 
 
 class Login:
@@ -56,11 +76,30 @@ class TournamentStatusCheck:
         self.get_response = get_response
 
     def __call__(self, request):
-        if not request.path.startswith("/api/"):
+        path = request.path
+        if not path.startswith("/api/"):
             return self.get_response(request)
 
-        if not TabSettings.get("results_published", False):
-            return JsonResponse({"error": "Results not published"}, status=423)
+        speaker_published = is_speaker_standings_published()
+        team_published = is_team_standings_published()
+
+        if path in SPEAKER_API_PATHS and not speaker_published:
+            return JsonResponse(
+                {"error": "Speaker results not published"},
+                status=423,
+            )
+
+        if path in TEAM_API_PATHS and not team_published:
+            return JsonResponse(
+                {"error": "Team results not published"},
+                status=423,
+            )
+
+        if path in SHARED_API_PATHS and not (speaker_published or team_published):
+            return JsonResponse(
+                {"error": "Standings data not published"},
+                status=423,
+            )
 
         return self.get_response(request)
 

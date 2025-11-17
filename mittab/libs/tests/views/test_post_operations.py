@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater, Round
+    Room, TabSettings, Team, Judge, School, Debater
 )
 
 
@@ -22,6 +22,8 @@ class TestPostOperations(TestCase):
         )
         self.client.login(username='testuser', password='testpass123')
         TabSettings.set("cur_round", 2)
+        TabSettings.set("standings_speaker_results_published", 1)
+        TabSettings.set("standings_team_results_published", 1)
 
     def test_create_operations(self):
         school = School.objects.first()
@@ -119,33 +121,13 @@ class TestPostOperations(TestCase):
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
-    def test_toggle_current_round_ballots_view(self):
-        Round.objects.filter(round_number=1).update(victor=Round.GOV)
-
-        response = self.client.get(
-            reverse("toggle_current_round_ballots"),
-            {"action": "advance"},
-        )
+    def test_debater_counts_api_permission_flow(self):
+        response = self.client.get(reverse("debater_counts_api"))
         self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload["success"])
-        self.assertTrue(payload["current_round_ballots_released"])
 
-        response = self.client.get(
-            reverse("toggle_current_round_ballots"),
-            {"action": "revert"},
-        )
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload["success"])
-        self.assertFalse(payload["current_round_ballots_released"])
-
-        Round.objects.filter(round_number=1).update(victor=Round.NONE)
-        response = self.client.get(
-            reverse("toggle_current_round_ballots"),
-            {"action": "advance"},
-        )
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertFalse(payload["success"])
-        self.assertIn("ballots", payload["error"])
+        TabSettings.set("standings_speaker_results_published", 0)
+        TabSettings.set("standings_team_results_published", 0)
+        response = self.client.get(reverse("debater_counts_api"))
+        self.assertEqual(response.status_code, 423)
+        TabSettings.set("standings_speaker_results_published", 1)
+        TabSettings.set("standings_team_results_published", 1)
