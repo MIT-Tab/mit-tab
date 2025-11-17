@@ -5,7 +5,6 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
     add_scratches_for_school_affil
@@ -25,10 +24,10 @@ def perform_the_break():
         None
     )
 
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 0)
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if nov_teams_to_break is None or var_teams_to_break is None:
         return False, "Please check your break tab settings"
 
     # This forces a refresh of the breaking teams
@@ -85,33 +84,6 @@ def is_pairing_possible(num_teams):
     # byes or noshows for teams that debated
     round_to_check = TabSettings.get("tot_rounds", 5)
     have_properly_entered_data(round_to_check)
-
-
-def get_next_available_room(num_teams, type_of_break):
-    base_queryset = Outround.objects.filter(num_teams=num_teams,
-                                            type_of_round=type_of_break)
-
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
-
-    if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / var_to_nov)
-    else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
-
-    rooms = [r.room
-             for r in RoomCheckIn.objects.filter(round_number=0)
-             .prefetch_related("room")]
-    rooms.sort(key=lambda r: r.rank, reverse=True)
-
-    for room in rooms:
-        if not base_queryset.filter(room=room).exists() and \
-           not other_queryset.filter(room=room).exists():
-            return room
-    return None
 
 
 def gov_team(team_one, team_two):
@@ -173,6 +145,14 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
     num_teams = teams_for_bracket
 
+    if num_teams < 2:
+        Outround.objects.filter(type_of_round=type_of_break).delete()
+        if type_of_break == BreakingTeam.VARSITY:
+            TabSettings.set("var_outrounds_public", 0)
+        else:
+            TabSettings.set("nov_outrounds_public", 0)
+        return
+
     is_pairing_possible(num_teams)
 
     Outround.objects.filter(
@@ -209,7 +189,6 @@ def pair(type_of_break=BreakingTeam.VARSITY):
             type_of_round=type_of_break,
             gov_team=gov.team,
             opp_team=opp.team,
-            room=get_next_available_room(num_teams,
-                                         type_of_break=type_of_break),
+            room=None,
             sidelock=sidelock
         )

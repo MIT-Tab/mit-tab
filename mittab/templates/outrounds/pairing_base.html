@@ -15,6 +15,11 @@
       <small class="{% if not errors or num_excluded == 0 %}text-success{% else %}text-danger{% endif %}">
           {% if not errors or num_excluded == 0 %} Valid {% else %} Invalid {% endif %} pairing
       </small>
+      {% if concurrent_round %}
+      <div class="small text-muted">
+        Concurrent with {{ concurrent_round }}
+      </div>
+      {% endif %}
         </h3>
     </div>
     <div class="col">
@@ -41,6 +46,17 @@
             {% return_to_input request.path %}
             <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
+            </button>
+          </form>
+          <form action="/outround_pairing/assign_rooms/{{ type_of_round }}/"
+              method="post"
+              onsubmit="return confirm('Assign rooms to this round? Existing assignments will be replaced.')"
+              class="d-inline"
+          >
+            {% csrf_token %}
+            {% return_to_input request.path %}
+            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-warning" title="Assign rooms to your pairing">
+              <i class="fas fa-chalkboard-teacher"></i> Assign Rooms
             </button>
           </form>
           <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"

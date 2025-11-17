@@ -454,9 +454,13 @@ class Outround(models.Model):
         (GOV_VIA_FORFEIT, "GOV via Forfeit"),
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
-    room = models.ForeignKey(Room,
-                             on_delete=models.CASCADE,
-                             related_name="rooms_outrounds")
+    room = models.ForeignKey(
+        Room,
+        on_delete=models.CASCADE,
+        related_name="rooms_outrounds",
+        null=True,
+        blank=True,
+    )
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
 
     sidelock = models.BooleanField(default=False)

@@ -10,12 +10,14 @@ from django.shortcuts import redirect, reverse
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.libs import assign_judges
+from mittab.libs import assign_judges, assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
 import mittab.libs.outround_tab_logic as outround_tab_logic
-from mittab.libs.outround_tab_logic import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import (
+    get_concurrent_round,
+)
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 import mittab.libs.backup as backup
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -53,8 +55,12 @@ def pair_next_outround(request, num_teams, type_of_round):
 
     check_status = []
 
-    judges = outround_tab_logic.have_enough_judges_type(type_of_round)
-    rooms = outround_tab_logic.have_enough_rooms_type(type_of_round)
+    judges = outround_tab_logic.have_enough_judges_type(
+        type_of_round, num_teams=num_teams
+    )
+    rooms = outround_tab_logic.have_enough_rooms_type(
+        type_of_round, num_teams=num_teams
+    )
 
     msg = (
         "Enough judges checked in for Out-rounds? "
@@ -109,44 +115,131 @@ def pair_next_outround(request, num_teams, type_of_round):
     return render(request, "pairing/pair_round.html", context)
 
 
-def get_outround_options(var_teams_to_break,
-                         nov_teams_to_break):
+def get_outround_options(var_teams_to_break, nov_teams_to_break):
     outround_options = []
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
-        var_teams_to_break += 1
+    def round_sizes(initial):
+        teams = max(initial or 0, 0)
+        if teams < 2:
+            return []
+        size = 1
+        while size < teams:
+            size <<= 1
+        sizes = []
+        while size > 1:
+            sizes.append(size)
+            size //= 2
+        return sizes
 
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
-        nov_teams_to_break += 1
-
-    while var_teams_to_break > 1:
-        if Outround.objects.filter(type_of_round=BreakingTeam.VARSITY,
-                                   num_teams=var_teams_to_break).exists():
+    for size in round_sizes(var_teams_to_break):
+        if Outround.objects.filter(
+            type_of_round=BreakingTeam.VARSITY,
+            num_teams=size,
+        ).exists():
             outround_options.append(
-                (reverse("outround_pairing_view", kwargs={
-                    "type_of_round": BreakingTeam.VARSITY,
-                    "num_teams": int(var_teams_to_break)}),
-                 f"[V] Ro{int(var_teams_to_break)}")
+                (
+                    reverse(
+                        "outround_pairing_view",
+                        kwargs={
+                            "type_of_round": BreakingTeam.VARSITY,
+                            "num_teams": int(size),
+                        },
+                    ),
+                    f"[V] Ro{int(size)}",
+                )
             )
-        var_teams_to_break /= 2
 
-    while nov_teams_to_break > 1:
-        if Outround.objects.filter(type_of_round=BreakingTeam.NOVICE,
-                                   num_teams=nov_teams_to_break).exists():
+    for size in round_sizes(nov_teams_to_break):
+        if Outround.objects.filter(
+            type_of_round=BreakingTeam.NOVICE,
+            num_teams=size,
+        ).exists():
             outround_options.append(
-                (reverse("outround_pairing_view", kwargs={
-                    "type_of_round": BreakingTeam.NOVICE,
-                    "num_teams": int(nov_teams_to_break)}),
-                 f"[N] Ro{int(nov_teams_to_break)}")
+                (
+                    reverse(
+                        "outround_pairing_view",
+                        kwargs={
+                            "type_of_round": BreakingTeam.NOVICE,
+                            "num_teams": int(size),
+                        },
+                    ),
+                    f"[N] Ro{int(size)}",
+                )
             )
-        nov_teams_to_break /= 2
 
     return outround_options
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def break_teams(request):
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 0)
+    novice_concurrent_var_round = TabSettings.get(
+        "novice_concurrent_var_round", 0
+    )
+    def get_var_round_options(var_value):
+        sizes = []
+        if not var_value or var_value < 2:
+            return sizes
+        normalized = 1
+        while normalized < var_value:
+            normalized *= 2
+        size = normalized
+        while size >= 2:
+            sizes.append(size)
+            size //= 2
+        return sizes
+    var_round_options = get_var_round_options(var_teams_to_break)
+
+    def parse_break_settings():
+        try:
+            var_value = int(request.POST.get("var_teams_to_break", var_teams_to_break))
+            nov_value = int(request.POST.get("nov_teams_to_break", nov_teams_to_break))
+        except (TypeError, ValueError):
+            raise ValueError("Varsity and Novice teams to break must be integers.")
+
+        if var_value < 2:
+            raise ValueError("You must break at least two varsity teams.")
+
+        if nov_value < 0:
+            raise ValueError("Novice teams to break cannot be negative.")
+
+        concurrency_raw = request.POST.get("novice_concurrent_var_round", "")
+        try:
+            concurrency = int(concurrency_raw) if concurrency_raw else 0
+        except ValueError:
+            raise ValueError("Invalid concurrent round selection.")
+
+        if nov_value >= 2 and concurrency:
+            if concurrency < nov_value or concurrency % nov_value != 0:
+                raise ValueError(
+                    "Concurrent round must be a varsity round at least as large as the novice break "
+                    "and divisible by it."
+                )
+        else:
+            concurrency = 0
+
+        return var_value, nov_value, concurrency
+
     if request.method == "POST":
+        try:
+            var_value, nov_value, concurrency = parse_break_settings()
+        except ValueError as exc:
+            return redirect_and_flash_error(
+                request,
+                str(exc),
+                path=reverse("break"),
+            )
+
+        TabSettings.set("var_teams_to_break", var_value)
+        TabSettings.set("nov_teams_to_break", nov_value)
+        TabSettings.set("novice_concurrent_var_round", concurrency)
+
+        var_teams_to_break = var_value
+        nov_teams_to_break = nov_value
+        novice_concurrent_var_round = concurrency
+        var_round_options = get_var_round_options(var_teams_to_break)
+
         # Perform the break
         backup.backup_round(btype=backup.BEFORE_BREAK)
 
@@ -209,6 +302,12 @@ def break_teams(request):
         "ready_to_pair": ready_to_pair,
         "ready_to_pair_alt": ready_to_pair_alt,
         "rooms": rooms,
+        "break_settings": {
+            "var_teams": var_teams_to_break,
+            "nov_teams": nov_teams_to_break,
+            "concurrent_round": novice_concurrent_var_round,
+            "var_round_options": var_round_options,
+        },
     }
     return render(request, "pairing/pair_round.html", context)
 
@@ -239,8 +338,8 @@ def outround_pairing_view(request,
     label = (
         f"[{'V' if type_of_round == BreakingTeam.VARSITY else 'N'}] Ro{num_teams}"
     )
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 0)
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
 
     if not nov_teams_to_break or not var_teams_to_break:
         return redirect_and_flash_error(request,
@@ -250,25 +349,19 @@ def outround_pairing_view(request,
     outround_options = get_outround_options(var_teams_to_break,
                                             nov_teams_to_break)
 
-    outrounds = Outround.objects.filter(type_of_round=type_of_round,
-                                        num_teams=num_teams).all()
+    outrounds = Outround.objects.filter(
+        type_of_round=type_of_round,
+        num_teams=num_teams
+    ).all()
 
-    judges_per_panel = TabSettings.get("var_panel_size", 3) \
-        if type_of_round == BreakingTeam.VARSITY \
+    judges_per_panel = (
+        TabSettings.get("var_panel_size", 3)
+        if type_of_round == BreakingTeam.VARSITY
         else TabSettings.get("nov_panel_size", 3)
+    )
     judge_slots = [i for i in range(1, judges_per_panel + 1)]
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
-
-    other_round_type = BreakingTeam.VARSITY \
-        if type_of_round == BreakingTeam.NOVICE \
-        else BreakingTeam.NOVICE
+    concurrent_round = get_concurrent_round(type_of_round, num_teams)
 
     pairing_exists = len(outrounds) > 0
 
@@ -294,53 +387,74 @@ def outround_pairing_view(request,
         opp_team=t
     ).exists()]
 
-    excluded_judges = Judge.objects.exclude(
+    judges_base = Judge.objects.exclude(
         judges_outrounds__num_teams=num_teams,
         judges_outrounds__type_of_round=type_of_round,
-    ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).filter(
-        checkin__round_number=0
+    )
+    if concurrent_round:
+        judges_base = judges_base.exclude(
+            judges_outrounds__num_teams=concurrent_round[1],
+            judges_outrounds__type_of_round=concurrent_round[0],
+        )
+    judges_base = judges_base.prefetch_related("scratches").distinct()
+
+    excluded_judges = list(
+        judges_base.filter(checkin__round_number=0)
+    )
+    non_checkins = list(
+        judges_base.exclude(checkin__round_number=0)
     )
 
-    non_checkins = Judge.objects.exclude(
-        judges_outrounds__num_teams=num_teams,
-        judges_outrounds__type_of_round=type_of_round
+    available_rooms_qs = Room.objects.filter(
+        roomcheckin__round_number=0
     ).exclude(
-        judges_outrounds__type_of_round=other_round_type,
-        judges_outrounds__num_teams=other_round_num
-    ).exclude(
-        checkin__round_number=0
-    )
-
-    available_rooms = Room.objects.exclude(
         rooms_outrounds__num_teams=num_teams,
         rooms_outrounds__type_of_round=type_of_round
-    ).exclude(
-        rooms_outrounds__num_teams=other_round_num,
-        rooms_outrounds__type_of_round=other_round_type
     )
-
-    checked_in_rooms = [r.room for r in RoomCheckIn.objects.filter(round_number=0)]
-    available_rooms = [r for r in available_rooms if r in checked_in_rooms]
+    if concurrent_round:
+        available_rooms_qs = available_rooms_qs.exclude(
+            rooms_outrounds__num_teams=concurrent_round[1],
+            rooms_outrounds__type_of_round=concurrent_round[0]
+        )
+    available_rooms = list(
+        available_rooms_qs.distinct().order_by("-rank")
+    )
 
     size = max(list(
         map(
             len,
             [excluded_teams, excluded_judges, non_checkins, available_rooms]
-        )))
+        ))) if any([excluded_teams, excluded_judges, non_checkins, available_rooms]) else 0
     # The minimum rank you want to warn on
     warning = 5
-    excluded_people = list(
-        zip(*[
-            x + [""] * (size - len(x)) for x in [
-                list(excluded_teams),
-                list(excluded_judges),
-                list(non_checkins),
-                list(available_rooms)
-            ]
-        ]))
+    excluded_people = []
+    if size:
+        excluded_people = list(
+            zip(*[
+                x + [""] * (size - len(x)) for x in [
+                    list(excluded_teams),
+                    list(excluded_judges),
+                    list(non_checkins),
+                    list(available_rooms)
+                ]
+            ]))
+
+    round_judges_status = outround_tab_logic.have_enough_judges_type(
+        type_of_round, num_teams=num_teams
+    )
+    round_rooms_status = outround_tab_logic.have_enough_rooms_type(
+        type_of_round, num_teams=num_teams
+    )
+
+    concurrent_round_label = None
+    if type_of_round == BreakingTeam.VARSITY:
+        nov_config = TabSettings.get("nov_teams_to_break", 0)
+        if nov_config and nov_config >= 2:
+            concurrent_round_label = f"[N] Ro{int(nov_config)}"
+    else:
+        var_config = TabSettings.get("novice_concurrent_var_round", 0)
+        if var_config and var_config >= 2:
+            concurrent_round_label = f"[V] Ro{int(var_config)}"
 
     context = {
         "choice": choice,
@@ -352,9 +466,6 @@ def outround_pairing_view(request,
         "outrounds": outrounds,
         "judges_per_panel": judges_per_panel,
         "judge_slots": judge_slots,
-        "var_to_nov": var_to_nov,
-        "other_round_num": other_round_num,
-        "other_round_type": other_round_type,
         "pairing_exists": pairing_exists,
         "excluded_teams": excluded_teams,
         "excluded_judges": excluded_judges,
@@ -363,6 +474,9 @@ def outround_pairing_view(request,
         "size": size,
         "warning": warning,
         "excluded_people": excluded_people,
+        "round_judges_status": round_judges_status,
+        "round_rooms_status": round_rooms_status,
+        "concurrent_round": concurrent_round_label,
     }
 
     return render(
@@ -387,41 +501,24 @@ def alternative_judges(request, round_id, judge_id=None):
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    concurrent_round = get_concurrent_round(
+        round_obj.type_of_round, round_obj.num_teams
+    )
 
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = round_obj.num_teams / var_to_nov
-    if round_obj.type_of_round == BreakingTeam.NOVICE:
-        other_round_num = round_obj.num_teams * var_to_nov
-
-    other_round_type = BreakingTeam.NOVICE \
-        if round_obj.type_of_round == BreakingTeam.VARSITY \
-        else BreakingTeam.VARSITY
-
-    excluded_judges = Judge.objects.exclude(
+    excluded_judges_qs = Judge.objects.exclude(
         judges_outrounds__num_teams=round_obj.num_teams,
         judges_outrounds__type_of_round=round_obj.type_of_round
-    ).exclude(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    ).filter(
+    )
+    if concurrent_round:
+        excluded_judges_qs = excluded_judges_qs.exclude(
+            judges_outrounds__num_teams=concurrent_round[1],
+            judges_outrounds__type_of_round=concurrent_round[0]
+        )
+    excluded_judges = excluded_judges_qs.filter(
         checkin__round_number=0
-    ).prefetch_related("scratches")
+    ).distinct().prefetch_related("scratches")
 
-    query = Q(
-        judges_outrounds__num_teams=round_obj.num_teams,
-        judges_outrounds__type_of_round=round_obj.type_of_round
-    )
-    query = query | Q(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    )
-
-    included_judges = Judge.objects.filter(query) \
-                                   .filter(checkin__round_number=0) \
-                                   .distinct() \
-                                   .prefetch_related("scratches")
+    included_judges = round_obj.judges.prefetch_related("scratches").all()
 
     scratched_team_ids = {round_gov.id, round_opp.id}
 
@@ -451,9 +548,6 @@ def alternative_judges(request, round_id, judge_id=None):
         "current_judge_obj": current_judge_obj,
         "current_judge_name": current_judge_name,
         "current_judge_rank": current_judge_rank,
-        "var_to_nov": var_to_nov,
-        "other_round_num": other_round_num,
-        "other_round_type": other_round_type,
         "excluded_judges": excluded_judges,
         "included_judges": included_judges,
         "is_outround": is_outround,
@@ -729,6 +823,9 @@ def forum_view(request, type_of_round):
 def alternative_rooms(request, round_id, current_room_id=None):
     round_obj = Outround.objects.get(id=int(round_id))
     num_teams = round_obj.num_teams
+    concurrent_round = get_concurrent_round(
+        round_obj.type_of_round, round_obj.num_teams
+    )
 
     current_room_obj = None
     if current_room_id is not None:
@@ -737,11 +834,23 @@ def alternative_rooms(request, round_id, current_room_id=None):
         except Room.DoesNotExist:
             pass
 
-    rooms = set(Room.objects.filter(
+    rooms_qs = Room.objects.filter(
         roomcheckin__round_number=0
-    ).annotate(
-        has_round=Exists(Outround.objects.filter(room_id=OuterRef("id"),
-                                                 num_teams=num_teams))
+    )
+    if concurrent_round:
+        rooms_qs = rooms_qs.exclude(
+            rooms_outrounds__num_teams=concurrent_round[1],
+            rooms_outrounds__type_of_round=concurrent_round[0],
+        )
+
+    rooms = set(rooms_qs.annotate(
+        has_round=Exists(
+            Outround.objects.filter(
+                room_id=OuterRef("id"),
+                num_teams=num_teams,
+                type_of_round=round_obj.type_of_round,
+            )
+        )
     ).order_by("-rank"))
 
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, rooms))
@@ -760,6 +869,12 @@ def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
         return redirect_and_flash_error(request, "Invalid round type specified.")
     num_teams = Outround.objects.filter(type_of_round=round_type
                                         ).aggregate(Min("num_teams"))["num_teams__min"]
+    if not num_teams:
+        return redirect_and_flash_error(
+            request,
+            "No outround pairings exist for this bracket.",
+        )
+    redirect_target = f"/outround_pairing/{round_type}/{num_teams}"
 
     if request.method == "POST":
         try:
@@ -772,4 +887,37 @@ def assign_judges_to_pairing(request, round_type=Outround.VARSITY):
             emit_current_exception()
             return redirect_and_flash_error(request,
                                             "Got error during judge assignment")
-    return redirect(f"/outround_pairing/{round_type}/{num_teams}")
+    return redirect(redirect_target)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def assign_rooms_to_outround_pairing(request, round_type=Outround.VARSITY):
+    valid_round_types = dict(Outround.TYPE_OF_ROUND_CHOICES)
+    if round_type not in valid_round_types:
+        return redirect_and_flash_error(request, "Invalid round type specified.")
+    num_teams = Outround.objects.filter(
+        type_of_round=round_type
+    ).aggregate(Min("num_teams"))["num_teams__min"]
+    if not num_teams:
+        return redirect_and_flash_error(
+            request,
+            "No outround pairings exist for this bracket.",
+        )
+
+    redirect_target = f"/outround_pairing/{round_type}/{num_teams}"
+
+    if request.method == "POST":
+        try:
+            type_str = "Varsity" if round_type == Outround.VARSITY else "Novice"
+            round_str = f"Round-of-{num_teams}-{type_str}"
+            backup.backup_round(
+                round_number=round_str,
+                btype=backup.BEFORE_ROOM_ASSIGN,
+            )
+            assign_rooms.add_outround_rooms(round_type=round_type)
+        except Exception:
+            emit_current_exception()
+            return redirect_and_flash_error(
+                request, "Got error during room assignment"
+            )
+    return redirect(redirect_target)

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from django.db.models import Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round
 
 class JudgePairingMode:
     DEFAULT = 0
@@ -289,11 +290,25 @@ def add_outround_judges(round_type=Outround.VARSITY):
     settings = get_outround_settings(round_type)
     link_outround = Outround.judges.through
 
+    if not num_teams:
+        raise errors.JudgeAssignmentError("No outround pairings exist for this bracket.")
+
     # First clear any existing judge assignments
     Outround.judges.through.objects.filter(
         outround__type_of_round=round_type,
         outround__num_teams=num_teams
     ).delete()
+
+    concurrent_round = get_concurrent_round(round_type, num_teams)
+    excluded_judge_ids = set()
+    if concurrent_round:
+        other_round_type, other_round_num = concurrent_round
+        excluded_judge_ids = set(
+            Outround.judges.through.objects.filter(
+                outround__type_of_round=other_round_type,
+                outround__num_teams=other_round_num
+            ).values_list("judge_id", flat=True)
+        )
 
     judges = list(
         Judge.objects.filter(
@@ -303,6 +318,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
             "scratches",
         )
     )
+    judges = [j for j in judges if j.id not in excluded_judge_ids]
     pairings = tab_logic.sorted_pairings(num_teams, outround=True)
     pairings = [p for p in pairings if p.type_of_round == round_type]
     # Try to have consistent ordering with the round display

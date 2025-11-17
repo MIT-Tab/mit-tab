@@ -1,7 +1,7 @@
 from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
+from mittab.libs.outround_tab_logic.helpers import get_concurrent_round
 
 
 def lost_teams():
@@ -10,7 +10,16 @@ def lost_teams():
             if outround.loser]
 
 
-def have_enough_judges_type(type_of_round):
+def _bracket_size(teams_count):
+    if teams_count < 2:
+        return teams_count
+    size = 1
+    while size < teams_count:
+        size <<= 1
+    return size
+
+
+def have_enough_judges_type(type_of_round, num_teams=None):
     loser_ids = [outround.loser.id
                  for outround in Outround.objects.all()
                  if outround.loser]
@@ -22,32 +31,28 @@ def have_enough_judges_type(type_of_round):
     else:
         panel_size = TabSettings.get("nov_panel_size", 3)
 
-    teams_count = BreakingTeam.objects.filter(
+    teams_qs = BreakingTeam.objects.filter(
         type_of_team=type_of_round
-    ).exclude(team__id__in=loser_ids).count()
+    ).exclude(team__id__in=loser_ids)
+    teams_count = teams_qs.count()
 
-    judges_needed = (
-        teams_count // 2
-    ) * panel_size
+    bracket_size = num_teams if num_teams is not None else _bracket_size(teams_count)
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    judges_needed = (bracket_size // 2) * panel_size
 
-    var_to_nov = offset_to_quotient(var_to_nov)
+    if bracket_size < 2:
+        num_judges = CheckIn.objects.filter(round_number=0).count()
+        return True, (num_judges, 0)
 
-    num_teams = teams_count
+    concurrent_round = get_concurrent_round(type_of_round, bracket_size)
 
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
-
-    other_round_type = BreakingTeam.VARSITY \
-        if type_of_round == BreakingTeam.NOVICE \
-        else BreakingTeam.NOVICE
-
-    num_in_use = Judge.objects.filter(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    ).count()
+    num_in_use = 0
+    if concurrent_round:
+        other_round_type, other_round_num = concurrent_round
+        num_in_use = Judge.objects.filter(
+            judges_outrounds__num_teams=other_round_num,
+            judges_outrounds__type_of_round=other_round_type
+        ).distinct().count()
 
     num_judges = CheckIn.objects.filter(round_number=0).count() - num_in_use
 
@@ -66,35 +71,34 @@ def have_enough_judges():
     )
 
 
-def have_enough_rooms_type(type_of_round):
+def have_enough_rooms_type(type_of_round, num_teams=None):
     loser_ids = [outround.loser.id
                  for outround in Outround.objects.all()
                  if outround.loser]
 
-    num_teams = BreakingTeam.objects.filter(
+    teams_qs = BreakingTeam.objects.filter(
         type_of_team=type_of_round
-    ).exclude(team__id__in=loser_ids).count()
+    ).exclude(team__id__in=loser_ids)
 
-    rooms_needed = (
-        num_teams // 2
-    )
+    teams_count = teams_qs.count()
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
+    bracket_size = num_teams if num_teams is not None else _bracket_size(teams_count)
 
-    var_to_nov = offset_to_quotient(var_to_nov)
+    rooms_needed = bracket_size // 2
 
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
+    if bracket_size < 2:
+        num_rooms = RoomCheckIn.objects.filter(round_number=0).count()
+        return True, (num_rooms, 0)
 
-    other_round_type = BreakingTeam.VARSITY \
-        if type_of_round == BreakingTeam.NOVICE \
-        else BreakingTeam.NOVICE
+    concurrent_round = get_concurrent_round(type_of_round, bracket_size)
 
-    num_in_use = Room.objects.filter(
-        rooms_outrounds__num_teams=other_round_num,
-        rooms_outrounds__type_of_round=other_round_type
-    ).count()
+    num_in_use = 0
+    if concurrent_round:
+        other_round_type, other_round_num = concurrent_round
+        num_in_use = Room.objects.filter(
+            rooms_outrounds__num_teams=other_round_num,
+            rooms_outrounds__type_of_round=other_round_type
+        ).distinct().count()
 
     num_rooms = RoomCheckIn.objects.filter(round_number=0).count() - num_in_use
 

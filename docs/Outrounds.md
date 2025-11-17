@@ -6,17 +6,19 @@ Outrounds are now here!
 
 When you reach the final in-round of your tournament, the button that is normally "Prepare Next Round" should read "Break 'em".  If this does not happen, please consult your `tot_rounds` TabSetting and ensure it is set properly.
 
-This will then break the appropriate number of teams as determined by the `nov_teams_to_break` and `var_teams_to_break` TabSetting.
+The break page now includes a configuration card where you can choose how many varsity and novice teams should break along with which varsity round runs concurrently with the opening novice round. Adjust those values before pressing “Break ’em” and they’ll be saved automatically for future sessions.
 
 All teams have a `break_preference` field which determines which break they'd prefer.  The only instance where this matters is if a novice team varsity breaks, but their break preference is set to novice, at which point they would not break varsity and only break to the novice bracket.
 
 It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_size` TabSettings for more information.  It will let you pair if you don't have enough judges, but it will warn you.
 
-The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `var_to_nov` variable.  If you would like varsity octafinals to happen at the same time as novice quarterfinals, this value should be `2` as the quotient of number of teams in varsity break rounds to the simultaneous novice break round is 2.  If they are happening at the same time, the value should be `1`, if they are octafinals at the same time as semifinals, then it should be 4, etc.
+Once you’ve saved those break settings, MIT Tab will keep the novice and varsity brackets synchronized and automatically exclude any judges or rooms already committed to the simultaneous bracket.
 
 ## Managing Pairings
 
-MIT Tab supports automatic judge assignment for outrounds. On the pairing view, you can click the "Assign Judges" button to automatically assign judges to rounds based on their rankings and scratches (assuming you have set `var_to_nov` correctly - see above - AND all scratches are entered). This will respect panel sizes as configured in `var_panel_size` and `nov_panel_size`.
+MIT Tab supports automatic judge assignment for outrounds. On the pairing view, you can click the "Assign Judges" button to automatically assign judges to rounds based on their rankings and scratches. This will respect panel sizes as configured in `var_panel_size` and `nov_panel_size`. The page also displays how many judges and rooms you need for the active round (and how many are currently available after excluding the concurrent bracket), so you can spot shortages before assigning panels.
+
+Automatic room assignment for outrounds lives next to the judge assignment button. Click **Assign Rooms** whenever you want to reseed rooms; the concurrent-round exclusion happens automatically based on the break configuration.
 
 **Important**: Wing-only judges (judges with the "Wing Only" checkbox enabled) will be automatically excluded from chair assignments. They can still be assigned as panel members but will never be selected as the chair during automatic assignment.
 

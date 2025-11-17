@@ -685,8 +685,8 @@ def forum_post(request):
 
     # Get team rankings and calculate breaking teams
     varsity_teams, nov_teams = get_team_rankings(None)
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break", 0)
+    var_teams_to_break = TabSettings.get("var_teams_to_break", 8)
 
     varsity_teams = varsity_teams[:var_teams_to_break]
 

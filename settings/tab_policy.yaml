@@ -9,14 +9,6 @@ settings:
     name: tot_rounds
     description: "The total number of preliminary rounds in the tournament"
     value: 5
-  - nov_teams_to_break:
-    name: nov_teams_to_break
-    description: "The number of novice teams to be included in the break (exclusive of novice teams who are varsity breaking)"
-    value: 4
-  - var_teams_to_break:
-    name: var_teams_to_break
-    description: "The number of varsity teams to be included in the break."
-    value: 8
   - nov_panel_size:
     name: nov_panel_size
     description: "The number of judges on a novice outs panel"
@@ -25,10 +17,6 @@ settings:
     name: var_panel_size
     description: "The number of judges on a varsity outs panel"
     value: 3
-  - var_to_nov:
-    name: var_to_nov
-    description: "The offset of the novice break to the varsity break.  If novice semis happen when varsity quarters happen, the offset should be 1.  If novice semis happen when varsity octofinals happen, the offset should be 2."
-    value: 2
   - sidelock:
     name: sidelock
     description: "Toggle to indicate whether you are side-locking outrounds. When enabled, the gov/opp assignments for outrounds will not be random, but will adhere to sidelocks, and will be indicated on the pairing card and bolded on the front-facing pairing display."

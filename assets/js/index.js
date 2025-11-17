@@ -4,6 +4,7 @@ import "../css/navigation.scss";
 
 import "./pairing";
 import "./outround";
+import "./breakSettings";
 
 import $ from "jquery";
 

@@ -91,7 +91,7 @@
 				{% endif %}
 			    {% endfor %}
 			</td>
-			<td data-label="Room">{{pairing.room.name}}</td>
+			<td data-label="Room">{{ pairing.room.name|default:"TBD" }}</td>
 		    </tr>
 		{% endfor %}
 		{% if outround.excluded|length > 0 %}
