@@ -121,11 +121,6 @@ $mittab-display-blue: #003a74;
   }
 }
 
-.public-table-subtitle {
-  color: rgba(0, 44, 92, 0.7);
-  margin-bottom: 0;
-}
-
 .public_footer {
   position: fixed;
   inset: auto 0 0 0;
@@ -153,11 +148,8 @@ $mittab-display-blue: #003a74;
 }
 
 .public_footer_spacer { height: 3em; }
-.footer-label,
 .pairings_bye_label { font-weight: 600; }
-.footer-entry,
 .pairings_bye_entry { display: inline; margin-right: 1em; min-width: 15%; }
-.right-margin { margin-right: 1em; }
 .right { float: right; }
 .left { float: left; }
 .hidden { display: none !important; }
