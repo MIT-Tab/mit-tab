@@ -59,6 +59,51 @@ function assignTeam(e) {
   });
 }
 
+function updateTeamSection(roundId, position, team) {
+  const $container = $(`.row[round-id=${roundId}] .${position}-team`);
+  $container.find(".team-assign-button").attr("team-id", team.id);
+  $container.find(".team-link").text(team.name);
+  $container.find(".team-link").attr("href", `/team/${team.id}`);
+  $container
+    .find(".tabcard, .outround-tabcard")
+    .attr("team-id", team.id)
+    .text("Loading results...");
+}
+
+function handleSwitchSides(event) {
+  event.preventDefault();
+  const $target = $(event.currentTarget);
+  const roundId = $target.attr("round-id");
+  const isOutround = Boolean($target.data("outround"));
+  const baseUrl = isOutround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/switch_sides/`;
+  const alertMsg = "Unable to switch sides. Refresh and try again.";
+
+  $.ajax({
+    url,
+    success(result) {
+      if (result.success) {
+        updateTeamSection(roundId, "gov", result.gov_team);
+        updateTeamSection(roundId, "opp", result.opp_team);
+        if (isOutround) {
+          $(document).trigger("outround:switch", {
+            roundId,
+            govTeam: result.gov_team,
+            oppTeam: result.opp_team,
+          });
+        } else {
+          populateTabCards();
+        }
+      } else {
+        window.alert(alertMsg);
+      }
+    },
+    error() {
+      window.alert(alertMsg);
+    },
+  });
+}
+
 function assignRoom(e) {
   e.preventDefault();
   const $parent = $(this).parent().parent();
@@ -149,10 +194,13 @@ function assignJudge(e) {
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.addClass("judge-assignment manual-lay");
       $buttonWrapper.attr("judge-id", result.judge_id);
 
       const rank = result.judge_rank.toFixed(2);
-      $button.html(`${result.judge_name} <small>(${rank})</small>`);
+      $button
+        .html(`${result.judge_name} <small>(${rank})</small>`)
+        .attr("title", "Manually assigned judge");
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
         .judge-toggle`).addClass("chair");
@@ -203,12 +251,85 @@ function togglePairingRelease(event) {
     url: "/pairing/release",
     success(result) {
       if (result.pairing_released) {
-        $("#close-pairings").removeClass("d-none");
-        $("#release-pairings").addClass("d-none");
+        $("#close-pairings-group").removeClass("d-none");
+        $("#release-pairings-group").addClass("d-none");
       } else {
-        $("#close-pairings").addClass("d-none");
-        $("#release-pairings").removeClass("d-none");
+        $("#close-pairings-group").addClass("d-none");
+        $("#release-pairings-group").removeClass("d-none");
       }
+    },
+  });
+}
+
+function syncBallotDropdowns(roundNumber, releaseActive, allBallotsIn) {
+  const label = releaseActive
+    ? `Stop showing round ${roundNumber} ballots`
+    : `Show round ${roundNumber} ballots`;
+
+  $(".release-ballots-option").each((_, element) => {
+    const $element = $(element);
+    $element.data("ballotsReleased", releaseActive);
+    if (typeof allBallotsIn !== "undefined") {
+      $element.data("allBallotsIn", allBallotsIn);
+      if (allBallotsIn) {
+        $element.removeClass("text-muted");
+      } else {
+        $element.addClass("text-muted");
+      }
+    }
+    if (releaseActive) {
+      $element.addClass("text-danger");
+    } else {
+      $element.removeClass("text-danger");
+    }
+    const allBallotsInRaw = $element.data("allBallotsIn");
+    const allBallotsInFlag =
+      allBallotsInRaw === true || allBallotsInRaw === "true";
+    $element.text(label);
+    if (allBallotsInFlag) {
+      $element.attr("title", label);
+    } else {
+      $element.attr("title", "please wait until all ballots are in");
+    }
+  });
+}
+
+function handleBallotReleaseClick(event) {
+  event.preventDefault();
+  const $button = $(event.currentTarget);
+  $button.blur();
+
+  const allBallotsInRaw = $button.data("allBallotsIn");
+  const allBallotsIn = allBallotsInRaw === true || allBallotsInRaw === "true";
+  if (!allBallotsIn) {
+    window.alert("please wait until all ballots are in.");
+    return;
+  }
+
+  const releaseRaw = $button.data("ballotsReleased");
+  const releaseActive = releaseRaw === true || releaseRaw === "true";
+  const action = releaseActive ? "revert" : "advance";
+  const errorMessage = releaseActive
+    ? "Unable to hide ballots for this round."
+    : "Unable to release ballots for this round.";
+
+  $.ajax({
+    url: `/pairing/release_ballots/?action=${action}`,
+    success(result) {
+      if (result.success) {
+        syncBallotDropdowns(
+          result.round_number,
+          result.current_round_ballots_released,
+          result.all_ballots_in,
+        );
+      } else if (result.error) {
+        window.alert(result.error);
+      } else {
+        window.alert(errorMessage);
+      }
+    },
+    error() {
+      window.alert(errorMessage);
     },
   });
 }
@@ -282,6 +403,7 @@ $(document).ready(() => {
   $(".room-toggle").click(populateAlternativeRooms);
   $(".alert-link").click(alertLink);
   $(".btn.release").click(togglePairingRelease);
+  $(document).on("click", ".release-ballots-option", handleBallotReleaseClick);
 
   $(document).on(
     "click",
@@ -294,4 +416,6 @@ $(document).ready(() => {
     ".judge-remove, .outround-judge-remove",
     handleJudgeRemoveClick,
   );
+
+  $(document).on("click", ".team-switch-sides", handleSwitchSides);
 });

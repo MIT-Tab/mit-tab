@@ -3,6 +3,9 @@ body {
     background-image: url("../img/az-subtle.png") !important;
     background-blend-mode: multiply;
 }
+:root {
+  color-scheme: light;
+}
 $font-size-base: 0.95rem !default;
 
 .form-control {
@@ -105,6 +108,22 @@ $font-size-base: 0.95rem !default;
   line-height: 2.5;
 }
 
+.judge-assignment .judge-toggle {
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.manual-lay .judge-toggle {
+  background-color: #fff3cd !important;
+  border-color: #f0ad4e !important;
+  box-shadow: 0 0 0 1px rgba(240, 173, 78, 0.35);
+  color: #6b3d00;
+}
+
+.manual-lay .judge-toggle small {
+  color: inherit;
+}
+
 .chair small::after {
   font-family: "Font Awesome 5 Free";
   font-weight: 900;
@@ -118,6 +137,32 @@ $font-size-base: 0.95rem !default;
 
 .form-inline .input-group {
   width: 100%;
+}
+
+.stats-bar-container {
+  height: 30px;
+  overflow: hidden;
+  display: flex;
+}
+
+.stats-bar-gov {
+  background-color: #28a745;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.stats-bar-opp {
+  background-color: #dc3545;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 .index .input-group .input-group-text,
@@ -171,4 +216,3 @@ $font-size-base: 0.95rem !default;
 .font-weight-semibold {
   font-weight: 600;
 }
-

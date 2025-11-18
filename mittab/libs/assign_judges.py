@@ -80,6 +80,9 @@ def add_judges():
     Round.judges.through.objects.filter(
         round__round_number=round_number
     ).delete()
+    ManualJudgeAssignment.objects.filter(
+        round__round_number=round_number
+    ).delete()
     # Get all checked-in judges
     all_judges = list(
         Judge.objects.filter(

@@ -9,7 +9,8 @@
 <div class="col">
   <div class="container-fluid">
     <form action="" method="post" class="ballot-form" enctype="multipart/form-data">
-
+      {% csrf_token %}
+      {% return_to_input %}
 
       <div class="row">
         <div class="col">

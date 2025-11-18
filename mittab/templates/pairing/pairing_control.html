@@ -1,4 +1,5 @@
 {% extends "base/__wide.html" %}
+{% load tags %}
 
 {% block title %}Round Status{% endblock %}
 
@@ -34,6 +35,7 @@
             class="d-inline"
           >
             {% csrf_token %}
+            {% return_to_input request.path %}
             {% if judges_assigned %}
             <button id="assign-judges" type="submit" class="mid btn btn-sm btn-success" href="/pairing/assign_judges/" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges Again
@@ -50,6 +52,7 @@
             class="d-inline"
           >
             {% csrf_token %}
+            {% return_to_input request.path %}
 
             {% if rooms_assigned %}
             <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-success" title="Assign rooms to your pairing">
@@ -65,23 +68,58 @@
           {% if simulate_round_button %}
           <form action="/pairings/simulate_rounds/" method="post" class="d-inline"> 
             {% csrf_token %}
+            {% return_to_input request.path %}
             <button id="simulate-round" type="submit" class="btn btn-sm btn-primary" title="Simulate the round">
               <i class="fas fa-play"></i> Simulate Round
             </button>
           </form>
           {% endif %}
 
-          <a class="btn btn-sm btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
-              id="close-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-closed"></i> Close Pairings
-          </a>
+          <div class="btn-group btn-group-sm {% if not pairing_released %}d-none{% endif %}" id="close-pairings-group">
+            <a class="btn btn-sm btn-success release" href="#"
+                id="close-pairings"
+                title="Release the pairings to the participants">
+              <i class="fas fa-door-closed"></i> Close Pairings
+            </a>
+            <button type="button" class="btn btn-sm btn-success dropdown-toggle dropdown-toggle-split"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+              title="Ballot release options">
+              <span class="sr-only">Toggle ballot release options</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-right">
+              <button type="button"
+                      class="dropdown-item release-ballots-option {% if current_round_ballots_released %}text-danger{% endif %}{% if not all_ballots_in %} text-muted{% endif %}"
+                      data-round-number="{{ round_number }}"
+                      data-ballots-released="{{ current_round_ballots_released|yesno:'true,false' }}"
+                      data-all-ballots-in="{{ all_ballots_in|yesno:'true,false' }}"
+                      title="{% if all_ballots_in %}{{ ballot_release_button_text }}{% else %}please wait until all ballots are in{% endif %}">
+                {{ ballot_release_button_text }}
+              </button>
+            </div>
+          </div>
 
-          <a class="btn btn-sm btn-warning release {% if pairing_released %}d-none{% endif %}" href="#"
-              id="release-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-open"></i> Release Pairings
-          </a>
+          <div class="btn-group btn-group-sm {% if pairing_released %}d-none{% endif %}" id="release-pairings-group">
+            <a class="btn btn-sm btn-warning release" href="#"
+                id="release-pairings"
+                title="Release the pairings to the participants">
+              <i class="fas fa-door-open"></i> Release Pairings
+            </a>
+            <button type="button" class="btn btn-sm btn-warning dropdown-toggle dropdown-toggle-split"
+              data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+              title="Ballot release options">
+              <span class="sr-only">Toggle ballot release options</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-right">
+              <button type="button"
+                      class="dropdown-item release-ballots-option {% if current_round_ballots_released %}text-danger{% endif %}{% if not all_ballots_in %} text-muted{% endif %}"
+                      data-round-number="{{ round_number }}"
+                      data-ballots-released="{{ current_round_ballots_released|yesno:'true,false' }}"
+                      data-all-ballots-in="{{ all_ballots_in|yesno:'true,false' }}"
+                      title="{% if all_ballots_in %}{{ ballot_release_button_text }}{% else %}please wait until all ballots are in{% endif %}">
+                {{ ballot_release_button_text }}
+              </button>
+            </div>
+          </div>
 
           {% if round_number == tot_rounds %}
           <a class="btn btn-sm btn-info" href="{% url "break" %}" title="Break 'em">

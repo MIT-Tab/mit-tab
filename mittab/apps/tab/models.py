@@ -566,6 +566,27 @@ class Round(models.Model):
         super(Round, self).delete(using, keep_parents)
 
 
+class ManualJudgeAssignment(models.Model):
+    round = models.ForeignKey(
+        Round,
+        on_delete=models.CASCADE,
+        related_name="manual_judge_assignments",
+    )
+    judge = models.ForeignKey(
+        Judge,
+        on_delete=models.CASCADE,
+        related_name="manual_round_assignments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("round", "judge")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.judge} manually assigned to {self.round}"
+
+
 class Bye(models.Model):
     bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
