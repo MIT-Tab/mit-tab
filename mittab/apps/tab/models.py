@@ -74,6 +74,40 @@ class TabSettings(models.Model):
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 
+class PublicDisplaySetting(models.Model):
+    RANKING = "ranking"
+    STANDING = "standing"
+    BALLOT = "ballot"
+    DISPLAY_TYPE_CHOICES = (
+        (RANKING, "Ranking"),
+        (STANDING, "Standing"),
+        (BALLOT, "Ballot"),
+    )
+
+    slug = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    display_type = models.CharField(max_length=20, choices=DISPLAY_TYPE_CHOICES)
+    is_enabled = models.BooleanField(default=False)
+    include_speaks = models.BooleanField(default=False)
+    include_ranks = models.BooleanField(default=False)
+    max_visible = models.PositiveIntegerField(default=10)
+    round_number = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "public display setting"
+
+    def __str__(self):
+        return self.label
+
+    @classmethod
+    def get_or_create_setting(cls, *, slug, label, display_type, defaults=None):
+        if defaults is None:
+            defaults = {}
+        payload = {"label": label, "display_type": display_type}
+        payload.update(defaults)
+        return cls.objects.get_or_create(slug=slug, defaults=payload)
+
+
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)

@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import random
 import datetime
 import os
 
@@ -19,7 +18,7 @@ from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
-    validate_panel, EBallotForm
+    validate_panel
 
 import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -27,6 +26,7 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
+from mittab.libs.tab_logic.stats import get_all_round_stats
 from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
     invalidate_public_rankings_cache,
@@ -34,8 +34,9 @@ from mittab.libs.cacheing.public_cache import (
 
 
 def invalidate_public_ballot_cache():
-    cache_logic.invalidate_cache("public_ballots_last")
-    cache_logic.invalidate_cache("public_ballots_all")
+    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
+    for round_number in range(1, tot_rounds + 1):
+        cache_logic.invalidate_cache(f"public_ballots_round_{round_number}")
     invalidate_public_rankings_cache()
 
 
@@ -55,8 +56,6 @@ def pair_round(request):
                 invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
-                latest_release_round = max(current_round.value - 2, 0)
-                TabSettings.set("latest_ballots_released", latest_release_round)
                 invalidate_public_ballot_cache()
         except Exception as exp:
             emit_current_exception()
@@ -507,17 +506,6 @@ def view_round(request, round_number):
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     rooms_assigned = all((r.room is not None for r in round_info))
-    outstanding_ballots = Round.objects.filter(
-        round_number=round_number,
-        victor=Round.NONE
-    ).exists()
-    all_ballots_in = pairing_exists and not outstanding_ballots
-    latest_ballots_released = int(
-        TabSettings.get("latest_ballots_released", 0) or 0
-    )
-    current_round_ballots_released = (
-        round_number > 0 and latest_ballots_released >= round_number
-    )
     excluded_judges = Judge.objects.exclude(
         judges__round_number=round_number).filter(
             checkin__round_number=round_number)
@@ -548,15 +536,6 @@ def view_round(request, round_number):
             ]
         ]))
 
-    if round_number > 0:
-        ballot_release_button_text = (
-            f"Stop showing round {round_number} ballots"
-            if current_round_ballots_released else
-            f"Show round {round_number} ballots"
-        )
-    else:
-        ballot_release_button_text = "Show ballots"
-
     context = {
         "errors": errors,
         "excluded_teams": excluded_teams,
@@ -567,10 +546,6 @@ def view_round(request, round_number):
         "all_judges_in_round": all_judges_in_round,
         "judge_rejudge_counts": judge_rejudge_counts,
         "round_number": round_number,
-        "all_ballots_in": all_ballots_in,
-        "latest_ballots_released": latest_ballots_released,
-        "current_round_ballots_released": current_round_ballots_released,
-        "ballot_release_button_text": ballot_release_button_text,
         "excluded_teams_no_bye": excluded_teams_no_bye,
         "num_excluded": num_excluded,
         "simulate_round_button": simulate_round_button,
@@ -829,49 +804,6 @@ def toggle_pairing_released(request):
     return JsonResponse(data)
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
-def toggle_current_round_ballots(request):
-    current_round_number = TabSettings.get("cur_round") - 1
-    action = request.GET.get("action", "advance")
-
-    outstanding_ballots = Round.objects.filter(
-        round_number=current_round_number,
-        victor=Round.NONE,
-    ).exists()
-
-    latest_ballots_released = int(
-        TabSettings.get("latest_ballots_released", 0) or 0
-    )
-    auto_release_round = max(TabSettings.get("cur_round", 1) - 2, 0)
-
-    if action == "advance":
-        if outstanding_ballots:
-            return JsonResponse({
-                "success": False,
-                "error": "please wait until all ballots are in",
-                "all_ballots_in": False,
-            })
-        latest_ballots_released = max(latest_ballots_released, current_round_number)
-    elif action == "revert":
-        latest_ballots_released = auto_release_round
-    else:
-        return JsonResponse({"success": False, "error": "Invalid action specified."})
-
-    TabSettings.set("latest_ballots_released", latest_ballots_released)
-    invalidate_public_ballot_cache()
-
-    data = {
-        "success": True,
-        "round_number": current_round_number,
-        "latest_ballots_released": latest_ballots_released,
-        "current_round_ballots_released": (
-            current_round_number > 0 and latest_ballots_released >= current_round_number
-        ),
-        "all_ballots_in": not outstanding_ballots,
-    }
-    return JsonResponse(data)
-
-
 def export_pairings_csv_view(request):
     return export_pairings_csv(is_outround=False)
 
@@ -1089,7 +1021,6 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def round_stats(request):
-    from mittab.libs.tab_logic.stats import get_all_round_stats
     stats = get_all_round_stats()
     return render(request, "tab/round_stats.html", {
         "title": "Round Statistics",

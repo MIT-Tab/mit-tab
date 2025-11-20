@@ -102,6 +102,11 @@ urlpatterns = [
          debater_views.rank_debaters_ajax,
          name="rank_debaters_ajax"),
     path("debater/rank/", debater_views.rank_debaters, name="rank_debaters"),
+    path(
+        "rankings/public-control/",
+        views.public_rankings_control,
+        name="public_rankings_control",
+    ),
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
@@ -180,9 +185,6 @@ urlpatterns = [
     path("pairing/release/",
          pairing_views.toggle_pairing_released,
          name="toggle_pairing_released"),
-    path("pairing/release_ballots/",
-         pairing_views.toggle_current_round_ballots,
-         name="toggle_current_round_ballots"),
     path("pairing/view_backups/",
          pairing_views.view_backups,
          name="view_backups"),
@@ -287,9 +289,6 @@ urlpatterns = [
 
     # Standings API
     path("forum_post", views.forum_post, name="forum_post"),
-    path("publish_results/<int:new_setting>/",
-         views.publish_results,
-         name="publish_results"),
     path("api/varsity-speaker-awards",
          api_views.varsity_speaker_awards_api,
          name="varsity_speaker_awards_api"),
@@ -311,6 +310,9 @@ urlpatterns = [
     path("api/new-schools",
          api_views.new_schools_api,
          name="new_schools_api"),
+    path("api/debater-counts",
+         api_views.debater_counts_api,
+         name="debater_counts_api"),
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
@@ -346,6 +348,16 @@ urlpatterns = [
     path("public/team-rankings/",
          public_views.rank_teams_public,
          name="rank_teams_public"),
+    path(
+        "public/speaker-rankings/",
+        public_views.public_speaker_rankings,
+        name="public_speaker_rankings",
+    ),
+    path(
+        "public/ballots/",
+        public_views.public_ballots,
+        name="public_ballots",
+    ),
     path("public/outrounds/<int:type_of_round>/",
          public_views.outround_pretty_pair,
          name="outround_pretty_pair"),
