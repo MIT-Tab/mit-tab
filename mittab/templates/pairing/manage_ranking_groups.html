@@ -1,0 +1,45 @@
+{% extends "base/__normal.html" %}
+
+{% block title %} Manage Ranking Groups {% endblock title %}
+{% block banner %} Manage Ranking Groups {% endblock banner %}
+
+
+{% block content %}
+
+<div class="col-md-6 ">
+    <h5>Current Ranking Groups</h5>
+    <table class="table rounded shadow-sm table-bordered">
+      <thead><th>Name</th><th>Teams</th><th>Debaters</th><th>Delete</th></thead>
+
+      {% for group in ranking_groups %}
+      <tr>
+        <td>
+          <h5 class="mb-0">
+            <a href='/ranking-group/{{ group.id }}/' class="text-decoration-none">
+              {{ group.name }}
+            </a>
+          </h5>
+        </td>
+        <td>{{ group.teams.count }}</td>
+        <td>{{ group.debaters.count }}</td>
+        <td>
+          <form action="/ranking-group/{{ group.id }}/"
+                method="POST" style="display:inline;"
+                onsubmit="return confirm('Are you sure you want to delete this ranking group?');">
+              {% csrf_token %}
+              <input type="hidden" name="_method" value="DELETE">
+              <button type="submit" class="btn btn-danger btn-sm">X</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+</div>
+
+<div class="col-md-4 container p-3 rounded shadow-sm border ">
+    <h5>Add New Ranking Group</h5>
+    {% include "common/_form.html" %}
+</div>
+
+
+{% endblock content %}
