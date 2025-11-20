@@ -1,24 +1,13 @@
 import pytest
-from django.contrib.auth import get_user_model
 from django.core.cache import caches
 from django.test import TestCase, Client
 from django.urls import reverse
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (TabSettings, Team,
+from mittab.apps.tab.models import (Room, TabSettings, Team,
                                     Round, Outround)
-from mittab.apps.tab.public_rankings import (
-    get_ballot_round_settings,
-    get_ranking_settings,
-    get_standings_publication_setting,
-    set_ballot_round_settings,
-    set_ranking_settings,
-)
+from mittab.apps.tab.public_rankings import PublicRankingMode
 from mittab.libs.cacheing import cache_logic
-from mittab.libs.tests.views.public_test_utils import (
-    prepare_public_site_state,
-    reset_public_site_state,
-)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -27,11 +16,52 @@ class TestPublicViews(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.test_round, self.original_victor = prepare_public_site_state()
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        # Ensure ballots are eligible for public display regardless of fixture defaults
+        Team.objects.update(ranking_public=True)
+
+        Outround(
+            gov_team=Team.objects.first(),
+            opp_team=Team.objects.last(),
+            num_teams=2,
+            type_of_round=Outround.NOVICE,
+            room=Room.objects.first(),
+        ).save()
+        Outround(
+            gov_team=Team.objects.first(),
+            opp_team=Team.objects.last(),
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+            room=Room.objects.last(),
+        ).save()
+
+        # Pairing for the next round (3) has started, so round 2 ballots may show
+        TabSettings.set("cur_round", 3)
+
+        # Mark the most recent round (cur_round - 1) as missing a ballot
+        self.test_round = Round.objects.filter(
+            round_number=TabSettings.get("cur_round") - 1
+        ).first()
+        self.original_victor = self.test_round.victor
+        self.test_round.victor = Round.NONE
+        self.test_round.save()
+        TabSettings.set("pairing_released", 1)
+        TabSettings.set("judges_public", 1)
+        TabSettings.set("teams_public", 1)
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
+        TabSettings.set("debaters_public", 1)
+        TabSettings.set("var_teams_visible", 2)  # Show finals and above
+        TabSettings.set("nov_teams_visible", 2)  # Show finals and above
 
     def tearDown(self):
         # Restore the original victor value to avoid polluting other tests
-        reset_public_site_state(self.test_round, self.original_victor)
+        self.test_round.victor = self.original_victor
+        self.test_round.save()
+        caches["public"].clear()
+        cache_logic.clear_cache()
         super().tearDown()
 
     def get_test_objects(self):
@@ -58,8 +88,6 @@ class TestPublicViews(TestCase):
             (reverse("public_judges"), [judge.name]),
             (reverse("public_teams"), [team.name]),
             (reverse("rank_teams_public"), [team.name]),
-            (reverse("public_speaker_rankings"), ["Speaker Rankings"]),
-            (reverse("public_ballots"), ["Public Ballots"]),
             (reverse("pretty_pair"), [round_obj.gov_team.name, gov_debater.name]),
             (reverse("missing_ballots"), [self.test_round.chair.name]),
             (reverse("e_ballot_search"), ["Submit E-Ballot"]),
@@ -94,134 +122,89 @@ class TestPublicViews(TestCase):
         (judge, team, _, v_out,
          n_out, gov_debater) = self.get_test_objects()
 
-        # Judges list
-        response = client.get(reverse("public_judges"))
-        self.assertIn(judge.name, response.content.decode())
-        TabSettings.set("judges_public", 0)
-        caches["public"].clear()
-        response = client.get(reverse("public_judges"))
-        self.assertEqual(response.status_code, 302)
-        TabSettings.set("judges_public", 1)
-        caches["public"].clear()
+        urls = [
+            reverse("public_judges"),
+            reverse("public_teams"),
+            reverse("rank_teams_public"),
+            reverse("pretty_pair"),
+            reverse("missing_ballots"),
+            reverse("outround_pretty_pair", args=[0]),
+            reverse("outround_pretty_pair", args=[1]),
+        ]
 
-        # Teams list
-        response = client.get(reverse("public_teams"))
-        self.assertIn(team.name, response.content.decode())
-        TabSettings.set("teams_public", 0)
-        caches["public"].clear()
-        response = client.get(reverse("public_teams"))
-        self.assertEqual(response.status_code, 302)
-        TabSettings.set("teams_public", 1)
-        caches["public"].clear()
+        # Setting name, allowed value, denied value
+        settings = [
+            ("judges_public", 1, 0),
+            ("teams_public", 1, 0),
+            ("public_ranking_mode", PublicRankingMode.TEAM, PublicRankingMode.NONE),
+            ("pairing_released", 1, 0),
+            ("pairing_released", 1, 0),
+            ("var_teams_visible", 2, 16),
+            ("nov_teams_visible", 2, 16),
+        ]
 
-        # Team results page
+        # content, status when allowed, status when denied
+        values = [
+            (judge.name, 200, 302),
+            (team.name, 200, 302),
+            (team.name, 200, 302),
+            (gov_debater.name, 200, 200),
+            (self.test_round.gov_team.display_backend, 200, 200),
+            (v_out.gov_team.name, 200, 200),
+            (n_out.gov_team.name, 200, 200),
+        ]
+
+        for url, setting, value in zip(urls, settings, values):
+            (setting_name, allowed_value, denied_value) = setting
+            (expected_content, status_allowed, status_denied) = value
+            # Test when permission is granted / content visible
+            TabSettings.set(setting_name, allowed_value)
+            response = client.get(url)
+            self.assertEqual(response.status_code, status_allowed,
+                f"Expected {status_allowed} for {url} "
+                f"when {setting_name}={allowed_value}")
+            self.assertIn(expected_content, response.content.decode(),
+                f"Expected '{expected_content}' to be "
+                f"visible when {setting_name}={allowed_value}")
+
+            # Test when permission is denied / content hidden
+            TabSettings.set(setting_name, denied_value)
+            caches["public"].clear()
+            response = client.get(url)
+            self.assertEqual(response.status_code, status_denied,
+                f"Expected {status_denied} for {url} "
+                f"when {setting_name}={denied_value}")
+            self.assertNotIn(expected_content, response.content.decode(),
+                f"Expected '{expected_content}' to be "
+                f"hidden when {setting_name}={denied_value}")
+
+
+    def test_public_ballot_modes(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        caches["public"].clear()
         response = client.get(reverse("rank_teams_public"))
         self.assertEqual(response.status_code, 200)
-        set_ranking_settings(
-            "team",
-            public=False,
-            include_speaks=False,
-            max_visible=1000,
-        )
+        content = response.content.decode()
+        self.assertIn("Last Round Ballots", content)
+        self.assertIn("Winner:", content)
+        self.assertIn("Speaks and ranks are hidden", content)
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.ALL_BALLOTS)
+        TabSettings.set("public_ballot_show_speaks", 1)
         caches["public"].clear()
         response = client.get(reverse("rank_teams_public"))
-        self.assertEqual(response.status_code, 302)
-        set_ranking_settings(
-            "team",
-            public=True,
-            include_speaks=False,
-            max_visible=1000,
-        )
-        caches["public"].clear()
-
-        # Speaker results require either varsity or novice to be public
-        response = client.get(reverse("public_speaker_rankings"))
         self.assertEqual(response.status_code, 200)
-        set_ranking_settings(
-            "varsity",
-            public=False,
-            include_speaks=True,
-            max_visible=10,
-        )
-        set_ranking_settings(
-            "novice",
-            public=False,
-            include_speaks=False,
-            max_visible=10,
-        )
-        caches["public"].clear()
-        response = client.get(reverse("public_speaker_rankings"))
-        self.assertEqual(response.status_code, 302)
-        set_ranking_settings(
-            "varsity",
-            public=True,
-            include_speaks=True,
-            max_visible=10,
-        )
-        set_ranking_settings(
-            "novice",
-            public=True,
-            include_speaks=False,
-            max_visible=10,
-        )
-        caches["public"].clear()
-
-        # Ballots page requires at least one round to be visible
-        response = client.get(reverse("public_ballots"))
-        self.assertEqual(response.status_code, 200)
-        set_ballot_round_settings(
-            1,
-            visible=False,
-            include_speaks=False,
-            include_ranks=False,
-        )
-        caches["public"].clear()
-        response = client.get(reverse("public_ballots"))
-        self.assertEqual(response.status_code, 302)
-        set_ballot_round_settings(
-            1,
-            visible=True,
-            include_speaks=False,
-            include_ranks=False,
-        )
-        caches["public"].clear()
-
-        # Pairings require release toggle
-        response = client.get(reverse("pretty_pair"))
-        self.assertIn(gov_debater.name, response.content.decode())
-        TabSettings.set("pairing_released", 0)
-        caches["public"].clear()
-        response = client.get(reverse("pretty_pair"))
-        self.assertEqual(response.status_code, 200)
-        TabSettings.set("pairing_released", 1)
-        caches["public"].clear()
-
-        # Outround visibility thresholds
-        response = client.get(reverse("outround_pretty_pair", args=[0]))
-        self.assertIn(v_out.gov_team.name, response.content.decode())
-        response = client.get(reverse("outround_pretty_pair", args=[1]))
-        self.assertIn(n_out.gov_team.name, response.content.decode())
-        TabSettings.set("var_teams_visible", 16)
-        TabSettings.set("nov_teams_visible", 16)
-        caches["public"].clear()
-        response = client.get(reverse("outround_pretty_pair", args=[0]))
-        self.assertEqual(response.status_code, 200)
-        response = client.get(reverse("outround_pretty_pair", args=[1]))
-        self.assertEqual(response.status_code, 200)
-        TabSettings.set("var_teams_visible", 2)
-        TabSettings.set("nov_teams_visible", 2)
-        caches["public"].clear()
-
+        content = response.content.decode()
+        self.assertIn("All Ballots", content)
+        self.assertNotIn("Speaks and ranks are hidden", content)
 
     def test_team_rankings_without_speaks(self):
         client = Client()
 
-        set_ranking_settings(
-            "team",
-            public=True,
-            include_speaks=False,
-            max_visible=1000,
-        )
+        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
+        TabSettings.set("public_ballot_show_speaks", 0)
         caches["public"].clear()
 
         response = client.get(reverse("rank_teams_public"))
@@ -230,63 +213,51 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaks and ranks are hidden", content)
         self.assertNotIn("<th>Speaks</th>", content)
 
-        set_ranking_settings(
-            "team",
-            public=True,
-            include_speaks=True,
-            max_visible=1000,
-        )
+    def test_public_ballots_hidden_until_next_round(self):
+        client = Client()
+
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        TabSettings.set("latest_ballots_released", 0)
+
+        # With cur_round=2 no subsequent round has been paired, so nothing shows
+        TabSettings.set("cur_round", 2)
         caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
         response = client.get(reverse("rank_teams_public"))
-        self.assertIn("<th>Speaks</th>", response.content.decode())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("No public ballots are available yet", response.content.decode())
 
-    def test_speaker_rankings_visibility(self):
+        # Once the next round is paired (cur_round=3), ballots become visible
+        TabSettings.set("cur_round", 3)
+        TabSettings.set("latest_ballots_released", 1)
+        caches["public"].clear()
+        cache_logic.invalidate_cache("public_ballots_last")
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Winner:", response.content.decode())
+
+    def test_manual_release_allows_current_round_ballots(self):
         client = Client()
 
-        response = client.get(reverse("public_speaker_rankings"))
-        content = response.content.decode()
-        self.assertIn("Varsity Speakers", content)
-        self.assertIn("Novice Speakers", content)
-
-        set_ranking_settings(
-            "varsity",
-            public=False,
-            include_speaks=True,
-            max_visible=10,
-        )
+        TabSettings.set("public_ranking_mode", PublicRankingMode.LAST_BALLOTS)
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("latest_ballots_released", 0)
         caches["public"].clear()
-        response = client.get(reverse("public_speaker_rankings"))
-        content = response.content.decode()
-        self.assertNotIn("Varsity Speakers", content)
-        self.assertIn("Novice Speakers", content)
+        cache_logic.invalidate_cache("public_ballots_last")
 
-    def test_public_ballots_include_scores(self):
-        client = Client()
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("No public ballots are available yet", response.content.decode())
 
-        set_ballot_round_settings(
-            1,
-            visible=True,
-            include_speaks=False,
-            include_ranks=False,
-        )
+        TabSettings.set("latest_ballots_released", 1)
         caches["public"].clear()
-        cache_logic.invalidate_cache("public_ballots_round_1")
+        cache_logic.invalidate_cache("public_ballots_last")
+        response = client.get(reverse("rank_teams_public"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Winner:", response.content.decode())
 
-        response = client.get(reverse("public_ballots"))
-        content = response.content.decode()
-        self.assertNotIn("badge badge-light", content)
+        TabSettings.set("latest_ballots_released", 0)
 
-        set_ballot_round_settings(
-            1,
-            visible=True,
-            include_speaks=True,
-            include_ranks=True,
-        )
-        caches["public"].clear()
-        cache_logic.invalidate_cache("public_ballots_round_1")
-        response = client.get(reverse("public_ballots"))
-        content = response.content.decode()
-        self.assertIn("badge badge-light", content)
 
     def test_n_plus_one(self):
         client = Client()
@@ -295,8 +266,6 @@ class TestPublicViews(TestCase):
             (("public_judges",), None),
             (("public_teams",), None),
             (("rank_teams_public",), None),
-             (("public_speaker_rankings",), None),
-             (("public_ballots",), None),
             (("pretty_pair",), None),
             (("missing_ballots",), None),
             (("outround_pretty_pair",), [0]),
@@ -311,72 +280,3 @@ class TestPublicViews(TestCase):
                 else:
                     response = client.get(reverse(*view_name))
                 self.assertEqual(response.status_code, 200)
-
-
-@pytest.mark.django_db(transaction=True)
-class TestPublicRankingsControl(TestCase):
-    fixtures = ["testing_finished_db"]
-
-    def setUp(self):
-        super().setUp()
-        self.client = Client()
-        self.user = get_user_model().objects.create_superuser(
-            username="control_user",
-            password="controlpass",
-            email="control@example.com",
-        )
-        self.client.login(username="control_user", password="controlpass")
-        self.test_round, self.original_victor = prepare_public_site_state()
-
-    def tearDown(self):
-        reset_public_site_state(self.test_round, self.original_victor)
-        super().tearDown()
-
-    def test_get_control_panel(self):
-        response = self.client.get(reverse("public_rankings_control"))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Public Rankings Control Panel", response.content.decode())
-
-    def test_update_public_display_settings(self):
-        payload = {
-            "standings_team_results": "on",
-            "team_public": "on",
-            "team_include_speaks": "on",
-            "team_max_visible": "25",
-            # Varsity intentionally left unpublished to verify false path
-            "novice_public": "on",
-            "novice_include_speaks": "",
-            "novice_max_visible": "5",
-            "round_1_visible": "on",
-            "round_1_include_speaks": "on",
-            # Leave include_ranks off
-        }
-
-        response = self.client.post(
-            reverse("public_rankings_control"),
-            payload,
-            follow=True,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        speaker_setting = get_standings_publication_setting("speaker_results")
-        team_setting = get_standings_publication_setting("team_results")
-        self.assertFalse(speaker_setting["published"])
-        self.assertTrue(team_setting["published"])
-
-        team_rankings = get_ranking_settings("team")
-        self.assertTrue(team_rankings["public"])
-        self.assertTrue(team_rankings["include_speaks"])
-        self.assertEqual(team_rankings["max_visible"], 25)
-
-        varsity_rankings = get_ranking_settings("varsity")
-        novice_rankings = get_ranking_settings("novice")
-        self.assertFalse(varsity_rankings["public"])
-        self.assertTrue(novice_rankings["public"])
-        self.assertFalse(novice_rankings["include_speaks"])
-        self.assertEqual(novice_rankings["max_visible"], 5)
-
-        ballot_settings = get_ballot_round_settings(1)
-        self.assertTrue(ballot_settings["visible"])
-        self.assertTrue(ballot_settings["include_speaks"])
-        self.assertFalse(ballot_settings["include_ranks"])

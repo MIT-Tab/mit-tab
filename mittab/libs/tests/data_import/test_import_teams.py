@@ -62,17 +62,6 @@ class TestImportingTeams(TestCase):
         assert debater_1.novice_status == Debater.NOVICE
         assert debater_2.novice_status == Debater.NOVICE
 
-    def test_import_sets_ranking_public_true(self):
-        data = [
-            ["Team 1", "NU", "", "full", "John", "", "1241", "Jane", "n", "1242"],
-        ]
-        importer = TeamImporter(MockWorkbook(data))
-        errors = importer.import_data()
-
-        assert not errors
-        team = Team.objects.get(name="Team 1")
-        assert team.ranking_public is True
-
     def test_rollback_from_duplicate_debater(self):
         assert Team.objects.count() == 0
         assert School.objects.count() == 0

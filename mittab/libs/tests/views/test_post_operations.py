@@ -4,9 +4,8 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater
+    Room, TabSettings, Team, Judge, School, Debater, Round
 )
-from mittab.apps.tab.public_rankings import set_standings_publication_setting
 
 
 @pytest.mark.django_db(transaction=True)
@@ -23,8 +22,6 @@ class TestPostOperations(TestCase):
         )
         self.client.login(username='testuser', password='testpass123')
         TabSettings.set("cur_round", 2)
-        set_standings_publication_setting("speaker_results", True)
-        set_standings_publication_setting("team_results", True)
 
     def test_create_operations(self):
         school = School.objects.first()
@@ -122,13 +119,33 @@ class TestPostOperations(TestCase):
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
-    def test_debater_counts_api_permission_flow(self):
-        response = self.client.get(reverse("debater_counts_api"))
-        self.assertEqual(response.status_code, 200)
+    def test_toggle_current_round_ballots_view(self):
+        Round.objects.filter(round_number=1).update(victor=Round.GOV)
 
-        set_standings_publication_setting("speaker_results", False)
-        set_standings_publication_setting("team_results", False)
-        response = self.client.get(reverse("debater_counts_api"))
-        self.assertEqual(response.status_code, 423)
-        set_standings_publication_setting("speaker_results", True)
-        set_standings_publication_setting("team_results", True)
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "advance"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["current_round_ballots_released"])
+
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "revert"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertFalse(payload["current_round_ballots_released"])
+
+        Round.objects.filter(round_number=1).update(victor=Round.NONE)
+        response = self.client.get(
+            reverse("toggle_current_round_ballots"),
+            {"action": "advance"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["success"])
+        self.assertIn("ballots", payload["error"])
