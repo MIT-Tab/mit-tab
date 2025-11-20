@@ -1,6 +1,8 @@
 from decimal import Decimal
 
-from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.urls import reverse
 import pytest
 
 from mittab.apps.tab.models import (
@@ -503,3 +505,92 @@ class TestDynamicSchoolConflicts(TestCase):
             "School conflicts must be enforced even with allow_rejudges=True:\n"
             + "\n".join(conflicts),
         )
+
+
+@pytest.mark.django_db
+class TestManualJudgeViews(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        self.client = Client()
+        self.user = get_user_model().objects.create_superuser(
+            username="viewtester",
+            password="viewpass",
+            email="view@example.com",
+        )
+        self.client.login(username="viewtester", password="viewpass")
+
+        self.school_primary = School.objects.create(name="View Primary")
+        self.school_other = School.objects.create(name="View Other")
+
+    def make_team(self, name, school):
+        return Team.objects.create(
+            name=name,
+            school=school,
+            seed=Team.FULL_SEED,
+        )
+
+    def make_judge(self, name, rank=Decimal("4.00")):
+        return Judge.objects.create(name=name, rank=rank)
+
+    def test_inround_alternative_judges_filter_school_conflicts(self):
+        gov_team = self.make_team("Manual Gov", self.school_primary)
+        opp_team = self.make_team("Manual Opp", self.school_other)
+        room = Room.objects.create(name="Manual Room", rank=Decimal("5.00"))
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+        )
+
+        conflict_judge = self.make_judge("Manual Conflict")
+        conflict_judge.schools.add(self.school_primary)
+        neutral_judge = self.make_judge("Manual Neutral")
+
+        CheckIn.objects.create(judge=conflict_judge, round_number=1)
+        CheckIn.objects.create(judge=neutral_judge, round_number=1)
+
+        response = self.client.get(
+            reverse("alternative_judges", args=[round_obj.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+
+        self.assertIn(neutral_judge.name, excluded_names | included_names)
+        self.assertNotIn(conflict_judge.name, excluded_names)
+        self.assertNotIn(conflict_judge.name, included_names)
+
+    def test_outround_alternative_judges_filter_school_conflicts(self):
+        gov_team = self.make_team("Outround Gov", self.school_primary)
+        opp_team = self.make_team("Outround Opp", self.school_other)
+        room = Room.objects.create(name="Outround Room", rank=Decimal("5.00"))
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+        )
+
+        conflict_judge = self.make_judge("Outround Conflict")
+        conflict_judge.schools.add(self.school_primary)
+        neutral_judge = self.make_judge("Outround Neutral")
+
+        CheckIn.objects.create(judge=conflict_judge, round_number=0)
+        CheckIn.objects.create(judge=neutral_judge, round_number=0)
+
+        response = self.client.get(
+            reverse("outround_alternative_judges", args=[outround.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+
+        self.assertIn(neutral_judge.name, excluded_names | included_names)
+        self.assertNotIn(conflict_judge.name, excluded_names)
+        self.assertNotIn(conflict_judge.name, included_names)
