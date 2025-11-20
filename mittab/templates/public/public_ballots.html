@@ -14,6 +14,11 @@
   {% for round_result in round_results %}
     <section class="mb-5">
       <h3>Round {{ round_result.round_number }}</h3>
+      {% if not round_result.include_speaks and not round_result.include_ranks %}
+        <div class="alert alert-secondary mb-3" role="status">
+          Speaks and ranks are hidden for this round.
+        </div>
+      {% endif %}
       {% if not round_result.ballots %}
         <div class="alert alert-info mb-0">
           No ballots are available for this round yet.

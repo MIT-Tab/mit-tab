@@ -1,18 +1,17 @@
+from enum import IntEnum
+
 from mittab.apps.tab.models import PublicDisplaySetting
 from mittab.libs.cacheing import cache_logic
 
-RANKING_CONFIG = {
-    "team": {"label": "Team", "defaults": {"max_visible": 1000}},
-    "varsity": {"label": "Varsity Speakers", "defaults": {"max_visible": 10}},
-    "novice": {"label": "Novice Speakers", "defaults": {"max_visible": 10}},
-}
+RANKING_SLUGS = ("team", "varsity", "novice")
+STANDING_SLUGS = ("speaker_results", "team_results")
+DISPLAY_FLAGS_CACHE_KEY = "public_display_flags"
 
-STANDING_CONFIG = {
-    "speaker_results": {"label": "Speaker Results"},
-    "team_results": {"label": "Team Results"},
-}
-
-BALLOT_LABEL_TEMPLATE = "Round {round} Ballots"
+class PublicRankingMode(IntEnum):
+    NONE = 0
+    TEAM = 1
+    LAST_BALLOTS = 2
+    ALL_BALLOTS = 3
 
 
 def _setting(slug, *, label, display_type, defaults=None):
@@ -25,16 +24,16 @@ def _setting(slug, *, label, display_type, defaults=None):
 
 
 def get_ranking_settings(slug):
-    config = RANKING_CONFIG[slug]
+    label, defaults = _ranking_metadata(slug)
     setting = _setting(
         slug,
-        label=config["label"],
+        label=label,
         display_type=PublicDisplaySetting.RANKING,
-        defaults=config.get("defaults"),
+        defaults=defaults,
     )
     return {
         "slug": slug,
-        "label": config["label"],
+        "label": label,
         "public": setting.is_enabled,
         "include_speaks": setting.include_speaks,
         "max_visible": setting.max_visible,
@@ -42,55 +41,59 @@ def get_ranking_settings(slug):
 
 
 def set_ranking_settings(slug, public, include_speaks, max_visible):
+    label, defaults = _ranking_metadata(slug)
     setting = _setting(
         slug,
-        label=RANKING_CONFIG[slug]["label"],
+        label=label,
         display_type=PublicDisplaySetting.RANKING,
+        defaults=defaults,
     )
-    setting.is_enabled = bool(public)
-    setting.include_speaks = bool(include_speaks)
-    setting.max_visible = max(1, int(max_visible))
-    setting.save(update_fields=["is_enabled", "include_speaks", "max_visible"])
+    _update_setting(
+        setting,
+        is_enabled=bool(public),
+        include_speaks=bool(include_speaks),
+        max_visible=max(1, int(max_visible)),
+    )
     invalidate_public_display_flags_cache()
 
 
 def get_all_ranking_settings():
-    return [get_ranking_settings(slug) for slug in RANKING_CONFIG]
+    return [get_ranking_settings(slug) for slug in RANKING_SLUGS]
 
 
 def get_standings_publication_setting(slug):
-    config = STANDING_CONFIG[slug]
+    label = _standing_label(slug)
     setting = _setting(
         slug,
-        label=config["label"],
+        label=label,
         display_type=PublicDisplaySetting.STANDING,
     )
     return {
         "slug": slug,
-        "label": config["label"],
+        "label": label,
         "published": setting.is_enabled,
     }
 
 
 def set_standings_publication_setting(slug, published):
+    label = _standing_label(slug)
     setting = _setting(
         slug,
-        label=STANDING_CONFIG[slug]["label"],
+        label=label,
         display_type=PublicDisplaySetting.STANDING,
     )
-    setting.is_enabled = bool(published)
-    setting.save(update_fields=["is_enabled"])
+    _update_setting(setting, is_enabled=bool(published))
 
 
 def get_all_standings_publication_settings():
-    return [get_standings_publication_setting(slug) for slug in STANDING_CONFIG]
+    return [get_standings_publication_setting(slug) for slug in STANDING_SLUGS]
 
 
 def get_ballot_round_settings(round_number):
-    slug = f"ballot_round_{round_number}"
+    slug, label = _ballot_metadata(round_number)
     setting = _setting(
         slug,
-        label=BALLOT_LABEL_TEMPLATE.format(round=round_number),
+        label=label,
         display_type=PublicDisplaySetting.BALLOT,
         defaults={"round_number": round_number},
     )
@@ -103,38 +106,39 @@ def get_ballot_round_settings(round_number):
 
 
 def set_ballot_round_settings(round_number, visible, include_speaks, include_ranks):
+    slug, label = _ballot_metadata(round_number)
     setting = _setting(
-        f"ballot_round_{round_number}",
-        label=BALLOT_LABEL_TEMPLATE.format(round=round_number),
+        slug,
+        label=label,
         display_type=PublicDisplaySetting.BALLOT,
         defaults={"round_number": round_number},
     )
-    setting.is_enabled = bool(visible)
-    setting.include_speaks = bool(include_speaks)
-    setting.include_ranks = bool(include_ranks)
-    setting.save(update_fields=["is_enabled", "include_speaks", "include_ranks"])
+    _update_setting(
+        setting,
+        is_enabled=bool(visible),
+        include_speaks=bool(include_speaks),
+        include_ranks=bool(include_ranks),
+    )
     invalidate_public_display_flags_cache()
 
 
 def get_all_ballot_round_settings(tot_rounds):
-    return [get_ballot_round_settings(round_number) for round_number in range(1, tot_rounds + 1)]
-
-
-DISPLAY_FLAGS_CACHE_KEY = "public_display_flags"
+    return [
+        get_ballot_round_settings(round_number)
+        for round_number in range(1, tot_rounds + 1)
+    ]
 
 
 def _load_public_display_flags():
-    team_public = get_ranking_settings("team")["public"]
-    varsity_public = get_ranking_settings("varsity")["public"]
-    novice_public = get_ranking_settings("novice")["public"]
+    rankings = {slug: get_ranking_settings(slug)["public"] for slug in RANKING_SLUGS}
     ballots_public = PublicDisplaySetting.objects.filter(
         display_type=PublicDisplaySetting.BALLOT,
         is_enabled=True,
     ).exists()
 
     return {
-        "team_results": bool(team_public),
-        "speaker_results": bool(varsity_public or novice_public),
+        "team_results": bool(rankings.get("team")),
+        "speaker_results": bool(rankings.get("varsity") or rankings.get("novice")),
         "ballots": bool(ballots_public),
     }
 
@@ -150,3 +154,35 @@ def get_public_display_flags():
 
 def invalidate_public_display_flags_cache():
     cache_logic.invalidate_cache(DISPLAY_FLAGS_CACHE_KEY)
+
+
+def _ranking_metadata(slug):
+    if slug == "team":
+        return "Team", {"max_visible": 1000}
+    if slug == "varsity":
+        return "Varsity Speakers", {"max_visible": 10}
+    if slug == "novice":
+        return "Novice Speakers", {"max_visible": 10}
+    raise ValueError(f"Unknown ranking slug '{slug}'")
+
+
+def _standing_label(slug):
+    if slug == "speaker_results":
+        return "Speaker Results"
+    if slug == "team_results":
+        return "Team Results"
+    raise ValueError(f"Unknown standing slug '{slug}'")
+
+
+def _ballot_metadata(round_number):
+    if round_number < 1:
+        raise ValueError("Round number must be positive")
+    slug = f"ballot_round_{round_number}"
+    label = f"Round {round_number} Ballots"
+    return slug, label
+
+
+def _update_setting(setting, **fields):
+    for field, value in fields.items():
+        setattr(setting, field, value)
+    setting.save(update_fields=list(fields.keys()))

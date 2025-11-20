@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import random
 import datetime
 import os
 
@@ -19,7 +18,7 @@ from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
-    validate_panel, EBallotForm
+    validate_panel
 
 import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -27,6 +26,7 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
+from mittab.libs.tab_logic.stats import get_all_round_stats
 from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
     invalidate_public_rankings_cache,
@@ -506,10 +506,6 @@ def view_round(request, round_number):
     pairing_released = TabSettings.get("pairing_released", 0) == 1
     judges_assigned = all((r.judges.count() > 0 for r in round_info))
     rooms_assigned = all((r.room is not None for r in round_info))
-    outstanding_ballots = Round.objects.filter(
-        round_number=round_number,
-        victor=Round.NONE
-    ).exists()
     excluded_judges = Judge.objects.exclude(
         judges__round_number=round_number).filter(
             checkin__round_number=round_number)
@@ -1025,7 +1021,6 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def round_stats(request):
-    from mittab.libs.tab_logic.stats import get_all_round_stats
     stats = get_all_round_stats()
     return render(request, "tab/round_stats.html", {
         "title": "Round Statistics",
