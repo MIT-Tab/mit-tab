@@ -1,7 +1,16 @@
 """Collection of useful methods for manipulating pairing data"""
+from decimal import Decimal
 import random
 
-from mittab.apps.tab.models import Round, RoundStats
+from mittab.apps.tab.models import (
+    CheckIn,
+    Judge,
+    Room,
+    RoomCheckIn,
+    Round,
+    RoundStats,
+    Scratch,
+)
 
 # Speaks every quarter point
 SPEAK_RANGE = [23 + 0.25 * i for i in range(17)]
@@ -132,3 +141,65 @@ def generate_results(round_number,
                                             prob_ironman=prob_ironman)
         for result in results:
             result.save()  # pylint: disable=E1101
+
+
+def clear_all_scratches():
+    """Remove any pre-existing scratch records so tests start from a clean slate."""
+    Scratch.objects.all().delete()
+
+
+def build_judge_pool(num_judges,
+                     base_rank=Decimal("5.00"),
+                     rank_step=Decimal("0.05"),
+                     checkin_rounds=(0, 1)):
+    """
+    Recreate a deterministic judge pool and register check-ins for the desired rounds.
+
+    Returns:
+        list[Judge]: New judge objects ordered by creation.
+    """
+    Judge.objects.all().delete()
+    CheckIn.objects.all().delete()
+
+    judges = [
+        Judge.objects.create(
+            name=f"Test Judge {idx}",
+            rank=base_rank - (rank_step * idx),
+        )
+        for idx in range(num_judges)
+    ]
+
+    CheckIn.objects.bulk_create(
+        CheckIn(judge=judge, round_number=round_number)
+        for judge in judges
+        for round_number in checkin_rounds
+    )
+    return judges
+
+
+def build_room_pool(num_rooms,
+                    round_numbers=(1,),
+                    base_rank=Decimal("5.00")):
+    """
+    Recreate rooms and register check-ins for the provided rounds.
+
+    Returns:
+        list[Room]: Newly created rooms for inspection in tests.
+    """
+    Room.objects.all().delete()
+    RoomCheckIn.objects.all().delete()
+
+    rooms = [
+        Room.objects.create(
+            name=f"Test Room {idx}",
+            rank=base_rank,
+        )
+        for idx in range(num_rooms)
+    ]
+
+    RoomCheckIn.objects.bulk_create(
+        RoomCheckIn(room=room, round_number=round_number)
+        for room in rooms
+        for round_number in round_numbers
+    )
+    return rooms

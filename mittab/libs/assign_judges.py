@@ -90,6 +90,7 @@ def add_judges():
         ).prefetch_related(
             "judges",  # poorly named relation for the round
             "scratches",
+            "schools",
         )
     )
 
@@ -301,6 +302,7 @@ def add_outround_judges(round_type=Outround.VARSITY):
         ).prefetch_related(
             "judges",  # poorly named relation for the round
             "scratches",
+            "schools",
         )
     )
     pairings = tab_logic.sorted_pairings(num_teams, outround=True)
@@ -436,18 +438,27 @@ def calc_weight(
 def judge_conflict(judge, team1, team2, allow_rejudges=None):
     if allow_rejudges is None:
         allow_rejudges = TabSettings.get("allow_rejudges", False)
+
     has_scratches = any(
         s.team_id in (team1.id, team2.id)
         for s in judge.scratches.all()
     )
+
+    has_school_conflict = any(
+        team.school in judge.schools.all() or
+        (team.hybrid_school in judge.schools.all())
+        for team in (team1, team2)
+    )
+
     if not allow_rejudges:
         return (
             has_scratches
+            or has_school_conflict
             or had_judge(judge, team1)
             or had_judge(judge, team2)
         )
     else:
-        return has_scratches
+        return has_scratches or has_school_conflict
 
 def is_bubble_round(pairing, round_number):
     gov_losses = round_number - tab_logic.stats.tot_wins(pairing.gov_team)

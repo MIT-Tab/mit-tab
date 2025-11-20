@@ -378,7 +378,7 @@ def alternative_judges(request, round_id, judge_id=None):
     # All of these variables are for the convenience of the template
     try:
         current_judge_id = int(judge_id)
-        current_judge_obj = Judge.objects.prefetch_related("scratches").get(
+        current_judge_obj = Judge.objects.prefetch_related("scratches", "schools").get(
             id=current_judge_id
         )
         current_judge_name = current_judge_obj.name
@@ -407,7 +407,7 @@ def alternative_judges(request, round_id, judge_id=None):
         judges_outrounds__type_of_round=other_round_type
     ).filter(
         checkin__round_number=0
-    ).prefetch_related("scratches")
+    ).prefetch_related("scratches", "schools", "judges")
 
     query = Q(
         judges_outrounds__num_teams=round_obj.num_teams,
@@ -421,22 +421,26 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = Judge.objects.filter(query) \
                                    .filter(checkin__round_number=0) \
                                    .distinct() \
-                                   .prefetch_related("scratches")
+                                   .prefetch_related("scratches", "schools", "judges")
 
-    scratched_team_ids = {round_gov.id, round_opp.id}
-
-    def has_team_scratch(judge):
-        return any(s.team_id in scratched_team_ids for s in judge.scratches.all())
+    eligible_excluded = assign_judges.can_judge_teams(
+        excluded_judges,
+        round_gov,
+        round_opp,
+    )
+    eligible_included = assign_judges.can_judge_teams(
+        included_judges,
+        round_gov,
+        round_opp,
+    )
 
     excluded_judges = [
         (j.name, j.id, float(j.rank), j.wing_only)
-        for j in excluded_judges
-        if not has_team_scratch(j)
+        for j in eligible_excluded
     ]
     included_judges = [
         (j.name, j.id, float(j.rank), j.wing_only)
-        for j in included_judges
-        if not has_team_scratch(j)
+        for j in eligible_included
     ]
 
     included_judges = sorted(included_judges, key=lambda x: -x[2])
