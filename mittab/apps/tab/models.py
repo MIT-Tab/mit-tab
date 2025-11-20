@@ -362,6 +362,10 @@ class Judge(models.Model):
         return any(checkin.round_number == round_number
                    for checkin in self.checkin_set.all())
 
+    def is_expected_for_round(self, round_number):
+        return any(expectation.round_number == round_number
+                   for expectation in self.expected_checkins.all())
+
     def __str__(self):
         return self.name
 
@@ -643,6 +647,26 @@ class CheckIn(models.Model):
             models.UniqueConstraint(
                 fields=["judge", "round_number"],
                 name="unique_judge_checkin_per_round",
+            )
+        ]
+
+
+class JudgeExpectedCheckIn(models.Model):
+    judge = models.ForeignKey(
+        Judge,
+        on_delete=models.CASCADE,
+        related_name="expected_checkins",
+    )
+    round_number = models.IntegerField()
+
+    def __str__(self):
+        return f"Judge {self.judge} is expected for round {self.round_number}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["judge", "round_number"],
+                name="unique_judge_expectation_per_round",
             )
         ]
 

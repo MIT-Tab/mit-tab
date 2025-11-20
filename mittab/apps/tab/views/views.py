@@ -323,6 +323,8 @@ def bulk_check_in(request):
 
     if entity_type == "judge":
         checkInObj, id_field = CheckIn, "judge_id"
+    elif entity_type == "judge_expected":
+        checkInObj, id_field = JudgeExpectedCheckIn, "judge_id"
     else:
         checkInObj, id_field = RoomCheckIn, "room_id"
 
@@ -576,22 +578,48 @@ def batch_checkin(request):
     all_round_numbers = [0] + round_numbers
 
     team_data = [
-        {"entity": t, "school": t.school, "debaters": t.debaters_display,
-         "checked_in": t.checked_in}
+        {
+            "entity": t,
+            "school": t.school,
+            "debaters": t.debaters_display,
+            "checked_in": t.checked_in,
+            "expected_checkins": [],
+        }
         for t in Team.objects.prefetch_related("school", "debaters").all()
     ]
 
-    judge_data = [
-        {"entity": j, "schools": j.schools.all(),
-         "checkins": [rn in {c.round_number for c in j.checkin_set.all()}
-                      for rn in all_round_numbers]}
-        for j in Judge.objects.prefetch_related("checkin_set", "schools")
-    ]
+    judges = Judge.objects.prefetch_related("checkin_set", "expected_checkins", "schools")
+    judge_data = []
+    expected_judge_data = []
+
+    for j in judges:
+        checkin_rounds = {c.round_number for c in j.checkin_set.all()}
+        expected_rounds = {c.round_number for c in j.expected_checkins.all()}
+        checkins = [rn in checkin_rounds for rn in all_round_numbers]
+        expected_flags = [rn in expected_rounds for rn in all_round_numbers]
+
+        judge_row = {
+            "entity": j,
+            "schools": j.schools.all(),
+            "checkins": checkins,
+            "expected_checkins": expected_flags,
+        }
+        judge_data.append(judge_row)
+
+        judge_expected_row = {
+            "entity": j,
+            "schools": j.schools.all(),
+            "checkins": expected_flags,
+            "expected_checkins": expected_flags,
+        }
+        expected_judge_data.append(judge_expected_row)
 
     room_data = [
         {"entity": r,
          "checkins": [rn in {c.round_number for c in r.roomcheckin_set.all()}
-                      for rn in all_round_numbers]}
+                      for rn in all_round_numbers],
+         "expected_checkins": [],
+         }
         for r in Room.objects.prefetch_related("roomcheckin_set")
     ]
 
@@ -604,6 +632,7 @@ def batch_checkin(request):
         return counts
 
     judge_counts = column_counts(judge_data)
+    expected_judge_counts = column_counts(expected_judge_data)
     room_counts = column_counts(room_data)
 
     def round_count_data(counts):
@@ -614,12 +643,14 @@ def batch_checkin(request):
         } for idx in range(len(round_numbers))]
 
     judge_round_counts = round_count_data(judge_counts)
+    expected_judge_round_counts = round_count_data(expected_judge_counts)
     room_round_counts = round_count_data(room_counts)
 
     return render(request, "batch_check_in/check_in.html", {
         "team_data": team_data,
         "team_headers": ["School", "Team", "Debater Names"],
         "judge_data": judge_data,
+        "judge_expectation_data": expected_judge_data,
         "judge_headers": ["School", "Judge"],
         "room_data": room_data,
         "room_headers": ["Room"],
@@ -629,8 +660,12 @@ def batch_checkin(request):
         "judge_total_count": len(judge_data),
         "room_total_count": len(room_data),
         "judge_round_counts": judge_round_counts,
+        "judge_expectation_round_counts": expected_judge_round_counts,
         "room_round_counts": room_round_counts,
         "judge_outround_count": judge_counts[0] if judge_counts else 0,
+        "judge_expectation_outround_count": (
+            expected_judge_counts[0] if expected_judge_counts else 0
+        ),
         "room_outround_count": room_counts[0] if room_counts else 0,
     })
 

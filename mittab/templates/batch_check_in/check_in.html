@@ -24,6 +24,9 @@
                            <a class="nav-link" id="judge-tab" data-toggle="tab" href="#judge" role="tab" aria-controls="judge" aria-selected="false">Judge</a>
                        </li>
                         <li class="nav-item" role="presentation">
+                           <a class="nav-link" id="judge-expected-tab" data-toggle="tab" href="#judge-expected" role="tab" aria-controls="judge-expected" aria-selected="false">Expected Judges</a>
+                       </li>
+                        <li class="nav-item" role="presentation">
                             <a class="nav-link" id="room-tab" data-toggle="tab" href="#room" role="tab" aria-controls="room" aria-selected="false">Room</a>
                         </li>
                     </ul>
@@ -35,6 +38,9 @@
                   <div class="tab-pane fade" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
                            {% include "batch_check_in/_checkin_pane.html" with entity_type='judge' data=judge_data headers=judge_headers checked_total=judge_total_count round_counts=judge_round_counts outround_count=judge_outround_count %}
                    </div>
+                       <div class="tab-pane fade" id="judge-expected" role="tabpanel" data-entity-type="judge_expected" aria-labelledby="judge-expected-tab">
+                            {% include "batch_check_in/_checkin_pane.html" with entity_type='judge_expected' data=judge_expectation_data headers=judge_headers checked_total=judge_total_count round_counts=judge_expectation_round_counts outround_count=judge_expectation_outround_count action_label='Expected' action_on_label='Yes' action_off_label='No' %}
+                    </div>
                        <div class="tab-pane fade" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
                             {% include "batch_check_in/_checkin_pane.html" with entity_type='room' data=room_data headers=room_headers checked_total=room_total_count round_counts=room_round_counts outround_count=room_outround_count %}
                         </div>

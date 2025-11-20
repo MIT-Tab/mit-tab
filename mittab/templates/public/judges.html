@@ -31,7 +31,7 @@
 		    <td style="width: 25%;" data-label="Name">{{ judge.name }}</td>
 		    <td style="width: 25%;" data-label="Affiliations">{{ judge.affiliations_display }}</td>
 		    {% for round in rounds %}
-			<td data-label="R{{ round }}">{% if judge|is_checked_in:round %}&#10004;{% else %}X{% endif %}</td>
+			<td data-label="R{{ round }}">{% if judge|is_expected:round %}&#10004;{% else %}X{% endif %}</td>
 		    {% endfor %}
 		</tr>
 	    {% endfor %}

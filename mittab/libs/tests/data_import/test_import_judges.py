@@ -1,7 +1,7 @@
 from django.test import TestCase
 import pytest
 
-from mittab.apps.tab.models import School, Judge
+from mittab.apps.tab.models import School, Judge, JudgeExpectedCheckIn, TabSettings
 from mittab.libs.tests.data_import import MockWorkbook
 from mittab.libs.data_import.import_judges import JudgeImporter
 
@@ -15,9 +15,11 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "9.5", "Harvard"],
-                ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern"],
-                ["Judge 3", "20"]]
+        TabSettings.set("tot_rounds", 2)
+
+        data = [["Judge 1", "9.5", "Harvard", "yes", ""],
+                ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern", "1", "0"],
+                ["Judge 3", "20", "", "", ""]]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -41,6 +43,10 @@ class TestImportingJudges(TestCase):
         assert float(judge_3.rank) == 20.0
         assert judge_3.name == "Judge 3"
         assert not judge_3.schools.all()
+        assert JudgeExpectedCheckIn.objects.filter(judge=judge_1,
+                                                   round_number=1).exists()
+        assert not JudgeExpectedCheckIn.objects.filter(judge=judge_1,
+                                                       round_number=2).exists()
 
     def test_rollback_from_duplicate(self):
         assert Judge.objects.count() == 0
@@ -90,3 +96,28 @@ class TestImportingJudges(TestCase):
         assert len(errors) == 1
         assert errors[0] == "Row 1: Judge 1 - Ensure that there are" \
             " no more than 4 digits in total."
+
+    def test_expected_rounds_imported(self):
+        TabSettings.set("tot_rounds", 3)
+
+        data = [["Judge 4", "9.5", "Harvard", "Y", "", "1"]]
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert not errors
+        judge = Judge.objects.get(name="Judge 4")
+        expected_rounds = sorted(
+            JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+                "round_number", flat=True)
+        )
+        assert expected_rounds == [1, 3]
+
+    def test_blank_school_cells_ignored(self):
+        data = [["Judge 5", "9.5", "", "  ", ""]]
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert not errors
+        judge = Judge.objects.get(name="Judge 5")
+        assert judge.schools.count() == 0
+        assert School.objects.count() == 0
