@@ -50,6 +50,16 @@
     </table>
   </div>
   {% endif %}
+  {% if debater_obj.ranking_groups.count %}
+  <div class="team-record mt-4">
+    <h5>Ranking Groups</h5>
+    <ul class="list-unstyled mb-0">
+      {% for ranking_group in debater_obj.ranking_groups.all %}
+      <li><a href='/ranking-group/{{ ranking_group.id }}/'>{{ ranking_group.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

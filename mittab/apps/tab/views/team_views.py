@@ -1,6 +1,7 @@
 from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
+from django.utils.text import slugify
 
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.cacheing import cache_logic
@@ -25,9 +26,16 @@ def view_teams(request):
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
 
-    c_teams = [(team.id, team.display_backend, flags(team),
-                TabFlags.flags_to_symbols(flags(team)))
-               for team in Team.objects.all()]
+    c_teams = [
+        (
+            team.id,
+            team.display_backend,
+            flags(team),
+            TabFlags.flags_to_symbols(flags(team)),
+            list(team.ranking_groups.order_by("name").values_list("name", flat=True)),
+        )
+        for team in Team.objects.prefetch_related("ranking_groups").all()
+    ]
     all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
     filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
@@ -384,9 +392,21 @@ def rank_teams(request):
         public=False
     )
 
+    ranking_group_tables = []
+    ranking_groups = RankingGroup.objects.prefetch_related("teams").order_by("name")
+    for ranking_group in ranking_groups:
+        team_ids = {team.id for team in ranking_group.teams.all()}
+        grouped_teams = [team for team in teams if team[0].id in team_ids]
+        if grouped_teams:
+            ranking_group_tables.append({
+                "title": f"{ranking_group.name} Rankings",
+                "anchor": f"team-ranking-group-{slugify(ranking_group.name)}",
+                "teams": grouped_teams,
+            })
+
     return render(request, "tab/rank_teams_component.html", {
         "varsity": teams,
         "novice": nov_teams,
+        "team_ranking_groups": ranking_group_tables,
         "title": "Team Rankings"
     })
-
