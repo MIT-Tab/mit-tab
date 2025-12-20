@@ -2,8 +2,8 @@ from typing import Type, cast
 
 from django import forms
 from django.contrib.auth.decorators import permission_required
-from django.db import transaction
-from django.db.models import Prefetch
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Prefetch
 from django.forms import BaseFormSet, formset_factory
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
@@ -21,9 +21,12 @@ from mittab.apps.registration.forms import (
     TeamForm,
 )
 from mittab.apps.tab.models import CheckIn, Debater, Judge, School, TabSettings, Team
-from mittab.apps.tab.helpers import redirect_and_flash_success
+from mittab.apps.tab.helpers import (
+    redirect_and_flash_error,
+    redirect_and_flash_success,
+)
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
-from .models import Registration, RegistrationConfig, RegistrationContent
+from .models import Registration, RegistrationConfig
 
 SCHOOL_ACTIVE_URL = "https://results.apda.online/api/schools/all/"
 SCHOOL_ALL_URL = SCHOOL_ACTIVE_URL
@@ -41,15 +44,6 @@ class RegistrationTeamFormSet(BaseFormSet):
 
     def clean(self):
         super().clean()
-        if any(self.errors):
-            return
-        active = [
-            form
-            for form in self.forms
-            if form.cleaned_data and not form.cleaned_data.get("DELETE")
-        ]
-        if not active:
-            raise forms.ValidationError("Add at least one team")
 
 
 TeamFormSet = cast(
@@ -331,38 +325,68 @@ def resolve_school(selection, cache=None):
     name = selection.get("name", "").strip()
     if not name:
         raise forms.ValidationError("Enter a school name")
-    school, _ = School.objects.get_or_create(name__iexact=name, defaults={"name": name})
+    try:
+        school, _ = School.objects.get_or_create(
+            name__iexact=name,
+            defaults={"name": name},
+        )
+    except IntegrityError:
+        existing = School.objects.filter(name__iexact=name).first()
+        if existing:
+            school = existing
+        else:
+            raise forms.ValidationError("School already exists, select it instead")
     cache[key] = school
     return school
+
+
+def uniquify_name(model_cls, desired_name, *, field_name="name", exclude_pk=None):
+    base = (desired_name or "").strip()
+    field = model_cls._meta.get_field(field_name)
+    max_length = getattr(field, "max_length", None)
+
+    def exists(candidate):
+        query = {f"{field_name}__iexact": candidate}
+        qs = model_cls.objects.filter(**query)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        return qs.exists()
+
+    if base and not exists(base):
+        return base
+
+    counter = 1
+    while True:
+        suffix = f" ({counter})"
+        truncated = base or "Entry"
+        if max_length:
+            truncated = truncated[: max_length - len(suffix)].rstrip()
+        candidate = f"{truncated}{suffix}"
+        if not exists(candidate):
+            return candidate
+        counter += 1
 
 
 def get_or_create_debater(data, school):
     name = (data["name"] or "").strip()
     if not name:
         raise forms.ValidationError("Debater name required")
-    debater, _ = Debater.objects.get_or_create(
-        name__iexact=name,
-        defaults={
-            "name": name,
-            "novice_status": data["novice_status"],
-            "apda_id": data.get("apda_id") or -1,
-        },
+    debater = (
+        Debater.objects.filter(pk=data.get("id")).first()
+        if data.get("id")
+        else Debater()
     )
-    debater.name = name
+    debater.name = uniquify_name(Debater, name, exclude_pk=debater.pk)
     debater.novice_status = data["novice_status"]
     debater.qualified = data["qualified"]
     debater.apda_id = data.get("apda_id") or -1
     debater.school = school
-    debater.save()
+    try:
+        debater.save()
+    except IntegrityError:
+        debater.name = uniquify_name(Debater, name, exclude_pk=debater.pk)
+        debater.save()
     return debater
-
-
-def ensure_unique_team_name(team, name):
-    conflict = Team.objects.filter(name__iexact=name)
-    if team.pk:
-        conflict = conflict.exclude(pk=team.pk)
-    if conflict.exists():
-        raise forms.ValidationError(f"Team name {name} already exists")
 
 
 def save_registration(reg_form, team_formset, judge_formset, registration):
@@ -392,13 +416,17 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
             ).first()
             or Team(registration=registration)
         )
-        team.name = payload["name"]
+        team.name = uniquify_name(Team, payload["name"], exclude_pk=team.pk)
         team.seed = payload["seed_choice"]
         team.school = primary_school
         team.hybrid_school = None
         team.break_preference = Team.VARSITY
         team.checked_in = False
-        team.save()
+        try:
+            team.save()
+        except IntegrityError:
+            team.name = uniquify_name(Team, payload["name"], exclude_pk=team.pk)
+            team.save()
         debaters = [
             get_or_create_debater(member, member_schools[index])
             for index, member in enumerate(members)
@@ -417,10 +445,14 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         judge = Judge.objects.filter(
             pk=payload.get("judge_id"), registration=registration
         ).first() or Judge(registration=registration)
-        judge.name = payload["name"]
+        judge.name = uniquify_name(Judge, payload["name"], exclude_pk=judge.pk)
         judge.rank = payload["experience"]
         judge.email = payload["email"]
-        judge.save()
+        try:
+            judge.save()
+        except IntegrityError:
+            judge.name = uniquify_name(Judge, payload["name"], exclude_pk=judge.pk)
+            judge.save()
         selected_schools = payload["schools"] or [{"pk": registration.school.pk}]
         resolved_schools = [
             resolve_school(selection, cache=school_cache)
@@ -432,6 +464,45 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
     for judge in registration.judges.exclude(pk__in=saved_judge_ids):
         judge.delete()
     return registration
+
+
+@require_http_methods(["GET", "POST"])
+def registration_code_lookup(request):
+    config = RegistrationConfig.get_or_create_active()
+    can_modify = config.can_modify()
+
+    if request.method == "POST":
+        code = (request.POST.get("registration_code") or "").strip()
+
+        if not can_modify:
+            return redirect_and_flash_error(
+                request,
+                "Registration editing is currently disabled.",
+                path=reverse("registration_code_lookup"),
+            )
+
+        if not code:
+            return redirect_and_flash_error(
+                request,
+                "Please enter the registration code from your confirmation email.",
+                path=reverse("registration_code_lookup"),
+            )
+
+        exists = Registration.objects.filter(herokunator_code=code).exists()
+        if not exists:
+            return redirect_and_flash_error(
+                request,
+                "We couldn't find a registration for that code. Double-check and try again.",
+                path=reverse("registration_code_lookup"),
+            )
+
+        return redirect("registration_portal_edit", code=code)
+
+    return render(
+        request,
+        "registration/code_lookup.html",
+        {"can_modify_registration": can_modify},
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -451,7 +522,6 @@ def registration_portal(request, code=None):
         request, registration, school_choices, round_config
     )
     config = RegistrationConfig.get_or_create_active()
-    content = RegistrationContent.get_solo()
     is_edit_mode = registration is not None
     can_create = config.can_create()
     can_modify = config.can_modify()
@@ -465,7 +535,23 @@ def registration_portal(request, code=None):
         )
     if request.method == "POST":
         if reg_form.is_valid() and team_formset.is_valid() and judge_formset.is_valid():
-            if not can_submit:
+            has_team = any(
+                form.cleaned_data and not form.cleaned_data.get("DELETE")
+                for form in team_formset.forms
+            )
+            has_judge = any(
+                form.cleaned_data and not form.cleaned_data.get("DELETE")
+                for form in judge_formset.forms
+            )
+            if not (has_team or has_judge):
+                message = "Add at least one team or one judge"
+                team_formset._non_form_errors = team_formset.error_class(  # pylint: disable=protected-access
+                    [message]
+                )
+                judge_formset._non_form_errors = judge_formset.error_class(  # pylint: disable=protected-access
+                    [message]
+                )
+            elif not can_submit:
                 reg_form.add_error(
                     None, lock_message or "Registration is currently unavailable"
                 )
@@ -508,7 +594,6 @@ def registration_portal(request, code=None):
         "team_formset": team_formset,
         "judge_formset": judge_formset,
         "config": config,
-        "content": content,
         "summary": summary,
         "max_teams": MAX_TEAMS,
         "is_edit_mode": is_edit_mode,
@@ -522,27 +607,67 @@ def registration_portal(request, code=None):
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def registration_setup(request):
+    return redirect("registration_admin")
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["GET", "POST"])
+def registration_admin(request):
     config = RegistrationConfig.get_or_create_active()
-    content = RegistrationContent.get_solo()
-    if request.method == "POST":
-        form = RegistrationSettingsForm(request.POST, config=config, content=content)
-        if form.is_valid():
-            form.save()
-            invalidate_all_public_caches()
-            return redirect_and_flash_success(
+    if request.method == "POST" and request.POST.get("registration_id"):
+        reg_id = request.POST.get("registration_id")
+        registration = Registration.objects.filter(pk=reg_id).first()
+        if not registration:
+            return redirect_and_flash_error(
                 request,
-                "Registration settings updated!",
-                path=reverse("registration_setup"),
+                "Registration not found.",
+                path=reverse("registration_admin"),
             )
-    else:
-        form = RegistrationSettingsForm(config=config, content=content)
+        registration.delete()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            "Registration and all associated data deleted.",
+            path=reverse("registration_admin"),
+        )
+
+    form = RegistrationSettingsForm(
+        request.POST or None,
+        config=config,
+    )
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            "Registration settings updated!",
+            path=reverse("registration_admin"),
+        )
+
+    registrations = (
+        Registration.objects.select_related("school")
+        .prefetch_related(
+            Prefetch(
+                "teams",
+                queryset=Team.objects.select_related("school", "hybrid_school").prefetch_related(
+                    "debaters"
+                ),
+            ),
+            Prefetch(
+                "judges",
+                queryset=Judge.objects.prefetch_related("schools"),
+            ),
+        )
+        .annotate(team_count=Count("teams"), judge_count=Count("judges"))
+        .order_by("-created_at")
+    )
     return render(
         request,
-        "registration/setup.html",
+        "registration/admin_list.html",
         {
+            "registrations": registrations,
             "form": form,
             "config": config,
-            "content": content,
         },
     )
 

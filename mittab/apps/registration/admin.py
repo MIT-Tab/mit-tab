@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from mittab.apps.tab.models import Judge, Team
 
-from .models import Registration, RegistrationConfig, RegistrationContent
+from .models import Registration, RegistrationConfig
 
 
 class RegistrationTeamInline(admin.TabularInline):
@@ -30,7 +30,3 @@ class RegistrationAdmin(admin.ModelAdmin):
 class RegistrationConfigAdmin(admin.ModelAdmin):
     list_display = ("allow_new_registrations", "allow_registration_edits", "updated_at")
 
-
-@admin.register(RegistrationContent)
-class RegistrationContentAdmin(admin.ModelAdmin):
-    list_display = ("updated_at",)

@@ -126,7 +126,7 @@ body {
   }
   .links {
     @include card-shell;
-    padding: 2rem 2.5rem;
+    padding: 1.5rem 1.75rem;
     color: #1d2b44;
 
 
@@ -158,16 +158,18 @@ body {
   width: 100%;
   border: 1px solid rgba(28, 54, 94, 0.16);
   border-radius: 0.85rem;
-  padding: 1.5rem 2rem;
+  padding: 1.1rem 1.4rem;
   background: linear-gradient(135deg, rgba(42, 102, 196, 0.09), rgba(25, 73, 154, 0.04));
-  align-items: center;
-  gap: 1.25rem;
+  align-items: flex-start;
+  gap: 1rem;
 
   &__text {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.25rem;
     color: #16243a;
+    flex: 1 1 65%;
+    min-width: 0;
 
     .eyebrow {
       font-size: 0.85rem;
@@ -177,22 +179,51 @@ body {
     }
 
     .headline {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       font-weight: 700;
     }
 
     .body {
       margin-bottom: 0;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       color: rgba(18, 34, 58, 0.85);
     }
   }
 
   &__btn {
     white-space: nowrap;
-    padding: 0.85rem 1.75rem;
-    font-size: 1rem;
+    padding: 0.7rem 1.2rem;
+    font-size: 0.95rem;
+    min-width: 8rem;
   }
+}
+
+.registration-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+
+  .btn {
+    flex: 1 1 0;
+  }
+
+  @media (min-width: 992px) {
+    flex-wrap: nowrap;
+    .btn {
+      flex: 0 0 auto;
+    }
+  }
+}
+
+.register-cta__actions {
+  flex: 0 0 auto;
+}
+
+.registration-actions--mobile {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .public-links {
@@ -306,6 +337,8 @@ body {
 .registration-mobile-cta {
   margin-top: 0.65rem;
   margin-bottom: 0.65rem;
+  flex: 1 1 0;
+  text-align: center;
 }
 
 .public-sidebar-card {

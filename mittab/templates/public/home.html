@@ -25,7 +25,6 @@
         <div class="public-sidebar-card status">
           <h3 class="title">Welcome to {% tournament_name %}!</h3>
           <div class="content">
-            {% if not registration_open %}
             <div class="status-block" data-status>
               <div class="status-icon" aria-hidden="true" data-status-icon>
                 <i class="fas fa-clipboard-check"></i>
@@ -60,21 +59,6 @@
                 <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
               </div>
             </div>
-            {% else %}
-            <div class="registration-panel">
-              <div class="registration-panel__header">
-                <h4>Registration Open</h4>
-              </div>
-              <div class="registration-panel__text">
-                {% if registration_description %}
-                  {{ registration_description|registration_text }}
-                {% else %}
-                  Registration is live! Please review the information below and complete the form to reserve your school’s slots.
-                {% endif %}
-              </div>
-              <a class="btn btn-primary btn-block mt-3" href="{{ registration_url }}">Register Now</a>
-            </div>
-            {% endif %}
           </div>
         </div>
       </aside>
@@ -83,14 +67,13 @@
         <header class="header mobile-only">
           <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
           {% if registration_open %}
-          <a class="btn btn-primary btn-lg btn-block registration-mobile-cta" href="{{ registration_url }}">Register Here</a>
+          <div class="registration-actions registration-actions--mobile mb-2">
+            <a class="btn btn-primary btn-lg btn-block registration-mobile-cta" href="{{ registration_url }}">Register Here</a>
+            <a class="btn btn-outline-primary btn-lg btn-block registration-mobile-cta" href="{% url 'registration_code_lookup' %}">Edit Registration</a>
+          </div>
           <div class="registration-mobile-card">
             <div class="registration-mobile-card__text">
-              {% if registration_description %}
-                {{ registration_description|registration_text }}
-              {% else %}
-                Registration is now open. Complete the form to add teams and judges for your school.
-              {% endif %}
+              Registration is now open. Complete the form to add teams and judges for your school.
             </div>
           </div>
           {% else %}
@@ -115,7 +98,10 @@
             <span class="headline">Reserve your slots today.</span>
             <p class="body">Lock in your teams and judging obligations before pairings post.</p>
           </div>
-          <a class="btn btn-primary btn-lg register-cta__btn" href="{{ registration_url }}">Register Here</a>
+          <div class="register-cta__actions registration-actions">
+            <a class="btn btn-primary btn-lg register-cta__btn" href="{{ registration_url }}">Register Here</a>
+            <a class="btn btn-outline-primary btn-lg register-cta__btn" href="{% url 'registration_code_lookup' %}">Edit Registration</a>
+          </div>
         </div>
         {% endif %}
 

@@ -1,6 +1,6 @@
 from django import forms
 
-from mittab.apps.registration.models import RegistrationConfig, RegistrationContent
+from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.tab.models import Team
 
 NEW_CHOICE_VALUE = "__new__"
@@ -374,50 +374,12 @@ class RegistrationSettingsForm(forms.Form):
         help_text="Controls whether existing registration links can modify their data.",
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
-    registration_description = forms.CharField(
-        label="Homepage Registration Description",
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "form-control",
-                "rows": 4,
-                "placeholder": (
-                    "Describe how teams should register "
-                    "(links supported)."
-                ),
-            }
-        ),
-        help_text=(
-            "Shown on the public homepage when new registrations are enabled."
-        ),
-    )
-    registration_completion_message = forms.CharField(
-        label="Post-Registration Instructions",
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "form-control",
-                "rows": 4,
-                "placeholder": (
-                    "Provide follow-up instructions after submission "
-                    "(links supported)."
-                ),
-            }
-        ),
-        help_text=(
-            "Displayed inside the registration portal once a school submits "
-            "their entry."
-        ),
-    )
 
-    def __init__(self, *args, config=None, content=None, **kwargs):
+    def __init__(self, *args, config=None, **kwargs):
         self.config = config or RegistrationConfig.get_or_create_active()
-        self.content = content or RegistrationContent.get_solo()
         initial = {
             "allow_new_registrations": self.config.allow_new_registrations,
             "allow_registration_edits": self.config.allow_registration_edits,
-            "registration_description": self.content.description,
-            "registration_completion_message": self.content.completion_message,
         }
         kwargs.setdefault("initial", initial)
         super().__init__(*args, **kwargs)
@@ -430,9 +392,4 @@ class RegistrationSettingsForm(forms.Form):
             "allow_registration_edits"
         ]
         self.config.save()
-        self.content.description = self.cleaned_data["registration_description"]
-        self.content.completion_message = self.cleaned_data[
-            "registration_completion_message"
-        ]
-        self.content.save()
-        return self.config, self.content
+        return self.config

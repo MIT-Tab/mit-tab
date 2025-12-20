@@ -192,6 +192,9 @@ const initJudgeSchoolSelect = ($scope = $(document)) => {
   $scope.find("[data-judge-school-select]").each((_, el) => {
     const $select = $(el);
     if ($select.data("select2")) return;
+    if (!$select.find('option[value=""]').length) {
+      $select.prepend('<option value=""></option>');
+    }
     $select.select2({
       theme: "bootstrap4",
       width: "100%",

@@ -10,19 +10,33 @@
         <div class="card-body">
             <h4 class="card-title mb-3">Portal Controls</h4>
             <p class="text-muted mb-4">
-                Toggle who can access the public registration portal and update the helper text that appears on the homepage and confirmation screen.
+                Toggle who can access the public registration portal and whether existing links can be edited.
             </p>
             <form method="post">
                 {% csrf_token %}
-                {% bootstrap_form form layout='vertical' %}
+                <div class="custom-control custom-switch mb-3">
+                    {{ form.allow_new_registrations }}
+                    <label class="custom-control-label" for="{{ form.allow_new_registrations.id_for_label }}">
+                        Allow New Registrations
+                    </label>
+                    <small class="form-text text-muted">
+                        When enabled, schools can start brand new registrations from the public portal.
+                    </small>
+                </div>
+                <div class="custom-control custom-switch mb-4">
+                    {{ form.allow_registration_edits }}
+                    <label class="custom-control-label" for="{{ form.allow_registration_edits.id_for_label }}">
+                        Allow Registration Updates
+                    </label>
+                    <small class="form-text text-muted">
+                        When enabled, existing registration links can edit their submissions.
+                    </small>
+                </div>
                 <div class="text-right">
                     <button type="submit" class="btn btn-primary">Save Settings</button>
                 </div>
             </form>
         </div>
-    </div>
-    <div class="alert alert-info">
-        The homepage banner and registration portal copy support hyperlinks automatically. Use the toggles above to immediately open or close registrations without relying on calendar dates.
     </div>
 </div>
 {% endblock %}

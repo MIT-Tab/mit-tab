@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path("", views.registration_portal, name="registration_portal"),
     path("setup/", views.registration_setup, name="registration_setup"),
+    path("manage/", views.registration_admin, name="registration_admin"),
+    path("edit/", views.registration_code_lookup, name="registration_code_lookup"),
     path("<str:code>/", views.registration_portal, name="registration_portal_edit"),
     # API proxy endpoints to avoid CORS issues
     path("api/schools/", views.proxy_schools_active, name="api_schools_active"),

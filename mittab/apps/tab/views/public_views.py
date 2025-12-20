@@ -22,7 +22,7 @@ from mittab.apps.tab.public_rankings import (
     get_ranking_settings,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.registration.models import RegistrationConfig, RegistrationContent
+from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
@@ -37,7 +37,6 @@ def public_access_error(request):
 @cache_public_view(timeout=60)
 def public_home(request):
     registration_config = RegistrationConfig.get_or_create_active()
-    registration_content = RegistrationContent.get_solo()
     registration_open = bool(registration_config and registration_config.can_create())
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
     tot_rounds = TabSettings.get("tot_rounds", 5)
@@ -57,7 +56,6 @@ def public_home(request):
                 "status_primary": status_primary,
                 "status_secondary": status_secondary,
                 "registration_open": registration_open,
-                "registration_description": registration_content.description if registration_content else "",
                 "registration_url": reverse("registration_portal"),
             },
         )
@@ -116,7 +114,6 @@ def public_home(request):
             "status_primary": status_primary,
             "status_secondary": status_secondary,
             "registration_open": registration_open,
-            "registration_description": registration_content.description if registration_content else "",
             "registration_url": reverse("registration_portal"),
         },
     )

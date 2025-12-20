@@ -1,0 +1,35 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Edit Registration{% endblock %}
+{% block banner %}Edit Registration{% endblock %}
+
+{% block content %}
+<div class="col-lg-6 col-md-8">
+  {% if not can_modify_registration %}
+    <div class="alert alert-warning">
+      Registration editing is currently disabled. Check back later or contact tab staff.
+    </div>
+  {% endif %}
+
+  <p>
+    Enter the registration code from your confirmation email to edit your submission.
+  </p>
+
+  <form method="post" action="">
+    {% csrf_token %}
+    {% return_to_input request.path %}
+    <div class="form-group">
+      <label for="registration_code">Registration code</label>
+      <input type="text"
+             name="registration_code"
+             id="registration_code"
+             class="form-control"
+             placeholder="Example: bold-frog"
+             {% if not can_modify_registration %}disabled{% endif %}
+             autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary" {% if not can_modify_registration %}disabled{% endif %}>Find Registration</button>
+  </form>
+</div>
+{% endblock %}

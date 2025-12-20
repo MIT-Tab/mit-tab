@@ -50,6 +50,9 @@
                                                class="custom-control-input" 
                                                name="{{ field.name }}" 
                                                id="{{ field.id_for_label }}"
+                                               data-toggle-label="true"
+                                               data-label-on="Enabled"
+                                               data-label-off="Disabled"
                                                {% if field.value %}checked{% endif %}>
                                         <label class="custom-control-label" for="{{ field.id_for_label }}">
                                             {% if field.value %}Enabled{% else %}Disabled{% endif %}

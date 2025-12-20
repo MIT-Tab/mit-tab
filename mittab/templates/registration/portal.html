@@ -8,22 +8,6 @@
 {% block content %}
 {% render_bundle 'registrationPortal' %}
 <div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
-    {% if content.description %}
-    <details class="registration-info-panel mb-3">
-        <summary class="registration-info-panel__toggle">
-            <span class="registration-info-panel__text">
-                <span class="eyebrow">Tournament Information</span>
-                <span class="headline">Read before registering</span>
-            </span>
-            <span class="registration-info-panel__chevron" aria-hidden="true">
-                <i class="fas fa-chevron-down"></i>
-            </span>
-        </summary>
-        <div class="registration-info-panel__body">
-            {{ content.description|registration_text }}
-        </div>
-    </details>
-    {% endif %}
     {% if registration_lock_message %}
     <div class="alert alert-warning">{{ registration_lock_message }}</div>
     {% endif %}
@@ -187,11 +171,6 @@
             </div>
         </div>
     </section>
-    {% if content.completion_message %}
-    <div class="alert alert-info mt-3">
-        {{ content.completion_message|registration_text }}
-    </div>
-    {% endif %}
     {% endif %}
 </div>
 {% endblock %}
