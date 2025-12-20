@@ -19,6 +19,14 @@
             <div class="mb-1 font-weight-medium">
               <span class="full-text">Outrounds</span>
               <span class="short-text">Outs</span>
+              <span class="badge badge-light ml-1">
+                <span class="checkin-count"
+                      data-entity-type="{{ entity_type }}"
+                      data-round-index="0"
+                      data-total="{{ checked_total|default:0 }}">
+                  {{ outround_count|default:0 }}
+                </span>/{{ checked_total|default:0 }}
+              </span>
             </div>
             <div class="d-flex justify-content-center" style="font-size: 0.7rem;">
               <a href="#" class="bulk-toggle btn btn-sm btn-outline-secondary py-0 px-1" 
@@ -31,27 +39,45 @@
                  data-action="check_out">None</a>
             </div>
           </th>
-          {% for round_number in round_numbers %}
+          {% for round_info in round_counts %}
           <th class="round-header text-center">
             <div class="mb-1 font-weight-medium">
-              <span class="full-text">Round {{ round_number }}</span>
-              <span class="short-text">R{{ round_number }}</span>
+              <span class="full-text">Round {{ round_info.round_number }}</span>
+              <span class="short-text">R{{ round_info.round_number }}</span>
+              <span class="badge badge-light ml-1">
+                <span class="checkin-count"
+                      data-entity-type="{{ entity_type }}"
+                      data-round-index="{{ round_info.index }}"
+                      data-total="{{ checked_total|default:0 }}">
+                  {{ round_info.count }}
+                </span>/{{ checked_total|default:0 }}
+              </span>
             </div>
             <div class="d-flex justify-content-center" style="font-size: 0.7rem;">
               <a href="#" class="bulk-toggle btn btn-sm btn-outline-secondary py-0 px-1" 
                  data-scope="column"
-                 data-round="{{ round_number }}"
+                 data-round="{{ round_info.index }}"
                  data-action="check_in">All</a>
               <a href="#" class="bulk-toggle btn btn-sm btn-outline-secondary py-0 px-1 ml-1" 
                  data-scope="column"
-                 data-round="{{ round_number }}"
+                 data-round="{{ round_info.index }}"
                  data-action="check_out">None</a>
             </div>
           </th>
           {% endfor %}
         {% else %}
           <th class="round-header text-center">
-            <div class="mb-1 font-weight-medium">Checked In?</div>
+            <div class="mb-1 font-weight-medium">
+              Checked In?
+              <span class="badge badge-light ml-1">
+                <span class="checkin-count"
+                      data-entity-type="{{ entity_type }}"
+                      data-round-index="-1"
+                      data-total="{{ checked_total|default:0 }}">
+                  {{ checked_in_count }}
+                </span>/{{ checked_total|default:0 }}
+              </span>
+            </div>
             <div class="d-flex justify-content-center" style="font-size: 0.7rem;">
               <a href="#" class="bulk-toggle btn btn-sm btn-outline-secondary py-0 px-1"
                  data-scope="column"
@@ -92,7 +118,12 @@
               <a href="/school/{{ school.id }}">{{ school.name }}</a>{% if not forloop.last %}, {% endif %}
             {% endfor %}
           </td>
-          <td><a href="/judge/{{ row.entity.id }}">{{ row.entity.name }}</a></td>
+          <td>
+            <a href="/judge/{{ row.entity.id }}">{{ row.entity.name }}</a>
+            {% if row.entity.wing_only %}
+              <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
+            {% endif %}
+          </td>
         {% elif entity_type == 'room' %}
           <td><a href="/room/{{ row.entity.id }}">{{ row.entity.name }}</a></td>
         {% endif %}

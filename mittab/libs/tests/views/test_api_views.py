@@ -7,6 +7,7 @@ from nplusone.core import profiler
 from mittab.apps.tab.models import (
     Room, TabSettings, Team, Outround, Round
 )
+from mittab.apps.tab.public_rankings import set_standings_publication_setting
 
 
 @pytest.mark.django_db(transaction=True)
@@ -25,6 +26,8 @@ class TestApiViews(TestCase):
 
         TabSettings.set("cur_round", 2)
         TabSettings.set("results_published", 1)
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", True)
 
         Outround(
             gov_team=Team.objects.first(),
@@ -60,6 +63,8 @@ class TestApiViews(TestCase):
              "new_debater_data", list, "name"),
             (reverse("new_schools_api"),
              "new_schools", list, None),
+            (reverse("debater_counts_api"),
+             "debater_counts", dict, "varsity"),
         ]
 
         for url, json_key, expected_type, item_key in api_views:
@@ -70,13 +75,20 @@ class TestApiViews(TestCase):
             data = response.json()
             self.assertIn(json_key, data,
                 f"Expected JSON key '{json_key}' not found in {url}")
-            self.assertIsInstance(data[json_key], expected_type,
+            payload = data[json_key]
+            self.assertIsInstance(payload, expected_type,
                 f"Expected {json_key} to be {expected_type.__name__} in {url}")
 
-            if (item_key and len(data[json_key]) > 0 and
-                isinstance(data[json_key][0], dict)):
-                self.assertIn(item_key, data[json_key][0],
-                    f"Expected key '{item_key}' in first item of {json_key}")
+            if not item_key:
+                continue
+
+            if isinstance(payload, list):
+                if payload and isinstance(payload[0], dict):
+                    self.assertIn(item_key, payload[0],
+                        f"Expected key '{item_key}' in first item of {json_key}")
+            elif isinstance(payload, dict):
+                self.assertIn(item_key, payload,
+                    f"Expected key '{item_key}' in {json_key}")
 
         stats_views = [
             (reverse("team_stats", args=[round_obj.round_number]), dict, "seed"),
@@ -103,26 +115,58 @@ class TestApiViews(TestCase):
                 self.assertIn(item_key, data[first_team_id],
                     f"Expected key '{item_key}' in team stats")
 
-    def test_unpublished_results(self):
-        TabSettings.set("results_published", 0)
+    def test_debater_counts_supports_control_board(self):
+        response = self.client.get(reverse("debater_counts_api"))
+        self.assertEqual(response.status_code, 200)
 
-        api_views = [
+        data = response.json()
+        self.assertIn("debater_counts", data)
+        counts = data["debater_counts"]
+        for key in ("varsity", "novice", "teams"):
+            self.assertIn(key, counts,
+                f"Expected '{key}' in debater counts for control board")
+            self.assertIsInstance(counts[key], int,
+                f"Expected '{key}' count to be int")
+
+    def test_publication_settings_gate_api_access(self):
+        speaker_urls = [
             reverse("varsity_speaker_awards_api"),
             reverse("novice_speaker_awards_api"),
+        ]
+        team_urls = [
             reverse("varsity_team_placements_api"),
             reverse("novice_team_placements_api"),
             reverse("non_placing_teams_api"),
+        ]
+        shared_urls = [
             reverse("new_debater_data_api"),
             reverse("new_schools_api"),
+            reverse("debater_counts_api"),
         ]
 
-        for url in api_views:
+        # Disable speaker publications, expect speaker APIs blocked
+        set_standings_publication_setting("speaker_results", False)
+        for url in speaker_urls:
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 423,
-                f"Expected 423 for unpublished results at {url}, "
-                f"got {response.status_code}")
-            self.assertIn("error", response.content.decode(),
-                f"Expected error message in response for {url}")
+            self.assertEqual(response.status_code, 423)
+        # Re-enable to unblock future checks
+        set_standings_publication_setting("speaker_results", True)
+
+        # Disable team publications, expect team APIs blocked
+        set_standings_publication_setting("team_results", False)
+        for url in team_urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 423)
+
+        # Shared APIs require either set; disable both to confirm they block
+        set_standings_publication_setting("speaker_results", False)
+        for url in shared_urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 423)
+
+        # Restore defaults for downstream tests
+        set_standings_publication_setting("speaker_results", True)
+        set_standings_publication_setting("team_results", True)
 
     def test_n_plus_one(self):
         round_obj = Round.objects.filter(round_number=1).first()
@@ -135,6 +179,7 @@ class TestApiViews(TestCase):
             ("non_placing_teams_api",),
             ("new_debater_data_api",),
             ("new_schools_api",),
+            ("debater_counts_api",),
             ("team_stats", [round_obj.round_number]),
         ]
 

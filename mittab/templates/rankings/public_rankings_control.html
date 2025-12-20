@@ -1,0 +1,126 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Public Rankings Control Panel{% endblock %}
+
+{% block content %}
+<div class="col-12">
+  <form method="post" class="card shadow-sm">
+    {% csrf_token %}
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+      <h3 class="mb-0">Public Rankings Control Panel</h3>
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save"></i> Save
+      </button>
+    </div>
+    <div class="card-body">
+      <section class="mb-4">
+        <div class="d-flex align-items-center">
+          <h5 class="mb-0">Standings Published</h5>
+          <span class="badge badge-info help-badge ml-2"
+                data-toggle="tooltip"
+                data-html="true"
+                title="Publishing standings makes data available for the APDA standings importer at results.apda.online. This does not change what the public sees on this tab site.">?</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered table-sm">
+            <thead class="thead-light">
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Published</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for standing in standings_settings %}
+              <tr>
+                <td>{{ standing.label }}</td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name="standings_"|add:standing.slug switch_id="standings_"|add:standing.slug checked=standing.published label=standing.published|yesno:"Enabled,Disabled" %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mb-4">
+        <h5>Rankings</h5>
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered table-sm">
+            <thead class="thead-light">
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Public</th>
+                <th scope="col">Include Speaks</th>
+                <th scope="col">Max Visible</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ranking in ranking_settings %}
+              <tr>
+                <td>{{ ranking.label }}</td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name=ranking.slug|add:"_public" switch_id=ranking.slug|add:"_public" checked=ranking.public label=ranking.public|yesno:"Enabled,Disabled" %}
+                </td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name=ranking.slug|add:"_include_speaks" switch_id=ranking.slug|add:"_include_speaks" checked=ranking.include_speaks label=ranking.include_speaks|yesno:"Enabled,Disabled" %}
+                </td>
+                <td>
+                  <input type="number"
+                         name="{{ ranking.slug }}_max_visible"
+                         id="{{ ranking.slug }}_max_visible"
+                         class="form-control form-control-sm"
+                         value="{{ ranking.max_visible }}"
+                         min="1"
+                         max="10000">
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h5>Ballots</h5>
+        {% if ballot_settings %}
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered table-sm">
+            <thead class="thead-light">
+              <tr>
+                <th scope="col">Round</th>
+                <th scope="col">Visible</th>
+                <th scope="col">Include Speaks</th>
+                <th scope="col">Include Ranks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ballot in ballot_settings %}
+              {% with round_num=ballot.round_number|stringformat:"s" %}
+              <tr>
+                <td>Round {{ ballot.round_number }}</td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_visible" switch_id="round_"|add:round_num|add:"_visible" checked=ballot.visible label=ballot.visible|yesno:"Enabled,Disabled" %}
+                </td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_include_speaks" switch_id="round_"|add:round_num|add:"_include_speaks" checked=ballot.include_speaks label=ballot.include_speaks|yesno:"Enabled,Disabled" %}
+                </td>
+                <td class="align-middle">
+                  {% include "rankings/_toggle_switch.html" with name="round_"|add:round_num|add:"_include_ranks" switch_id="round_"|add:round_num|add:"_include_ranks" checked=ballot.include_ranks label=ballot.include_ranks|yesno:"Enabled,Disabled" %}
+                </td>
+              </tr>
+              {% endwith %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+          Configure the total number of in-rounds to manage ballot visibility.
+        </div>
+        {% endif %}
+      </section>
+    </div>
+  </form>
+</div>
+{% endblock %}

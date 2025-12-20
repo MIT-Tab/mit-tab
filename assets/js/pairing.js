@@ -59,6 +59,51 @@ function assignTeam(e) {
   });
 }
 
+function updateTeamSection(roundId, position, team) {
+  const $container = $(`.row[round-id=${roundId}] .${position}-team`);
+  $container.find(".team-assign-button").attr("team-id", team.id);
+  $container.find(".team-link").text(team.name);
+  $container.find(".team-link").attr("href", `/team/${team.id}`);
+  $container
+    .find(".tabcard, .outround-tabcard")
+    .attr("team-id", team.id)
+    .text("Loading results...");
+}
+
+function handleSwitchSides(event) {
+  event.preventDefault();
+  const $target = $(event.currentTarget);
+  const roundId = $target.attr("round-id");
+  const isOutround = Boolean($target.data("outround"));
+  const baseUrl = isOutround ? "/outround" : "/round";
+  const url = `${baseUrl}/${roundId}/switch_sides/`;
+  const alertMsg = "Unable to switch sides. Refresh and try again.";
+
+  $.ajax({
+    url,
+    success(result) {
+      if (result.success) {
+        updateTeamSection(roundId, "gov", result.gov_team);
+        updateTeamSection(roundId, "opp", result.opp_team);
+        if (isOutround) {
+          $(document).trigger("outround:switch", {
+            roundId,
+            govTeam: result.gov_team,
+            oppTeam: result.opp_team,
+          });
+        } else {
+          populateTabCards();
+        }
+      } else {
+        window.alert(alertMsg);
+      }
+    },
+    error() {
+      window.alert(alertMsg);
+    },
+  });
+}
+
 function assignRoom(e) {
   e.preventDefault();
   const $parent = $(this).parent().parent();
@@ -149,10 +194,13 @@ function assignJudge(e) {
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
+      $buttonWrapper.addClass("judge-assignment manual-lay");
       $buttonWrapper.attr("judge-id", result.judge_id);
 
       const rank = result.judge_rank.toFixed(2);
-      $button.html(`${result.judge_name} <small>(${rank})</small>`);
+      $button
+        .html(`${result.judge_name} <small>(${rank})</small>`)
+        .attr("title", "Manually assigned judge");
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
         .judge-toggle`).addClass("chair");
@@ -203,11 +251,11 @@ function togglePairingRelease(event) {
     url: "/pairing/release",
     success(result) {
       if (result.pairing_released) {
-        $("#close-pairings").removeClass("d-none");
-        $("#release-pairings").addClass("d-none");
+        $("#close-pairings-group").removeClass("d-none");
+        $("#release-pairings-group").addClass("d-none");
       } else {
-        $("#close-pairings").addClass("d-none");
-        $("#release-pairings").removeClass("d-none");
+        $("#close-pairings-group").addClass("d-none");
+        $("#release-pairings-group").removeClass("d-none");
       }
     },
   });
@@ -294,4 +342,6 @@ $(document).ready(() => {
     ".judge-remove, .outround-judge-remove",
     handleJudgeRemoveClick,
   );
+
+  $(document).on("click", ".team-switch-sides", handleSwitchSides);
 });

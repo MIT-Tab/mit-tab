@@ -5,6 +5,8 @@ from django.test import TestCase, Client
 from django.urls import reverse
 
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
+from mittab.apps.tab.public_rankings import set_ranking_settings
+from mittab.libs.cacheing import cache_logic
 
 
 @pytest.mark.django_db(transaction=True)
@@ -25,6 +27,8 @@ class TestPublicCache(TestCase):
         super().setUp()
         self.cache = caches["public"]
         self.cache.clear()
+        cache_logic.clear_cache()
+        Team.objects.update(ranking_public=True)
         self.client = Client()
 
         # Set up outrounds
@@ -50,19 +54,21 @@ class TestPublicCache(TestCase):
         self.test_round.save()
 
         # Enable all public views
-        TabSettings.set("cur_round", 2)
+        # Allow round 1 ballots to be public by ensuring round 2 pairing exists
+        TabSettings.set("cur_round", 3)
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
-        TabSettings.set("rankings_public", 1)
         TabSettings.set("debaters_public", 1)
         TabSettings.set("var_teams_visible", 2)
         TabSettings.set("nov_teams_visible", 2)
+        set_ranking_settings("team", True, include_speaks=True, max_visible=1000)
 
     def tearDown(self):
         self.test_round.victor = self.original_victor
         self.test_round.save()
         self.cache.clear()
+        cache_logic.clear_cache()
         super().tearDown()
 
     def _get_cache_key_count(self):
@@ -213,34 +219,50 @@ class TestPublicCache(TestCase):
                 'setting': 'teams_public',
                 'url': reverse("public_teams"),
                 'visible_content': team.name,
+                'enabled': 1,
+                'disabled': 0,
             },
             {
                 'setting': 'judges_public',
                 'url': reverse("public_judges"),
                 'visible_content': judge.name,
+                'enabled': 1,
+                'disabled': 0,
             },
             {
-                'setting': 'rankings_public',
+                'setting': 'team_ranking_visibility',
                 'url': reverse("rank_teams_public"),
                 'visible_content': team.name,
+                'enabled': True,
+                'disabled': False,
+                'toggle': lambda value: set_ranking_settings("team", value, True, 1000),
             },
         ]
 
         for test in permission_tests:
             # Test enabled state
             self.cache.clear()
-            TabSettings.set(test['setting'], 1)
+            enabled_value = test.get('enabled', 1)
+            disabled_value = test.get('disabled', 0)
+            toggle = test.get('toggle')
+            if toggle:
+                toggle(bool(enabled_value))
+            else:
+                TabSettings.set(test['setting'], enabled_value)
             response = self.client.get(test['url'])
             self.assertEqual(response.status_code, 200)
             self.assertIn(test['visible_content'], response.content.decode(),
-                f"Content should be visible when {test['setting']}=1")
+                f"Content should be visible when {test['setting']}={enabled_value}")
 
             # Test disabled state (should redirect)
             self.cache.clear()
-            TabSettings.set(test['setting'], 0)
+            if toggle:
+                toggle(bool(disabled_value))
+            else:
+                TabSettings.set(test['setting'], disabled_value)
             response = self.client.get(test['url'])
             self.assertEqual(response.status_code, 302,
-                f"Should redirect when {test['setting']}=0")
+                f"Should redirect when {test['setting']}={disabled_value}")
 
         # Test outround visibility settings
         outround_tests = [
