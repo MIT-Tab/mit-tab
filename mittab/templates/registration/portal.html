@@ -30,30 +30,30 @@
     <!-- {% if config and config.extra_information %}
     <div class="alert alert-info">{{ config.extra_information }}</div>
     {% endif %} -->
-    <form method="post" novalidate data-registration-form>
+    <form method="post" novalidate data-registration-form class="registration-layout">
         {% csrf_token %}
-        <div class="form-row mb-3">
+        <div class="registration-split">
             <!-- School and Contact card - left half -->
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body py-3">
-                        <h5 class="card-title mb-3">School And Contact</h5>
+            <div>
+                <div class="card registration-card h-100">
+                    <div class="card-body registration-card__body">
+                        <h5 class="card-title registration-card__title">School And Contact</h5>
                         {% for error in registration_form.non_field_errors %}
-                        <div class="alert alert-danger">{{ error }}</div>
+                        <div class="alert alert-danger mb-2">{{ error }}</div>
                         {% endfor %}
-                        {% include "registration/_input_group.html" with field=registration_form.school label="School" errors=registration_form.school.errors margin="mb-2" size="" %}
-                        {% include "registration/_input_group.html" with field=registration_form.email label="Email" errors=registration_form.email.errors margin="mb-2" size="" %}
+                        {% include "registration/_input_group.html" with field=registration_form.school label="School" errors=registration_form.school.errors margin="mb-1" size="" %}
+                        {% include "registration/_input_group.html" with field=registration_form.email label="Email" errors=registration_form.email.errors margin="" size="" %}
                     </div>
                 </div>
             </div>
             
             <!-- Right half: Create forms -->
-            <div class="col-md-6">
+            <div>
                 <div class="registration-quick-actions">
                     <!-- Create New School -->
                     <div class="registration-quick-actions__panel">
-                        <h6 class="mb-2">Create New School</h6>
-                        <div class="input-group input-group-sm mb-2">
+                        <h6 class="mb-1">Create New School</h6>
+                        <div class="input-group input-group-sm registration-field mb-2">
                             <div class="input-group-prepend">
                                 <span class="input-group-text">Name</span>
                             </div>
@@ -64,8 +64,8 @@
                     
                     <!-- Create New Debater -->
                     <div class="registration-quick-actions__panel">
-                        <h6 class="mb-2">Create New Debater</h6>
-                        <div class="input-group input-group-sm mb-1">
+                        <h6 class="mb-1">Create New Debater</h6>
+                        <div class="input-group input-group-sm registration-field mb-1">
                             <div class="input-group-prepend">
                                 <span class="input-group-text" style="font-size: 0.75rem;">School</span>
                             </div>
@@ -73,13 +73,13 @@
                                 <option value="">Select school</option>
                             </select>
                         </div>
-                        <div class="input-group input-group-sm mb-1">
+                        <div class="input-group input-group-sm registration-field mb-1">
                             <div class="input-group-prepend">
                                 <span class="input-group-text" style="font-size: 0.75rem;">Name</span>
                             </div>
                             <input type="text" id="new-debater-name" class="form-control form-control-sm" placeholder="Debater name">
                         </div>
-                        <div class="input-group input-group-sm mb-2">
+                        <div class="input-group input-group-sm registration-field mb-2">
                             <div class="input-group-prepend">
                                 <span class="input-group-text" style="font-size: 0.75rem;">Status</span>
                             </div>
@@ -93,43 +93,43 @@
                 </div>
             </div>
         </div>
-        <div class="card mb-3">
-            <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="card-title mb-0">Teams</h5>
+        <div class="card registration-card">
+            <div class="card-body registration-card__body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title registration-card__title mb-0">Teams</h5>
                     <button type="button" class="btn btn-secondary btn-sm" data-add-form="team" disabled>Add Team</button>
                 </div>
-                <small class="text-muted d-block mb-2">Select a school above before adding teams. Team schools will be automatically populated from your registration school.</small>
+                <small class="text-muted d-block">Select a school above before adding teams. Team schools will be automatically populated from your registration school.</small>
                 {{ team_formset.management_form }}
                 {% if team_formset.non_form_errors %}
-                <div class="alert alert-danger mt-2">
+                <div class="alert alert-danger mb-2 mt-1">
                     {% for error in team_formset.non_form_errors %}
                     <div>{{ error }}</div>
                     {% endfor %}
                 </div>
                 {% endif %}
-                <div class="mt-2" data-formset-container="team">
+                <div data-formset-container="team">
                     {% for form in team_formset.forms %}
                         {% include "registration/_team_form.html" with form=form %}
                     {% endfor %}
                 </div>
             </div>
         </div>
-        <div class="card mb-3">
-            <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="card-title mb-0">Judges</h5>
+        <div class="card registration-card">
+            <div class="card-body registration-card__body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title registration-card__title mb-0">Judges</h5>
                     <button type="button" class="btn btn-secondary btn-sm" data-add-form="judge">Add Judge</button>
                 </div>
                 {{ judge_formset.management_form }}
                 {% if judge_formset.non_form_errors %}
-                <div class="alert alert-danger mt-2">
+                <div class="alert alert-danger mb-2 mt-1">
                     {% for error in judge_formset.non_form_errors %}
                     <div>{{ error }}</div>
                     {% endfor %}
                 </div>
                 {% endif %}
-                <div class="mt-2" data-formset-container="judge">
+                <div data-formset-container="judge">
                     {% for form in judge_formset.forms %}
                         {% include "registration/_judge_form.html" with form=form %}
                     {% endfor %}

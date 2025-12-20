@@ -126,16 +126,8 @@ class TeamForm(ValueMixin, forms.Form):
         initial=Team.UNSEEDED,
     )
     team_school_source = forms.ChoiceField(
-        choices=[("debater_one", "Debater One"), ("debater_two", "Debater Two")],
+        choices=[("debater_one", "Debater 1"), ("debater_two", "Debater 2")],
         initial="debater_one",
-    )
-    hybrid_school_source = forms.ChoiceField(
-        choices=[
-            ("none", "No hybrid school"),
-            ("debater_one", "Debater One"),
-            ("debater_two", "Debater Two"),
-        ],
-        initial="none",
     )
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
     locals().update(_build_debater_fields())
@@ -153,9 +145,6 @@ class TeamForm(ValueMixin, forms.Form):
             }
         )
         self.fields["team_school_source"].widget.attrs.update(
-            {"class": "form-control form-control-sm"}
-        )
-        self.fields["hybrid_school_source"].widget.attrs.update(
             {"class": "form-control form-control-sm"}
         )
 
@@ -184,11 +173,7 @@ class TeamForm(ValueMixin, forms.Form):
         primary = data.get("team_school_source") or "debater_one"
         if not data.get(f"{primary}_school"):
             raise forms.ValidationError("Select a school for the primary debater")
-        hybrid = data.get("hybrid_school_source") or "none"
-        if hybrid != "none" and not data.get(f"{hybrid}_school"):
-            raise forms.ValidationError("Select a school for the hybrid designation")
         data["team_school_source"] = primary
-        data["hybrid_school_source"] = hybrid
         return data
 
     def _member_payload(self, prefix):
@@ -216,7 +201,6 @@ class TeamForm(ValueMixin, forms.Form):
             "seed_choice": int(self.cleaned_data["seed_choice"]),
             "members": self.get_members(),
             "team_school_source": self.cleaned_data["team_school_source"],
-            "hybrid_school_source": self.cleaned_data["hybrid_school_source"],
         }
 
     def _configure_school_field(self, field_name, current, base_choices, name_widget):
@@ -235,6 +219,7 @@ class TeamForm(ValueMixin, forms.Form):
             {
                 "class": "form-control",
                 "data-school-select": "team",
+                "data-prefill-from-registration": "true",
             }
         )
         name_id = self[field_name.replace("_school", "_name")].auto_id
@@ -274,9 +259,12 @@ class JudgeForm(forms.Form):
         max_value=10,
         widget=forms.NumberInput(attrs={"min": "0", "max": "10", "step": "1"}),
     )
+    schools = forms.MultipleChoiceField(required=False, choices=())
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, round_config=None, school_choices=None, **kwargs):
+        self.round_config = round_config or {"prelims": [], "outround": None}
+        self.school_choices = school_choices or []
         super().__init__(*args, **kwargs)
         self.fields["name"].widget.attrs.setdefault("class", "form-control")
         self.fields["email"].widget.attrs.update(
@@ -288,6 +276,60 @@ class JudgeForm(forms.Form):
         self.fields["experience"].widget.attrs.update(
             {"class": "form-control", "placeholder": "0-10"}
         )
+        self.fields["schools"] = forms.MultipleChoiceField(
+            required=False,
+            choices=[],
+            widget=forms.SelectMultiple(
+                attrs={
+                    "class": "form-control judge-schools-select",
+                    "data-judge-school-select": "true",
+                    "data-prefill-from-registration": "true",
+                }
+            ),
+        )
+        self.choice_map = {}
+        self._configure_school_choices()
+        self.availability_fields = []
+        self._build_availability_fields()
+
+    def _configure_school_choices(self):
+        label_map = self.initial.get("school_label_map", {}) or {}
+        choices = list(self.school_choices)
+        seen = {value for value, _ in choices}
+        current_values = self.initial.get("schools") or []
+        for value in current_values:
+            if value and value not in seen:
+                label = label_map.get(value, "Selected School")
+                choices.append((value, label))
+                seen.add(value)
+        self.choice_map = dict(choices)
+        self.label_map = {**label_map, **self.choice_map}
+        self.fields["schools"].choices = choices
+
+    def _build_availability_fields(self):
+        outround = self.round_config.get("outround")
+        if outround is not None:
+            self._add_availability_field(outround, "Outrounds")
+        for round_number in self.round_config.get("prelims", []):
+            label = f"Round {round_number}"
+            self._add_availability_field(round_number, label)
+
+    def _availability_field_name(self, round_number):
+        return (
+            "availability_outround"
+            if round_number == 0
+            else f"availability_round_{round_number}"
+        )
+
+    def _add_availability_field(self, round_number, label):
+        field_name = self._availability_field_name(round_number)
+        self.fields[field_name] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+        )
+        self.availability_fields.append(
+            {"field": self[field_name], "label": label}
+        )
 
     def get_payload(self):
         return {
@@ -296,7 +338,27 @@ class JudgeForm(forms.Form):
             "name": self.cleaned_data["name"],
             "email": self.cleaned_data["email"],
             "experience": self.cleaned_data["experience"],
+            "schools": self.get_school_payloads(),
+            "availability_rounds": self.get_available_rounds(),
         }
+
+    def get_school_payloads(self):
+        selections = self.cleaned_data.get("schools") or []
+        payloads = []
+        for value in selections:
+            label = self.label_map.get(value)
+            payloads.append(parse_school(value, label))
+        return payloads
+
+    def get_available_rounds(self):
+        selected = []
+        outround = self.round_config.get("outround")
+        if outround is not None and self.cleaned_data.get("availability_outround"):
+            selected.append(outround)
+        for round_number in self.round_config.get("prelims", []):
+            if self.cleaned_data.get(self._availability_field_name(round_number)):
+                selected.append(round_number)
+        return selected
 
 
 class RegistrationSettingsForm(forms.Form):

@@ -9,6 +9,7 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.utils.functional import cached_property
 import requests
 from requests.exceptions import RequestException
 
@@ -19,7 +20,7 @@ from mittab.apps.registration.forms import (
     RegistrationSettingsForm,
     TeamForm,
 )
-from mittab.apps.tab.models import Debater, Judge, School, Team
+from mittab.apps.tab.models import CheckIn, Debater, Judge, School, TabSettings, Team
 from mittab.apps.tab.helpers import redirect_and_flash_success
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 from .models import Registration, RegistrationConfig, RegistrationContent
@@ -61,7 +62,40 @@ TeamFormSet = cast(
         max_num=MAX_TEAMS,
     ),
 )
-JudgeFormSet = formset_factory(JudgeForm, extra=0, can_delete=True)
+class RegistrationJudgeFormSet(BaseFormSet):
+    def __init__(self, *args, round_config=None, school_choices=None, **kwargs):
+        self.round_config = round_config or {"prelims": [], "outround": None}
+        self.school_choices = school_choices or []
+        super().__init__(*args, **kwargs)
+
+    def _construct_form(self, i, **kwargs):
+        kwargs["round_config"] = self.round_config
+        kwargs["school_choices"] = self.school_choices
+        return super()._construct_form(i, **kwargs)
+
+    @cached_property
+    def empty_form(self):
+        form = self.form(
+            auto_id=self.auto_id,
+            prefix=self.add_prefix("__prefix__"),
+            empty_permitted=True,
+            use_required_attribute=False,
+            round_config=self.round_config,
+            school_choices=self.school_choices,
+        )
+        self.add_fields(form, None)
+        return form
+
+
+JudgeFormSet = cast(
+    Type[RegistrationJudgeFormSet],
+    formset_factory(
+        JudgeForm,
+        formset=RegistrationJudgeFormSet,
+        extra=0,
+        can_delete=True,
+    ),
+)
 
 
 def fetch_remote_schools():
@@ -85,10 +119,57 @@ def fetch_remote_schools():
 
 
 def build_school_choices():
-    return [
-        (f"apda:{school['id']}", school["name"])
-        for school in fetch_remote_schools()
+    results = []
+    seen_values = set()
+
+    def add_choice(value, label):
+        if not value or value in seen_values:
+            return
+        seen_values.add(value)
+        results.append((value, label))
+
+    for school in fetch_remote_schools():
+        add_choice(f"apda:{school['id']}", school["name"])
+
+    for school in School.objects.order_by("name").only("pk", "name", "apda_id"):
+        if school.apda_id not in (None, -1):
+            value = f"apda:{school.apda_id}"
+        else:
+            value = f"pk:{school.pk}"
+        add_choice(value, school.name)
+
+    results.sort(key=lambda item: (item[1] or "").lower())
+    return results
+
+
+def get_round_config():
+    try:
+        total_rounds = int(TabSettings.get("tot_rounds", 6))
+    except (TypeError, ValueError):
+        total_rounds = 6
+    total_rounds = max(total_rounds, 0)
+    return {
+        "outround": 0,
+        "prelims": list(range(1, total_rounds + 1)),
+    }
+
+
+def sync_judge_checkins(judge, desired_rounds):
+    desired = set(desired_rounds)
+    existing = set(
+        CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
+    )
+    additions = [
+        CheckIn(judge=judge, round_number=round_number)
+        for round_number in desired - existing
     ]
+    removals = existing - desired
+    if additions:
+        CheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+    if removals:
+        CheckIn.objects.filter(
+            judge=judge, round_number__in=removals
+        ).delete()
 
 
 def school_value(school):
@@ -96,7 +177,7 @@ def school_value(school):
         return ""
     if school.apda_id not in (None, -1):
         return f"apda:{school.apda_id}"
-    return NEW_CHOICE_VALUE
+    return f"pk:{school.pk}"
 
 
 def registration_team_initial(team):
@@ -115,18 +196,11 @@ def registration_team_initial(team):
         primary_source = "debater_two"
     elif team.school and first_school and team.school.pk == first_school.pk:
         primary_source = "debater_one"
-    hybrid_source = "none"
-    if team.hybrid_school:
-        if first_school and team.hybrid_school.pk == first_school.pk:
-            hybrid_source = "debater_one"
-        elif second_school and team.hybrid_school.pk == second_school.pk:
-            hybrid_source = "debater_two"
     return {
         "team_id": team.pk,
         "name": team.name,
         "seed_choice": team.seed,
         "team_school_source": primary_source,
-        "hybrid_school_source": hybrid_source,
         "debater_one_id": defaults[0]["debater"].pk if defaults[0]["debater"] else None,
         "debater_one_name": (
             defaults[0]["debater"].name if defaults[0]["debater"] else ""
@@ -160,17 +234,29 @@ def registration_team_initial(team):
     }
 
 
-def registration_judge_initial(judge):
-    return {
+def registration_judge_initial(judge, round_config):
+    checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
+    affiliated = list(judge.schools.all())
+    initial = {
         "registration_judge_id": judge.pk,
         "judge_id": judge.pk,
         "name": judge.name,
         "email": judge.email,
         "experience": judge.rank,
+        "schools": [school_value(school) for school in affiliated],
+        "school_label_map": {
+            school_value(school): school.name for school in affiliated
+        },
     }
+    outround = round_config.get("outround")
+    if outround is not None:
+        initial["availability_outround"] = outround in checkins
+    for round_number in round_config.get("prelims", []):
+        initial[f"availability_round_{round_number}"] = round_number in checkins
+    return initial
 
 
-def get_registration_forms(request, registration, school_choices):
+def get_registration_forms(request, registration, school_choices, round_config):
     if request.method == "POST":
         reg_form = RegistrationForm(request.POST, school_choices=school_choices)
         team_formset = TeamFormSet(  # pylint: disable=unexpected-keyword-arg
@@ -178,7 +264,12 @@ def get_registration_forms(request, registration, school_choices):
             prefix="teams",
             school_choices=school_choices,
         )
-        judge_formset = JudgeFormSet(request.POST, prefix="judges")
+        judge_formset = JudgeFormSet(  # pylint: disable=unexpected-keyword-arg
+            request.POST,
+            prefix="judges",
+            round_config=round_config,
+            school_choices=school_choices,
+        )
         return reg_form, team_formset, judge_formset
     if registration:
         reg_form = RegistrationForm(
@@ -196,8 +287,8 @@ def get_registration_forms(request, registration, school_choices):
             ).prefetch_related("debaters")
         ]
         judges_initial = [
-            registration_judge_initial(judge)
-            for judge in registration.judges.all()
+            registration_judge_initial(judge, round_config)
+            for judge in registration.judges.prefetch_related("checkin_set", "schools")
         ]
     else:
         reg_form = RegistrationForm(school_choices=school_choices)
@@ -208,7 +299,12 @@ def get_registration_forms(request, registration, school_choices):
         prefix="teams",
         school_choices=school_choices,
     )
-    judge_formset = JudgeFormSet(initial=judges_initial, prefix="judges")
+    judge_formset = JudgeFormSet(  # pylint: disable=unexpected-keyword-arg
+        initial=judges_initial,
+        prefix="judges",
+        round_config=round_config,
+        school_choices=school_choices,
+    )
     return reg_form, team_formset, judge_formset
 
 
@@ -276,6 +372,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
     registration.email = reg_form.cleaned_data["email"]
     registration.save()
 
+    school_cache = {}
     saved_team_ids = []
     for form in team_formset:
         if form.cleaned_data.get("DELETE"):
@@ -289,12 +386,6 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
             raise forms.ValidationError(
                 "The primary debater must represent the registration school"
             )
-        hybrid_school = None
-        if payload["hybrid_school_source"] != "none":
-            hybrid_index = (
-                0 if payload["hybrid_school_source"] == "debater_one" else 1
-            )
-            hybrid_school = member_schools[hybrid_index]
         team = (
             Team.objects.filter(
                 pk=payload.get("team_id"), registration=registration
@@ -304,7 +395,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         team.name = payload["name"]
         team.seed = payload["seed_choice"]
         team.school = primary_school
-        team.hybrid_school = hybrid_school
+        team.hybrid_school = None
         team.break_preference = Team.VARSITY
         team.checked_in = False
         team.save()
@@ -330,7 +421,13 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         judge.rank = payload["experience"]
         judge.email = payload["email"]
         judge.save()
-        judge.schools.set([registration.school])
+        selected_schools = payload["schools"] or [{"pk": registration.school.pk}]
+        resolved_schools = [
+            resolve_school(selection, cache=school_cache)
+            for selection in selected_schools
+        ]
+        judge.schools.set(resolved_schools)
+        sync_judge_checkins(judge, payload["availability_rounds"])
         saved_judge_ids.append(judge.pk)
     for judge in registration.judges.exclude(pk__in=saved_judge_ids):
         judge.delete()
@@ -349,8 +446,9 @@ def registration_portal(request, code=None):
         if not registration:
             raise Http404()
     school_choices = build_school_choices()
+    round_config = get_round_config()
     reg_form, team_formset, judge_formset = get_registration_forms(
-        request, registration, school_choices
+        request, registration, school_choices, round_config
     )
     config = RegistrationConfig.get_or_create_active()
     content = RegistrationContent.get_solo()
@@ -398,7 +496,10 @@ def registration_portal(request, code=None):
                         "school", "hybrid_school"
                     ).prefetch_related("debaters"),
                 ),
-                "judges",
+                Prefetch(
+                    "judges",
+                    queryset=Judge.objects.prefetch_related("schools"),
+                ),
             )
             .get(pk=registration.pk)
         )
