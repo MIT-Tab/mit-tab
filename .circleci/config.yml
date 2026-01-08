@@ -154,6 +154,28 @@ jobs:
             . venv/bin/activate
             cd docs
             make linkcheck
+  docker-build:
+    machine:
+      image: default
+    steps:
+      - checkout
+      - run:
+          name: Build and test Dockerfile
+          command: |
+            docker build -t mittab:test -f Dockerfile .
+      - run:
+          name: Verify Python version matches Pipfile
+          command: |
+            EXPECTED_VERSION=$(grep python_version Pipfile | sed 's/.*"\(.*\)".*/\1/')
+            ACTUAL_VERSION=$(docker run --rm mittab:test python --version | awk '{print $2}')
+            echo "Expected Python version: $EXPECTED_VERSION"
+            echo "Actual Python version: $ACTUAL_VERSION"
+            if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+              echo "ERROR: Python version mismatch!"
+              echo "Pipfile requires $EXPECTED_VERSION but Dockerfile has $ACTUAL_VERSION"
+              exit 1
+            fi
+            echo "Python versions match!"
 workflows:
   version: 2
   build_and_lint:
@@ -161,3 +183,4 @@ workflows:
       - lint
       - build
       - docs
+      - docker-build
