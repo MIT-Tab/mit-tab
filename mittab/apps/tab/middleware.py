@@ -51,6 +51,7 @@ class Login:
         whitelisted = (
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
+            or path.startswith("/registration/")
             or EBALLOT_REGEX.match(path)
         )
 

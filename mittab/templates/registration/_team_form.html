@@ -1,0 +1,33 @@
+<div class="card registration-card mb-3" data-form="team">
+    <div class="card-body registration-card__body">
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-danger mb-2">{{ error }}</div>
+        {% endfor %}
+        <div class="registration-team-grid">
+            <div>
+                <div class="card registration-card h-100">
+                    <div class="card-body registration-card__body registration-card__body--dense">
+                        <h6 class="mb-1">Team Info</h6>
+                        {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors margin="" %}
+                        <div class="form-group mb-2">
+                            <label class="small font-weight-bold mb-1">School Protection</label>
+                            {{ form.team_school_source }}
+                            {{ form.team_school_source.errors }}
+                        </div>
+                        <div class="form-group mb-0 seed-select">
+                            <label class="small font-weight-bold mb-1">Seed</label>
+                            {{ form.seed_choice }}
+                            {{ form.seed_choice.errors }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% include "registration/_debater_card.html" with slot="first" title="First Debater" prefix="debater_one" %}
+            {% include "registration/_debater_card.html" with slot="second" title="Second Debater" prefix="debater_two" %}
+            <div class="registration-team-actions">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="team">Remove</button>
+            </div>
+        </div>
+    </div>
+</div>

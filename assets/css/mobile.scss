@@ -214,23 +214,68 @@
     ol { font-size: 0.8rem; column-count: 2; column-gap: 1rem; }
   }
 
+  .registration-mobile-cta {
+    height: 10vw;
+    width: 75%;
+    font-size: 1.5rem !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .registration-mobile-card {
+    padding: 1.1rem 1.15rem;
+  }
+
+  .registration-mobile-card__text {
+    font-size: .7rem;
+    line-height: 1.7;
+    a {
+      display: inline;
+      white-space: normal;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      hyphens: auto;
+      max-width: 100%;
+    }
+  }
+
   .public-home {
-    padding: 1.4rem 0.9rem;
+    padding: 0;
 
-    .public-home__grid { grid-template-columns: 1fr !important; gap: 1.25rem; }
-    .public-home__title { font-size: 1.6rem; }
-    .public-home__links { padding: 1.2rem; }
+    .grid {
+      grid-template-columns: 1fr !important;
+      gap: 1.25rem;
+    }
+
+    .links {
+      padding: 1.15rem 1.2rem;
+      border-radius: 1rem;
+      box-shadow: 0 16px 45px -32px rgba(15, 24, 45, 0.55);
+    }
+
+    .title {
+      font-size: 1.6rem;
+    }
   }
 
-  .public-links__tile {
-    grid-template-columns: auto 1fr;
-    gap: 0.8rem;
-    padding: 1rem 1.1rem;
-  }
+  .public-links {
+    .tile {
+      grid-template-columns: auto 1fr;
+      gap: 0.8rem;
+      padding: 1rem 1.1rem;
+    }
 
-  .public-links__chevron { display: none; }
-  .public-links__body { gap: 0.25rem; }
-  .public-links__icon { width: 2.3rem; height: 2.3rem; }
+    .chevron {
+      display: none;
+    }
+
+    .body {
+      gap: 0.25rem;
+    }
+  }
 
   .footer small { font-size: 0.76rem; }
 }
@@ -280,8 +325,15 @@
       }
   }
 
-  .public-home { padding: 1.15rem 0.75rem; }
-  .public-links__tile { padding: 0.85rem 0.9rem; border-left-width: 3px; }
+  .public-home {
+    padding: 0;
+
+    .links {
+      padding: 1rem 1.05rem;
+    }
+  }
+
+  .public-links .tile { padding: 0.85rem 0.9rem; border-left-width: 3px; }
 
   .footer { padding: 0.95rem 0.35rem; }
   .footer small { font-size: 0.74rem; }

@@ -10,8 +10,9 @@ module.exports = {
   entry: {
     main: "./assets/js/index",
     publicDisplay: "./assets/js/publicDisplay",
+    bracket: "./assets/js/bracket",
+    registrationPortal: "./assets/js/registration/index",
     publicHome: "./assets/js/publicHome",
-    bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
   },
   optimization: {

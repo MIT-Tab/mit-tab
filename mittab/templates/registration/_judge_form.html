@@ -1,0 +1,39 @@
+<div class="card registration-card mb-2" data-form="judge">
+    <div class="card-body registration-card__body">
+        <div class="registration-judge-grid">
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="form-group mb-0 registration-judge-grid__item">
+                {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors margin="" %}
+            </div>
+            <div class="form-group mb-0 registration-judge-grid__item">
+                {% include "registration/_input_group.html" with field=form.email label="Email" errors=form.email.errors margin="" %}
+            </div>
+            <div class="form-group mb-0 registration-judge-grid__item">
+                {% include "registration/_input_group.html" with field=form.experience label="Experience" errors=form.experience.errors margin="" %}
+            </div>
+            <div class="form-group mb-0 registration-judge-grid__item registration-judge-grid__item--wide">
+                <label class="small font-weight-bold d-block">Schools</label>
+                {{ form.schools }}
+                {% if form.schools.errors %}
+                <div class="text-danger small mb-0">{{ form.schools.errors }}</div>
+                {% endif %}
+            </div>
+            {% if form.availability_fields %}
+            <div class="form-group mt-2 mb-0 registration-judge-grid__item registration-judge-grid__item--wide">
+                <label class="small font-weight-bold d-block mb-2">Availability</label>
+                <div class="judge-availability">
+                    {% for availability in form.availability_fields %}
+                    <div class="custom-control custom-checkbox mr-3 mb-2">
+                        {{ availability.field }}
+                        <label class="custom-control-label" for="{{ availability.field.id_for_label }}">{{ availability.label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="d-flex align-items-center justify-content-start mt-2 registration-judge-grid__item registration-judge-grid__item--wide">
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="judge">Remove</button>
+            </div>
+        </div>
+    </div>
+</div>

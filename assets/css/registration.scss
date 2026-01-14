@@ -1,0 +1,379 @@
+.btn {
+    height : auto;
+}
+
+:root {
+  color-scheme: light;
+}
+
+#registration-app {
+  --rg-space-1: 0.2rem;
+  --rg-space-2: 0.3rem;
+  --rg-space-3: 0.4rem;
+  --rg-card-radius: 0.5rem;
+  --rg-card-border: 1px solid rgba(12, 32, 54, 0.08);
+  --rg-card-shadow: 0 10px 30px -24px rgba(15, 33, 55, 0.45);
+  --rg-label-width: 72px;
+  --rg-label-font: 0.76rem;
+  --rg-control-height: 2.25rem;
+  --rg-control-height-sm: 2.05rem;
+
+  .registration-layout {
+    display: grid;
+    gap: var(--rg-space-3);
+  }
+
+  .registration-split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: var(--rg-space-2);
+    align-items: stretch;
+  }
+
+  .registration-card {
+    border-radius: var(--rg-card-radius);
+  }
+
+  .card {
+    box-shadow: var(--rg-card-shadow);
+    border: var(--rg-card-border);
+    border-radius: var(--rg-card-radius);
+  }
+
+  .registration-card__body {
+    padding: 0.52rem 0.55rem;
+    display: grid;
+    gap: var(--rg-space-2);
+  }
+
+  .registration-card__body--dense {
+    padding: 0.4rem 0.44rem;
+    gap: var(--rg-space-1);
+  }
+
+  .registration-card__title {
+    margin-bottom: 0;
+  }
+
+  .registration-team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(260px, 1fr)) auto;
+    gap: var(--rg-space-2);
+    align-items: stretch;
+  }
+
+  .registration-team-grid > * {
+    min-width: 0;
+  }
+
+  @media (max-width: 1199.98px) {
+    .registration-team-grid {
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+  }
+
+  .registration-team-actions {
+    align-self: start;
+  }
+
+  .registration-judge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--rg-space-2);
+    align-items: start;
+    grid-auto-rows: minmax(var(--rg-control-height), auto);
+  }
+
+  .registration-judge-grid > * {
+    min-width: 0;
+  }
+
+  .registration-judge-grid__item--wide {
+    grid-column: 1 / -1;
+  }
+
+  .registration-field {
+    display: grid;
+    grid-template-columns: var(--rg-label-width) minmax(0, 1fr);
+    column-gap: var(--rg-space-1);
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .registration-field .input-group-prepend {
+    margin-right: 0;
+    grid-column: 1;
+    height: 100%;
+  }
+
+  .registration-field .input-group-text {
+    width: 100%;
+    justify-content: flex-start;
+    font-size: var(--rg-label-font);
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    height: 100%;
+    min-height: var(--rg-control-height);
+    line-height: 1.15;
+    display: flex;
+    align-items: center;
+    padding: 0.18rem 0.35rem;
+  }
+
+  .registration-field .form-control {
+    grid-column: 2;
+    width: 100%;
+    min-height: var(--rg-control-height);
+    height: var(--rg-control-height);
+    padding: 0.28rem 0.48rem;
+    font-size: 0.87rem;
+    line-height: 1.3;
+  }
+
+  .registration-field.input-group-sm .input-group-text {
+    font-size: 0.75rem;
+    padding: 0.14rem 0.28rem;
+    min-height: var(--rg-control-height-sm);
+  }
+
+  .registration-field.input-group-sm .form-control {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+    min-height: var(--rg-control-height-sm);
+    height: var(--rg-control-height-sm);
+  }
+
+  .registration-field + .text-danger {
+    margin-left: calc(var(--rg-label-width) + var(--rg-space-1));
+  }
+
+  .input-group-text {
+    font-size: 0.74rem;
+    padding: 0.18rem 0.34rem;
+  }
+
+  .input-group {
+    align-items: stretch;
+
+    .input-group-prepend {
+      margin-right: 0;
+      height: calc(var(--rg-control-height) - 3px);
+
+      .input-group-text {
+        border-right: 0;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+      }
+    }
+
+    .form-control {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      border-left: 0;
+    }
+  }
+
+  .seed-select select {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+
+  .judge-availability {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+
+    .custom-control {
+      padding-left: 1.5rem;
+    }
+
+    .custom-control-label {
+      font-size: 0.85rem;
+    }
+  }
+
+  .judge-schools-select {
+    min-height: 0;
+    width: 100%;
+  }
+
+  .registration-judge-grid .select2-container--bootstrap4 {
+    width: 100% !important;
+  }
+
+  .registration-judge-grid .select2-selection--multiple {
+    min-height: var(--rg-control-height);
+    padding: 0.18rem 0.4rem;
+    border-radius: 0.25rem;
+  }
+
+  .registration-judge-grid
+    .select2-container--bootstrap4
+    .select2-selection--multiple
+    .select2-selection__rendered {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0;
+  }
+
+  .registration-judge-grid
+    .select2-container--bootstrap4
+    .select2-selection--multiple
+    .select2-selection__choice {
+    margin-top: 0.12rem;
+  }
+
+  .registration-info-panel {
+    border: 1px solid rgba(16, 46, 97, 0.18);
+    border-radius: 0.85rem;
+    overflow: hidden;
+    background: #f7fbff;
+
+    &__toggle {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      color: #12213b;
+      font-weight: 600;
+    }
+
+    &__text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.75rem;
+        color: rgba(18, 33, 59, 0.65);
+      }
+
+      .headline {
+        font-size: 1.05rem;
+        font-weight: 600;
+      }
+    }
+
+    &__chevron {
+      color: rgba(18, 33, 59, 0.55);
+      transition: transform 0.2s ease;
+    }
+
+    &__toggle.is-expanded &__chevron {
+      transform: rotate(180deg);
+    }
+
+    &__body {
+      border-top: 1px solid rgba(16, 46, 97, 0.12);
+      background: #fff;
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #1c2e46;
+    }
+  }
+
+  .registration-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--rg-space-2);
+
+    &__panel {
+      border: var(--rg-card-border);
+      border-radius: var(--rg-card-radius);
+      padding: 0.48rem 0.52rem;
+      background: #fff;
+      box-shadow: var(--rg-card-shadow);
+      display: grid;
+      gap: var(--rg-space-2);
+    }
+
+    .btn-block {
+      margin-top: 0;
+      padding: 0.28rem 0.48rem;
+      font-size: 0.85rem;
+      height: var(--rg-control-height);
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
+  #registration-app {
+  .registration-split,
+  .registration-team-grid,
+  .registration-judge-grid {
+    grid-template-columns: 1fr;
+  }
+
+    .registration-team-actions {
+      justify-self: start;
+    }
+
+    .seed-select {
+      width: 100%;
+
+      select {
+        width: 100%;
+      }
+    }
+
+    .registration-field {
+      grid-template-columns: 1fr;
+    }
+
+    .registration-field .input-group-prepend {
+      width: 100%;
+    }
+
+    .registration-field .input-group-text {
+      width: 100%;
+      justify-content: flex-start;
+      border-bottom-left-radius: 0.25rem;
+      border-bottom-right-radius: 0.25rem;
+      border-right: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .registration-field .form-control {
+      grid-column: 1;
+      width: 100%;
+      border-left: 1px solid rgba(0, 0, 0, 0.125);
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+      min-height: 2rem;
+    }
+
+    .registration-field + .text-danger {
+      margin-left: 0;
+    }
+
+    .registration-quick-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .registration-info-panel__toggle {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .registration-quick-actions__panel {
+      height: auto;
+    }
+
+    .h-100 {
+      height: auto !important;
+    }
+  }
+}

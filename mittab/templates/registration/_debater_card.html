@@ -1,0 +1,14 @@
+{% load tags %}
+{% with name_key=prefix|add:"_name" school_key=prefix|add:"_school" %}
+{% with name_field=form|get_field:name_key school_field=form|get_field:school_key %}
+<div>
+    <div class="card registration-card h-100" data-debater="{{ slot }}">
+        <div class="card-body registration-card__body registration-card__body--dense">
+            <h6 class="mb-1 registration-card__title">{{ title }}</h6>
+            {% include "registration/_input_group.html" with field=name_field label="Name" errors=name_field.errors label_style="font-size: 0.75rem;" margin="mb-1" %}
+            {% include "registration/_input_group.html" with field=school_field label="School" errors=school_field.errors label_style="font-size: 0.75rem;" margin="mb-1" %}
+        </div>
+    </div>
+</div>
+{% endwith %}
+{% endwith %}

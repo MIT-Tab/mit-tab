@@ -1,0 +1,29 @@
+{% if show_create_button %}
+<div class="form-row align-items-end">
+    <div class="form-group {{ col_class|default:'col-md-6' }}">
+        {{ field.label_tag }}
+        {{ field }}
+        {{ field.errors }}
+    </div>
+    <div class="form-group col-auto">
+        <label class="d-block">&nbsp;</label>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-trigger-new="{{ field.id_for_label }}">Create New</button>
+    </div>
+    <div class="form-group {% if col_class|default:'col-md-6' == 'col-md-6' %}col-md-6{% else %}col-md-4{% endif %} {% if field.value != '__new__' %}d-none{% endif %}" data-new-school-container="{{ field.id_for_label }}">
+        {{ name_field.label_tag }}
+        {{ name_field }}
+        {{ name_field.errors }}
+    </div>
+</div>
+{% else %}
+<div class="form-group">
+    {{ field.label_tag }}
+    {{ field }}
+    {{ field.errors }}
+    <div data-new-school-container="{{ field.id_for_label }}" class="mt-2 {% if field.value != '__new__' %}d-none{% endif %}">
+        {{ name_field.label_tag }}
+        {{ name_field }}
+        {{ name_field.errors }}
+    </div>
+</div>
+{% endif %}
