@@ -21,6 +21,7 @@ from mittab.apps.tab.public_rankings import (
     get_all_ballot_round_settings,
     get_all_ranking_settings,
     get_all_standings_publication_settings,
+    get_paired_round_numbers,
     set_ballot_round_settings,
     set_ranking_settings,
     set_standings_publication_setting,
@@ -673,11 +674,24 @@ def public_rankings_control(request):
             else:
                 parsed_max_visible = ranking["max_visible"]
             max_visible = max(1, parsed_max_visible)
+
+            up_to_round = ranking.get("up_to_round") or 0
+            raw_up_to_round = (request.POST.get(f"{slug}_up_to_round") or "").strip()
+            if raw_up_to_round:
+                try:
+                    up_to_round = int(raw_up_to_round)
+                except (TypeError, ValueError):
+                    validation_errors.append(
+                        f"Invalid 'up to round' value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+
             set_ranking_settings(
                 slug,
                 public=is_public,
                 include_speaks=include_speaks,
                 max_visible=max_visible,
+                up_to_round=up_to_round,
             )
 
         for round_number in range(1, tot_rounds + 1):
@@ -701,6 +715,7 @@ def public_rankings_control(request):
     standings_settings = get_all_standings_publication_settings()
     ranking_settings = get_all_ranking_settings()
     ballot_settings = get_all_ballot_round_settings(tot_rounds)
+    paired_rounds = get_paired_round_numbers()
 
     return render(
         request,
@@ -710,6 +725,7 @@ def public_rankings_control(request):
             "ranking_settings": ranking_settings,
             "ballot_settings": ballot_settings,
             "tot_rounds": tot_rounds,
+            "paired_rounds": paired_rounds,
         },
     )
 
