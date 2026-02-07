@@ -34,6 +34,17 @@ class TeamAdmin(admin.ModelAdmin):
     filter_horizontal = ("debaters", )
 
 
+class MotionAdmin(admin.ModelAdmin):
+    list_display = ("round_display", "motion_text_truncated", "is_published", "updated_at")
+    list_filter = ("is_published", "outround_type")
+    search_fields = ("motion_text", "info_slide")
+    ordering = ("round_number", "outround_type", "-num_teams")
+
+    def motion_text_truncated(self, obj):
+        return obj.motion_text[:100] + "..." if len(obj.motion_text) > 100 else obj.motion_text
+    motion_text_truncated.short_description = "Motion Text"
+
+
 admin.site.register(models.Debater)
 admin.site.register(models.Team, TeamAdmin)
 admin.site.register(models.School)
@@ -50,3 +61,4 @@ admin.site.register(models.Bye)
 admin.site.register(models.NoShow)
 admin.site.register(models.BreakingTeam)
 admin.site.register(models.Outround, OutroundAdmin)
+admin.site.register(models.Motion, MotionAdmin)

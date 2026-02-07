@@ -1,0 +1,295 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Motions - {% tournament_name %}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .motions-page {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .motions-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+
+    .motions-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1f2f4a;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .motions-header .subtitle {
+        font-size: 1rem;
+        color: #6b7280;
+    }
+
+    .motions-section {
+        margin-bottom: 2.5rem;
+    }
+
+    .motions-section h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #374151;
+        margin: 0 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .motion-card {
+        background: #ffffff;
+        border: 1px solid rgba(21, 33, 61, 0.12);
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 16px -8px rgba(12, 31, 58, 0.15);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .motion-card:hover {
+        box-shadow: 0 8px 24px -12px rgba(12, 31, 58, 0.25);
+        transform: translateY(-2px);
+    }
+
+    .motion-card-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        padding: 0.875rem 1.25rem;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .motion-card.varsity .motion-card-header {
+        background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+    }
+
+    .motion-card.novice .motion-card-header {
+        background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+    }
+
+    .motion-card-body {
+        padding: 1.25rem;
+    }
+
+    .info-slide {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.925rem;
+        color: #475569;
+        line-height: 1.6;
+    }
+
+    .info-slide-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 0.5rem;
+    }
+
+    .motion-text {
+        font-size: 1.125rem;
+        font-weight: 500;
+        color: #1f2937;
+        line-height: 1.5;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    .no-motions {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6b7280;
+    }
+
+    .no-motions i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.4;
+    }
+
+    .no-motions h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #374151;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .no-motions p {
+        margin: 0;
+        font-size: 1rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .motions-page {
+            padding: 1.5rem 1rem;
+        }
+
+        .motions-header h1 {
+            font-size: 1.75rem;
+        }
+
+        .motion-card-header {
+            padding: 0.75rem 1rem;
+            font-size: 0.925rem;
+        }
+
+        .motion-card-body {
+            padding: 1rem;
+        }
+
+        .motion-text {
+            font-size: 1rem;
+        }
+
+        .info-slide {
+            padding: 0.875rem;
+            font-size: 0.875rem;
+        }
+    }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+        .motions-header h1 {
+            color: #f3f4f6;
+        }
+
+        .motions-section h2 {
+            color: #e5e7eb;
+            border-bottom-color: #374151;
+        }
+
+        .motion-card {
+            background: #1f2937;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .info-slide {
+            background: #111827;
+            border-color: #374151;
+            color: #9ca3af;
+        }
+
+        .info-slide-label {
+            color: #9ca3af;
+        }
+
+        .motion-text {
+            color: #f3f4f6;
+        }
+
+        .no-motions {
+            color: #9ca3af;
+        }
+
+        .no-motions h2 {
+            color: #e5e7eb;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block content %}
+<div class="col-12">
+    <div class="motions-page">
+        <div class="motions-header">
+            <h1>Motions</h1>
+            <p class="subtitle">{% tournament_name %}</p>
+        </div>
+
+        {% if has_motions %}
+            {% if inround_motions %}
+                <div class="motions-section">
+                    <h2><i class="fas fa-list-ol"></i> Preliminary Rounds</h2>
+                    {% for motion in inround_motions %}
+                        <div class="motion-card">
+                            <div class="motion-card-header">
+                                {{ motion.round_display }}
+                            </div>
+                            <div class="motion-card-body">
+                                {% if motion.info_slide %}
+                                    <div class="info-slide">
+                                        <span class="info-slide-label">Info Slide</span>
+                                        {{ motion.info_slide|escape|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+                                <div class="motion-text">
+                                    {{ motion.motion_text|escape|linebreaksbr }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if varsity_outrounds %}
+                <div class="motions-section">
+                    <h2><i class="fas fa-trophy"></i> Varsity Elimination Rounds</h2>
+                    {% for motion in varsity_outrounds %}
+                        <div class="motion-card varsity">
+                            <div class="motion-card-header">
+                                {{ motion.round_display }}
+                            </div>
+                            <div class="motion-card-body">
+                                {% if motion.info_slide %}
+                                    <div class="info-slide">
+                                        <span class="info-slide-label">Info Slide</span>
+                                        {{ motion.info_slide|escape|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+                                <div class="motion-text">
+                                    {{ motion.motion_text|escape|linebreaksbr }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if novice_outrounds %}
+                <div class="motions-section">
+                    <h2><i class="fas fa-medal"></i> Novice Elimination Rounds</h2>
+                    {% for motion in novice_outrounds %}
+                        <div class="motion-card novice">
+                            <div class="motion-card-header">
+                                {{ motion.round_display }}
+                            </div>
+                            <div class="motion-card-body">
+                                {% if motion.info_slide %}
+                                    <div class="info-slide">
+                                        <span class="info-slide-label">Info Slide</span>
+                                        {{ motion.info_slide|escape|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+                                <div class="motion-text">
+                                    {{ motion.motion_text|escape|linebreaksbr }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="no-motions">
+                <i class="fas fa-scroll"></i>
+                <h2>No Motions Available</h2>
+                <p>Motions will appear here once they are released by the tournament directors.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

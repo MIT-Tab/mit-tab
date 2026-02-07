@@ -1,0 +1,79 @@
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+
+{% block title %}Edit Motion{% endblock %}
+
+{% block banner %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="col-md-8">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Edit Motion for {{ motion.round_display }}</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="round_display" class="font-weight-bold">Round</label>
+                    <input type="text" class="form-control" id="round_display" 
+                           value="{{ motion.round_display }}" disabled>
+                    <small class="form-text text-muted">
+                        The round cannot be changed. Delete and create a new motion if needed.
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="info_slide" class="font-weight-bold">
+                        Info Slide <small class="text-muted">(optional)</small>
+                    </label>
+                    <textarea name="info_slide" id="info_slide" class="form-control" rows="4"
+                              placeholder="Optional context or background information for the motion...">{{ motion.info_slide }}</textarea>
+                    <small class="form-text text-muted">
+                        This text will be displayed before the motion as context or background information.
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="motion_text" class="font-weight-bold">Motion Text</label>
+                    <textarea name="motion_text" id="motion_text" class="form-control" rows="4" 
+                              required>{{ motion.motion_text }}</textarea>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'manage_motions' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="col-md-4">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Motion Info</h5>
+        </div>
+        <div class="card-body">
+            <dl>
+                <dt>Status</dt>
+                <dd>
+                    {% if motion.is_published %}
+                        <span class="badge badge-success">
+                            <i class="fas fa-eye"></i> Published
+                        </span>
+                    {% else %}
+                        <span class="badge badge-secondary">
+                            <i class="fas fa-eye-slash"></i> Draft
+                        </span>
+                    {% endif %}
+                </dd>
+                <dt>Created</dt>
+                <dd>{{ motion.created_at|date:"M d, Y H:i" }}</dd>
+                <dt>Last Updated</dt>
+                <dd>{{ motion.updated_at|date:"M d, Y H:i" }}</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}
