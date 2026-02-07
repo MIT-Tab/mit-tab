@@ -5,7 +5,11 @@ This module provides both private (admin) views for tournament directors
 to manage motions, and public views for competitors and judges to view
 published motions.
 """
+import logging
+
+from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
+from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.http import JsonResponse
@@ -14,6 +18,9 @@ from django.utils.html import escape
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import Motion, TabSettings, BreakingTeam
 from mittab.libs.cacheing.public_cache import cache_public_view, invalidate_public_motions_cache
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_available_rounds():
@@ -62,9 +69,10 @@ def _get_motions_for_display():
 def _get_published_motions():
     """
     Get only published motions for public display.
+    Sorted in reverse order so the latest/highest round appears first.
     """
     motions = list(Motion.objects.filter(is_published=True))
-    motions.sort(key=lambda m: m.sort_key)
+    motions.sort(key=lambda m: m.sort_key, reverse=True)
     return motions
 
 
@@ -147,23 +155,54 @@ def edit_motion(request, motion_id):
     Edit an existing motion.
     """
     motion = get_object_or_404(Motion, pk=motion_id)
-    
+
     if request.method == "POST":
+        round_selection = request.POST.get("round_selection", "")
         info_slide = request.POST.get("info_slide", "").strip()
         motion_text = request.POST.get("motion_text", "").strip()
-        
+
         if not motion_text:
-            return redirect_and_flash_error(request, "Motion text is required.")
-        
-        motion.info_slide = info_slide
-        motion.motion_text = motion_text
-        motion.save()
-        _invalidate_motions_cache()
-        return redirect_and_flash_success(request, "Motion updated successfully.", path=reverse("manage_motions"))
-    
+            messages.error(request, "Motion text is required.")
+        elif not round_selection:
+            messages.error(request, "Round selection is required.")
+        else:
+            try:
+                if round_selection.startswith("inround_"):
+                    round_number = int(round_selection.replace("inround_", ""))
+                    motion.round_number = round_number
+                    motion.outround_type = None
+                    motion.num_teams = None
+                elif round_selection.startswith("outround_"):
+                    parts = round_selection.replace("outround_", "").split("_")
+                    outround_type = int(parts[0])
+                    num_teams = int(parts[1])
+                    motion.round_number = None
+                    motion.outround_type = outround_type
+                    motion.num_teams = num_teams
+                else:
+                    raise ValidationError("Invalid round selection.")
+
+                motion.info_slide = info_slide
+                motion.motion_text = motion_text
+                motion.full_clean()
+                motion.save()
+                _invalidate_motions_cache()
+                return redirect_and_flash_success(request, "Motion updated successfully.", path=reverse("manage_motions"))
+            except ValidationError as e:
+                messages.error(request, " ".join(e.messages))
+            except Exception:
+                logger.exception("Unexpected error updating motion %s", motion_id)
+                messages.error(request, "Unexpected error updating motion. Please try again.")
+
+    available_rounds = _get_available_rounds()
+
     return render(request, "motions/edit_motion.html", {
         "title": f"Edit Motion - {motion.round_display}",
         "motion": motion,
+        "available_rounds": available_rounds,
+        "current_round_selection": request.POST.get("round_selection", motion.round_selection_value),
+        "submitted_info_slide": request.POST.get("info_slide", motion.info_slide),
+        "submitted_motion_text": request.POST.get("motion_text", motion.motion_text),
     })
 
 

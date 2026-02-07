@@ -784,6 +784,15 @@ class Motion(models.Model):
             # Outrounds: sort by type (varsity first), then by num_teams (descending)
             return (1, self.outround_type or 0, -(self.num_teams or 0))
 
+    @property
+    def round_selection_value(self):
+        """Returns the form value used in the round_selection dropdown."""
+        if self.round_number is not None:
+            return f"inround_{self.round_number}"
+        elif self.num_teams is not None:
+            return f"outround_{self.outround_type}_{self.num_teams}"
+        return ""
+
     def clean(self):
         """Validate that either round_number or outround fields are set, but not both."""
         super().clean()
