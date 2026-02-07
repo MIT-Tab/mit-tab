@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater
+    Room, TabSettings, Team, Judge, School, Debater, PublicHomeShortcut
 )
 
 
@@ -118,3 +118,27 @@ class TestPostOperations(TestCase):
                     f"(expected 200 after redirects) for {method} to {url}")
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
+
+    def test_public_home_shortcuts_update(self):
+        response = self.client.post(
+            reverse("public_home_shortcuts"),
+            {
+                "slot_1": "public_team_results",
+                "slot_2": "public_speaker_results",
+                "slot_3": "public_ballots",
+                "slot_4": "released_pairings",
+                "slot_5": "missing_ballots",
+                "slot_6": "varsity_outrounds",
+                "slot_7": "novice_outrounds",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=1).nav_item,
+            "public_team_results",
+        )
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=3).nav_item,
+            "public_ballots",
+        )

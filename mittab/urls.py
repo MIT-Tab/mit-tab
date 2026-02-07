@@ -107,6 +107,11 @@ urlpatterns = [
         views.public_rankings_control,
         name="public_rankings_control",
     ),
+    path(
+        "settings/public-home-shortcuts/",
+        views.public_home_shortcuts,
+        name="public_home_shortcuts",
+    ),
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),

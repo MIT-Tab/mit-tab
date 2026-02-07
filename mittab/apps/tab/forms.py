@@ -573,6 +573,40 @@ class SettingsForm(forms.Form):
             TabSettings.set(key, value_to_set)
 
 
+class PublicHomeShortcutsForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        super(PublicHomeShortcutsForm, self).__init__(*args, **kwargs)
+
+        definitions = PublicHomeShortcut.nav_definition_map()
+        choices = [
+            (item["slug"], item["title"])
+            for item in PUBLIC_HOME_SHORTCUT_DEFINITIONS
+        ]
+        configured_slots = PublicHomeShortcut.default_slot_mapping()
+        configured_slots.update({
+            shortcut.position: shortcut.nav_item
+            for shortcut in PublicHomeShortcut.objects.all()
+        })
+
+        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            nav_item = configured_slots.get(slot)
+            title = definitions.get(nav_item, {}).get("title", nav_item)
+            self.fields[f"slot_{slot}"] = forms.ChoiceField(
+                label=f"Shortcut {slot}",
+                choices=choices,
+                initial=nav_item,
+                help_text=f"Currently: {title}",
+                widget=forms.Select(attrs={"class": "form-control"}),
+            )
+
+    def save(self):
+        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            PublicHomeShortcut.objects.update_or_create(
+                position=slot,
+                defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},
+            )
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*list(result.values())))

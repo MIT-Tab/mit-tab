@@ -5,6 +5,92 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+
+
+PUBLIC_HOME_SHORTCUT_SLOTS = 7
+PUBLIC_HOME_SHORTCUT_DEFINITIONS = (
+    {
+        "slug": "released_pairings",
+        "title": "Released Pairings",
+        "subtitle": "Latest rounds and room assignments.",
+        "url_name": "pretty_pair",
+        "url_args": (),
+    },
+    {
+        "slug": "missing_ballots",
+        "title": "Missing Ballots",
+        "subtitle": "Outstanding ballots that need attention.",
+        "url_name": "missing_ballots",
+        "url_args": (),
+    },
+    {
+        "slug": "submit_e_ballot",
+        "title": "Submit E-Ballot",
+        "subtitle": "Judges enter ballot codes to file results.",
+        "url_name": "e_ballot_search",
+        "url_args": (),
+    },
+    {
+        "slug": "judge_list",
+        "title": "Judge List",
+        "subtitle": "Roster and check-in status.",
+        "url_name": "public_judges",
+        "url_args": (),
+    },
+    {
+        "slug": "team_list",
+        "title": "Team List",
+        "subtitle": "Registered teams and schools.",
+        "url_name": "public_teams",
+        "url_args": (),
+    },
+    {
+        "slug": "varsity_outrounds",
+        "title": "Varsity Outrounds",
+        "subtitle": "Varsity elimination brackets and pairings.",
+        "url_name": "outround_pretty_pair",
+        "url_args": (0,),
+    },
+    {
+        "slug": "novice_outrounds",
+        "title": "Novice Outrounds",
+        "subtitle": "Novice elimination brackets and pairings.",
+        "url_name": "outround_pretty_pair",
+        "url_args": (1,),
+    },
+    {
+        "slug": "public_team_results",
+        "title": "Public Team Results",
+        "subtitle": "Standings and published team records.",
+        "url_name": "rank_teams_public",
+        "url_args": (),
+    },
+    {
+        "slug": "public_speaker_results",
+        "title": "Public Speaker Results",
+        "subtitle": "Published speaker rankings and records.",
+        "url_name": "public_speaker_rankings",
+        "url_args": (),
+    },
+    {
+        "slug": "public_ballots",
+        "title": "Public Ballots",
+        "subtitle": "Published ballots and detailed round results.",
+        "url_name": "public_ballots",
+        "url_args": (),
+    },
+)
+
+PUBLIC_HOME_SHORTCUT_DEFAULTS = (
+    "released_pairings",
+    "missing_ballots",
+    "submit_e_ballot",
+    "judge_list",
+    "team_list",
+    "varsity_outrounds",
+    "novice_outrounds",
+)
 
 
 class TabSettings(models.Model):
@@ -106,6 +192,54 @@ class PublicDisplaySetting(models.Model):
         payload = {"label": label, "display_type": display_type}
         payload.update(defaults)
         return cls.objects.get_or_create(slug=slug, defaults=payload)
+
+
+class PublicHomeShortcut(models.Model):
+    position = models.PositiveSmallIntegerField(
+        choices=[(i, f"Slot {i}") for i in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1)],
+        unique=True,
+    )
+    nav_item = models.CharField(
+        max_length=50,
+        choices=[(item["slug"], item["title"]) for item in PUBLIC_HOME_SHORTCUT_DEFINITIONS],
+    )
+
+    class Meta:
+        verbose_name = "public home shortcut"
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"Slot {self.position}: {self.nav_item}"
+
+    def save(
+        self,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        super(PublicHomeShortcut, self).save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomeShortcut, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def nav_definition_map(cls):
+        return {item["slug"]: item for item in PUBLIC_HOME_SHORTCUT_DEFINITIONS}
+
+    @classmethod
+    def default_slot_mapping(cls):
+        return {
+            index + 1: slug
+            for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
+        }
 
 
 class School(models.Model):
