@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.utils.text import slugify
 
 from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -12,8 +13,16 @@ from mittab.libs.errors import *
 
 def view_debaters(request):
     # Get a list of (id,debater_name) tuples
-    c_debaters = [(debater.pk, debater.display, 0, "")
-                  for debater in Debater.objects.all()]
+    c_debaters = [
+        (
+            debater.pk,
+            debater.display,
+            0,
+            "",
+            list(debater.ranking_groups.order_by("name").values_list("name", flat=True)),
+        )
+        for debater in Debater.objects.prefetch_related("ranking_groups").all()
+    ]
     return render(
         request, "common/list_data.html", {
             "item_type": "debater",
@@ -25,7 +34,7 @@ def view_debaters(request):
 def view_debater(request, debater_id):
     debater_id = int(debater_id)
     try:
-        debater = Debater.objects.get(pk=debater_id)
+        debater = Debater.objects.prefetch_related("ranking_groups").get(pk=debater_id)
     except Debater.DoesNotExist:
         return redirect_and_flash_error(request, "No such debater")
     if request.method == "POST":
@@ -132,9 +141,25 @@ def rank_debaters(request):
         request
     )
 
+    ranking_group_tables = []
+    ranking_groups = RankingGroup.objects.prefetch_related("debaters").order_by("name")
+    for ranking_group in ranking_groups:
+        debater_ids = {debater.id for debater in ranking_group.debaters.all()}
+        grouped_debaters = [
+            debater_entry for debater_entry in debaters
+            if debater_entry[0].id in debater_ids
+        ]
+        if grouped_debaters:
+            ranking_group_tables.append({
+                "title": f"{ranking_group.name} Rankings",
+                "anchor": f"debater-ranking-group-{slugify(ranking_group.name)}",
+                "debaters": grouped_debaters,
+            })
+
     return render(
         request, "tab/rank_debaters_component.html", {
             "debaters": debaters,
             "nov_debaters": nov_debaters,
+            "debater_ranking_groups": ranking_group_tables,
             "title": "Speaker Rankings"
         })
