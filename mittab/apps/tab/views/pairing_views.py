@@ -686,6 +686,7 @@ def team_stats(request, round_number, outround=False):
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)
         stats["opps"] = tab_logic.num_opps(team)
+        stats["debaters"] = team.debaters_display()
 
         if hasattr(team, "breaking_team"):
             stats["outround_seed"] = team.breaking_team.seed
