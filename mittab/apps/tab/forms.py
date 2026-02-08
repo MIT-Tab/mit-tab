@@ -11,6 +11,7 @@ from mittab.apps.tab.models import *
 from mittab.libs import errors
 from mittab import settings
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.outround_tab_logic.pairing import OutroundPairingMode, ChallengeSeedBasis
 
 
 class UploadBackupForm(forms.Form):
@@ -707,7 +708,23 @@ class OutroundResultEntryForm(forms.Form):
         round_obj.save()
 
         round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])
-        if round_obj.victor > 0:
+        pairing_mode = int(TabSettings.get(
+            "outround_pairing_mode",
+            OutroundPairingMode.STANDARD,
+        ))
+        challenge_seed_basis = int(TabSettings.get(
+            "challenge_seed_basis",
+            ChallengeSeedBasis.PREVIOUS_ROUND,
+        ))
+        reseed_after_results = not (
+            pairing_mode == OutroundPairingMode.CHALLENGE_ONCE
+            or (
+                pairing_mode == OutroundPairingMode.CHALLENGE_EACH_ROUND
+                and challenge_seed_basis == ChallengeSeedBasis.ORIGINAL
+            )
+        )
+
+        if round_obj.victor > 0 and reseed_after_results:
             winning_team_seed = round_obj.winner.breaking_team.effective_seed
             losing_team_seed = round_obj.loser.breaking_team.effective_seed
 

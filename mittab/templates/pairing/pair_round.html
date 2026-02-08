@@ -21,6 +21,96 @@
       </tr>
       {% endfor %}
     </table>
+    {% if challenge_context.enabled %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title mb-2">Challenge Outs</h5>
+        <p class="mb-2">
+          Pairing Mode: <b>{{ challenge_context.mode_label }}</b><br>
+          Seed Basis: <b>{{ challenge_context.seed_basis_label }}</b>
+        </p>
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Challenger</th>
+              <th>Current Challenge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in challenge_context.challenges %}
+            <tr>
+              <td>
+                {% for team in challenge_context.team_options %}
+                  {% if team.id == item.challenger_id %}{{ team.label }}{% endif %}
+                {% endfor %}
+              </td>
+              <td>
+                {% if item.challenged_id %}
+                  {% for team in challenge_context.team_options %}
+                    {% if team.id == item.challenged_id %}{{ team.label }}{% endif %}
+                  {% endfor %}
+                {% else %}
+                  <span class="text-muted">Default challenge order will be used</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="row">
+          <div class="col-md-7">
+            <div class="border rounded p-2 mb-2">
+              <b>Set Challenge</b>
+              <div class="form-row mt-2">
+                <div class="col">
+                  <select class="form-control form-control-sm" name="challenger_id">
+                    {% for team in challenge_context.team_options %}
+                    <option value="{{ team.id }}">{{ team.label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col">
+                  <select class="form-control form-control-sm" name="challenged_id">
+                    {% for team in challenge_context.team_options %}
+                    <option value="{{ team.id }}">{{ team.label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <button class="btn btn-sm btn-secondary" type="submit" name="action" value="set_challenge">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-5">
+            <div class="border rounded p-2 mb-2">
+              <b>Current Challenger Override</b>
+              <div class="form-row mt-2">
+                <div class="col">
+                  <select class="form-control form-control-sm" name="current_challenger_id">
+                    <option value="0">Use default order</option>
+                    {% for team in challenge_context.team_options %}
+                    <option value="{{ team.id }}" {% if team.id == challenge_context.current_challenger_id %}selected{% endif %}>
+                      {{ team.label }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <button class="btn btn-sm btn-secondary" type="submit" name="action" value="set_current_challenger">
+                    Set
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     <div class="mt-5">
       <p class="alert alert-warning">
         This action will attempt to pair the next round. If you have ignored the warnings above it may fail. Be warned, and always backup if you are unsure.

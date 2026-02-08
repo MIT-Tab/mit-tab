@@ -24,6 +24,7 @@ from mittab.apps.tab.public_rankings import (
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
+from mittab.libs.outround_tab_logic import OutroundPairingMode
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
 
@@ -591,6 +592,12 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
+    challenge_mode = int(TabSettings.get(
+        "outround_pairing_mode",
+        OutroundPairingMode.STANDARD,
+    ))
+    if challenge_mode != OutroundPairingMode.STANDARD:
+        show_outrounds_bracket = False
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)

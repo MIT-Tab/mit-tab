@@ -26,7 +26,44 @@ from mittab.libs.cacheing.public_cache import (
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
+    challenge_num_teams = int(num_teams / 2)
     if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "set_challenge":
+            try:
+                challenger_id = int(request.POST.get("challenger_id", 0))
+                challenged_id = int(request.POST.get("challenged_id", 0))
+                outround_tab_logic.save_challenge_pick(
+                    type_of_round,
+                    challenge_num_teams,
+                    challenger_id,
+                    challenged_id,
+                )
+                return redirect_and_flash_success(
+                    request,
+                    "Challenge updated.",
+                    path=request.path,
+                )
+            except ValueError as exc:
+                return redirect_and_flash_error(request, str(exc), path=request.path)
+
+        if action == "set_current_challenger":
+            try:
+                challenger_id = int(request.POST.get("current_challenger_id", 0) or 0)
+                outround_tab_logic.save_current_challenger(
+                    type_of_round,
+                    challenge_num_teams,
+                    challenger_id,
+                )
+                return redirect_and_flash_success(
+                    request,
+                    "Current challenger updated.",
+                    path=request.path,
+                )
+            except ValueError as exc:
+                return redirect_and_flash_error(request, str(exc), path=request.path)
+
         type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
         round_str = f"Round-of-{num_teams}-{type_str}"
         backup.backup_round(round_number=round_str,
@@ -35,7 +72,10 @@ def pair_next_outround(request, num_teams, type_of_round):
         Outround.objects.filter(num_teams__lt=num_teams,
                                 type_of_round=type_of_round).delete()
 
-        outround_tab_logic.pair(type_of_round)
+        try:
+            outround_tab_logic.pair(type_of_round)
+        except ValueError as exc:
+            return redirect_and_flash_error(request, str(exc), path=request.path)
         invalidate_outround_public_pairings_cache(type_of_round)
 
         return redirect_and_flash_success(
@@ -105,6 +145,10 @@ def pair_next_outround(request, num_teams, type_of_round):
         "num_teams": num_teams,
         "type_of_round": type_of_round,
         "round_label": round_label,
+        "challenge_context": outround_tab_logic.get_challenge_setup_context(
+            type_of_round,
+            challenge_num_teams,
+        ),
     }
     return render(request, "pairing/pair_round.html", context)
 
