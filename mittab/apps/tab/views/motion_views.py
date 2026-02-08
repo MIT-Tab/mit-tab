@@ -105,10 +105,10 @@ def add_motion(request):
         
         motion.full_clean()
         motion.save()
-        invalidate_motions_cache()
+        invalidate_public_motions_cache()
         return redirect_and_flash_success(request, "Motion added successfully.", path=reverse("manage_motions"))
-    except Exception as e:
-        return redirect_and_flash_error(request, f"Error adding motion: {str(e)}")
+    except Exception:
+        return redirect_and_flash_error(request, "Unexpected error adding motion. Please try again.")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -145,7 +145,7 @@ def edit_motion(request, motion_id):
                 motion.motion_text = motion_text
                 motion.full_clean()
                 motion.save()
-                invalidate_motions_cache()
+                invalidate_public_motions_cache()
                 return redirect_and_flash_success(request, "Motion updated successfully.", path=reverse("manage_motions"))
             except ValidationError as e:
                 messages.error(request, " ".join(e.messages))
@@ -171,7 +171,7 @@ def delete_motion(request, motion_id):
     
     motion = get_object_or_404(Motion, pk=motion_id)
     motion.delete()
-    invalidate_motions_cache()
+    invalidate_public_motions_cache()
     return redirect_and_flash_success(request, "Motion deleted successfully.", path=reverse("manage_motions"))
 
 
@@ -183,7 +183,7 @@ def toggle_motion_published(request, motion_id):
     motion = get_object_or_404(Motion, pk=motion_id)
     motion.is_published = not motion.is_published
     motion.save()
-    invalidate_motions_cache()
+    invalidate_public_motions_cache()
     
     status = "published" if motion.is_published else "unpublished"
     return redirect_and_flash_success(
@@ -199,7 +199,7 @@ def publish_all_motions(request):
         return redirect("manage_motions")
     
     Motion.objects.all().update(is_published=True)
-    invalidate_motions_cache()
+    invalidate_public_motions_cache()
     return redirect_and_flash_success(request, "All motions published.", path=reverse("manage_motions"))
 
 
@@ -209,7 +209,7 @@ def unpublish_all_motions(request):
         return redirect("manage_motions")
     
     Motion.objects.all().update(is_published=False)
-    invalidate_motions_cache()
+    invalidate_public_motions_cache()
     return redirect_and_flash_success(request, "All motions unpublished.", path=reverse("manage_motions"))
 
 
@@ -238,7 +238,3 @@ def public_motions(request):
         "has_motions": bool(motions),
     })
 
-
-def invalidate_motions_cache():
-    """Invalidate the public motions cache when motions are modified."""
-    invalidate_public_motions_cache()

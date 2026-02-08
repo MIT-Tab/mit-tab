@@ -21,10 +21,12 @@
                         <optgroup label="Preliminary Rounds">
                             {% for round_type, round_id, round_name in available_rounds %}
                                 {% if round_type == 'inround' %}
+                                    {% with inround_value=round_id|stringformat:"s" %}
                                     <option value="inround_{{ round_id }}"
-                                        {% if current_round_selection == "inround_"|add:round_id %}selected{% endif %}>
+                                        {% if current_round_selection == "inround_"|add:inround_value %}selected{% endif %}>
                                         {{ round_name }}
                                     </option>
+                                    {% endwith %}
                                 {% endif %}
                             {% endfor %}
                         </optgroup>

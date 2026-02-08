@@ -3,5 +3,12 @@
         "mittab"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./mittab",
+        "-p",
+        "*test*.py"
+    ]
 }
