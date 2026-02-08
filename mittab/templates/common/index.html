@@ -30,7 +30,7 @@
 
     {% with count=number_schools model_name="Schools" list_data=school_list %}
       {% with html_id="school-list" list_path=view_schools %}
-        {% with enter_path=enter_school view_path_prefix="school" %}
+        {% with enter_path=enter_school view_path_prefix="school" flagged_item_ids=schools_missing_apda_ids flagged_count=schools_missing_apda_count %}
           {% include "common/_index_list.html" %}
         {% endwith %}
       {% endwith %}
@@ -54,7 +54,7 @@
 
     {% with count=number_debaters model_name="Debaters" list_data=debater_list %}
       {% with html_id="debater-list" list_path=view_debaters %}
-        {% with enter_path=enter_debater view_path_prefix="debater" %}
+        {% with enter_path=enter_debater view_path_prefix="debater" flagged_item_ids=debaters_missing_apda_ids flagged_count=debaters_missing_apda_count %}
           {% include "common/_index_list.html" %}
         {% endwith %}
       {% endwith %}
