@@ -83,6 +83,10 @@ class TestMotionViews(TestCase):
 
     def test_toggle_and_bulk_publish_actions(self):
         motion_one = Motion.objects.create(round_number=1, motion_text="Motion 1")
+        motion_two = Motion.objects.create(round_number=2, motion_text="Motion 2")
+        self.assertEqual(Motion.objects.count(), 2)
+        self.assertFalse(motion_one.is_published)
+        self.assertFalse(motion_two.is_published)
 
         toggle_response = self.client.post(
             reverse("toggle_motion_published", args=[motion_one.pk]),
