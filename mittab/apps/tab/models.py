@@ -703,3 +703,111 @@ class RoomTag(models.Model):
 
     def __str__(self):
         return self.tag
+
+
+class Motion(models.Model):
+    """
+    Represents a debate motion (topic) for a specific round.
+    
+    Round identification:
+    - For inrounds: round_number is set (1, 2, 3, etc.)
+    - For outrounds: round_number is None, and outround_type + num_teams identifies the round
+      (e.g., Varsity Quarterfinals = outround_type=0, num_teams=8)
+    """
+    VARSITY = 0
+    NOVICE = 1
+    OUTROUND_TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice"),
+    )
+
+    # Round identification - either round_number for inrounds, or outround fields for outrounds
+    round_number = models.IntegerField(null=True, blank=True,
+                                       help_text="Round number for inrounds (1, 2, 3, etc.)")
+    outround_type = models.IntegerField(null=True, blank=True, choices=OUTROUND_TYPE_CHOICES,
+                                        help_text="Type of outround (Varsity/Novice)")
+    num_teams = models.IntegerField(null=True, blank=True,
+                                    help_text="Number of teams in outround (e.g., 8 for quarterfinals)")
+
+    # Motion content
+    info_slide = models.TextField(blank=True, default="",
+                                  help_text="Optional context/info slide text shown before the motion")
+    motion_text = models.TextField(help_text="The debate motion/resolution text")
+
+    # Publication status
+    is_published = models.BooleanField(default=False,
+                                       help_text="Whether this motion is visible to the public")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["round_number", "outround_type", "-num_teams"]
+        verbose_name = "motion"
+        verbose_name_plural = "motions"
+
+    def __str__(self):
+        return f"Motion for {self.round_display}: {self.motion_text[:50]}..."
+
+    @property
+    def is_outround(self):
+        """Returns True if this is an outround motion."""
+        return self.round_number is None and self.num_teams is not None
+
+    @property
+    def round_display(self):
+        """Returns a human-readable round name."""
+        if self.round_number is not None:
+            return f"Round {self.round_number}"
+        elif self.num_teams is not None:
+            type_name = "Varsity" if self.outround_type == self.VARSITY else "Novice"
+            round_names = {
+                2: "Finals",
+                4: "Semifinals",
+                8: "Quarterfinals",
+                16: "Octofinals",
+                32: "Double Octofinals",
+                64: "Triple Octofinals",
+            }
+            round_name = round_names.get(self.num_teams, f"Round of {self.num_teams}")
+            return f"{type_name} {round_name}"
+        return "Unknown Round"
+
+    @property
+    def sort_key(self):
+        """Returns a sort key for ordering motions (inrounds first, then outrounds by size)."""
+        if self.round_number is not None:
+            # Inrounds: sort by round number
+            return (0, self.round_number, 0)
+        else:
+            # Outrounds: sort by type (varsity first), then by num_teams (descending)
+            return (1, self.outround_type or 0, -(self.num_teams or 0))
+
+    @property
+    def round_selection_value(self):
+        """Returns the form value used in the round_selection dropdown."""
+        if self.round_number is not None:
+            return f"inround_{self.round_number}"
+        elif self.num_teams is not None:
+            return f"outround_{self.outround_type}_{self.num_teams}"
+        return ""
+
+    def clean(self):
+        """Validate that either round_number or outround fields are set, but not both."""
+        super().clean()
+        has_round_number = self.round_number is not None
+        has_outround = self.num_teams is not None
+
+        if has_round_number and has_outround:
+            raise ValidationError(
+                "A motion cannot have both a round number (inround) and outround fields set."
+            )
+        if not has_round_number and not has_outround:
+            raise ValidationError(
+                "A motion must have either a round number (inround) or outround fields set."
+            )
+        if has_outround and self.outround_type is None:
+            raise ValidationError(
+                "Outround motions must specify the outround type (Varsity/Novice)."
+            )

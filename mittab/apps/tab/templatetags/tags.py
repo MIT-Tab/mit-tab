@@ -88,3 +88,9 @@ def with_return_to(url):
 @register.simple_tag
 def public_display_flags():
     return get_public_display_flags()
+
+
+@register.simple_tag
+def motions_enabled():
+    """Returns True if motions feature is enabled."""
+    return bool(TabSettings.get("motions_enabled", 0))
