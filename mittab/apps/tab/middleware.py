@@ -1,7 +1,9 @@
 import re
+from urllib.parse import urlsplit
 
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
@@ -48,6 +50,27 @@ class Login:
 
     def __call__(self, request):
         path = request.path
+        should_store_return_to = (
+            request.method == "GET"
+            and not request.path.startswith("/api/")
+            and request.headers.get("X-Requested-With") != "XMLHttpRequest"
+        )
+        if should_store_return_to:
+            session_target = request.get_full_path()
+            referer = request.META.get("HTTP_REFERER")
+            if referer and url_has_allowed_host_and_scheme(
+                referer,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                parts = urlsplit(referer)
+                referer_path = parts.path or "/"
+                if parts.query:
+                    referer_path = f"{referer_path}?{parts.query}"
+                if referer_path != request.get_full_path():
+                    session_target = referer_path
+            request.session["_return_to"] = session_target
+
         whitelisted = (
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
