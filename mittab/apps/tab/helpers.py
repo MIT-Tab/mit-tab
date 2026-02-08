@@ -15,12 +15,15 @@ def get_redirect_target(request, path=None, fallback="/"):
         5) HTTP referer header
         6) Provided fallback (defaults to '/')
     """
+    session = getattr(request, "session", None)
+    session_return_to = session.get("_return_to") if session is not None else None
+
     candidates = [
         path,
         request.POST.get("return_to"),
         request.GET.get("return_to"),
         request.GET.get("next"),
-        request.session.get("_return_to"),
+        session_return_to,
         request.META.get("HTTP_REFERER"),
     ]
 
