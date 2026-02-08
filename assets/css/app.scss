@@ -182,6 +182,12 @@ $font-size-base: 0.95rem !default;
   height: 38px;
 }
 
+.index-info-trigger {
+  vertical-align: baseline;
+  line-height: 1;
+  cursor: help;
+}
+
 // Warning popups
 .warning-container {
   width: 500px;
