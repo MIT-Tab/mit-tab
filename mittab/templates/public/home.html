@@ -86,65 +86,15 @@
         </header>
 
         <nav class="public-links" aria-label="Quick links">
-          <a class="tile shadow-sm" href="{% url 'pretty_pair' %}">
-            <span class="body">
-              <span class="title">Released Pairings</span>
-              <span class="subtitle">Latest rounds and room assignments.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile shadow-sm" href="{% url 'missing_ballots' %}">
-            <span class="body">
-              <span class="title">Missing Ballots</span>
-              <span class="subtitle">Outstanding ballots that need attention.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-                    <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
-            <span class="body">
-              <span class="title">Submit E-Ballot</span>
-              <span class="subtitle">Judges enter ballot codes to file results.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile shadow-sm" href="{% url 'public_judges' %}">
-            <span class="body">
-              <span class="title">Judge List</span>
-              <span class="subtitle">Roster and check-in status.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile shadow-sm" href="{% url 'public_teams' %}">
-            <span class="body">
-              <span class="title">Team List</span>
-              <span class="subtitle">Registered teams and schools.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          {% motions_enabled as show_motions %}
-          {% if show_motions %}
-          <a class="tile shadow-sm" href="{% url 'public_motions' %}">
-            <span class="body">
-              <span class="title">Motions</span>
-              <span class="subtitle">View debate motions and info slides.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          {% endif %}
-          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 0 %}">
-            <span class="body">
-              <span class="title">Varsity Outrounds</span>
-              <span class="subtitle">Varsity elimination brackets and pairings.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 1 %}">
-            <span class="body">
-              <span class="title">Novice Outrounds</span>
-              <span class="subtitle">Novice elimination brackets and pairings.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
+          {% for shortcut in quick_links %}
+            <a class="tile shadow-sm" href="{{ shortcut.url }}">
+              <span class="body">
+                <span class="title">{{ shortcut.title }}</span>
+                <span class="subtitle">{{ shortcut.subtitle }}</span>
+              </span>
+              <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+            </a>
+          {% endfor %}
         </nav>
       </aside>
     </div>

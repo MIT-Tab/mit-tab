@@ -573,6 +573,69 @@ class SettingsForm(forms.Form):
             TabSettings.set(key, value_to_set)
 
 
+class PublicHomeShortcutsForm(forms.Form):
+    tournament_name = forms.CharField(
+        label="Tournament Name",
+        max_length=200,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "style": "min-width: 300px;",
+            }
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(PublicHomeShortcutsForm, self).__init__(*args, **kwargs)
+
+        definitions = PublicHomeShortcut.nav_definition_map()
+        self.fields["tournament_name"].initial = TabSettings.get(
+            "tournament_name", DEFAULT_TOURNAMENT_NAME
+        )
+
+        page_options = list(PublicHomePage.objects.filter(is_active=True))
+        if not page_options:
+            page_options = list(PublicHomePage.objects.all())
+        choices = [
+            (page.slug, page.title)
+            for page in page_options
+        ]
+        default_slots = PublicHomeShortcut.default_slot_mapping()
+        configured_slots = dict(default_slots)
+        configured_slots.update({
+            shortcut.position: shortcut.nav_item
+            for shortcut in PublicHomeShortcut.objects.all()
+        })
+
+        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            nav_item = configured_slots.get(slot)
+            default_nav_item = default_slots.get(slot)
+            if nav_item not in definitions:
+                nav_item = default_nav_item
+            title = definitions.get(nav_item, {}).get("title", nav_item)
+            self.fields[f"slot_{slot}"] = forms.ChoiceField(
+                label=f"Shortcut {slot}",
+                choices=choices,
+                initial=nav_item,
+                help_text=f"Currently: {title}",
+                widget=forms.Select(attrs={"class": "form-control"}),
+            )
+
+    def save(self):
+        tournament_name = (
+            self.cleaned_data["tournament_name"].strip()
+            or DEFAULT_TOURNAMENT_NAME
+        )
+        TabSettings.set("tournament_name", tournament_name)
+        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 1)
+
+        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            PublicHomeShortcut.objects.update_or_create(
+                position=slot,
+                defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},
+            )
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*list(result.values())))

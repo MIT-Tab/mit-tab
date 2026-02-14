@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (Room, TabSettings, Team,
-                                    Round, Outround)
+                                    Round, Outround, PublicHomeShortcut)
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
     get_public_display_flags,
@@ -250,6 +250,80 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaks and ranks are hidden for this section.", content)
         self.assertNotIn("Novice Speakers", content,
             "Hidden divisions should not render a section")
+
+    def test_public_home_uses_shortcut_configuration(self):
+        client = Client()
+
+        PublicHomeShortcut.objects.filter(position=1).update(
+            nav_item="public_team_results"
+        )
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertIn("Public Team Results", content)
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
+            content,
+        )
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("pretty_pair")}"',
+            content,
+        )
+
+    def test_public_home_falls_back_to_defaults_when_shortcuts_missing(self):
+        client = Client()
+
+        PublicHomeShortcut.objects.all().delete()
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(reverse("pretty_pair"), content)
+        self.assertIn(reverse("missing_ballots"), content)
+
+    def test_public_home_shows_only_seven_shortcuts_when_motions_enabled(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertNotIn('<span class="title">Motions</span>', content)
+
+    def test_public_home_can_show_motions_when_selected_as_shortcut(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        defaults[1] = "public_motions"
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertIn('<span class="title">Motions</span>', content)
+        self.assertIn(reverse("public_motions"), content)
 
     def test_public_rankings_control_updates_display_settings(self):
         client = Client()

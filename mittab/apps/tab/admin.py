@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django import forms
+from django.utils.html import format_html
 
 from mittab.apps.tab import models
 
@@ -34,6 +35,28 @@ class TeamAdmin(admin.ModelAdmin):
     filter_horizontal = ("debaters", )
 
 
+class PublicHomeShortcutAdmin(admin.ModelAdmin):
+    list_display = ("position", "nav_item", "preview_destination")
+    list_editable = ("nav_item",)
+    ordering = ("position",)
+
+    def preview_destination(self, obj):
+        definition = models.PublicHomeShortcut.nav_definition_map().get(obj.nav_item)
+        if definition is None:
+            return "-"
+        url = definition["url_path"]
+        return format_html('<a href="{url}" target="_blank">{url}</a>', url=url)
+
+    preview_destination.short_description = "Destination"
+
+
+class PublicHomePageAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "url_path", "sort_order", "is_active")
+    list_editable = ("url_path", "sort_order", "is_active")
+    search_fields = ("title", "slug", "url_path")
+    ordering = ("sort_order", "title")
+
+
 class MotionAdmin(admin.ModelAdmin):
     list_display = ("round_display", "motion_text_truncated", "is_published", "updated_at")
     list_filter = ("is_published", "outround_type")
@@ -55,6 +78,8 @@ admin.site.register(models.RoundStats)
 admin.site.register(models.CheckIn)
 admin.site.register(models.RoomCheckIn)
 admin.site.register(models.TabSettings)
+admin.site.register(models.PublicHomePage, PublicHomePageAdmin)
+admin.site.register(models.PublicHomeShortcut, PublicHomeShortcutAdmin)
 admin.site.register(models.Room)
 admin.site.register(models.RoomTag)
 admin.site.register(models.Bye)

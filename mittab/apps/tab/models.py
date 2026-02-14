@@ -5,6 +5,90 @@ from django.db import models
 from django.core.exceptions import ValidationError
 
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+
+
+DEFAULT_TOURNAMENT_NAME = "New Tournament"
+HOMEPAGE_SETUP_COMPLETE_KEY = "homepage_setup_complete"
+PUBLIC_HOME_SHORTCUT_SLOTS = 7
+PUBLIC_HOME_PAGE_DEFINITIONS = (
+    {
+        "slug": "released_pairings",
+        "title": "Released Pairings",
+        "subtitle": "Latest rounds and room assignments.",
+        "url_path": "/public/pairings/",
+    },
+    {
+        "slug": "missing_ballots",
+        "title": "Missing Ballots",
+        "subtitle": "Outstanding ballots that need attention.",
+        "url_path": "/public/missing-ballots/",
+    },
+    {
+        "slug": "submit_e_ballot",
+        "title": "Submit E-Ballot",
+        "subtitle": "Judges enter ballot codes to file results.",
+        "url_path": "/public/e-ballots/",
+    },
+    {
+        "slug": "judge_list",
+        "title": "Judge List",
+        "subtitle": "Roster and check-in status.",
+        "url_path": "/public/judges/",
+    },
+    {
+        "slug": "team_list",
+        "title": "Team List",
+        "subtitle": "Registered teams and schools.",
+        "url_path": "/public/teams/",
+    },
+    {
+        "slug": "varsity_outrounds",
+        "title": "Varsity Outrounds",
+        "subtitle": "Varsity elimination brackets and pairings.",
+        "url_path": "/public/outrounds/0/",
+    },
+    {
+        "slug": "novice_outrounds",
+        "title": "Novice Outrounds",
+        "subtitle": "Novice elimination brackets and pairings.",
+        "url_path": "/public/outrounds/1/",
+    },
+    {
+        "slug": "public_team_results",
+        "title": "Public Team Results",
+        "subtitle": "Standings and published team records.",
+        "url_path": "/public/team-rankings/",
+    },
+    {
+        "slug": "public_speaker_results",
+        "title": "Public Speaker Results",
+        "subtitle": "Published speaker rankings and records.",
+        "url_path": "/public/speaker-rankings/",
+    },
+    {
+        "slug": "public_ballots",
+        "title": "Public Ballots",
+        "subtitle": "Published ballots and detailed round results.",
+        "url_path": "/public/ballots/",
+    },
+    {
+        "slug": "public_motions",
+        "title": "Motions",
+        "subtitle": "View debate motions and info slides.",
+        "url_path": "/public/motions/",
+    },
+)
+
+PUBLIC_HOME_SHORTCUT_DEFAULTS = (
+    "released_pairings",
+    "missing_ballots",
+    "submit_e_ballot",
+    "judge_list",
+    "team_list",
+    "varsity_outrounds",
+    "novice_outrounds",
+)
 
 
 class TabSettings(models.Model):
@@ -106,6 +190,110 @@ class PublicDisplaySetting(models.Model):
         payload = {"label": label, "display_type": display_type}
         payload.update(defaults)
         return cls.objects.get_or_create(slug=slug, defaults=payload)
+
+
+class PublicHomePage(models.Model):
+    slug = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=255, blank=True, default="")
+    url_path = models.CharField(max_length=200)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "public home page"
+        ordering = ["sort_order", "title"]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        super(PublicHomePage, self).save(*args, **kwargs)
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomePage, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def ensure_defaults(cls):
+        for index, definition in enumerate(PUBLIC_HOME_PAGE_DEFINITIONS, start=1):
+            cls.objects.get_or_create(
+                slug=definition["slug"],
+                defaults={
+                    "title": definition["title"],
+                    "subtitle": definition["subtitle"],
+                    "url_path": definition["url_path"],
+                    "sort_order": index,
+                },
+            )
+
+
+class PublicHomeShortcut(models.Model):
+    position = models.PositiveSmallIntegerField(
+        choices=[(i, f"Slot {i}") for i in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1)],
+        unique=True,
+    )
+    nav_item = models.CharField(max_length=50, db_index=True)
+
+    class Meta:
+        verbose_name = "public home shortcut"
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"Slot {self.position}: {self.nav_item}"
+
+    def save(
+        self,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        super(PublicHomeShortcut, self).save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomeShortcut, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def nav_definition_map(cls):
+        PublicHomePage.ensure_defaults()
+        return {
+            page.slug: {
+                "slug": page.slug,
+                "title": page.title,
+                "subtitle": page.subtitle,
+                "url_path": page.url_path,
+            }
+            for page in PublicHomePage.objects.all()
+        }
+
+    @classmethod
+    def default_slot_mapping(cls):
+        return {
+            index + 1: slug
+            for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
+        }
+
+    @classmethod
+    def is_homepage_setup_complete(cls):
+        explicit_setting = TabSettings.objects.filter(
+            key=HOMEPAGE_SETUP_COMPLETE_KEY
+        ).first()
+        if explicit_setting is not None and explicit_setting.value is not None:
+            return explicit_setting.value == 1
+
+        tournament_name = (TabSettings.get(
+            "tournament_name", DEFAULT_TOURNAMENT_NAME
+        ) or "").strip()
+        return bool(tournament_name and tournament_name != DEFAULT_TOURNAMENT_NAME)
 
 
 class School(models.Model):

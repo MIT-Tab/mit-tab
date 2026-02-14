@@ -1,0 +1,96 @@
+{% extends "base/__normal.html" %}
+{% load tags %}
+
+{% block title %}Homepage Setup{% endblock %}
+
+{% block banner %}Homepage Setup{% endblock %}
+
+{% block extra_head %}
+<style>
+  .shortcut-config-shell {
+    max-width: 900px;
+  }
+  .shortcut-config-table {
+    margin-bottom: 0;
+  }
+  .shortcut-config-table th,
+  .shortcut-config-table td {
+    vertical-align: middle;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+  .shortcut-config-table th:first-child,
+  .shortcut-config-table td:first-child {
+    width: 88px;
+    white-space: nowrap;
+  }
+  .shortcut-config-table select.form-control {
+    height: 34px;
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+  }
+  .shortcut-config-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-12 shortcut-config-shell">
+  <p class="mb-2 text-muted">Set your tournament name and choose each public homepage shortcut destination.</p>
+
+  <form method="post">
+    {% csrf_token %}
+    {% return_to_input %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="form-group">
+      <label for="{{ form.tournament_name.id_for_label }}">{{ form.tournament_name.label }}</label>
+      {{ form.tournament_name }}
+      {% if form.tournament_name.errors %}
+        <div class="text-danger small mt-1">{{ form.tournament_name.errors|striptags }}</div>
+      {% endif %}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered shortcut-config-table">
+        <thead class="thead-light">
+          <tr>
+            <th>Slot</th>
+            <th>Shortcut Destination</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for field in form %}
+            {% if field.name != "tournament_name" %}
+            <tr>
+              <td><strong>{{ field.label }}</strong></td>
+              <td>
+                {{ field }}
+                {% if field.errors %}
+                  <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                {% endif %}
+              </td>
+            </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="shortcut-config-actions">
+      <button type="submit" class="btn btn-primary btn-sm">Save Homepage Setup</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

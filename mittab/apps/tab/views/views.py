@@ -13,7 +13,7 @@ import yaml
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
-    UploadDataForm, ScratchForm, SettingsForm
+    UploadDataForm, ScratchForm, SettingsForm, PublicHomeShortcutsForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -471,6 +471,31 @@ def settings_form(request):
             "categories": categories_with_fields,
             "title": "Tab Settings"
         })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def public_home_shortcuts(request):
+    if request.method == "POST":
+        form = PublicHomeShortcutsForm(request.POST)
+        if form.is_valid():
+            form.save()
+            invalidate_all_public_caches()
+            return redirect_and_flash_success(
+                request,
+                "Homepage setup updated!",
+                path=reverse("homepage_setup"),
+            )
+    else:
+        form = PublicHomeShortcutsForm()
+
+    return render(
+        request,
+        "tab/public_home_shortcuts_form.html",
+        {
+            "form": form,
+            "title": "Homepage Setup",
+        },
+    )
 
 
 def upload_data(request):
