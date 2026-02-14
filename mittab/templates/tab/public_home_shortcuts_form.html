@@ -1,9 +1,9 @@
 {% extends "base/__normal.html" %}
 {% load tags %}
 
-{% block title %}Public Home Shortcuts{% endblock %}
+{% block title %}Homepage Setup{% endblock %}
 
-{% block banner %}Public Home Shortcuts{% endblock %}
+{% block banner %}Homepage Setup{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -42,7 +42,7 @@
 
 {% block content %}
 <div class="col-12 shortcut-config-shell">
-  <p class="mb-2 text-muted">Choose the destination for each homepage shortcut tile.</p>
+  <p class="mb-2 text-muted">Set your tournament name and choose each public homepage shortcut destination.</p>
 
   <form method="post">
     {% csrf_token %}
@@ -54,6 +54,14 @@
       </div>
     {% endif %}
 
+    <div class="form-group">
+      <label for="{{ form.tournament_name.id_for_label }}">{{ form.tournament_name.label }}</label>
+      {{ form.tournament_name }}
+      {% if form.tournament_name.errors %}
+        <div class="text-danger small mt-1">{{ form.tournament_name.errors|striptags }}</div>
+      {% endif %}
+    </div>
+
     <div class="table-responsive">
       <table class="table table-sm table-bordered shortcut-config-table">
         <thead class="thead-light">
@@ -64,6 +72,7 @@
         </thead>
         <tbody>
           {% for field in form %}
+            {% if field.name != "tournament_name" %}
             <tr>
               <td><strong>{{ field.label }}</strong></td>
               <td>
@@ -73,13 +82,14 @@
                 {% endif %}
               </td>
             </tr>
+            {% endif %}
           {% endfor %}
         </tbody>
       </table>
     </div>
 
     <div class="shortcut-config-actions">
-      <button type="submit" class="btn btn-primary btn-sm">Save Shortcuts</button>
+      <button type="submit" class="btn btn-primary btn-sm">Save Homepage Setup</button>
     </div>
   </form>
 </div>

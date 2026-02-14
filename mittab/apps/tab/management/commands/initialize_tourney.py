@@ -5,7 +5,11 @@ from django.core.management import call_command
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    HOMEPAGE_SETUP_COMPLETE_KEY,
+    TabSettings,
+)
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
 
 USER_MODEL = get_user_model()
@@ -60,7 +64,8 @@ class Command(BaseCommand):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-        TabSettings.set("tournament_name", "New Tournament")
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 0)
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")

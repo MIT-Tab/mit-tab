@@ -479,10 +479,11 @@ def public_home_shortcuts(request):
         form = PublicHomeShortcutsForm(request.POST)
         if form.is_valid():
             form.save()
+            invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
-                "Public homepage shortcuts updated!",
-                path=reverse("public_home_shortcuts"),
+                "Homepage setup updated!",
+                path=reverse("homepage_setup"),
             )
     else:
         form = PublicHomeShortcutsForm()
@@ -492,7 +493,7 @@ def public_home_shortcuts(request):
         "tab/public_home_shortcuts_form.html",
         {
             "form": form,
-            "title": "Public Home Shortcuts",
+            "title": "Homepage Setup",
         },
     )
 

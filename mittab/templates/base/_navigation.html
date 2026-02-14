@@ -36,7 +36,7 @@
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
 {% url "settings_form" as settings_form %}
-{% url "public_home_shortcuts" as public_home_shortcuts %}
+{% url "homepage_setup" as homepage_setup %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -114,14 +114,14 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request public_home_shortcuts %}{% active request manage_motions %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request homepage_setup %}{% active request manage_motions %}">
             Admin
           </a>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin|with_return_to }}">Batch Checkin</a>
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data|with_return_to }}">Bulk Data Upload</a>
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form|with_return_to }}">Settings Form</a>
-            <a class="dropdown-item {% active request public_home_shortcuts %}" href="{{ public_home_shortcuts|with_return_to }}">Homepage Shortcuts</a>
+            <a class="dropdown-item {% active request homepage_setup %}" href="{{ homepage_setup|with_return_to }}">Homepage Setup</a>
             {% if motions_enabled_flag %}
             <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
             {% endif %}

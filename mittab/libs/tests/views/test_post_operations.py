@@ -4,7 +4,16 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater, PublicHomeShortcut
+    HOMEPAGE_SETUP_COMPLETE_KEY,
+    PUBLIC_HOME_PAGE_DEFINITIONS,
+    Room,
+    TabSettings,
+    Team,
+    Judge,
+    School,
+    Debater,
+    PublicHomePage,
+    PublicHomeShortcut,
 )
 
 
@@ -123,6 +132,7 @@ class TestPostOperations(TestCase):
         response = self.client.post(
             reverse("public_home_shortcuts"),
             {
+                "tournament_name": "MIT Invitational",
                 "slot_1": "public_team_results",
                 "slot_2": "public_speaker_results",
                 "slot_3": "public_ballots",
@@ -141,4 +151,54 @@ class TestPostOperations(TestCase):
         self.assertEqual(
             PublicHomeShortcut.objects.get(position=3).nav_item,
             "public_ballots",
+        )
+        self.assertEqual(TabSettings.get("tournament_name"), "MIT Invitational")
+        self.assertEqual(TabSettings.get(HOMEPAGE_SETUP_COMPLETE_KEY, 0), 1)
+
+    def test_start_new_tourny_clears_homepage_configuration(self):
+        PublicHomePage.ensure_defaults()
+        PublicHomeShortcut.objects.update_or_create(
+            position=1,
+            defaults={"nav_item": "public_team_results"},
+        )
+        PublicHomePage.objects.update_or_create(
+            slug="custom_link",
+            defaults={
+                "title": "Custom Link",
+                "subtitle": "Custom subtitle",
+                "url_path": "/public/custom-link/",
+                "sort_order": 99,
+                "is_active": True,
+            },
+        )
+
+        response = self.client.post(reverse("start_tourny"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PublicHomeShortcut.objects.count(), 0)
+        self.assertEqual(PublicHomePage.objects.count(), 0)
+
+    def test_public_home_page_ensure_defaults_is_idempotent(self):
+        PublicHomePage.objects.all().delete()
+        PublicHomePage.objects.create(
+            slug="released_pairings",
+            title="Custom Released Pairings",
+            subtitle="custom subtitle",
+            url_path="/public/pairings/",
+            sort_order=15,
+        )
+
+        PublicHomePage.ensure_defaults()
+        PublicHomePage.ensure_defaults()
+
+        self.assertEqual(
+            PublicHomePage.objects.count(),
+            len(PUBLIC_HOME_PAGE_DEFINITIONS),
+        )
+        self.assertEqual(
+            PublicHomePage.objects.values_list("slug", flat=True).distinct().count(),
+            len(PUBLIC_HOME_PAGE_DEFINITIONS),
+        )
+        self.assertEqual(
+            PublicHomePage.objects.get(slug="released_pairings").title,
+            "Custom Released Pairings",
         )

@@ -4,7 +4,7 @@ from django import template
 from django.forms.fields import FileField
 
 from mittab.apps.tab.helpers import get_redirect_target
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
@@ -60,7 +60,7 @@ def is_manual_judge_assignment(context, round_id, judge_id):
 
 @register.simple_tag
 def tournament_name():
-    return TabSettings.get("tournament_name", "New Tournament")
+    return TabSettings.get("tournament_name", DEFAULT_TOURNAMENT_NAME)
 
 
 @register.simple_tag(takes_context=True)

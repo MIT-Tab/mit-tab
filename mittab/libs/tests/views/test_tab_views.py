@@ -7,6 +7,8 @@ from django.urls import reverse
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    HOMEPAGE_SETUP_COMPLETE_KEY,
     Room,
     TabSettings,
     Team,
@@ -93,7 +95,7 @@ class TestTabViews(TestCase):
             (reverse("add_scratch"), "Add Scratch"),
             (reverse("view_scratches"), "Scratches"),
             (reverse("settings_form"), "Settings"),
-            (reverse("public_home_shortcuts"), "Public Home Shortcuts"),
+            (reverse("public_home_shortcuts"), "Homepage Setup"),
             (reverse("view_backups"), "Backups"),
             (reverse("upload_data"), "Upload Data"),
             (reverse("confirm_start_tourny"), "Are you sure?"),
@@ -143,6 +145,29 @@ class TestTabViews(TestCase):
                 self.assertEqual(response.status_code, 200,
                                  f"Failed to render {reverse(*view_name_tuple)}, "
                                  f" got status {response.status_code}")
+
+    def test_login_redirects_to_homepage_setup_when_not_configured(self):
+        self.client.logout()
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 0)
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {"username": "testuser", "password": "testpass123"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("homepage_setup"))
+
+    def test_login_redirects_to_home_when_homepage_setup_is_complete(self):
+        self.client.logout()
+        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 1)
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {"username": "testuser", "password": "testpass123"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("index"))
 
     def test_manual_judge_indicator_visible(self):
         round_obj = Round.objects.filter(round_number=1).first()

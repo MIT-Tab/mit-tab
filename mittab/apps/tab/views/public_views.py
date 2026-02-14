@@ -44,7 +44,7 @@ def build_public_home_shortcuts():
         shortcuts.append({
             "title": definition["title"],
             "subtitle": definition["subtitle"],
-            "url": reverse(definition["url_name"], args=definition["url_args"]),
+            "url": definition["url_path"],
         })
     return shortcuts
 
