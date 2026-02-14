@@ -8,6 +8,7 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
     Room,
+    RoomCheckIn,
     TabSettings,
     Team,
     Round,
@@ -170,6 +171,28 @@ class TestTabViews(TestCase):
         self.assertNotIn("manual-lay", card_html)
         self.assertFalse(
             ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
+        )
+
+    def test_view_room_saves_outround_checkin(self):
+        room = Room.objects.first()
+        url = reverse("view_room", args=[room.pk])
+        post_data = {
+            "name": room.name,
+            "rank": room.rank,
+            "checkin_-1": "on",
+        }
+
+        response = self.client.post(url, data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            RoomCheckIn.objects.filter(room=room, round_number=0).exists()
+        )
+
+        post_data.pop("checkin_-1")
+        response = self.client.post(url, data=post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            RoomCheckIn.objects.filter(room=room, round_number=0).exists()
         )
 
     def _round_card_html(self, response, round_id):
