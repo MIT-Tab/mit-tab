@@ -14,6 +14,7 @@ import mittab.apps.tab.views.team_views as team_views
 import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.motion_views as motion_views
 
 
 admin.autodiscover()
@@ -275,6 +276,29 @@ urlpatterns = [
             views.settings_form,
             name="settings_form"),
 
+    # Motion management (admin)
+    path("motions/",
+         motion_views.manage_motions,
+         name="manage_motions"),
+    path("motions/add/",
+         motion_views.add_motion,
+         name="add_motion"),
+    path("motions/<int:motion_id>/edit/",
+         motion_views.edit_motion,
+         name="edit_motion"),
+    path("motions/<int:motion_id>/delete/",
+         motion_views.delete_motion,
+         name="delete_motion"),
+    path("motions/<int:motion_id>/toggle-published/",
+         motion_views.toggle_motion_published,
+         name="toggle_motion_published"),
+    path("motions/publish-all/",
+         motion_views.publish_all_motions,
+         name="publish_all_motions"),
+    path("motions/unpublish-all/",
+         motion_views.unpublish_all_motions,
+         name="unpublish_all_motions"),
+
     # Backups
     re_path(r"^backup/restore/(.+)/$",
             pairing_views.restore_backup,
@@ -366,6 +390,9 @@ urlpatterns = [
     path("public/outrounds/<int:type_of_round>/",
          public_views.outround_pretty_pair,
          name="outround_pretty_pair"),
+    path("public/motions/",
+         motion_views.public_motions,
+         name="public_motions"),
 ]
 
 if settings.SILK_ENABLED:

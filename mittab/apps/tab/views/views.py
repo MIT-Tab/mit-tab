@@ -1,5 +1,6 @@
 import os
 from django.db import IntegrityError
+from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
@@ -41,6 +42,13 @@ def index(request):
     if not request.user.is_authenticated:
         return redirect("public_home")
 
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
     team_list = [(team.pk, team.display_backend) for team in Team.objects.all()]
@@ -71,6 +79,14 @@ def index(request):
         "number_schools": number_schools,
         "number_debaters": number_debaters,
         "number_rooms": number_rooms,
+        "schools_missing_apda_ids": [
+            school.pk for school in schools_missing_apda_qs
+        ],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
     }
 
     return render(request, "common/index.html", context)

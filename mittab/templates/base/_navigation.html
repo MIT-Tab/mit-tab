@@ -51,7 +51,10 @@
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
 {% url "public_home" as public_home %}
 {% url "tab_login" as staff_login %}
+{% url "manage_motions" as manage_motions %}
+{% url "public_motions" as public_motions %}
 {% public_display_flags as public_display_flags %}
+{% motions_enabled as motions_enabled_flag %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
@@ -111,7 +114,7 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request public_home_shortcuts %}{% active request manage_motions %}">
             Admin
           </a>
           <div class="dropdown-menu">
@@ -119,6 +122,9 @@
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data|with_return_to }}">Bulk Data Upload</a>
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form|with_return_to }}">Settings Form</a>
             <a class="dropdown-item {% active request public_home_shortcuts %}" href="{{ public_home_shortcuts|with_return_to }}">Homepage Shortcuts</a>
+            {% if motions_enabled_flag %}
+            <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
+            {% endif %}
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny|with_return_to }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>
@@ -126,7 +132,7 @@
       </ul>
       <ul class="navbar-nav ml-auto">
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}{% active request public_motions %}">
             Public
           </a>
           <div class="dropdown-menu">
@@ -143,6 +149,9 @@
             {% endif %}
             {% if public_display_flags.ballots %}
             <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
+            {% endif %}
+            {% if motions_enabled_flag %}
+            <a class="dropdown-item {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
             {% endif %}
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
@@ -188,6 +197,11 @@
         {% if public_display_flags.ballots %}
         <li class="nav-item">
           <a class="nav-link {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
+        </li>
+        {% endif %}
+        {% if motions_enabled_flag %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
         </li>
         {% endif %}
         <li class="nav-item">

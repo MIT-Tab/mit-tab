@@ -3,7 +3,22 @@
       data-toggle="collapse"
       data-target="#{{ html_id }}-content"
       aria-expanded="true">
-    <span class="section-title">{{count}} {{model_name}}</span>
+    <span class="section-title">
+      {{count}} {{model_name}}
+      {% if flagged_count %}
+        <button
+          type="button"
+          class="btn btn-link p-0 ml-1 text-muted index-info-trigger"
+          data-toggle="tooltip"
+          data-placement="bottom"
+          data-html="false"
+          title="{{ flagged_count }} {{ model_name|lower }} marked No ID. No ID means APDA ID is blank or -1. If there is no standings profile yet (results.apda.online), this is correct. If a profile already exists, the APDA ID should be filled in here."
+          onclick="event.stopPropagation(); return false;"
+          aria-label="No ID info for {{ model_name|lower }}">
+          <i class="fas fa-info-circle" aria-hidden="true"></i>
+        </button>
+      {% endif %}
+    </span>
     <span class="section-actions">
       <span class="btn-group btn-group-sm">
         <a class="btn btn-sm btn-light" href="{{ list_path }}"
@@ -35,8 +50,15 @@
         </div>
       {% endif %}
       <ol id="{{ html_id }}">
-        {% for id, name in list_data %}
-          <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
+        {% for item in list_data %}
+          <li class="searchable">
+            <a href="/{{ view_path_prefix }}/{{ item.0 }}/">{{ item.1 }}</a>
+            {% if flagged_item_ids and item.0 in flagged_item_ids %}
+              <span class="badge badge-light border ml-1 text-muted" title="Often indicates a newly added record.">
+                No ID
+              </span>
+            {% endif %}
+          </li>
         {% endfor %}
       </ol>
     </div>
