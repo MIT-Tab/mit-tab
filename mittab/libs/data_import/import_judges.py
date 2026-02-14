@@ -12,6 +12,12 @@ def import_judges(file_to_import):
 
 
 class JudgeImporter(WorkbookImporter):
+    file_label = "judges"
+    expected_headers = [
+        ("Judge", ("judge", "judge name")),
+        ("Rank", ("rank", "judge rank")),
+    ]
+
     def import_row(self, row, row_number):
         judge_name = row[0]
         judge_rank = row[1]
@@ -19,10 +25,14 @@ class JudgeImporter(WorkbookImporter):
         try:
             judge_rank = round(float(judge_rank), 2)
         except ValueError:
-            self.error("Judge rank is not a number", row)
+            self.error(f"Judge '{judge_name}' has a non-numeric rank '{judge_rank}'", row_number)
+            return
 
         schools = []
         for school_name in row[2:]:
+            school_name = school_name.strip()
+            if not school_name:
+                continue
             school_query = School.objects.filter(name__iexact=school_name)
             if school_query.exists():
                 school = school_query.first()

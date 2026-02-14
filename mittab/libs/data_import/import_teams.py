@@ -5,13 +5,27 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 
 def import_teams(file_to_import):
     try:
-        workbook = Workbook(file_to_import, 8)
+        workbook = Workbook(file_to_import, 9)
     except InvalidWorkbookException:
         return ["Teams file is not a valid .xlsx file"]
     return TeamImporter(workbook).import_data()
 
 
 class TeamImporter(WorkbookImporter):
+    file_label = "teams"
+    expected_headers = [
+        ("Team", ("team", "team name")),
+        ("School", ("school", "school name")),
+        ("Hybrid School", ("hybrid school", "hybrid school name", "hybrid")),
+        ("Seed", ("seed", "team seed")),
+        ("Debater 1", ("debater 1", "debater 1 name")),
+        ("Debater 1 Status", ("debater 1 status", "debater 1 novice status")),
+        ("Debater 1 APDA ID", ("debater 1 apda id", "debater 1 id")),
+        ("Debater 2", ("debater 2", "debater 2 name")),
+        ("Debater 2 Status", ("debater 2 status", "debater 2 novice status")),
+        ("Debater 2 APDA ID", ("debater 2 apda id", "debater 2 id")),
+    ]
+
     novice_values = ["n", "nov", "novice"]
     full_seed_values = ["full", "full seed"]
     half_seed_values = ["half", "half seed"]
@@ -120,5 +134,5 @@ class TeamImporter(WorkbookImporter):
         else:
             for _field, error_msgs in team_form.errors.items():
                 for error_msg in error_msgs:
-                    self.error(f"{deb2_name} - {error_msg}", row_number)
+                    self.error(f"{team_name} - {error_msg}", row_number)
             return

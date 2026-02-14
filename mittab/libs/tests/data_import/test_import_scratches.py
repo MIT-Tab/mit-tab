@@ -63,3 +63,23 @@ class TestImportingScratches(TestCase):
         assert "Row 1: Judge 'Judge doesn't exist' does not exist" in errors
         assert "Row 2: 'invalid type' is not a valid scratch type" in errors
         assert "Row 3: Team 'Team doesn't exist' does not exist" in errors
+
+    def test_header_mismatch_gives_clear_column_order_error(self):
+        orig_team_count = Team.objects.count()
+        orig_judge_count = Judge.objects.count()
+        orig_scratch_count = Scratch.objects.count()
+
+        header = ["Judge", "Team", "Scratch Type"]
+        data = [["AU Elle Woods", "Adrienne Martinez", "team scratch"]]
+        importer = ScratchImporter(MockWorkbook(data, header=header))
+        errors = importer.import_data()
+
+        assert len(errors) == 2
+        assert errors[0] == \
+            "Header mismatch in the scratches file at column 1: expected 'Team', got 'Judge'."
+        assert errors[1].startswith(
+            "Please keep the header row and column order from the template. Expected order:"
+        )
+        assert Scratch.objects.count() == orig_scratch_count
+        assert Judge.objects.count() == orig_judge_count
+        assert Team.objects.count() == orig_team_count

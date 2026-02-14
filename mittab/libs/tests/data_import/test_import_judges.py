@@ -74,6 +74,20 @@ class TestImportingJudges(TestCase):
         assert errors[0] == "Row 2: Judge 2 - Ensure that there are no" \
             " more than 2 digits before the decimal point."
 
+    def test_non_numeric_rank_has_actionable_error(self):
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 0
+
+        data = [["Judge 1", "not-a-number", "Harvard"]]
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 0
+        assert errors == [
+            "Row 1: Judge 'Judge 1' has a non-numeric rank 'not-a-number'"
+        ]
+
     def test_schools_not_rolledback_if_existed_before(self):
         school = School(name="NU")
         school.save()
@@ -90,3 +104,18 @@ class TestImportingJudges(TestCase):
         assert len(errors) == 1
         assert errors[0] == "Row 1: Judge 1 - Ensure that there are" \
             " no more than 4 digits in total."
+
+    def test_header_mismatch_gives_clear_column_order_error(self):
+        header = ["Rank", "Judge", "School"]
+        data = [["Judge 1", "9.5", "Harvard"]]
+        importer = JudgeImporter(MockWorkbook(data, header=header))
+        errors = importer.import_data()
+
+        assert len(errors) == 2
+        assert errors[0] == \
+            "Header mismatch in the judges file at column 1: expected 'Judge', got 'Rank'."
+        assert errors[1].startswith(
+            "Please keep the header row and column order from the template. Expected order:"
+        )
+        assert Judge.objects.count() == 0
+        assert School.objects.count() == 0

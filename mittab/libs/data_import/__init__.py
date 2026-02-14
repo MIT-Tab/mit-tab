@@ -43,9 +43,19 @@ class Workbook:
             yield row_data
             row += 1
 
+    def header(self):
+        col = 0
+        row_data = []
+        while self.get(0, col) is not None or col < self.min_rows:
+            row_data.append((self.get(0, col) or "").strip())
+            col += 1
+        return row_data if row_data else None
+
 
 class WorkbookImporter(ABC):
     min_row_size = 1
+    expected_headers = []
+    file_label = "data"
 
     def __init__(self, workbook):
         self.workbook = workbook
@@ -57,8 +67,20 @@ class WorkbookImporter(ABC):
         pass
 
     def import_data(self):
+        self.validate_headers()
+        if self.errors:
+            return self.errors
+
         for row_number, row in enumerate(self.workbook.rows()):
-            self.import_row(row, row_number)
+            try:
+                self.import_row(row, row_number)
+            except Exception as exc:
+                self.error(
+                    "Could not parse this row. Please verify that your file "
+                    "uses the correct template and column order "
+                    f"({exc.__class__.__name__}).",
+                    row_number)
+                break
         if self.errors:
             self.rollback()
         return self.errors
@@ -80,3 +102,39 @@ class WorkbookImporter(ABC):
             self.errors.append(f"Row {row_number + 1}: {msg}")
         else:
             self.errors.append(msg)
+
+    @staticmethod
+    def _normalize_header_value(value):
+        return " ".join(str(value).strip().lower().split())
+
+    def validate_headers(self):
+        if not self.expected_headers:
+            return
+
+        header_getter = getattr(self.workbook, "header", None)
+        if not callable(header_getter):
+            return
+
+        header = header_getter()
+        if header is None:
+            return
+
+        normalized_header = [self._normalize_header_value(h) for h in header]
+
+        for idx, (expected_label, aliases) in enumerate(self.expected_headers):
+            actual = normalized_header[idx] if idx < len(normalized_header) else ""
+            normalized_aliases = [self._normalize_header_value(a) for a in aliases]
+            if actual not in normalized_aliases:
+                actual_display = header[idx].strip() if idx < len(header) and header[idx] else "(blank)"
+                expected_order = ", ".join(
+                    label for label, _aliases in self.expected_headers
+                )
+                self.error(
+                    f"Header mismatch in the {self.file_label} file at column "
+                    f"{idx + 1}: expected '{expected_label}', got "
+                    f"'{actual_display}'.")
+                self.error(
+                    "Please keep the header row and column order from the "
+                    f"template. Expected order: {expected_order}"
+                )
+                return

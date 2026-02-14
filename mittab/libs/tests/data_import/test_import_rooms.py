@@ -39,3 +39,17 @@ class TestImportingJudges(TestCase):
         assert "Row 3: Room 1 - Room with this Name already exists." in errors
         assert "Row 2: Room 2 - Ensure that there are no more than" \
             " 4 digits in total." in errors
+
+    def test_header_mismatch_gives_clear_column_order_error(self):
+        header = ["Rank", "Room"]
+        data = [["Room 1", "10.22"]]
+        importer = RoomImporter(MockWorkbook(data, header=header))
+        errors = importer.import_data()
+
+        assert len(errors) == 2
+        assert errors[0] == \
+            "Header mismatch in the rooms file at column 1: expected 'Room', got 'Rank'."
+        assert errors[1].startswith(
+            "Please keep the header row and column order from the template. Expected order:"
+        )
+        assert Room.objects.count() == 0

@@ -6,11 +6,17 @@ def import_rooms(file_to_import):
     try:
         workbook = Workbook(file_to_import, 2)
     except InvalidWorkbookException:
-        return ["Rooms file is not a valid .xslx file"]
+        return ["Rooms file is not a valid .xlsx file"]
     return RoomImporter(workbook).import_data()
 
 
 class RoomImporter(WorkbookImporter):
+    file_label = "rooms"
+    expected_headers = [
+        ("Room", ("room", "room name")),
+        ("Rank", ("rank", "room rank")),
+    ]
+
     def import_row(self, row, row_number):
         room_name = row[0]
         room_rank = row[1]

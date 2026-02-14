@@ -121,3 +121,51 @@ class TestImportingTeams(TestCase):
         assert School.objects.first().name == "NU"
         assert len(errors) == 1
         assert errors[0] == "Row 1: Invalid seed value for team Team 1"
+
+    def test_invalid_team_name_error_uses_team_name(self):
+        assert Team.objects.count() == 0
+        assert School.objects.count() == 0
+        assert Debater.objects.count() == 0
+
+        long_team_name = "X" * 31
+        data = [
+            [long_team_name, "NU", "", "full", "John", "", "1241", "Jane", "", "1242"]
+        ]
+
+        importer = TeamImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert Team.objects.count() == 0
+        assert School.objects.count() == 0
+        assert Debater.objects.count() == 0
+        assert len(errors) == 1
+        assert errors[0].startswith(f"Row 1: {long_team_name} -")
+        assert "Ensure this value has at most 30 characters" in errors[0]
+
+    def test_header_mismatch_gives_clear_column_order_error(self):
+        header = [
+            "School",
+            "Team",
+            "Hybrid School",
+            "Seed",
+            "Debater 1",
+            "Debater 1 Status",
+            "Debater 1 APDA ID",
+            "Debater 2",
+            "Debater 2 Status",
+            "Debater 2 APDA ID",
+        ]
+
+        data = [["Team 1", "NU", "", "full", "John", "", "1241", "Jane", "", "1242"]]
+        importer = TeamImporter(MockWorkbook(data, header=header))
+        errors = importer.import_data()
+
+        assert len(errors) == 2
+        assert errors[0] == \
+            "Header mismatch in the teams file at column 1: expected 'Team', got 'School'."
+        assert errors[1].startswith(
+            "Please keep the header row and column order from the template. Expected order:"
+        )
+        assert Team.objects.count() == 0
+        assert School.objects.count() == 0
+        assert Debater.objects.count() == 0
