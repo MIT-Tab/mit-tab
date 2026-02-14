@@ -279,6 +279,46 @@ class TestPublicViews(TestCase):
         self.assertIn(reverse("pretty_pair"), content)
         self.assertIn(reverse("missing_ballots"), content)
 
+    def test_public_home_shows_only_seven_shortcuts_when_motions_enabled(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertNotIn('<span class="title">Motions</span>', content)
+
+    def test_public_home_can_show_motions_when_selected_as_shortcut(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        defaults[1] = "public_motions"
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertIn('<span class="title">Motions</span>', content)
+        self.assertIn(reverse("public_motions"), content)
+
     def test_public_rankings_control_updates_display_settings(self):
         client = Client()
         user = get_user_model().objects.create_superuser(

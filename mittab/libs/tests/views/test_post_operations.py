@@ -134,7 +134,7 @@ class TestPostOperations(TestCase):
             {
                 "tournament_name": "MIT Invitational",
                 "slot_1": "public_team_results",
-                "slot_2": "public_speaker_results",
+                "slot_2": "public_motions",
                 "slot_3": "public_ballots",
                 "slot_4": "released_pairings",
                 "slot_5": "missing_ballots",
@@ -147,6 +147,10 @@ class TestPostOperations(TestCase):
         self.assertEqual(
             PublicHomeShortcut.objects.get(position=1).nav_item,
             "public_team_results",
+        )
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=2).nav_item,
+            "public_motions",
         )
         self.assertEqual(
             PublicHomeShortcut.objects.get(position=3).nav_item,

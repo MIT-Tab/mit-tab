@@ -72,6 +72,12 @@ PUBLIC_HOME_PAGE_DEFINITIONS = (
         "subtitle": "Published ballots and detailed round results.",
         "url_path": "/public/ballots/",
     },
+    {
+        "slug": "public_motions",
+        "title": "Motions",
+        "subtitle": "View debate motions and info slides.",
+        "url_path": "/public/motions/",
+    },
 )
 
 PUBLIC_HOME_SHORTCUT_DEFAULTS = (

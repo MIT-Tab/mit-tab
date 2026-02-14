@@ -95,16 +95,6 @@
               <span class="chevron"><i class="fas fa-arrow-right"></i></span>
             </a>
           {% endfor %}
-          {% motions_enabled as show_motions %}
-          {% if show_motions %}
-          <a class="tile shadow-sm" href="{% url 'public_motions' %}">
-            <span class="body">
-              <span class="title">Motions</span>
-              <span class="subtitle">View debate motions and info slides.</span>
-            </span>
-            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-          </a>
-          {% endif %}
         </nav>
       </aside>
     </div>
