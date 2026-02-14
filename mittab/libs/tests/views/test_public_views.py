@@ -264,8 +264,14 @@ class TestPublicViews(TestCase):
         content = response.content.decode()
 
         self.assertIn("Public Team Results", content)
-        self.assertIn(reverse("rank_teams_public"), content)
-        self.assertNotIn(reverse("pretty_pair"), content)
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
+            content,
+        )
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("pretty_pair")}"',
+            content,
+        )
 
     def test_public_home_falls_back_to_defaults_when_shortcuts_missing(self):
         client = Client()
