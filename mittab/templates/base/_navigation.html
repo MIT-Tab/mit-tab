@@ -1,6 +1,7 @@
 {% load tags %}
 
 {% url "index" as home %}
+{% url "apda_board_home" as apda_board_home %}
 {% url "logout" as logout %}
 
 {% url "enter_school" as enter_school %}
@@ -54,10 +55,11 @@
 {% url "public_motions" as public_motions %}
 {% public_display_flags as public_display_flags %}
 {% motions_enabled as motions_enabled_flag %}
+{% is_apda_board user as is_apda_board_user %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
-    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{{ home|with_return_to }}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
+    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{% if is_apda_board_user %}{{ apda_board_home|with_return_to }}{% else %}{{ home|with_return_to }}{% endif %}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
 
     {% if user.is_authenticated %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,6 +67,18 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      {% if is_apda_board_user %}
+      <ul class="navbar-nav mr-auto order-0">
+        <li class="nav-item">
+          <a class="nav-link {% active request apda_board_home %}" href="{{ apda_board_home|with_return_to }}">APDA Board Home</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
+        </li>
+      </ul>
+      {% else %}
       <ul class="navbar-nav mr-auto order-0">
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
@@ -159,6 +173,7 @@
           <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
         </li>
       </ul>
+      {% endif %}
     </div>
     {% else %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
