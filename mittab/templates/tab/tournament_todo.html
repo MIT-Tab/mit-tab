@@ -1,0 +1,118 @@
+{% extends "base/__normal.html" %}
+{% load tags %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Tournament Checklist{% endblock %}
+
+{% block banner %}Tournament Checklist{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'tournamentTodo' %}
+{% endblock %}
+
+{% block content %}
+<div class="todo-checklist-page col-12 col-xl-10">
+  <p class="text-muted mb-2">
+    Track pre-tournament and day-of progress. Checklist status is shared across all staff users.
+  </p>
+
+  <form
+    method="post"
+    class="todo-checklist-form"
+    data-autosave-url="{% url 'tournament_todo_toggle' %}"
+  >
+    {% csrf_token %}
+    {% return_to_input %}
+
+    {% for section in sections %}
+    <section class="todo-section" data-phase="{{ section.phase }}">
+      <div class="todo-section-header">
+        <h4 class="todo-section-title mb-0">{{ section.title }}</h4>
+        <span
+          class="todo-section-progress-text"
+          data-completed="{{ section.completed }}"
+          data-total="{{ section.total }}"
+        >{{ section.completed }} / {{ section.total }}</span>
+      </div>
+      <div class="todo-section-progress" aria-hidden="true">
+        <div
+          class="todo-section-progress-bar"
+          data-progress-percent="{{ section.progress_percent }}"
+          style="width: {{ section.progress_percent }}%;"
+        ></div>
+      </div>
+
+      <ol class="todo-step-list list-unstyled">
+        {% for step in section.steps %}
+        <li class="todo-step-item {% if step.checked %}is-complete{% endif %}">
+          <div class="todo-step-number">{{ forloop.counter }}</div>
+
+          <div class="todo-step-content">
+            {% if step.url %}
+            <a class="todo-step-item-link" href="{{ step.url|with_return_to }}">
+              <span class="todo-step-title mb-0">{{ step.title }}</span>
+              {% if step.description %}
+              <span
+                class="badge badge-info help-badge todo-step-help"
+                data-toggle="tooltip"
+                title="{{ step.description }}"
+              >?</span>
+              {% endif %}
+            </a>
+            {% else %}
+            <div class="todo-step-item-link">
+              <span class="todo-step-title mb-0">{{ step.title }}</span>
+              {% if step.description %}
+              <span
+                class="badge badge-info help-badge todo-step-help"
+                data-toggle="tooltip"
+                title="{{ step.description }}"
+              >?</span>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if step.auto_completed %}
+            <div class="small text-success mt-1">Auto</div>
+            {% endif %}
+          </div>
+
+          <label class="todo-step-check" for="step_{{ step.slug }}">
+            <input
+              class="todo-step-checkbox"
+              type="checkbox"
+              name="step_{{ step.slug }}"
+              id="step_{{ step.slug }}"
+              aria-label="Mark {{ step.title }} complete"
+              {% if step.checked %}checked{% endif %}
+              {% if step.auto_completed %}disabled{% endif %}
+            >
+            <span class="todo-step-checkmark" aria-hidden="true">
+              <i class="fas fa-check"></i>
+            </span>
+            <span class="sr-only">Mark {{ step.title }} complete</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endfor %}
+
+    <div class="todo-preference">
+      <input
+        class="todo-preference-checkbox"
+        type="checkbox"
+        name="hide_tournament_todo"
+        id="hide_tournament_todo"
+        {% if hide_tournament_todo %}checked{% endif %}
+      >
+      <label class="todo-preference-label mb-0" for="hide_tournament_todo">
+        Do not show this page automatically after login
+      </label>
+    </div>
+
+    <div class="todo-checklist-actions">
+      <a href="{% url 'index' %}" class="btn btn-outline-secondary">Go to Dashboard</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

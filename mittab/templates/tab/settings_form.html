@@ -23,6 +23,7 @@
     {{ form.media }}
     <form action="" method="post" id="data-entry-form">
         {% csrf_token %}
+        <input type="hidden" name="visited_categories" id="visited-categories">
         <div class="tab-content">
             {% for category in categories %}
                 <div class="tab-pane fade{% if forloop.first %} show active{% endif %}" id="{{ category.id }}">
@@ -78,4 +79,33 @@
     <div class="alert alert-warning">Please be careful editing these settings.   If you require assistance, please check out the <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html"> documentation!</a>
     </div>
 </div>
+<script>
+  (function() {
+    const visitedField = document.getElementById("visited-categories");
+    const visited = new Set();
+
+    function syncVisited() {
+      visitedField.value = Array.from(visited).join(",");
+    }
+
+    const activeTab = document.querySelector('.nav-link[data-toggle="tab"].active');
+    if (activeTab) {
+      const target = (activeTab.getAttribute("href") || "").replace("#", "");
+      if (target) {
+        visited.add(target);
+      }
+    }
+
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+      const target = (e.target.getAttribute("href") || "").replace("#", "");
+      if (target) {
+        visited.add(target);
+        syncVisited();
+      }
+    });
+
+    document.getElementById("data-entry-form").addEventListener("submit", syncVisited);
+    syncVisited();
+  })();
+</script>
 {% endblock %}

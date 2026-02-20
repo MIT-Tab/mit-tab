@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <table>
+      <caption>
+        <a href="{% url 'tournament_todo' %}" class="section">Tournament Setup</a>
+      </caption>
+      <tr class="model-tournament-todo">
+        <th scope="row">
+          <a href="{% url 'tournament_todo' %}">Tournament To-Do List</a>
+        </th>
+        <td>
+          <a href="{% url 'tournament_todo' %}" class="viewlink">Open</a>
+        </td>
+      </tr>
+    </table>
+  </div>
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+{% endblock %}

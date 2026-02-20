@@ -94,6 +94,7 @@ class TestTabViews(TestCase):
             (reverse("view_scratches"), "Scratches"),
             (reverse("settings_form"), "Settings"),
             (reverse("public_home_shortcuts"), "Homepage Setup"),
+            (reverse("tournament_todo"), "Tournament Checklist"),
             (reverse("view_backups"), "Backups"),
             (reverse("upload_data"), "Upload Data"),
             (reverse("confirm_start_tourny"), "Are you sure?"),

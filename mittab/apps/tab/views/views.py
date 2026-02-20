@@ -36,6 +36,10 @@ from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
 from mittab.libs.tab_logic.rankings import get_team_rankings
+from mittab.libs.tournament_todo_rules import (
+    record_seen_settings_category_ids,
+    split_csv_values,
+)
 
 
 def index(request):
@@ -447,6 +451,17 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
+            visited_categories = split_csv_values(
+                request.POST.get("visited_categories", "")
+            )
+            valid_category_ids = {
+                category.get("id")
+                for category in categories
+                if category.get("id")
+            }
+            record_seen_settings_category_ids(
+                visited_categories.intersection(valid_category_ids)
+            )
             invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,

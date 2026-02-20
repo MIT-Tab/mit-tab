@@ -3,6 +3,7 @@ import random
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.conf import settings as django_settings
 
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
@@ -155,6 +156,21 @@ class TabSettings(models.Model):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+
+
+class UserTournamentSetupPreference(models.Model):
+    user = models.OneToOneField(
+        django_settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_setup_preference",
+    )
+    hide_tournament_todo = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "tournament setup preference"
+
+    def __str__(self):
+        return f"{self.user} hide checklist: {self.hide_tournament_todo}"
 
 
 class PublicDisplaySetting(models.Model):

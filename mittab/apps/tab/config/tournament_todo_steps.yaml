@@ -1,0 +1,91 @@
+before_tournament_steps:
+  - slug: set_tournament_name
+    title: Set Tournament Name
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Homepage Setup. Update the tournament name so your public pages, exports, and backups all show the correct event title, then save and confirm the new name is visible.
+    url_name: homepage_setup
+    completion_rule: tournament_name_set
+
+  - slug: configure_settings
+    title: Configure Core Settings
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Settings Form. Review each settings section so pairing, rankings, and display behavior match your tournament format, then save after making any updates.
+    url_name: settings_form
+    completion_rule: settings_reviewed
+
+  - slug: import_core_data
+    title: Import Schools, Teams, Debaters, Rooms, and Judges
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Bulk Data Upload. Upload your schools, teams, debaters, rooms, and judges files so the tournament has complete data before rounds begin, then verify those records appear in the relevant list pages.
+    url_name: upload_data
+    completion_rule: core_data_imported
+
+  - slug: add_accessible_room_tags
+    title: Add Accessible Room Tags
+    description: >-
+      Use this checklist link to open Manage Room Tags, then create and apply accessibility tags to the rooms that support those needs. Doing this early helps you honor accommodations during pairing without last-minute room changes.
+    url_name: manage_room_tags
+    completion_rule: accessible_room_tags_added
+
+  - slug: enter_discretionary_scratches
+    title: Enter Discretionary Scratches
+    description: >-
+      Go to the navigation bar and, under the Scratches tab, select Add Scratch. Enter judge-team conflicts before pairing so tab avoids bad assignments, then check the scratches list to confirm everything was recorded.
+    url_name: add_scratch
+    completion_rule: scratches_entered
+
+day_of_steps:
+  - slug: check_in_entities
+    title: Check In Teams, Judges, and Rooms
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Batch Checkin. Mark who is present for round 1 so pairings only use available teams, judges, and rooms, then verify the attendance totals look right.
+    url_name: batch_checkin
+    completion_rule: entities_checked_in
+
+  - slug: pair_round_one
+    title: Pair Round 1
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, open Current Round. Pair round 1, review rooms and judges for obvious issues, make any manual fixes needed, and release once it looks clean.
+    url_name: view_status
+    completion_rule: round_one_paired
+
+  - slug: finish_final_inround
+    title: Finish Final Inround
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, use Current Round and All Rounds to verify results. Make sure every ballot from the last scheduled in-round is entered so standings and break logic are final and accurate.
+    url_name: view_status
+    completion_rule: final_inround_completed
+
+  - slug: announce_awards
+    title: Announce Awards
+    description: >-
+      Go to the navigation bar and, under the Rankings tab, select Forum Post Results. Review the rankings and champion output there so you have a clean, complete source for announcing awards and posting final results.
+    url_name: forum_post
+
+  - slug: publish_speaker_rankings_to_standings
+    title: Publish Speaker Rankings to Standings
+    description: >-
+      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Speaker Results so final speaker standings are available to public standings consumers, then save and confirm the public speaker page is visible.
+    url_name: public_rankings_control
+    completion_rule: speaker_results_published
+
+  - slug: pair_outrounds
+    title: Pair Outrounds
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, select Outround Pairings. Run the break and generate elimination pairings so the bracket can proceed from the first outround through finals, then assign judges and rooms before release.
+    url_name: outround_pairing_view_default
+    completion_rule: outrounds_paired
+
+  - slug: finish_outrounds
+    title: Finish Outrounds
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, return to Outround Pairings for each elimination round. Enter every outround result and advance the bracket until finals are complete so champions and final placements are correct.
+    url_name: outround_pairing_view_default
+    completion_rule: outrounds_completed
+
+  - slug: publish_debater_rankings_to_standings
+    title: Publish Debater Rankings to Standings
+    description: >-
+      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Team Results so final debater and team standings output is available publicly, then save and verify the public team results page is active.
+    url_name: public_rankings_control
+    completion_rule: team_results_published

@@ -976,7 +976,7 @@ def start_new_tourny(request):
 def clear_db():
     obj_types = [
         CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
-        PublicHomePage, TabSettings, Team, School, Debater
+        PublicHomePage, UserTournamentSetupPreference, TabSettings, Team, School, Debater
     ]
     list(map(delete_obj, obj_types))
 
