@@ -1,5 +1,6 @@
 import os
 from django.db import IntegrityError
+from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
@@ -30,6 +31,7 @@ from mittab.apps.tab.public_rankings import (
     get_all_ballot_round_settings,
     get_all_ranking_settings,
     get_all_standings_publication_settings,
+    get_paired_round_numbers,
     set_ballot_round_settings,
     set_ranking_settings,
     set_standings_publication_setting,
@@ -48,6 +50,13 @@ from mittab.libs.tab_logic.rankings import get_team_rankings
 def index(request):
     if not request.user.is_authenticated:
         return redirect("public_home")
+
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
 
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
@@ -79,6 +88,14 @@ def index(request):
         "number_schools": number_schools,
         "number_debaters": number_debaters,
         "number_rooms": number_rooms,
+        "schools_missing_apda_ids": [
+            school.pk for school in schools_missing_apda_qs
+        ],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
     }
 
     return render(request, "common/index.html", context)
@@ -732,11 +749,24 @@ def public_rankings_control(request):
             else:
                 parsed_max_visible = ranking["max_visible"]
             max_visible = max(1, parsed_max_visible)
+
+            up_to_round = ranking.get("up_to_round") or 0
+            raw_up_to_round = (request.POST.get(f"{slug}_up_to_round") or "").strip()
+            if raw_up_to_round:
+                try:
+                    up_to_round = int(raw_up_to_round)
+                except (TypeError, ValueError):
+                    validation_errors.append(
+                        f"Invalid 'up to round' value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+
             set_ranking_settings(
                 slug,
                 public=is_public,
                 include_speaks=include_speaks,
                 max_visible=max_visible,
+                up_to_round=up_to_round,
             )
 
         for round_number in range(1, tot_rounds + 1):
@@ -760,6 +790,7 @@ def public_rankings_control(request):
     standings_settings = get_all_standings_publication_settings()
     ranking_settings = get_all_ranking_settings()
     ballot_settings = get_all_ballot_round_settings(tot_rounds)
+    paired_rounds = get_paired_round_numbers()
 
     return render(
         request,
@@ -769,6 +800,7 @@ def public_rankings_control(request):
             "ranking_settings": ranking_settings,
             "ballot_settings": ballot_settings,
             "tot_rounds": tot_rounds,
+            "paired_rounds": paired_rounds,
         },
     )
 

@@ -121,6 +121,16 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
+          {% motions_enabled as show_motions %}
+          {% if show_motions %}
+          <a class="tile shadow-sm" href="{% url 'public_motions' %}">
+            <span class="body">
+              <span class="title">Motions</span>
+              <span class="subtitle">View debate motions and info slides.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          {% endif %}
           <a class="tile shadow-sm" href="{% url 'outround_pretty_pair' 0 %}">
             <span class="body">
               <span class="title">Varsity Outrounds</span>

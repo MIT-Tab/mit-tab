@@ -122,10 +122,15 @@ def public_view_judges(request):
     rounds = [num for num in range(1, num_rounds + 1)]
 
     return render(
-        request, "public/judges.html", {
-            "judges": Judge.objects.order_by("name").prefetch_related("schools", "checkin_set").all(),
-            "rounds": rounds
-        })
+        request,
+        "public/judges.html",
+        {
+            "judges": Judge.objects.order_by("name")
+            .prefetch_related("schools", "checkin_set")
+            .all(),
+            "rounds": rounds,
+        },
+    )
 
 
 @cache_public_view(timeout=60)
@@ -152,7 +157,8 @@ def rank_teams_public(request):
     if not settings["public"]:
         return redirect("public_access_error")
 
-    teams = rankings.get_team_rankings(request, public=True)
+    up_to_round = settings.get("up_to_round") or 0
+    teams = rankings.get_team_rankings(request, public=True, up_to_round=up_to_round)
     rows = build_public_team_rows(teams, settings["include_speaks"])
     rows = rows[:settings["max_visible"]]
 
@@ -188,10 +194,10 @@ def public_speaker_rankings(request):
     rows = {
         slug: build_public_speaker_rows(
             speaker_lists[slug],
-            ranking_configs[slug]["include_speaks"],
-            ranking_configs[slug]["max_visible"],
+            config["include_speaks"],
+            config["max_visible"],
         )
-        for slug in ranking_configs
+        for slug, config in ranking_configs.items()
     }
     sections = [{
         "title": "Varsity Speakers" if slug == "varsity" else "Novice Speakers",
@@ -275,6 +281,7 @@ def build_public_team_rows(teams, show_scores):
         "wins": entry[1],
         "speaks": entry[2] if show_scores else None,
         "ranks": entry[3] if show_scores else None,
+        "debaters": entry[0].debaters_display(),
     } for entry in teams]
 
     if show_scores:
@@ -389,11 +396,16 @@ def pretty_pair(request):
                     ] + [team.opp_team for team in round_pairing]
 
     byes = [
-        bye.bye_team for bye in Bye.objects.filter(round_number=round_number).select_related('bye_team')
+        bye.bye_team
+        for bye in Bye.objects.filter(round_number=round_number).select_related(
+            "bye_team"
+        )
     ]
     team_count = len(paired_teams) + len(byes)
 
-    for present_team in Team.objects.filter(checked_in=True).prefetch_related('debaters'):
+    for present_team in Team.objects.filter(checked_in=True).prefetch_related(
+        "debaters"
+    ):
         if present_team not in paired_teams:
             if present_team not in byes:
                 errors.append(present_team)

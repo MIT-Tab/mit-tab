@@ -12,16 +12,22 @@ function populateTabCards() {
     success(result) {
       Object.entries(result).forEach(([teamId, stats]) => {
         const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
-        const text = [
+        const statsText = [
           stats.wins,
           stats.total_speaks.toFixed(2),
           stats.govs,
           stats.opps,
           stats.seed,
         ].join(" / ");
+        const debatersText = stats.debaters || "";
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
         tabCardElement.attr("href", `/team/card/${teamId}`);
-        tabCardElement.text(`${text}`);
+        tabCardElement.empty();
+        if (debatersText) {
+          tabCardElement.append(document.createTextNode(debatersText));
+          tabCardElement.append("<br>");
+        }
+        tabCardElement.append(document.createTextNode(statsText));
       });
     },
   });

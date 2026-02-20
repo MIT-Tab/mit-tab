@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-from mittab.apps.tab.models import PublicDisplaySetting
+from mittab.apps.tab.models import PublicDisplaySetting, Round
 from mittab.libs.cacheing import cache_logic
 
 RANKING_SLUGS = ("team", "varsity", "novice")
@@ -37,10 +37,11 @@ def get_ranking_settings(slug):
         "public": setting.is_enabled,
         "include_speaks": setting.include_speaks,
         "max_visible": setting.max_visible,
+        "up_to_round": setting.round_number,
     }
 
 
-def set_ranking_settings(slug, public, include_speaks, max_visible):
+def set_ranking_settings(slug, public, include_speaks, max_visible, up_to_round=None):
     label, defaults = _ranking_metadata(slug)
     setting = _setting(
         slug,
@@ -53,12 +54,22 @@ def set_ranking_settings(slug, public, include_speaks, max_visible):
         is_enabled=bool(public),
         include_speaks=bool(include_speaks),
         max_visible=max(1, int(max_visible)),
+        round_number=up_to_round,
     )
     invalidate_public_display_flags_cache()
 
 
 def get_all_ranking_settings():
     return [get_ranking_settings(slug) for slug in RANKING_SLUGS]
+
+
+def get_paired_round_numbers():
+    """Return sorted round numbers that have been paired (have Round objects)."""
+    return list(
+        Round.objects.values_list("round_number", flat=True)
+        .distinct()
+        .order_by("round_number")
+    )
 
 
 def get_standings_publication_setting(slug):
