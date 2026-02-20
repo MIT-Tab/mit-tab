@@ -1,5 +1,6 @@
 import os
 from django.db import IntegrityError
+from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
@@ -25,9 +26,18 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
+from mittab.apps.tab.public_rankings import (
+    get_all_ballot_round_settings,
+    get_all_ranking_settings,
+    get_all_standings_publication_settings,
+    set_ballot_round_settings,
+    set_ranking_settings,
+    set_standings_publication_setting,
+)
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import (
-    invalidate_all_public_caches
+    invalidate_all_public_caches,
+    invalidate_public_rankings_cache,
 )
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
@@ -49,7 +59,6 @@ def index(request):
     completed_finals = Outround.objects.filter(num_teams=2).exclude(
         victor=Outround.UNKNOWN
     ).count()
-    results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
@@ -65,7 +74,6 @@ def index(request):
         "room_list": room_list,
         "expected_finals": expected_finals,
         "completed_finals": completed_finals,
-        "results_published": results_published,
         "number_teams": number_teams,
         "number_judges": number_judges,
         "number_schools": number_schools,
@@ -654,6 +662,27 @@ def batch_checkin(request):
         for r in Room.objects.prefetch_related("roomcheckin_set")
     ]
 
+    def column_counts(rows):
+        counts = [0] * len(all_round_numbers)
+        for row in rows:
+            for idx, checked in enumerate(row["checkins"]):
+                if checked:
+                    counts[idx] += 1
+        return counts
+
+    judge_counts = column_counts(judge_data)
+    room_counts = column_counts(room_data)
+
+    def round_count_data(counts):
+        return [{
+            "index": idx + 1,
+            "round_number": round_numbers[idx],
+            "count": counts[idx + 1]
+        } for idx in range(len(round_numbers))]
+
+    judge_round_counts = round_count_data(judge_counts)
+    room_round_counts = round_count_data(room_counts)
+
     return render(request, "batch_check_in/check_in.html", {
         "team_data": team_data,
         "team_headers": ["School", "Team", "Debater Names"],
@@ -662,30 +691,86 @@ def batch_checkin(request):
         "room_data": room_data,
         "room_headers": ["Room"],
         "round_numbers": round_numbers,
+        "team_total_count": len(team_data),
+        "team_checked_in_count": sum(1 for t in team_data if t["checked_in"]),
+        "judge_total_count": len(judge_data),
+        "room_total_count": len(room_data),
+        "judge_round_counts": judge_round_counts,
+        "room_round_counts": room_round_counts,
+        "judge_outround_count": judge_counts[0] if judge_counts else 0,
+        "room_outround_count": room_counts[0] if room_counts else 0,
     })
 
 
-def publish_results(request, new_setting):
-    # Convert URL parameter: 0 = unpublish, 1 = publish
-    new_setting = bool(new_setting)
-    current_setting = TabSettings.get("results_published", False)
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def public_rankings_control(request):
+    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
 
-    if new_setting != current_setting:
-        TabSettings.set("results_published", new_setting)
-        status = "published" if new_setting else "unpublished"
-        return redirect_and_flash_success(
-            request,
-            f"Results successfully {status}. Results are now "
-            f"{'visible' if new_setting else 'hidden'}.",
-            path="/",
-        )
-    else:
-        status = "published" if current_setting else "unpublished"
-        return redirect_and_flash_success(
-            request,
-            f"Results are already {status}.",
-            path="/",
-        )
+    if request.method == "POST":
+        validation_errors = []
+        standings_settings = get_all_standings_publication_settings()
+        for standing in standings_settings:
+            slug = standing["slug"]
+            published = bool(request.POST.get(f"standings_{slug}"))
+            set_standings_publication_setting(slug, published)
+
+        ranking_settings = get_all_ranking_settings()
+        for ranking in ranking_settings:
+            slug = ranking["slug"]
+            is_public = bool(request.POST.get(f"{slug}_public"))
+            include_speaks = bool(request.POST.get(f"{slug}_include_speaks"))
+            raw_max_visible = (request.POST.get(f"{slug}_max_visible") or "").strip()
+            if raw_max_visible:
+                try:
+                    parsed_max_visible = int(raw_max_visible)
+                except (TypeError, ValueError):
+                    parsed_max_visible = ranking["max_visible"]
+                    validation_errors.append(
+                        f"Invalid max visible value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+            else:
+                parsed_max_visible = ranking["max_visible"]
+            max_visible = max(1, parsed_max_visible)
+            set_ranking_settings(
+                slug,
+                public=is_public,
+                include_speaks=include_speaks,
+                max_visible=max_visible,
+            )
+
+        for round_number in range(1, tot_rounds + 1):
+            set_ballot_round_settings(
+                round_number,
+                visible=bool(request.POST.get(f"round_{round_number}_visible")),
+                include_speaks=bool(
+                    request.POST.get(f"round_{round_number}_include_speaks")
+                ),
+                include_ranks=bool(
+                    request.POST.get(f"round_{round_number}_include_ranks")
+                ),
+            )
+
+        invalidate_public_rankings_cache()
+        for message_text in validation_errors:
+            messages.warning(request, message_text)
+        messages.success(request, "Public rankings settings saved.")
+        return redirect("public_rankings_control")
+
+    standings_settings = get_all_standings_publication_settings()
+    ranking_settings = get_all_ranking_settings()
+    ballot_settings = get_all_ballot_round_settings(tot_rounds)
+
+    return render(
+        request,
+        "rankings/public_rankings_control.html",
+        {
+            "standings_settings": standings_settings,
+            "ranking_settings": ranking_settings,
+            "ballot_settings": ballot_settings,
+            "tot_rounds": tot_rounds,
+        },
+    )
 
 
 def forum_post(request):

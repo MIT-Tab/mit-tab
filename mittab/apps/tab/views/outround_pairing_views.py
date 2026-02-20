@@ -378,7 +378,7 @@ def alternative_judges(request, round_id, judge_id=None):
     # All of these variables are for the convenience of the template
     try:
         current_judge_id = int(judge_id)
-        current_judge_obj = Judge.objects.prefetch_related("scratches").get(
+        current_judge_obj = Judge.objects.prefetch_related("scratches", "schools").get(
             id=current_judge_id
         )
         current_judge_name = current_judge_obj.name
@@ -407,7 +407,7 @@ def alternative_judges(request, round_id, judge_id=None):
         judges_outrounds__type_of_round=other_round_type
     ).filter(
         checkin__round_number=0
-    ).prefetch_related("scratches")
+    ).prefetch_related("scratches", "schools", "judges")
 
     query = Q(
         judges_outrounds__num_teams=round_obj.num_teams,
@@ -421,22 +421,26 @@ def alternative_judges(request, round_id, judge_id=None):
     included_judges = Judge.objects.filter(query) \
                                    .filter(checkin__round_number=0) \
                                    .distinct() \
-                                   .prefetch_related("scratches")
+                                   .prefetch_related("scratches", "schools", "judges")
 
-    scratched_team_ids = {round_gov.id, round_opp.id}
-
-    def has_team_scratch(judge):
-        return any(s.team_id in scratched_team_ids for s in judge.scratches.all())
+    eligible_excluded = assign_judges.can_judge_teams(
+        excluded_judges,
+        round_gov,
+        round_opp,
+    )
+    eligible_included = assign_judges.can_judge_teams(
+        included_judges,
+        round_gov,
+        round_opp,
+    )
 
     excluded_judges = [
         (j.name, j.id, float(j.rank), j.wing_only)
-        for j in excluded_judges
-        if not has_team_scratch(j)
+        for j in eligible_excluded
     ]
     included_judges = [
         (j.name, j.id, float(j.rank), j.wing_only)
-        for j in included_judges
-        if not has_team_scratch(j)
+        for j in eligible_included
     ]
 
     included_judges = sorted(included_judges, key=lambda x: -x[2])
@@ -518,6 +522,37 @@ def assign_team(request, round_id, position, team_id):
             "team": {
                 "id": team_obj.id,
                 "name": team_obj.name
+            },
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def switch_sides(request, round_id):
+    try:
+        round_obj = Outround.objects.select_related("gov_team",
+                                                    "opp_team").get(id=int(round_id))
+        if not round_obj.gov_team or not round_obj.opp_team:
+            return JsonResponse({"success": False})
+        round_obj.gov_team, round_obj.opp_team = round_obj.opp_team, round_obj.gov_team
+        if round_obj.choice == Outround.GOV:
+            round_obj.choice = Outround.OPP
+        elif round_obj.choice == Outround.OPP:
+            round_obj.choice = Outround.GOV
+        round_obj.save()
+        data = {
+            "success": True,
+            "round_id": round_obj.id,
+            "gov_team": {
+                "id": round_obj.gov_team.id,
+                "name": round_obj.gov_team.name
+            },
+            "opp_team": {
+                "id": round_obj.opp_team.id,
+                "name": round_obj.opp_team.name
             },
         }
     except Exception:

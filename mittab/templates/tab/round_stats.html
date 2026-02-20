@@ -1,0 +1,127 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block banner %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="col-12">
+  {% if tournament_stats %}
+  <h4 class="mt-3 mb-3">Tournament Overview</h4>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm">
+      <thead class="thead-light">
+        <tr>
+          <th style="width: 40%;">Side Balance</th>
+          <th>Median</th>
+          <th>Mean</th>
+          <th>High</th>
+          <th>Low</th>
+          <th>Std Dev</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="align-middle">
+            <div class="stats-bar-container bg-light rounded">
+              <div class="stats-bar-gov rounded-left" style="width: {{ tournament_stats.gov_pct }}%;">
+                {% if tournament_stats.gov_pct >= 15 %}Gov {{ tournament_stats.gov_pct|floatformat:1 }}%{% endif %}
+              </div>
+              <div class="stats-bar-opp rounded-right" style="width: {{ tournament_stats.opp_pct }}%;">
+                {% if tournament_stats.opp_pct >= 15 %}Opp {{ tournament_stats.opp_pct|floatformat:1 }}%{% endif %}
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1">Gov: {{ tournament_stats.gov_wins }} | Opp: {{ tournament_stats.opp_wins }}</small>
+          </td>
+          <td class="align-middle">{{ tournament_stats.median_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ tournament_stats.mean_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ tournament_stats.highest_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ tournament_stats.lowest_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ tournament_stats.stddev_speak|floatformat:2|default:"N/A" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if prelim_stats %}
+  <h4 class="mt-4 mb-3">Prelim Rounds</h4>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm table-striped">
+      <thead class="thead-light">
+        <tr>
+          <th style="width: 8%;">Round</th>
+          <th style="width: 32%;">Side Balance</th>
+          <th>Median</th>
+          <th>Mean</th>
+          <th>High</th>
+          <th>Low</th>
+          <th>Std Dev</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stats in prelim_stats %}
+        <tr>
+          <td class="text-center align-middle font-weight-bold">{{ stats.round_number }}</td>
+          <td class="align-middle">
+            <div class="stats-bar-container bg-light rounded">
+              <div class="stats-bar-gov rounded-left" style="width: {{ stats.gov_pct }}%;">
+                {% if stats.gov_pct >= 15 %}Gov {{ stats.gov_pct|floatformat:1 }}%{% endif %}
+              </div>
+              <div class="stats-bar-opp rounded-right" style="width: {{ stats.opp_pct }}%;">
+                {% if stats.opp_pct >= 15 %}Opp {{ stats.opp_pct|floatformat:1 }}%{% endif %}
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1">Gov: {{ stats.gov_wins }} | Opp: {{ stats.opp_wins }}</small>
+          </td>
+          <td class="align-middle">{{ stats.median_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ stats.mean_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ stats.highest_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ stats.lowest_speak|floatformat:2|default:"N/A" }}</td>
+          <td class="align-middle">{{ stats.stddev_speak|floatformat:2|default:"N/A" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if outround_stats %}
+  <h4 class="mt-4 mb-3">Elimination Rounds</h4>
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm table-striped">
+      <thead class="thead-light">
+        <tr>
+          <th style="width: 30%;">Round</th>
+          <th style="width: 70%;">Side Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stats in outround_stats %}
+        <tr>
+          <td class="align-middle font-weight-bold">{{ stats.name }}</td>
+          <td class="align-middle">
+            <div class="stats-bar-container bg-light rounded">
+              <div class="stats-bar-gov rounded-left" style="width: {{ stats.gov_pct }}%;">
+                {% if stats.gov_pct >= 15 %}Gov {{ stats.gov_pct|floatformat:1 }}%{% endif %}
+              </div>
+              <div class="stats-bar-opp rounded-right" style="width: {{ stats.opp_pct }}%;">
+                {% if stats.opp_pct >= 15 %}Opp {{ stats.opp_pct|floatformat:1 }}%{% endif %}
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1">Gov: {{ stats.gov_wins }} | Opp: {{ stats.opp_wins }}</small>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if not tournament_stats and not prelim_stats and not outround_stats %}
+  <div class="alert alert-info mt-4">
+    <i class="fas fa-info-circle"></i> No round data available yet. Statistics will appear once rounds have been entered.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

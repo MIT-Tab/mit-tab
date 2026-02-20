@@ -1,5 +1,4 @@
 # pylint: disable=too-many-lines
-import random
 import datetime
 import os
 
@@ -19,7 +18,7 @@ from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
     UploadBackupForm, score_panel, \
-    validate_panel, EBallotForm
+    validate_panel
 
 import mittab.libs.cacheing.cache_logic as cache_logic
 from mittab.libs.data_export.pairings_export import export_pairings_csv
@@ -27,9 +26,18 @@ import mittab.libs.tab_logic as tab_logic
 import mittab.libs.assign_judges as assign_judges
 from mittab.libs.assign_judges import judge_team_rejudge_counts
 import mittab.libs.backup as backup
+from mittab.libs.tab_logic.stats import get_all_round_stats
 from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
+    invalidate_public_rankings_cache,
 )
+
+
+def invalidate_public_ballot_cache():
+    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
+    for round_number in range(1, tot_rounds + 1):
+        cache_logic.invalidate_cache(f"public_ballots_round_{round_number}")
+    invalidate_public_rankings_cache()
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -48,6 +56,7 @@ def pair_round(request):
                 invalidate_inround_public_pairings_cache()
                 current_round.value = current_round.value + 1
                 current_round.save()
+                invalidate_public_ballot_cache()
         except Exception as exp:
             emit_current_exception()
             return redirect_and_flash_error(
@@ -444,6 +453,14 @@ def view_round(request, round_number):
 
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
+    round_ids = [pair.id for pair in round_info]
+    manual_judge_assignments = {}
+    if round_ids:
+        manual_entries = ManualJudgeAssignment.objects.filter(
+            round_id__in=round_ids
+        ).values_list("round_id", "judge_id")
+        for round_id, judge_id in manual_entries:
+            manual_judge_assignments.setdefault(round_id, set()).add(judge_id)
 
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
 
@@ -545,6 +562,7 @@ def view_round(request, round_number):
         "excluded_people": excluded_people,
         "n_over_two": n_over_two,
         "paired_teams": paired_teams,
+        "manual_judge_assignments": manual_judge_assignments,
     }
     return render(request, "pairing/pairing_control.html", context)
 
@@ -555,10 +573,10 @@ def alternative_judges(request, round_id, judge_id=None):
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges", "scratches")
+                                   .prefetch_related("judges", "scratches", "schools")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
-                                   .prefetch_related("judges", "scratches")
+                                   .prefetch_related("judges", "scratches", "schools")
 
     excluded_judges_list = assign_judges.can_judge_teams(
         excluded_judges, round_gov, round_opp)
@@ -569,7 +587,7 @@ def alternative_judges(request, round_id, judge_id=None):
     try:
         current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related(
-            "judges", "scratches").get(id=current_judge_id)
+            "judges", "scratches", "schools").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
     except TypeError:
@@ -646,6 +664,7 @@ def alternative_teams(request, round_id, current_team_id, position):
         "excluded_teams": excluded_teams,
         "included_teams": included_teams,
         "position": position,
+        "is_outround": False,
     }
     return render(request, "pairing/team_dropdown.html", context)
 
@@ -704,6 +723,37 @@ def assign_team(request, round_id, position, team_id):
             "team": {
                 "id": team_obj.id,
                 "name": team_obj.name
+            },
+        }
+    except Exception:
+        emit_current_exception()
+        data = {"success": False}
+    return JsonResponse(data)
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def switch_sides(request, round_id):
+    try:
+        round_obj = Round.objects.select_related("gov_team",
+                                                 "opp_team").get(id=int(round_id))
+        if not round_obj.gov_team or not round_obj.opp_team:
+            return JsonResponse({"success": False})
+        round_obj.gov_team, round_obj.opp_team = round_obj.opp_team, round_obj.gov_team
+        if round_obj.pullup == Round.GOV:
+            round_obj.pullup = Round.OPP
+        elif round_obj.pullup == Round.OPP:
+            round_obj.pullup = Round.GOV
+        round_obj.save()
+        data = {
+            "success": True,
+            "round_id": round_obj.id,
+            "gov_team": {
+                "id": round_obj.gov_team.id,
+                "name": round_obj.gov_team.name
+            },
+            "opp_team": {
+                "id": round_obj.opp_team.id,
+                "name": round_obj.opp_team.name
             },
         }
     except Exception:
@@ -967,3 +1017,12 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
         except ValueError:
             return redirect_and_flash_error(request, "Chair could not be assigned")
     return redirect_and_flash_error(request, "Judge not found in round")
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def round_stats(request):
+    stats = get_all_round_stats()
+    return render(request, "tab/round_stats.html", {
+        "title": "Round Statistics",
+        **stats
+    })

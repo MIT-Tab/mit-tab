@@ -1,29 +1,62 @@
 <div class="col-12 col-md-6"{% if section_id %} id="{{ section_id }}"{% endif %}>
   <h5 class="text-center">{{ table_title }}</h5>
   <div class="public-table-wrap">
-  <table class="table table-striped table-sm table-bordered">
-    <thead>
-      <th>#</th>
-      <th>Team Name</th>
-      <th>Wins</th>
-      <th>Speaks</th>
-      <th>Ranks</th>
-      {% if teams.0|length == 5 %}
-      <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
-      {% endif %}
-    </thead>
-    {% for team in teams %}
-    <tr>
-      <td>{{ forloop.counter }}</td>
-      <td><a {% if user.is_authenticated %} href="/team/{{ team.0.id }}" {% endif %}>{{ team.0.display_backend }}</a></td>
-      <td>{{ team.1 }}</td>
-      <td>{{ team.2|floatformat:2 }}</td>
-      <td>{{ team.3|floatformat:2 }}</td>
-      {% if team|length == 5 %}
-      <td>{{ team.4 }}</td>
-      {% endif %}
-    </tr>
-    {% endfor %}
-  </table>
+  {% if public_team_rows %}
+    {% with show_scores=public_show_scores|default_if_none:True %}
+    <table class="table table-striped table-sm table-bordered">
+      <thead>
+        <th>#</th>
+        <th>Team Name</th>
+        <th>Wins</th>
+        {% if show_scores %}
+        <th>Speaks</th>
+        <th>Ranks</th>
+        {% endif %}
+      </thead>
+      <tbody>
+      {% for row in public_team_rows %}
+        <tr>
+          <td>{{ row.place }}</td>
+          <td>
+            <a {% if user.is_authenticated %} href="/team/{{ row.team.id }}" {% endif %}>
+              {{ row.team.display_backend }}
+            </a>
+          </td>
+          <td>{{ row.wins }}</td>
+          {% if show_scores %}
+          <td>{{ row.speaks|floatformat:2 }}</td>
+          <td>{{ row.ranks|floatformat:2 }}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endwith %}
+  {% else %}
+    <table class="table table-striped table-sm table-bordered">
+      <thead>
+        <th>#</th>
+        <th>Team Name</th>
+        <th>Wins</th>
+        <th>Speaks</th>
+        <th>Ranks</th>
+        {% if teams.0|length == 5 %}
+        <th title="Tiebreaker between the team and the next-best team">Tiebreaker</th>
+        {% endif %}
+      </thead>
+      {% for team in teams %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a {% if user.is_authenticated %} href="/team/{{ team.0.id }}" {% endif %}>{{ team.0.display_backend }}</a></td>
+        <td>{{ team.1 }}</td>
+        <td>{{ team.2|floatformat:2 }}</td>
+        <td>{{ team.3|floatformat:2 }}</td>
+        {% if team|length == 5 %}
+        <td>{{ team.4 }}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
   </div>
 </div>

@@ -30,8 +30,3 @@ settings:
     description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
     value: false
     type: boolean
-  - rankings_public:
-    name: rankings_public
-    description: "A toggle to indicate whether you would like to display the rankings of teams publicly. You can opt teams out by unchecking the 'ranking public' box on the team edit page."
-    value: false
-    type: boolean

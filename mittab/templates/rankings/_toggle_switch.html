@@ -1,0 +1,10 @@
+<div class="custom-control custom-switch mb-0">
+  <input type="checkbox"
+         name="{{ name }}"
+         id="{{ switch_id|default:name }}"
+         class="custom-control-input"
+         {% if checked %}checked{% endif %}>
+  <label class="custom-control-label" for="{{ switch_id|default:name }}">
+    {{ label }}
+  </label>
+</div>

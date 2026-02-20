@@ -11,9 +11,15 @@
   <div class="data-list">
     <ul class="list_item">
       {% if item_type == "judge" %}
-        {% for id, name, flags, symbols, rank in item_list %}
+        {% for id, name, flags, symbols, rank, wing_only in item_list %}
             <li class="searchable filterable {% if forloop.counter0|divisibleby:2 %}even{%else%}odd{%endif%}" data-filters="{{flags}}" data-rank="{{rank}}">
-              <a class="no_decoration" href="/{{item_type}}/{{id}}">{{name}} <span class="item-detail" data-code="{{symbols}}" data-rank="({{rank}})">{{symbols}}</span></a>
+              <a class="no_decoration" href="/{{item_type}}/{{id}}">
+                {{name}}
+                <span class="item-detail" data-code="{{symbols}}" data-rank="({{rank}})">{{symbols}}</span>
+                {% if wing_only %}
+                  <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
+                {% endif %}
+              </a>
             </li>
         {% endfor %}
       {% else %}

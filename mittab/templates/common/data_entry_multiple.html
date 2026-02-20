@@ -1,5 +1,5 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
+{% load bootstrap4 tags %}
 
 {% block title %} {{title}} {% endblock %}
 {% block banner %} {{title}} {% endblock %}
@@ -24,6 +24,8 @@
       </div>
     </div>
     {% endfor %}
+
+    {% return_to_input %}
 
     {% if forms %}
     <input type="submit" class="btn btn-primary" value="Submit"/>
