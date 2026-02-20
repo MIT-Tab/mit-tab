@@ -7,7 +7,6 @@ from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.models import (
     DEFAULT_TOURNAMENT_NAME,
-    HOMEPAGE_SETUP_COMPLETE_KEY,
     TabSettings,
 )
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
@@ -65,7 +64,6 @@ class Command(BaseCommand):
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
         TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
-        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 0)
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")

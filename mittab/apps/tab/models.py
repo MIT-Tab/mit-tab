@@ -9,7 +9,6 @@ from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 
 
 DEFAULT_TOURNAMENT_NAME = "New Tournament"
-HOMEPAGE_SETUP_COMPLETE_KEY = "homepage_setup_complete"
 PUBLIC_HOME_SHORTCUT_SLOTS = 7
 PUBLIC_HOME_PAGE_DEFINITIONS = (
     {
@@ -281,20 +280,6 @@ class PublicHomeShortcut(models.Model):
             index + 1: slug
             for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
         }
-
-    @classmethod
-    def is_homepage_setup_complete(cls):
-        explicit_setting = TabSettings.objects.filter(
-            key=HOMEPAGE_SETUP_COMPLETE_KEY
-        ).first()
-        if explicit_setting is not None and explicit_setting.value is not None:
-            return explicit_setting.value == 1
-
-        tournament_name = (TabSettings.get(
-            "tournament_name", DEFAULT_TOURNAMENT_NAME
-        ) or "").strip()
-        return bool(tournament_name and tournament_name != DEFAULT_TOURNAMENT_NAME)
-
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)

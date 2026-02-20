@@ -627,7 +627,6 @@ class PublicHomeShortcutsForm(forms.Form):
             or DEFAULT_TOURNAMENT_NAME
         )
         TabSettings.set("tournament_name", tournament_name)
-        TabSettings.set(HOMEPAGE_SETUP_COMPLETE_KEY, 1)
 
         for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
             PublicHomeShortcut.objects.update_or_create(

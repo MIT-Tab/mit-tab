@@ -4,7 +4,6 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from mittab.apps.tab.models import (
-    HOMEPAGE_SETUP_COMPLETE_KEY,
     PUBLIC_HOME_PAGE_DEFINITIONS,
     Room,
     TabSettings,
@@ -157,7 +156,6 @@ class TestPostOperations(TestCase):
             "public_ballots",
         )
         self.assertEqual(TabSettings.get("tournament_name"), "MIT Invitational")
-        self.assertEqual(TabSettings.get(HOMEPAGE_SETUP_COMPLETE_KEY, 0), 1)
 
     def test_start_new_tourny_clears_homepage_configuration(self):
         PublicHomePage.ensure_defaults()
