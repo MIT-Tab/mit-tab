@@ -1,51 +1,19 @@
-<div class="col-12">
-    <a href="{% url 'cache_refresh' %}?key=speaker_rankings&next={% url 'rank_teams_ajax' %}">
-	Force Refresh
+<div class="col-12 d-flex flex-wrap align-items-center mb-2">
+    <a class="mr-3" href="{% url 'cache_refresh' %}?key=speaker_rankings&next={% url 'rank_teams_ajax' %}">
+		Force Refresh
     </a>
+    <a class="btn btn-sm btn-light" href="{% url 'manage_ranking_groups' %}">Manage Ranking Groups</a>
 </div>
-<div class="col-12 col-md-6">
-  <h5 class="text-center">Varsity Ranking</h5>
-  <table class="table table-striped table-sm table-bordered">
-    <thead>
-      <th>#</th>
-      <th>Name</th>
-      <th>Speaks</th>
-      <th>Ranks</th>
-      <th>Team</th>
-      <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
-    </thead>
-    {% for debater, speaks, ranks, team, tiebreaker in debaters %}
-    <tr>
-      <td> {{ forloop.counter }} </td>
-      <td> <a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
-      <td> {{ speaks|floatformat:2 }}</td>
-      <td> {{ ranks|floatformat:2 }}</td>
-      <td> <a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
-      <td>{{ tiebreaker }}</td>
-    </tr>
+{% if debater_ranking_groups %}
+<div class="col-12 mb-3 ranking-groups-nav">
+    <span class="font-weight-bold mr-2">Ranking Groups:</span>
+    {% for ranking_group in debater_ranking_groups %}
+        <a class="mr-3" href="#{{ ranking_group.anchor }}">{{ ranking_group.title }}</a>
     {% endfor %}
-  </table>
 </div>
-<div class="col-12 col-md-6">
-  <h5 class="text-center">Novice Ranking</h5>
-  <table class="table table-striped table-sm table-bordered">
-    <thead>
-      <th>#</th>
-      <th>Name</th>
-      <th>Speaks</th>
-      <th>Ranks</th>
-      <th>Team</th>
-      <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
-    </thead>
-    {% for debater, speaks, ranks, team, tiebreaker in nov_debaters %}
-    <tr>
-      <td>{{ forloop.counter }}</td>
-      <td><a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
-      <td>{{ speaks|floatformat:2 }}</td>
-      <td>{{ ranks|floatformat:2 }}</td>
-      <td> <a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
-      <td>{{ tiebreaker }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-</div>
+{% endif %}
+{% include "tab/_rank_debaters_table.html" with debaters=debaters table_title="Varsity Ranking" %}
+{% include "tab/_rank_debaters_table.html" with debaters=nov_debaters table_title="Novice Ranking" %}
+{% for ranking_group in debater_ranking_groups %}
+    {% include "tab/_rank_debaters_table.html" with debaters=ranking_group.debaters table_title=ranking_group.title section_id=ranking_group.anchor %}
+{% endfor %}

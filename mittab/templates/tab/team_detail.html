@@ -26,6 +26,16 @@
           {% endfor %}
         </td>
       </tr>
+      {% if team_obj.ranking_groups.count %}
+      <tr>
+        <td>Ranking Groups</td>
+        <td>
+          {% for ranking_group in team_obj.ranking_groups.all %}
+            <a href='/ranking-group/{{ ranking_group.id }}/'>{{ ranking_group.name }}</a>{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endif %}
       <tr>
         <td>School</td>
         <td><a href='/school/{{ team_obj.school.id }}/'>{{ team_obj.school.name }}</a></td>

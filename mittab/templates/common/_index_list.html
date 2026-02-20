@@ -38,11 +38,17 @@
   </h4>
   <div class="collapse show" id="{{ html_id }}-content">
     <div class="index-section-content">
+      {% if model_name == "Teams" %}
+        <div class="text-center mb-2">
+          <a href="{% url 'manage_ranking_groups' %}" class="btn btn-sm btn-light">Manage Ranking Groups</a>
+        </div>
+      {% endif %}
       {% if model_name == "Rooms" %}
         <div class="text-center mb-2">
           <a href="{% url 'manage_room_tags' %}" class="btn btn-sm btn-light">Manage Room Tags</a>
         </div>
-      {% elif view_path_prefix == "judge" %}
+      {% endif %}
+      {% if view_path_prefix == "judge" %}
         <div class="text-center mb-2">
           <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
             Download Judge Codes

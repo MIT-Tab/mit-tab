@@ -144,8 +144,10 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
-                                              required=False)
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False
+    )
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -233,9 +235,6 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(DebaterForm, self).__init__(*args, **kwargs)
-
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
@@ -762,6 +761,49 @@ class MiniRoomTagForm(RoomTagForm):
         self.fields.pop("teams")
         self.fields.pop("judges")
         self.fields.pop("rooms")
+
+
+class RankingGroupForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.teams.all()
+            self.fields["debaters"].initial = self.instance.debaters.all()
+
+    def save(self, commit=True):
+        ranking_group = super().save(commit=False)
+
+        def save_m2m():
+            ranking_group.teams.set(self.cleaned_data.get("teams", []))
+            ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+
+        if commit:
+            ranking_group.save()
+            save_m2m()
+        else:
+            self._save_m2m = save_m2m
+
+        return ranking_group
+
+    class Meta:
+        model = RankingGroup
+        fields = ("name", "teams", "debaters")
+
+
+class MiniRankingGroupForm(RankingGroupForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("debaters")
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(

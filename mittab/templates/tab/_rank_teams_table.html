@@ -1,4 +1,4 @@
-<div class="col-12 col-md-6">
+<div class="col-12 col-md-6"{% if section_id %} id="{{ section_id }}"{% endif %}>
   <h5 class="text-center">{{ table_title }}</h5>
   <div class="public-table-wrap">
   {% if public_team_rows %}
