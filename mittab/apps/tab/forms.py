@@ -780,9 +780,18 @@ class RankingGroupForm(forms.ModelForm):
             self.fields["debaters"].initial = self.instance.debaters.all()
 
     def save(self, commit=True):
-        ranking_group = super().save(commit=commit)
-        ranking_group.teams.set(self.cleaned_data.get("teams", []))
-        ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+        ranking_group = super().save(commit=False)
+
+        def save_m2m():
+            ranking_group.teams.set(self.cleaned_data.get("teams", []))
+            ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+
+        if commit:
+            ranking_group.save()
+            save_m2m()
+        else:
+            self._save_m2m = save_m2m
+
         return ranking_group
 
     class Meta:
