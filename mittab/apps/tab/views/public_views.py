@@ -1,9 +1,14 @@
 import random
+import os
 
 from django.db.models import Prefetch
+from django.http import FileResponse
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from mittab import settings
+from mittab.apps.tab import logo_utils
 from mittab.apps.tab.forms import EBallotForm
 from mittab.apps.tab.helpers import redirect_and_flash_error
 from mittab.apps.tab.models import (
@@ -31,6 +36,26 @@ from mittab.libs.tab_logic import rankings
 @cache_public_view(timeout=300)
 def public_access_error(request):
     return render(request, "public/access_error.html")
+
+
+def tournament_logo(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if not logo_path:
+        raise Http404("Tournament logo not found")
+    return FileResponse(open(logo_path, "rb"), content_type="image/png")
+
+
+def favicon(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if logo_path:
+        return FileResponse(open(logo_path, "rb"), content_type="image/png")
+
+    return _fallback_favicon_response()
+
+
+def _fallback_favicon_response():
+    favicon_path = os.path.join(settings.BASE_DIR, "assets", "img", "favicon.ico")
+    return FileResponse(open(favicon_path, "rb"), content_type="image/x-icon")
 
 
 @cache_public_view(timeout=60)

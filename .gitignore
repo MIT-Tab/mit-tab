@@ -47,6 +47,7 @@ nosetests.xml
 
 # Dont commit the db files
 mittab/backups/
+mittab/uploads/
 *.sqlite3
 *.sqlite3-journal
 

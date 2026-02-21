@@ -20,7 +20,7 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools",
-                   "/api/debater-counts", "/favicon.ico")
+                   "/api/debater-counts", "/favicon.ico", "/tournament-logo/")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 API_PATH_REQUIREMENTS = {

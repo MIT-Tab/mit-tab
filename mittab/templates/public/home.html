@@ -12,6 +12,7 @@
 {% block banner %}{% endblock %}
 
 {% block content %}
+{% tournament_logo_url as tournament_logo %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
   <div class="public-home"
        data-public-home
@@ -25,6 +26,13 @@
         <div class="public-sidebar-card status">
           <h3 class="title">Welcome to {% tournament_name %}!</h3>
           <div class="content">
+            {% if tournament_logo %}
+            <div class="tournament-logo-shell">
+              <img class="tournament-logo-image"
+                   src="{{ tournament_logo }}"
+                   alt="{% tournament_name %} logo">
+            </div>
+            {% else %}
             <div class="status-block" data-status>
               <!-- Status will be dynamically updated by JavaScript -->
               <div class="status-icon" aria-hidden="true" data-status-icon>
@@ -35,6 +43,7 @@
                 <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
               </div>
             </div>
+            {% endif %}
             
             <div class="divider"></div>
             
@@ -72,6 +81,13 @@
       <aside class="links" aria-labelledby="public-home-quick-links">
         <header class="header mobile-only">
           <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
+          {% if tournament_logo %}
+          <div class="tournament-logo-shell tournament-logo-shell-mobile">
+            <img class="tournament-logo-image"
+                 src="{{ tournament_logo }}"
+                 alt="{% tournament_name %} logo">
+          </div>
+          {% else %}
           <h2 class="status-title mb-2">Status:</h2>
           <div class="status-block status-block--inline" data-status>
             <div class="status-icon" aria-hidden="true" data-status-icon>
@@ -83,6 +99,7 @@
               <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
             </div>
           </div>
+          {% endif %}
         </header>
 
         <nav class="public-links" aria-label="Quick links">

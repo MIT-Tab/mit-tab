@@ -61,6 +61,42 @@ function initializeSettingsForm() {
   );
 }
 
+function initializeThemeColorPicker() {
+  const hexPattern = /^#[0-9a-fA-F]{6}$/;
+
+  $(".theme-color-picker").each((_, pickerEl) => {
+    const picker = $(pickerEl);
+    const targetId = picker.data("target-input");
+    const textInput = $(`#${targetId}`);
+
+    if (!textInput.length) {
+      return;
+    }
+
+    const syncPickerFromText = () => {
+      const value = (textInput.val() || "").toString().trim();
+      if (hexPattern.test(value)) {
+        picker.val(value);
+      }
+    };
+
+    const syncTextFromPicker = () => {
+      textInput.val((picker.val() || "").toString().toUpperCase());
+    };
+
+    syncPickerFromText();
+
+    textInput.on("input", syncPickerFromText);
+    textInput.on("blur", () => {
+      const value = (textInput.val() || "").toString().trim();
+      if (hexPattern.test(value)) {
+        textInput.val(value.toUpperCase());
+      }
+    });
+    picker.on("input change", syncTextFromPicker);
+  });
+}
+
 $(document).ready(() => {
   ballotsInit();
   filtersInit();
@@ -69,6 +105,7 @@ $(document).ready(() => {
   bsCustomFileInput.init();
   initializeTooltips();
   initializeSettingsForm();
+  initializeThemeColorPicker();
 
   initializeConfirms();
   initializeRevealButtons();

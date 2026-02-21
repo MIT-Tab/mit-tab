@@ -2,9 +2,12 @@ from urllib.parse import urlencode
 
 from django import template
 from django.forms.fields import FileField
+from django.urls import reverse
 
 from mittab.apps.tab.helpers import get_redirect_target
+from mittab.apps.tab import logo_utils
 from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.theme import DEFAULT_THEME_COLOR, get_theme_css_variables
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
@@ -94,3 +97,26 @@ def public_display_flags():
 def motions_enabled():
     """Returns True if motions feature is enabled."""
     return bool(TabSettings.get("motions_enabled", 0))
+
+
+@register.simple_tag
+def theme_css_variables():
+    theme_color = TabSettings.get("theme_color", DEFAULT_THEME_COLOR)
+    return get_theme_css_variables(theme_color)
+
+
+@register.simple_tag
+def tournament_logo_url():
+    if not logo_utils.has_tournament_logo():
+        return ""
+
+    mtime = logo_utils.get_tournament_logo_mtime()
+    url = reverse("tournament_logo")
+    if mtime is None:
+        return url
+    return f"{url}?v={mtime}"
+
+
+@register.simple_tag
+def favicon_url():
+    return reverse("favicon")
