@@ -11,12 +11,15 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
     MiniRoomTagForm,
+    DebaterApdaIdForm,
     RankingGroupForm,
     RoomTagForm,
+    SchoolApdaIdForm,
     SchoolForm,
     RoomForm,
     UploadDataForm,
@@ -50,6 +53,8 @@ from mittab.libs.tab_logic.rankings import get_team_rankings
 def index(request):
     if not request.user.is_authenticated:
         return redirect("public_home")
+    if is_apda_board_user(request.user):
+        return redirect("apda_board_home")
 
     schools_missing_apda_qs = School.objects.filter(
         Q(apda_id__isnull=True) | Q(apda_id=-1)
@@ -99,6 +104,118 @@ def index(request):
     }
 
     return render(request, "common/index.html", context)
+
+
+def apda_board_home(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    allowed_standing_slugs = ("speaker_results", "team_results")
+    if request.method == "POST":
+        for slug in allowed_standing_slugs:
+            published = bool(request.POST.get(f"standings_{slug}"))
+            set_standings_publication_setting(slug, published)
+        invalidate_public_rankings_cache()
+        return redirect_and_flash_success(
+            request,
+            "APDA standings publication settings saved.",
+            path=reverse("apda_board_home"),
+        )
+
+    standings_settings = [
+        setting for setting in get_all_standings_publication_settings()
+        if setting["slug"] in allowed_standing_slugs
+    ]
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+
+    context = {
+        "school_list": [(school.pk, school.name) for school in School.objects.all()],
+        "debater_list": [
+            (debater.pk, debater.display) for debater in Debater.objects.all()
+        ],
+        "standings_settings": standings_settings,
+        "schools_missing_apda_ids": [school.pk for school in schools_missing_apda_qs],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
+    }
+    return render(request, "apda_board/home.html", context)
+
+
+def apda_board_school_detail(request, school_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    school = School.objects.filter(pk=int(school_id)).first()
+    if not school:
+        return redirect_and_flash_error(request, "School not found")
+
+    if request.method == "POST":
+        form = SchoolApdaIdForm(request.POST, instance=school)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {school.name}.",
+                path=reverse("apda_board_school_detail", args=[school.id]),
+            )
+    else:
+        form = SchoolApdaIdForm(instance=school)
+
+    teams = Team.objects.filter(school=school).prefetch_related("debaters")
+    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related("debaters")
+
+    return render(
+        request,
+        "apda_board/school_detail.html",
+        {
+            "form": form,
+            "school_obj": school,
+            "school_teams": teams,
+            "school_hybrid_teams": hybrid_teams,
+            "title": f"APDA Board: {school.name}",
+        },
+    )
+
+
+def apda_board_debater_detail(request, debater_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    debater = Debater.objects.filter(pk=int(debater_id)).first()
+    if not debater:
+        return redirect_and_flash_error(request, "Debater not found")
+
+    if request.method == "POST":
+        form = DebaterApdaIdForm(request.POST, instance=debater)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {debater.name}.",
+                path=reverse("apda_board_debater_detail", args=[debater.id]),
+            )
+    else:
+        form = DebaterApdaIdForm(instance=debater)
+
+    teams = Team.objects.filter(debaters=debater).select_related("school", "hybrid_school")
+    return render(
+        request,
+        "apda_board/debater_detail.html",
+        {
+            "form": form,
+            "debater_obj": debater,
+            "teams": teams,
+            "title": f"APDA Board: {debater.name}",
+        },
+    )
 
 
 def tab_logout(request, *args):

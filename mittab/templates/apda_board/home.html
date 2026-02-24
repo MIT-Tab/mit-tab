@@ -1,0 +1,102 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}APDA Board Dashboard{% endblock %}
+
+{% block content %}
+<div class="col-12">
+
+
+  <form method="post" class="card shadow-sm mb-4">
+    {% csrf_token %}
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Standings Published</h5>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped table-bordered table-sm mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Published</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for standing in standings_settings %}
+            <tr>
+              <td>{{ standing.label }}</td>
+              <td class="align-middle">
+                {% include "rankings/_toggle_switch.html" with name="standings_"|add:standing.slug switch_id="standings_"|add:standing.slug checked=standing.published label=standing.published|yesno:"Enabled,Disabled" %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+
+  <div class="row">
+    <div class="col-sm index-section" id="apda-school-list-section">
+      <h4 class="text-center font-weight-normal index-section-header"
+          data-toggle="collapse"
+          data-target="#apda-school-list-content"
+          aria-expanded="true">
+        <span class="section-title">
+          {{ school_list|length }} Schools
+        </span>
+      </h4>
+      <div class="collapse show" id="apda-school-list-content">
+        <div class="index-section-content">
+          <ol id="apda-school-list">
+            {% for school_id, school_name in school_list %}
+            <li class="searchable">
+              <a href="{% url 'apda_board_school_detail' school_id %}">{{ school_name }}</a>
+              {% if school_id in schools_missing_apda_ids %}
+              <span class="badge badge-light border ml-1 text-muted">No ID</span>
+              {% endif %}
+            </li>
+            {% empty %}
+            <li>No schools found.</li>
+            {% endfor %}
+          </ol>
+          {% if schools_missing_apda_count %}
+          <small class="text-muted d-block mt-2">{{ schools_missing_apda_count }} school(s) have no APDA ID.</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm index-section" id="apda-debater-list-section">
+      <h4 class="text-center font-weight-normal index-section-header"
+          data-toggle="collapse"
+          data-target="#apda-debater-list-content"
+          aria-expanded="true">
+        <span class="section-title">
+          {{ debater_list|length }} Debaters
+        </span>
+      </h4>
+      <div class="collapse show" id="apda-debater-list-content">
+        <div class="index-section-content">
+          <ol id="apda-debater-list">
+            {% for debater_id, debater_name in debater_list %}
+            <li class="searchable">
+              <a href="{% url 'apda_board_debater_detail' debater_id %}">{{ debater_name }}</a>
+              {% if debater_id in debaters_missing_apda_ids %}
+              <span class="badge badge-light border ml-1 text-muted">No ID</span>
+              {% endif %}
+            </li>
+            {% empty %}
+            <li>No debaters found.</li>
+            {% endfor %}
+          </ol>
+          {% if debaters_missing_apda_count %}
+          <small class="text-muted d-block mt-2">{{ debaters_missing_apda_count }} debater(s) have no APDA ID.</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
