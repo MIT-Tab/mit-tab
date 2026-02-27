@@ -594,3 +594,38 @@ class TestManualJudgeViews(TestCase):
         self.assertIn(neutral_judge.name, excluded_names | included_names)
         self.assertNotIn(conflict_judge.name, excluded_names)
         self.assertNotIn(conflict_judge.name, included_names)
+
+    def test_outround_alternative_judges_allows_rejudges(self):
+        TabSettings.set("allow_rejudges", False)
+        gov_team = self.make_team("Rejudge Gov", self.school_primary)
+        opp_team = self.make_team("Rejudge Opp", self.school_other)
+        room = Room.objects.create(name="Rejudge Room", rank=Decimal("5.00"))
+
+        prior_round = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+        )
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+        )
+
+        rejudge = self.make_judge("Outround Rejudge")
+        prior_round.judges.add(rejudge)
+        prior_round.chair = rejudge
+        prior_round.save()
+        CheckIn.objects.create(judge=rejudge, round_number=0)
+
+        response = self.client.get(
+            reverse("outround_alternative_judges", args=[outround.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+        self.assertIn(rejudge.name, excluded_names | included_names)
