@@ -598,19 +598,22 @@ def alternative_judges(request, round_id, judge_id=None):
         "judges_outrounds",
         undecided_only=True,
     )
-    base_judges = Judge.objects.filter(
+    checked_in_judges = Judge.objects.filter(
         checkin__round_number=0
     ).prefetch_related("scratches", "schools", "judges").distinct()
     if selected_specs:
-        occupied_in_scope = base_judges.filter(scope_filter).exclude(
+        included_judges = checked_in_judges.filter(scope_filter).distinct()
+        occupied_in_scope = included_judges.exclude(
             judges_outrounds=round_obj
         )
-        base_judges = base_judges.exclude(
+        excluded_judges = checked_in_judges.exclude(
             id__in=occupied_in_scope.values_list("id", flat=True)
         )
+    else:
+        excluded_judges = checked_in_judges
+        included_judges = checked_in_judges.filter(judges_outrounds=round_obj).distinct()
 
-    excluded_judges = base_judges.exclude(judges_outrounds=round_obj).distinct()
-    included_judges = base_judges.filter(judges_outrounds=round_obj).distinct()
+    excluded_judges = excluded_judges.exclude(judges_outrounds=round_obj).distinct()
 
     eligible_excluded = assign_judges.can_judge_teams(
         excluded_judges,
