@@ -62,7 +62,7 @@ class RoomForm(forms.ModelForm):
     def save(self, commit=True):
         room = super(RoomForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        for i in range(num_rounds):
+        for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
             if field_name in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data[field_name]
