@@ -28,6 +28,17 @@ urlpatterns = [
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
+    path("apda-board/", views.apda_board_home, name="apda_board_home"),
+    path(
+        "apda-board/school/<int:school_id>/",
+        views.apda_board_school_detail,
+        name="apda_board_school_detail",
+    ),
+    path(
+        "apda-board/debater/<int:debater_id>/",
+        views.apda_board_debater_detail,
+        name="apda_board_debater_detail",
+    ),
     re_path(r"^403/", views.render_403, name="403"),
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),
