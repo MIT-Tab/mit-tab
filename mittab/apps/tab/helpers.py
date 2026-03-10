@@ -11,14 +11,19 @@ def get_redirect_target(request, path=None, fallback="/"):
         1) Explicit path argument
         2) Hidden form field (POST) named 'return_to'
         3) Explicit GET parameters (?return_to= or ?next=)
-        4) HTTP referer header
-        5) Provided fallback (defaults to '/')
+        4) Session-stored return target
+        5) HTTP referer header
+        6) Provided fallback (defaults to '/')
     """
+    session = getattr(request, "session", None)
+    session_return_to = session.get("_return_to") if session is not None else None
+
     candidates = [
         path,
         request.POST.get("return_to"),
         request.GET.get("return_to"),
         request.GET.get("next"),
+        session_return_to,
         request.META.get("HTTP_REFERER"),
     ]
 
