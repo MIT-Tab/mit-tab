@@ -1,5 +1,3 @@
-from urllib.parse import urlencode
-
 from django import template
 from django.forms.fields import FileField
 
@@ -68,7 +66,7 @@ def return_to_value(context):
     request = context.get("request")
     if not request:
         return ""
-    return get_redirect_target(request, fallback=None) or ""
+    return get_redirect_target(request, fallback=None) or request.get_full_path()
 
 
 @register.inclusion_tag("common/_return_to_input.html", takes_context=True)
@@ -79,10 +77,7 @@ def return_to_input(context, target=None):
 
 @register.filter
 def with_return_to(url):
-    if not url:
-        return url
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}{urlencode({'return_to': url})}"
+    return url
 
 
 @register.simple_tag
