@@ -9,7 +9,7 @@ before_tournament_steps:
   - slug: configure_settings
     title: Configure Core Settings
     description: >-
-      Go to the navigation bar and, under the Admin tab, select Settings Form. Review each settings section so pairing, rankings, and display behavior match your tournament format, then save after making any updates.
+      Go to the navigation bar and, under the Admin tab, select Settings Form. Review each settings section so pairing, rankings, and display behavior match your tournament format, then save after making any updates. Make sure to catch important settings like wing pairing mode and speaks warnings.
     url_name: settings_form
     completion_rule: settings_reviewed
 
