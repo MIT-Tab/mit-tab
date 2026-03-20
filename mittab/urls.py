@@ -321,6 +321,11 @@ urlpatterns = [
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
+    path(
+        "archive/black_rod_bundle/",
+        views.generate_black_rod_bundle,
+        name="download_black_rod_bundle",
+    ),
 
     # Standings API
     path("forum_post", views.forum_post, name="forum_post"),
