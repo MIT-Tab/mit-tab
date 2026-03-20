@@ -11,6 +11,7 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
@@ -546,6 +547,19 @@ def generate_archive(request):
 
     response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
     response["Content-Length"] = len(xml)
+    response["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def generate_black_rod_bundle(request):
+    tournament_name = request.META["SERVER_NAME"].split(".")[0]
+    filename = tournament_name + "-black-rod-bundle.json"
+
+    bundle = BlackRodBundleExporter(tournament_name).export_tournament()
+
+    response = HttpResponse(bundle, content_type="application/json; charset=utf-8")
+    response["Content-Length"] = len(bundle.encode("utf-8"))
     response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
