@@ -5,13 +5,13 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
 
 
 @pytest.mark.django_db(transaction=True)
-class TestInitializeTourneyCommand(TestCase):
+class TestInitializeTourneyCommand(TransactionTestCase):
     def test_board_user_uses_env_password_and_starts_active(self):
         with patch.dict(os.environ, {"BOARD_PASSWORD": "board-from-env"}), patch(
             "mittab.apps.tab.management.commands.initialize_tourney.backup_round"
