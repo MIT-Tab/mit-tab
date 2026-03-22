@@ -70,6 +70,7 @@ def test_login_middleware_stores_return_to_for_get_requests():
         {
             "is_anonymous": False,
             "is_authenticated": True,
+            "is_superuser": False,
             "groups": mock_groups,
         },
     )()
@@ -102,6 +103,7 @@ def test_login_middleware_prefers_internal_referer_for_return_to():
         {
             "is_anonymous": False,
             "is_authenticated": True,
+            "is_superuser": False,
             "groups": mock_groups,
         },
     )()
