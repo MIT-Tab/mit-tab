@@ -250,9 +250,15 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_swap_judge"),
-    path("outround_pairing/assign_judges/<int:round_type>/",
+    path("outround_pairing/assign_judges/",
          outround_pairing_views.assign_judges_to_pairing,
          name="outround_assign_judges"),
+    path("outround_pairing/assign_judges/<int:round_type>/",
+         outround_pairing_views.assign_judges_to_pairing,
+         name="outround_assign_judges_legacy"),
+    path("outround_pairing/assign_rooms/",
+         outround_pairing_views.assign_rooms_to_pairing,
+         name="outround_assign_rooms"),
     re_path(r"^outround/(\d+)/result/$",
             outround_pairing_views.enter_result,
             name="enter_result"),
@@ -326,6 +332,11 @@ urlpatterns = [
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
+    path(
+        "archive/black_rod_bundle/",
+        views.generate_black_rod_bundle,
+        name="download_black_rod_bundle",
+    ),
 
     # Standings API
     path("forum_post", views.forum_post, name="forum_post"),

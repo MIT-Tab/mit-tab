@@ -109,7 +109,8 @@
         {%endif%}
         <div class="dropdown room">
           <span 
-            room-id="{{pairing.room.id}}" 
+            class="{% if not pairing.room %}unassigned{% endif %}"
+            room-id="{{ pairing.room.id|default_if_none:'' }}" 
             round-id="{{pairing.id}}"
             outround="true">
             <a 
@@ -121,7 +122,7 @@
               aria-haspopup="true" 
               aria-expanded="false" 
               style="white-space: normal;">
-              <i class="far fa-building"></i> {{pairing.room.name}}
+              <i class="far fa-building"></i> {% if pairing.room %}{{ pairing.room.name }}{% else %}Assign Room{% endif %}
             </a>
             <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
           </span>

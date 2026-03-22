@@ -12,11 +12,11 @@ All teams have a `break_preference` field which determines which break they'd pr
 
 It will also perform a number of checks to ensure you have enough rooms and judges.  It does support paneled rounds (as long as they are consistently paneled) -- please consult the `nov_panel_size` and `var_panel_size` TabSettings for more information.  It will let you pair if you don't have enough judges, but it will warn you.
 
-The other tab setting that must be set correctly in order to ensure judges / rooms are not double booked is the `var_to_nov` variable.  If you would like varsity octafinals to happen at the same time as novice quarterfinals, this value should be `2` as the quotient of number of teams in varsity break rounds to the simultaneous novice break round is 2.  If they are happening at the same time, the value should be `1`, if they are octafinals at the same time as semifinals, then it should be 4, etc.
-
 ## Managing Pairings
 
-MIT Tab supports automatic judge assignment for outrounds. On the pairing view, you can click the "Assign Judges" button to automatically assign judges to rounds based on their rankings and scratches (assuming you have set `var_to_nov` correctly - see above - AND all scratches are entered). This will respect panel sizes as configured in `var_panel_size` and `nov_panel_size`.
+MIT Tab supports automatic judge and room assignment for outrounds. On the pairing view, use the Varsity and Novice dropdowns to choose which active outrounds are in scope, then click "Assign Judges" and/or "Assign Rooms". Assignment runs across the selected scope as a single pool, so judges and rooms are not double-booked within the selected rounds.
+
+Automatic judge assignment respects panel sizes as configured in `var_panel_size` and `nov_panel_size`, and can use the `outround_judge_priority` setting when varsity and novice rounds are assigned together.
 
 **Important**: Wing-only judges (judges with the "Wing Only" checkbox enabled) will be automatically excluded from chair assignments. They can still be assigned as panel members but will never be selected as the chair during automatic assignment.
 

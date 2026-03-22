@@ -491,6 +491,8 @@ class Outround(models.Model):
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
     room = models.ForeignKey(Room,
+                             blank=True,
+                             null=True,
                              on_delete=models.CASCADE,
                              related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)

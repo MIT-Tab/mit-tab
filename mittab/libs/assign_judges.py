@@ -20,6 +20,10 @@ class OutroundRoundPriority:
     TOP_OF_BRACKET = 0
     MIDDLE_OF_BRACKET = 1
 
+class OutroundJudgePriority:
+    VARSITY_WINGS = 0
+    NOVICE_CHAIRS = 1
+
 class WingPairingMode:
     HELP_CHAIRS = 0
     WING_LEARNING = 1
@@ -44,7 +48,7 @@ def get_outround_settings(round_type):
     panel_size = (
         TabSettings.get("var_panel_size", 3)
         if round_type == Outround.VARSITY
-        else TabSettings.get("nov_panel_size", 1)
+        else TabSettings.get("nov_panel_size", 3)
     )
     return SimpleNamespace(
         mode=TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT),
@@ -57,6 +61,25 @@ def get_outround_settings(round_type):
             OutroundRoundPriority.TOP_OF_BRACKET,
         ),
         panel_size=panel_size,
+        judge_priority=TabSettings.get(
+            "outround_judge_priority",
+            OutroundJudgePriority.VARSITY_WINGS,
+        ),
+    )
+
+
+def sort_outround_pairings(pairings, round_priority):
+    seed_func = (
+        max
+        if round_priority == OutroundRoundPriority.MIDDLE_OF_BRACKET
+        else min
+    )
+    return sorted(
+        pairings,
+        key=lambda x: seed_func(
+            x.gov_team.breaking_team.effective_seed,
+            x.opp_team.breaking_team.effective_seed
+        )
     )
 
 def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
@@ -284,60 +307,105 @@ def add_judges():
     Round.judges.through.objects.bulk_create(judge_round_joins)
 
 
-def add_outround_judges(round_type=Outround.VARSITY):
-    num_teams = Outround.objects.filter(type_of_round=round_type
-                                        ).aggregate(Min("num_teams"))["num_teams__min"]
-    settings = get_outround_settings(round_type)
+def _normalize_round_specs(round_specs=None, round_type=None):
+    if round_specs is None:
+        if round_type is None:
+            round_type = Outround.VARSITY
+        num_teams = Outround.objects.filter(
+            type_of_round=round_type
+        ).aggregate(Min("num_teams"))["num_teams__min"]
+        if num_teams is None:
+            return []
+        round_specs = [(round_type, int(num_teams))]
+
+    valid_round_types = dict(Outround.TYPE_OF_ROUND_CHOICES)
+    deduped = []
+    seen = set()
+    for spec in round_specs:
+        try:
+            type_of_round, num_teams = int(spec[0]), int(spec[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if type_of_round not in valid_round_types:
+            continue
+        key = (type_of_round, num_teams)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(key)
+    return deduped
+
+
+def _ordered_pairings_for_slot(pairings, panel_member, snake_draft_mode):
+    ordered = list(pairings)
+    if snake_draft_mode and panel_member % 2 == 1:
+        ordered.reverse()
+    return ordered
+
+
+def _build_active_pairings(
+        round_specs,
+        pairings_by_spec,
+        panel_size_by_spec,
+        panel_member,
+        snake_draft_mode,
+        force_novice_last):
+    active_specs = [
+        spec for spec in round_specs
+        if panel_member < panel_size_by_spec.get(spec, 0)
+    ]
+
+    if force_novice_last:
+        varsity_specs = [s for s in active_specs if s[0] == Outround.VARSITY]
+        novice_specs = [s for s in active_specs if s[0] == Outround.NOVICE]
+        ordered_specs = varsity_specs + novice_specs
+    else:
+        ordered_specs = active_specs
+
+    active_pairings = []
+    for spec in ordered_specs:
+        active_pairings.extend(
+            _ordered_pairings_for_slot(
+                pairings_by_spec.get(spec, []),
+                panel_member,
+                snake_draft_mode,
+            )
+        )
+    return active_pairings
+
+
+def _assign_outround_judges_for_specs(
+        round_specs,
+        pairings_by_spec,
+        panel_size_by_spec,
+        judges,
+        judge_scores,
+        settings,
+        available_indices,
+        force_novice_last=False):
     link_outround = Outround.judges.through
+    judge_round_joins = []
 
-    # First clear any existing judge assignments
-    Outround.judges.through.objects.filter(
-        outround__type_of_round=round_type,
-        outround__num_teams=num_teams
-    ).delete()
-
-    judges = list(
-        Judge.objects.filter(
-            checkin__round_number=0
-        ).prefetch_related(
-            "judges",  # poorly named relation for the round
-            "scratches",
-            "schools",
-        )
-    )
-    pairings = tab_logic.sorted_pairings(num_teams, outround=True)
-    pairings = [p for p in pairings if p.type_of_round == round_type]
-    # Try to have consistent ordering with the round display
-    random.seed(1337)
-    random.shuffle(pairings)
-    random.seed(1337)
-    random.shuffle(judges)
-
-    # Order the judges and pairings by power ranking
-    judges = sorted(judges, key=lambda j: j.rank, reverse=True)
-    judge_scores = construct_judge_scores(judges)
-    seed_func = (
-        max
-        if settings.round_priority == OutroundRoundPriority.MIDDLE_OF_BRACKET
-        else min
-    )
-    pairings.sort(
-        key=lambda x: seed_func(
-            x.gov_team.breaking_team.effective_seed,
-            x.opp_team.breaking_team.effective_seed
-        )
-    )
-
-    num_rounds = len(pairings)
-    judge_round_joins, available_indices = [], list(range(len(judges)))
+    max_panel_size = max(panel_size_by_spec.values()) if panel_size_by_spec else 0
     snake_draft_mode = settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
 
-    # Iterate once for each member of the panel
-    for panel_member in range(settings.panel_size):
+    for panel_member in range(max_panel_size):
+        active_pairings = _build_active_pairings(
+            round_specs=round_specs,
+            pairings_by_spec=pairings_by_spec,
+            panel_size_by_spec=panel_size_by_spec,
+            panel_member=panel_member,
+            snake_draft_mode=snake_draft_mode,
+            force_novice_last=force_novice_last,
+        )
+        num_rounds = len(active_pairings)
+        if num_rounds == 0:
+            continue
+
         graph_edges = []
         for judge_i in available_indices:
             judge = judges[judge_i]
-            for pairing_i, pairing in enumerate(pairings):
+            for pairing_i, pairing in enumerate(active_pairings):
                 has_conflict = judge_conflict(
                     judge,
                     pairing.gov_team,
@@ -346,40 +414,27 @@ def add_outround_judges(round_type=Outround.VARSITY):
                 )
                 if has_conflict:
                     continue
-                effective_pairing_i = pairing_i
-                if snake_draft_mode and panel_member % 2 == 1:
-                    effective_pairing_i = num_rounds - pairing_i - 1
-
                 weight = calc_weight(
                     judge_scores[judge_i],
-                    effective_pairing_i,
+                    pairing_i,
                     settings.mode,
                     num_rounds=num_rounds,
                 )
                 graph_edges.append((pairing_i, num_rounds + judge_i, weight))
 
         panel_matches = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
-        # If there is no possible assignment of judges, raise an error
         if -1 in panel_matches[:num_rounds] or (num_rounds > 0 and not graph_edges):
             if not graph_edges:
-                raise errors.JudgeAssignmentError(
-                    "Impossible to assign judges."
-                )
-            elif -1 in panel_matches[:num_rounds]:
-                pairing_list = panel_matches[: len(pairings)]
-                bad_pairing = pairings[pairing_list.index(-1)]
-                raise errors.JudgeAssignmentError(
-                    f"Could not find a judge for: {bad_pairing}"
-                )
-            else:
-                raise errors.JudgeAssignmentError()
+                raise errors.JudgeAssignmentError("Impossible to assign judges.")
+            pairing_list = panel_matches[:len(active_pairings)]
+            bad_pairing = active_pairings[pairing_list.index(-1)]
+            raise errors.JudgeAssignmentError(
+                f"Could not find a judge for: {bad_pairing}"
+            )
 
-        # Because we can't bulk-update the judges field of rounds (it's many-to-many),
-        # we use the join table model and bulk-create it
         for pairing_i, padded_judge_i in enumerate(panel_matches[:num_rounds]):
             judge_i = padded_judge_i - num_rounds
-
-            round_obj = pairings[pairing_i]
+            round_obj = active_pairings[pairing_i]
             judge = judges[judge_i]
 
             if panel_member == 0:
@@ -388,9 +443,119 @@ def add_outround_judges(round_type=Outround.VARSITY):
             judge_round_joins.append(link_outround(judge=judge, outround=round_obj))
             available_indices.remove(judge_i)
 
-    # Save the judges to the pairings
-    Outround.objects.bulk_update(pairings, ["chair"])
-    Outround.judges.through.objects.bulk_create(judge_round_joins)
+    return judge_round_joins
+
+
+def _collect_outround_pairing_data(round_specs, round_priority):
+    pairings_by_spec = {}
+    panel_size_by_spec = {}
+
+    for round_type, num_teams in round_specs:
+        pairings = tab_logic.sorted_pairings(num_teams, outround=True)
+        pairings = [
+            p for p in pairings
+            if p.type_of_round == round_type and p.victor == Outround.UNKNOWN
+        ]
+        pairings_by_spec[(round_type, num_teams)] = sort_outround_pairings(
+            pairings,
+            round_priority,
+        )
+        panel_size_by_spec[(round_type, num_teams)] = (
+            TabSettings.get("var_panel_size", 3)
+            if round_type == Outround.VARSITY
+            else TabSettings.get("nov_panel_size", 3)
+        )
+
+    return pairings_by_spec, panel_size_by_spec
+
+
+def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
+    normalized_specs = _normalize_round_specs(round_specs, round_type=round_type)
+    if not normalized_specs:
+        return
+
+    settings = get_outround_settings(normalized_specs[0][0])
+    pairings_by_spec, panel_size_by_spec = _collect_outround_pairing_data(
+        normalized_specs,
+        settings.round_priority,
+    )
+
+    active_round_ids = [
+        pairing.id
+        for pairings in pairings_by_spec.values()
+        for pairing in pairings
+    ]
+    if not active_round_ids:
+        return
+
+    # Clear existing assignments only for undecided rounds in the selected scope.
+    Outround.judges.through.objects.filter(outround_id__in=active_round_ids).delete()
+    Outround.objects.filter(id__in=active_round_ids).update(chair=None)
+
+    judges = list(
+        Judge.objects.filter(
+            checkin__round_number=0
+        ).prefetch_related(
+            "judges",
+            "scratches",
+            "schools",
+        )
+    )
+    random.seed(1337)
+    random.shuffle(judges)
+    judges = sorted(judges, key=lambda j: j.rank, reverse=True)
+    judge_scores = construct_judge_scores(judges)
+    available_indices = list(range(len(judges)))
+
+    has_varsity = any(spec[0] == Outround.VARSITY for spec in normalized_specs)
+    has_novice = any(spec[0] == Outround.NOVICE for spec in normalized_specs)
+    run_joint_novice_chairs = (
+        has_varsity
+        and has_novice
+        and settings.judge_priority == OutroundJudgePriority.NOVICE_CHAIRS
+    )
+
+    judge_round_joins = []
+    if run_joint_novice_chairs:
+        judge_round_joins.extend(
+            _assign_outround_judges_for_specs(
+                round_specs=normalized_specs,
+                pairings_by_spec=pairings_by_spec,
+                panel_size_by_spec=panel_size_by_spec,
+                judges=judges,
+                judge_scores=judge_scores,
+                settings=settings,
+                available_indices=available_indices,
+                force_novice_last=True,
+            )
+        )
+    else:
+        varsity_specs = [s for s in normalized_specs if s[0] == Outround.VARSITY]
+        novice_specs = [s for s in normalized_specs if s[0] == Outround.NOVICE]
+        for specs in (varsity_specs, novice_specs):
+            if not specs:
+                continue
+            judge_round_joins.extend(
+                _assign_outround_judges_for_specs(
+                    round_specs=specs,
+                    pairings_by_spec=pairings_by_spec,
+                    panel_size_by_spec=panel_size_by_spec,
+                    judges=judges,
+                    judge_scores=judge_scores,
+                    settings=settings,
+                    available_indices=available_indices,
+                    force_novice_last=False,
+                )
+            )
+
+    rounds_to_update = []
+    for round_type, num_teams in normalized_specs:
+        rounds_to_update.extend(pairings_by_spec.get((round_type, num_teams), []))
+
+    if rounds_to_update:
+        Outround.objects.bulk_update(rounds_to_update, ["chair"])
+    if judge_round_joins:
+        Outround.judges.through.objects.bulk_create(judge_round_joins)
 
 def calc_weight(
         judge_i,
@@ -473,10 +638,10 @@ def had_judge(judge, team):
     return False
 
 
-def can_judge_teams(list_of_judges, team1, team2):
+def can_judge_teams(list_of_judges, team1, team2, allow_rejudges=None):
     result = []
     for judge in list_of_judges:
-        if not judge_conflict(judge, team1, team2):
+        if not judge_conflict(judge, team1, team2, allow_rejudges=allow_rejudges):
             result.append(judge)
     return result
 

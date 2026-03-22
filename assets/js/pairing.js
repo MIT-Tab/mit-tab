@@ -123,6 +123,11 @@ function assignRoom(e) {
   let $buttonWrapper;
   if (curRoomId) {
     $buttonWrapper = $(`span[round-id=${roundId}][room-id=${curRoomId}]`);
+  } else {
+    $buttonWrapper = $(`.room span[round-id=${roundId}]`).first();
+  }
+  if (!$buttonWrapper.length) {
+    return;
   }
   const $button = $buttonWrapper.find(".btn-sm");
   $button.addClass("disabled");
@@ -148,7 +153,8 @@ function populateAlternativeRooms() {
   const roundId = $parent.attr("round-id");
   const outround = $parent.attr("outround") === "true";
   const baseUrl = outround ? "/outround" : "/round";
-  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}`;
+  const query = outround ? window.location.search || "" : "";
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}${query}`;
 
   $.ajax({
     url,

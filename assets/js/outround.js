@@ -16,40 +16,61 @@ function cycleChoice(event) {
 }
 
 function populateTabCards() {
-  const roundNumber = $("#round-number").data("round-number");
-  if (!roundNumber || !$(".outround-tabcard").length) {
+  const roundNumberEl = $("#round-number");
+  const roundNumbersAttr = roundNumberEl.attr("data-round-numbers");
+  let roundNumbers = [];
+
+  if (roundNumbersAttr) {
+    roundNumbers = roundNumbersAttr
+      .split(",")
+      .map((n) => n.trim())
+      .filter((n) => n);
+  }
+
+  if (!roundNumbers.length) {
+    const fallbackRoundNumber = roundNumberEl.data("round-number");
+    if (fallbackRoundNumber) {
+      roundNumbers = [String(fallbackRoundNumber)];
+    }
+  }
+
+  roundNumbers = [...new Set(roundNumbers)];
+
+  if (!roundNumbers.length || !$(".outround-tabcard").length) {
     return;
   }
-  $.ajax({
-    url: `/outround/${roundNumber}/stats`,
-    success(result) {
-      Object.entries(result).forEach(([teamId, stats]) => {
-        const tabCardElement = $(`.outround-tabcard[team-id=${teamId}]`);
-        const text = [
-          stats.effective_outround_seed,
-          stats.outround_seed,
-          stats.wins,
-          stats.total_speaks.toFixed(2),
-          stats.govs,
-          stats.opps,
-          stats.seed,
-        ].join(" / ");
-        tabCardElement.attr(
-          "title",
-          "Effective Seed / Outround Seed / In-round Wins" +
-            " / Speaks / Govs / Opps / Seed",
-        );
-        tabCardElement.attr("href", `/team/card/${teamId}`);
-        tabCardElement.text(text);
-      });
-    },
+
+  roundNumbers.forEach((roundNumber) => {
+    $.ajax({
+      url: `/outround/${roundNumber}/stats`,
+      success(result) {
+        Object.entries(result).forEach(([teamId, stats]) => {
+          const tabCardElement = $(`.outround-tabcard[team-id=${teamId}]`);
+          const text = [
+            stats.effective_outround_seed,
+            stats.outround_seed,
+            stats.wins,
+            stats.total_speaks.toFixed(2),
+            stats.govs,
+            stats.opps,
+            stats.seed,
+          ].join(" / ");
+          tabCardElement.attr(
+            "title",
+            "Effective Seed / Outround Seed / In-round Wins" +
+              " / Speaks / Govs / Opps / Seed",
+          );
+          tabCardElement.attr("href", `/team/card/${teamId}`);
+          tabCardElement.text(text);
+        });
+      },
+    });
   });
 }
 
 function assignTeam(e) {
   e.preventDefault();
   const teamId = $(e.target).attr("team-id");
-  const oldTeamId = $(e.target).attr("src-team-id");
   const roundId = $(e.target).attr("round-id");
   const position = $(e.target).attr("position");
   const url = `/outround/pairings/assign_team/${roundId}/${position}/${teamId}`;
@@ -67,13 +88,7 @@ function assignTeam(e) {
         $container.find(".team-link").text(result.team.name);
         $container.find(".team-link").attr("href", `/team/${result.team.id}`);
         $container.find(".outround-tabcard").attr("team-id", result.team.id);
-
-        populateTabCards($(`.outround-tabcard[team-id=${result.team.id}]`));
-
-        const $oldTeamTabCard = $(`.outround-tabcard[team-id=${oldTeamId}]`);
-        if ($oldTeamTabCard) {
-          populateTabCards($oldTeamTabCard);
-        }
+        populateTabCards();
       } else {
         window.alert(alertMsg);
       }
@@ -140,7 +155,8 @@ function populateAlternativeJudges() {
   const $parent = $(this).parent();
   const judgeId = $parent.attr("judge-id");
   const roundId = $parent.attr("round-id");
-  const url = `/outround/${roundId}/alternative_judges/${judgeId || ""}`;
+  const query = window.location.search || "";
+  const url = `/outround/${roundId}/alternative_judges/${judgeId || ""}${query}`;
 
   $.ajax({
     url,
@@ -154,29 +170,31 @@ function populateAlternativeJudges() {
 }
 
 function togglePairingRelease(event) {
-  const button = $(".outround-release");
-  const numTeams = button.data("num_teams");
-  const typeOfRound = button.data("type_of_round");
+  const button = $(event.currentTarget);
+  const numTeams = button.attr("data-num_teams");
+  const typeOfRound = button.attr("data-type_of_round");
+  const releaseKey = button.attr("data-release-key");
 
   event.preventDefault();
   $.ajax({
     url: `/outround_pairing/release/${numTeams}/${typeOfRound}`,
     success(result) {
+      const groupSelector = `.outround-release[data-release-key='${releaseKey}']`;
+      const closeBtn = `${groupSelector}.close-pairings-btn`;
+      const openBtn = `${groupSelector}.open-pairings-btn`;
       if (result.pairing_released) {
-        $("#close-pairings").removeClass("d-none");
-        $("#release-pairings").addClass("d-none");
+        $(closeBtn).removeClass("d-none");
+        $(openBtn).addClass("d-none");
       } else {
-        $("#close-pairings").addClass("d-none");
-        $("#release-pairings").removeClass("d-none");
+        $(closeBtn).addClass("d-none");
+        $(openBtn).removeClass("d-none");
       }
     },
   });
 }
 
 $(document).ready(() => {
-  $(".team.outround-tabcard").each((_, element) => {
-    populateTabCards($(element));
-  });
+  populateTabCards();
   $(".choice-update").each((_, element) => {
     $(element).click(cycleChoice);
   });
