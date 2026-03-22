@@ -60,7 +60,7 @@ def test_login_middleware_stores_return_to_for_get_requests():
         (),
         {
             "filter": lambda *args, **kwargs: type(
-                "QuerySet", (), {"exists": lambda: False}
+                "QuerySet", (), {"exists": lambda self: False}
             )()
         },
     )()
@@ -93,7 +93,7 @@ def test_login_middleware_prefers_internal_referer_for_return_to():
         (),
         {
             "filter": lambda *args, **kwargs: type(
-                "QuerySet", (), {"exists": lambda: False}
+                "QuerySet", (), {"exists": lambda self: False}
             )()
         },
     )()
