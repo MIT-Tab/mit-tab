@@ -668,8 +668,14 @@ def generate_archive(request):
     return response
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def generate_black_rod_bundle(request):
+    # Allow access for users with tab_settings.can_change permission or APDA board users
+    if not (
+        request.user.has_perm("tab.tab_settings.can_change")
+        or is_apda_board_user(request.user)
+    ):
+        return redirect("/403/")
+
     tournament_name = request.META["SERVER_NAME"].split(".")[0]
     filename = tournament_name + "-black-rod-bundle.json"
 
