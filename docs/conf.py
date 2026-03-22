@@ -179,4 +179,6 @@ myst_enable_extensions = [
 ]
 
 # Ignore bad random CI warning
-linkcheck_ignore = [r"https://www\.wikiwand\.com/en/articles/Blossom_algorithm.*"]
+linkcheck_ignore = [
+    r"https://www\.wikiwand\.com/en/articles/Blossom_algorithm",
+]

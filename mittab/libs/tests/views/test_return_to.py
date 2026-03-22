@@ -52,8 +52,28 @@ def test_with_return_to_keeps_urls_clean():
 
 
 def test_login_middleware_stores_return_to_for_get_requests():
-    request = RequestFactory().get("/pairings/status/?round=1", HTTP_HOST="testserver")
-    request.user = type("User", (), {"is_anonymous": False})()
+    request = RequestFactory().get(
+        "/pairings/status/?round=1", HTTP_HOST="testserver"
+    )
+    mock_groups = type(
+        "Groups",
+        (),
+        {
+            "filter": lambda *args, **kwargs: type(
+                "QuerySet", (), {"exists": lambda self: False}
+            )()
+        },
+    )()
+    request.user = type(
+        "User",
+        (),
+        {
+            "is_anonymous": False,
+            "is_authenticated": True,
+            "is_superuser": False,
+            "groups": mock_groups,
+        },
+    )()
     request.session = {}
 
     response = Login(lambda req: HttpResponse("ok"))(request)
@@ -68,7 +88,25 @@ def test_login_middleware_prefers_internal_referer_for_return_to():
         HTTP_HOST="testserver",
         HTTP_REFERER="http://testserver/batch_checkin/",
     )
-    request.user = type("User", (), {"is_anonymous": False})()
+    mock_groups = type(
+        "Groups",
+        (),
+        {
+            "filter": lambda *args, **kwargs: type(
+                "QuerySet", (), {"exists": lambda self: False}
+            )()
+        },
+    )()
+    request.user = type(
+        "User",
+        (),
+        {
+            "is_anonymous": False,
+            "is_authenticated": True,
+            "is_superuser": False,
+            "groups": mock_groups,
+        },
+    )()
     request.session = {}
 
     response = Login(lambda req: HttpResponse("ok"))(request)

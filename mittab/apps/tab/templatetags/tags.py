@@ -1,6 +1,7 @@
 from django import template
 from django.forms.fields import FileField
 
+from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab.models import TabSettings
 from mittab.apps.tab.public_rankings import get_public_display_flags
@@ -89,3 +90,8 @@ def public_display_flags():
 def motions_enabled():
     """Returns True if motions feature is enabled."""
     return bool(TabSettings.get("motions_enabled", 0))
+
+
+@register.simple_tag
+def is_apda_board(user):
+    return is_apda_board_user(user)

@@ -33,6 +33,12 @@ class SchoolForm(forms.ModelForm):
         fields = "__all__"
 
 
+class SchoolApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = School
+        fields = ["apda_id"]
+
+
 class RoomForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         entry = "first_entry" in kwargs
@@ -238,6 +244,12 @@ class DebaterForm(forms.ModelForm):
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
+
+
+class DebaterApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = Debater
+        fields = ["apda_id"]
 
 
 def validate_speaks(value):
