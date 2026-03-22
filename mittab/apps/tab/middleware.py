@@ -54,7 +54,7 @@ APDA_BOARD_ALLOWED_PREFIXES = (
     "/static/",
     "/dynamic-media/",
 )
-APDA_BOARD_ALLOWED_EXACT_PATHS = ("/",)
+APDA_BOARD_ALLOWED_EXACT_PATHS = ("/", "/archive/black_rod_bundle/")
 
 
 class Login:
