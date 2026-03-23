@@ -1,0 +1,100 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Ballot Submitted{% endblock %}
+
+{% block banner %}Ballot Submitted{% endblock %}
+
+{% block content %}
+
+<div class="col">
+  <div class="container-fluid">
+
+    {% if disclosure_message %}
+    <div class="alert alert-info mb-3">
+      <strong>Speaker Disclosure Policy:</strong> {{ disclosure_message }}
+    </div>
+    {% endif %}
+
+    <div class="alert alert-success mb-3">
+      <strong>Your ballot has been submitted successfully.</strong>
+      Below is a read-only record of what you submitted.
+    </div>
+
+    <div class="row mb-3">
+      <div class="form-group col-md-6">
+        <label class="font-weight-bold">Winner</label>
+        <div class="form-control bg-light">{{ winner_display }}</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            Government: {{ gov_team.display }}
+          </div>
+          <div class="card-body">
+            <div class="gov">
+              {% for deb in gov_debaters %}
+              <div class="row pb-1 {% if not forloop.last %}border-bottom mb-1{% endif %}">
+                <div class="col-12 form-group mb-1">
+                  <label class="font-weight-bold">{{ deb.role }}</label>
+                  <div class="form-control bg-light">{{ deb.name }}</div>
+                </div>
+                <div class="col-md-6 form-group mb-1">
+                  <label>Speaks</label>
+                  <div class="form-control bg-light">{{ deb.speaks }}</div>
+                </div>
+                <div class="col-md-6 form-group mb-1">
+                  <label>Rank</label>
+                  <div class="form-control bg-light">{{ deb.ranks }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            Opposition: {{ opp_team.display }}
+          </div>
+          <div class="card-body">
+            <div class="opp">
+              {% for deb in opp_debaters %}
+              <div class="row pb-1 {% if not forloop.last %}border-bottom mb-1{% endif %}">
+                <div class="col-12 form-group mb-1">
+                  <label class="font-weight-bold">{{ deb.role }}</label>
+                  <div class="form-control bg-light">{{ deb.name }}</div>
+                </div>
+                <div class="col-md-6 form-group mb-1">
+                  <label>Speaks</label>
+                  <div class="form-control bg-light">{{ deb.speaks }}</div>
+                </div>
+                <div class="col-md-6 form-group mb-1">
+                  <label>Rank</label>
+                  <div class="form-control bg-light">{{ deb.ranks }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="col">
+        <p class="text-muted">
+          If you need to change your ballot, please go to tab staff.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
