@@ -3,94 +3,93 @@
 
 {% block title %}Ballot Submitted{% endblock %}
 
-{% block banner %}Ballot Submitted{% endblock %}
+{% block banner %}{% endblock %}
 
 {% block content %}
 
 <div class="col">
   <div class="container-fluid">
 
+    {# ── Confirmation header ── #}
+    <div class="ballot-submitted-header d-flex align-items-center mb-4">
+      <div class="check-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div>
+        <h3>Ballot submitted</h3>
+        <p class="subtitle">This is a read-only record of what you submitted. To make changes, go to tab staff.</p>
+      </div>
+    </div>
+
     {% if disclosure_message %}
-    <div class="alert alert-info mb-3">
+    <div class="alert alert-info mb-4">
+      <i class="fas fa-info-circle mr-1"></i>
       <strong>Speaker Disclosure Policy:</strong> {{ disclosure_message }}
     </div>
     {% endif %}
 
-    <div class="alert alert-success mb-3">
-      <strong>Your ballot has been submitted successfully.</strong>
-      Below is a read-only record of what you submitted.
-    </div>
-
-    <div class="row mb-3">
-      <div class="form-group col-md-6">
-        <label class="font-weight-bold">Winner</label>
-        <div class="form-control bg-light">{{ winner_display }}</div>
+    {# ── Winner ── #}
+    <div class="row mb-4 winner-row">
+      <div class="col-md-6">
+        <div class="field-label">Winner</div>
+        <div class="submitted-field">{{ winner_display }}</div>
       </div>
     </div>
 
+    {# ── Team cards ── #}
     <div class="row">
-      <div class="col-md-6">
-        <div class="card">
+      <div class="col-md-6 mb-3">
+        <div class="card submitted-card">
           <div class="card-header">
-            Government: {{ gov_team.display }}
+            <span>Government: {{ gov_team.display }}</span>
+            <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
           </div>
           <div class="card-body">
-            <div class="gov">
-              {% for deb in gov_debaters %}
-              <div class="row pb-1 {% if not forloop.last %}border-bottom mb-1{% endif %}">
-                <div class="col-12 form-group mb-1">
-                  <label class="font-weight-bold">{{ deb.role }}</label>
-                  <div class="form-control bg-light">{{ deb.name }}</div>
-                </div>
-                <div class="col-md-6 form-group mb-1">
-                  <label>Speaks</label>
-                  <div class="form-control bg-light">{{ deb.speaks }}</div>
-                </div>
-                <div class="col-md-6 form-group mb-1">
-                  <label>Rank</label>
-                  <div class="form-control bg-light">{{ deb.ranks }}</div>
-                </div>
+            {% for deb in gov_debaters %}
+            <div class="row pb-2 {% if not forloop.last %}border-bottom mb-2{% endif %}">
+              <div class="col-12 mb-1">
+                <div class="field-label">{{ deb.role }}</div>
+                <div class="submitted-field">{{ deb.name }}</div>
               </div>
-              {% endfor %}
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Speaks</div>
+                <div class="submitted-field">{{ deb.speaks }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Rank</div>
+                <div class="submitted-field">{{ deb.ranks }}</div>
+              </div>
             </div>
+            {% endfor %}
           </div>
         </div>
       </div>
 
-      <div class="col-md-6">
-        <div class="card">
+      <div class="col-md-6 mb-3">
+        <div class="card submitted-card">
           <div class="card-header">
-            Opposition: {{ opp_team.display }}
+            <span>Opposition: {{ opp_team.display }}</span>
+            <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
           </div>
           <div class="card-body">
-            <div class="opp">
-              {% for deb in opp_debaters %}
-              <div class="row pb-1 {% if not forloop.last %}border-bottom mb-1{% endif %}">
-                <div class="col-12 form-group mb-1">
-                  <label class="font-weight-bold">{{ deb.role }}</label>
-                  <div class="form-control bg-light">{{ deb.name }}</div>
-                </div>
-                <div class="col-md-6 form-group mb-1">
-                  <label>Speaks</label>
-                  <div class="form-control bg-light">{{ deb.speaks }}</div>
-                </div>
-                <div class="col-md-6 form-group mb-1">
-                  <label>Rank</label>
-                  <div class="form-control bg-light">{{ deb.ranks }}</div>
-                </div>
+            {% for deb in opp_debaters %}
+            <div class="row pb-2 {% if not forloop.last %}border-bottom mb-2{% endif %}">
+              <div class="col-12 mb-1">
+                <div class="field-label">{{ deb.role }}</div>
+                <div class="submitted-field">{{ deb.name }}</div>
               </div>
-              {% endfor %}
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Speaks</div>
+                <div class="submitted-field">{{ deb.speaks }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Rank</div>
+                <div class="submitted-field">{{ deb.ranks }}</div>
+              </div>
             </div>
+            {% endfor %}
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="row mt-3">
-      <div class="col">
-        <p class="text-muted">
-          If you need to change your ballot, please go to tab staff.
-        </p>
       </div>
     </div>
 
