@@ -1,6 +1,23 @@
 import $ from "jquery";
 import "../css/batchCheckin.scss";
 
+const updateCheckinCounts = (entityType, roundDeltas) => {
+  Object.entries(roundDeltas).forEach(([roundIndex, delta]) => {
+    const selector = `.checkin-count[data-entity-type='${entityType}'][data-round-index='${roundIndex}']`;
+    $(selector).each((_, el) => {
+      const $el = $(el);
+      const total = Number($el.data("total")) || 0;
+      const current = Number($el.text()) || 0;
+      let next = current + delta;
+      if (Number.isNaN(next)) {
+        next = current;
+      }
+      next = Math.max(0, Math.min(total, next));
+      $el.text(next);
+    });
+  });
+};
+
 const submitCheckIn = (checkboxes, checked) => {
   const $boxes = $(checkboxes);
   if (!$boxes.length) return;
@@ -11,6 +28,16 @@ const submitCheckIn = (checkboxes, checked) => {
     .data("entityType");
   const ids = [...new Set($boxes.map((_, el) => $(el).data("id")).get())];
   const rounds = $boxes.map((_, el) => $(el).data("round")).get();
+
+  const roundDeltas = {};
+  $boxes.each((_, cb) => {
+    const $cb = $(cb);
+    const current = $cb.prop("checked");
+    if (current === checked) return;
+    const roundIndex = $cb.data("round") == null ? -1 : $cb.data("round");
+    roundDeltas[roundIndex] =
+      (roundDeltas[roundIndex] || 0) + (checked ? 1 : -1);
+  });
 
   $.post("/bulk_check_in/", {
     csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
@@ -24,6 +51,9 @@ const submitCheckIn = (checkboxes, checked) => {
       $boxes.each((_, cb) =>
         $(cb).prop("checked", checked).next("label").text(`Checked ${status}`),
       );
+      if (Object.keys(roundDeltas).length) {
+        updateCheckinCounts(entityType, roundDeltas);
+      }
     })
     .fail(() => alert("Check-in failed. Please try again."));
 };

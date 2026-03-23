@@ -9,7 +9,8 @@
 <div class="col">
   <div class="container-fluid">
     <form action="" method="post" class="ballot-form" enctype="multipart/form-data">
-
+      {% csrf_token %}
+      {% return_to_input %}
 
       <div class="row">
         <div class="col">
@@ -39,4 +40,13 @@
     </form>
   </div>
 </div>
+
+<script>
+  window.speakSettings = {
+    warnJudgesAboutSpeaks: {{ warn_judges_about_speaks|lower }},
+    lowSpeakWarningThreshold: {{ low_speak_warning_threshold }},
+    highSpeakWarningThreshold: {{ high_speak_warning_threshold }}
+  };
+</script>
+
 {% endblock %}

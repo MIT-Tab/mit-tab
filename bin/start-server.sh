@@ -4,6 +4,20 @@ set +x
 
 cd /var/www/tab
 
+# Ensure memcached is running for shared caching
+if command -v memcached >/dev/null 2>&1; then
+  MEMCACHED_PORT="${MEMCACHED_PORT:-11211}"
+  MEMCACHED_HOST="${MEMCACHED_HOST:-127.0.0.1}"
+  MEMCACHED_MEMORY="${MEMCACHED_MEMORY:-64}"
+
+  memcached -u nobody -m "$MEMCACHED_MEMORY" -p "$MEMCACHED_PORT" -l "$MEMCACHED_HOST" &
+  MEMCACHED_PID=$!
+  trap 'kill "$MEMCACHED_PID"' EXIT
+  export MEMCACHED_LOCATION="${MEMCACHED_HOST}:${MEMCACHED_PORT}"
+else
+  echo "memcached binary not found; public cache will run in local memory only." >&2
+fi
+
 host="${MYSQL_HOST:-127.0.0.1}"
 cert_path="${MYSQL_SSL_CA:-/var/www/tab/tmp/digitalocean-db-ca.pem}"
 mkdir -p "$(dirname "$cert_path")"
@@ -34,5 +48,16 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
   python manage.py loaddata testing_db;
 fi
 
-/usr/local/bin/gunicorn --worker-tmp-dir /dev/shm \
-  mittab.wsgi:application -w 2 --bind 0.0.0.0:8000 -t 300
+GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+GUNICORN_CONNECTIONS=${GUNICORN_CONNECTIONS:-512}
+
+/usr/local/bin/gunicorn mittab.wsgi:application \
+  --worker-class gevent \
+  --workers "$GUNICORN_WORKERS" \
+  --worker-connections "$GUNICORN_CONNECTIONS" \
+  --max-requests 2000 \
+  --max-requests-jitter 200 \
+  --keep-alive 5 \
+  --graceful-timeout 30 \
+  --timeout 120 \
+  --bind 0.0.0.0:8000

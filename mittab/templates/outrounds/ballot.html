@@ -10,6 +10,7 @@
 <div class="col">
   <div class="container-fluid">
     <form action="{{ action }}" method="post" class="ballot-form single" enctype="multipart/form-data">{% csrf_token %}
+    {% return_to_input %}
     {% outround_form form %}
 
     <div class="row">

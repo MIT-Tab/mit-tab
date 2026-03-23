@@ -4,7 +4,7 @@ from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
 
-from mittab.libs import cache_logic
+from mittab.libs.cacheing import cache_logic
 
 
 class TabSettings(models.Model):
@@ -72,6 +72,40 @@ class TabSettings(models.Model):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+
+
+class PublicDisplaySetting(models.Model):
+    RANKING = "ranking"
+    STANDING = "standing"
+    BALLOT = "ballot"
+    DISPLAY_TYPE_CHOICES = (
+        (RANKING, "Ranking"),
+        (STANDING, "Standing"),
+        (BALLOT, "Ballot"),
+    )
+
+    slug = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    display_type = models.CharField(max_length=20, choices=DISPLAY_TYPE_CHOICES)
+    is_enabled = models.BooleanField(default=False)
+    include_speaks = models.BooleanField(default=False)
+    include_ranks = models.BooleanField(default=False)
+    max_visible = models.PositiveIntegerField(default=10)
+    round_number = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "public display setting"
+
+    def __str__(self):
+        return self.label
+
+    @classmethod
+    def get_or_create_setting(cls, *, slug, label, display_type, defaults=None):
+        if defaults is None:
+            defaults = {}
+        payload = {"label": label, "display_type": display_type}
+        payload.update(defaults)
+        return cls.objects.get_or_create(slug=slug, defaults=payload)
 
 
 class School(models.Model):
@@ -202,6 +236,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     @classmethod
@@ -232,6 +267,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     def set_unique_team_code(self):
@@ -359,8 +395,8 @@ class Judge(models.Model):
                                 update_fields)
 
     def is_checked_in_for_round(self, round_number):
-        return CheckIn.objects.filter(judge=self,
-                                      round_number=round_number).exists()
+        return any(checkin.round_number == round_number
+                   for checkin in self.checkin_set.all())
 
     def __str__(self):
         return self.name
@@ -519,6 +555,8 @@ class Outround(models.Model):
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
     room = models.ForeignKey(Room,
+                             blank=True,
+                             null=True,
                              on_delete=models.CASCADE,
                              related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -630,6 +668,27 @@ class Round(models.Model):
         super(Round, self).delete(using, keep_parents)
 
 
+class ManualJudgeAssignment(models.Model):
+    round = models.ForeignKey(
+        Round,
+        on_delete=models.CASCADE,
+        related_name="manual_judge_assignments",
+    )
+    judge = models.ForeignKey(
+        Judge,
+        on_delete=models.CASCADE,
+        related_name="manual_round_assignments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("round", "judge")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.judge} manually assigned to {self.round}"
+
+
 class Bye(models.Model):
     bye_team = models.ForeignKey(Team, related_name="byes", on_delete=models.CASCADE)
     round_number = models.IntegerField()
@@ -644,7 +703,15 @@ class NoShow(models.Model):
                                      related_name="no_shows",
                                      on_delete=models.CASCADE)
     round_number = models.IntegerField()
-    lenient_late = models.BooleanField(default=False)
+
+    @property
+    def lenient_late(self):
+        """
+        Determines if this no-show should be treated leniently based on
+        the current tab setting. Returns True if the lenient_late setting
+        is greater than or equal to this round number.
+        """
+        return TabSettings.get("lenient_late", 0) >= self.round_number
 
     def __str__(self):
         return str(self.no_show_team) + " was no-show for round " + str(
@@ -704,3 +771,128 @@ class RoomTag(models.Model):
 
     def __str__(self):
         return self.tag
+
+
+class RankingGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    teams = models.ManyToManyField(
+        "Team",
+        blank=True,
+        related_name="ranking_groups",
+    )
+    debaters = models.ManyToManyField(
+        "Debater",
+        blank=True,
+        related_name="ranking_groups",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Motion(models.Model):
+    """
+    Represents a debate motion (topic) for a specific round.
+    
+    Round identification:
+    - For inrounds: round_number is set (1, 2, 3, etc.)
+    - For outrounds: round_number is None, and outround_type + num_teams identifies the round
+      (e.g., Varsity Quarterfinals = outround_type=0, num_teams=8)
+    """
+    VARSITY = 0
+    NOVICE = 1
+    OUTROUND_TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice"),
+    )
+
+    # Round identification - either round_number for inrounds, or outround fields for outrounds
+    round_number = models.IntegerField(null=True, blank=True,
+                                       help_text="Round number for inrounds (1, 2, 3, etc.)")
+    outround_type = models.IntegerField(null=True, blank=True, choices=OUTROUND_TYPE_CHOICES,
+                                        help_text="Type of outround (Varsity/Novice)")
+    num_teams = models.IntegerField(null=True, blank=True,
+                                    help_text="Number of teams in outround (e.g., 8 for quarterfinals)")
+
+    # Motion content
+    info_slide = models.TextField(blank=True, default="",
+                                  help_text="Optional context/info slide text shown before the motion")
+    motion_text = models.TextField(help_text="The debate motion/resolution text")
+
+    # Publication status
+    is_published = models.BooleanField(default=False,
+                                       help_text="Whether this motion is visible to the public")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["round_number", "outround_type", "-num_teams"]
+        verbose_name = "motion"
+        verbose_name_plural = "motions"
+
+    def __str__(self):
+        return f"Motion for {self.round_display}: {self.motion_text[:50]}..."
+
+    @property
+    def is_outround(self):
+        """Returns True if this is an outround motion."""
+        return self.round_number is None and self.num_teams is not None
+
+    @property
+    def round_display(self):
+        """Returns a human-readable round name."""
+        if self.round_number is not None:
+            return f"Round {self.round_number}"
+        elif self.num_teams is not None:
+            type_name = "Varsity" if self.outround_type == self.VARSITY else "Novice"
+            round_names = {
+                2: "Finals",
+                4: "Semifinals",
+                8: "Quarterfinals",
+                16: "Octofinals",
+                32: "Double Octofinals",
+                64: "Triple Octofinals",
+            }
+            round_name = round_names.get(self.num_teams, f"Round of {self.num_teams}")
+            return f"{type_name} {round_name}"
+        return "Unknown Round"
+
+    @property
+    def sort_key(self):
+        """Returns a sort key for ordering motions (inrounds first, then outrounds by size)."""
+        if self.round_number is not None:
+            # Inrounds: sort by round number
+            return (0, self.round_number, 0)
+        else:
+            # Outrounds: sort by type (varsity first), then by num_teams (descending)
+            return (1, self.outround_type or 0, -(self.num_teams or 0))
+
+    @property
+    def round_selection_value(self):
+        """Returns the form value used in the round_selection dropdown."""
+        if self.round_number is not None:
+            return f"inround_{self.round_number}"
+        elif self.num_teams is not None:
+            return f"outround_{self.outround_type}_{self.num_teams}"
+        return ""
+
+    def clean(self):
+        """Validate that either round_number or outround fields are set, but not both."""
+        super().clean()
+        has_round_number = self.round_number is not None
+        has_outround = self.num_teams is not None
+
+        if has_round_number and has_outround:
+            raise ValidationError(
+                "A motion cannot have both a round number (inround) and outround fields set."
+            )
+        if not has_round_number and not has_outround:
+            raise ValidationError(
+                "A motion must have either a round number (inround) or outround fields set."
+            )
+        if has_outround and self.outround_type is None:
+            raise ValidationError(
+                "Outround motions must specify the outround type (Varsity/Novice)."
+            )

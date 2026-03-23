@@ -39,17 +39,13 @@ def pair_round():
     # Need a reproduceable random pairing order
     random.seed(0xBEEF)
 
-    # add scratches for teams/judges from the same school
-    # NOTE that this only happens if they haven't already been added
-    add_scratches_for_school_affil()
     all_pull_ups = []
 
     # Record no-shows
     forfeit_teams = list(Team.objects.filter(checked_in=False))
     for team in forfeit_teams:
-        lenient_late = TabSettings.get("lenient_late", 0) >= current_round
         no_show = NoShow(
-            no_show_team=team, round_number=current_round, lenient_late=lenient_late
+            no_show_team=team, round_number=current_round
         )
         no_show.save()
 
@@ -289,26 +285,6 @@ def validate_round_data(round_to_check):
     # If we have results, they should be entered and there should be no
     # byes or noshows for teams that debated
     have_properly_entered_data(round_to_check)
-
-
-def add_scratches_for_school_affil():
-    """
-    Add scratches for teams/judges from the same school
-    Only do this if they haven't already been added
-    """
-    all_judges = Judge.objects.all().prefetch_related("schools", "scratches__team")
-    all_teams = Team.objects.all().prefetch_related("school", "hybrid_school")
-
-    to_create = []
-
-    for judge in all_judges:
-        for team in all_teams:
-            judge_schools = judge.schools.all()
-            if team.school in judge_schools or team.hybrid_school in judge_schools:
-                if not any(s.team == team for s in judge.scratches.all()):
-                    to_create.append(Scratch(judge=judge, team=team, scratch_type=1))
-    Scratch.objects.bulk_create(to_create)
-
 
 def highest_seed(team1, team2):
     return max(team1.seed, team2.seed)
@@ -650,3 +626,26 @@ def determine_gov_opp(all_pairs):
         else:
             final_pairings += [[team2, team1]]
     return final_pairings
+
+
+def clear_current_round_pairing():
+    """
+    Safely clear all pairing data for the current round.
+    This removes Rounds, Byes, and NoShows for the current round number.
+
+    This is used when re-pairing a round to ensure a clean slate.
+    The current round number is NOT decremented - it stays the same.
+
+    Returns the round number that was cleared.
+    """
+    current_round = TabSettings.get("cur_round") - 1
+
+    if current_round < 1:
+        raise ValueError("No round has been paired yet")
+
+    Round.objects.filter(round_number=current_round).delete()
+    Bye.objects.filter(round_number=current_round).delete()
+    NoShow.objects.filter(round_number=current_round).delete()
+    TabSettings.set("pairing_released", 0)
+
+    return current_round

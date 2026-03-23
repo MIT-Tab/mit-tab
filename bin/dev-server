@@ -9,10 +9,13 @@ server_env = os.environ.copy()
 server_env["DEBUG"] = "1"
 server_env["MITTAB_DB_HOST"] = "127.0.0.1"
 
+webpack_env = os.environ.copy()
+webpack_env["NODE_ENV"] = "development"
+
 webpack_args = ["./node_modules/.bin/webpack", "--config", "webpack.config.js", "--watch"]
 server_args = ["python", "manage.py", "runserver", "0.0.0.0:8001"]
 
-webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stderr)
+webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stderr, env=webpack_env)
 server_proc = subprocess.Popen(server_args, stdout=sys.stdout, stderr=sys.stderr, env=server_env)
 
 def on_interrupt(*args):

@@ -1,0 +1,61 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block extra_head %}
+    {% render_bundle 'publicDisplay' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12 public-table-root">
+  <div class="public-table-header">
+    <h1>Speaker Rankings</h1>
+  </div>
+
+  {% for section in speaker_sections %}
+    {% if section.show %}
+      <section class="mb-5">
+        <h3>{{ section.title }}</h3>
+        {% if not section.show_scores %}
+          <div class="alert alert-secondary" role="status">
+            Speaks and ranks are hidden for this section.
+          </div>
+        {% endif %}
+        <div class="public-table-wrap rounded-lg">
+          <table class="table table-striped table-sm table-bordered mb-0">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Speaker</th>
+                <th>Team</th>
+                {% if section.show_scores %}
+                  <th>Speaks</th>
+                  <th>Ranks</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in section.rows %}
+                <tr>
+                  <td>{{ row.place }}</td>
+                  <td>{{ row.debater.display }}</td>
+                  <td>{{ row.team.display_backend }}</td>
+                  {% if section.show_scores %}
+                    <td>{{ row.speaks|floatformat:2 }}</td>
+                    <td>{{ row.ranks|floatformat:2 }}</td>
+                  {% endif %}
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="{% if section.show_scores %}5{% else %}3{% endif %}" class="text-center">
+                    {{ section.empty_message }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

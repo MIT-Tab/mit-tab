@@ -126,3 +126,4 @@ typings/
 
 *.dump.sql
 .vscode/
+/loadtest/

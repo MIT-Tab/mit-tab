@@ -6,14 +6,16 @@ from django.contrib.auth.views import LoginView
 from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
-import mittab.apps.tab.views as views
-import mittab.apps.tab.api_views as api_views
-import mittab.apps.tab.judge_views as judge_views
+import mittab.apps.tab.views.views as views
+import mittab.apps.tab.views.public_views as public_views
+import mittab.apps.tab.views.api_views as api_views
+import mittab.apps.tab.views.judge_views as judge_views
 import mittab.apps.tab.scratch_views as scratch_views
-import mittab.apps.tab.team_views as team_views
-import mittab.apps.tab.debater_views as debater_views
-import mittab.apps.tab.pairing_views as pairing_views
-import mittab.apps.tab.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.team_views as team_views
+import mittab.apps.tab.views.debater_views as debater_views
+import mittab.apps.tab.views.pairing_views as pairing_views
+import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.motion_views as motion_views
 
 
 admin.autodiscover()
@@ -27,17 +29,23 @@ urlpatterns = [
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
+    path("apda-board/", views.apda_board_home, name="apda_board_home"),
+    path(
+        "apda-board/school/<int:school_id>/",
+        views.apda_board_school_detail,
+        name="apda_board_school_detail",
+    ),
+    path(
+        "apda-board/debater/<int:debater_id>/",
+        views.apda_board_debater_detail,
+        name="apda_board_debater_detail",
+    ),
     re_path(r"^403/", views.render_403, name="403"),
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),
 
-    # Account related
-    path("accounts/login/",
-         LoginView.as_view(template_name="registration/login.html"),
-         name="tab_login"),
 
     # Judge related
-    re_path(r"^judges/", judge_views.public_view_judges, name="public_judges"),
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
@@ -60,6 +68,11 @@ urlpatterns = [
     path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
     path("room-tag/", views.room_tag, name="room_tag"),
     path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
+    path("ranking-group/<group_id>/", views.ranking_group, name="ranking_group"),
+    path("ranking-group/", views.ranking_group, name="ranking_group"),
+    path("manage-ranking-groups",
+         views.manage_ranking_groups,
+         name="manage_ranking_groups"),
 
 
     # Scratch related
@@ -77,7 +90,6 @@ urlpatterns = [
     re_path(r"^enter_scratch/", scratch_views.add_scratch, name="add_scratch"),
 
     # Team related
-    re_path(r"^teams/", team_views.public_view_teams, name="public_teams"),
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
     path(r"scratches/<str:object_type>/<int:object_id>/",
             scratch_views.view_scratches_for_object,
@@ -92,8 +104,6 @@ urlpatterns = [
     path("team/ranking/", team_views.rank_teams_ajax,
          name="rank_teams_ajax"),
     path("team/rank/", team_views.rank_teams, name="rank_teams"),
-    path("rank_teams_public/", team_views.rank_teams_public,
-         name="rank_teams_public"),
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
@@ -105,12 +115,20 @@ urlpatterns = [
          debater_views.rank_debaters_ajax,
          name="rank_debaters_ajax"),
     path("debater/rank/", debater_views.rank_debaters, name="rank_debaters"),
+    path(
+        "rankings/public-control/",
+        views.public_rankings_control,
+        name="public_rankings_control",
+    ),
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
     path("pairings/view_rounds/",
          pairing_views.view_rounds,
          name="view_rounds"),
+    path("pairings/round_stats/",
+         pairing_views.round_stats,
+         name="round_stats"),
     re_path(r"^round/(\d+)/$", pairing_views.view_round, name="view_round"),
     re_path(r"^round/(\d+)/stats/$", pairing_views.team_stats, name="team_stats"),
     re_path(r"^outround/(\d+)/stats/$", pairing_views.team_stats,
@@ -140,10 +158,14 @@ urlpatterns = [
     re_path(r"^pairings/assign_team/(\d+)/(gov|opp)/(\d+)/$",
             pairing_views.assign_team,
             name="assign_team"),
+    path("round/<int:round_id>/switch_sides/",
+         pairing_views.switch_sides,
+         name="switch_sides"),
     re_path(r"^round/(\d+)/assign_judge/(\d+)/(\d+)/$",
             pairing_views.assign_judge,
             name="swap_judge"),
     path("pairing/pair_round/", pairing_views.pair_round, name="pair_round"),
+    path("pairing/re_pair_round/", pairing_views.re_pair_round, name="re_pair_round"),
     path("pairing/assign_judges/",
          pairing_views.assign_judges_to_pairing,
          name="assign_judges"),
@@ -155,6 +177,9 @@ urlpatterns = [
          pairing_views.assign_room,
          kwargs={"outround": True},
          name="assign_room_outround"),
+    path("outround/<int:round_id>/switch_sides/",
+         outround_pairing_views.switch_sides,
+         name="outround_switch_sides"),
     path("pairing/assign_rooms_to_pairing/",
          pairing_views.assign_rooms_to_pairing,
          name="assign_rooms_to_pairing"),
@@ -164,12 +189,6 @@ urlpatterns = [
     path("pairing/start_tourny/",
          pairing_views.start_new_tourny,
          name="start_tourny"),
-    path("pairings/pairinglist/",
-         pairing_views.pretty_pair,
-         name="pretty_pair"),
-    path("pairings/missing_ballots/",
-         pairing_views.missing_ballots,
-         name="missing_ballots"),
     path("pairings/export_csv/",
          pairing_views.export_pairings_csv_view,
          name="export_pairings_csv"),
@@ -182,11 +201,6 @@ urlpatterns = [
     path("pairing/view_backups/",
          pairing_views.view_backups,
          name="view_backups"),
-    path("e_ballots/", pairing_views.e_ballot_search,
-         name="e_ballot_search"),
-    path("e_ballots/<str:ballot_code>/",
-         pairing_views.enter_e_ballot,
-         name="enter_e_ballot"),
     path("pairings/simulate_rounds/", views.simulate_round, name="simulate_round"),
     path("batch_checkin/", views.batch_checkin, name="batch_checkin"),
     path("round/<int:round_id>/alternative_rooms/",
@@ -232,18 +246,21 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_swap_judge"),
-    path("outround_pairing/assign_judges/<int:round_type>/",
+    path("outround_pairing/assign_judges/",
          outround_pairing_views.assign_judges_to_pairing,
          name="outround_assign_judges"),
+    path("outround_pairing/assign_judges/<int:round_type>/",
+         outround_pairing_views.assign_judges_to_pairing,
+         name="outround_assign_judges_legacy"),
+    path("outround_pairing/assign_rooms/",
+         outround_pairing_views.assign_rooms_to_pairing,
+         name="outround_assign_rooms"),
     re_path(r"^outround/(\d+)/result/$",
             outround_pairing_views.enter_result,
             name="enter_result"),
     path("outround_pairing/pair/<int:type_of_round>/<int:num_teams>/",
          outround_pairing_views.pair_next_outround,
          name="next_outround"),
-    path("outround_pairings/pairinglist/<int:type_of_round>/",
-         outround_pairing_views.pretty_pair,
-         name="outround_pretty_pair"),
     path("outround_pairings/export_csv/<int:type_of_round>/",
          outround_pairing_views.export_outround_pairings_csv_view,
          name="export_outround_pairings_csv"),
@@ -272,6 +289,29 @@ urlpatterns = [
             views.settings_form,
             name="settings_form"),
 
+    # Motion management (admin)
+    path("motions/",
+         motion_views.manage_motions,
+         name="manage_motions"),
+    path("motions/add/",
+         motion_views.add_motion,
+         name="add_motion"),
+    path("motions/<int:motion_id>/edit/",
+         motion_views.edit_motion,
+         name="edit_motion"),
+    path("motions/<int:motion_id>/delete/",
+         motion_views.delete_motion,
+         name="delete_motion"),
+    path("motions/<int:motion_id>/toggle-published/",
+         motion_views.toggle_motion_published,
+         name="toggle_motion_published"),
+    path("motions/publish-all/",
+         motion_views.publish_all_motions,
+         name="publish_all_motions"),
+    path("motions/unpublish-all/",
+         motion_views.unpublish_all_motions,
+         name="unpublish_all_motions"),
+
     # Backups
     re_path(r"^backup/restore/(.+)/$",
             pairing_views.restore_backup,
@@ -288,12 +328,14 @@ urlpatterns = [
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
+    path(
+        "archive/black_rod_bundle/",
+        views.generate_black_rod_bundle,
+        name="download_black_rod_bundle",
+    ),
 
     # Standings API
     path("forum_post", views.forum_post, name="forum_post"),
-    path("publish_results/<int:new_setting>/",
-         views.publish_results,
-         name="publish_results"),
     path("api/varsity-speaker-awards",
          api_views.varsity_speaker_awards_api,
          name="varsity_speaker_awards_api"),
@@ -315,9 +357,60 @@ urlpatterns = [
     path("api/new-schools",
          api_views.new_schools_api,
          name="new_schools_api"),
+    path("api/debater-counts",
+         api_views.debater_counts_api,
+         name="debater_counts_api"),
 
     # Cache related
     re_path(r"^cache_refresh", views.force_cache_refresh, name="cache_refresh"),
+
+    # Public views
+    path("public/",
+         public_views.public_home,
+         name="public_home"),
+    path("public/access-error/",
+         public_views.public_access_error,
+         name="public_access_error"),
+    path("public/login/",
+         LoginView.as_view(template_name="public/staff_login.html"),
+         name="tab_login"),
+    path("public/pairings/",
+         public_views.pretty_pair,
+         name="pretty_pair"),
+    path("public/missing-ballots/",
+         public_views.missing_ballots,
+         name="missing_ballots"),
+    path("public/e-ballots/",
+         public_views.e_ballot_search,
+         name="e_ballot_search"),
+    path("public/e-ballots/<str:ballot_code>/",
+         public_views.enter_e_ballot,
+         name="enter_e_ballot"),
+    path("public/judges/",
+         public_views.public_view_judges,
+         name="public_judges"),
+    path("public/teams/",
+         public_views.public_view_teams,
+         name="public_teams"),
+    path("public/team-rankings/",
+         public_views.rank_teams_public,
+         name="rank_teams_public"),
+    path(
+        "public/speaker-rankings/",
+        public_views.public_speaker_rankings,
+        name="public_speaker_rankings",
+    ),
+    path(
+        "public/ballots/",
+        public_views.public_ballots,
+        name="public_ballots",
+    ),
+    path("public/outrounds/<int:type_of_round>/",
+         public_views.outround_pretty_pair,
+         name="outround_pretty_pair"),
+    path("public/motions/",
+         motion_views.public_motions,
+         name="public_motions"),
 ]
 
 if settings.SILK_ENABLED:
@@ -326,6 +419,6 @@ if settings.SILK_ENABLED:
         path("silk/", include("silk.urls", namespace="silk"))
     ]
 
-handler403 = "mittab.apps.tab.views.render_403"
-handler404 = "mittab.apps.tab.views.render_404"
-handler500 = "mittab.apps.tab.views.render_500"
+handler403 = "mittab.apps.tab.views.views.render_403"
+handler404 = "mittab.apps.tab.views.views.render_404"
+handler500 = "mittab.apps.tab.views.views.render_500"

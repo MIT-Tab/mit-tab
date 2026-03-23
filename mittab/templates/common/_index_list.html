@@ -1,32 +1,72 @@
-<div class="col-sm" id="school_list">
-  <h4 class="text-center font-weight-normal">
-    {{count}} {{model_name}}
-    <div class="btn-group btn-group-sm">
-      <a class="btn btn-sm btn-light" href="{{ list_path }}"
-        title="List {{model_name|lower}}"
-        id="{{ html_id }}-btn-list">
-        <i class="fas fa-list"></i>
-      </a>
-      <a class="btn btn-sm btn-light" href="{{ enter_path }}"
-        title="Add {{model_name|lower}}"
-        id="{{ html_id }}-btn-add">
-        <i class="fas fa-plus"></i>
-      </a>
-    </div>
-    {% if view_path_prefix == "judge" %}
-    <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
-      Download Judge Codes
-    </a>
-    {% endif %}
+<div class="col-sm index-section" id="{{ html_id }}-section">
+  <h4 class="text-center font-weight-normal index-section-header"
+      data-toggle="collapse"
+      data-target="#{{ html_id }}-content"
+      aria-expanded="true">
+    <span class="section-title">
+      {{count}} {{model_name}}
+      {% if flagged_count %}
+        <button
+          type="button"
+          class="btn btn-link p-0 ml-1 text-muted index-info-trigger"
+          data-toggle="tooltip"
+          data-placement="bottom"
+          data-html="false"
+          title="{{ flagged_count }} {{ model_name|lower }} marked No ID. No ID means APDA ID is blank or -1. If there is no standings profile yet (results.apda.online), this is correct. If a profile already exists, the APDA ID should be filled in here."
+          onclick="event.stopPropagation(); return false;"
+          aria-label="No ID info for {{ model_name|lower }}">
+          <i class="fas fa-info-circle" aria-hidden="true"></i>
+        </button>
+      {% endif %}
+    </span>
+    <span class="section-actions">
+      <span class="btn-group btn-group-sm">
+        <a class="btn btn-sm btn-light" href="{{ list_path }}"
+          title="List {{model_name|lower}}"
+          id="{{ html_id }}-btn-list"
+          onclick="event.stopPropagation();">
+          <i class="fas fa-list"></i>
+        </a>
+        <a class="btn btn-sm btn-light" href="{{ enter_path }}"
+          title="Add {{model_name|lower}}"
+          id="{{ html_id }}-btn-add"
+          onclick="event.stopPropagation();">
+          <i class="fas fa-plus"></i>
+        </a>
+      </span>
+    </span>
   </h4>
-  {% if model_name == "Rooms" %}
-    <h4 class="text-center font-weight-normal">  
-     <a href = {% url "manage_room_tags" %} class = "btn btn-sm btn-light"> Manage Room Tags</a>
-      </h4>
-     {% endif %}
-  <ol id="{{ html_id }}">
-    {% for id, name in list_data %}
-      <li class="searchable"><a href="/{{ view_path_prefix }}/{{ id }}/">{{ name }}</a></li>
-    {% endfor %}
-  </ol>
+  <div class="collapse show" id="{{ html_id }}-content">
+    <div class="index-section-content">
+      {% if model_name == "Teams" %}
+        <div class="text-center mb-2">
+          <a href="{% url 'manage_ranking_groups' %}" class="btn btn-sm btn-light">Manage Ranking Groups</a>
+        </div>
+      {% endif %}
+      {% if model_name == "Rooms" %}
+        <div class="text-center mb-2">
+          <a href="{% url 'manage_room_tags' %}" class="btn btn-sm btn-light">Manage Room Tags</a>
+        </div>
+      {% endif %}
+      {% if view_path_prefix == "judge" %}
+        <div class="text-center mb-2">
+          <a class="btn btn-sm btn-light" href="{% url 'download_judge_codes' %}">
+            Download Judge Codes
+          </a>
+        </div>
+      {% endif %}
+      <ol id="{{ html_id }}">
+        {% for item in list_data %}
+          <li class="searchable">
+            <a href="/{{ view_path_prefix }}/{{ item.0 }}/">{{ item.1 }}</a>
+            {% if flagged_item_ids and item.0 in flagged_item_ids %}
+              <span class="badge badge-light border ml-1 text-muted" title="Often indicates a newly added record.">
+                No ID
+              </span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
 </div>

@@ -30,13 +30,13 @@
                 
                     <div class="tab-content">
                     <div class="tab-pane fade show active" id="team" role="tabpanel" data-entity-type="team" aria-labelledby="team-tab">
-                           {% include "batch_check_in/_checkin_pane.html" with entity_type='team' data=team_data headers=team_headers %}
+                           {% include "batch_check_in/_checkin_pane.html" with entity_type='team' data=team_data headers=team_headers checked_total=team_total_count checked_in_count=team_checked_in_count %}
                        </div>
                   <div class="tab-pane fade" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
-                           {% include "batch_check_in/_checkin_pane.html" with entity_type='judge' data=judge_data headers=judge_headers round_numbers=round_numbers %}
+                           {% include "batch_check_in/_checkin_pane.html" with entity_type='judge' data=judge_data headers=judge_headers checked_total=judge_total_count round_counts=judge_round_counts outround_count=judge_outround_count %}
                    </div>
                        <div class="tab-pane fade" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
-                            {% include "batch_check_in/_checkin_pane.html" with entity_type='room' data=room_data headers=room_headers round_numbers=round_numbers %}
+                            {% include "batch_check_in/_checkin_pane.html" with entity_type='room' data=room_data headers=room_headers checked_total=room_total_count round_counts=room_round_counts outround_count=room_outround_count %}
                         </div>
 
                         {% endblock %}

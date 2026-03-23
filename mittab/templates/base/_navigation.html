@@ -1,6 +1,7 @@
 {% load tags %}
 
 {% url "index" as home %}
+{% url "apda_board_home" as apda_board_home %}
 {% url "logout" as logout %}
 
 {% url "enter_school" as enter_school %}
@@ -18,6 +19,8 @@
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
 {% url "download_archive" as download_archive %}
+{% url "download_black_rod_bundle" as download_black_rod_bundle %}
+{% url "round_stats" as round_stats %}
 {% url "forum_post" as forum_post %}
 
 {% url "enter_debater" as enter_debater %}
@@ -42,12 +45,22 @@
 {% url "public_judges" as public_judges %}
 {% url "public_teams" as public_teams %}
 {% url "rank_teams_public" as public_team_rankings %}
+{% url "public_rankings_control" as public_rankings_control %}
+{% url "public_speaker_rankings" as public_speaker_rankings %}
+{% url "public_ballots" as public_ballots %}
 {% url "outround_pretty_pair" 0 as public_outround_varsity %}
 {% url "outround_pretty_pair" 1 as public_outround_novice %}
+{% url "public_home" as public_home %}
+{% url "tab_login" as staff_login %}
+{% url "manage_motions" as manage_motions %}
+{% url "public_motions" as public_motions %}
+{% public_display_flags as public_display_flags %}
+{% motions_enabled as motions_enabled_flag %}
+{% is_apda_board user as is_apda_board_user %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
-    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{{ home }}">MIT-TAB</a>
+    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{% if is_apda_board_user %}{{ apda_board_home|with_return_to }}{% else %}{{ home|with_return_to }}{% endif %}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
 
     {% if user.is_authenticated %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -55,38 +68,53 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      {% if is_apda_board_user %}
+      <ul class="navbar-nav mr-auto order-0">
+        <li class="nav-item">
+          <a class="nav-link {% active request apda_board_home %}" href="{{ apda_board_home|with_return_to }}">APDA Board Home</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
+        </li>
+      </ul>
+      {% else %}
       <ul class="navbar-nav mr-auto order-0">
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
             Pairings
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_status %}" href="{{ view_status }}">Current Round</a>
-            <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds }}">All Rounds</a>
-            <a class="dropdown-item {%active request outround_pairings %}" href="{{ outround_pairings }}">Outround Pairings</a>
+            <a class="dropdown-item {%active request view_status %}" href="{{ view_status|with_return_to }}">Current Round</a>
+            <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds|with_return_to }}">All Rounds</a>
+            <a class="dropdown-item {%active request outround_pairings %}" href="{{ outround_pairings|with_return_to }}">Outround Pairings</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request forum_post %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request round_stats %}{% active request forum_post %}">
             Rankings
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters }}">Debater Ranking</a>
-            <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams }}">Team Ranking</a>
-            <a class="dropdown-item {% active request forum_post %}" href="{{ forum_post }}">Forum Post Results</a>
+            <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters|with_return_to }}">Debater Ranking</a>
+            <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams|with_return_to }}">Team Ranking</a>
+            <a class="dropdown-item {% active request round_stats %}" href="{{ round_stats }}">Round Stats</a>
+            <a class="dropdown-item {% active request forum_post %}" href="{{ forum_post|with_return_to }}">Forum Post Results</a>
+            <a class="dropdown-item {% active request public_rankings_control %}" href="{{ public_rankings_control|with_return_to }}">Public Rankings Control</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}{% active request download_black_rod_bundle %}">
             Backups
           </a>
 
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups }}">View Backups</a>
-            <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards }}">View Tab Cards</a>
-            <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
+            <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups|with_return_to }}">View Backups</a>
+            <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards|with_return_to }}">View Tab Cards</a>
+            <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive|with_return_to }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
+            <a class="dropdown-item {% active request download_black_rod_bundle %}" href="{{ download_black_rod_bundle|with_return_to }}" title="Export a tournament bundle for Black Rod ingest.">Export Black-Rod Bundle</a>
           </div>
         </li>
 
@@ -95,44 +123,59 @@
             Scratches
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches }}">View Scratches</a>
-            <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch }}">Add Scratch</a>
+            <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches|with_return_to }}">View Scratches</a>
+            <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch|with_return_to }}">Add Scratch</a>
           </div>
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request manage_motions %}">
             Admin
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin }}">Batch Checkin</a>
-            <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data }}">Bulk Data Upload</a>
-            <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form }}">Settings Form</a>
-            <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny }}">New Tournament</a>
+            <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin|with_return_to }}">Batch Checkin</a>
+            <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data|with_return_to }}">Bulk Data Upload</a>
+            <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form|with_return_to }}">Settings Form</a>
+            {% if motions_enabled_flag %}
+            <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
+            {% endif %}
+            <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny|with_return_to }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>
         </li>
       </ul>
       <ul class="navbar-nav ml-auto">
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}{% active request public_motions %}">
             Public
           </a>
           <div class="dropdown-menu">
-            <a class="dropdown-item {% active request public_pairings %}" href="{{ public_pairings }}">Released Pairings</a>
-            <a class="dropdown-item {% active request public_missing_ballots %}" href="{{ public_missing_ballots }}">Missing Ballots</a>
-            <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot }}">Submit E-Ballot</a>
-            <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges }}">Judge List</a>
-            <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams }}">Team List</a>
-            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings }}">Team Rankings</a>
-            <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity }}">Varsity Outrounds</a>
-            <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice }}">Novice Outrounds</a>
+            <a class="dropdown-item {% active request public_pairings %}" href="{{ public_pairings|with_return_to }}">Released Pairings</a>
+            <a class="dropdown-item {% active request public_missing_ballots %}" href="{{ public_missing_ballots|with_return_to }}">Missing Ballots</a>
+            <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
+            <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
+            <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
+            {% if public_display_flags.team_results %}
+            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+            {% endif %}
+            {% if public_display_flags.speaker_results %}
+            <a class="dropdown-item {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
+            {% endif %}
+            {% if public_display_flags.ballots %}
+            <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
+            {% endif %}
+            {% if motions_enabled_flag %}
+            <a class="dropdown-item {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
+            {% endif %}
+            <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
+            <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
           </div>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ logout }}">Logout</a>
+          <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
         </li>
       </ul>
+      {% endif %}
     </div>
     {% else %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -142,32 +185,55 @@
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav mr-auto order-0">
         <li class="nav-item">
-          <a class="nav-link {% active request public_pairings %}" href="{{ public_pairings }}">Released Pairings</a>
+          <a class="nav-link {% active request public_pairings %}" href="{{ public_pairings|with_return_to }}">Released Pairings</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% active request public_missing_ballots %}" href="{{ public_missing_ballots }}">Missing Ballots</a>
+          <a class="nav-link {% active request public_missing_ballots %}" href="{{ public_missing_ballots|with_return_to }}">Missing Ballots</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% active request public_eballot %}" href="{{ public_eballot }}">Submit E-Ballot</a>
+          <a class="nav-link {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% active request public_judges %}" href="{{ public_judges }}">Judge List</a>
+          <a class="nav-link {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% active request public_teams %}" href="{{ public_teams }}">Team List</a>
+          <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
+        </li>
+        {% if public_display_flags.team_results %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+        </li>
+        {% endif %}
+        {% if public_display_flags.speaker_results %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
+        </li>
+        {% endif %}
+        {% if public_display_flags.ballots %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
+        </li>
+        {% endif %}
+        {% if motions_enabled_flag %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
+        </li>
+        {% endif %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings }}">Team Rankings</a>
+          <a class="nav-link {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
         </li>
+      </ul>
+      <ul class="navbar-nav ml-auto order-1">
         <li class="nav-item">
-          <a class="nav-link {% active request public_outround_varsity %}" href="{{ public_outround_varsity }}">Varsity Outrounds</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% active request public_outround_novice %}" href="{{ public_outround_novice }}">Novice Outrounds</a>
+          <a class="nav-link {% active request staff_login %}" href="{{ staff_login|with_return_to }}">
+            <i class="fas fa-sign-in-alt"></i> Staff Login
+          </a>
         </li>
       </ul>
     </div>
     {% endif %}
   </div>
-  <br>
 </nav>

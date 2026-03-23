@@ -115,6 +115,7 @@ class TeamImporter(WorkbookImporter):
             })
 
         if team_form.is_valid():
+            team_form.instance.ranking_public = True
             self.create(team_form)
         else:
             for _field, error_msgs in team_form.errors.items():

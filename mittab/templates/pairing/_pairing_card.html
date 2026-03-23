@@ -71,9 +71,13 @@
       <div class="col-4 judges">
         {% load tags %}
         {% for judge in pairing.judges.all %}
-        <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
+        {% is_manual_judge_assignment pairing.id judge.id as is_manual_assignment %}
+        <span class="judge-assignment{% if is_manual_assignment %} manual-lay{% endif %}"
+              round-id="{{pairing.id}}"
+              judge-id="{{judge.id}}">
           <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
-             data-toggle="dropdown" href="#">
+             data-toggle="dropdown" href="#"
+             {% if is_manual_assignment %}title="Manually assigned judge"{% endif %}>
             {{judge.name}} <small>({{judge.rank}})</small>
             {% judge_team_count judge pairing as rejudge_count %}
             {% if rejudge_count > 1 %}
@@ -121,7 +125,8 @@
         {% endif %}
         <div class="dropdown room">
           <span 
-            room-id="{{pairing.room.id}}" 
+            class="{% if not pairing.room %}unassigned{% endif %}"
+            room-id="{{ pairing.room.id|default_if_none:'' }}" 
             round-id="{{pairing.id}}"
             outround="false">
             <a 
@@ -133,7 +138,7 @@
               aria-haspopup="true" 
               aria-expanded="false" 
               style="white-space: normal;">
-              <i class="far fa-building"></i> {{pairing.room.name}}
+              <i class="far fa-building"></i> {% if pairing.room %}{{ pairing.room.name }}{% else %}Assign Room{% endif %}
             </a>
             <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
           </span>

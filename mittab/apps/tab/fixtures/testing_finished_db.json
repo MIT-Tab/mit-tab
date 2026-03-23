@@ -21022,8 +21022,7 @@
     "pk": 1,
     "fields": {
         "no_show_team": 11,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21031,8 +21030,7 @@
     "pk": 2,
     "fields": {
         "no_show_team": 14,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21040,8 +21038,7 @@
     "pk": 3,
     "fields": {
         "no_show_team": 16,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21049,8 +21046,7 @@
     "pk": 5,
     "fields": {
         "no_show_team": 22,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21058,8 +21054,7 @@
     "pk": 6,
     "fields": {
         "no_show_team": 24,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21067,8 +21062,7 @@
     "pk": 7,
     "fields": {
         "no_show_team": 26,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21076,8 +21070,7 @@
     "pk": 8,
     "fields": {
         "no_show_team": 29,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21085,8 +21078,7 @@
     "pk": 9,
     "fields": {
         "no_show_team": 32,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21094,8 +21086,7 @@
     "pk": 10,
     "fields": {
         "no_show_team": 35,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21103,8 +21094,7 @@
     "pk": 11,
     "fields": {
         "no_show_team": 51,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21112,8 +21102,7 @@
     "pk": 12,
     "fields": {
         "no_show_team": 54,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21121,8 +21110,7 @@
     "pk": 13,
     "fields": {
         "no_show_team": 72,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21130,8 +21118,7 @@
     "pk": 14,
     "fields": {
         "no_show_team": 74,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21139,8 +21126,7 @@
     "pk": 15,
     "fields": {
         "no_show_team": 111,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21148,8 +21134,7 @@
     "pk": 16,
     "fields": {
         "no_show_team": 113,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21157,8 +21142,7 @@
     "pk": 17,
     "fields": {
         "no_show_team": 116,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21166,8 +21150,7 @@
     "pk": 18,
     "fields": {
         "no_show_team": 117,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21175,8 +21158,7 @@
     "pk": 19,
     "fields": {
         "no_show_team": 121,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21184,8 +21166,7 @@
     "pk": 20,
     "fields": {
         "no_show_team": 126,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21193,8 +21174,7 @@
     "pk": 21,
     "fields": {
         "no_show_team": 140,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21202,8 +21182,7 @@
     "pk": 22,
     "fields": {
         "no_show_team": 142,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21211,8 +21190,7 @@
     "pk": 23,
     "fields": {
         "no_show_team": 145,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21220,8 +21198,7 @@
     "pk": 24,
     "fields": {
         "no_show_team": 148,
-        "round_number": 1,
-        "lenient_late": false
+        "round_number": 1
     }
 },
 {
@@ -21229,8 +21206,7 @@
     "pk": 25,
     "fields": {
         "no_show_team": 51,
-        "round_number": 2,
-        "lenient_late": false
+        "round_number": 2
     }
 },
 {
@@ -21238,8 +21214,7 @@
     "pk": 26,
     "fields": {
         "no_show_team": 54,
-        "round_number": 2,
-        "lenient_late": false
+        "round_number": 2
     }
 },
 {
@@ -21247,8 +21222,7 @@
     "pk": 27,
     "fields": {
         "no_show_team": 72,
-        "round_number": 2,
-        "lenient_late": false
+        "round_number": 2
     }
 },
 {
@@ -21256,8 +21230,7 @@
     "pk": 28,
     "fields": {
         "no_show_team": 74,
-        "round_number": 2,
-        "lenient_late": false
+        "round_number": 2
     }
 },
 {
@@ -21265,8 +21238,7 @@
     "pk": 29,
     "fields": {
         "no_show_team": 103,
-        "round_number": 2,
-        "lenient_late": false
+        "round_number": 2
     }
 },
 {
@@ -21274,8 +21246,7 @@
     "pk": 30,
     "fields": {
         "no_show_team": 16,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21283,8 +21254,7 @@
     "pk": 31,
     "fields": {
         "no_show_team": 51,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21292,8 +21262,7 @@
     "pk": 32,
     "fields": {
         "no_show_team": 54,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21301,8 +21270,7 @@
     "pk": 33,
     "fields": {
         "no_show_team": 72,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21310,8 +21278,7 @@
     "pk": 34,
     "fields": {
         "no_show_team": 74,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21319,8 +21286,7 @@
     "pk": 35,
     "fields": {
         "no_show_team": 103,
-        "round_number": 3,
-        "lenient_late": false
+        "round_number": 3
     }
 },
 {
@@ -21328,8 +21294,7 @@
     "pk": 36,
     "fields": {
         "no_show_team": 16,
-        "round_number": 4,
-        "lenient_late": false
+        "round_number": 4
     }
 },
 {
@@ -21337,8 +21302,7 @@
     "pk": 37,
     "fields": {
         "no_show_team": 51,
-        "round_number": 4,
-        "lenient_late": false
+        "round_number": 4
     }
 },
 {
@@ -21346,8 +21310,7 @@
     "pk": 38,
     "fields": {
         "no_show_team": 54,
-        "round_number": 4,
-        "lenient_late": false
+        "round_number": 4
     }
 },
 {
@@ -21355,8 +21318,7 @@
     "pk": 39,
     "fields": {
         "no_show_team": 72,
-        "round_number": 4,
-        "lenient_late": false
+        "round_number": 4
     }
 },
 {
@@ -21364,8 +21326,7 @@
     "pk": 40,
     "fields": {
         "no_show_team": 74,
-        "round_number": 4,
-        "lenient_late": false
+        "round_number": 4
     }
 },
 {
@@ -21373,8 +21334,7 @@
     "pk": 41,
     "fields": {
         "no_show_team": 16,
-        "round_number": 5,
-        "lenient_late": false
+        "round_number": 5
     }
 },
 {
@@ -21382,8 +21342,7 @@
     "pk": 42,
     "fields": {
         "no_show_team": 51,
-        "round_number": 5,
-        "lenient_late": false
+        "round_number": 5
     }
 },
 {
@@ -21391,8 +21350,7 @@
     "pk": 43,
     "fields": {
         "no_show_team": 54,
-        "round_number": 5,
-        "lenient_late": false
+        "round_number": 5
     }
 },
 {
@@ -21400,8 +21358,7 @@
     "pk": 44,
     "fields": {
         "no_show_team": 72,
-        "round_number": 5,
-        "lenient_late": false
+        "round_number": 5
     }
 },
 {
@@ -21409,8 +21366,7 @@
     "pk": 45,
     "fields": {
         "no_show_team": 74,
-        "round_number": 5,
-        "lenient_late": false
+        "round_number": 5
     }
 },
 {

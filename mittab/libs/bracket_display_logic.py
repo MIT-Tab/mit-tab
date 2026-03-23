@@ -1,7 +1,7 @@
 import json
 
 from mittab.apps.tab.models import BreakingTeam, Outround
-from mittab.libs.cache_logic import cache
+from mittab.libs.cacheing.cache_logic import cache
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 
 LOCKED, WAITING, READY, COMPLETED = 0, 1, 2, 4

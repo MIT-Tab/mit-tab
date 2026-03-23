@@ -8,8 +8,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
-from mittab.libs import errors, cache_logic
+from mittab.libs import errors
 from mittab import settings
+from mittab.libs.cacheing import cache_logic
 
 
 class UploadBackupForm(forms.Form):
@@ -30,6 +31,12 @@ class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
         fields = "__all__"
+
+
+class SchoolApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = School
+        fields = ["apda_id"]
 
 
 class RoomForm(forms.ModelForm):
@@ -61,7 +68,7 @@ class RoomForm(forms.ModelForm):
     def save(self, commit=True):
         room = super(RoomForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        for i in range(num_rounds):
+        for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
             if field_name in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data[field_name]
@@ -143,8 +150,10 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
-                                              required=False)
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False
+    )
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -272,12 +281,15 @@ class TeamTeamScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(DebaterForm, self).__init__(*args, **kwargs)
-
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
+
+
+class DebaterApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = Debater
+        fields = ["apda_id"]
 
 
 def validate_speaks(value):
@@ -801,6 +813,49 @@ class MiniRoomTagForm(RoomTagForm):
         self.fields.pop("teams")
         self.fields.pop("judges")
         self.fields.pop("rooms")
+
+
+class RankingGroupForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.teams.all()
+            self.fields["debaters"].initial = self.instance.debaters.all()
+
+    def save(self, commit=True):
+        ranking_group = super().save(commit=False)
+
+        def save_m2m():
+            ranking_group.teams.set(self.cleaned_data.get("teams", []))
+            ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+
+        if commit:
+            ranking_group.save()
+            save_m2m()
+        else:
+            self._save_m2m = save_m2m
+
+        return ranking_group
+
+    class Meta:
+        model = RankingGroup
+        fields = ("name", "teams", "debaters")
+
+
+class MiniRankingGroupForm(RankingGroupForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("debaters")
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(

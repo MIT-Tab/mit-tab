@@ -7,33 +7,35 @@
 {% endblock %}
 
 {% block content %}
-<div class="col-12">
+<div class="col-12 public-table-root">
         <div id="scrollPage" class="hidden"></div>
 
             <h1>Team List</h1>
             <h3>({{ num_checked_in }} of {{ teams|length }} teams checked in)</h3>
+            <div class="public-table-wrap">
             <table class="public_table">
                 <thead>
                 <tr>
-                    <th style="width: 25%;">Team Name</th>
-                    <th style="width: 15%;">School</th>
+                    <th style="width: 20%;">Team Name</th>
+                    <th style="width: 20%;">School</th>
                     <th style="width: 15%;">Hybrid School</th>
-                    <th style="width: 30%;">Debaters</th>
+                    <th style="width: 25%;">Debaters</th>
                     <th style="width: 15%;">Checked In</th>
                 </tr>
             </thead>
             <tbody>
 			{% for team in teams %}
 			<tr>
-				<td style="width: 25%;">{{ team.display }}</td>
-				<td style="width: 15%;">{{ team.school.display }}</td>
-				<td style="width: 15%;">{{ team.hybrid_school.name }}</td>
-				<td style="width: 30%;">{{ team.debaters_display }}</td>
-				<td style="width: 15%;">{{ team.checked_in|yesno:"Yes,No" }}</td>
+				<td>{{ team.display }}</td>
+				<td>{{ team.school.display }}</td>
+				<td>{{ team.hybrid_school.name }}</td>
+				<td>{{ team.debaters_display }}</td>
+				<td>{{ team.checked_in|yesno:"Yes,No" }}</td>
 			</tr>
 			{% endfor %}
             </tbody>
 		</table>
+            </div>
 
         <div class="public_footer_spacer"></div>
 

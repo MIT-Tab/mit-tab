@@ -177,3 +177,8 @@ epub_exclude_files = ['search.html']
 myst_enable_extensions = [
     "colon_fence",
 ]
+
+# Ignore bad random CI warning
+linkcheck_ignore = [
+    r"https://www\.wikiwand\.com/en/articles/Blossom_algorithm",
+]

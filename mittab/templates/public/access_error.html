@@ -1,0 +1,19 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Page Not Public{% endblock %}
+
+{% block banner %}This page is not public{% endblock %}
+
+{% block content %}
+<div class="col-12 col-lg-8 mx-auto">
+  <div class="card shadow-sm border-0">
+    <div class="card-body py-5 text-center">
+      <h1 class="h4 mb-3">This page is not public.</h1>
+      <p class="text-muted mb-0">
+        Access to this information is limited by the tournament settings.
+        Check back later or contact the tournament staff if you believe this is an error.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+<div class="col-12 col-md-6"{% if section_id %} id="{{ section_id }}"{% endif %}>
+  <h5 class="text-center">{{ table_title }}</h5>
+  <table class="table table-striped table-sm table-bordered">
+    <thead>
+      <th>#</th>
+      <th>Name</th>
+      <th>Speaks</th>
+      <th>Ranks</th>
+      <th>Team</th>
+      <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
+    </thead>
+    {% for debater, speaks, ranks, team, tiebreaker in debaters %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td><a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
+      <td>{{ speaks|floatformat:2 }}</td>
+      <td>{{ ranks|floatformat:2 }}</td>
+      <td><a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
+      <td>{{ tiebreaker }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
