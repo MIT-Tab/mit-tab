@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from mittab.apps.tab.models import Debater, Judge, Outround, Round, School, Team
+from mittab.apps.tab.models import Debater, Judge, Outround, Round, RoundStats, School, Team
 
 
 class BlackRodBundleExporter:
@@ -78,6 +78,7 @@ class BlackRodBundleExporter:
                 "gov": self._serialize_team(round_obj.gov_team),
                 "opp": self._serialize_team(round_obj.opp_team),
                 "judges": self._serialize_judges(round_obj.chair, round_obj.judges.all()),
+                "stats": self._serialize_round_stats(round_obj),
             }
             for round_obj in qs
         ]
@@ -130,6 +131,18 @@ class BlackRodBundleExporter:
             seen_ids.add(judge.id)
 
         return judge_rows
+
+    @staticmethod
+    def _serialize_round_stats(round_obj):
+        """Serialize speaks and ranks for all debaters in a round."""
+        stats = RoundStats.objects.filter(round=round_obj).select_related("debater")
+        result = {}
+        for stat in stats:
+            result[stat.debater.id] = {
+                "speaks": float(stat.speaks),
+                "ranks": float(stat.ranks),
+            }
+        return result
 
     def _build_school_by_debater_id(self):
         if self._school_by_debater_id is not None:

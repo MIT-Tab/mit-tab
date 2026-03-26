@@ -83,6 +83,8 @@ class TestExportViews(TestCase):
         round_row = payload["rounds"][0]
         self.assertIn("import_key", round_row)
         self.assertIn("judges", round_row)
+        self.assertIn("victor", round_row)
+        self.assertIsInstance(round_row["victor"], int)
         self.assertIn("gov", round_row)
         self.assertIn("opp", round_row)
         self.assertNotIn("team_name", round_row)
@@ -93,6 +95,8 @@ class TestExportViews(TestCase):
         self.assertTrue(outround_rows)
         self.assertIn(outround_rows[0]["division"], {"varsity", "novice"})
         self.assertIsInstance(outround_rows[0]["elim_size"], int)
+        self.assertIn("victor", outround_rows[0])
+        self.assertIsInstance(outround_rows[0]["victor"], int)
 
     def test_n_plus_one(self):
         export_views = [
