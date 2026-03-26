@@ -1,6 +1,7 @@
-import pytest
-from unittest.mock import MagicMock, patch
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
+
+import pytest
 from django.core.cache import caches
 from django.http import HttpResponse
 from django.test import TestCase, Client
@@ -275,9 +276,15 @@ class TestPublicViews(TestCase):
 
         self.assertEqual(context["ballot_code"], "CTX123")
         self.assertEqual(context["winner_display"], "UNKNOWN")
-        self.assertEqual(context["gov_debaters"][0]["name"], round_obj.gov_team.debaters.first().name)
+        self.assertEqual(
+            context["gov_debaters"][0]["name"],
+            round_obj.gov_team.debaters.first().name,
+        )
         self.assertEqual(context["gov_debaters"][1]["name"], "—")
-        self.assertEqual(context["opp_debaters"][0]["name"], round_obj.opp_team.debaters.first().name)
+        self.assertEqual(
+            context["opp_debaters"][0]["name"],
+            round_obj.opp_team.debaters.first().name,
+        )
         self.assertEqual(context["opp_debaters"][1]["name"], "—")
 
     def test_view_submitted_ballot_redirects_without_matching_judge(self):
@@ -293,7 +300,9 @@ class TestPublicViews(TestCase):
         judge, round_obj = self._prepare_ballot_round()
         RoundStats.objects.filter(round=round_obj).delete()
 
-        response = client.get(reverse("view_submitted_ballot", args=[judge.ballot_code]))
+        response = client.get(
+            reverse("view_submitted_ballot", args=[judge.ballot_code])
+        )
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("e_ballot_search"))
@@ -304,7 +313,9 @@ class TestPublicViews(TestCase):
         self._set_disclosure_settings(True, False)
         self._create_round_stats(round_obj)
 
-        response = client.get(reverse("view_submitted_ballot", args=[judge.ballot_code]))
+        response = client.get(
+            reverse("view_submitted_ballot", args=[judge.ballot_code])
+        )
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
@@ -441,7 +452,9 @@ class TestPublicViews(TestCase):
         judge, round_obj = self._prepare_ballot_round()
         RoundStats.objects.filter(round=round_obj).delete()
 
-        with patch("mittab.apps.tab.views.public_views.enter_result") as mock_enter_result:
+        with patch(
+            "mittab.apps.tab.views.public_views.enter_result"
+        ) as mock_enter_result:
             mock_enter_result.return_value = HttpResponse("entry-form")
 
             response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))

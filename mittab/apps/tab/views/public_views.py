@@ -464,7 +464,7 @@ def e_ballot_search(request):
 
 
 def _build_disclosure_message():
-    """Return a disclosure message string based on open/closed speaks and ranks settings.
+    """Return a disclosure message for the open/closed speaks and ranks settings.
 
     Returns None if neither setting is configured.
     """
@@ -474,7 +474,8 @@ def _build_disclosure_message():
     if open_speaks is None and open_ranks is None:
         return None
 
-    # Treat unset (None) as "not configured" — only emit messages for configured settings
+    # Treat unset (None) as "not configured".
+    # Only emit messages for configured settings.
     speaks_set = open_speaks is not None
     ranks_set = open_ranks is not None
 
@@ -482,7 +483,8 @@ def _build_disclosure_message():
         if open_speaks and open_ranks:
             return (
                 "This tournament is open speaks and open ranks. "
-                "You are required to disclose both speaks and ranks to debaters if they opt-in to hearing them."
+                "You are required to disclose both speaks and ranks to "
+                "debaters if they opt-in to hearing them."
             )
         elif open_speaks and not open_ranks:
             return (
@@ -505,7 +507,8 @@ def _build_disclosure_message():
         if open_speaks:
             return (
                 "This tournament is open speaks. "
-                "You are required to disclose speaks to debaters if they opt-in to hearing them."
+                "You are required to disclose speaks to debaters if they "
+                "opt-in to hearing them."
             )
         else:
             return (
@@ -516,7 +519,8 @@ def _build_disclosure_message():
         if open_ranks:
             return (
                 "This tournament is open ranks. "
-                "You are required to disclose ranks to debaters if they opt-in to hearing them."
+                "You are required to disclose ranks to debaters if they "
+                "opt-in to hearing them."
             )
         else:
             return (
@@ -527,21 +531,24 @@ def _build_disclosure_message():
 
 def _submitted_ballot_context(round_obj, ballot_code):
     """Build context for the submitted (frozen) ballot view for the given round."""
-    ROLE_NAMES = {
+    role_names = {
         "pm": "Prime Minister",
         "mg": "Member of Government",
         "lo": "Leader of the Opposition",
         "mo": "Member of the Opposition",
     }
-    VICTOR_DISPLAY = dict(Round.VICTOR_CHOICES)
+    victor_display = dict(Round.VICTOR_CHOICES)
 
-    stats = {s.debater_role: s for s in round_obj.roundstats_set.select_related("debater").all()}
+    stats = {
+        s.debater_role: s
+        for s in round_obj.roundstats_set.select_related("debater").all()
+    }
 
     gov_debaters = []
     for role in ["pm", "mg"]:
         s = stats.get(role)
         gov_debaters.append({
-            "role": ROLE_NAMES[role],
+            "role": role_names[role],
             "name": s.debater.name if s else "—",
             "speaks": s.speaks if s else "—",
             "ranks": int(round(s.ranks)) if s else "—",
@@ -551,7 +558,7 @@ def _submitted_ballot_context(round_obj, ballot_code):
     for role in ["lo", "mo"]:
         s = stats.get(role)
         opp_debaters.append({
-            "role": ROLE_NAMES[role],
+            "role": role_names[role],
             "name": s.debater.name if s else "—",
             "speaks": s.speaks if s else "—",
             "ranks": int(round(s.ranks)) if s else "—",
@@ -561,7 +568,7 @@ def _submitted_ballot_context(round_obj, ballot_code):
         "title": f"Ballot Submitted — {round_obj}",
         "gov_team": round_obj.gov_team,
         "opp_team": round_obj.opp_team,
-        "winner_display": VICTOR_DISPLAY.get(round_obj.victor, "Unknown"),
+        "winner_display": victor_display.get(round_obj.victor, "Unknown"),
         "gov_debaters": gov_debaters,
         "opp_debaters": opp_debaters,
         "ballot_code": ballot_code,
@@ -582,11 +589,18 @@ def view_submitted_ballot(request, ballot_code):
             f'No judges with the ballot code "{ballot_code}." '
             "Try submitting again, or go to tab to resolve the issue."
         )
-        return redirect_and_flash_error(request, message, path=reverse("tab_login"))
+        return redirect_and_flash_error(
+            request, message, path=reverse("tab_login")
+        )
 
     rounds = list(
-        judge.judges.prefetch_related("chair", "roundstats_set", "roundstats_set__debater",
-                                      "gov_team", "opp_team")
+        judge.judges.prefetch_related(
+            "chair",
+            "roundstats_set",
+            "roundstats_set__debater",
+            "gov_team",
+            "opp_team",
+        )
         .filter(round_number=current_round).all()
     )
 
@@ -622,7 +636,12 @@ def enter_e_ballot(request, ballot_code):
                         request, "Invalid round result, could not remedy.",
                         path=reverse("e_ballot_search"))
                 # Redirect to frozen ballot view
-                return redirect(reverse("view_submitted_ballot", kwargs={"ballot_code": ballot_code}))
+                return redirect(
+                    reverse(
+                        "view_submitted_ballot",
+                        kwargs={"ballot_code": ballot_code},
+                    )
+                )
             # Re-render the form with errors
             return render(
                 request, "ballots/round_entry.html", {
@@ -632,16 +651,24 @@ def enter_e_ballot(request, ballot_code):
                     "opp_team": round_obj.opp_team,
                     "ballot_code": ballot_code,
                     "action": request.path,
-                    "warn_judges_about_speaks": TabSettings.get("warn_judges_about_speaks", True),
-                    "low_speak_warning_threshold": TabSettings.get("low_speak_warning_threshold", 25),
-                    "high_speak_warning_threshold": TabSettings.get("high_speak_warning_threshold", 34),
+                    "warn_judges_about_speaks": TabSettings.get(
+                        "warn_judges_about_speaks", True
+                    ),
+                    "low_speak_warning_threshold": TabSettings.get(
+                        "low_speak_warning_threshold", 25
+                    ),
+                    "high_speak_warning_threshold": TabSettings.get(
+                        "high_speak_warning_threshold", 34
+                    ),
                 })
         else:
             message = """
                       Missing necessary form data. Please go to tab if this
                       error persists
                       """
-            return redirect_and_flash_error(request, message, path=reverse("e_ballot_search"))
+            return redirect_and_flash_error(
+                request, message, path=reverse("e_ballot_search")
+            )
 
     current_round = TabSettings.get(key="cur_round") - 1
 
