@@ -140,6 +140,32 @@ class TestPublicViews(TestCase):
 
         self.assertIsNone(_build_disclosure_message())
 
+    def test_tabsettings_get_returns_explicit_default_for_missing_key(self):
+        for setting in TabSettings.objects.filter(key="missing_disclosure_setting"):
+            setting.delete()
+
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        self.assertIsNone(TabSettings.get("missing_disclosure_setting", None))
+        self.assertEqual(
+            TabSettings.get("missing_disclosure_setting", 0),
+            0,
+        )
+
+    def test_tabsettings_get_raises_without_default_for_missing_key(self):
+        for setting in TabSettings.objects.filter(key="missing_disclosure_setting"):
+            setting.delete()
+
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "No TabSetting with key 'missing_disclosure_setting'",
+        ):
+            TabSettings.get("missing_disclosure_setting")
+
     def test_permissions(self):
         client = Client()
 
