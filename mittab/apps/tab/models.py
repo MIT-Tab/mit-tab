@@ -7,6 +7,9 @@ from django.core.exceptions import ValidationError
 from mittab.libs.cacheing import cache_logic
 
 
+_TABSETTING_MISSING = object()
+
+
 class TabSettings(models.Model):
     key = models.CharField(max_length=50)
     value = models.IntegerField(null=True, blank=True)
@@ -21,7 +24,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=None):
+    def get(cls, key, default=_TABSETTING_MISSING):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -34,7 +37,7 @@ class TabSettings(models.Model):
             f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
-        if result is None and default is None:
+        if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default

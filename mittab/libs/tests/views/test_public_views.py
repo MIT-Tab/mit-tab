@@ -15,6 +15,7 @@ from mittab.apps.tab.public_rankings import (
     set_ballot_round_settings,
     set_ranking_settings,
 )
+from mittab.apps.tab.views.public_views import _build_disclosure_message
 from mittab.libs.cacheing import cache_logic
 
 
@@ -127,6 +128,17 @@ class TestPublicViews(TestCase):
                 response = client.get(url)
                 self.assertIn(response.status_code, [200, 302],
                     "Failed to handle e-ballot entry for valid ballot code")
+
+    def test_disclosure_message_allows_missing_settings(self):
+        for setting in TabSettings.objects.filter(
+            key__in=["open_speaks", "open_ranks"]
+        ):
+            setting.delete()
+
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        self.assertIsNone(_build_disclosure_message())
 
     def test_permissions(self):
         client = Client()
