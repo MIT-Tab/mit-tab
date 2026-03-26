@@ -99,10 +99,14 @@ class TestPublicViews(TestCase):
         return judge, team, round_obj, v_out, n_out, gov_debater
 
     def _set_disclosure_settings(self, open_speaks, open_ranks):
+        """Set disclosure settings. Values: None=unset, True=open (1), False=closed (2)"""
         for key, value in (("open_speaks", open_speaks), ("open_ranks", open_ranks)):
-            TabSettings.objects.filter(key=key).delete()
-            if value is not None:
-                TabSettings.set(key, int(bool(value)))
+            if value is None:
+                # Set to 0 (unset)
+                TabSettings.set(key, 0)
+            else:
+                # Convert True -> 1 (open), False -> 2 (closed)
+                TabSettings.set(key, 1 if value else 2)
 
         caches["public"].clear()
         cache_logic.clear_cache()
@@ -198,10 +202,9 @@ class TestPublicViews(TestCase):
                     "Failed to handle e-ballot entry for valid ballot code")
 
     def test_disclosure_message_allows_missing_settings(self):
-        for setting in TabSettings.objects.filter(
-            key__in=["open_speaks", "open_ranks"]
-        ):
-            setting.delete()
+        # Set both to 0 (unset)
+        TabSettings.set("open_speaks", 0)
+        TabSettings.set("open_ranks", 0)
 
         caches["public"].clear()
         cache_logic.clear_cache()

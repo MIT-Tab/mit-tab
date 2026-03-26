@@ -467,62 +467,63 @@ def _build_disclosure_message():
     """Return a disclosure message for the open/closed speaks and ranks settings.
 
     Returns None if neither setting is configured.
+    Values: 0=Unset, 1=Open, 2=Closed
     """
-    open_speaks = TabSettings.get("open_speaks", None)
-    open_ranks = TabSettings.get("open_ranks", None)
+    open_speaks = TabSettings.get("open_speaks", 0)
+    open_ranks = TabSettings.get("open_ranks", 0)
 
-    if open_speaks is None and open_ranks is None:
+    # Treat 0 as unset/not configured
+    if open_speaks == 0 and open_ranks == 0:
         return None
 
-    # Treat unset (None) as "not configured".
-    # Only emit messages for configured settings.
-    speaks_set = open_speaks is not None
-    ranks_set = open_ranks is not None
+    # Only emit messages for configured settings (non-zero values)
+    speaks_set = open_speaks != 0
+    ranks_set = open_ranks != 0
 
     if speaks_set and ranks_set:
-        if open_speaks and open_ranks:
+        if open_speaks == 1 and open_ranks == 1:
             return (
                 "This tournament is open speaks and open ranks. "
                 "You are required to disclose both speaks and ranks to "
                 "debaters if they opt-in to hearing them."
             )
-        elif open_speaks and not open_ranks:
+        elif open_speaks == 1 and open_ranks == 2:
             return (
                 "This tournament is open speaks but closed ranks. "
                 "You are required to disclose speaks to debaters if they opt-in, "
                 "but you should not tell debaters their ranks."
             )
-        elif not open_speaks and open_ranks:
+        elif open_speaks == 2 and open_ranks == 1:
             return (
                 "This tournament is closed speaks but open ranks. "
                 "You should not tell speaks to debaters, "
                 "but are required to disclose ranks if debaters opt-in to hearing them."
             )
-        else:
+        else:  # open_speaks == 2 and open_ranks == 2
             return (
                 "This tournament is closed speaks and closed ranks. "
                 "You should not tell debaters their speaks or ranks."
             )
     elif speaks_set:
-        if open_speaks:
+        if open_speaks == 1:
             return (
                 "This tournament is open speaks. "
                 "You are required to disclose speaks to debaters if they "
                 "opt-in to hearing them."
             )
-        else:
+        else:  # open_speaks == 2
             return (
                 "This tournament is closed speaks. "
                 "You should not tell debaters their speaks."
             )
-    else:
-        if open_ranks:
+    else:  # ranks_set
+        if open_ranks == 1:
             return (
                 "This tournament is open ranks. "
                 "You are required to disclose ranks to debaters if they "
                 "opt-in to hearing them."
             )
-        else:
+        else:  # open_ranks == 2
             return (
                 "This tournament is closed ranks. "
                 "You should not tell debaters their ranks."
