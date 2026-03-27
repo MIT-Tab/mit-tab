@@ -187,9 +187,12 @@ def public_speaker_rankings(request):
     speaker_lists = {
         "varsity": [
             entry for entry in varsity_speakers
-            if entry[0].novice_status == Debater.VARSITY
+            if entry[0].novice_status == Debater.VARSITY and entry[0].ranking_public
         ],
-        "novice": novice_speakers,
+        "novice": [
+            entry for entry in novice_speakers
+            if entry[0].ranking_public
+        ],
     }
     rows = {
         slug: build_public_speaker_rows(

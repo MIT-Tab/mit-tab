@@ -151,6 +151,7 @@ class Debater(models.Model):
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
+    ranking_public = models.BooleanField(default=True)
 
     def save(self,
              force_insert=False,
