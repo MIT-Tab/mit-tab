@@ -10,6 +10,7 @@ import mittab.apps.tab.views.views as views
 import mittab.apps.tab.views.public_views as public_views
 import mittab.apps.tab.views.api_views as api_views
 import mittab.apps.tab.views.judge_views as judge_views
+import mittab.apps.tab.scratch_views as scratch_views
 import mittab.apps.tab.views.team_views as team_views
 import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
@@ -46,12 +47,6 @@ urlpatterns = [
 
     # Judge related
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
-    re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
-            judge_views.add_scratches,
-            name="add_scratches"),
-    re_path(r"^judge/(\d+)/scratches/view/",
-            judge_views.view_scratches,
-            name="view_scratches"),
     path("view_judges/", judge_views.view_judges, name="view_judges"),
     path("enter_judge/", judge_views.enter_judge, name="enter_judge"),
     path("download_judge_codes/",
@@ -81,23 +76,38 @@ urlpatterns = [
 
 
     # Scratch related
-    re_path(r"^judge/(\d+)/scratches/delete/(\d+)/",
-            views.delete_scratch,
-            name="delete_scratch_judge"),
-    re_path(r"^team/(\d+)/scratches/delete/(\d+)/",
-            views.delete_scratch,
-            name="delete_scratch_team"),
-    re_path(r"^scratches/view/", views.view_scratches, name="view_scratches"),
-    re_path(r"^enter_scratch/", views.add_scratch, name="add_scratch"),
+    path(
+        "scratch/<str:scratch_type>/<int:scratch_id>/",
+        scratch_views.scratch_detail,
+        name="scratch_detail",
+    ),
+    path(
+        "scratch/<str:scratch_type>/<int:scratch_id>/delete/",
+        scratch_views.scratch_delete,
+        name="scratch_delete",
+    ),
+    re_path(r"^scratches/view/", scratch_views.view_scratches, name="view_scratches"),
+    re_path(r"^enter_scratch/", scratch_views.add_scratch, name="add_scratch"),
+    path(
+        "scratches/judge/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        {"object_type": "judge"},
+        name="view_scratches_judge",
+    ),
+    path(
+        "scratches/team/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        {"object_type": "team"},
+        name="view_scratches_team",
+    ),
+    path(
+        "scratches/<str:object_type>/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        name="view_scratches_for_object",
+    ),
 
     # Team related
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
-    re_path(r"^team/(\d+)/scratches/add/(\d+)/",
-            team_views.add_scratches,
-            name="add_scratches"),
-    re_path(r"^team/(\d+)/scratches/view/",
-            team_views.view_scratches,
-            name="view_scratches_team"),
     path("view_teams/", team_views.view_teams, name="view_teams"),
     path("enter_team/", team_views.enter_team, name="enter_team"),
     path("all_tab_cards/", team_views.all_tab_cards, name="all_tab_cards"),

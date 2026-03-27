@@ -68,7 +68,7 @@ class TestTabViews(TestCase):
             (reverse("view_judges"), judge.name),
             (reverse("view_judge", args=[judge.pk]), judge.name),
             (reverse("enter_judge"), "Create Judge"),
-            (reverse("view_scratches", args=[judge.pk]), "Scratches"),
+            (reverse("view_scratches_judge", args=[judge.pk]), "Scratches"),
             (reverse("view_schools"), school.name),
             (reverse("view_school", args=[school.pk]), school.name),
             (reverse("enter_school"), "Create School"),

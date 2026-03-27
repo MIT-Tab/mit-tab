@@ -19,19 +19,34 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         self._add_judges()
         self._add_debaters()
         self._add_teams()
-        self._go_home()
+        self._add_scratches()
 
-        self.browser.find_by_xpath("//a[contains(text(), 'Team 0')]").first.click()
-        self.browser.find_by_xpath("//*[text()='Scratches for Team 0']").first.click()
+    def _add_scratches(self):
+        self._visit("/enter_scratch/")
 
-        self.browser.find_by_xpath("//*[text()='Add Scratch']").last.click()
-        self.browser.find_by_xpath("//*[text()='Team 0']").first.click()
-        self.browser.find_by_xpath("//*[text()='Judge 2']").first.click()
-        self.browser.find_by_xpath("//*[text()='Tab Scratch']").first.click()
-        self.browser.find_by_xpath("//*[@value='Submit']").first.click()
+        scratches = [
+            ("judge_team", {"judge": "3", "team": "1", "scratch_type": "1"}),
+            ("judge_judge", {"judge_one": "1", "judge_two": "2"}),
+            ("team_team", {"team_one": "2", "team_two": "3"}),
+        ]
 
-        msg = "Scratches created successfully"
-        assert self._wait_for_text(msg)
+        for i, (tab, fields) in enumerate(scratches):
+            if i > 0:
+                self.browser.find_by_id(f"{tab}-tab").first.click()
+                self._wait()
+                self._wait()  # Extra wait for tab transition
+
+            for field_name, value in fields.items():
+                self.browser.select(f"{tab}_0-{field_name}", value)
+
+            self._wait()
+            # Find Submit button within the active tab pane
+            submit_btn = self.browser.find_by_xpath(
+                f"//*[@id='{tab}']//input[@value='Submit']"
+            ).first
+            submit_btn.click()
+            assert self._wait_for_text("Scratches created successfully")
+            self._visit("/enter_scratch/")
 
     def _add_teams(self):
         for i in range(4):
@@ -133,7 +148,9 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
            the custom_form_logic parameter to fill in any additional fields
         """
         self._go_home()
-        self.browser.find_by_xpath(f"//*[@id='{entity_name.lower()}-list-btn-add']").first.click()
+        self.browser.find_by_xpath(
+            f"//*[@id='{entity_name.lower()}-list-btn-add']"
+        ).first.click()
 
         if custom_form_logic:
             custom_form_logic()
@@ -144,10 +161,12 @@ class SettingUpATournamentTestCase(BaseWebTestCase):
         assert self._wait_for_text(msg)
 
         self._go_home()
-        self.browser.find_by_xpath(f"//a[contains(text(), '{data['name']}')]").first.click()
+        self.browser.find_by_xpath(
+            f"//a[contains(text(), '{data['name']}')]"
+        ).first.click()
 
-        for key in data:
-            assert self._wait_for_text(str(data[key]))
+        for _key, value in data.items():
+            assert self._wait_for_text(str(value))
 
     def _submit_form(self, **data):
         """

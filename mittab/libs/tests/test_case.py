@@ -39,7 +39,7 @@ class BaseWebTestCase(LiveServerTestCase):
                                    options=chrome_options)
         else:
             self.browser = Browser("firefox",
-                                   headless=False,
+                                   headless=True,
                                    wait_time=30)
         self.browser.driver.set_page_load_timeout(240)
         TabSettings.set("cur_round", 1)

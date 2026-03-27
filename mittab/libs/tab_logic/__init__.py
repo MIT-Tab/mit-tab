@@ -11,6 +11,126 @@ from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 
 
+def _re_rank_bracket_after_pull_up(
+        brackets, bracket, all_checked_in_teams, middle_of_bracket):
+    removed_teams = []
+    for team in all_checked_in_teams:
+        if (
+                team in middle_of_bracket
+                and tot_wins(team) == bracket
+                and team in brackets[bracket]
+        ):
+            removed_teams.append(team)
+            brackets[bracket].remove(team)
+
+    brackets[bracket] = rank_teams_except_record(brackets[bracket])
+    for team in removed_teams:
+        brackets[bracket].insert(len(brackets[bracket]) // 2, team)
+
+
+def _ordered_pullup_candidates(source_bracket, historical_pullups):
+    not_pulled_up = [team for team in source_bracket if team not in historical_pullups]
+    already_pulled_up = [team for team in source_bracket if team in historical_pullups]
+    return list(reversed(not_pulled_up)) + list(reversed(already_pulled_up))
+
+
+def _build_pairings_for_brackets(brackets, current_round):
+    pairings = []
+    for bracket in range(current_round):
+        temp = perfect_pairing(brackets[bracket])
+        if current_round != 1:
+            print(f"Pairing bracket {bracket} of size {len(temp)}")
+        for pair in temp:
+            pairings.append([pair[0], pair[1]])
+    return pairings
+
+
+def _pair_brackets_with_pullup_search(
+        brackets,
+        current_round,
+        all_checked_in_teams,
+        middle_of_bracket,
+        historical_pullups):
+    def search(working_brackets, bracket_index, selected_pullups, bye_team):
+        while bracket_index >= 0 and len(working_brackets[bracket_index]) % 2 == 0:
+            bracket_index -= 1
+
+        if bracket_index < 0:
+            try:
+                pairings = _build_pairings_for_brackets(working_brackets, current_round)
+            except errors.NotEnoughTeamsError:
+                return None
+            return pairings, selected_pullups, bye_team
+
+        if bracket_index == 0:
+            candidate_byes = working_brackets[0][-1:]
+            for candidate_bye in candidate_byes:
+                next_brackets = [list(bracket) for bracket in working_brackets]
+                next_brackets[0].remove(candidate_bye)
+                result = search(
+                    next_brackets,
+                    bracket_index - 1,
+                    list(selected_pullups),
+                    candidate_bye,
+                )
+                if result is not None:
+                    return result
+            return None
+
+        if bracket_index == 1 and not working_brackets[0]:
+            candidate_byes = [
+                team for team in reversed(working_brackets[1]) if not had_bye(team)
+            ]
+            for candidate_bye in candidate_byes:
+                next_brackets = [list(bracket) for bracket in working_brackets]
+                next_brackets[1].remove(candidate_bye)
+                result = search(
+                    next_brackets,
+                    bracket_index - 1,
+                    list(selected_pullups),
+                    candidate_bye,
+                )
+                if result is not None:
+                    return result
+            return None
+
+        for pull_up in _ordered_pullup_candidates(
+                working_brackets[bracket_index - 1],
+                historical_pullups):
+            next_brackets = [list(bracket) for bracket in working_brackets]
+            next_selected_pullups = list(selected_pullups)
+            next_selected_pullups.append(pull_up)
+            next_brackets[bracket_index].append(pull_up)
+            next_brackets[bracket_index - 1].remove(pull_up)
+            _re_rank_bracket_after_pull_up(
+                next_brackets,
+                bracket_index,
+                all_checked_in_teams,
+                middle_of_bracket,
+            )
+            result = search(
+                next_brackets,
+                bracket_index - 1,
+                next_selected_pullups,
+                bye_team,
+            )
+            if result is not None:
+                return result
+        return None
+
+    result = search(
+        [list(bracket) for bracket in brackets],
+        current_round - 1,
+        [],
+        None,
+    )
+    if result is None:
+        raise errors.NotEnoughTeamsError(
+            "Could not satisfy all scratch constraints while pairing teams."
+        )
+    return result
+
+
 def pair_round():
     """
     Pair the next round of debate.
@@ -95,94 +215,27 @@ def pair_round():
             bracket_middle = bracket_size // 2
             list_of_teams[wins].insert(bracket_middle, team)
 
-        # Correct for brackets with odd numbers of teams
-        #  1) If we are in the bottom bracket, give someone a bye
-        #  2) If we are in 1-up bracket and there are no all down
-        #     teams, give someone a bye
-        #  3) Otherwise, find a pull up from the next bracket
+        pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
+        teams_been_pulled_up = [
+            r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
+        ]
+        teams_been_pulled_up.extend(
+            [r.opp_team for r in pullup_rounds if r.pullup == Round.OPP]
+        )
 
-        for bracket in reversed(list(range(current_round))):
-            if len(list_of_teams[bracket]) % 2 != 0:
-                # If there are no teams all down, give the bye to a one down team.
-                if bracket == 0:
-                    byeint = len(list_of_teams[bracket]) - 1
-                    bye = Bye(
-                        bye_team=list_of_teams[bracket][byeint],
-                        round_number=current_round,
-                    )
-                    bye.save()
-                    list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
-                elif bracket == 1 and not list_of_teams[0]:
-                    # in 1 up and no all down teams
-                    found_bye = False
-                    for byeint in range(len(list_of_teams[1]) - 1, -1, -1):
-                        if had_bye(list_of_teams[1][byeint]):
-                            pass
-                        elif not found_bye:
-                            bye = Bye(
-                                bye_team=list_of_teams[1][byeint],
-                                round_number=current_round,
-                            )
-                            bye.save()
-                            list_of_teams[1].remove(list_of_teams[1][byeint])
-                            found_bye = True
-                    if not found_bye:
-                        raise errors.NotEnoughTeamsError()
-                else:
-                    pull_up = None
-                    pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
-                    teams_been_pulled_up = [
-                        r.gov_team for r in pullup_rounds if r.pullup == Round.GOV
-                    ]
-                    teams_been_pulled_up.extend(
-                        [r.opp_team for r in pullup_rounds if r.pullup == Round.OPP]
-                    )
+        pairings, all_pull_ups, bye_team = _pair_brackets_with_pullup_search(
+            list_of_teams,
+            current_round,
+            all_checked_in_teams,
+            middle_of_bracket,
+            teams_been_pulled_up,
+        )
+        if bye_team is not None:
+            Bye.objects.create(bye_team=bye_team, round_number=current_round)
 
-                    # try to pull-up the lowest-ranked team that hasn't been
-                    # pulled-up. Fall-back to the lowest-ranked team if all have
-                    # been pulled-up
-                    not_pulled_up_teams = [
-                        t
-                        for t in list_of_teams[bracket - 1]
-                        if t not in teams_been_pulled_up
-                    ]
-                    if not_pulled_up_teams:
-                        pull_up = not_pulled_up_teams[-1]
-                    else:
-                        pull_up = list_of_teams[bracket - 1][-1]
-
-                    all_pull_ups.append(pull_up)
-                    list_of_teams[bracket].append(pull_up)
-                    list_of_teams[bracket - 1].remove(pull_up)
-
-                    # after adding pull-up to new bracket and deleting from old,
-                    # sort again by speaks making sure to leave any first
-                    # round bye in the correct spot
-                    removed_teams = []
-                    for team in all_checked_in_teams:
-                        # They have all wins and they haven't forfeited so
-                        # they need to get paired in
-                        if team in middle_of_bracket and tot_wins(team) == bracket:
-                            removed_teams += [team]
-                            list_of_teams[bracket].remove(team)
-                    list_of_teams[bracket] = rank_teams_except_record(
-                        list_of_teams[bracket]
-                    )
-                    for team in removed_teams:
-                        list_of_teams[bracket].insert(
-                            len(list_of_teams[bracket]) // 2, team
-                        )
-
-    # Pass in the prepared nodes to the perfect pairing logic
-    # to get a pairing for the round
-    pairings = []
-    for bracket in range(current_round):
-        if current_round == 1:
-            temp = perfect_pairing(list_of_teams)
-        else:
-            temp = perfect_pairing(list_of_teams[bracket])
-            print(f"Pairing bracket {bracket} of size {len(temp)}")
-        for pair in temp:
+    if current_round == 1:
+        pairings = []
+        for pair in perfect_pairing(list_of_teams):
             pairings.append([pair[0], pair[1]])
 
     if current_round == 1:
@@ -487,9 +540,19 @@ def perfect_pairing(list_of_teams):
     """Uses the mwmatching library to assign teams in a pairing"""
     graph_edges = []
     weights = get_weights()
+    scratched_pairs = {
+        (team_one, team_two)
+        for team_one, team_two in TeamTeamScratch.objects.values_list(
+            "team_one_id", "team_two_id"
+        )
+    }
     for i, team1 in enumerate(list_of_teams):
         for j, team2 in enumerate(list_of_teams):
             if i > j:
+                if team1.id and team2.id:
+                    pair_key = (min(team1.id, team2.id), max(team1.id, team2.id))
+                    if pair_key in scratched_pairs:
+                        continue
                 weight = calc_weight(
                     team1,
                     team2,
@@ -505,6 +568,13 @@ def perfect_pairing(list_of_teams):
                 )
                 graph_edges += [(i, j, weight)]
     pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    if (
+            len(pairings_num) < len(list_of_teams)
+            or -1 in pairings_num[:len(list_of_teams)]
+    ):
+        raise errors.NotEnoughTeamsError(
+            "Could not satisfy all scratch constraints while pairing teams."
+        )
     all_pairs = []
     for pair in pairings_num:
         if pair < len(list_of_teams):

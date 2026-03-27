@@ -1,5 +1,4 @@
 import os
-from django.db import IntegrityError
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
@@ -24,7 +23,6 @@ from mittab.apps.tab.forms import (
     SchoolForm,
     RoomForm,
     UploadDataForm,
-    ScratchForm,
     SettingsForm,
 )
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -171,7 +169,9 @@ def apda_board_school_detail(request, school_id):
         form = SchoolApdaIdForm(instance=school)
 
     teams = Team.objects.filter(school=school).prefetch_related("debaters")
-    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related("debaters")
+    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related(
+        "debaters"
+    )
 
     return render(
         request,
@@ -206,7 +206,9 @@ def apda_board_debater_detail(request, debater_id):
     else:
         form = DebaterApdaIdForm(instance=debater)
 
-    teams = Team.objects.filter(debaters=debater).select_related("school", "hybrid_school")
+    teams = Team.objects.filter(debaters=debater).select_related(
+        "school", "hybrid_school"
+    )
     return render(
         request,
         "apda_board/debater_detail.html",
@@ -242,26 +244,6 @@ def render_500(request, *args, **kwargs):
     response = render(request, "common/500.html")
     response.status_code = 500
     return response
-
-
-# View for manually adding scratches
-def add_scratch(request):
-    if request.method == "POST":
-        form = ScratchForm(request.POST)
-        if form.is_valid():
-            try:
-                form.save()
-            except IntegrityError:
-                return redirect_and_flash_error(request,
-                                                "This scratch already exists.")
-        return redirect_and_flash_success(request,
-                                          "Scratch created successfully")
-    else:
-        form = ScratchForm(initial={"scratch_type": 0})
-    return render(request, "common/data_entry.html", {
-        "title": "Adding Scratch",
-        "form": form
-    })
 
 
 #### BEGIN SCHOOL ###
@@ -490,31 +472,6 @@ def bulk_check_in(request):
 
     return JsonResponse({"success": True})
 
-
-@permission_required("tab.scratch.can_delete", login_url="/403/")
-def delete_scratch(request, _item_id, scratch_id):
-    try:
-        scratch_id = int(scratch_id)
-        scratch = Scratch.objects.get(pk=scratch_id)
-        scratch.delete()
-    except Scratch.DoesNotExist:
-        return redirect_and_flash_error(
-            request,
-            "This scratch does not exist, please try again with a valid id.")
-    return redirect_and_flash_success(request,
-                                      "Scratch deleted successfully",
-                                      path="/")
-
-
-def view_scratches(request):
-    # Get a list of (id,school_name) tuples
-    c_scratches = [(s.team.pk, str(s), 0, "") for s in Scratch.objects.all()]
-    return render(
-        request, "common/list_data.html", {
-            "item_type": "team",
-            "title": "Viewing All Scratches for Teams",
-            "item_list": c_scratches
-        })
 
 def get_settings_from_yaml():
 
@@ -776,7 +733,10 @@ def ranking_group(request, group_id=None):
         {
             "form": form,
             "links": [],
-            "title": f"Viewing Ranking Group: {group.name}" if group else "Create Ranking Group",
+            "title": (
+                f"Viewing Ranking Group: {group.name}"
+                if group else "Create Ranking Group"
+            ),
         },
     )
 

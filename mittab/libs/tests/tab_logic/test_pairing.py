@@ -1,3 +1,5 @@
+# pylint: disable=protected-access
+from decimal import Decimal
 from django.db import transaction
 from django.test import TestCase
 import pytest
@@ -5,14 +7,18 @@ import pytest
 from mittab.apps.tab.models import (
     CheckIn,
     Judge,
+    JudgeJudgeScratch,
     Room,
     RoomCheckIn,
     Round,
     School,
+    Scratch,
     TabSettings,
     Team,
+    TeamTeamScratch,
 )
 from mittab.libs import assign_judges, assign_rooms
+from mittab.libs.errors import NotEnoughTeamsError
 from mittab.libs import tab_logic
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.tests.helpers import generate_results
@@ -162,3 +168,325 @@ class TestPairingLogic(TestCase):
 
         self.re_pair_latest_round()
         self.assertEqual(self.pairings_for(second_round), baseline_pairings)
+
+
+@pytest.mark.django_db
+class TestScratchHonoring(TestCase):
+    """Test that scratches are properly honored during pairing"""
+
+    fixtures = ["testing_db"]
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        TabSettings.set("cur_round", 1)
+        self.generate_checkins(2)
+
+    def generate_checkins(self, round_number):
+        CheckIn.objects.all().delete()
+        RoomCheckIn.objects.all().delete()
+
+        judges = list(Judge.objects.all())
+        rooms = list(Room.objects.all())
+        checkins = [
+            CheckIn(judge=j, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for j in judges
+        ]
+        room_checkins = [
+            RoomCheckIn(room=r, round_number=rnd)
+            for rnd in range(0, round_number + 1)
+            for r in rooms
+        ]
+        CheckIn.objects.bulk_create(checkins)
+        RoomCheckIn.objects.bulk_create(room_checkins)
+
+    def test_team_team_scratch_prevents_pairing(self):
+        """Test that team-team scratches prevent those teams from being paired"""
+        # Get two teams
+        teams = list(Team.objects.all()[:2])
+        team_one, team_two = teams[0], teams[1]
+
+        # Create a team-team scratch
+        TeamTeamScratch.objects.create(team_one=team_one, team_two=team_two)
+
+        # Pair the round
+        cache_logic.clear_cache()
+        tab_logic.pair_round()
+
+        # Check that these two teams were not paired together
+        rounds_with_both = Round.objects.filter(
+            round_number=1
+        ).filter(
+            gov_team__in=[team_one, team_two],
+            opp_team__in=[team_one, team_two]
+        )
+
+        self.assertEqual(
+            rounds_with_both.count(),
+            0,
+            "Teams with a team-team scratch should not be paired together"
+        )
+
+    def test_judge_team_scratch_prevents_assignment(self):
+        """Test that judge-team scratches prevent judge assignment to team"""
+        # Pair the round first
+        cache_logic.clear_cache()
+        tab_logic.pair_round()
+
+        # Get a round and create a scratch between judge and one team
+        round_obj = Round.objects.filter(round_number=1).first()
+        judge = Judge.objects.filter(checkin__round_number=1).first()
+        team = round_obj.gov_team
+
+        Scratch.objects.create(
+            judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH
+        )
+
+        # Clear existing judge assignments
+        round_obj.judges.clear()
+        round_obj.chair = None
+        round_obj.save()
+
+        # Assign judges
+        assign_judges.add_judges()
+
+        # Check that the judge was not assigned to this round
+        round_obj.refresh_from_db()
+        assigned_judges = list(round_obj.judges.all())
+        if round_obj.chair:
+            assigned_judges.append(round_obj.chair)
+
+        self.assertNotIn(
+            judge,
+            assigned_judges,
+            "Judge with scratch should not be assigned to team's round"
+        )
+
+    def test_judge_judge_scratch_prevents_panel_assignment(self):
+        """Test that judge-judge scratches prevent judges from being on same panel"""
+        # Get two judges
+        judges = list(Judge.objects.filter(checkin__round_number=1)[:2])
+        if len(judges) < 2:
+            self.skipTest("Not enough judges for this test")
+
+        judge_one, judge_two = judges[0], judges[1]
+
+        # Create a judge-judge scratch
+        JudgeJudgeScratch.objects.create(
+            judge_one=judge_one, judge_two=judge_two
+        )
+
+        # Pair the round
+        cache_logic.clear_cache()
+        tab_logic.pair_round()
+
+        # Assign judges
+        assign_judges.add_judges()
+
+        # Check that these judges are not on the same panel
+        for round_obj in Round.objects.filter(round_number=1):
+            panel_judges = list(round_obj.judges.all())
+            if round_obj.chair:
+                panel_judges.append(round_obj.chair)
+
+            judge_ids = [j.id for j in panel_judges]
+
+            # Both judges should not be in the same panel
+            has_both = judge_one.id in judge_ids and judge_two.id in judge_ids
+            self.assertFalse(
+                has_both,
+                f"Judges with scratch should not be on same panel. "
+                f"Panel: {judge_ids}, Scratched: {judge_one.id}, {judge_two.id}"
+            )
+
+    def test_multiple_scratches_honored(self):
+        """Test that multiple types of scratches are all honored"""
+        # Create various scratches
+        teams = list(Team.objects.all()[:4])
+        judges = list(Judge.objects.filter(checkin__round_number=1)[:3])
+
+        # Team-team scratch
+        if len(teams) >= 2:
+            TeamTeamScratch.objects.create(
+                team_one=teams[0], team_two=teams[1]
+            )
+
+        # Judge-judge scratch
+        if len(judges) >= 2:
+            JudgeJudgeScratch.objects.create(
+                judge_one=judges[0], judge_two=judges[1]
+            )
+
+        # Pair and assign
+        cache_logic.clear_cache()
+        tab_logic.pair_round()
+        assign_judges.add_judges()
+
+        # Verify team-team scratch
+        if len(teams) >= 2:
+            rounds_with_both_teams = Round.objects.filter(
+                round_number=1,
+                gov_team__in=[teams[0], teams[1]],
+                opp_team__in=[teams[0], teams[1]]
+            )
+            self.assertEqual(rounds_with_both_teams.count(), 0)
+
+        # Verify judge-judge scratch
+        if len(judges) >= 2:
+            for round_obj in Round.objects.filter(round_number=1):
+                panel_judges = list(round_obj.judges.all())
+                if round_obj.chair:
+                    panel_judges.append(round_obj.chair)
+                judge_ids = [j.id for j in panel_judges]
+                has_both = judges[0].id in judge_ids and judges[1].id in judge_ids
+                self.assertFalse(has_both)
+
+    def test_impossible_team_team_scratches_raise_clean_error(self):
+        """Test impossible scratch constraints fail explicitly"""
+        teams = list(Team.objects.all()[:4])
+        focal_team = teams[0]
+
+        for blocked_team in teams[1:]:
+            TeamTeamScratch.objects.create(
+                team_one=focal_team,
+                team_two=blocked_team,
+            )
+
+        with self.assertRaisesRegex(
+            NotEnoughTeamsError,
+            "Could not satisfy all scratch constraints while pairing teams.",
+        ):
+            tab_logic.perfect_pairing(teams)
+
+    def test_pullup_search_tries_alternate_team_when_default_pullup_is_scratched(self):
+        TabSettings.set("cur_round", 3)
+        school = School.objects.create(name="Pullup Scratch School")
+        teams = [
+            Team.objects.create(
+                name=f"Pullup Scratch Team {idx}",
+                school=school,
+                seed=Team.UNSEEDED,
+                tiebreaker=idx,
+            )
+            for idx in range(1, 7)
+        ]
+        bottom_team = teams[0]
+        middle_teams = teams[1:5]
+        top_team = teams[5]
+
+        TeamTeamScratch.objects.create(
+            team_one=top_team,
+            team_two=middle_teams[-1],
+        )
+
+        pairings, pullups, bye_team = tab_logic._pair_brackets_with_pullup_search(
+            brackets=[
+                [bottom_team],
+                list(middle_teams),
+                [top_team],
+            ],
+            current_round=3,
+            all_checked_in_teams=teams,
+            middle_of_bracket=[],
+            historical_pullups=[],
+        )
+
+        paired_team_ids = {
+            frozenset((team_one.id, team_two.id))
+            for team_one, team_two in pairings
+        }
+        self.assertIn(
+            frozenset((top_team.id, middle_teams[-2].id)),
+            paired_team_ids,
+        )
+        self.assertNotIn(middle_teams[-1], pullups)
+        self.assertIn(middle_teams[-2], pullups)
+        self.assertIsNone(bye_team)
+
+
+@pytest.mark.django_db
+class TestJudgeRoomQualityAlignment(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("pair_wings", 0)
+        TabSettings.set("enable_room_seeding", 1)
+
+        school = School.objects.create(name="Judge Room School")
+        teams = [
+            Team.objects.create(
+                name=f"Quality Team {seed}",
+                school=school,
+                seed=seed,
+            )
+            for seed in (
+                Team.FULL_SEED,
+                Team.HALF_SEED,
+                Team.FREE_SEED,
+                Team.UNSEEDED,
+            )
+        ]
+
+        self.top_round = Round.objects.create(
+            round_number=1,
+            gov_team=teams[0],
+            opp_team=teams[1],
+        )
+        self.bottom_round = Round.objects.create(
+            round_number=1,
+            gov_team=teams[2],
+            opp_team=teams[3],
+        )
+
+        self.top_judge = Judge.objects.create(
+            name="Top Judge",
+            rank=Decimal("5.00"),
+        )
+        self.bottom_judge = Judge.objects.create(
+            name="Bottom Judge",
+            rank=Decimal("1.00"),
+        )
+        CheckIn.objects.create(judge=self.top_judge, round_number=1)
+        CheckIn.objects.create(judge=self.bottom_judge, round_number=1)
+
+        self.top_room = Room.objects.create(
+            name="Top Room",
+            rank=Decimal("5.00"),
+        )
+        self.bottom_room = Room.objects.create(
+            name="Bottom Room",
+            rank=Decimal("1.00"),
+        )
+        RoomCheckIn.objects.create(room=self.top_room, round_number=1)
+        RoomCheckIn.objects.create(room=self.bottom_room, round_number=1)
+
+    def test_best_round_gets_best_judge_and_room(self):
+        assign_judges.add_judges()
+        assign_rooms.add_rooms()
+
+        self.top_round.refresh_from_db()
+        self.bottom_round.refresh_from_db()
+
+        self.assertEqual(
+            self.top_round.chair,
+            self.top_judge,
+            "The strongest judge should chair the strongest round",
+        )
+        self.assertEqual(
+            self.top_round.room,
+            self.top_room,
+            "The strongest round should receive the strongest room",
+        )
+        self.assertEqual(
+            self.bottom_round.chair,
+            self.bottom_judge,
+            "The weaker judge should be assigned to the weaker round",
+        )
+        self.assertEqual(
+            self.bottom_round.room,
+            self.bottom_room,
+            "The weaker round should receive the weaker room",
+        )

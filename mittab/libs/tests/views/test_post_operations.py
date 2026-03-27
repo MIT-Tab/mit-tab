@@ -43,7 +43,12 @@ class TestPostOperations(TestCase):
              {"name": "Test Team", "school": school.id,
               "debaters": [d.id for d in debaters], "seed": 5}),
             ("add_scratch", reverse("add_scratch"),
-             {"judge": judge.id, "team": team.id, "scratch_type": 0}),
+             {
+                 "form_type": "judge_team",
+                 "judge_team_0-judge": judge.id,
+                 "judge_team_0-team": team.id,
+                 "judge_team_0-scratch_type": 0,
+             }),
             ("toggle_pairing_released",
              reverse("toggle_pairing_released"), {}),
             ("enter_room_duplicate", reverse("enter_room"),

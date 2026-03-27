@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -9,6 +10,7 @@ from mittab.apps.tab.models import (
     BreakingTeam,
     CheckIn,
     Judge,
+    JudgeJudgeScratch,
     Outround,
     Room,
     RoomCheckIn,
@@ -17,6 +19,7 @@ from mittab.apps.tab.models import (
     Scratch,
     TabSettings,
     Team,
+    TeamTeamScratch,
 )
 from mittab.libs import assign_judges, tab_logic
 from mittab.libs.assign_judges import judge_conflict
@@ -257,7 +260,10 @@ class TestDynamicSchoolConflicts(TestCase):
         )
 
     def test_judge_assignment_honors_primary_school_conflicts(self):
-        teams, judges, schools, _ = self.prepare_tournament_round(num_teams=20, num_judges=15)
+        teams, judges, schools, _ = self.prepare_tournament_round(
+            num_teams=20,
+            num_judges=15,
+        )
 
         # Set up school affiliations for judges
         # First 3 judges affiliated with school 0
@@ -299,7 +305,10 @@ class TestDynamicSchoolConflicts(TestCase):
         )
 
     def test_hybrid_school_conflicts_are_respected(self):
-        teams, judges, schools, _ = self.prepare_tournament_round(num_teams=16, num_judges=12)
+        _teams, judges, schools, _ = self.prepare_tournament_round(
+            num_teams=16,
+            num_judges=12,
+        )
 
         # Create a fourth school for hybrid affiliations
         school_hybrid = School.objects.create(name="Hybrid Test School")
@@ -343,7 +352,10 @@ class TestDynamicSchoolConflicts(TestCase):
         )
 
     def test_explicit_scratches_still_enforced_alongside_school_conflicts(self):
-        teams, judges, schools, _ = self.prepare_tournament_round(num_teams=16, num_judges=12)
+        teams, judges, schools, _ = self.prepare_tournament_round(
+            num_teams=16,
+            num_judges=12,
+        )
 
         # Set up school affiliations
         judges[0].schools.add(schools[0])
@@ -375,7 +387,9 @@ class TestDynamicSchoolConflicts(TestCase):
         initial_scratch_count = Scratch.objects.count()
 
         # Reload judges with prefetched relations
-        judges = list(Judge.objects.prefetch_related("scratches", "schools", "judges").all())
+        judges = list(
+            Judge.objects.prefetch_related("scratches", "schools", "judges").all()
+        )
 
         # Verify judge_conflict detects both types of conflicts
         # School conflict
@@ -418,7 +432,10 @@ class TestDynamicSchoolConflicts(TestCase):
 
     def test_allow_rejudges_setting_with_school_conflicts(self):
         # Set up a smaller tournament for multi-round testing
-        teams, judges, schools, _ = self.prepare_tournament_round(num_teams=12, num_judges=10)
+        teams, judges, schools, _ = self.prepare_tournament_round(
+            num_teams=12,
+            num_judges=10,
+        )
 
         # Set up school affiliations
         judges[0].schools.add(schools[0])
@@ -438,7 +455,9 @@ class TestDynamicSchoolConflicts(TestCase):
         TabSettings.set("allow_rejudges", False)
 
         # Reload judges with prefetched relations
-        judges_prefetched = list(Judge.objects.prefetch_related("scratches", "schools", "judges").all())
+        judges_prefetched = list(
+            Judge.objects.prefetch_related("scratches", "schools", "judges").all()
+        )
 
         # School conflicts should be detected
         self.assertTrue(
@@ -465,7 +484,9 @@ class TestDynamicSchoolConflicts(TestCase):
         ).judges.add(judges_prefetched[2])
 
         # Reload judges to pick up the round relation
-        judges_prefetched = list(Judge.objects.prefetch_related("scratches", "schools", "judges").all())
+        judges_prefetched = list(
+            Judge.objects.prefetch_related("scratches", "schools", "judges").all()
+        )
 
         # With allow_rejudges=False, previous judging should cause conflict
         self.assertTrue(
@@ -481,7 +502,9 @@ class TestDynamicSchoolConflicts(TestCase):
 
         # But if there IS a school conflict, it should still be enforced
         judges_prefetched[2].schools.add(schools[2])
-        judges_prefetched = list(Judge.objects.prefetch_related("scratches", "schools", "judges").all())
+        judges_prefetched = list(
+            Judge.objects.prefetch_related("scratches", "schools", "judges").all()
+        )
 
         self.assertTrue(
             judge_conflict(judges_prefetched[2], teams[2], teams[3], allow_rejudges=True),
@@ -630,6 +653,62 @@ class TestManualJudgeViews(TestCase):
         included_names = {judge[0] for judge in response.context["included_judges"]}
         self.assertIn(rejudge.name, excluded_names | included_names)
 
+    def test_inround_alternative_judges_filter_panel_scratches(self):
+        gov_team = self.make_team("Panel Gov", self.school_primary)
+        opp_team = self.make_team("Panel Opp", self.school_other)
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        chair = self.make_judge("Panel Chair")
+        blocked = self.make_judge("Blocked Wing")
+        neutral = self.make_judge("Eligible Wing")
+        round_obj.judges.add(chair)
+        round_obj.chair = chair
+        round_obj.save()
+
+        JudgeJudgeScratch.objects.create(judge_one=chair, judge_two=blocked)
+        CheckIn.objects.create(judge=chair, round_number=1)
+        CheckIn.objects.create(judge=blocked, round_number=1)
+        CheckIn.objects.create(judge=neutral, round_number=1)
+
+        response = self.client.get(
+            reverse("alternative_judges", args=[round_obj.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+
+        self.assertIn(neutral.name, excluded_names | included_names)
+        self.assertNotIn(blocked.name, excluded_names)
+        self.assertNotIn(blocked.name, included_names)
+
+    def test_inround_assign_judge_rejects_panel_scratches(self):
+        gov_team = self.make_team("Assign Gov", self.school_primary)
+        opp_team = self.make_team("Assign Opp", self.school_other)
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        chair = self.make_judge("Assign Chair")
+        blocked = self.make_judge("Assign Blocked")
+        round_obj.judges.add(chair)
+        round_obj.chair = chair
+        round_obj.save()
+        JudgeJudgeScratch.objects.create(judge_one=chair, judge_two=blocked)
+
+        response = self.client.get(
+            reverse("assign_judge", args=[round_obj.id, blocked.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], False)
+        self.assertEqual(list(round_obj.judges.values_list("id", flat=True)), [chair.id])
+
     def test_outround_alternative_judges_within_pairing_uses_selected_scope(self):
         varsity_gov = self.make_team("Varsity Gov", self.school_primary)
         varsity_opp = self.make_team("Varsity Opp", self.school_other)
@@ -677,3 +756,179 @@ class TestManualJudgeViews(TestCase):
         self.assertIn(concurrent_scope_judge.name, included_names)
         self.assertIn(available_judge.name, excluded_names)
         self.assertNotIn(concurrent_scope_judge.name, excluded_names)
+
+    def test_outround_alternative_judges_filter_panel_scratches(self):
+        gov_team = self.make_team("Out Panel Gov", self.school_primary)
+        opp_team = self.make_team("Out Panel Opp", self.school_other)
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+        )
+
+        chair = self.make_judge("Out Panel Chair")
+        blocked = self.make_judge("Out Panel Blocked")
+        neutral = self.make_judge("Out Panel Neutral")
+        outround.judges.add(chair)
+        outround.chair = chair
+        outround.save()
+
+        JudgeJudgeScratch.objects.create(judge_one=chair, judge_two=blocked)
+        CheckIn.objects.create(judge=chair, round_number=0)
+        CheckIn.objects.create(judge=blocked, round_number=0)
+        CheckIn.objects.create(judge=neutral, round_number=0)
+
+        response = self.client.get(
+            reverse("outround_alternative_judges", args=[outround.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+
+        self.assertIn(neutral.name, excluded_names | included_names)
+        self.assertNotIn(blocked.name, excluded_names)
+        self.assertNotIn(blocked.name, included_names)
+
+    def test_outround_assign_judge_rejects_panel_scratches(self):
+        gov_team = self.make_team("Out Assign Gov", self.school_primary)
+        opp_team = self.make_team("Out Assign Opp", self.school_other)
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+        )
+
+        chair = self.make_judge("Out Assign Chair")
+        blocked = self.make_judge("Out Assign Blocked")
+        outround.judges.add(chair)
+        outround.chair = chair
+        outround.save()
+        JudgeJudgeScratch.objects.create(judge_one=chair, judge_two=blocked)
+
+        response = self.client.get(
+            reverse("outround_assign_judge", args=[outround.id, blocked.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], False)
+        self.assertEqual(list(outround.judges.values_list("id", flat=True)), [chair.id])
+
+    def test_inround_alternative_teams_filter_team_scratches(self):
+        gov_team = self.make_team("Team Filter Gov", self.school_primary)
+        opp_team = self.make_team("Team Filter Opp", self.school_other)
+        blocked_team = self.make_team("Team Filter Blocked", self.school_primary)
+        allowed_team = self.make_team("Team Filter Allowed", self.school_other)
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        TeamTeamScratch.objects.create(team_one=opp_team, team_two=blocked_team)
+
+        response = self.client.get(
+            reverse("round_alternative_teams", args=[round_obj.id, gov_team.id, "gov"])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_ids = {team.id for team in response.context["excluded_teams"]}
+        included_ids = {team.id for team in response.context["included_teams"]}
+
+        self.assertIn(allowed_team.id, excluded_ids | included_ids)
+        self.assertNotIn(blocked_team.id, excluded_ids)
+        self.assertNotIn(blocked_team.id, included_ids)
+
+    def test_inround_assign_team_rejects_team_scratches(self):
+        gov_team = self.make_team("Assign Team Gov", self.school_primary)
+        opp_team = self.make_team("Assign Team Opp", self.school_other)
+        blocked_team = self.make_team("Assign Team Blocked", self.school_primary)
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        TeamTeamScratch.objects.create(team_one=opp_team, team_two=blocked_team)
+
+        response = self.client.get(
+            reverse("assign_team", args=[round_obj.id, "gov", blocked_team.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], False)
+
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.gov_team_id, gov_team.id)
+
+    def test_outround_alternative_teams_filter_team_scratches(self):
+        gov_team = self.make_team("Out Team Filter Gov", self.school_primary)
+        opp_team = self.make_team("Out Team Filter Opp", self.school_other)
+        blocked_team = self.make_team("Out Team Filter Blocked", self.school_primary)
+        allowed_team = self.make_team("Out Team Filter Allowed", self.school_other)
+
+        for idx, team in enumerate(
+            [gov_team, opp_team, blocked_team, allowed_team],
+            start=1,
+        ):
+            BreakingTeam.objects.create(
+                team=team,
+                seed=idx,
+                effective_seed=idx,
+                type_of_team=BreakingTeam.VARSITY,
+            )
+
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            num_teams=4,
+            type_of_round=Outround.VARSITY,
+        )
+
+        TeamTeamScratch.objects.create(team_one=opp_team, team_two=blocked_team)
+
+        response = self.client.get(
+            reverse(
+                "outround_alternative_teams",
+                args=[outround.id, gov_team.id, "gov"],
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_ids = {team.id for team in response.context["excluded_teams"]}
+        included_ids = {team.id for team in response.context["included_teams"]}
+
+        self.assertIn(allowed_team.id, excluded_ids | included_ids)
+        self.assertNotIn(blocked_team.id, excluded_ids)
+        self.assertNotIn(blocked_team.id, included_ids)
+
+    def test_outround_assign_team_rejects_team_scratches(self):
+        gov_team = self.make_team("Out Assign Team Gov", self.school_primary)
+        opp_team = self.make_team("Out Assign Team Opp", self.school_other)
+        blocked_team = self.make_team("Out Assign Team Blocked", self.school_primary)
+
+        for idx, team in enumerate([gov_team, opp_team, blocked_team], start=1):
+            BreakingTeam.objects.create(
+                team=team,
+                seed=idx,
+                effective_seed=idx,
+                type_of_team=BreakingTeam.VARSITY,
+            )
+
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            num_teams=4,
+            type_of_round=Outround.VARSITY,
+        )
+
+        TeamTeamScratch.objects.create(team_one=opp_team, team_two=blocked_team)
+
+        response = self.client.get(
+            reverse("outround_assign_team", args=[outround.id, "gov", blocked_team.id])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["success"], False)
+
+        outround.refresh_from_db()
+        self.assertEqual(outround.gov_team_id, gov_team.id)
