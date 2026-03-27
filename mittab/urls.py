@@ -88,12 +88,26 @@ urlpatterns = [
     ),
     re_path(r"^scratches/view/", scratch_views.view_scratches, name="view_scratches"),
     re_path(r"^enter_scratch/", scratch_views.add_scratch, name="add_scratch"),
+    path(
+        "scratches/judge/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        {"object_type": "judge"},
+        name="view_scratches_judge",
+    ),
+    path(
+        "scratches/team/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        {"object_type": "team"},
+        name="view_scratches_team",
+    ),
+    path(
+        "scratches/<str:object_type>/<int:object_id>/",
+        scratch_views.view_scratches_for_object,
+        name="view_scratches_for_object",
+    ),
 
     # Team related
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
-    path(r"scratches/<str:object_type>/<int:object_id>/",
-            scratch_views.view_scratches_for_object,
-            name="view_scratches_team"),
     path("view_teams/", team_views.view_teams, name="view_teams"),
     path("enter_team/", team_views.enter_team, name="enter_team"),
     path("all_tab_cards/", team_views.all_tab_cards, name="all_tab_cards"),

@@ -1,6 +1,8 @@
 from django.contrib.auth.decorators import permission_required
 from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404, render, reverse
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 
 from mittab.apps.tab.forms import (
     ScratchForm,
@@ -31,6 +33,102 @@ SCRATCH_FORMS = {
     "team-team": TeamTeamScratchForm,
 }
 
+SCRATCH_TAB_TYPES = {"judge_team", "judge_judge", "team_team"}
+
+
+def _get_form_kwargs(scratch_type):
+    if scratch_type == "judge-team":
+        return {
+            "judge_queryset": Judge.objects.order_by("name"),
+            "team_queryset": Team.objects.order_by("name"),
+        }
+    if scratch_type == "judge-judge":
+        return {"judge_queryset": Judge.objects.order_by("name")}
+    if scratch_type == "team-team":
+        return {"team_queryset": Team.objects.order_by("name")}
+    return {}
+
+
+def _build_form_for_instance(scratch_type, instance, data=None, prefix=None):
+    form_class = SCRATCH_FORMS[scratch_type]
+    return form_class(
+        data,
+        instance=instance,
+        prefix=prefix,
+        **_get_form_kwargs(scratch_type),
+    )
+
+
+def _serialize_entry(scratch_type, instance):
+    return {
+        "scratch_type": scratch_type,
+        "instance": instance,
+    }
+
+
+def _get_scratch_entries_for_judge(judge_id):
+    entries = [
+        _serialize_entry("judge-team", scratch)
+        for scratch in Scratch.objects.filter(judge_id=judge_id).select_related(
+            "judge", "team"
+        ).order_by("team__name", "judge__name")
+    ]
+    entries.extend(
+        _serialize_entry("judge-judge", scratch)
+        for scratch in JudgeJudgeScratch.objects.filter(
+            Q(judge_one_id=judge_id) | Q(judge_two_id=judge_id)
+        ).select_related("judge_one", "judge_two").order_by(
+            "judge_one__name", "judge_two__name"
+        )
+    )
+    return entries
+
+
+def _get_scratch_entries_for_team(team_id):
+    entries = [
+        _serialize_entry("judge-team", scratch)
+        for scratch in Scratch.objects.filter(team_id=team_id).select_related(
+            "judge", "team"
+        ).order_by("team__name", "judge__name")
+    ]
+    entries.extend(
+        _serialize_entry("team-team", scratch)
+        for scratch in TeamTeamScratch.objects.filter(
+            Q(team_one_id=team_id) | Q(team_two_id=team_id)
+        ).select_related("team_one", "team_two").order_by(
+            "team_one__name", "team_two__name"
+        )
+    )
+    return entries
+
+
+def _build_object_forms(entries, data=None):
+    forms = []
+    for index, entry in enumerate(entries, start=1):
+        form = _build_form_for_instance(
+            entry["scratch_type"],
+            entry["instance"],
+            data=data,
+            prefix=str(index),
+        )
+        forms.append(
+            (
+                form,
+                reverse(
+                    "scratch_delete",
+                    args=(entry["scratch_type"], entry["instance"].id),
+                ),
+            )
+        )
+    return forms
+
+
+def _parse_scratch_count(raw_count):
+    try:
+        return max(1, int(raw_count))
+    except (TypeError, ValueError):
+        return 1
+
 
 def add_scratch(request):
     judges = Judge.objects.order_by("name")
@@ -38,8 +136,11 @@ def add_scratch(request):
 
     judge_id, team_id = request.GET.get("judge_id"), request.GET.get("team_id")
     active_tab = request.POST.get("form_type") or request.GET.get("tab") or "judge_team"
-    if active_tab not in {"judge_team", "judge_judge", "team_team"}:
+    if active_tab not in SCRATCH_TAB_TYPES:
         active_tab = "judge_team"
+    form_count = _parse_scratch_count(
+        request.POST.get("count", request.GET.get("count"))
+    )
 
     is_post = request.method == "POST"
 
@@ -56,38 +157,35 @@ def add_scratch(request):
         data = (
             request.POST if (is_post and active_tab == prefix) else None
         )
-        return form_cls(
-            data,
-            prefix=f"{prefix}_0",
-            **queryset_args,
-            initial=None if data else initial,
-        )
+        return [
+            form_cls(
+                data,
+                prefix=f"{prefix}_{index}",
+                **queryset_args,
+                initial=None if data else initial,
+            )
+            for index in range(form_count)
+        ]
 
     forms_by_type = {
-        "judge_team": [
-            make_form(
-                ScratchForm,
-                "judge_team",
-                {"judge_queryset": judges, "team_queryset": teams},
-                scratch_initial,
-            )
-        ],
-        "judge_judge": [
-            make_form(
-                JudgeJudgeScratchForm,
-                "judge_judge",
-                {"judge_queryset": judges},
-                judge_pair_initial,
-            )
-        ],
-        "team_team": [
-            make_form(
-                TeamTeamScratchForm,
-                "team_team",
-                {"team_queryset": teams},
-                team_pair_initial,
-            )
-        ],
+        "judge_team": make_form(
+            ScratchForm,
+            "judge_team",
+            {"judge_queryset": judges, "team_queryset": teams},
+            scratch_initial,
+        ),
+        "judge_judge": make_form(
+            JudgeJudgeScratchForm,
+            "judge_judge",
+            {"judge_queryset": judges},
+            judge_pair_initial,
+        ),
+        "team_team": make_form(
+            TeamTeamScratchForm,
+            "team_team",
+            {"team_queryset": teams},
+            team_pair_initial,
+        ),
     }
 
     if is_post:
@@ -120,7 +218,7 @@ def add_scratch(request):
             "forms_by_type": forms_by_type,
             "tabs": list(tab_labels.items()),
             "forms_context": [
-                {"key": k, "label": v, "forms": forms_by_type[k]}
+                {"key": k, "label": v, "forms": forms_by_type[k], "count": form_count}
                 for k, v in tab_labels.items()
             ],
             "active_tab": active_tab,
@@ -202,18 +300,41 @@ def view_scratches(request):
     )
 
 
-def view_scratches_for_object(request, object_type, object_id):
+def view_scratches_for_object(request, object_id, object_type):
     try:
         object_id = int(object_id)
-        obj = get_object_or_404(Judge if object_type == "judge" else Team, pk=object_id)
     except ValueError:
         return redirect_and_flash_error(request, "Received invalid data")
+
     if object_type == "judge":
-        forms = get_scratch_forms_for_judge(object_id)
+        obj = get_object_or_404(Judge, pk=object_id)
+        entries = _get_scratch_entries_for_judge(object_id)
+        add_query = f"?judge_id={object_id}&tab=judge_team"
     elif object_type == "team":
-        forms = get_scratch_forms_for_team(object_id)
+        obj = get_object_or_404(Team, pk=object_id)
+        entries = _get_scratch_entries_for_team(object_id)
+        add_query = f"?team_id={object_id}&tab=judge_team"
     else:
         return redirect_and_flash_error(request, "Unknown object type")
+
+    forms = _build_object_forms(
+        entries,
+        data=request.POST if request.method == "POST" else None,
+    )
+    if request.method == "POST" and all(form.is_valid() for form, _ in forms):
+        try:
+            with transaction.atomic():
+                for form, _ in forms:
+                    form.save()
+        except IntegrityError:
+            for form, _ in forms:
+                form.add_error(None, "This scratch already exists.")
+        else:
+            return redirect_and_flash_success(
+                request,
+                "Scratches successfully modified",
+                path=request.get_full_path(),
+            )
 
     return render(
         request,
@@ -221,68 +342,33 @@ def view_scratches_for_object(request, object_type, object_id):
         {
             "title": f"Viewing Scratch Information for {obj}",
             "data_type": "Scratch",
-            "forms": [(form, None) for form in forms],
+            "forms": forms,
+            "links": [(reverse("add_scratch") + add_query, "Add Scratch")],
         },
     )
-
-
-def get_scratch_forms_for_judge(judge_id):
-    forms = []
-    for scratch in Scratch.objects.filter(judge_id=judge_id).select_related("team"):
-        form = ScratchForm(
-            instance=scratch,
-            prefix=str(len(forms) + 1),
-            team_queryset=Team.objects.order_by("name"),
-            judge_queryset=Judge.objects.order_by("name"),
-        )
-        forms.append(form)
-    for scratch in JudgeJudgeScratch.objects.filter(
-        judge_one_id=judge_id
-    ).select_related("judge_two") | JudgeJudgeScratch.objects.filter(
-        judge_two_id=judge_id
-    ).select_related(
-        "judge_one"
-    ):
-        form = JudgeJudgeScratchForm(
-            instance=scratch,
-            prefix=str(len(forms) + 1),
-            judge_queryset=Judge.objects.order_by("name"),
-        )
-        forms.append(form)
-    return forms
-
-
-def get_scratch_forms_for_team(team_id):
-    forms = []
-    for scratch in Scratch.objects.filter(team_id=team_id).select_related("judge"):
-        form = ScratchForm(
-            instance=scratch,
-            prefix=str(len(forms) + 1),
-            team_queryset=Team.objects.order_by("name"),
-            judge_queryset=Judge.objects.order_by("name"),
-        )
-        forms.append(form)
-    for scratch in TeamTeamScratch.objects.filter(team_one_id=team_id).select_related(
-        "team_two"
-    ) | TeamTeamScratch.objects.filter(team_two_id=team_id).select_related("team_one"):
-        form = TeamTeamScratchForm(
-            instance=scratch,
-            prefix=str(len(forms) + 1),
-            team_queryset=Team.objects.order_by("name"),
-        )
-        forms.append(form)
-    return forms
-
-# Backwards-compatible aliases for callers that use the old camelCase names
-getScratchFormsForJudge = get_scratch_forms_for_judge
-getScratchFormsForTeam = get_scratch_forms_for_team
-
-
 def scratch_detail(request, scratch_type, scratch_id):
     model = SCRATCH_OBJECTS.get(scratch_type)
-    form_class = SCRATCH_FORMS.get(scratch_type)
-    scratch_obj = model.objects.get(pk=scratch_id)
-    form_obj = form_class(instance=scratch_obj)
+    if not model:
+        return redirect_and_flash_error(
+            request, "Unknown scratch type", path=reverse("view_scratches")
+        )
+    scratch_obj = get_object_or_404(model, pk=scratch_id)
+    form_obj = _build_form_for_instance(
+        scratch_type,
+        scratch_obj,
+        data=request.POST if request.method == "POST" else None,
+    )
+    if request.method == "POST" and form_obj.is_valid():
+        try:
+            form_obj.save()
+        except IntegrityError:
+            form_obj.add_error(None, "This scratch already exists.")
+        else:
+            return redirect_and_flash_success(
+                request,
+                "Scratch updated successfully",
+                path=request.get_full_path(),
+            )
     return render(
         request,
         "common/data_entry.html",

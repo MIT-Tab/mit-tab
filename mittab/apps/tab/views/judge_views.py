@@ -1,5 +1,6 @@
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.urls import reverse
 
 from mittab.apps.tab.forms import JudgeForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
@@ -96,7 +97,7 @@ def view_judge(request, judge_id):
         form = JudgeForm(instance=judge)
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
             "gov_team", "opp_team", "room"))
-    scratch_url = f"/scratches/judge/{judge_id}/"
+    scratch_url = reverse("view_scratches_judge", args=[judge_id])
     links = [(scratch_url, f"Scratches for {judge.name}")]
     return render(
         request, "tab/judge_detail.html", {

@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.text import slugify
 
-from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.apps.tab.forms import TeamForm, TeamEntryForm
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -81,7 +81,7 @@ def view_team(request, team_id):
         form = TeamForm(instance=team)
         links = [
             (
-                f"/team/{team_id}/scratches/view/",
+                reverse("view_scratches_team", args=[team_id]),
                 f"Scratches for {team.display_backend}",
             )
         ]

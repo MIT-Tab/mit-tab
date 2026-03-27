@@ -8,6 +8,7 @@ from mittab.apps.tab.models import (
     BreakingTeam,
     CheckIn,
     Judge,
+    JudgeJudgeScratch,
     Outround,
     Room,
     RoomCheckIn,
@@ -187,3 +188,99 @@ class TestOutroundAssignmentScope(TestCase):
         pending_round.refresh_from_db()
         self.assertEqual(decided_round.room_id, sentinel_room.id)
         self.assertIsNotNone(pending_round.room_id)
+
+
+@pytest.mark.django_db
+class TestOutroundPanelScratchViability(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        school = School.objects.create(name="Fallback School")
+        teams = [
+            Team.objects.create(
+                name=f"Fallback Team {idx}",
+                school=school,
+                seed=Team.FULL_SEED,
+            )
+            for idx in range(1, 5)
+        ]
+        for idx, team in enumerate(teams, start=1):
+            BreakingTeam.objects.create(
+                team=team,
+                seed=idx,
+                effective_seed=idx,
+                type_of_team=BreakingTeam.VARSITY,
+            )
+
+        self.rounds = [
+            Outround.objects.create(
+                num_teams=4,
+                type_of_round=Outround.VARSITY,
+                gov_team=teams[0],
+                opp_team=teams[3],
+            ),
+            Outround.objects.create(
+                num_teams=4,
+                type_of_round=Outround.VARSITY,
+                gov_team=teams[1],
+                opp_team=teams[2],
+            ),
+        ]
+
+        self.bridge_judge = Judge.objects.create(
+            name="Bridge Judge",
+            rank=Decimal("4.00"),
+        )
+        self.flex_judge = Judge.objects.create(
+            name="Flexible Judge",
+            rank=Decimal("3.00"),
+        )
+        self.spare_judge_a = Judge.objects.create(
+            name="Spare Judge A",
+            rank=Decimal("2.00"),
+        )
+        self.spare_judge_b = Judge.objects.create(
+            name="Spare Judge B",
+            rank=Decimal("1.00"),
+        )
+        for judge in (
+            self.bridge_judge,
+            self.flex_judge,
+            self.spare_judge_a,
+            self.spare_judge_b,
+        ):
+            CheckIn.objects.create(judge=judge, round_number=0)
+
+        TabSettings.set("var_panel_size", 2)
+        TabSettings.set("outround_judge_priority", 0)
+
+    def test_assign_outround_judges_avoids_dead_end_chair_assignments(self):
+        JudgeJudgeScratch.objects.create(
+            judge_one=self.bridge_judge,
+            judge_two=self.spare_judge_a,
+        )
+        JudgeJudgeScratch.objects.create(
+            judge_one=self.bridge_judge,
+            judge_two=self.spare_judge_b,
+        )
+
+        assign_judges.add_outround_judges(round_specs=[(Outround.VARSITY, 4)])
+
+        rounds = list(
+            Outround.objects.filter(
+                type_of_round=Outround.VARSITY,
+                num_teams=4,
+            )
+        )
+        self.assertEqual(len(rounds), 2)
+
+        for round_obj in rounds:
+            self.assertEqual(round_obj.judges.count(), 2)
+
+        bridge_round = next(
+            round_obj
+            for round_obj in rounds
+            if round_obj.judges.filter(id=self.bridge_judge.id).exists()
+        )
+        self.assertTrue(bridge_round.judges.filter(id=self.flex_judge.id).exists())

@@ -1,5 +1,4 @@
 import os
-from django.db import IntegrityError
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
@@ -24,7 +23,6 @@ from mittab.apps.tab.forms import (
     SchoolForm,
     RoomForm,
     UploadDataForm,
-    ScratchForm,
     SettingsForm,
 )
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -171,7 +169,9 @@ def apda_board_school_detail(request, school_id):
         form = SchoolApdaIdForm(instance=school)
 
     teams = Team.objects.filter(school=school).prefetch_related("debaters")
-    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related("debaters")
+    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related(
+        "debaters"
+    )
 
     return render(
         request,
@@ -206,7 +206,9 @@ def apda_board_debater_detail(request, debater_id):
     else:
         form = DebaterApdaIdForm(instance=debater)
 
-    teams = Team.objects.filter(debaters=debater).select_related("school", "hybrid_school")
+    teams = Team.objects.filter(debaters=debater).select_related(
+        "school", "hybrid_school"
+    )
     return render(
         request,
         "apda_board/debater_detail.html",
@@ -731,7 +733,10 @@ def ranking_group(request, group_id=None):
         {
             "form": form,
             "links": [],
-            "title": f"Viewing Ranking Group: {group.name}" if group else "Create Ranking Group",
+            "title": (
+                f"Viewing Ranking Group: {group.name}"
+                if group else "Create Ranking Group"
+            ),
         },
     )
 
