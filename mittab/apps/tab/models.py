@@ -7,6 +7,9 @@ from django.core.exceptions import ValidationError
 from mittab.libs.cacheing import cache_logic
 
 
+_TABSETTING_MISSING = object()
+
+
 class TabSettings(models.Model):
     key = models.CharField(max_length=50)
     value = models.IntegerField(null=True, blank=True)
@@ -21,7 +24,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=None):
+    def get(cls, key, default=_TABSETTING_MISSING):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -34,7 +37,7 @@ class TabSettings(models.Model):
             f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
-        if result is None and default is None:
+        if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default
@@ -899,20 +902,20 @@ class Motion(models.Model):
         return ""
 
     def clean(self):
-        """Validate that either inround or outround fields are set."""
+        """Validate that either inround or outround fields are set, not both."""
         super().clean()
         has_round_number = self.round_number is not None
         has_outround = self.num_teams is not None
 
         if has_round_number and has_outround:
             raise ValidationError(
-                "A motion cannot have both a round number (inround) "
-                "and outround fields set."
+                "A motion cannot have both a round number "
+                "(inround) and outround fields set."
             )
         if not has_round_number and not has_outround:
             raise ValidationError(
-                "A motion must have either a round number (inround) "
-                "or outround fields set."
+                "A motion must have either a round number "
+                "(inround) or outround fields set."
             )
         if has_outround and self.outround_type is None:
             raise ValidationError(
