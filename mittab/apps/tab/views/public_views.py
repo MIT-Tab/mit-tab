@@ -187,7 +187,7 @@ def public_speaker_rankings(request):
     speaker_lists = {
         "varsity": [
             entry for entry in varsity_speakers
-            if entry[0].novice_status == Debater.VARSITY and entry[0].ranking_public
+            if entry[0].ranking_public
         ],
         "novice": [
             entry for entry in novice_speakers
