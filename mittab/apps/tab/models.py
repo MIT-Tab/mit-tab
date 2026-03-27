@@ -7,6 +7,9 @@ from django.core.exceptions import ValidationError
 from mittab.libs.cacheing import cache_logic
 
 
+_TABSETTING_MISSING = object()
+
+
 class TabSettings(models.Model):
     key = models.CharField(max_length=50)
     value = models.IntegerField(null=True, blank=True)
@@ -21,7 +24,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=None):
+    def get(cls, key, default=_TABSETTING_MISSING):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -34,7 +37,7 @@ class TabSettings(models.Model):
             f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
-        if result is None and default is None:
+        if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default
@@ -729,10 +732,11 @@ class RankingGroup(models.Model):
 class Motion(models.Model):
     """
     Represents a debate motion (topic) for a specific round.
-    
+
     Round identification:
     - For inrounds: round_number is set (1, 2, 3, etc.)
-    - For outrounds: round_number is None, and outround_type + num_teams identifies the round
+        - For outrounds: round_number is None, and outround_type + num_teams
+            identifies the round
       (e.g., Varsity Quarterfinals = outround_type=0, num_teams=8)
     """
     VARSITY = 0
@@ -742,22 +746,38 @@ class Motion(models.Model):
         (NOVICE, "Novice"),
     )
 
-    # Round identification - either round_number for inrounds, or outround fields for outrounds
-    round_number = models.IntegerField(null=True, blank=True,
-                                       help_text="Round number for inrounds (1, 2, 3, etc.)")
-    outround_type = models.IntegerField(null=True, blank=True, choices=OUTROUND_TYPE_CHOICES,
-                                        help_text="Type of outround (Varsity/Novice)")
-    num_teams = models.IntegerField(null=True, blank=True,
-                                    help_text="Number of teams in outround (e.g., 8 for quarterfinals)")
+    # Round identification - either round_number for inrounds,
+    # or outround fields for outrounds
+    round_number = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Round number for inrounds (1, 2, 3, etc.)",
+    )
+    outround_type = models.IntegerField(
+        null=True,
+        blank=True,
+        choices=OUTROUND_TYPE_CHOICES,
+        help_text="Type of outround (Varsity/Novice)",
+    )
+    num_teams = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of teams in outround (e.g., 8 for quarterfinals)",
+    )
 
     # Motion content
-    info_slide = models.TextField(blank=True, default="",
-                                  help_text="Optional context/info slide text shown before the motion")
+    info_slide = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional context/info slide text shown before the motion",
+    )
     motion_text = models.TextField(help_text="The debate motion/resolution text")
 
     # Publication status
-    is_published = models.BooleanField(default=False,
-                                       help_text="Whether this motion is visible to the public")
+    is_published = models.BooleanField(
+        default=False,
+        help_text="Whether this motion is visible to the public",
+    )
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -797,12 +817,12 @@ class Motion(models.Model):
 
     @property
     def sort_key(self):
-        """Returns a sort key for ordering motions (inrounds first, then outrounds by size)."""
+        """Return a sort key for ordering motions."""
         if self.round_number is not None:
             # Inrounds: sort by round number
             return (0, self.round_number, 0)
         else:
-            # Outrounds: sort by type (varsity first), then by num_teams (descending)
+            # Outrounds: sort by type first, then by `num_teams` descending.
             return (1, self.outround_type or 0, -(self.num_teams or 0))
 
     @property
@@ -815,18 +835,20 @@ class Motion(models.Model):
         return ""
 
     def clean(self):
-        """Validate that either round_number or outround fields are set, but not both."""
+        """Validate that either inround or outround fields are set, not both."""
         super().clean()
         has_round_number = self.round_number is not None
         has_outround = self.num_teams is not None
 
         if has_round_number and has_outround:
             raise ValidationError(
-                "A motion cannot have both a round number (inround) and outround fields set."
+                "A motion cannot have both a round number "
+                "(inround) and outround fields set."
             )
         if not has_round_number and not has_outround:
             raise ValidationError(
-                "A motion must have either a round number (inround) or outround fields set."
+                "A motion must have either a round number "
+                "(inround) or outround fields set."
             )
         if has_outround and self.outround_type is None:
             raise ValidationError(

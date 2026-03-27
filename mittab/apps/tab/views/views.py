@@ -552,6 +552,8 @@ def get_settings_from_yaml():
         for setting in all_settings:
             stored_value = stored_settings.get(setting["name"])
             if stored_value is None:
+                # Keep the YAML default for missing settings
+                # For choice fields with empty string default, this means it stays unset
                 continue
             if setting.get("type") == "boolean":
                 setting["value"] = stored_value == 1

@@ -44,3 +44,21 @@ settings:
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
     value: true
     type: boolean
+  - open_speaks:
+    name: open_speaks
+    description: "Whether judges should disclose speaker points to debaters (open = tell debaters their speaks; closed = do not). Leave unset if your tournament has no policy on this."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Unset (No Policy)"]
+      - [1, "Open (Disclose Speaks)"]
+      - [2, "Closed (Do Not Disclose)"]
+  - open_ranks:
+    name: open_ranks
+    description: "Whether judges should disclose ranks to debaters (open = disclose ranks if debaters opt-in; closed = do not). Leave unset if your tournament has no policy on this."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Unset (No Policy)"]
+      - [1, "Open (Disclose Ranks)"]
+      - [2, "Closed (Do Not Disclose)"]
