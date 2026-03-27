@@ -99,7 +99,10 @@ class TestPublicViews(TestCase):
         return judge, team, round_obj, v_out, n_out, gov_debater
 
     def _set_disclosure_settings(self, open_speaks, open_ranks):
-        """Set disclosure settings. Values: None=unset, True=open (1), False=closed (2)"""
+        """Set disclosure settings.
+        
+        Values: None=unset, True=open (1), False=closed (2)
+        """
         for key, value in (("open_speaks", open_speaks), ("open_ranks", open_ranks)):
             if value is None:
                 # Set to 0 (unset)
