@@ -34,6 +34,23 @@ def _ordered_pullup_candidates(source_bracket, historical_pullups):
     return list(reversed(not_pulled_up)) + list(reversed(already_pulled_up))
 
 
+def _ordered_bye_candidates(source_bracket, preserve_default_choice=False):
+    if not source_bracket:
+        return []
+
+    default_candidate = source_bracket[-1]
+    ordered_candidates = []
+    if preserve_default_choice:
+        ordered_candidates.append(default_candidate)
+
+    for team in reversed(source_bracket):
+        if preserve_default_choice and team == default_candidate:
+            continue
+        if not had_bye(team):
+            ordered_candidates.append(team)
+    return ordered_candidates
+
+
 def _build_pairings_for_brackets(brackets, current_round):
     pairings = []
     for bracket in range(current_round):
@@ -63,7 +80,10 @@ def _pair_brackets_with_pullup_search(
             return pairings, selected_pullups, bye_team
 
         if bracket_index == 0:
-            candidate_byes = working_brackets[0][-1:]
+            candidate_byes = _ordered_bye_candidates(
+                working_brackets[0],
+                preserve_default_choice=True,
+            )
             for candidate_bye in candidate_byes:
                 next_brackets = [list(bracket) for bracket in working_brackets]
                 next_brackets[0].remove(candidate_bye)
@@ -78,9 +98,7 @@ def _pair_brackets_with_pullup_search(
             return None
 
         if bracket_index == 1 and not working_brackets[0]:
-            candidate_byes = [
-                team for team in reversed(working_brackets[1]) if not had_bye(team)
-            ]
+            candidate_byes = _ordered_bye_candidates(working_brackets[1])
             for candidate_bye in candidate_byes:
                 next_brackets = [list(bracket) for bracket in working_brackets]
                 next_brackets[1].remove(candidate_bye)
