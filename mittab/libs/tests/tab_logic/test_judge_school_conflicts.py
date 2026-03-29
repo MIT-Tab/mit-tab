@@ -112,6 +112,52 @@ class TestMinimalSchoolConflictScenarios(TestCase):
             "Conflicted judges must not be added to the panel",
         )
 
+    def test_add_judges_retries_chair_choices_when_panel_scratches_dead_end(self):
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("pair_wings", 1)
+
+        school = School.objects.create(name="Retry Inround")
+        rounds = [
+            Round.objects.create(
+                round_number=1,
+                gov_team=self.make_team("Retry Gov 1", school),
+                opp_team=self.make_team("Retry Opp 1", school),
+            ),
+            Round.objects.create(
+                round_number=1,
+                gov_team=self.make_team("Retry Gov 2", school),
+                opp_team=self.make_team("Retry Opp 2", school),
+            ),
+        ]
+
+        bridge_judge = self.make_judge("Bridge Judge", Decimal("4.00"))
+        flex_judge = self.make_judge("Flex Judge", Decimal("3.00"))
+        spare_judge_a = self.make_judge("Spare Judge A", Decimal("2.00"))
+        spare_judge_b = self.make_judge("Spare Judge B", Decimal("1.00"))
+        for judge in (bridge_judge, flex_judge, spare_judge_a, spare_judge_b):
+            CheckIn.objects.create(judge=judge, round_number=1)
+
+        JudgeJudgeScratch.objects.create(
+            judge_one=bridge_judge,
+            judge_two=spare_judge_a,
+        )
+        JudgeJudgeScratch.objects.create(
+            judge_one=bridge_judge,
+            judge_two=spare_judge_b,
+        )
+
+        assign_judges.add_judges()
+
+        for round_obj in rounds:
+            self.assertEqual(round_obj.judges.count(), 2)
+
+        bridge_round = next(
+            round_obj
+            for round_obj in rounds
+            if round_obj.judges.filter(id=bridge_judge.id).exists()
+        )
+        self.assertTrue(bridge_round.judges.filter(id=flex_judge.id).exists())
+
     def test_add_outround_judges_skips_school_conflicts(self):
         TabSettings.set("var_panel_size", 1)
 
