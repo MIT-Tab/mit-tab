@@ -1,12 +1,17 @@
 import re
+from datetime import timedelta
+from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
+    BALLOT_CODE_MAX_LENGTH,
     Room,
     RoomCheckIn,
     TabSettings,
@@ -17,7 +22,10 @@ from mittab.apps.tab.models import (
     Debater,
     Outround,
     ManualJudgeAssignment,
+    JudgeCodeEmailLog,
 )
+from mittab.libs.email_service import EmailServiceError
+from mittab.apps.tab.views.judge_views import EMAIL_RATE_LIMIT_WINDOW
 
 
 @pytest.mark.django_db(transaction=True)
@@ -204,3 +212,147 @@ class TestTabViews(TestCase):
         )
         self.assertIsNotNone(match, f"Round card for round {round_id} not found")
         return match.group(0)
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_send_judge_codes_view(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        email_service.return_value.send_bulk.return_value = 1
+
+        response = self.client.get(reverse("send_judge_codes"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("judge@example.com", response.content.decode())
+
+        response = self.client.post(
+            reverse("send_judge_codes"),
+            {"judge_ids": [str(judge.id)]},
+        )
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_called_once()
+
+    def test_send_judge_codes_defaults_to_never_received(self):
+        never_sent_judge = Judge.objects.first()
+        never_sent_judge.email = "judge@example.com"
+        never_sent_judge.save()
+
+        previously_sent_judge = Judge.objects.create(
+            name="Previously Sent Judge",
+            rank=3.5,
+            email="prior@example.com",
+        )
+        previously_sent_judge.schools.add(School.objects.first())
+
+        JudgeCodeEmailLog.objects.create(
+            judge=previously_sent_judge,
+            email=previously_sent_judge.email,
+            ballot_code=previously_sent_judge.ballot_code,
+        )
+        JudgeCodeEmailLog.objects.filter(judge=previously_sent_judge).update(
+            sent_at=timezone.now() - EMAIL_RATE_LIMIT_WINDOW - timedelta(minutes=1)
+        )
+
+        response = self.client.get(reverse("send_judge_codes"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        self.assertIn("Select Never Received", content)
+        self.assertIn("Select All", content)
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{never_sent_judge.id}" checked',
+        )
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{previously_sent_judge.id}" >',
+        )
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_send_judge_codes_deduplicates_emails(self, email_service):
+        email_service.return_value.send_bulk.return_value = 1
+
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        other = Judge.objects.create(
+            name="Extra Judge",
+            rank=3.5,
+        )
+        other.schools.add(School.objects.first())
+        other.email = "judge@example.com"
+        other.save()
+
+        response = self.client.post(
+            reverse("send_judge_codes"),
+            {"judge_ids": [str(judge.id), str(other.id)]},
+        )
+        self.assertEqual(response.status_code, 302)
+        # Only one email should be queued for the shared address
+        email_service.return_value.send_bulk.assert_called_once()
+        args, _kwargs = email_service.return_value.send_bulk.call_args
+        self.assertEqual(len(list(args[0])), 1)
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_send_judge_codes_rate_limited(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        JudgeCodeEmailLog.objects.create(
+            judge=judge,
+            email=judge.email,
+            ballot_code=judge.ballot_code,
+            sent_at=timezone.now()
+        )
+
+        response = self.client.post(
+            reverse("send_judge_codes"),
+            {"judge_ids": [str(judge.id)]},
+        )
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_not_called()
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_send_judge_codes_logs_partial_successes(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge1@example.com"
+        judge.save()
+
+        other = Judge.objects.create(
+            name="Extra Partial Judge",
+            rank=3.5,
+            email="judge2@example.com",
+        )
+        other.schools.add(School.objects.first())
+
+        def fail_after_first(requests):
+            raise EmailServiceError("boom", sent_requests=list(requests[:1]))
+
+        email_service.return_value.send_bulk.side_effect = fail_after_first
+
+        response = self.client.post(
+            reverse("send_judge_codes"),
+            {"judge_ids": [str(judge.id), str(other.id)]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(JudgeCodeEmailLog.objects.count(), 1)
+        self.assertEqual(JudgeCodeEmailLog.objects.first().judge, judge)
+
+    def test_judge_ballot_code_validation(self):
+        judge = Judge.objects.first()
+        judge.ballot_code = "alpha-bravo"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "TEST123"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "alpha-123"
+        with self.assertRaises(ValidationError):
+            judge.is_valid_ballot_code()
+
+        judge.ballot_code = "a" * (BALLOT_CODE_MAX_LENGTH + 1)
+        with self.assertRaises(ValidationError):
+            judge.is_valid_ballot_code()
