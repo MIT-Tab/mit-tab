@@ -3,7 +3,7 @@ import random
 from haikunator import Haikunator
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
 
@@ -365,7 +365,7 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
-BALLOT_CODE_MAX_LENGTH = 64
+BALLOT_CODE_MAX_LENGTH = 30
 ballot_code_validator = RegexValidator(
     regex=r"^[A-Za-z]+-[A-Za-z]+$",
     message="Ballot code must contain at least one letter on each side of a single hyphen.",
@@ -381,7 +381,10 @@ class Judge(models.Model):
                                    blank=True,
                                    null=True,
                                    unique=True,
-                                   validators=[ballot_code_validator])
+                                   validators=[
+                                       MaxLengthValidator(BALLOT_CODE_MAX_LENGTH),
+                                       ballot_code_validator,
+                                   ])
     is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)

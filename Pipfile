@@ -40,3 +40,6 @@ nplusone = "*"
 
 [requires]
 python_version = "3.10.16"
+
+[scripts]
+pylint = "python -m pylint --recursive=y --score=n manage.py mittab"

@@ -215,7 +215,7 @@ def view_judge(request, judge_id):
         if form.is_valid():
             try:
                 form.save()
-            except ValueError:
+            except (ValueError, ValidationError):
                 return redirect_and_flash_error(
                     request, "Judge information cannot be validated")
             updated_name = form.cleaned_data["name"]
@@ -243,7 +243,7 @@ def enter_judge(request):
         if form.is_valid():
             try:
                 form.save()
-            except ValueError:
+            except (ValueError, ValidationError):
                 return redirect_and_flash_error(request,
                                                 "Judge cannot be validated")
             created_name = form.cleaned_data["name"]
@@ -377,17 +377,25 @@ def send_judge_codes(request):
     tournament_name = TabSettings.get("tournament_name", "your tournament")
     plan = _prepare_judge_code_plan(all_judges, tournament_name, request)
     sendable_by_id = {entry["judge"].id: entry for entry in plan["sendable"]}
-    default_selected_ids = set(sendable_by_id.keys())
+    default_selected_ids = list(sendable_by_id.keys())
+    default_selected_id_set = set(default_selected_ids)
 
     if request.method == "POST":
-        selected_ids = {
-            int(judge_id)
-            for judge_id in request.POST.getlist("judge_ids")
-            if judge_id.isdigit()
-        }
-        selected_ids &= default_selected_ids
+        selected_ids = []
+        seen_ids = set()
+        for judge_id in request.POST.getlist("judge_ids"):
+            if not judge_id.isdigit():
+                continue
+
+            parsed_id = int(judge_id)
+            if parsed_id not in default_selected_id_set or parsed_id in seen_ids:
+                continue
+
+            selected_ids.append(parsed_id)
+            seen_ids.add(parsed_id)
     else:
         selected_ids = default_selected_ids
+    selected_id_set = set(selected_ids)
 
     last_sent_map = dict(
         JudgeCodeEmailLog.objects.values("judge_id")
@@ -413,7 +421,7 @@ def send_judge_codes(request):
     judge_rows = []
     for judge in all_judges:
         can_send = judge.id in sendable_by_id
-        checked = can_send and judge.id in selected_ids
+        checked = can_send and judge.id in selected_id_set
         status = status_lookup.get(judge.id, "Ready" if can_send else "Not eligible")
         judge_rows.append({
             "judge": judge,
@@ -448,10 +456,32 @@ def send_judge_codes(request):
 
         try:
             sent = EmailService().send_bulk(email_requests)
-        except (EmailServiceError, ImproperlyConfigured) as exc:
+        except ImproperlyConfigured as exc:
             return redirect_and_flash_error(
                 request,
                 f"Unable to send judge codes: {exc}",
+            )
+        except EmailServiceError as exc:
+            sent_request_ids = {id(email_request) for email_request in exc.sent_requests}
+            sent_log_entries = [
+                entry["log_entry"]
+                for entry in selected_entries
+                if id(entry["email_request"]) in sent_request_ids
+            ]
+            if sent_log_entries:
+                JudgeCodeEmailLog.objects.bulk_create(sent_log_entries)
+
+            partial_message = ""
+            if sent_log_entries:
+                sent_count = len(sent_log_entries)
+                partial_message = (
+                    f" after sending {sent_count} judge code"
+                    f"{'' if sent_count == 1 else 's'}"
+                )
+
+            return redirect_and_flash_error(
+                request,
+                f"Unable to send judge codes{partial_message}: {exc}",
             )
 
         JudgeCodeEmailLog.objects.bulk_create(log_entries)

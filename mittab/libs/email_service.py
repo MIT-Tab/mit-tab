@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class EmailServiceError(Exception):
     """Raised when Amazon SES rejects a send request."""
 
+    def __init__(self, message, sent_requests=None):
+        super().__init__(message)
+        self.sent_requests = list(sent_requests or [])
+
 
 @dataclass(frozen=True)
 class EmailRequest:
@@ -41,6 +45,7 @@ class EmailService:
             return 0
 
         sent = 0
+        sent_requests: List[EmailRequest] = []
         failures: List[str] = []
         list_management = self._list_management_options()
         configuration_set = settings.AWS_SES_CONFIGURATION_SET
@@ -59,13 +64,15 @@ class EmailService:
             try:
                 self.client.send_email(**payload)
                 sent += 1
+                sent_requests.append(request)
             except (BotoCoreError, ClientError) as exc:
                 logger.exception("Amazon SES send failed: %s", exc)
                 failures.append(str(exc))
 
         if failures:
             raise EmailServiceError(
-                f"Failed to send {len(failures)} email(s): {failures[-1]}"
+                f"Failed to send {len(failures)} email(s): {failures[-1]}",
+                sent_requests=sent_requests,
             )
 
         return sent
@@ -88,7 +95,8 @@ class EmailService:
         contact_list = settings.AWS_MAILMANAGER_ADDRESS_LIST
         if not contact_list:
             logger.warning(
-                "AWS_MAILMANAGER_ADDRESS_LIST not configured; unsubscribe links will be omitted"
+                "AWS_MAILMANAGER_ADDRESS_LIST not configured; "
+                "unsubscribe links will be omitted"
             )
             return None
 

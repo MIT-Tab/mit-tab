@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tab', '0032_manualjudgeassignment'),
+        ("tab", "0036_alter_outround_room_nullable"),
     ]
 
     operations = [
@@ -20,14 +20,14 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='judge',
             name='ballot_code',
-            field=models.CharField(blank=True, max_length=255, null=True, unique=True, validators=[django.core.validators.RegexValidator(message='Ballot code must contain at least one letter on each side of a single hyphen.', regex='^[A-Za-z]+-[A-Za-z]+$')]),
+            field=models.CharField(blank=True, max_length=255, null=True, unique=True, validators=[django.core.validators.MaxLengthValidator(30), django.core.validators.RegexValidator(message='Ballot code must contain at least one letter on each side of a single hyphen.', regex='^[A-Za-z]+-[A-Za-z]+$')]),
         ),
         migrations.CreateModel(
             name='JudgeCodeEmailLog',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('email', models.EmailField(max_length=254)),
-                ('ballot_code', models.CharField(max_length=64)),
+                ('ballot_code', models.CharField(max_length=30)),
                 ('sent_at', models.DateTimeField(auto_now_add=True)),
                 ('judge', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='code_email_logs', to='tab.judge')),
             ],

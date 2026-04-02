@@ -10,6 +10,7 @@ from django.utils import timezone
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
+    BALLOT_CODE_MAX_LENGTH,
     Room,
     RoomCheckIn,
     TabSettings,
@@ -22,6 +23,7 @@ from mittab.apps.tab.models import (
     ManualJudgeAssignment,
     JudgeCodeEmailLog,
 )
+from mittab.libs.email_service import EmailServiceError
 
 
 @pytest.mark.django_db(transaction=True)
@@ -274,8 +276,42 @@ class TestTabViews(TestCase):
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_not_called()
 
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_send_judge_codes_logs_partial_successes(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge1@example.com"
+        judge.save()
+
+        other = Judge.objects.create(
+            name="Extra Partial Judge",
+            rank=3.5,
+            email="judge2@example.com",
+        )
+        other.schools.add(School.objects.first())
+
+        def fail_after_first(requests):
+            raise EmailServiceError("boom", sent_requests=list(requests[:1]))
+
+        email_service.return_value.send_bulk.side_effect = fail_after_first
+
+        response = self.client.post(
+            reverse("send_judge_codes"),
+            {"judge_ids": [str(judge.id), str(other.id)]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(JudgeCodeEmailLog.objects.count(), 1)
+        self.assertEqual(JudgeCodeEmailLog.objects.first().judge, judge)
+
     def test_judge_ballot_code_validation(self):
         judge = Judge.objects.first()
-        judge.ballot_code = "INVALIDCODE"
+        judge.ballot_code = "alpha-bravo"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "TEST123"
+        with self.assertRaises(ValidationError):
+            judge.is_valid_ballot_code()
+
+        judge.ballot_code = "a" * (BALLOT_CODE_MAX_LENGTH + 1)
         with self.assertRaises(ValidationError):
             judge.is_valid_ballot_code()

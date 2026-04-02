@@ -9,6 +9,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const getValue = (cell) =>
     cell?.dataset.sortValue ?? cell?.textContent?.trim().toLowerCase() ?? "";
 
+  const setSortDirection = (cell, direction) => {
+    const headerCell = cell;
+    headerCell.dataset.sortDir = direction;
+    const arrow = headerCell.querySelector(".sort-arrow");
+    let arrowText = "";
+    if (direction === "asc") {
+      arrowText = "▲";
+    } else if (direction === "desc") {
+      arrowText = "▼";
+    }
+    if (arrow) {
+      arrow.textContent = arrowText;
+    }
+  };
+
   const sortTable = (header) => {
     const key = header.dataset.sortKey;
     if (!key) return;
@@ -21,17 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     headers.forEach((th) => {
       if (th === header) return;
-      th.dataset.sortDir = "";
-      const arrow = th.querySelector(".sort-arrow");
-      if (arrow) {
-        arrow.textContent = "";
-      }
+      setSortDirection(th, "");
     });
-    header.dataset.sortDir = currentDir;
-    const activeArrow = header.querySelector(".sort-arrow");
-    if (activeArrow) {
-      activeArrow.textContent = currentDir === "asc" ? "▲" : "▼";
-    }
+    setSortDirection(header, currentDir);
 
     rows.sort((a, b) => {
       const aCell = a.cells[header.cellIndex];
@@ -53,10 +60,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   headers.forEach((th) => {
-    th.style.cursor = "pointer";
-    th.addEventListener("click", (event) => {
+    const header = th;
+    header.style.cursor = "pointer";
+    header.addEventListener("click", (event) => {
       event.preventDefault();
-      sortTable(th);
+      sortTable(header);
     });
   });
 });
