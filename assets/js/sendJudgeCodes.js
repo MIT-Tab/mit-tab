@@ -3,11 +3,28 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!table) {
     return;
   }
+  const selectNeverReceivedButton = document.getElementById(
+    "select-never-received",
+  );
+  const selectAllButton = document.getElementById("select-all-judges");
 
   const headers = table.querySelectorAll("[data-sort-key]");
+  const checkboxRows = () =>
+    Array.from(table.querySelectorAll("tbody tr[data-can-send='true']"));
 
   const getValue = (cell) =>
     cell?.dataset.sortValue ?? cell?.textContent?.trim().toLowerCase() ?? "";
+
+  const setSelection = (predicate) => {
+    checkboxRows().forEach((row) => {
+      const checkbox = row.querySelector("input[name='judge_ids']");
+      if (!checkbox) {
+        return;
+      }
+
+      checkbox.checked = predicate(row);
+    });
+  };
 
   const setSortDirection = (cell, direction) => {
     const headerCell = cell;
@@ -67,4 +84,16 @@ document.addEventListener("DOMContentLoaded", () => {
       sortTable(header);
     });
   });
+
+  if (selectNeverReceivedButton) {
+    selectNeverReceivedButton.addEventListener("click", () => {
+      setSelection((row) => row.dataset.neverReceived === "true");
+    });
+  }
+
+  if (selectAllButton) {
+    selectAllButton.addEventListener("click", () => {
+      setSelection(() => true);
+    });
+  }
 });

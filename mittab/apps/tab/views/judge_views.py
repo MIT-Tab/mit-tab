@@ -377,7 +377,13 @@ def send_judge_codes(request):
     tournament_name = TabSettings.get("tournament_name", "your tournament")
     plan = _prepare_judge_code_plan(all_judges, tournament_name, request)
     sendable_by_id = {entry["judge"].id: entry for entry in plan["sendable"]}
-    default_selected_ids = list(sendable_by_id.keys())
+    emailed_judge_ids = set(
+        JudgeCodeEmailLog.objects.values_list("judge_id", flat=True)
+    )
+    default_selected_ids = [
+        judge_id for judge_id in sendable_by_id.keys()
+        if judge_id not in emailed_judge_ids
+    ]
     default_selected_id_set = set(default_selected_ids)
 
     if request.method == "POST":
@@ -432,6 +438,7 @@ def send_judge_codes(request):
             "status": status,
             "reason": reason_lookup.get(judge.id),
             "recent": judge.id in plan["recent_judges"],
+            "never_received": judge.id not in emailed_judge_ids,
             "last_sent": last_sent_map.get(judge.id),
         })
 
@@ -506,6 +513,7 @@ def send_judge_codes(request):
         "judge_rows": judge_rows,
         "rate_limit_hours": rate_limit_hours,
         "sendable_count": len(sendable_by_id),
+        "never_received_sendable_count": len(default_selected_ids),
         "skipped_invalid": plan["skipped_invalid"],
         "skipped_rate_limited": plan["skipped_rate_limited"],
         "skipped_duplicate_email": plan["skipped_duplicate_email"],

@@ -367,8 +367,11 @@ class BreakingTeam(models.Model):
 
 BALLOT_CODE_MAX_LENGTH = 30
 ballot_code_validator = RegexValidator(
-    regex=r"^[A-Za-z]+-[A-Za-z]+$",
-    message="Ballot code must contain at least one letter on each side of a single hyphen.",
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$",
+    message=(
+        "Ballot code must be either legacy alphanumeric text or a single-hyphen code "
+        "with letters on each side."
+    ),
 )
 
 

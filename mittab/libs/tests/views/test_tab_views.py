@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 from unittest import mock
 
 import pytest
@@ -24,6 +25,7 @@ from mittab.apps.tab.models import (
     JudgeCodeEmailLog,
 )
 from mittab.libs.email_service import EmailServiceError
+from mittab.apps.tab.views.judge_views import EMAIL_RATE_LIMIT_WINDOW
 
 
 @pytest.mark.django_db(transaction=True)
@@ -229,6 +231,42 @@ class TestTabViews(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_called_once()
+
+    def test_send_judge_codes_defaults_to_never_received(self):
+        never_sent_judge = Judge.objects.first()
+        never_sent_judge.email = "judge@example.com"
+        never_sent_judge.save()
+
+        previously_sent_judge = Judge.objects.create(
+            name="Previously Sent Judge",
+            rank=3.5,
+            email="prior@example.com",
+        )
+        previously_sent_judge.schools.add(School.objects.first())
+
+        JudgeCodeEmailLog.objects.create(
+            judge=previously_sent_judge,
+            email=previously_sent_judge.email,
+            ballot_code=previously_sent_judge.ballot_code,
+        )
+        JudgeCodeEmailLog.objects.filter(judge=previously_sent_judge).update(
+            sent_at=timezone.now() - EMAIL_RATE_LIMIT_WINDOW - timedelta(minutes=1)
+        )
+
+        response = self.client.get(reverse("send_judge_codes"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        self.assertIn("Select Never Received", content)
+        self.assertIn("Select All", content)
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{never_sent_judge.id}" checked',
+        )
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{previously_sent_judge.id}" >',
+        )
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
     def test_send_judge_codes_deduplicates_emails(self, email_service):

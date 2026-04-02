@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='judge',
             name='ballot_code',
-            field=models.CharField(blank=True, max_length=255, null=True, unique=True, validators=[django.core.validators.MaxLengthValidator(30), django.core.validators.RegexValidator(message='Ballot code must contain at least one letter on each side of a single hyphen.', regex='^[A-Za-z]+-[A-Za-z]+$')]),
+            field=models.CharField(blank=True, max_length=255, null=True, unique=True, validators=[django.core.validators.MaxLengthValidator(30), django.core.validators.RegexValidator(message='Ballot code must be either legacy alphanumeric text or a single-hyphen code with letters on each side.', regex='^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$')]),
         ),
         migrations.CreateModel(
             name='JudgeCodeEmailLog',
