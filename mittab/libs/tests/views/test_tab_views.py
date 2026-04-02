@@ -347,6 +347,9 @@ class TestTabViews(TestCase):
         self.assertTrue(judge.is_valid_ballot_code())
 
         judge.ballot_code = "TEST123"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "alpha-123"
         with self.assertRaises(ValidationError):
             judge.is_valid_ballot_code()
 
