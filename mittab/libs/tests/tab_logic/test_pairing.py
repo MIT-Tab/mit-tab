@@ -162,3 +162,76 @@ class TestPairingLogic(TestCase):
 
         self.re_pair_latest_round()
         self.assertEqual(self.pairings_for(second_round), baseline_pairings)
+
+
+@pytest.mark.django_db
+class TestSchoolNoProtectionPairing(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def test_same_school_penalty_is_skipped_for_no_protection_schools(self):
+        protected_school = School.objects.create(name="Protected School")
+        other_school = School.objects.create(name="Other School")
+
+        team_a = Team.objects.create(
+            name="Protected A",
+            school=protected_school,
+            seed=Team.FULL_SEED,
+        )
+        team_b = Team.objects.create(
+            name="Protected B",
+            school=protected_school,
+            seed=Team.FULL_SEED,
+        )
+        team_c = Team.objects.create(
+            name="Other A",
+            school=other_school,
+            seed=Team.HALF_SEED,
+        )
+        team_d = Team.objects.create(
+            name="Other B",
+            school=other_school,
+            seed=Team.HALF_SEED,
+        )
+
+        weights = tab_logic.get_weights()
+        current_round = 1
+        tot_rounds = 5
+
+        protected_weight = tab_logic.calc_weight(
+            team_a,
+            team_b,
+            0,
+            1,
+            team_c,
+            team_d,
+            2,
+            3,
+            weights,
+            current_round,
+            tot_rounds,
+        )
+
+        protected_school.no_protection = True
+        protected_school.save(update_fields=["no_protection"])
+        team_a.refresh_from_db()
+        team_b.refresh_from_db()
+
+        unprotected_weight = tab_logic.calc_weight(
+            team_a,
+            team_b,
+            0,
+            1,
+            team_c,
+            team_d,
+            2,
+            3,
+            weights,
+            current_round,
+            tot_rounds,
+        )
+
+        self.assertEqual(
+            unprotected_weight - protected_weight,
+            abs(weights["same_school_penalty"]),
+            "No-protection schools should not incur same-school penalties",
+        )

@@ -114,9 +114,14 @@ class PublicDisplaySetting(models.Model):
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
+    no_protection = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
+
+    @property
+    def provides_protection(self):
+        return not self.no_protection
 
     def delete(self, using=None, keep_parents=False):
         team_check = Team.objects.filter(school=self)

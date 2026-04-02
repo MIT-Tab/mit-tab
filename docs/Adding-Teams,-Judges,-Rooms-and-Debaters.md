@@ -42,6 +42,9 @@ at any given moment.
 ![](img/list_add_bar.png)
 ### Schools
 1. Name - Name of the school, e.g. "Yale"
+2. No protection - If checked, teams using this school will not receive automatic
+same-school pairing protection, and judges affiliated with this school will not
+be blocked automatically.
 
 ### Judges
 1. Name - Name of the judge.
@@ -58,8 +61,9 @@ judge. **Use this for team scratches as well as multiple affiliations**
 
 ### Teams
 1. Name - Name of the team, e.g. "Yale A"
-2. School - School that this team should be protected from in pairing. If you
-are entering a hybrid, select the team that has protection.
+2. School - School that this team should be protected from in pairing. If that
+school has `No protection` enabled, the team will not receive automatic school
+protection. If you are entering a hybrid, select the team that has protection.
 3. Hybrid school - For hybrids, the school they are not taking protection from.
 This will prevent the team from being judged by this school, but not from
 hitting teams from that school

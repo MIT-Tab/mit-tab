@@ -71,6 +71,41 @@ class TestMinimalSchoolConflictScenarios(TestCase):
             "Judges without matching schools should be eligible",
         )
 
+    def test_judge_conflict_ignores_primary_school_with_no_protection(self):
+        school_primary = School.objects.create(name="Independent U", no_protection=True)
+        school_other = School.objects.create(name="Other U")
+
+        gov_team = self.make_team("Independent Gov", school_primary)
+        opp_team = self.make_team("Independent Opp", school_other)
+
+        affiliated_judge = self.make_judge("Independent Judge", Decimal("4.10"))
+        affiliated_judge.schools.add(school_primary)
+
+        self.assertFalse(
+            judge_conflict(affiliated_judge, gov_team, opp_team),
+            "No-protection schools should not create judge conflicts",
+        )
+
+    def test_judge_conflict_ignores_hybrid_school_with_no_protection(self):
+        school_primary = School.objects.create(name="Primary U")
+        school_other = School.objects.create(name="Other U")
+        hybrid_school = School.objects.create(name="Independent Hybrid U", no_protection=True)
+
+        gov_team = self.make_team("Gov Team", school_primary)
+        opp_team = self.make_team(
+            "Independent Hybrid Team",
+            school_other,
+            hybrid_school=hybrid_school,
+        )
+
+        affiliated_judge = self.make_judge("Hybrid Independent Judge", Decimal("4.20"))
+        affiliated_judge.schools.add(hybrid_school)
+
+        self.assertFalse(
+            judge_conflict(affiliated_judge, gov_team, opp_team),
+            "No-protection hybrid schools should not create judge conflicts",
+        )
+
     def test_add_judges_skips_school_conflicts_in_inrounds(self):
         TabSettings.set("cur_round", 2)
         TabSettings.set("pair_wings", 0)
@@ -229,13 +264,14 @@ class TestDynamicSchoolConflicts(TestCase):
                 else set()
             )
             for team in (round_obj.gov_team, round_obj.opp_team):
-                if team.school_id in chair_school_ids:
+                if team.school_id in chair_school_ids and team.school.provides_protection:
                     conflicts.append(
                         f"Judge {chair.name} assigned to {team.name} "
                         f"from school {team.school.name}"
                     )
                 if include_hybrid and team.hybrid_school_id and \
-                        team.hybrid_school_id in chair_school_ids:
+                        team.hybrid_school_id in chair_school_ids and \
+                        team.hybrid_school.provides_protection:
                     conflicts.append(
                         f"Judge {chair.name} assigned to {team.name} "
                         f"with hybrid school {team.hybrid_school.name}"
@@ -504,6 +540,37 @@ class TestDynamicSchoolConflicts(TestCase):
             conflicts,
             "School conflicts must be enforced even with allow_rejudges=True:\n"
             + "\n".join(conflicts),
+        )
+
+    def test_add_judges_allows_no_protection_school_affiliations(self):
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("pair_wings", 0)
+        TabSettings.set("allow_rejudges", 0)
+
+        school_primary = School.objects.create(name="Independent Inround", no_protection=True)
+        school_other = School.objects.create(name="Other Inround")
+
+        gov_team = self.make_team("Inround Gov", school_primary)
+        opp_team = self.make_team("Inround Opp", school_other)
+
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+        )
+
+        affiliated_judge = self.make_judge("Independent Affiliated Judge", Decimal("4.50"))
+        affiliated_judge.schools.add(school_primary)
+
+        CheckIn.objects.create(judge=affiliated_judge, round_number=1)
+
+        assign_judges.add_judges()
+        round_obj.refresh_from_db()
+
+        self.assertEqual(
+            round_obj.chair,
+            affiliated_judge,
+            "Judges should remain eligible for no-protection school teams",
         )
 
 

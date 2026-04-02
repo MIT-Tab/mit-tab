@@ -609,9 +609,17 @@ def judge_conflict(judge, team1, team2, allow_rejudges=None):
         for s in judge.scratches.all()
     )
 
+    judge_school_ids = {school.id for school in judge.schools.all()}
+
     has_school_conflict = any(
-        team.school in judge.schools.all() or
-        (team.hybrid_school in judge.schools.all())
+        (
+            team.school_id in judge_school_ids
+            and team.school.provides_protection
+        )
+        or (
+            team.hybrid_school_id in judge_school_ids
+            and team.hybrid_school.provides_protection
+        )
         for team in (team1, team2)
     )
 
