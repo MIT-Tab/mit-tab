@@ -24,6 +24,10 @@ class UploadDataForm(forms.Form):
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
 
 
+class UploadApdaCsvForm(forms.Form):
+    file = forms.FileField(label="CSV File")
+
+
 class SchoolForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(SchoolForm, self).__init__(*args, **kwargs)

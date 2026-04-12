@@ -57,6 +57,18 @@
       </h4>
       <div class="collapse show" id="apda-school-list-content">
         <div class="index-section-content">
+          <div class="mb-3">
+            <a href="{% url 'export_apda_board_schools_csv' %}" class="btn btn-sm btn-outline-secondary mb-2">
+              <i class="fa fa-download"></i> Export CSV
+            </a>
+            <form method="post" action="{% url 'import_apda_board_schools_csv' %}" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="form-group mb-2">
+                <input type="file" class="form-control-file form-control-sm" id="apda-school-csv" name="file" accept=".csv,text/csv" required>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Import CSV</button>
+            </form>
+          </div>
           <ol id="apda-school-list">
             {% for school_id, school_name in school_list %}
             <li class="searchable">
@@ -87,6 +99,18 @@
       </h4>
       <div class="collapse show" id="apda-debater-list-content">
         <div class="index-section-content">
+          <div class="mb-3">
+            <a href="{% url 'export_apda_board_debaters_csv' %}" class="btn btn-sm btn-outline-secondary mb-2">
+              <i class="fa fa-download"></i> Export CSV
+            </a>
+            <form method="post" action="{% url 'import_apda_board_debaters_csv' %}" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="form-group mb-2">
+                <input type="file" class="form-control-file form-control-sm" id="apda-debater-csv" name="file" accept=".csv,text/csv" required>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Import CSV</button>
+            </form>
+          </div>
           <ol id="apda-debater-list">
             {% for debater_id, debater_name in debater_list %}
             <li class="searchable">
