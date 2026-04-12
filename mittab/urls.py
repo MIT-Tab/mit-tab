@@ -30,6 +30,26 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
     path(
+        "apda-board/schools/export/",
+        views.export_apda_board_schools_csv,
+        name="export_apda_board_schools_csv",
+    ),
+    path(
+        "apda-board/schools/import/",
+        views.import_apda_board_schools_csv,
+        name="import_apda_board_schools_csv",
+    ),
+    path(
+        "apda-board/debaters/export/",
+        views.export_apda_board_debaters_csv,
+        name="export_apda_board_debaters_csv",
+    ),
+    path(
+        "apda-board/debaters/import/",
+        views.import_apda_board_debaters_csv,
+        name="import_apda_board_debaters_csv",
+    ),
+    path(
         "apda-board/school/<int:school_id>/",
         views.apda_board_school_detail,
         name="apda_board_school_detail",

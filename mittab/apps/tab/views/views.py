@@ -24,6 +24,7 @@ from mittab.apps.tab.forms import (
     SchoolForm,
     RoomForm,
     UploadDataForm,
+    UploadApdaCsvForm,
     ScratchForm,
     SettingsForm,
 )
@@ -48,6 +49,14 @@ from mittab.libs.cacheing.public_cache import (
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.libs.data_import.apda_board_import import (
+    import_apda_board_debaters_csv as import_apda_board_debaters_csv_file,
+    import_apda_board_schools_csv as import_apda_board_schools_csv_file,
+)
+from mittab.libs.data_export.apda_board_export import (
+    export_apda_board_debaters_csv as export_apda_board_debaters_csv_file,
+    export_apda_board_schools_csv as export_apda_board_schools_csv_file,
+)
 from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
@@ -148,6 +157,68 @@ def apda_board_home(request):
         "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
     }
     return render(request, "apda_board/home.html", context)
+
+
+def export_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_schools_csv_file()
+
+
+def export_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_debaters_csv_file()
+
+
+def import_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for school APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_schools_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported school APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
+
+
+def import_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for debater APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_debaters_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported debater APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
 
 
 def apda_board_school_detail(request, school_id):

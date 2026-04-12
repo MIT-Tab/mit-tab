@@ -2,6 +2,7 @@ import pytest
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -129,3 +130,79 @@ class TestApdaBoardViews(TestCase):
             password="password",
         )
         self.assertFalse(logged_in)
+
+    def test_apda_board_school_export_csv(self):
+        response = self.client.get(reverse("export_apda_board_schools_csv"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertIn(
+            "attachment; filename=apda_board_schools.csv",
+            response["Content-Disposition"],
+        )
+
+        lines = response.content.decode("utf-8").splitlines()
+        self.assertTrue(lines)
+        self.assertEqual(lines[0], "school,id")
+
+    def test_apda_board_debater_export_csv(self):
+        response = self.client.get(reverse("export_apda_board_debaters_csv"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertIn(
+            "attachment; filename=apda_board_debaters.csv",
+            response["Content-Disposition"],
+        )
+
+        lines = response.content.decode("utf-8").splitlines()
+        self.assertTrue(lines)
+        self.assertEqual(lines[0], "debater,id")
+
+    def test_apda_board_school_import_updates_existing_and_ignores_missing(self):
+        school = School.objects.first()
+        missing_school_name = "School That Does Not Exist"
+        upload = SimpleUploadedFile(
+            "schools.csv",
+            (
+                "school,id\n"
+                f"{school.name},4242\n"
+                f"{missing_school_name},9999\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("import_apda_board_schools_csv"),
+            {"file": upload},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("apda_board_home"))
+        school.refresh_from_db()
+        self.assertEqual(school.apda_id, 4242)
+        self.assertFalse(School.objects.filter(name=missing_school_name).exists())
+
+    def test_apda_board_debater_import_updates_existing_and_ignores_missing(self):
+        debater = Debater.objects.first()
+        missing_debater_name = "Debater That Does Not Exist"
+        upload = SimpleUploadedFile(
+            "debaters.csv",
+            (
+                "debater,id\n"
+                f"{debater.name},3131\n"
+                f"{missing_debater_name},9999\n"
+            ).encode("utf-8"),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("import_apda_board_debaters_csv"),
+            {"file": upload},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("apda_board_home"))
+        debater.refresh_from_db()
+        self.assertEqual(debater.apda_id, 3131)
+        self.assertFalse(Debater.objects.filter(name=missing_debater_name).exists())
