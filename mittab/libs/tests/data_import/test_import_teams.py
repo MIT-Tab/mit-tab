@@ -17,11 +17,11 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
 
         data = [
-            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
-            ["Team 2", "Harvard", "", "", "Alice", "", "1251", "Bob", "", "1252"],
+            ["Team 1", "NU", "Deis", "full", "John", "", "john@example.com", "1241", "Jane", "n", "jane@example.com", "1242"],
+            ["Team 2", "Harvard", "", "", "Alice", "", "alice@example.com", "1251", "Bob", "", "bob@example.com", "1252"],
             [
                 "Team 3", "Deis", "Harvard", "Half Seed ", "Carly",
-                "Novice", "1111", "Dan", "Novice ", "1112"]
+                "Novice", "carly@example.com", "1111", "Dan", "Novice ", "dan@example.com", "1112"]
         ]
 
         importer = TeamImporter(MockWorkbook(data))
@@ -40,7 +40,9 @@ class TestImportingTeams(TestCase):
         debater_1 = team_1.debaters.get(name="John")
         debater_2 = team_1.debaters.get(name="Jane")
         assert debater_1.novice_status == Debater.VARSITY
+        assert debater_1.email == "john@example.com"
         assert debater_2.novice_status == Debater.NOVICE
+        assert debater_2.email == "jane@example.com"
 
         team_2 = Team.objects.get(name="Team 2")
         assert team_2.school.name == "Harvard"
@@ -50,7 +52,9 @@ class TestImportingTeams(TestCase):
         debater_1 = team_2.debaters.get(name="Alice")
         debater_2 = team_2.debaters.get(name="Bob")
         assert debater_1.novice_status == Debater.VARSITY
+        assert debater_1.email == "alice@example.com"
         assert debater_2.novice_status == Debater.VARSITY
+        assert debater_2.email == "bob@example.com"
 
         team_3 = Team.objects.get(name="Team 3")
         assert team_3.school.name == "Deis"
@@ -60,7 +64,9 @@ class TestImportingTeams(TestCase):
         debater_1 = team_3.debaters.get(name="Carly")
         debater_2 = team_3.debaters.get(name="Dan")
         assert debater_1.novice_status == Debater.NOVICE
+        assert debater_1.email == "carly@example.com"
         assert debater_2.novice_status == Debater.NOVICE
+        assert debater_2.email == "dan@example.com"
 
     def test_rollback_from_duplicate_debater(self):
         assert Team.objects.count() == 0
@@ -68,8 +74,8 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
 
         data = [
-            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
-            ["Team 2", "Harvard", "", "", "Alice", "", "1251", "John", "", "1252"]
+            ["Team 1", "NU", "Deis", "full", "John", "", "john@example.com", "1241", "Jane", "n", "jane@example.com", "1242"],
+            ["Team 2", "Harvard", "", "", "Alice", "", "alice@example.com", "1251", "John", "", "john2@example.com", "1252"]
         ]
 
         importer = TeamImporter(MockWorkbook(data))
@@ -88,8 +94,8 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
 
         data = [
-            ["Team 1", "NU", "Deis", "full", "John", "", "1241", "Jane", "n", "1242"],
-            ["Team 2", "Harvard", "", "invalid", "Alice", "", "1251", "Bob", "", "1252"]
+            ["Team 1", "NU", "Deis", "full", "John", "", "john@example.com", "1241", "Jane", "n", "jane@example.com", "1242"],
+            ["Team 2", "Harvard", "", "invalid", "Alice", "", "alice@example.com", "1251", "Bob", "", "bob@example.com", "1252"]
         ]
 
         importer = TeamImporter(MockWorkbook(data))
@@ -110,7 +116,7 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 1
 
         data = [
-            ["Team 1", "NU", "Deis", "invalid", "John", "", "1241", "Jane", "n", "1242"]
+            ["Team 1", "NU", "Deis", "invalid", "John", "", "john@example.com", "1241", "Jane", "n", "jane@example.com", "1242"]
         ]
         importer = TeamImporter(MockWorkbook(data))
         errors = importer.import_data()
@@ -121,3 +127,16 @@ class TestImportingTeams(TestCase):
         assert School.objects.first().name == "NU"
         assert len(errors) == 1
         assert errors[0] == "Row 1: Invalid seed value for team Team 1"
+
+    def test_empty_debater_emails_are_normalized_to_none(self):
+        data = [
+            ["Team 1", "NU", "", "", "John", "", "   ", "1241", "Jane", "n", "", "1242"]
+        ]
+
+        importer = TeamImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert not errors
+        team = Team.objects.get(name="Team 1")
+        assert team.debaters.get(name="John").email is None
+        assert team.debaters.get(name="Jane").email is None
