@@ -1,7 +1,12 @@
 from abc import ABC
 from functools import total_ordering
 
-from mittab.apps.tab.models import Debater, Team
+from mittab.apps.tab.models import (
+    Debater,
+    SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
+    TabSettings,
+    Team,
+)
 from mittab.libs.tab_logic.stats import *
 
 
@@ -13,8 +18,9 @@ def rank_speakers():
         "roundstats_set",
         "roundstats_set__round",
     ).all()
+    stat_priority = speaker_stat_priority()
     return sorted([
-        DebaterScore(d)
+        DebaterScore(d, stat_priority=stat_priority)
         for d in debaters
     ])
 
@@ -62,6 +68,20 @@ OPP_STRENGTH = Stat("Opp strength", -1)
 COIN_FLIP = Stat("Coin flip")
 
 
+def speaker_stat_priority(use_single_adjusted=None):
+    if use_single_adjusted is None:
+        use_single_adjusted = TabSettings.get(
+            SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 0
+        )
+    if use_single_adjusted:
+        return (SINGLE_ADJUSTED_SPEAKS, SINGLE_ADJUSTED_RANKS, SPEAKS,
+                RANKS, DOUBLE_ADJUSTED_SPEAKS, DOUBLE_ADJUSTED_RANKS,
+                COIN_FLIP)
+    return (SPEAKS, RANKS, SINGLE_ADJUSTED_SPEAKS,
+            SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
+            DOUBLE_ADJUSTED_RANKS, COIN_FLIP)
+
+
 @total_ordering
 class Score(ABC):
     stat_priority = ()
@@ -81,27 +101,30 @@ class Score(ABC):
     def scoring_tuple(self):
         return tuple(
             map(lambda stat: stat.sort_coefficient * self[stat],
-                self.stat_priority))
+                self.get_stat_priority()))
 
     def get_tiebreaker(self, other):
-        for stat, self_val, other_val in zip(self.stat_priority,
+        for stat, self_val, other_val in zip(self.get_stat_priority(),
                                              self.scoring_tuple(),
                                              other.scoring_tuple()):
             if self_val != other_val:
                 return stat
         return None
 
+    def get_stat_priority(self):
+        return self.stat_priority
+
     def __getitem__(self, key):
         return self.stats[key] or 0
 
 
 class DebaterScore(Score):
-    stat_priority = (SPEAKS, RANKS, SINGLE_ADJUSTED_SPEAKS,
-                     SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
-                     DOUBLE_ADJUSTED_RANKS, COIN_FLIP)
+    stat_priority = speaker_stat_priority(False)
 
-    def __init__(self, debater):
+    def __init__(self, debater, stat_priority=None):
         super(DebaterScore, self).__init__()
+        if stat_priority is not None:
+            self.stat_priority = stat_priority
         self.debater = debater
         self.stats[SPEAKS] = tot_speaks_deb(debater)
         self.stats[RANKS] = tot_ranks_deb(debater)

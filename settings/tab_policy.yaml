@@ -62,3 +62,8 @@ settings:
       - [0, "Unset (No Policy)"]
       - [1, "Open (Disclose Ranks)"]
       - [2, "Closed (Do Not Disclose)"]
+  - speaker_rankings_use_single_adjusted:
+    name: speaker_rankings_use_single_adjusted
+    description: "Use single adjusted speaker points and ranks before unadjusted speaker points and ranks when sorting speaker rankings. This does not affect team rankings or pairing."
+    value: false
+    type: boolean
