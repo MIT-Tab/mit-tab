@@ -735,6 +735,15 @@ class ManualJudgeAssignment(models.Model):
         return "Unknown"
 
 
+class AuditEventQuerySet(models.QuerySet):
+    def delete(self):
+        raise ValidationError("Audit events cannot be deleted directly")
+
+
+class AuditEventManager(models.Manager.from_queryset(AuditEventQuerySet)):
+    pass
+
+
 class AuditEvent(models.Model):
     CREATE = "create"
     EDIT = "edit"
@@ -766,6 +775,8 @@ class AuditEvent(models.Model):
     changes = models.JSONField(default=dict, blank=True, editable=False)
     note = models.TextField(blank=True, editable=False)
 
+    objects = AuditEventManager()
+
     class Meta:
         ordering = ["-created_at", "-id"]
         indexes = [
@@ -781,6 +792,9 @@ class AuditEvent(models.Model):
         if self.pk and AuditEvent.objects.filter(pk=self.pk).exists():
             raise ValidationError("Audit events are immutable")
         super(AuditEvent, self).save(force_insert, force_update, using, update_fields)
+
+    def delete(self, using=None, keep_parents=False):
+        raise ValidationError("Audit events cannot be deleted directly")
 
     @classmethod
     def record(cls, obj, event_type, user=None, changes=None, note=""):

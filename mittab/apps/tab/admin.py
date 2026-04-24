@@ -33,6 +33,13 @@ class OutroundAdmin(admin.ModelAdmin):
 class AttributionAdminMixin:
     readonly_fields = ("created_by", "created_at")
 
+    def get_deleted_objects(self, objs, request):
+        deleted_objects, model_count, perms_needed, protected = (
+            super(AttributionAdminMixin, self).get_deleted_objects(objs, request)
+        )
+        perms_needed.discard(models.AuditEvent._meta.verbose_name)
+        return deleted_objects, model_count, perms_needed, protected
+
     def save_model(self, request, obj, form, change):
         if not change and hasattr(obj, "created_by") and not obj.created_by_id:
             obj.created_by = request.user

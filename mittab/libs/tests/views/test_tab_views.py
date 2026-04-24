@@ -298,6 +298,61 @@ class TestTabViews(TestCase):
         self.assertIn("Created by testuser", content)
         self.assertIn("Edited by testuser", content)
 
+    def test_audit_events_cannot_be_deleted_directly(self):
+        team = Team.objects.create(
+            name="Direct Audit Delete Team",
+            school=School.objects.first(),
+            seed=Team.UNSEEDED,
+            break_preference=Team.VARSITY,
+        )
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Audit events cannot be deleted directly",
+        ):
+            event.delete()
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Audit events cannot be deleted directly",
+        ):
+            AuditEvent.objects.filter(pk=event.pk).delete()
+
+    def test_audited_object_can_be_deleted_with_audit_events(self):
+        team = Team.objects.create(
+            name="Audited Delete Team",
+            school=School.objects.first(),
+            seed=Team.UNSEEDED,
+            break_preference=Team.VARSITY,
+        )
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+
+        team.delete()
+
+        self.assertFalse(Team.objects.filter(pk=team.pk).exists())
+        self.assertFalse(AuditEvent.objects.filter(pk=event.pk).exists())
+
+    def test_admin_can_delete_audited_object_with_audit_events(self):
+        team = Team.objects.create(
+            name="Admin Audited Delete Team",
+            school=School.objects.first(),
+            seed=Team.UNSEEDED,
+            break_preference=Team.VARSITY,
+        )
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+        url = reverse("admin:tab_team_delete", args=[team.pk])
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Cannot delete team")
+
+        response = self.client.post(url, {"post": "yes"})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Team.objects.filter(pk=team.pk).exists())
+        self.assertFalse(AuditEvent.objects.filter(pk=event.pk).exists())
+
     def test_manual_judge_assignment_tracks_actor(self):
         round_obj = Round.objects.filter(round_number=1).first()
         round_obj.judges.clear()
