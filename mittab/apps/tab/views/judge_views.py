@@ -214,7 +214,7 @@ def view_judge(request, judge_id):
         form = JudgeForm(request.POST, instance=judge)
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except (ValueError, ValidationError):
                 return redirect_and_flash_error(
                     request, "Judge information cannot be validated")
@@ -233,6 +233,8 @@ def view_judge(request, judge_id):
             "form": form,
             "links": links,
             "judge_rounds": judging_rounds,
+            "audit_events": judge.audit_events.all(),
+            "judge_obj": judge,
             "title": f"Viewing Judge: {judge.name}"
         })
 
@@ -242,7 +244,7 @@ def enter_judge(request):
         form = JudgeForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except (ValueError, ValidationError):
                 return redirect_and_flash_error(request,
                                                 "Judge cannot be validated")
@@ -279,7 +281,7 @@ def add_scratches(request, judge_id, number_scratches):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches created successfully")
     else:
@@ -295,7 +297,7 @@ def add_scratches(request, judge_id, number_scratches):
         ]
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, [None] * len(forms))),
+            "forms": list(zip(forms, [None] * len(forms), [None] * len(forms))),
             "data_type": "Scratch",
             "title": f"Adding Scratch(es) for {judge.name}"
         })
@@ -331,7 +333,7 @@ def view_scratches(request, judge_id):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches created successfully")
     else:
@@ -348,11 +350,19 @@ def view_scratches(request, judge_id):
         f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
         for i in range(len(scratches))
     ]
+    metadata = [
+        {
+            "created_by": scratch.created_by_display,
+            "created_at": scratch.created_at,
+            "audit_events": scratch.audit_events.all(),
+        }
+        for scratch in scratches
+    ]
     links = [(f"/judge/{judge_id}/scratches/add/1/", "Add Scratch")]
 
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, delete_links)),
+            "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
             "title": f"Viewing Scratch Information for {judge.name}"

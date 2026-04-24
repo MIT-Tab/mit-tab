@@ -48,6 +48,7 @@
       {% endif %}
     </table>
   </div>
+  {% include "common/_audit_trail.html" with audited_obj=team_obj audit_events=audit_events %}
 </div>
 {% endif %}
 {% endblock %}

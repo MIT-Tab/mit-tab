@@ -7,12 +7,12 @@ def normalize_email(value):
     return value.strip() or None
 
 
-def import_teams(file_to_import):
+def import_teams(file_to_import, created_by=None):
     try:
         workbook = Workbook(file_to_import, 12)
     except InvalidWorkbookException:
         return ["Teams file is not a valid .xlsx file"]
-    return TeamImporter(workbook).import_data()
+    return TeamImporter(workbook, created_by=created_by).import_data()
 
 
 class TeamImporter(WorkbookImporter):

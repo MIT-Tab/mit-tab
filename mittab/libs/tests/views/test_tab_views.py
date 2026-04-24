@@ -23,6 +23,8 @@ from mittab.apps.tab.models import (
     Outround,
     ManualJudgeAssignment,
     JudgeCodeEmailLog,
+    Scratch,
+    AuditEvent,
 )
 from mittab.libs.email_service import EmailServiceError
 from mittab.apps.tab.views.judge_views import EMAIL_RATE_LIMIT_WINDOW
@@ -180,6 +182,145 @@ class TestTabViews(TestCase):
         self.assertFalse(
             ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
         )
+
+    def test_team_creator_and_edit_audit_visible(self):
+        school = School.objects.first()
+        debaters = [
+            Debater.objects.create(
+                name="Audit Debater One",
+                novice_status=Debater.VARSITY,
+            ),
+            Debater.objects.create(
+                name="Audit Debater Two",
+                novice_status=Debater.VARSITY,
+            ),
+        ]
+
+        response = self.client.post(reverse("enter_team"), {
+            "name": "Audit Team",
+            "school": school.id,
+            "debaters": [debater.id for debater in debaters],
+            "seed": Team.UNSEEDED,
+            "break_preference": Team.VARSITY,
+            "checked_in": "on",
+            "ranking_public": "on",
+            "number_scratches": 0,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        team = Team.objects.get(name="Audit Team")
+        self.assertEqual(team.created_by, self.user)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                content_type__model="team",
+                object_id=team.id,
+                event_type=AuditEvent.CREATE,
+                user=self.user,
+            ).exists()
+        )
+
+        response = self.client.post(reverse("view_team", args=[team.id]), {
+            "name": "Audit Team Renamed",
+            "school": school.id,
+            "debaters": [debater.id for debater in debaters],
+            "seed": Team.UNSEEDED,
+            "break_preference": Team.VARSITY,
+            "checked_in": "on",
+            "ranking_public": "on",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        edit_event = AuditEvent.objects.get(
+            content_type__model="team",
+            object_id=team.id,
+            event_type=AuditEvent.EDIT,
+            user=self.user,
+        )
+        self.assertIn("name", edit_event.changes["fields"])
+
+        response = self.client.get(reverse("view_team", args=[team.id]))
+        content = response.content.decode()
+        self.assertIn("Audit Trail", content)
+        self.assertIn("testuser", content)
+        self.assertIn("Edited", content)
+
+    def test_scratch_creator_and_edit_audit_visible(self):
+        school = School.objects.first()
+        debaters = [
+            Debater.objects.create(
+                name="Scratch Audit Debater One",
+                novice_status=Debater.VARSITY,
+            ),
+            Debater.objects.create(
+                name="Scratch Audit Debater Two",
+                novice_status=Debater.VARSITY,
+            ),
+        ]
+        team = Team.objects.create(
+            name="Scratch Audit Team",
+            school=school,
+            seed=Team.UNSEEDED,
+            break_preference=Team.VARSITY,
+        )
+        team.debaters.add(*debaters)
+        judge = Judge.objects.first()
+
+        response = self.client.post(reverse("add_scratch"), {
+            "team": team.id,
+            "judge": judge.id,
+            "scratch_type": Scratch.TEAM_SCRATCH,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        scratch = Scratch.objects.get(team=team, judge=judge)
+        self.assertEqual(scratch.created_by, self.user)
+
+        response = self.client.post(
+            reverse("view_scratches_team", args=[team.id]),
+            {
+                "1-team": team.id,
+                "1-judge": judge.id,
+                "1-scratch_type": Scratch.TAB_SCRATCH,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        edit_event = AuditEvent.objects.get(
+            content_type__model="scratch",
+            object_id=scratch.id,
+            event_type=AuditEvent.EDIT,
+            user=self.user,
+        )
+        self.assertIn("scratch_type", edit_event.changes["fields"])
+
+        response = self.client.get(reverse("view_scratches_team", args=[team.id]))
+        content = response.content.decode()
+        self.assertIn("Created by testuser", content)
+        self.assertIn("Edited by testuser", content)
+
+    def test_manual_judge_assignment_tracks_actor(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.judges.clear()
+        judge = Judge.objects.first()
+
+        response = self.client.get(
+            reverse("assign_judge", args=[round_obj.id, judge.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        assignment = ManualJudgeAssignment.objects.get(round=round_obj, judge=judge)
+        self.assertEqual(assignment.created_by, self.user)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                content_type__model="round",
+                object_id=round_obj.id,
+                event_type=AuditEvent.MANUAL_JUDGE_ASSIGN,
+                user=self.user,
+            ).exists()
+        )
+
+        response = self.client.get(reverse("view_status"))
+        self.assertIn("Manually assigned by testuser", response.content.decode())
 
     def test_view_room_saves_outround_checkin(self):
         room = Room.objects.first()

@@ -7,7 +7,7 @@
 {% block content %}
 <div class="col-md-6">
   <form method="post" action=""> {% csrf_token %}
-    {% for form, delete in forms %}
+    {% for form, delete, metadata in forms %}
     <div class="card mb-3">
       <div class="card-header">
         <h5 class="float-left">{{data_type}} #{{ form.prefix }}</h5>
@@ -20,6 +20,22 @@
         {% endif %}
       </div>
       <div class="card-body">
+        {% if metadata %}
+        <div class="mb-3 small text-muted">
+          Created by {{ metadata.created_by }}{% if metadata.created_at %} at {{ metadata.created_at }}{% endif %}
+          {% if metadata.audit_events %}
+            <ul class="mt-2 mb-0">
+              {% for event in metadata.audit_events %}
+                <li>
+                  {{ event.label }} by {{ event.user_display }} at {{ event.created_at }}
+                  {% if event.note %}: {{ event.note }}{% endif %}
+                  {% if event.changes.fields %} ({{ event.changes.fields|join:", " }}){% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+        {% endif %}
         {% bootstrap_form form %}
       </div>
     </div>
