@@ -15,9 +15,14 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "judge1@example.com", "9.5", "Harvard"],
-                ["Judge 2", "judge2@example.com", "10.5555", "Yale", "Harvard", "Northeastern"],
-                ["Judge 3", "", "20"]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard"],
+            [
+                "Judge 2", "judge2@example.com", "10.5555",
+                "Yale", "Harvard", "Northeastern",
+            ],
+            ["Judge 3", "", "20"],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -49,9 +54,14 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "judge1@example.com", "9.5", "Harvard"],
-                ["Judge 2", "judge2@example.com", "10.5555", "Yale", "Harvard", "Northeastern"],
-                ["Judge 1", "judge3@example.com", "20"]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard"],
+            [
+                "Judge 2", "judge2@example.com", "10.5555",
+                "Yale", "Harvard", "Northeastern",
+            ],
+            ["Judge 1", "judge3@example.com", "20"],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -65,9 +75,14 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "judge1@example.com", "9.5", "Harvard"],
-                ["Judge 2", "judge2@example.com", "200", "Yale", "Harvard", "Northeastern"],
-                ["Judge 3", "judge3@example.com", "20"]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard"],
+            [
+                "Judge 2", "judge2@example.com", "200",
+                "Yale", "Harvard", "Northeastern",
+            ],
+            ["Judge 3", "judge3@example.com", "20"],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
