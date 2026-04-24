@@ -3,9 +3,13 @@ from mittab.apps.tab.forms import DebaterForm, TeamForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
 
 
+def normalize_email(value):
+    return value.strip() or None
+
+
 def import_teams(file_to_import):
     try:
-        workbook = Workbook(file_to_import, 8)
+        workbook = Workbook(file_to_import, 12)
     except InvalidWorkbookException:
         return ["Teams file is not a valid .xlsx file"]
     return TeamImporter(workbook).import_data()
@@ -69,18 +73,22 @@ class TeamImporter(WorkbookImporter):
             deb1_status = Debater.NOVICE
         else:
             deb1_status = Debater.VARSITY
-        deb1_apda_id = row[6].strip() or -1
-        deb2_name = row[7]
-        deb2_status = row[8].strip().lower()
+        deb1_email = normalize_email(row[6])
+        deb1_apda_id = row[7].strip() or -1
+        deb2_name = row[8]
+        deb2_status = row[9].strip().lower()
+        deb2_email = normalize_email(row[10])
+        deb2_apda_id = row[11].strip() or -1
+
         if deb2_status in self.novice_values:
             deb2_status = Debater.NOVICE
         else:
             deb2_status = Debater.VARSITY
-        deb2_apda_id = row[9].strip() or -1
 
         deb1_form = DebaterForm(data={
             "name": deb1_name,
             "novice_status": deb1_status,
+            "email": deb1_email,
             "apda_id": deb1_apda_id
         })
         if deb1_form.is_valid():
@@ -94,6 +102,7 @@ class TeamImporter(WorkbookImporter):
         deb2_form = DebaterForm(data={
             "name": deb2_name,
             "novice_status": deb2_status,
+            "email": deb2_email,
             "apda_id": deb2_apda_id
         })
         if deb2_form.is_valid():

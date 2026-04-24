@@ -143,6 +143,7 @@ class School(models.Model):
 
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -188,7 +189,7 @@ class Debater(models.Model):
 
 
 class Team(models.Model):
-    name = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=35, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
                                       blank=True,
