@@ -122,8 +122,19 @@ class JudgeForm(forms.ModelForm):
             except Exception:
                 pass
 
-    def save(self, commit=True):
-        judge = super(JudgeForm, self).save(commit)
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        judge = super(JudgeForm, self).save(commit=False)
+        is_create = judge.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not judge.created_by_id:
+            judge.created_by = actor
+        if commit:
+            judge.save()
+            self.save_m2m()
+        else:
+            return judge
+
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
@@ -139,6 +150,10 @@ class JudgeForm(forms.ModelForm):
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
 
+        if actor:
+            event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+            changes = {} if is_create else {"fields": changed_fields}
+            AuditEvent.record(judge, event_type, actor, changes=changes)
         return judge
 
     class Meta:
@@ -177,6 +192,22 @@ class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
         exclude = ["tiebreaker"]
+
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        team = super(TeamForm, self).save(commit=False)
+        is_create = team.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not team.created_by_id:
+            team.created_by = actor
+        if commit:
+            team.save()
+            self.save_m2m()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(team, event_type, actor, changes=changes)
+        return team
 
     class Media:
         css = {
@@ -229,13 +260,22 @@ class ScratchForm(forms.ModelForm):
             self.fields["team"].initial = str(self.instance.team.id)
             self.fields["judge"].initial = str(self.instance.judge.id)
 
-    def save(self, commit=True):
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
         instance = super(ScratchForm, self).save(commit=False)
+        is_create = instance.pk is None
+        changed_fields = list(self.changed_data)
         # Convert string IDs to actual model instances
         instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
         instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
+        if is_create and actor and not instance.created_by_id:
+            instance.created_by = actor
         if commit:
             instance.save()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(instance, event_type, actor, changes=changes)
         return instance
 
     class Meta:

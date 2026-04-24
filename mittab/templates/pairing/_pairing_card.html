@@ -72,12 +72,13 @@
         {% load tags %}
         {% for judge in pairing.judges.all %}
         {% is_manual_judge_assignment pairing.id judge.id as is_manual_assignment %}
+        {% manual_judge_assignment_label pairing.id judge.id as manual_assignment_label %}
         <span class="judge-assignment{% if is_manual_assignment %} manual-lay{% endif %}"
               round-id="{{pairing.id}}"
               judge-id="{{judge.id}}">
           <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
              data-toggle="dropdown" href="#"
-             {% if is_manual_assignment %}title="Manually assigned judge"{% endif %}>
+             {% if is_manual_assignment %}title="{{ manual_assignment_label }}"{% endif %}>
             {{judge.name}} <small>({{judge.rank}})</small>
             {% judge_team_count judge pairing as rejudge_count %}
             {% if rejudge_count > 1 %}
@@ -102,6 +103,14 @@
         <br>
         {% endif %}
         {% endfor %}
+        {% manual_judge_audit_events pairing.id as manual_events %}
+        {% if manual_events %}
+          <div class="small text-muted mt-1">
+          {% for event in manual_events %}
+            <div>{{ event.label }} by {{ event.user_display }}{% if event.note %}: {{ event.note }}{% endif %}</div>
+          {% endfor %}
+          </div>
+        {% endif %}
       </div>
 
       <div class="col-3 text-center">

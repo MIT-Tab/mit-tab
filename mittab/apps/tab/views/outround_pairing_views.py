@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
@@ -397,6 +398,7 @@ def outround_pairing_view(request,
 
     outround_sections = []
     excluded_teams_map = {}
+    outround_ids = []
     for selected_type, selected_num in selected_specs:
         section_outrounds = list(
             Outround.objects.filter(
@@ -409,6 +411,7 @@ def outround_pairing_view(request,
                 "judges__required_room_tags",
             )
         )
+        outround_ids.extend(outround.id for outround in section_outrounds)
         judges_per_panel = (
             TabSettings.get("var_panel_size", 3)
             if selected_type == BreakingTeam.VARSITY
@@ -454,6 +457,20 @@ def outround_pairing_view(request,
         for team in section_excluded_teams:
             excluded_teams_map[team.id] = team
     excluded_teams = list(excluded_teams_map.values())
+    manual_judge_audit_events = {}
+    if outround_ids:
+        outround_content_type = ContentType.objects.get_for_model(Outround)
+        audit_entries = AuditEvent.objects.filter(
+            content_type=outround_content_type,
+            object_id__in=outround_ids,
+            event_type__in=[
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                AuditEvent.MANUAL_JUDGE_REMOVE,
+                AuditEvent.MANUAL_CHAIR_CHANGE,
+            ],
+        ).select_related("user")
+        for entry in audit_entries:
+            manual_judge_audit_events.setdefault(entry.object_id, []).append(entry)
 
     page_label = "Selected Outrounds"
     if len(outround_sections) == 1:
@@ -564,6 +581,7 @@ def outround_pairing_view(request,
         ),
         "stats_round_numbers": list(dict.fromkeys([spec[1] for spec in selected_specs])),
         "return_path": request.get_full_path(),
+        "manual_judge_audit_events": manual_judge_audit_events,
     }
 
     return render(
@@ -762,11 +780,36 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=int(remove_id))
             round_obj.judges.remove(remove_obj)
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={
+                    "assigned_judge": judge_obj.name,
+                    "removed_judge": remove_obj.name,
+                },
+                note=f"Swapped {remove_obj.name} for {judge_obj.name}",
+            )
 
             if remove_obj == round_obj.chair:
                 round_obj.chair = round_obj.judges.order_by("-rank").first()
         elif not round_obj.chair:
             round_obj.chair = judge_obj
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
+        else:
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
 
         round_obj.save()
         data = {

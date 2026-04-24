@@ -98,7 +98,7 @@ def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
 
 def add_judges():
     round_number = TabSettings.get("cur_round") - 1
-    settings = get_inround_settings()
+    pairing_settings = get_inround_settings()
 
     Round.judges.through.objects.filter(
         round__round_number=round_number
@@ -129,9 +129,11 @@ def add_judges():
     random.seed(1337)
     random.shuffle(pairings)
 
-    chair_scores = construct_judge_scores(chairs, settings.mode)
+    chair_scores = construct_judge_scores(chairs, pairing_settings.mode)
 
-    bubble_priority = settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
+    bubble_priority = (
+        pairing_settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
+    )
     if bubble_priority and round_number > 1:
         bubble_rounds = [p for p in pairings if is_bubble_round(p, round_number)]
         non_bubble_rounds = [p for p in pairings if p not in bubble_rounds]
@@ -152,7 +154,7 @@ def add_judges():
     for pairing in pairings:
         all_teams.extend((pairing.gov_team, pairing.opp_team))
     rejudge_counts = {}
-    if settings.allow_rejudges:
+    if pairing_settings.allow_rejudges:
         rejudge_counts = judge_team_rejudge_counts(chairs, all_teams)
 
     graph_edges = []
@@ -164,11 +166,11 @@ def add_judges():
                 chair,
                 pairing.gov_team,
                 pairing.opp_team,
-                settings.allow_rejudges,
+                pairing_settings.allow_rejudges,
             )
             if has_conflict:
                 continue
-            weight = calc_weight(chair_score, pairing_i, settings.mode)
+            weight = calc_weight(chair_score, pairing_i, pairing_settings.mode)
             judge_counts = rejudge_counts.get(chair.id)
             rejudge_sum = 0
             if judge_counts:
@@ -176,8 +178,11 @@ def add_judges():
                     judge_counts.get(pairing.gov_team.id, 0)
                     + judge_counts.get(pairing.opp_team.id, 0)
                 )
-            if rejudge_sum > 0 and settings.rejudge_penalty > 0:
-                penalty = settings.rejudge_penalty * (1 + 0.1 * chair_score)
+            if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                penalty = (
+                    pairing_settings.rejudge_penalty *
+                    (1 + 0.1 * chair_score)
+                )
                 weight -= penalty * rejudge_sum
 
             graph_edges.append((pairing_i, num_rounds + chair_i, weight))
@@ -232,22 +237,31 @@ def add_judges():
         )
 
     Round.objects.bulk_update(pairings, ["chair"])
-    if settings.pair_wings and num_rounds and len(all_judges) > num_rounds:
+    if (
+            pairing_settings.pair_wings
+            and num_rounds
+            and len(all_judges) > num_rounds):
         max_per_round = min(3, len(all_judges) // num_rounds + 1)
         for _ in range(1, max_per_round):
             # Build wing pool from all_judges excluding already assigned
-            wing_judges = [j for j in all_judges if j.id not in assigned_judge_objects]
+            wing_judges = [
+                j for j in all_judges
+                if j.id not in assigned_judge_objects
+            ]
             if not wing_judges:
                 break
 
             wing_pool = list(range(len(wing_judges)))
             pairing_indices = list(range(num_rounds))
-            if settings.wing_mode == WingPairingMode.RANDOM:
+            if pairing_settings.wing_mode == WingPairingMode.RANDOM:
                 random.shuffle(wing_pool)
                 random.shuffle(pairing_indices)
 
             wing_edges = []
-            wing_judge_scores = construct_judge_scores(wing_judges, settings.mode)
+            wing_judge_scores = construct_judge_scores(
+                wing_judges,
+                pairing_settings.mode,
+            )
             for relative_rank, wing_judge_i in enumerate(wing_pool):
                 judge = wing_judges[wing_judge_i]
                 judge_score = wing_judge_scores[wing_judge_i]
@@ -257,7 +271,7 @@ def add_judges():
                         judge,
                         pairing.gov_team,
                         pairing.opp_team,
-                        settings.allow_rejudges,
+                        pairing_settings.allow_rejudges,
                     )
                     if has_conflict:
                         continue
@@ -271,16 +285,19 @@ def add_judges():
                     weight = calc_weight(
                         judge_score,
                         pairing_i,
-                        settings.mode,
+                        pairing_settings.mode,
                         num_rounds=num_rounds,
                         is_assigning_wings=True,
-                        wing_mode=settings.wing_mode,
+                        wing_mode=pairing_settings.wing_mode,
                         chair_judge_i=chair_by_pairing[pairing_i],
                         relative_judge_rank=relative_rank,
                         judge_index=wing_judge_i,
                     )
-                    if rejudge_sum > 0 and settings.rejudge_penalty > 0:
-                        penalty = settings.rejudge_penalty * (1 + 0.1 * judge_score)
+                    if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                        penalty = (
+                            pairing_settings.rejudge_penalty *
+                            (1 + 0.1 * judge_score)
+                        )
                         weight -= penalty * rejudge_sum
 
                     wing_edges.append((pairing_i, num_rounds + wing_judge_i, weight))
@@ -380,14 +397,16 @@ def _assign_outround_judges_for_specs(
         panel_size_by_spec,
         judges,
         judge_scores,
-        settings,
+        pairing_settings,
         available_indices,
         force_novice_last=False):
     link_outround = Outround.judges.through
     judge_round_joins = []
 
     max_panel_size = max(panel_size_by_spec.values()) if panel_size_by_spec else 0
-    snake_draft_mode = settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
+    snake_draft_mode = (
+        pairing_settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
+    )
 
     for panel_member in range(max_panel_size):
         active_pairings = _build_active_pairings(
@@ -417,12 +436,15 @@ def _assign_outround_judges_for_specs(
                 weight = calc_weight(
                     judge_scores[judge_i],
                     pairing_i,
-                    settings.mode,
+                    pairing_settings.mode,
                     num_rounds=num_rounds,
                 )
                 graph_edges.append((pairing_i, num_rounds + judge_i, weight))
 
-        panel_matches = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+        panel_matches = mwmatching.maxWeightMatching(
+            graph_edges,
+            maxcardinality=True,
+        )
         if -1 in panel_matches[:num_rounds] or (num_rounds > 0 and not graph_edges):
             if not graph_edges:
                 raise errors.JudgeAssignmentError("Impossible to assign judges.")
@@ -474,10 +496,10 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     if not normalized_specs:
         return
 
-    settings = get_outround_settings(normalized_specs[0][0])
+    pairing_settings = get_outround_settings(normalized_specs[0][0])
     pairings_by_spec, panel_size_by_spec = _collect_outround_pairing_data(
         normalized_specs,
-        settings.round_priority,
+        pairing_settings.round_priority,
     )
 
     active_round_ids = [
@@ -512,7 +534,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     run_joint_novice_chairs = (
         has_varsity
         and has_novice
-        and settings.judge_priority == OutroundJudgePriority.NOVICE_CHAIRS
+        and pairing_settings.judge_priority == OutroundJudgePriority.NOVICE_CHAIRS
     )
 
     judge_round_joins = []
@@ -524,7 +546,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
                 panel_size_by_spec=panel_size_by_spec,
                 judges=judges,
                 judge_scores=judge_scores,
-                settings=settings,
+                pairing_settings=pairing_settings,
                 available_indices=available_indices,
                 force_novice_last=True,
             )
@@ -542,7 +564,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
                     panel_size_by_spec=panel_size_by_spec,
                     judges=judges,
                     judge_scores=judge_scores,
-                    settings=settings,
+                    pairing_settings=pairing_settings,
                     available_indices=available_indices,
                     force_novice_last=False,
                 )

@@ -7,12 +7,12 @@ def normalize_email(value):
     return value.strip() or None
 
 
-def import_judges(file_to_import):
+def import_judges(file_to_import, created_by=None):
     try:
         workbook = Workbook(file_to_import, 2)
     except InvalidWorkbookException:
         return ["Judges file is not a valid .xlsx file"]
-    return JudgeImporter(workbook).import_data()
+    return JudgeImporter(workbook, created_by=created_by).import_data()
 
 
 class JudgeImporter(WorkbookImporter):

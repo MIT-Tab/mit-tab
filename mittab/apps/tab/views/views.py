@@ -321,7 +321,7 @@ def add_scratch(request):
         form = ScratchForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except IntegrityError:
                 return redirect_and_flash_error(request,
                                                 "This scratch already exists.")
@@ -684,11 +684,11 @@ def upload_data(request):
         if form.is_valid():
             if "team_file" in request.FILES:
                 team_info["errors"] = import_teams.import_teams(
-                    request.FILES["team_file"])
+                    request.FILES["team_file"], created_by=request.user)
                 team_info["uploaded"] = True
             if "judge_file" in request.FILES:
                 judge_info["errors"] = import_judges.import_judges(
-                    request.FILES["judge_file"])
+                    request.FILES["judge_file"], created_by=request.user)
                 judge_info["uploaded"] = True
             if "room_file" in request.FILES:
                 room_info["errors"] = import_rooms.import_rooms(
@@ -696,7 +696,7 @@ def upload_data(request):
                 room_info["uploaded"] = True
             if "scratch_file" in request.FILES:
                 scratch_info["errors"] = import_scratches.import_scratches(
-                    request.FILES["scratch_file"])
+                    request.FILES["scratch_file"], created_by=request.user)
                 scratch_info["uploaded"] = True
 
         if not team_info["errors"] + judge_info["errors"] + \

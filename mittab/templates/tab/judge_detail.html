@@ -1,9 +1,9 @@
 {% extends "common/data_entry.html" %}
 
 {% block detail_content %}
-{% if judge_rounds %}
 <div class="col-md-1"></div>
 <div class="col-md-5">
+  {% if judge_rounds %}
   <div class="team-record">
     <h5>Rounds Judged</h5>
     <table class="table table-striped">
@@ -18,6 +18,7 @@
       {% endfor %}
     </table>
   </div>
+  {% endif %}
+  {% include "common/_audit_trail.html" with audited_obj=judge_obj audit_events=audit_events %}
 </div>
-{% endif %}
 {% endblock %}

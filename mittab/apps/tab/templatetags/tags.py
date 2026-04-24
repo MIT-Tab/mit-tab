@@ -57,6 +57,18 @@ def is_manual_judge_assignment(context, round_id, judge_id):
     judges_for_round = manual_assignments.get(round_id, set())
     return judge_id in judges_for_round
 
+
+@register.simple_tag(takes_context=True)
+def manual_judge_assignment_label(context, round_id, judge_id):
+    labels = context.get("manual_judge_assignment_labels", {})
+    return labels.get((round_id, judge_id), "Manually assigned judge")
+
+
+@register.simple_tag(takes_context=True)
+def manual_judge_audit_events(context, round_id):
+    events = context.get("manual_judge_audit_events", {})
+    return events.get(round_id, [])
+
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")

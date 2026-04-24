@@ -1,6 +1,9 @@
 import random
 
 from haikunator import Haikunator
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
@@ -9,6 +12,42 @@ from mittab.libs.cacheing import cache_logic
 
 
 _TABSETTING_MISSING = object()
+
+
+class AuditAttributionMixin(models.Model):
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
+    audit_events = GenericRelation("AuditEvent")
+
+    class Meta:
+        abstract = True
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk:
+            existing = type(self).objects.filter(pk=self.pk).values(
+                "created_by_id"
+            ).first()
+            if existing and existing["created_by_id"] != self.created_by_id:
+                raise ValidationError("Creator attribution is immutable")
+        super(AuditAttributionMixin, self).save(
+            force_insert, force_update, using, update_fields)
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
 
 
 class TabSettings(models.Model):
@@ -188,7 +227,7 @@ class Debater(models.Model):
         ordering = ["name"]
 
 
-class Team(models.Model):
+class Team(AuditAttributionMixin):
     name = models.CharField(max_length=35, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
@@ -376,7 +415,7 @@ ballot_code_validator = RegexValidator(
 )
 
 
-class Judge(models.Model):
+class Judge(AuditAttributionMixin):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
@@ -472,7 +511,7 @@ class JudgeCodeEmailLog(models.Model):
         ]
 
 
-class Scratch(models.Model):
+class Scratch(AuditAttributionMixin):
     judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
     team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
@@ -672,6 +711,14 @@ class ManualJudgeAssignment(models.Model):
         on_delete=models.CASCADE,
         related_name="manual_round_assignments",
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -680,6 +727,86 @@ class ManualJudgeAssignment(models.Model):
 
     def __str__(self):
         return f"{self.judge} manually assigned to {self.round}"
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
+
+
+class AuditEvent(models.Model):
+    CREATE = "create"
+    EDIT = "edit"
+    MANUAL_JUDGE_ASSIGN = "manual_judge_assign"
+    MANUAL_JUDGE_REMOVE = "manual_judge_remove"
+    MANUAL_CHAIR_CHANGE = "manual_chair_change"
+    EVENT_CHOICES = (
+        (CREATE, "Created"),
+        (EDIT, "Edited"),
+        (MANUAL_JUDGE_ASSIGN, "Manual judge assignment"),
+        (MANUAL_JUDGE_REMOVE, "Manual judge removal"),
+        (MANUAL_CHAIR_CHANGE, "Manual chair change"),
+    )
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    event_type = models.CharField(max_length=40, choices=EVENT_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    object_repr = models.CharField(max_length=255, editable=False)
+    changes = models.JSONField(default=dict, blank=True, editable=False)
+    note = models.TextField(blank=True, editable=False)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id", "created_at"]),
+            models.Index(fields=["event_type", "created_at"]),
+        ]
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk and AuditEvent.objects.filter(pk=self.pk).exists():
+            raise ValidationError("Audit events are immutable")
+        super(AuditEvent, self).save(force_insert, force_update, using, update_fields)
+
+    @classmethod
+    def record(cls, obj, event_type, user=None, changes=None, note=""):
+        if obj is None or not obj.pk:
+            return None
+        return cls.objects.create(
+            content_object=obj,
+            event_type=event_type,
+            user=user if getattr(user, "is_authenticated", False) else None,
+            object_repr=str(obj),
+            changes=changes or {},
+            note=note,
+        )
+
+    @property
+    def user_display(self):
+        if self.user:
+            return self.user.get_username()
+        return "Unknown"
+
+    @property
+    def label(self):
+        return dict(self.EVENT_CHOICES).get(self.event_type, self.event_type)
+
+    def __str__(self):
+        return f"{self.label} {self.object_repr} by {self.user_display}"
 
 
 class Bye(models.Model):

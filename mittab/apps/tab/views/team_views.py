@@ -66,7 +66,7 @@ def view_team(request, team_id):
         form = TeamForm(request.POST, instance=team)
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except ValueError:
                 return redirect_and_flash_error(
                     request,
@@ -88,7 +88,8 @@ def view_team(request, team_id):
                 "form": form,
                 "links": links,
                 "team_obj": team,
-                "team_stats": stats
+                "team_stats": stats,
+                "audit_events": team.audit_events.all(),
             })
 
     return render(request, "common/data_entry.html", {"form": form})
@@ -99,7 +100,7 @@ def enter_team(request):
         form = TeamEntryForm(request.POST)
         if form.is_valid():
             try:
-                team = form.save()
+                team = form.save(actor=request.user)
             except ValueError:
                 return redirect_and_flash_error(
                     request,
@@ -151,7 +152,7 @@ def add_scratches(request, team_id, number_scratches):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches created successfully")
     else:
@@ -168,7 +169,7 @@ def add_scratches(request, team_id, number_scratches):
         ]
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, [None] * len(forms))),
+            "forms": list(zip(forms, [None] * len(forms), [None] * len(forms))),
             "data_type": "Scratch",
             "title": f"Adding Scratch(es) for {team.display_backend}"
         })
@@ -200,7 +201,7 @@ def view_scratches(request, team_id):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches successfully modified")
     else:
@@ -217,10 +218,18 @@ def view_scratches(request, team_id):
         f"/team/{team_id}/scratches/delete/{scratches[i].id}"
         for i in range(len(scratches))
     ]
+    metadata = [
+        {
+            "created_by": scratch.created_by_display,
+            "created_at": scratch.created_at,
+            "audit_events": scratch.audit_events.all(),
+        }
+        for scratch in scratches
+    ]
     links = [(f"/team/{team_id}/scratches/add/1/", "Add Scratch")]
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, delete_links)),
+            "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
             "title": f"Viewing Scratch Information for {team.display_backend}"
