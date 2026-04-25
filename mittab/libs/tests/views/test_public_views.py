@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (Judge, Room, TabSettings, Team,
+from mittab.apps.tab.models import (Debater, Judge, Room, TabSettings, Team,
                                     Round, Outround, RoundStats)
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
@@ -717,6 +717,114 @@ class TestPublicViews(TestCase):
         flags = get_public_display_flags()
         self.assertTrue(flags["ballots"])
 
+
+    def test_debater_ranking_public_false_excluded_from_varsity_speakers(self):
+        """A debater with ranking_public=False should not appear in varsity speaker rankings."""
+        client = Client()
+        Debater.objects.update(ranking_public=True)
+        set_ranking_settings("varsity", True, include_speaks=True, max_visible=1000)
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        debater = Debater.objects.first()
+        self.assertIsNotNone(debater, "Expected at least one debater in the fixture")
+
+        # Confirm the debater appears when ranking_public=True
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(debater.name, response.content.decode(),
+            "Debater should appear in rankings when ranking_public=True; "
+            "ensure this debater has round stats in the fixture")
+
+        # Now opt the debater out and verify they are hidden
+        debater.ranking_public = False
+        debater.save()
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(debater.name, response.content.decode())
+
+    def test_novice_debater_ranking_public_false_excluded_from_novice_speakers(self):
+        """A novice debater with ranking_public=False should not appear in any section."""
+        client = Client()
+        Debater.objects.update(ranking_public=True)
+        set_ranking_settings("varsity", True, include_speaks=True, max_visible=1000)
+        set_ranking_settings("novice", True, include_speaks=True, max_visible=1000)
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        debater = Debater.objects.filter(novice_status=Debater.NOVICE).first()
+        self.assertIsNotNone(debater, "Expected at least one novice debater in the fixture")
+
+        # Confirm the debater appears when ranking_public=True
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(debater.name, response.content.decode(),
+            "Novice debater should appear in rankings when ranking_public=True; "
+            "ensure this debater has round stats in the fixture")
+
+        # Now opt the debater out and verify they are hidden from both sections
+        debater.ranking_public = False
+        debater.save()
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(debater.name, response.content.decode())
+
+    def test_novice_debater_ranking_public_true_appears_in_varsity_and_novice(self):
+        """A novice debater with ranking_public=True should appear in both varsity and novice sections."""
+        client = Client()
+        Debater.objects.update(ranking_public=True)
+        set_ranking_settings("varsity", True, include_speaks=True, max_visible=1000)
+        set_ranking_settings("novice", True, include_speaks=True, max_visible=1000)
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        debater = Debater.objects.filter(novice_status=Debater.NOVICE).first()
+        self.assertIsNotNone(debater, "Expected at least one novice debater in the fixture")
+
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Varsity Speakers", content)
+        self.assertIn("Novice Speakers", content)
+
+        # Verify the debater's name appears in both the varsity and novice sections
+        varsity_start = content.index("Varsity Speakers")
+        novice_start = content.index("Novice Speakers")
+        varsity_section = content[varsity_start:novice_start]
+        novice_section = content[novice_start:]
+        self.assertIn(debater.name, varsity_section,
+            "Novice debater should appear in the varsity (all-speakers) section")
+        self.assertIn(debater.name, novice_section,
+            "Novice debater should appear in the novice section")
+
+    def test_varsity_debater_does_not_appear_in_novice_speakers(self):
+        """A varsity-only debater should not appear in the novice speaker rankings section."""
+        client = Client()
+        Debater.objects.update(ranking_public=True)
+        set_ranking_settings("varsity", True, include_speaks=True, max_visible=1000)
+        set_ranking_settings("novice", True, include_speaks=True, max_visible=1000)
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+        varsity_debater = Debater.objects.filter(novice_status=Debater.VARSITY).first()
+        self.assertIsNotNone(varsity_debater, "Expected at least one varsity debater in the fixture")
+
+        response = client.get(reverse("public_speaker_rankings"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertIn("Novice Speakers", content,
+            "Novice section should be present in the response")
+        novice_start = content.index("Novice Speakers")
+        novice_section = content[novice_start:]
+        self.assertNotIn(varsity_debater.name, novice_section,
+            "Varsity debater should not appear in the novice section")
 
     def test_n_plus_one(self):
         client = Client()
