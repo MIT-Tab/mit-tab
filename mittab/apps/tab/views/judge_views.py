@@ -137,6 +137,101 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
     }
 
 
+def _completed_rounds_with_written_rfds():
+    completed_victors = (
+        Round.GOV,
+        Round.OPP,
+        Round.GOV_VIA_FORFEIT,
+        Round.OPP_VIA_FORFEIT,
+    )
+    first_round = int(TabSettings.get("written_rfd_first_round", -1) or -1)
+    if first_round < 1:
+        return Round.objects.none()
+
+    return (
+        Round.objects.filter(
+            round_number__gte=first_round,
+            victor__in=completed_victors,
+            roundstats__isnull=False,
+        )
+        .select_related("gov_team", "opp_team", "chair")
+        .prefetch_related("gov_team__debaters", "opp_team__debaters")
+        .distinct()
+        .order_by("-round_number", "gov_team__name", "opp_team__name")
+    )
+
+
+def _recipient_emails_for_round(round_obj):
+    emails = []
+    seen = set()
+    for team in (round_obj.gov_team, round_obj.opp_team):
+        for debater in team.debaters.all():
+            email = (debater.email or "").strip()
+            if not email:
+                continue
+            email_key = email.lower()
+            if email_key in seen:
+                continue
+            seen.add(email_key)
+            emails.append(email)
+    return emails
+
+
+def _prepare_written_rfd_plan(rounds, tournament_name):
+    sendable = []
+    skipped_missing_rfd = []
+    skipped_missing_email = []
+
+    for round_obj in rounds:
+        recipient_emails = _recipient_emails_for_round(round_obj)
+        if not recipient_emails:
+            skipped_missing_email.append((round_obj, "No debater emails on file"))
+            continue
+
+        rfd_text = (round_obj.rfd or "").strip()
+        if not rfd_text:
+            skipped_missing_rfd.append((round_obj, "No written RFD entered"))
+            continue
+
+        winner = round_obj.winner
+        winner_name = winner.display if winner else round_obj.get_victor_display()
+        judge_name = round_obj.chair.name if round_obj.chair else "Unknown"
+        subject = f"{tournament_name} Round {round_obj.round_number} RFD"
+        text_body = (
+            f"{tournament_name} Round {round_obj.round_number}\n\n"
+            f"Government: {round_obj.gov_team.display}\n"
+            f"Opposition: {round_obj.opp_team.display}\n"
+            f"Winner: {winner_name}\n\n"
+            f"Judge: {judge_name}\n\n"
+            "Reason for decision:\n"
+            f"{rfd_text}\n\n"
+            "Thank you,\n"
+            "Tab Staff"
+        )
+        email_requests = [
+            EmailRequest(
+                to_address=email,
+                subject=subject,
+                text_body=text_body,
+            )
+            for email in recipient_emails
+        ]
+        log_entries = [
+            WrittenRFDEmailLog(round=round_obj, email=email)
+            for email in recipient_emails
+        ]
+        sendable.append({
+            "round": round_obj,
+            "recipient_emails": recipient_emails,
+            "email_requests": email_requests,
+            "log_entries": log_entries,
+        })
+
+    return {
+        "sendable": sendable,
+        "skipped_missing_rfd": skipped_missing_rfd,
+        "skipped_missing_email": skipped_missing_email,
+    }
 
 
 def view_judges(request):
@@ -530,3 +625,142 @@ def send_judge_codes(request):
         "skipped_missing_email": plan["skipped_missing_email"],
     }
     return render(request, "tab/send_judge_codes.html", context)
+
+
+def send_written_rfds(request):
+    rounds = list(_completed_rounds_with_written_rfds())
+    tournament_name = TabSettings.get("tournament_name", "your tournament")
+    plan = _prepare_written_rfd_plan(rounds, tournament_name)
+    sendable_by_id = {entry["round"].id: entry for entry in plan["sendable"]}
+
+    emailed_round_ids = set(
+        WrittenRFDEmailLog.objects.values_list("round_id", flat=True)
+    )
+    default_selected_ids = [
+        round_id for round_id in sendable_by_id.keys()
+        if round_id not in emailed_round_ids
+    ]
+    default_selected_id_set = set(default_selected_ids)
+
+    if request.method == "POST":
+        selected_ids = []
+        seen_ids = set()
+        for round_id in request.POST.getlist("round_ids"):
+            if not round_id.isdigit():
+                continue
+
+            parsed_id = int(round_id)
+            if parsed_id not in sendable_by_id or parsed_id in seen_ids:
+                continue
+
+            selected_ids.append(parsed_id)
+            seen_ids.add(parsed_id)
+    else:
+        selected_ids = default_selected_ids
+    selected_id_set = set(selected_ids)
+
+    last_sent_map = dict(
+        WrittenRFDEmailLog.objects.values("round_id")
+        .annotate(last_sent=Max("sent_at"))
+        .values_list("round_id", "last_sent")
+    )
+
+    status_lookup = {}
+    reason_lookup = {}
+    for round_obj, reason in plan["skipped_missing_rfd"]:
+        status_lookup[round_obj.id] = "Missing RFD"
+        reason_lookup[round_obj.id] = reason
+    for round_obj, reason in plan["skipped_missing_email"]:
+        status_lookup[round_obj.id] = "Missing email"
+        reason_lookup[round_obj.id] = reason
+
+    round_rows = []
+    for round_obj in rounds:
+        can_send = round_obj.id in sendable_by_id
+        checked = can_send and round_obj.id in selected_id_set
+        recipient_count = (
+            len(sendable_by_id[round_obj.id]["recipient_emails"])
+            if can_send else len(_recipient_emails_for_round(round_obj))
+        )
+        winner = round_obj.winner
+        round_rows.append({
+            "round": round_obj,
+            "winner": winner.display if winner else round_obj.get_victor_display(),
+            "recipient_count": recipient_count,
+            "can_send": can_send,
+            "checked": checked,
+            "status": status_lookup.get(round_obj.id, "Ready" if can_send else "Not eligible"),
+            "reason": reason_lookup.get(round_obj.id),
+            "never_received": round_obj.id not in emailed_round_ids,
+            "last_sent": last_sent_map.get(round_obj.id),
+        })
+
+    if request.method == "POST":
+        selected_entries = [sendable_by_id[round_id] for round_id in selected_ids]
+
+        if not selected_entries:
+            return redirect_and_flash_error(
+                request,
+                "No written RFD emails were sent.",
+            )
+
+        email_requests = [
+            email_request
+            for entry in selected_entries
+            for email_request in entry["email_requests"]
+        ]
+        log_entries_by_request_id = {
+            id(email_request): log_entry
+            for entry in selected_entries
+            for email_request, log_entry in zip(
+                entry["email_requests"], entry["log_entries"]
+            )
+        }
+
+        try:
+            sent = EmailService().send_bulk(email_requests)
+        except ImproperlyConfigured as exc:
+            return redirect_and_flash_error(
+                request,
+                f"Unable to send written RFDs: {exc}",
+            )
+        except EmailServiceError as exc:
+            sent_log_entries = [
+                log_entries_by_request_id[id(email_request)]
+                for email_request in exc.sent_requests
+                if id(email_request) in log_entries_by_request_id
+            ]
+            if sent_log_entries:
+                WrittenRFDEmailLog.objects.bulk_create(sent_log_entries)
+
+            partial_message = ""
+            if sent_log_entries:
+                sent_count = len(sent_log_entries)
+                partial_message = (
+                    f" after sending {sent_count} written RFD email"
+                    f"{'' if sent_count == 1 else 's'}"
+                )
+
+            return redirect_and_flash_error(
+                request,
+                f"Unable to send written RFDs{partial_message}: {exc}",
+            )
+
+        WrittenRFDEmailLog.objects.bulk_create(
+            [log_entries_by_request_id[id(email_request)]
+             for email_request in email_requests]
+        )
+
+        return redirect_and_flash_success(
+            request,
+            f"Sent {sent} written RFD email{'' if sent == 1 else 's'}.",
+        )
+
+    context = {
+        "round_rows": round_rows,
+        "sendable_count": len(sendable_by_id),
+        "never_received_sendable_count": len(default_selected_id_set),
+        "skipped_missing_rfd": plan["skipped_missing_rfd"],
+        "skipped_missing_email": plan["skipped_missing_email"],
+    }
+    return render(request, "tab/send_written_rfds.html", context)

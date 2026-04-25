@@ -62,3 +62,12 @@ settings:
       - [0, "Unset (No Policy)"]
       - [1, "Open (Disclose Ranks)"]
       - [2, "Closed (Do Not Disclose)"]
+  - written_rfd_first_round:
+    name: written_rfd_first_round
+    description: "The first preliminary round where judges' ballots include written reasons for decision. Use -1 to disable written RFDs."
+    value: -1
+  - written_rfd_deadline:
+    name: written_rfd_deadline
+    description: "Deadline for judges to edit written RFDs. This is interpreted in EST and applies to all rounds with written RFDs."
+    value: ""
+    type: datetime

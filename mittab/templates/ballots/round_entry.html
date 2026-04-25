@@ -9,6 +9,13 @@
 
 <div class="col">
   <div class="container-fluid">
+    {% if previous_ballots_url %}
+    <div class="d-flex justify-content-start mb-3">
+      <a class="btn btn-lg btn-outline-primary" href="{{ previous_ballots_url }}">
+        Previous Ballots
+      </a>
+    </div>
+    {% endif %}
     <form action="{{ action }}" method="post" class="ballot-form single" enctype="multipart/form-data">{% csrf_token %}
     {% return_to_input %}
     {% round_form form gov_team opp_team %}
