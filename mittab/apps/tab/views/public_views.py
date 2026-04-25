@@ -703,7 +703,7 @@ def previous_ballots(request, ballot_code):
     current_round = TabSettings.get(key="cur_round") - 1
     rounds = (
         _submitted_rounds_for_judge(judge)
-        .filter(round_number__lt=current_round)
+        .filter(round_number__lte=current_round)
         .order_by("-round_number", "gov_team__name", "opp_team__name")
     )
     ballot_rows = []

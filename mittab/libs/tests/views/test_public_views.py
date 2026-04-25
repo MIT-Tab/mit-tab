@@ -404,6 +404,24 @@ class TestPublicViews(TestCase):
             content,
         )
 
+    def test_previous_ballots_lists_submitted_current_ballot_round(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+
+        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"Round {round_obj.round_number}", content)
+        self.assertIn(
+            reverse(
+                "view_submitted_ballot_round",
+                args=[judge.ballot_code, round_obj.id],
+            ),
+            content,
+        )
+
     def test_enter_e_ballot_post_missing_round_id_redirects(self):
         client = Client()
         judge, _ = self._prepare_ballot_round()
