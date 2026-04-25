@@ -9,6 +9,13 @@
 
 <div class="col">
   <div class="container-fluid">
+    {% if previous_ballots_url %}
+    <div class="d-flex justify-content-start mb-3">
+      <a class="btn btn-lg btn-outline-primary" href="{{ previous_ballots_url }}">
+        Previous Ballots
+      </a>
+    </div>
+    {% endif %}
 
     {# ── Confirmation header ── #}
     <div class="ballot-submitted-header d-flex align-items-center mb-4">
@@ -35,6 +42,43 @@
         <div class="submitted-field">{{ winner_display }}</div>
       </div>
     </div>
+
+    {% if rfd_enabled %}
+    <div class="card submitted-card rfd-card mb-4">
+      <div class="card-header">
+        <span>Reason for Decision</span>
+        {% if rfd_editable %}
+        <span class="readonly-badge">Editable</span>
+        {% else %}
+        <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if rfd_deadline_configured %}
+        <div class="alert alert-info">
+          You can edit this written RFD until {{ rfd_deadline_display }}. The ballot result, speaks, ranks, and debaters are not editable here.
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+          Tab has not configured the written RFD deadline, so this written RFD is read only here.
+        </div>
+        {% endif %}
+
+        {% if rfd_editable %}
+        <form method="post" action="">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="field-label" for="id_rfd">Why the winning team won</label>
+            <textarea class="form-control" id="id_rfd" name="rfd" rows="7">{{ rfd_text }}</textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Save Written RFD</button>
+        </form>
+        {% else %}
+        <div class="submitted-field rfd-display">{{ rfd_text|linebreaksbr|default:"No written RFD has been entered." }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
 
     {# ── Team cards ── #}
     <div class="row">

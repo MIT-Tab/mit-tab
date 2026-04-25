@@ -3,6 +3,7 @@ import datetime
 import os
 
 from django.shortcuts import render, get_object_or_404
+from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
@@ -15,6 +16,10 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_editing_open,
+)
 from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
@@ -892,7 +897,33 @@ def enter_result(request,
         "roundstats_set__debater",
     ).get(id=round_id)
 
+    submitted_ballot_exists = RoundStats.objects.filter(round=round_obj).exists()
+
     if request.method == "POST":
+        if (
+            not ballot_code
+            and submitted_ballot_exists
+            and "rfd" in request.POST
+            and "winner" not in request.POST
+        ):
+            if not (
+                round_allows_written_rfd(round_obj)
+                and written_rfd_editing_open(round_obj)
+            ):
+                return redirect_and_flash_error(
+                    request,
+                    "Written RFDs cannot be edited for this ballot.",
+                    path=request.path,
+                )
+
+            round_obj.rfd = request.POST.get("rfd", "").strip()
+            round_obj.save(update_fields=["rfd"])
+            return redirect_and_flash_success(
+                request,
+                "Written RFD saved.",
+                path=request.path,
+            )
+
         form = form_class(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
@@ -904,6 +935,16 @@ def enter_result(request,
                                               "Result entered successfully",
                                               path=redirect_to)
     else:
+        if not ballot_code and submitted_ballot_exists:
+            from mittab.apps.tab.views.public_views import _submitted_ballot_context
+
+            context = _submitted_ballot_context(
+                round_obj,
+                ballot_code=None,
+                allow_rfd_edit=True,
+            )
+            return render(request, "ballots/ballot_submitted.html", context)
+
         form_kwargs = {"round_instance": round_obj}
         if ballot_code:
             form_kwargs["ballot_code"] = ballot_code
@@ -923,6 +964,9 @@ def enter_result(request,
                 "low_speak_warning_threshold", 25),
             "high_speak_warning_threshold": TabSettings.get(
                 "high_speak_warning_threshold", 34),
+            "previous_ballots_url": reverse(
+                "previous_ballots", args=[ballot_code]
+            ) if ballot_code else "",
         })
 
 
