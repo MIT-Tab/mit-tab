@@ -93,6 +93,23 @@ class TestRankingLogic(TestCase):
 
         self.assertEqual(scores, [better_single_adjusted, better_unadjusted])
 
+    def test_speaker_single_adjusted_setting_does_not_apply_to_ranks(self):
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 1)
+        stat_priority = speaker_stat_priority()
+        better_unadjusted_ranks = self.debater_score_with_stats(
+            100, 1, 100, 2, stat_priority
+        )
+        better_single_adjusted_ranks = self.debater_score_with_stats(
+            100, 2, 100, 1, stat_priority
+        )
+
+        scores = sorted([better_single_adjusted_ranks, better_unadjusted_ranks])
+
+        self.assertEqual(scores, [
+            better_unadjusted_ranks,
+            better_single_adjusted_ranks,
+        ])
+
     def test_speaker_setting_does_not_change_team_score_priority(self):
         TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 1)
 

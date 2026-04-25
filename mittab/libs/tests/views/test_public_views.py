@@ -9,8 +9,16 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (Judge, Room, TabSettings, Team,
-                                    Round, Outround, RoundStats)
+from mittab.apps.tab.models import (
+    Judge,
+    Outround,
+    Room,
+    Round,
+    RoundStats,
+    SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
+    TabSettings,
+    Team,
+)
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
     get_public_display_flags,
@@ -593,6 +601,28 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaks and ranks are hidden for this section.", content)
         self.assertNotIn("Novice Speakers", content,
             "Hidden divisions should not render a section")
+
+    def test_public_speaker_rankings_orders_display_score_columns_by_setting(self):
+        client = Client()
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 0)
+        caches["public"].clear()
+        response = client.get(reverse("public_speaker_rankings"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Unadjusted"),
+            content.index("Single adjusted"),
+        )
+
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 1)
+        caches["public"].clear()
+        response = client.get(reverse("public_speaker_rankings"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Single adjusted"),
+            content.index("Unadjusted"),
+        )
 
     def test_public_rankings_control_updates_display_settings(self):
         client = Client()
