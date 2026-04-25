@@ -205,6 +205,44 @@ $font-size-base: 0.95rem !default;
   content: " \f6c0";
 }
 
+// Audit trail
+.audit-trail-toggle {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  opacity: 0.75;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  i {
+    font-size: 0.7rem;
+  }
+}
+
+.audit-trail-events {
+  border-left: 2px solid #dee2e6;
+  padding-left: 0.6rem;
+  margin-top: 0.35rem;
+}
+
+.audit-trail-event {
+  font-size: 0.75rem;
+  color: #6c757d;
+  padding: 1px 0;
+}
+
+.audit-trail-table {
+  font-size: 0.85rem;
+  margin-bottom: 0;
+
+  td:first-child {
+    width: 1%;
+    white-space: nowrap;
+    color: #495057;
+  }
+}
+
 .dropdown-menu {
   max-height: 500px;
   overflow-y: auto;
