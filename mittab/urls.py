@@ -80,6 +80,9 @@ urlpatterns = [
     path("send_judge_codes/",
          judge_views.send_judge_codes,
          name="send_judge_codes"),
+    path("send_written_rfds/",
+         judge_views.send_written_rfds,
+         name="send_written_rfds"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -416,6 +419,12 @@ urlpatterns = [
     path("public/e-ballots/<str:ballot_code>/submitted/",
          public_views.view_submitted_ballot,
          name="view_submitted_ballot"),
+    path("public/e-ballots/<str:ballot_code>/previous/",
+         public_views.previous_ballots,
+         name="previous_ballots"),
+    path("public/e-ballots/<str:ballot_code>/submitted/<int:round_id>/",
+         public_views.view_submitted_ballot,
+         name="view_submitted_ballot_round"),
     path("public/judges/",
          public_views.public_view_judges,
          name="public_judges"),

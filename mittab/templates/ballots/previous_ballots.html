@@ -1,0 +1,60 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Previous Ballots{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block content %}
+<div class="col">
+  <div class="container-fluid">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4">
+      <div>
+        <h1 class="h3 mb-1">Previous Ballots</h1>
+        <div class="text-muted">Submitted ballots for {{ judge.name }}</div>
+      </div>
+      <a class="btn btn-outline-secondary mt-3 mt-md-0" href="{% url 'enter_e_ballot' ballot_code %}">
+        Current Ballot
+      </a>
+    </div>
+
+    {% if ballot_rows %}
+    <div class="table-responsive shadow-sm rounded bg-white">
+      <table class="table table-hover mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th scope="col">Round</th>
+            <th scope="col">Government</th>
+            <th scope="col">Opposition</th>
+            <th scope="col">Winner</th>
+            <th scope="col">Written RFD</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ballot_rows %}
+          <tr>
+            <td>Round {{ row.round.round_number }}</td>
+            <td>{{ row.round.gov_team.display }}</td>
+            <td>{{ row.round.opp_team.display }}</td>
+            <td>{% if row.winner %}{{ row.winner.display }}{% else %}{{ row.round.get_victor_display }}{% endif %}</td>
+            <td>
+              {% if row.rfd_enabled %}
+                {{ row.rfd_status }}
+              {% else %}
+                Not required
+              {% endif %}
+            </td>
+            <td class="text-right">
+              <a class="btn btn-sm btn-primary" href="{{ row.url }}">View Ballot</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">No previous submitted ballots were found for this judge code.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

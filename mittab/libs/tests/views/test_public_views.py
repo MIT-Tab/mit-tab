@@ -339,6 +339,71 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaker Disclosure Policy", content)
         self.assertIn("open speaks but closed ranks", content)
 
+    def test_submitted_ballot_allows_written_rfd_until_deadline(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+        TabSettings.set("written_rfd_first_round", round_obj.round_number)
+        TabSettings.set("written_rfd_deadline", "2099-01-01 12:00")
+
+        response = client.get(
+            reverse("view_submitted_ballot", args=[judge.ballot_code])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Reason for Decision", content)
+        self.assertIn("Save Written RFD", content)
+        self.assertIn("You can edit this written RFD until", content)
+
+        response = client.post(
+            reverse("view_submitted_ballot", args=[judge.ballot_code]),
+            {"rfd": "Gov won the central weighing clash."},
+        )
+        self.assertEqual(response.status_code, 302)
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.rfd, "Gov won the central weighing clash.")
+
+    def test_submitted_ballot_blocks_written_rfd_after_deadline(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+        round_obj.rfd = "Original RFD"
+        round_obj.save(update_fields=["rfd"])
+        TabSettings.set("written_rfd_first_round", round_obj.round_number)
+        TabSettings.set("written_rfd_deadline", "2000-01-01 12:00")
+
+        response = client.post(
+            reverse("view_submitted_ballot", args=[judge.ballot_code]),
+            {"rfd": "Changed too late"},
+        )
+        self.assertEqual(response.status_code, 302)
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.rfd, "Original RFD")
+
+    def test_previous_ballots_lists_submitted_prior_rounds(self):
+        client = Client()
+        judge, _ = self._prepare_ballot_round()
+        previous_round = Round.objects.filter(round_number=1).first()
+        previous_round.chair = judge
+        previous_round.save()
+        previous_round.judges.add(judge)
+        self._create_round_stats(previous_round)
+        TabSettings.set("written_rfd_first_round", previous_round.round_number)
+
+        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Previous Ballots", content)
+        self.assertIn(f"Round {previous_round.round_number}", content)
+        self.assertIn(
+            reverse(
+                "view_submitted_ballot_round",
+                args=[judge.ballot_code, previous_round.id],
+            ),
+            content,
+        )
+
     def test_enter_e_ballot_post_missing_round_id_redirects(self):
         client = Client()
         judge, _ = self._prepare_ballot_round()
@@ -417,7 +482,9 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("tab_login"))
 
-    def test_enter_e_ballot_get_redirects_when_pairings_not_released(self):
+    def test_enter_e_ballot_redirects_to_previous_ballots_when_pairings_not_released(
+        self,
+    ):
         client = Client()
         judge, _ = self._prepare_ballot_round()
         TabSettings.set("pairing_released", 0)
@@ -425,7 +492,10 @@ class TestPublicViews(TestCase):
         response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(
+            response.url,
+            reverse("previous_ballots", args=[judge.ballot_code]),
+        )
 
     def test_enter_e_ballot_get_redirects_when_no_round_found(self):
         client = Client()

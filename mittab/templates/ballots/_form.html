@@ -68,6 +68,12 @@
   when assigning speaker points.
 </div>
 
+{% if form.rfd %}
+<div class="alert alert-info mb-3">
+  <strong>Written RFD:</strong> {{ form.rfd.help_text }}
+</div>
+{% endif %}
+
 
 <div class="row">
 <div class="col-md-6">
@@ -149,3 +155,16 @@
   </div>
 </div>
 </div>
+
+{% if form.rfd %}
+<div class="row mt-3">
+  <div class="col">
+    <div class="card rfd-card">
+      <div class="card-header">Reason for Decision</div>
+      <div class="card-body">
+        {% bootstrap_field form.rfd %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

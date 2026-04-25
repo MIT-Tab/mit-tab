@@ -518,6 +518,20 @@ class JudgeCodeEmailLog(models.Model):
         ]
 
 
+class WrittenRFDEmailLog(models.Model):
+    round = models.ForeignKey(
+        "Round", on_delete=models.CASCADE, related_name="written_rfd_email_logs"
+    )
+    email = models.EmailField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["round", "sent_at"]),
+            models.Index(fields=["email", "sent_at"]),
+        ]
+
+
 class Scratch(AuditAttributionMixin):
     judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
     team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
@@ -675,6 +689,7 @@ class Round(models.Model):
     room = models.ForeignKey(
         Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+    rfd = models.TextField(blank=True, default="")
 
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
@@ -684,6 +699,14 @@ class Round(models.Model):
         return (
             f"Round {self.round_number} between {self.gov_team} and {self.opp_team}"
         )
+
+    @property
+    def winner(self):
+        if self.victor in [self.GOV, self.GOV_VIA_FORFEIT]:
+            return self.gov_team
+        if self.victor in [self.OPP, self.OPP_VIA_FORFEIT]:
+            return self.opp_team
+        return None
 
     def save(self,
              force_insert=False,

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 import os
 import itertools
 import pprint
@@ -8,6 +9,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_deadline_display,
+    written_rfd_editing_open,
+)
 from mittab.libs import errors
 from mittab import settings
 from mittab.libs.cacheing import cache_logic
@@ -362,6 +368,9 @@ class ResultEntryForm(forms.Form):
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
 
+        if not no_fill:
+            self.add_written_rfd_field(round_object)
+
         if round_object.victor == 0 or no_fill:
             return
 
@@ -373,6 +382,39 @@ class ResultEntryForm(forms.Form):
                 deb, "speaks")].initial = stats.speaks
             self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
                 round(stats.ranks))
+
+    def add_written_rfd_field(self, round_object):
+        if not round_allows_written_rfd(round_object):
+            return
+
+        deadline = written_rfd_deadline_display()
+        rfd_editing_open = written_rfd_editing_open(round_object)
+        if rfd_editing_open:
+            help_text = (
+                "Optional. You may submit the ballot without an RFD and edit "
+                "this text later"
+            )
+            if deadline:
+                help_text += f" until {deadline}."
+        elif deadline:
+            help_text = f"The written RFD deadline was {deadline}."
+        else:
+            help_text = "Tab has not configured the written RFD deadline yet."
+
+        rfd_attrs = {
+            "class": "form-control",
+            "rows": 6,
+        }
+        if not rfd_editing_open:
+            rfd_attrs["readonly"] = "readonly"
+
+        self.fields["rfd"] = forms.CharField(
+            label="Reason for decision",
+            required=False,
+            initial=round_object.rfd,
+            help_text=help_text,
+            widget=forms.Textarea(attrs=rfd_attrs),
+        )
 
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -478,6 +520,9 @@ class ResultEntryForm(forms.Form):
                     old_stats.delete()
                 stats.save()
             round_obj.save()
+            if "rfd" in self.cleaned_data and written_rfd_editing_open(round_obj):
+                round_obj.rfd = self.cleaned_data.get("rfd", "")
+                round_obj.save(update_fields=["rfd"])
         return round_obj
 
     def deb_attr_val(self, position, attr, cast=None):
@@ -560,7 +605,6 @@ class EBallotForm(ResultEntryForm):
 
         return super(EBallotForm, self).clean()
 
-
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
@@ -605,6 +649,39 @@ class SettingsForm(forms.Form):
                         "style": "min-width: 300px;"
                     })
                 )
+            elif setting.get("type") == "datetime":
+                initial_value = setting["value"]
+                if isinstance(initial_value, str) and initial_value:
+                    for date_format in (
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ):
+                        try:
+                            initial_value = datetime.strptime(
+                                initial_value, date_format
+                            )
+                            break
+                        except ValueError:
+                            continue
+                self.fields[field_name] = forms.DateTimeField(
+                    label=label,
+                    help_text=setting["description"],
+                    initial=initial_value,
+                    required=False,
+                    input_formats=[
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ],
+                    widget=forms.DateTimeInput(
+                        attrs={
+                            "class": "form-control",
+                            "type": "datetime-local",
+                        },
+                        format="%Y-%m-%dT%H:%M",
+                    ),
+                )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
@@ -622,6 +699,9 @@ class SettingsForm(forms.Form):
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
+            elif "type" in setting and setting["type"] == "datetime":
+                value = self.cleaned_data[field]
+                value_to_set = value.strftime("%Y-%m-%d %H:%M") if value else ""
             else:
                 value_to_set = self.cleaned_data[field]
 

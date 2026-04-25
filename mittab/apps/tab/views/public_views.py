@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from mittab.apps.tab.forms import EBallotForm
-from mittab.apps.tab.helpers import redirect_and_flash_error
+from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import (
     BreakingTeam,
     Bye,
@@ -26,6 +26,12 @@ from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_deadline,
+    written_rfd_deadline_display,
+    written_rfd_editing_open,
+)
 
 
 @cache_public_view(timeout=300)
@@ -536,7 +542,12 @@ def _build_disclosure_message():
             )
 
 
-def _submitted_ballot_context(round_obj, ballot_code):
+def _submitted_ballot_context(
+    round_obj,
+    ballot_code,
+    judge=None,
+    allow_rfd_edit=False,
+):
     """Build context for the submitted (frozen) ballot view for the given round."""
     role_names = {
         "pm": "Prime Minister",
@@ -571,25 +582,64 @@ def _submitted_ballot_context(round_obj, ballot_code):
             "ranks": int(round(s.ranks)) if s else "—",
         })
 
+    rfd_deadline = written_rfd_deadline()
+    rfd_enabled = round_allows_written_rfd(round_obj)
+    rfd_editable = (
+        rfd_enabled
+        and (
+            allow_rfd_edit
+            or (judge is not None and round_obj.chair_id == judge.id)
+        )
+        and written_rfd_editing_open(round_obj)
+    )
     return {
         "title": f"Ballot Submitted — {round_obj}",
         "gov_team": round_obj.gov_team,
         "opp_team": round_obj.opp_team,
+        "round_obj": round_obj,
         "winner_display": victor_display.get(round_obj.victor, "Unknown"),
         "gov_debaters": gov_debaters,
         "opp_debaters": opp_debaters,
         "ballot_code": ballot_code,
         "disclosure_message": _build_disclosure_message(),
+        "rfd_enabled": rfd_enabled,
+        "rfd_text": round_obj.rfd,
+        "rfd_editable": rfd_editable,
+        "rfd_deadline_display": written_rfd_deadline_display(rfd_deadline),
+        "rfd_deadline_configured": rfd_deadline is not None,
+        "previous_ballots_url": (
+            reverse("previous_ballots", args=[ballot_code]) if ballot_code else ""
+        ),
     }
 
 
-def view_submitted_ballot(request, ballot_code):
+def _judge_for_ballot_code(ballot_code):
+    return Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
+        "judges",
+    ).first()
+
+
+def _submitted_rounds_for_judge(judge):
+    return (
+        judge.judges.prefetch_related(
+            "chair",
+            "roundstats_set",
+            "roundstats_set__debater",
+            "gov_team",
+            "gov_team__debaters",
+            "opp_team",
+            "opp_team__debaters",
+        )
+        .filter(roundstats__isnull=False)
+        .distinct()
+    )
+
+
+def view_submitted_ballot(request, ballot_code, round_id=None):
     """Show a read-only frozen view of the submitted ballot for a judge code."""
     current_round = TabSettings.get(key="cur_round") - 1
 
-    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
-        "judges",
-    ).first()
+    judge = _judge_for_ballot_code(ballot_code)
 
     if not judge:
         message = (
@@ -600,18 +650,14 @@ def view_submitted_ballot(request, ballot_code):
             request, message, path=reverse("tab_login")
         )
 
-    rounds = list(
-        judge.judges.prefetch_related(
-            "chair",
-            "roundstats_set",
-            "roundstats_set__debater",
-            "gov_team",
-            "opp_team",
-        )
-        .filter(round_number=current_round).all()
-    )
+    rounds_qs = _submitted_rounds_for_judge(judge)
+    if round_id is None:
+        rounds_qs = rounds_qs.filter(round_number=current_round)
+    else:
+        rounds_qs = rounds_qs.filter(id=round_id)
+    rounds = list(rounds_qs.all())
 
-    if not rounds or not RoundStats.objects.filter(round=rounds[0]).exists():
+    if not rounds:
         return redirect_and_flash_error(
             request,
             "No submitted ballot found for your code this round.",
@@ -619,8 +665,69 @@ def view_submitted_ballot(request, ballot_code):
         )
 
     round_obj = rounds[0]
-    context = _submitted_ballot_context(round_obj, ballot_code)
+    if request.method == "POST":
+        if not (
+            round_allows_written_rfd(round_obj)
+            and round_obj.chair_id == judge.id
+            and written_rfd_editing_open(round_obj)
+        ):
+            return redirect_and_flash_error(
+                request,
+                "Written RFDs cannot be edited for this ballot.",
+                path=request.path,
+            )
+
+        round_obj.rfd = request.POST.get("rfd", "").strip()
+        round_obj.save(update_fields=["rfd"])
+        return redirect_and_flash_success(
+            request,
+            "Written RFD saved.",
+            path=request.path,
+        )
+
+    context = _submitted_ballot_context(round_obj, ballot_code, judge)
     return render(request, "ballots/ballot_submitted.html", context)
+
+
+def previous_ballots(request, ballot_code):
+    judge = _judge_for_ballot_code(ballot_code)
+    if not judge:
+        message = (
+            f'No judges with the ballot code "{ballot_code}." '
+            "Try submitting again, or go to tab to resolve the issue."
+        )
+        return redirect_and_flash_error(
+            request, message, path=reverse("tab_login")
+        )
+
+    current_round = TabSettings.get(key="cur_round") - 1
+    rounds = (
+        _submitted_rounds_for_judge(judge)
+        .filter(round_number__lt=current_round)
+        .order_by("-round_number", "gov_team__name", "opp_team__name")
+    )
+    ballot_rows = []
+    for round_obj in rounds:
+        ballot_rows.append({
+            "round": round_obj,
+            "winner": round_obj.winner,
+            "rfd_enabled": round_allows_written_rfd(round_obj),
+            "rfd_status": "Written" if round_obj.rfd.strip() else "Blank",
+            "url": reverse(
+                "view_submitted_ballot_round",
+                args=[ballot_code, round_obj.id],
+            ),
+        })
+
+    return render(
+        request,
+        "ballots/previous_ballots.html",
+        {
+            "ballot_code": ballot_code,
+            "judge": judge,
+            "ballot_rows": ballot_rows,
+        },
+    )
 
 
 def enter_e_ballot(request, ballot_code):
@@ -667,6 +774,9 @@ def enter_e_ballot(request, ballot_code):
                     "high_speak_warning_threshold": TabSettings.get(
                         "high_speak_warning_threshold", 34
                     ),
+                    "previous_ballots_url": reverse(
+                        "previous_ballots", args=[ballot_code]
+                    ),
                 })
         else:
             message = """
@@ -690,7 +800,7 @@ def enter_e_ballot(request, ballot_code):
                     go to tab to resolve the issue.
                     """
     elif TabSettings.get("pairing_released", 0) != 1:
-        message = "Pairings for this round have not been released."
+        return redirect("previous_ballots", ballot_code=ballot_code)
     else:
         # see above, judge.judges is rounds
         rounds = list(judge.judges.prefetch_related("chair", "roundstats_set",
@@ -716,7 +826,7 @@ def enter_e_ballot(request, ballot_code):
                     """
         elif RoundStats.objects.filter(round=rounds[0]).exists():
             # Ballot already submitted — show frozen view
-            context = _submitted_ballot_context(rounds[0], ballot_code)
+            context = _submitted_ballot_context(rounds[0], ballot_code, judge)
             return render(request, "ballots/ballot_submitted.html", context)
         else:
             return enter_result(request, rounds[0].id, EBallotForm, ballot_code)

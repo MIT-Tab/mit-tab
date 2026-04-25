@@ -154,6 +154,15 @@ $font-size-base: 0.95rem !default;
   font-size: 1rem;
 }
 
+.rfd-display {
+  min-height: 120px;
+  white-space: normal;
+}
+
+.rfd-card textarea {
+  min-height: 160px;
+}
+
 .field-label {
   font-size: 0.8rem;
   font-weight: 600;
