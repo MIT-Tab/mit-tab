@@ -4,7 +4,13 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from mittab.apps.tab.forms import RankingGroupForm
-from mittab.apps.tab.models import Debater, RankingGroup, TabSettings, Team
+from mittab.apps.tab.models import (
+    Debater,
+    RankingGroup,
+    SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
+    TabSettings,
+    Team,
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -66,6 +72,25 @@ class TestRankingGroups(TestCase):
         self.assertIn("Speaker Showcase Rankings", content)
         self.assertIn("debater-ranking-group-speaker-showcase", content)
         self.assertIn(self.debater.name, content)
+
+    def test_rank_debaters_orders_display_score_columns_by_setting(self):
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 0)
+        response = self.client.get(reverse("rank_debaters"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Unadjusted"),
+            content.index("Single adjusted"),
+        )
+
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 1)
+        response = self.client.get(reverse("rank_debaters"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Single adjusted"),
+            content.index("Unadjusted"),
+        )
 
     def test_manage_ranking_groups_post_creates_group(self):
         response = self.client.post(

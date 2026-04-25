@@ -62,6 +62,11 @@ settings:
       - [0, "Unset (No Policy)"]
       - [1, "Open (Disclose Ranks)"]
       - [2, "Closed (Do Not Disclose)"]
+  - speaker_rankings_use_single_adjusted:
+    name: speaker_rankings_use_single_adjusted
+    description: "Use single adjusted speaker points before unadjusted speaker points when sorting speaker rankings. This does not change rank priority and does not affect team rankings or pairing."
+    value: false
+    type: boolean
   - written_rfd_first_round:
     name: written_rfd_first_round
     description: "The first preliminary round where judges' ballots include written reasons for decision. Use -1 to disable written RFDs."

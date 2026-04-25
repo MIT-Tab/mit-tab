@@ -12,6 +12,9 @@ from mittab.libs.cacheing import cache_logic
 
 
 _TABSETTING_MISSING = object()
+SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING = (
+    "speaker_rankings_use_single_adjusted"
+)
 
 
 class AuditAttributionMixin(models.Model):
@@ -105,6 +108,8 @@ class TabSettings(models.Model):
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
 
     def save(self,
@@ -114,6 +119,8 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 

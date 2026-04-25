@@ -11,6 +11,48 @@ from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
 
 
+class SpeakerRankingEntry:
+    """Tuple-compatible speaker row with display-only score columns."""
+
+    def __init__(self, debater, speaks, ranks, team, tiebreaker, score_columns):
+        self.debater = debater
+        self.speaks = speaks
+        self.ranks = ranks
+        self.team = team
+        self.tiebreaker = tiebreaker
+        self.score_columns = score_columns
+        self._tuple = (debater, speaks, ranks, team, tiebreaker)
+
+    def __iter__(self):
+        return iter(self._tuple)
+
+    def __len__(self):
+        return len(self._tuple)
+
+    def __getitem__(self, index):
+        return self._tuple[index]
+
+
+def _speaker_score_columns(debater_stats):
+    score_columns_by_stat = {
+        rankings.SINGLE_ADJUSTED_SPEAKS: {
+            "label": "Single adjusted",
+            "speaks": debater_stats[rankings.SINGLE_ADJUSTED_SPEAKS],
+            "ranks": debater_stats[rankings.SINGLE_ADJUSTED_RANKS],
+        },
+        rankings.SPEAKS: {
+            "label": "Unadjusted",
+            "speaks": debater_stats[rankings.SPEAKS],
+            "ranks": debater_stats[rankings.RANKS],
+        },
+    }
+    return [
+        score_columns_by_stat[stat]
+        for stat in debater_stats.get_stat_priority()
+        if stat in score_columns_by_stat
+    ]
+
+
 def view_debaters(request):
     # Get a list of (id,debater_name) tuples
     c_debaters = [
@@ -123,9 +165,14 @@ def get_speaker_rankings(request=None):
                 tiebreaker = tiebreaker_stat.name
             else:
                 tiebreaker = "Tie not broken"
-        debaters.append((debater_stats.debater, debater_stats[rankings.SPEAKS],
-                         debater_stats[rankings.RANKS],
-                         debater_stats.debater.team(), tiebreaker))
+        debaters.append(SpeakerRankingEntry(
+            debater_stats.debater,
+            debater_stats[rankings.SPEAKS],
+            debater_stats[rankings.RANKS],
+            debater_stats.debater.team(),
+            tiebreaker,
+            _speaker_score_columns(debater_stats),
+        ))
 
     nov_debaters = list(filter(lambda s: s[0].novice_status == Debater.NOVICE,
                                debaters))

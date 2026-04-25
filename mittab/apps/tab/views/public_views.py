@@ -317,18 +317,24 @@ def build_public_team_rows(teams, show_scores):
 def build_public_speaker_rows(speakers, show_scores, max_visible):
     rows = []
     for idx, entry in enumerate(speakers[:max_visible], start=1):
-        # get_speaker_rankings now returns 5-tuples:
+        # get_speaker_rankings returns tuple-compatible entries:
         # (debater, speaks, ranks, team, tiebreaker). Older data may omit the
         # tiebreaker, so gracefully handle either shape.
         if len(entry) == 5:
             debater, speaks, ranks, team, _tiebreaker = entry
         else:
             debater, speaks, ranks, team = entry
+        score_columns = getattr(entry, "score_columns", [{
+            "label": "Unadjusted",
+            "speaks": speaks,
+            "ranks": ranks,
+        }])
         rows.append({
             "place": idx,
             "debater": debater,
             "speaks": speaks if show_scores else None,
             "ranks": ranks if show_scores else None,
+            "score_columns": score_columns if show_scores else [],
             "team": team,
         })
     return rows
@@ -697,7 +703,7 @@ def previous_ballots(request, ballot_code):
     current_round = TabSettings.get(key="cur_round") - 1
     rounds = (
         _submitted_rounds_for_judge(judge)
-        .filter(round_number__lt=current_round)
+        .filter(round_number__lte=current_round)
         .order_by("-round_number", "gov_team__name", "opp_team__name")
     )
     ballot_rows = []
