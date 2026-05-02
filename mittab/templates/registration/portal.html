@@ -5,6 +5,10 @@
 {% block title %}Tournament Registration{% endblock %}
 {% block banner %}<span class="registration-page-title">Tournament Registration</span>{% endblock %}
 
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
 {% block content %}
 {% render_bundle 'registrationPortal' %}
 <div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">

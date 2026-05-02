@@ -1,12 +1,8 @@
 import $ from "jquery";
 import "select2";
-import "select2/dist/css/select2.css";
-import "@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css";
 
-const NEW_VALUE = "__new__";
 const DEB_URL = (id) => `/registration/api/debaters/${id}/`;
 
-const customSchools = [];
 const customDebaters = {};
 
 const getRegistrationSelect = () =>
@@ -65,16 +61,6 @@ const sortOptions = ($select) => {
   if (current && $select.find(`option[value="${current}"]`).length) {
     $select.val(current);
   }
-};
-
-const toggleNewSchoolInput = ($select) => {
-  const targetId = $select.attr("id");
-  $(`[data-new-school-container="${targetId}"]`).each((_, el) => {
-    const $container = $(el);
-    const show = $select.val() === NEW_VALUE;
-    $container.toggleClass("d-none", !show);
-    $container.find("input").toggleClass("d-none", !show);
-  });
 };
 
 const fillDebaterData = (selectEl, debaterData = null) => {
@@ -319,16 +305,12 @@ const subformHasErrors = ($subform) =>
 const collapseSubformIfPopulated = ($subform) => {
   if ($subform.data("forceExpanded")) return;
   if (subformHasErrors($subform)) return;
-  const nameVal = ($subform
-    .find('input[name$="-name"]')
-    .first()
-    .val() || ""
+  const nameVal = (
+    $subform.find('input[name$="-name"]').first().val() || ""
   ).trim();
   if (nameVal) {
     $subform.addClass("is-collapsed");
-    $subform
-      .find("[data-subform-toggle]")
-      .attr("aria-expanded", "false");
+    $subform.find("[data-subform-toggle]").attr("aria-expanded", "false");
   }
 };
 
@@ -444,7 +426,6 @@ const prefillTeamSchools = () => {
 
 const configureSchoolSelect = ($select) => {
   syncSchoolOptionsFromRegistration($select);
-  toggleNewSchoolInput($select);
   maybePrefillFromRegistration($select);
   loadDebaters($select);
 };
@@ -482,7 +463,6 @@ const registerQuickActions = () => {
       alert(`School "${name}" is already available in the school list.`);
       return;
     }
-    customSchools.push(name);
     const value = `custom:${encodeURIComponent(name)}`;
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
@@ -637,15 +617,6 @@ export default function initRegistrationPortal() {
     },
   );
 
-  $root.on("click", "[data-trigger-new]", function triggerNew(event) {
-    event.preventDefault();
-    const target = $(this).data("triggerNew");
-    const $select = $(`#${target}`);
-    if ($select.length) {
-      $select.val(NEW_VALUE).trigger("change");
-    }
-  });
-
   // Warn the user before leaving the registration page (reload, close, back,
   // or follow a link). Only skip the prompt when the form is actually being
   // submitted. Browsers also require at least one user interaction with the
@@ -659,8 +630,8 @@ export default function initRegistrationPortal() {
     window.addEventListener("beforeunload", (event) => {
       if (allowUnload) return;
       event.preventDefault();
-      // returnValue is technically deprecated but remains the only reliable
-      // cross-browser way (Safari, Firefox) to trigger the "Leave site?" prompt.
+      // Required for Safari/Firefox to trigger the "Leave site?" prompt.
+      // eslint-disable-next-line no-param-reassign
       event.returnValue = "";
     });
   }

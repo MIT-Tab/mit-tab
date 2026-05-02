@@ -105,7 +105,11 @@ def test_registration_flow_creates_objects(email_service, client):
                     "Registration U",
                     apda_id="1000",
                 ),
-                speaker("Registration U Speaker 2", "__new__", "Hybrid School"),
+                speaker(
+                    "Registration U Speaker 2",
+                    "custom:Hybrid%20School",
+                    "Hybrid School",
+                ),
             ],
             seed_choice=Team.FREE_SEED,
         )
@@ -126,7 +130,7 @@ def test_registration_flow_creates_objects(email_service, client):
     response = client.post("/registration/", data=data, follow=True)
     assert response.status_code == 200
     assert response.request["QUERY_STRING"] == "saved=1"
-    assert b"Registration Saved" in response.content
+    assert b"Registration saved" in response.content
     assert b"School And Contact" not in response.content
     registration = Registration.objects.first()
     assert registration.herokunator_code in response.request["PATH_INFO"]
@@ -284,7 +288,7 @@ def test_registration_edit_logs_changes(email_service, client):
             },
         ],
     )
-    edited_team[f"teams-0-team_id"] = str(team.pk)
+    edited_team["teams-0-team_id"] = str(team.pk)
     edited = registration_payload(
         "apda:77", "Log School", "after@example.com", [edited_team], []
     )

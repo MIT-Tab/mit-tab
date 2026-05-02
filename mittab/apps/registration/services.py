@@ -9,7 +9,6 @@ from mittab.apps.tab.models import CheckIn, Debater, Judge, School, TabSettings,
 from .models import Registration, RegistrationChangeLog
 
 SCHOOL_ACTIVE_URL = "https://results.apda.online/api/schools/all/"
-SCHOOL_ALL_URL = SCHOOL_ACTIVE_URL
 
 
 def fetch_remote_schools():
@@ -200,10 +199,12 @@ def resolve_school(selection, cache=None):
                 apda_id=apda_id,
                 defaults={"name": name},
             )
-        except IntegrityError:
+        except IntegrityError as exc:
             school = School.objects.filter(name__iexact=name).first()
             if not school:
-                raise forms.ValidationError("School already exists, select it instead")
+                raise forms.ValidationError(
+                    "School already exists, select it instead"
+                ) from exc
         cache[key] = school
         return school
     name = selection.get("name", "").strip()
@@ -214,12 +215,14 @@ def resolve_school(selection, cache=None):
             name__iexact=name,
             defaults={"name": name},
         )
-    except IntegrityError:
+    except IntegrityError as exc:
         existing = School.objects.filter(name__iexact=name).first()
         if existing:
             school = existing
         else:
-            raise forms.ValidationError("School already exists, select it instead")
+            raise forms.ValidationError(
+                "School already exists, select it instead"
+            ) from exc
     cache[key] = school
     return school
 
@@ -328,7 +331,9 @@ def registration_snapshot(registration):
                 "seed": team.seed,
                 "school": _school_snapshot(team.school),
                 "hybrid_school": _school_snapshot(team.hybrid_school),
-                "debaters": [_debater_snapshot(debater) for debater in team.debaters.all()],
+                "debaters": [
+                    _debater_snapshot(debater) for debater in team.debaters.all()
+                ],
             }
         )
     judges = []
@@ -448,7 +453,9 @@ def log_registration_change(registration, action, before=None, after=None):
 
 
 def save_registration(reg_form, team_formset, judge_formset, registration):
-    before = registration_snapshot(registration) if registration and registration.pk else {}
+    before = (
+        registration_snapshot(registration) if registration and registration.pk else {}
+    )
     school = resolve_school(reg_form.get_school())
     registration = registration or Registration()
     registration.school = school

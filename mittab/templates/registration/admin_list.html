@@ -1,7 +1,12 @@
 {% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Registration Admin{% endblock %}
 {% block banner %}<span class="registration-page-title">Registration Admin</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
 
 {% block content %}
 <div class="col-12 registration-admin">

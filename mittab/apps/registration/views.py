@@ -11,7 +11,6 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
-from django.utils.functional import cached_property
 import requests
 from requests.exceptions import RequestException
 
@@ -23,8 +22,6 @@ from mittab.apps.registration.forms import (
 )
 from mittab.apps.registration.emails import send_registration_confirmation_email
 from mittab.apps.registration.services import (
-    SCHOOL_ACTIVE_URL,
-    SCHOOL_ALL_URL,
     build_school_choices,
     get_round_config,
     log_registration_deleted,
@@ -92,9 +89,10 @@ class RegistrationJudgeFormSet(BaseFormSet):
         kwargs["school_choices"] = self.school_choices
         return super()._construct_form(i, **kwargs)
 
-    @cached_property
+    @property
     def empty_form(self):
-        form = self.form(
+        form_class = getattr(self, "form")
+        form = form_class(
             auto_id=self.auto_id,
             prefix=self.add_prefix("__prefix__"),
             empty_permitted=True,
@@ -195,7 +193,10 @@ def registration_code_lookup(request):
         if not exists:
             return redirect_and_flash_error(
                 request,
-                "We couldn't find a registration for that code. Double-check and try again.",
+                (
+                    "We couldn't find a registration for that code. "
+                    "Double-check and try again."
+                ),
                 path=reverse("registration_code_lookup"),
             )
 
@@ -356,9 +357,9 @@ def registration_admin(request):
         .prefetch_related(
             Prefetch(
                 "teams",
-                queryset=Team.objects.select_related("school", "hybrid_school").prefetch_related(
-                    "debaters"
-                ),
+                queryset=Team.objects.select_related(
+                    "school", "hybrid_school"
+                ).prefetch_related("debaters"),
             ),
             Prefetch(
                 "judges",
@@ -380,35 +381,6 @@ def registration_admin(request):
             "recent_changes": recent_changes,
         },
     )
-
-
-@require_http_methods(["GET"])
-def proxy_schools_active(request):
-    """Proxy endpoint for active schools to avoid CORS issues."""
-    try:
-        response = requests.get(SCHOOL_ACTIVE_URL, timeout=10)
-        if response.ok:
-            return JsonResponse(response.json(), safe=False)
-        return JsonResponse(
-            {"error": "Failed to fetch schools"}, status=response.status_code
-        )
-    except RequestException as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-@require_http_methods(["GET"])
-def proxy_schools_all(request):
-    """Proxy endpoint for all schools to avoid CORS issues."""
-    try:
-        response = requests.get(SCHOOL_ALL_URL, timeout=10)
-        if response.ok:
-            return JsonResponse(response.json(), safe=False)
-        return JsonResponse(
-            {"error": "Failed to fetch schools"}, status=response.status_code
-        )
-    except RequestException as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 
 @require_http_methods(["GET"])
 def proxy_debaters(request, school_id):

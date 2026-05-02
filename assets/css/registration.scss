@@ -644,10 +644,7 @@
   margin: 0 auto;
 
   .registration-lookup__card {
-    background: #ffffff;
-    border: 1px solid rgba(21, 33, 61, 0.12);
-    border-radius: 0.75rem;
-    box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
+    @include rg-card-shell;
     padding: 1.6rem 1.75rem;
     display: flex;
     flex-direction: column;
@@ -729,10 +726,7 @@
 
   .registration-admin__settings,
   .registration-admin__panel {
-    background: #ffffff;
-    border: 1px solid rgba(21, 33, 61, 0.12);
-    border-radius: 0.75rem;
-    box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
+    @include rg-card-shell;
     padding: 1.1rem 1.3rem;
   }
 

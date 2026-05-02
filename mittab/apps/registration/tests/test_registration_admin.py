@@ -11,8 +11,8 @@ from mittab.apps.registration.models import (
 from mittab.apps.tab.models import Judge, School, Team
 
 
-@pytest.fixture
-def admin_client(client, django_user_model):
+@pytest.fixture(name="logged_in_admin_client")
+def fixture_logged_in_admin_client(client, django_user_model):
     user = django_user_model.objects.create_superuser(
         username="admin",
         email="admin@example.com",
@@ -23,9 +23,12 @@ def admin_client(client, django_user_model):
 
 
 @pytest.mark.django_db
-def test_admin_list_shows_registration(admin_client):
+def test_admin_list_shows_registration(logged_in_admin_client):
     school = School.objects.create(name="Admin U")
-    registration = Registration.objects.create(school=school, email="contact@example.com")
+    registration = Registration.objects.create(
+        school=school,
+        email="contact@example.com",
+    )
     team = Team.objects.create(
         name="Admin Team",
         school=school,
@@ -41,7 +44,7 @@ def test_admin_list_shows_registration(admin_client):
     judge.schools.add(school)
     url = reverse("registration_admin")
 
-    response = admin_client.get(url)
+    response = logged_in_admin_client.get(url)
 
     assert response.status_code == 200
     content = response.content.decode()
@@ -51,9 +54,12 @@ def test_admin_list_shows_registration(admin_client):
 
 
 @pytest.mark.django_db
-def test_admin_can_delete_registration(admin_client):
+def test_admin_can_delete_registration(logged_in_admin_client):
     school = School.objects.create(name="Delete U")
-    registration = Registration.objects.create(school=school, email="delete@example.com")
+    registration = Registration.objects.create(
+        school=school,
+        email="delete@example.com",
+    )
     Team.objects.create(
         name="Delete Team",
         school=school,
@@ -69,7 +75,11 @@ def test_admin_can_delete_registration(admin_client):
     judge.schools.add(school)
     url = reverse("registration_admin")
 
-    response = admin_client.post(url, {"registration_id": registration.id}, follow=True)
+    response = logged_in_admin_client.post(
+        url,
+        {"registration_id": registration.id},
+        follow=True,
+    )
 
     assert response.status_code == 200
     assert Registration.objects.count() == 0
@@ -82,14 +92,14 @@ def test_admin_can_delete_registration(admin_client):
 
 
 @pytest.mark.django_db
-def test_admin_can_update_settings(admin_client):
+def test_admin_can_update_settings(logged_in_admin_client):
     config = RegistrationConfig.get_or_create_active()
     config.allow_new_registrations = False
     config.allow_registration_edits = False
     config.save()
 
     url = reverse("registration_admin")
-    response = admin_client.post(
+    response = logged_in_admin_client.post(
         url,
         {
             "allow_new_registrations": "on",

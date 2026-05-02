@@ -5,7 +5,6 @@ from django import forms
 from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.tab.models import Debater, Team
 
-NEW_CHOICE_VALUE = "__new__"
 DEBATER_PREFIXES = ("debater_one", "debater_two")
 
 
@@ -41,12 +40,12 @@ class ValueMixin:
             return self.data.get(self.add_prefix(field_name), "")
         return self.initial.get(field_name, "")
 
-    @staticmethod
-    def _reveal_input(widget):
-        classes = widget.attrs.get("class", "")
-        widget.attrs["class"] = " ".join(
-            part for part in classes.split() if part != "d-none"
-        ).strip()
+
+class SchoolMultipleChoiceField(forms.MultipleChoiceField):
+    def valid_value(self, value):
+        if isinstance(value, str) and value.startswith("custom:"):
+            return True
+        return super().valid_value(value)
 
 
 def parse_school(value, name):
@@ -65,11 +64,6 @@ def parse_school(value, name):
         label = unquote(token).strip()
         if label.startswith("-") and label[1:].isdigit():
             label = (name or "").strip()
-        if not label:
-            raise forms.ValidationError("Enter a school name")
-        return {"name": label}
-    if value == NEW_CHOICE_VALUE:
-        label = (name or "").strip()
         if not label:
             raise forms.ValidationError("Enter a school name")
         return {"name": label}
@@ -107,8 +101,6 @@ class RegistrationForm(ValueMixin, forms.Form):
         self.fields["school_name"].widget.attrs.setdefault(
             "data-related-select", self.fields["school"].widget.attrs.get("id")
         )
-        if current == NEW_CHOICE_VALUE:
-            self._reveal_input(self.fields["school_name"].widget)
         self.fields["email"].widget.attrs.update({"class": "form-control"})
 
     def get_school(self):
@@ -258,9 +250,6 @@ class TeamForm(ValueMixin, forms.Form):
         name_widget.attrs.setdefault(
             "data-related-select", field.widget.attrs.get("id")
         )
-        if current == NEW_CHOICE_VALUE:
-            self._reveal_input(name_widget)
-
     def _configure_debater_inputs(self, prefix):
         name_field = f"{prefix}_name"
         apda_field = f"{prefix}_apda_id"
@@ -285,7 +274,7 @@ class JudgeForm(forms.Form):
         max_value=10,
         widget=forms.NumberInput(attrs={"min": "0", "max": "10", "step": "1"}),
     )
-    schools = forms.MultipleChoiceField(required=False, choices=())
+    schools = SchoolMultipleChoiceField(required=False, choices=())
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
 
     def __init__(self, *args, round_config=None, school_choices=None, **kwargs):
@@ -302,7 +291,7 @@ class JudgeForm(forms.Form):
         self.fields["experience"].widget.attrs.update(
             {"class": "form-control", "placeholder": "0-10"}
         )
-        self.fields["schools"] = forms.MultipleChoiceField(
+        self.fields["schools"] = SchoolMultipleChoiceField(
             required=False,
             choices=[],
             widget=forms.SelectMultiple(
