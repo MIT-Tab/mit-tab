@@ -12,12 +12,12 @@ from mittab.libs.cacheing.public_cache import cache_public_view, invalidate_publ
 
 def get_available_rounds():
     rounds = []
-
+    
     # Add inrounds
     tot_rounds = TabSettings.get("tot_rounds", 5)
     for i in range(1, tot_rounds + 1):
         rounds.append(('inround', i, f"Round {i}"))
-
+    
     # Add outrounds - standard sizes
     outround_sizes = [64, 32, 16, 8, 4, 2]
     round_names = {
@@ -28,14 +28,14 @@ def get_available_rounds():
         32: "Double Octofinals",
         64: "Triple Octofinals",
     }
-
+    
     for num_teams in outround_sizes:
         round_name = round_names.get(num_teams, f"Round of {num_teams}")
         # Varsity outrounds
         rounds.append(('outround', f"0_{num_teams}", f"Varsity {round_name}"))
         # Novice outrounds
         rounds.append(('outround', f"1_{num_teams}", f"Novice {round_name}"))
-
+    
     return rounds
 
 def _get_published_motions():
@@ -47,18 +47,18 @@ def _get_published_motions():
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def manage_motions(request):
     motions_enabled = TabSettings.get("motions_enabled", 0)
-
+    
     if not motions_enabled:
         return redirect_and_flash_error(
             request,
             "Motions feature is disabled. Enable it in Settings to use this feature.",
             path=reverse("settings_form")
         )
-
+    
     motions = list(Motion.objects.all())
     motions.sort(key=lambda m: m.sort_key)
     available_rounds = get_available_rounds()
-
+    
     return render(request, "motions/manage_motions.html", {
         "title": "Manage Motions",
         "motions": motions,
@@ -70,17 +70,17 @@ def manage_motions(request):
 def add_motion(request):
     if request.method != "POST":
         return redirect("manage_motions")
-
+    
     round_selection = request.POST.get("round_selection", "")
     info_slide = request.POST.get("info_slide", "").strip()
     motion_text = request.POST.get("motion_text", "").strip()
-
+    
     if not motion_text:
         return redirect_and_flash_error(request, "Motion text is required.")
-
+    
     if not round_selection:
         return redirect_and_flash_error(request, "Round selection is required.")
-
+    
     # Parse round selection
     try:
         if round_selection.startswith("inround_"):
@@ -102,7 +102,7 @@ def add_motion(request):
             )
         else:
             return redirect_and_flash_error(request, "Invalid round selection.")
-
+        
         motion.full_clean()
         motion.save()
         invalidate_public_motions_cache()
@@ -168,7 +168,7 @@ def edit_motion(request, motion_id):
 def delete_motion(request, motion_id):
     if request.method != "POST":
         return redirect("manage_motions")
-
+    
     motion = get_object_or_404(Motion, pk=motion_id)
     motion.delete()
     invalidate_public_motions_cache()
@@ -179,12 +179,12 @@ def delete_motion(request, motion_id):
 def toggle_motion_published(request, motion_id):
     if request.method != "POST":
         return redirect("manage_motions")
-
+    
     motion = get_object_or_404(Motion, pk=motion_id)
     motion.is_published = not motion.is_published
     motion.save()
     invalidate_public_motions_cache()
-
+    
     status = "published" if motion.is_published else "unpublished"
     return redirect_and_flash_success(
         request,
@@ -197,7 +197,7 @@ def toggle_motion_published(request, motion_id):
 def publish_all_motions(request):
     if request.method != "POST":
         return redirect("manage_motions")
-
+    
     Motion.objects.all().update(is_published=True)
     invalidate_public_motions_cache()
     return redirect_and_flash_success(request, "All motions published.", path=reverse("manage_motions"))
@@ -207,7 +207,7 @@ def publish_all_motions(request):
 def unpublish_all_motions(request):
     if request.method != "POST":
         return redirect("manage_motions")
-
+    
     Motion.objects.all().update(is_published=False)
     invalidate_public_motions_cache()
     return redirect_and_flash_success(request, "All motions unpublished.", path=reverse("manage_motions"))
@@ -216,20 +216,20 @@ def unpublish_all_motions(request):
 @cache_public_view(timeout=60)
 def public_motions(request):
     motions_enabled = TabSettings.get("motions_enabled", 0)
-
+    
     if not motions_enabled:
         return redirect("public_access_error")
-
+    
     motions = _get_published_motions()
-
+    
     # Group motions by type for display
     inround_motions = [m for m in motions if not m.is_outround]
     outround_motions = [m for m in motions if m.is_outround]
-
+    
     # Further group outrounds by type
     varsity_outrounds = [m for m in outround_motions if m.outround_type == BreakingTeam.VARSITY]
     novice_outrounds = [m for m in outround_motions if m.outround_type == BreakingTeam.NOVICE]
-
+    
     return render(request, "public/motions.html", {
         "title": "Motions",
         "inround_motions": inround_motions,
@@ -237,3 +237,4 @@ def public_motions(request):
         "novice_outrounds": novice_outrounds,
         "has_motions": bool(motions),
     })
+

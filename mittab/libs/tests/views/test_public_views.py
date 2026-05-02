@@ -108,7 +108,7 @@ class TestPublicViews(TestCase):
 
     def _set_disclosure_settings(self, open_speaks, open_ranks):
         """Set disclosure settings.
-
+        
         Values: None=unset, True=open (1), False=closed (2)
         """
         for key, value in (("open_speaks", open_speaks), ("open_ranks", open_ranks)):

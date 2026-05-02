@@ -217,37 +217,18 @@
   .public-home {
     padding: 0;
 
-    .grid {
-      grid-template-columns: 1fr !important;
-      gap: 1.25rem;
-    }
-
-    .links {
-      padding: 1.15rem 1.2rem;
-      border-radius: 1rem;
-      box-shadow: 0 16px 45px -32px rgba(15, 24, 45, 0.55);
-    }
-
-    .title {
-      font-size: 1.6rem;
-    }
+    .grid { grid-template-columns: 1fr !important; gap: 1.25rem; }
+    .links { padding: 1.15rem 1.2rem; border-radius: 1rem; box-shadow: 0 16px 45px -32px rgba(15, 24, 45, 0.55); }
+    .title { font-size: 1.6rem; }
   }
 
-  .public-links {
-    .tile {
-      grid-template-columns: auto 1fr;
-      gap: 0.8rem;
-      padding: 1rem 1.1rem;
-    }
-
-    .chevron {
-      display: none;
-    }
-
-    .body {
-      gap: 0.25rem;
-    }
+  .public-links .tile {
+    grid-template-columns: auto 1fr;
+    gap: 0.8rem;
+    padding: 1rem 1.1rem;
   }
+  .public-links .chevron { display: none; }
+  .public-links .body { gap: 0.25rem; }
 
   .footer small { font-size: 0.76rem; }
 }
@@ -300,9 +281,7 @@
   .public-home {
     padding: 0;
 
-    .links {
-      padding: 1rem 1.05rem;
-    }
+    .links { padding: 1rem 1.05rem; }
   }
 
   .public-links .tile { padding: 0.85rem 0.9rem; border-left-width: 3px; }
