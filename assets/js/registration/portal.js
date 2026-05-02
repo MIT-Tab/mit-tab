@@ -145,6 +145,9 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
   $select.val(restoredValue);
   $select.prop("disabled", false);
   syncDebater($select[0]);
+  // Notify listeners (summary header, etc.) that the value has changed
+  // — needed because programmatic .val() does not fire a change event.
+  $select.trigger("change");
 };
 
 const broadcastCustomDebater = (schoolValue, debater) => {
@@ -251,6 +254,92 @@ const removeForm = (button) => {
   } else {
     $form.remove();
   }
+};
+
+const truncate = (text, max = 60) => {
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1).trim()}…` : text;
+};
+
+const readSelectedText = ($el) => {
+  if (!$el || !$el.length) return "";
+  if ($el.is("select")) {
+    // Skip placeholder/loading options — they always have value=""
+    const value = $el.val();
+    if (!value) return "";
+    return ($el.find("option:selected").text() || "").trim();
+  }
+  return ($el.val() || "").toString().trim();
+};
+
+const updateSubformSummary = ($subform) => {
+  const $summaryName = $subform.find("[data-subform-summary-name]");
+  const $summaryDetail = $subform.find("[data-subform-summary-detail]");
+  if (!$summaryName.length) return;
+  const type = $subform.data("form");
+
+  if (type === "team") {
+    const teamName = readSelectedText(
+      $subform.find('input[name$="-name"]').first(),
+    );
+    const d1 = readSelectedText(
+      $subform.find('select[name$="debater_one_name"]'),
+    );
+    const d2 = readSelectedText(
+      $subform.find('select[name$="debater_two_name"]'),
+    );
+    $summaryName.text(teamName || "Untitled team");
+    $summaryName.toggleClass(
+      "registration-subform__name--placeholder",
+      !teamName,
+    );
+    const debaters = [d1, d2].filter(Boolean).join(" · ");
+    $summaryDetail.text(truncate(debaters));
+  } else if (type === "judge") {
+    const judgeName = readSelectedText(
+      $subform.find('input[name$="-name"]').first(),
+    );
+    const email = readSelectedText(
+      $subform.find('input[name$="-email"]').first(),
+    );
+    $summaryName.text(judgeName || "Untitled judge");
+    $summaryName.toggleClass(
+      "registration-subform__name--placeholder",
+      !judgeName,
+    );
+    $summaryDetail.text(truncate(email));
+  }
+};
+
+const subformHasErrors = ($subform) =>
+  $subform.find(
+    ".alert-danger, .registration-field__error, .text-danger, .invalid-feedback",
+  ).length > 0;
+
+const collapseSubformIfPopulated = ($subform) => {
+  if ($subform.data("forceExpanded")) return;
+  if (subformHasErrors($subform)) return;
+  const nameVal = ($subform
+    .find('input[name$="-name"]')
+    .first()
+    .val() || ""
+  ).trim();
+  if (nameVal) {
+    $subform.addClass("is-collapsed");
+    $subform
+      .find("[data-subform-toggle]")
+      .attr("aria-expanded", "false");
+  }
+};
+
+const initSubforms = ($scope) => {
+  $scope.find("[data-form]").each((_, el) => {
+    const $subform = $(el);
+    if ($subform.data("subformInitialized")) return;
+    $subform.data("subformInitialized", true);
+    updateSubformSummary($subform);
+    collapseSubformIfPopulated($subform);
+  });
 };
 
 const appendSchoolOption = (value, name) => {
@@ -375,6 +464,9 @@ const addForm = (type, maxTeams) => {
   });
   initJudgeSchoolSelect($element);
   prefillTeamSchools();
+  $element.data("forceExpanded", true);
+  $element.data("subformInitialized", true);
+  updateSubformSummary($element);
 };
 
 const registerQuickActions = () => {
@@ -394,7 +486,7 @@ const registerQuickActions = () => {
     const value = `custom:${encodeURIComponent(name)}`;
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
-    alert(`School "${name}" added.`);
+    $("#new-school-modal").modal("hide");
   });
 
   $("#create-debater-btn").on("click", () => {
@@ -425,7 +517,7 @@ const registerQuickActions = () => {
     broadcastCustomDebater(schoolValue, debater);
     $("#new-debater-name").val("");
     $("#new-debater-status").val("0");
-    alert(`Debater "${name}" added.`);
+    $("#new-debater-modal").modal("hide");
   });
 };
 
@@ -466,6 +558,7 @@ export default function initRegistrationPortal() {
   prefillTeamSchools();
   registerQuickActions();
   initNewDebaterSelect();
+  initSubforms($root);
 
   $root.on("change", "[data-school-select]", function onSchoolChange() {
     const $select = $(this);
@@ -506,8 +599,43 @@ export default function initRegistrationPortal() {
 
   $root.on("click", "[data-remove-form]", function onRemoveClick(event) {
     event.preventDefault();
+    event.stopPropagation();
     removeForm(this);
   });
+
+  const toggleSubform = (target) => {
+    const $subform = $(target).closest("[data-form]");
+    $subform.toggleClass("is-collapsed");
+    const isCollapsed = $subform.hasClass("is-collapsed");
+    $subform
+      .find("[data-subform-toggle]")
+      .attr("aria-expanded", isCollapsed ? "false" : "true");
+    if (!isCollapsed) {
+      $subform.data("forceExpanded", true);
+    }
+  };
+
+  $root.on("click", "[data-subform-toggle]", function onToggleClick(event) {
+    if ($(event.target).closest("[data-remove-form]").length) return;
+    event.preventDefault();
+    toggleSubform(this);
+  });
+
+  $root.on("keydown", "[data-subform-toggle]", function onToggleKey(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if ($(event.target).closest("[data-remove-form]").length) return;
+    event.preventDefault();
+    toggleSubform(this);
+  });
+
+  $root.on(
+    "input change",
+    "[data-form] input, [data-form] select",
+    function onFieldChange() {
+      const $subform = $(this).closest("[data-form]");
+      updateSubformSummary($subform);
+    },
+  );
 
   $root.on("click", "[data-trigger-new]", function triggerNew(event) {
     event.preventDefault();
@@ -517,4 +645,27 @@ export default function initRegistrationPortal() {
       $select.val(NEW_VALUE).trigger("change");
     }
   });
+
+  // Warn the user before leaving with unsaved changes.
+  // Bound at the end of init so init-time programmatic change events
+  // (prefilling, debater list rebuilds) don't falsely mark the form dirty.
+  const $form = $root.find("[data-registration-form]");
+  if ($form.length) {
+    let dirty = false;
+    const markDirty = () => {
+      dirty = true;
+    };
+    $form.on("input change", "input, select, textarea", markDirty);
+    $form.on("click", "[data-add-form], [data-remove-form]", markDirty);
+    $("#create-school-btn, #create-debater-btn").on("click", markDirty);
+    $form.on("submit", () => {
+      dirty = false;
+    });
+    $(window).on("beforeunload", (event) => {
+      if (!dirty) return undefined;
+      const native = event.originalEvent || event;
+      native.returnValue = "";
+      return "";
+    });
+  }
 }

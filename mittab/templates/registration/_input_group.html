@@ -1,9 +1,7 @@
-<div class="input-group registration-field {{ size|default:'input-group-sm' }} {{ margin|default:'mb-2' }}">
-    <div class="input-group-prepend">
-        <span class="input-group-text"{% if label_style %} style="{{ label_style }}"{% endif %}>{{ label }}</span>
-    </div>
+<div class="registration-field{% if compact %} registration-field--compact{% endif %} {{ margin|default:'' }}">
+    <label class="registration-field__label"{% if field.id_for_label %} for="{{ field.id_for_label }}"{% endif %}>{{ label }}</label>
     {{ field }}
+    {% if errors %}
+    <div class="registration-field__error">{{ errors }}</div>
+    {% endif %}
 </div>
-{% if errors %}
-<div class="text-danger small {{ error_class|default:'mb-1' }}">{{ errors }}</div>
-{% endif %}
