@@ -33,4 +33,22 @@ class Migration(migrations.Migration):
                 ('school', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='tab.school')),
             ],
         ),
+        migrations.CreateModel(
+            name='RegistrationChangeLog',
+            fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('registration_code', models.CharField(blank=True, max_length=255)),
+                ('school_name', models.CharField(blank=True, max_length=50)),
+                ('email', models.EmailField(blank=True, max_length=254)),
+                ('action', models.CharField(choices=[('created', 'Created'), ('updated', 'Updated'), ('deleted', 'Deleted')], max_length=20)),
+                ('summary', models.TextField(blank=True)),
+                ('changes', models.JSONField(blank=True, default=dict)),
+                ('snapshot', models.JSONField(blank=True, default=dict)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('registration', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='change_logs', to='registration.registration')),
+            ],
+            options={
+                'ordering': ['-created_at'],
+            },
+        ),
     ]

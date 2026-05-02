@@ -4,9 +4,9 @@ from unittest import mock
 import pytest
 
 from mittab.apps.registration.forms import DEBATER_PREFIXES
-from mittab.apps.registration.models import Registration
+from mittab.apps.registration.models import Registration, RegistrationChangeLog
 from mittab.apps.registration.views import MAX_TEAMS
-from mittab.apps.tab.models import CheckIn, School, Team
+from mittab.apps.tab.models import CheckIn, Debater, School, Team
 
 
 def base_management(prefix, total, initial=0):
@@ -49,6 +49,17 @@ def team_entry(index, name, speakers, seed_choice=Team.UNSEEDED,
     return base
 
 
+def blank_team_entry(index, school="apda:50", school_name="Test School"):
+    return team_entry(
+        index,
+        "",
+        [
+            speaker("", school, school_name),
+            speaker("", school, school_name),
+        ],
+    )
+
+
 def judge_entry(index, name, email, experience, availability_rounds=None, schools=None):
     return {
         f"judges-{index}-registration_judge_id": "",
@@ -79,7 +90,7 @@ def registration_payload(school, school_name, email, teams, judges):
 
 
 @pytest.mark.django_db
-@mock.patch("mittab.apps.registration.views.EmailService")
+@mock.patch("mittab.apps.registration.emails.EmailService")
 def test_registration_flow_creates_objects(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
     School.objects.create(name="Judge Hybrid", apda_id=999)
@@ -114,6 +125,9 @@ def test_registration_flow_creates_objects(email_service, client):
     )
     response = client.post("/registration/", data=data, follow=True)
     assert response.status_code == 200
+    assert response.request["QUERY_STRING"] == "saved=1"
+    assert b"Registration Saved" in response.content
+    assert b"School And Contact" not in response.content
     registration = Registration.objects.first()
     assert registration.herokunator_code in response.request["PATH_INFO"]
     assert registration.email == "contact@example.com"
@@ -150,10 +164,15 @@ def test_registration_flow_creates_objects(email_service, client):
     assert "http://testserver/registration/" in email_request.text_body
     assert "Registration U A" in email_request.text_body
     assert "Reg Judge" in email_request.text_body
+    log = RegistrationChangeLog.objects.get()
+    assert log.action == RegistrationChangeLog.CREATED
+    assert log.registration == registration
+    assert log.snapshot["school"]["name"] == "Registration U"
+    assert log.snapshot["teams"][0]["debaters"][0]["apda_id"] == 1000
 
 
 @pytest.mark.django_db
-@mock.patch("mittab.apps.registration.views.EmailService")
+@mock.patch("mittab.apps.registration.emails.EmailService")
 def test_custom_school_reuses_existing_name(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
     school = School.objects.create(name="Existing U", apda_id=-1)
@@ -203,3 +222,126 @@ def test_registration_requires_single_free_seed(client):
     response = client.post("/registration/", data=data)
     assert response.status_code == 200
     assert b"Select at most one free seed" in response.content
+
+
+@pytest.mark.django_db
+def test_registration_ignores_blank_prefilled_team_rows(client):
+    teams = [
+        team_entry(
+            0,
+            "Started Team",
+            [
+                speaker("Only Speaker", "apda:50", "Test School"),
+                speaker("", "apda:50", "Test School"),
+            ],
+        ),
+        blank_team_entry(1),
+        blank_team_entry(2),
+        blank_team_entry(3),
+    ]
+    data = registration_payload("apda:50", "Test School", "team@example.com", teams, [])
+
+    response = client.post("/registration/", data=data)
+
+    assert response.status_code == 200
+    assert response.content.count(b"Each team needs two debaters") == 1
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_edit_logs_changes(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
+    teams = [
+        team_entry(
+            0,
+            "Original Team",
+            [
+                speaker("Speaker A", "apda:77", "Log School"),
+                speaker("Speaker B", "apda:77", "Log School"),
+            ],
+        )
+    ]
+    data = registration_payload(
+        "apda:77", "Log School", "before@example.com", teams, []
+    )
+    response = client.post("/registration/", data=data, follow=True)
+    assert response.status_code == 200
+    registration = Registration.objects.get()
+    team = registration.teams.first()
+    debaters = list(team.debaters.order_by("name"))
+
+    edited_team = team_entry(
+        0,
+        "Updated Team",
+        [
+            {
+                **speaker("Speaker A", "apda:77", "Log School"),
+                "id": str(debaters[0].pk),
+            },
+            {
+                **speaker("Speaker B", "apda:77", "Log School"),
+                "id": str(debaters[1].pk),
+            },
+        ],
+    )
+    edited_team[f"teams-0-team_id"] = str(team.pk)
+    edited = registration_payload(
+        "apda:77", "Log School", "after@example.com", [edited_team], []
+    )
+    response = client.post(
+        f"/registration/{registration.herokunator_code}/",
+        data=edited,
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    logs = list(RegistrationChangeLog.objects.order_by("created_at"))
+    assert [log.action for log in logs] == [
+        RegistrationChangeLog.CREATED,
+        RegistrationChangeLog.UPDATED,
+    ]
+    assert "email" in logs[1].changes
+    assert "teams" in logs[1].changes
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_does_not_update_unrelated_debater_id(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
+    school = School.objects.create(name="Existing School", apda_id=501)
+    unrelated = Debater.objects.create(
+        name="Unrelated Person",
+        novice_status=Debater.VARSITY,
+        qualified=False,
+        apda_id=9001,
+        school=school,
+    )
+    teams = [
+        team_entry(
+            0,
+            "Privacy Team",
+            [
+                {
+                    **speaker("Submitted Speaker", "apda:501", "Existing School"),
+                    "id": str(unrelated.pk),
+                },
+                speaker("Second Speaker", "apda:501", "Existing School"),
+            ],
+        )
+    ]
+    data = registration_payload(
+        "apda:501", "Existing School", "privacy@example.com", teams, []
+    )
+
+    response = client.post("/registration/", data=data, follow=True)
+
+    assert response.status_code == 200
+    unrelated.refresh_from_db()
+    assert unrelated.name == "Unrelated Person"
+    registration = Registration.objects.get()
+    names = {
+        debater.name
+        for team in registration.teams.all()
+        for debater in team.debaters.all()
+    }
+    assert "Submitted Speaker" in names

@@ -14,6 +14,7 @@
     <!-- {% if config and config.extra_information %}
     <div class="alert alert-info">{{ config.extra_information }}</div>
     {% endif %} -->
+    {% if not registration_saved %}
     <form method="post" novalidate data-registration-form class="registration-layout">
         {% csrf_token %}
         <div class="registration-split">
@@ -127,14 +128,15 @@
             {% endif %}
         </div>
     </form>
-    <template id="team-empty-form">
+    <script type="text/template" id="team-empty-form">
         {% include "registration/_team_form.html" with form=team_formset.empty_form %}
-    </template>
-    <template id="judge-empty-form">
+    </script>
+    <script type="text/template" id="judge-empty-form">
         {% include "registration/_judge_form.html" with form=judge_formset.empty_form %}
-    </template>
+    </script>
+    {% endif %}
     {% if summary %}
-    <section class="mt-4">
+    <section {% if not registration_saved %}class="mt-4"{% endif %}>
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">Registration Saved</h5>

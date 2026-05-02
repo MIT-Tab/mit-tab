@@ -3,7 +3,7 @@ from urllib.parse import unquote
 from django import forms
 
 from mittab.apps.registration.models import RegistrationConfig
-from mittab.apps.tab.models import Team
+from mittab.apps.tab.models import Debater, Team
 
 NEW_CHOICE_VALUE = "__new__"
 DEBATER_PREFIXES = ("debater_one", "debater_two")
@@ -15,17 +15,20 @@ def _build_debater_fields():
         fields[f"{prefix}_id"] = forms.IntegerField(
             required=False, widget=forms.HiddenInput
         )
-        fields[f"{prefix}_name"] = forms.CharField(max_length=30)
+        fields[f"{prefix}_name"] = forms.CharField(required=False, max_length=30)
         fields[f"{prefix}_apda_id"] = forms.IntegerField(
             required=False, widget=forms.HiddenInput
         )
-        fields[f"{prefix}_novice_status"] = forms.IntegerField(
-            required=False, widget=forms.HiddenInput
+        fields[f"{prefix}_novice_status"] = forms.TypedChoiceField(
+            choices=Debater.NOVICE_CHOICES,
+            coerce=int,
+            required=False,
+            initial=Debater.VARSITY,
         )
         fields[f"{prefix}_qualified"] = forms.BooleanField(
             required=False, widget=forms.HiddenInput
         )
-        fields[f"{prefix}_school"] = forms.CharField()
+        fields[f"{prefix}_school"] = forms.CharField(required=False)
         fields[f"{prefix}_school_name"] = forms.CharField(
             required=False, max_length=50
         )
@@ -116,7 +119,7 @@ class RegistrationForm(ValueMixin, forms.Form):
 
 class TeamForm(ValueMixin, forms.Form):
     team_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
-    name = forms.CharField(max_length=30)
+    name = forms.CharField(required=False, max_length=30)
     seed_choice = forms.TypedChoiceField(
         choices=[
             (Team.UNSEEDED, "Unseeded"),
@@ -125,10 +128,12 @@ class TeamForm(ValueMixin, forms.Form):
             (Team.FULL_SEED, "Full Seed"),
         ],
         coerce=int,
+        required=False,
         initial=Team.UNSEEDED,
     )
     team_school_source = forms.ChoiceField(
         choices=[("debater_one", "Debater 1"), ("debater_two", "Debater 2")],
+        required=False,
         initial="debater_one",
     )
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
@@ -157,7 +162,9 @@ class TeamForm(ValueMixin, forms.Form):
             )
             self.fields[name_field].widget.attrs["class"] = "form-control"
             self.fields[f"{prefix}_qualified"].widget.attrs.setdefault("value", "")
-            self.fields[f"{prefix}_novice_status"].initial = 0
+            self.fields[f"{prefix}_novice_status"].widget.attrs.update(
+                {"class": "form-control form-control-sm"}
+            )
             self._configure_school_field(
                 f"{prefix}_school",
                 self._current_value(f"{prefix}_school"),
@@ -170,11 +177,25 @@ class TeamForm(ValueMixin, forms.Form):
         data = super().clean()
         if data.get("DELETE"):
             return data
+        has_content = any(
+            data.get(field)
+            for field in ("team_id", "name", "debater_one_name", "debater_two_name")
+        )
+        if not has_content:
+            data["DELETE"] = True
+            return data
+        if not data.get("name"):
+            raise forms.ValidationError("Team name required")
         if not data.get("debater_one_name") or not data.get("debater_two_name"):
             raise forms.ValidationError("Each team needs two debaters")
+        if data.get("seed_choice") is None:
+            data["seed_choice"] = Team.UNSEEDED
         primary = data.get("team_school_source") or "debater_one"
         if not data.get(f"{primary}_school"):
             raise forms.ValidationError("Select a school for the primary debater")
+        for prefix in DEBATER_PREFIXES:
+            if not data.get(f"{prefix}_school"):
+                raise forms.ValidationError("Select a school for each debater")
         data["team_school_source"] = primary
         return data
 
@@ -188,7 +209,9 @@ class TeamForm(ValueMixin, forms.Form):
             "id": self.cleaned_data.get(f"{prefix}_id"),
             "name": self.cleaned_data[f"{prefix}_name"],
             "apda_id": self.cleaned_data.get(f"{prefix}_apda_id"),
-            "novice_status": int(self.cleaned_data[f"{prefix}_novice_status"]),
+            "novice_status": int(
+                self.cleaned_data[f"{prefix}_novice_status"] or Debater.VARSITY
+            ),
             "qualified": bool(self.cleaned_data.get(f"{prefix}_qualified")),
             "school": parse_school(school_value, school_label),
         }
@@ -246,6 +269,7 @@ class TeamForm(ValueMixin, forms.Form):
             {
                 "data-debater-input": prefix,
                 "data-apda-target": self[apda_field].auto_id,
+                "data-current-value": self._current_value(name_field),
             }
         )
         self.fields[apda_field].widget.attrs.setdefault("id", self[apda_field].auto_id)

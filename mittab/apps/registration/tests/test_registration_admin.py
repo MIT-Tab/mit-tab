@@ -3,7 +3,11 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
-from mittab.apps.registration.models import Registration, RegistrationConfig
+from mittab.apps.registration.models import (
+    Registration,
+    RegistrationChangeLog,
+    RegistrationConfig,
+)
 from mittab.apps.tab.models import Judge, School, Team
 
 
@@ -71,6 +75,10 @@ def test_admin_can_delete_registration(admin_client):
     assert Registration.objects.count() == 0
     assert Team.objects.count() == 0
     assert Judge.objects.count() == 0
+    log = RegistrationChangeLog.objects.get()
+    assert log.action == RegistrationChangeLog.DELETED
+    assert log.registration is None
+    assert log.registration_code == registration.herokunator_code
 
 
 @pytest.mark.django_db
@@ -94,3 +102,20 @@ def test_admin_can_update_settings(admin_client):
     config.refresh_from_db()
     assert config.allow_new_registrations is True
     assert config.allow_registration_edits is True
+
+
+@pytest.mark.django_db
+def test_registration_config_is_singleton():
+    config = RegistrationConfig.objects.create(
+        allow_new_registrations=False,
+        allow_registration_edits=False,
+    )
+    assert config.pk == RegistrationConfig.SINGLETON_PK
+
+    active = RegistrationConfig.get_or_create_active()
+    active.allow_new_registrations = True
+    active.save()
+
+    assert RegistrationConfig.objects.count() == 1
+    config.refresh_from_db()
+    assert config.allow_new_registrations is True

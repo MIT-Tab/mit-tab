@@ -81,9 +81,7 @@ const fillDebaterData = (selectEl, debaterData = null) => {
   const { apdaTarget } = selectEl.dataset;
   const noviceField = selectEl
     .closest("[data-debater]")
-    ?.querySelector(
-      `input[name$="${selectEl.dataset.debaterInput}_novice_status"]`,
-    );
+    ?.querySelector(`[name$="${selectEl.dataset.debaterInput}_novice_status"]`);
   const qualifiedField = selectEl
     .closest("[data-debater]")
     ?.querySelector(
@@ -116,6 +114,7 @@ const syncDebater = (selectEl) => {
 };
 
 const renderDebaterList = ($select, entries = [], schoolValue = "") => {
+  const currentValue = $select.val() || $select.data("currentValue") || "";
   $select.empty().append('<option value="">Select a debater</option>');
   entries.forEach((entry) => {
     const name = entry.name || entry.full_name || "";
@@ -140,7 +139,12 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
     });
   }
   sortOptions($select);
+  const restoredValue = $select.find(`option[value="${currentValue}"]`).length
+    ? currentValue
+    : "";
+  $select.val(restoredValue);
   $select.prop("disabled", false);
+  syncDebater($select[0]);
 };
 
 const broadcastCustomDebater = (schoolValue, debater) => {
@@ -169,25 +173,35 @@ const loadDebaters = ($schoolSelect) => {
   if (!$debaterSelect.length) return;
   const value = $schoolSelect.val();
   if (!value) {
+    $schoolSelect.removeData("loadedDebaterSchool");
     setPlaceholder($debaterSelect, "Select a school first");
     return;
   }
+  if (
+    $schoolSelect.data("loadedDebaterSchool") === value &&
+    $debaterSelect.find("option").length > 1
+  ) {
+    return;
+  }
   if (value.startsWith("custom:")) {
+    $schoolSelect.data("loadedDebaterSchool", value);
     renderDebaterList($debaterSelect, [], value);
     return;
   }
   if (!value.startsWith("apda:")) {
+    $schoolSelect.removeData("loadedDebaterSchool");
     setPlaceholder($debaterSelect, "Select a school first");
     return;
   }
+  $schoolSelect.data("loadedDebaterSchool", value);
   setPlaceholder($debaterSelect, "Loading debaters...");
   $.getJSON(DEB_URL(value.split(":")[1]))
     .done((data) => {
       const entries = Array.isArray(data) ? data : data.debaters || [];
       renderDebaterList($debaterSelect, entries, value);
-      syncDebater($debaterSelect[0]);
     })
     .fail(() => {
+      $schoolSelect.removeData("loadedDebaterSchool");
       setPlaceholder($debaterSelect, "Unable to load debaters");
     });
 };
@@ -330,6 +344,9 @@ const prefillTeamSchools = () => {
       $select.data("prefillAuto", false);
       return;
     }
+    if (!isMultiple && currentValue === regValue) {
+      return;
+    }
     $select.data("prefillAuto", true);
     $select.val(regValue).trigger("change");
     $select.data("prefillAuto", false);
@@ -436,6 +453,8 @@ const initNewDebaterSelect = () => {
 export default function initRegistrationPortal() {
   const $root = $("#registration-app");
   if (!$root.length) return;
+  if ($root.data("registrationInitialized")) return;
+  $root.data("registrationInitialized", true);
   const maxTeams = parseInt($root.data("maxTeams") || "200", 10);
 
   $root.find("[data-school-select]").each((_, el) => {
