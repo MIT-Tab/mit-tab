@@ -14,6 +14,7 @@ import mittab.apps.tab.views.team_views as team_views
 import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
+import mittab.apps.tab.views.motion_views as motion_views
 
 
 admin.autodiscover()
@@ -28,6 +29,37 @@ urlpatterns = [
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
     path("registration/", include("mittab.apps.registration.urls")),
+    path("apda-board/", views.apda_board_home, name="apda_board_home"),
+    path(
+        "apda-board/schools/export/",
+        views.export_apda_board_schools_csv,
+        name="export_apda_board_schools_csv",
+    ),
+    path(
+        "apda-board/schools/import/",
+        views.import_apda_board_schools_csv,
+        name="import_apda_board_schools_csv",
+    ),
+    path(
+        "apda-board/debaters/export/",
+        views.export_apda_board_debaters_csv,
+        name="export_apda_board_debaters_csv",
+    ),
+    path(
+        "apda-board/debaters/import/",
+        views.import_apda_board_debaters_csv,
+        name="import_apda_board_debaters_csv",
+    ),
+    path(
+        "apda-board/school/<int:school_id>/",
+        views.apda_board_school_detail,
+        name="apda_board_school_detail",
+    ),
+    path(
+        "apda-board/debater/<int:debater_id>/",
+        views.apda_board_debater_detail,
+        name="apda_board_debater_detail",
+    ),
     re_path(r"^403/", views.render_403, name="403"),
     re_path(r"^404/", views.render_404, name="404"),
     re_path(r"^500/", views.render_500, name="500"),
@@ -46,6 +78,12 @@ urlpatterns = [
     path("download_judge_codes/",
          judge_views.download_judge_codes,
          name="download_judge_codes"),
+    path("send_judge_codes/",
+         judge_views.send_judge_codes,
+         name="send_judge_codes"),
+    path("send_written_rfds/",
+         judge_views.send_written_rfds,
+         name="send_written_rfds"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -62,6 +100,11 @@ urlpatterns = [
     path("room-tag/<tag_id>/", views.room_tag, name="room_tag"),
     path("room-tag/", views.room_tag, name="room_tag"),
     path("manage-room-tags", views.manage_room_tags, name="manage_room_tags"),
+    path("ranking-group/<group_id>/", views.ranking_group, name="ranking_group"),
+    path("ranking-group/", views.ranking_group, name="ranking_group"),
+    path("manage-ranking-groups",
+         views.manage_ranking_groups,
+         name="manage_ranking_groups"),
 
 
     # Scratch related
@@ -234,9 +277,15 @@ urlpatterns = [
     re_path(r"^outround/(\d+)/assign_judge/(\d+)/(\d+)/$",
             outround_pairing_views.assign_judge,
             name="outround_swap_judge"),
-    path("outround_pairing/assign_judges/<int:round_type>/",
+    path("outround_pairing/assign_judges/",
          outround_pairing_views.assign_judges_to_pairing,
          name="outround_assign_judges"),
+    path("outround_pairing/assign_judges/<int:round_type>/",
+         outround_pairing_views.assign_judges_to_pairing,
+         name="outround_assign_judges_legacy"),
+    path("outround_pairing/assign_rooms/",
+         outround_pairing_views.assign_rooms_to_pairing,
+         name="outround_assign_rooms"),
     re_path(r"^outround/(\d+)/result/$",
             outround_pairing_views.enter_result,
             name="enter_result"),
@@ -271,6 +320,29 @@ urlpatterns = [
             views.settings_form,
             name="settings_form"),
 
+    # Motion management (admin)
+    path("motions/",
+         motion_views.manage_motions,
+         name="manage_motions"),
+    path("motions/add/",
+         motion_views.add_motion,
+         name="add_motion"),
+    path("motions/<int:motion_id>/edit/",
+         motion_views.edit_motion,
+         name="edit_motion"),
+    path("motions/<int:motion_id>/delete/",
+         motion_views.delete_motion,
+         name="delete_motion"),
+    path("motions/<int:motion_id>/toggle-published/",
+         motion_views.toggle_motion_published,
+         name="toggle_motion_published"),
+    path("motions/publish-all/",
+         motion_views.publish_all_motions,
+         name="publish_all_motions"),
+    path("motions/unpublish-all/",
+         motion_views.unpublish_all_motions,
+         name="unpublish_all_motions"),
+
     # Backups
     re_path(r"^backup/restore/(.+)/$",
             pairing_views.restore_backup,
@@ -287,6 +359,11 @@ urlpatterns = [
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),
+    path(
+        "archive/black_rod_bundle/",
+        views.generate_black_rod_bundle,
+        name="download_black_rod_bundle",
+    ),
 
     # Standings API
     path("forum_post", views.forum_post, name="forum_post"),
@@ -340,6 +417,15 @@ urlpatterns = [
     path("public/e-ballots/<str:ballot_code>/",
          public_views.enter_e_ballot,
          name="enter_e_ballot"),
+    path("public/e-ballots/<str:ballot_code>/submitted/",
+         public_views.view_submitted_ballot,
+         name="view_submitted_ballot"),
+    path("public/e-ballots/<str:ballot_code>/previous/",
+         public_views.previous_ballots,
+         name="previous_ballots"),
+    path("public/e-ballots/<str:ballot_code>/submitted/<int:round_id>/",
+         public_views.view_submitted_ballot,
+         name="view_submitted_ballot_round"),
     path("public/judges/",
          public_views.public_view_judges,
          name="public_judges"),
@@ -362,6 +448,9 @@ urlpatterns = [
     path("public/outrounds/<int:type_of_round>/",
          public_views.outround_pretty_pair,
          name="outround_pretty_pair"),
+    path("public/motions/",
+         motion_views.public_motions,
+         name="public_motions"),
 ]
 
 if settings.SILK_ENABLED:

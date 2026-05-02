@@ -1,10 +1,9 @@
-from urllib.parse import urlencode
-
 from django import template
 from django.forms.fields import FileField
 from django.utils.html import urlize
 from django.utils.safestring import mark_safe
 
+from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab.models import TabSettings
 from mittab.apps.tab.public_rankings import get_public_display_flags
@@ -61,6 +60,18 @@ def is_manual_judge_assignment(context, round_id, judge_id):
     return judge_id in judges_for_round
 
 
+@register.simple_tag(takes_context=True)
+def manual_judge_assignment_label(context, round_id, judge_id):
+    labels = context.get("manual_judge_assignment_labels", {})
+    return labels.get((round_id, judge_id), "Manually assigned judge")
+
+
+@register.simple_tag(takes_context=True)
+def manual_judge_audit_events(context, round_id):
+    events = context.get("manual_judge_audit_events", {})
+    return events.get(round_id, [])
+
+
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
@@ -88,7 +99,7 @@ def return_to_value(context):
     request = context.get("request")
     if not request:
         return ""
-    return get_redirect_target(request, fallback=None) or ""
+    return get_redirect_target(request, fallback=None) or request.get_full_path()
 
 
 @register.inclusion_tag("common/_return_to_input.html", takes_context=True)
@@ -99,12 +110,20 @@ def return_to_input(context, target=None):
 
 @register.filter
 def with_return_to(url):
-    if not url:
-        return url
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}{urlencode({'return_to': url})}"
+    return url
 
 
 @register.simple_tag
 def public_display_flags():
     return get_public_display_flags()
+
+
+@register.simple_tag
+def motions_enabled():
+    """Returns True if motions feature is enabled."""
+    return bool(TabSettings.get("motions_enabled", 0))
+
+
+@register.simple_tag
+def is_apda_board(user):
+    return is_apda_board_user(user)

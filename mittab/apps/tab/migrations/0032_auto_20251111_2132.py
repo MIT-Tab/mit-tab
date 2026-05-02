@@ -24,11 +24,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='judge',
-            name='email',
-            field=models.EmailField(blank=True, max_length=254),
-        ),
-        migrations.AddField(
-            model_name='judge',
             name='registration',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='judges', to='registration.registration'),
         ),

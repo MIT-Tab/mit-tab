@@ -14,6 +14,7 @@ module.exports = {
     registrationPortal: "./assets/js/registration/index",
     publicHome: "./assets/js/publicHome",
     batchCheckin: "./assets/js/batchCheckin",
+    sendJudgeCodes: "./assets/js/sendJudgeCodes",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

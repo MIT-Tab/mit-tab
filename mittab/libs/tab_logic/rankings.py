@@ -1,7 +1,12 @@
 from abc import ABC
 from functools import total_ordering
 
-from mittab.apps.tab.models import Debater, Team
+from mittab.apps.tab.models import (
+    Debater,
+    SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
+    TabSettings,
+    Team,
+)
 from mittab.libs.tab_logic.stats import *
 
 
@@ -13,13 +18,14 @@ def rank_speakers():
         "roundstats_set",
         "roundstats_set__round",
     ).all()
+    stat_priority = speaker_stat_priority()
     return sorted([
-        DebaterScore(d)
+        DebaterScore(d, stat_priority=stat_priority)
         for d in debaters
     ])
 
 
-def rank_teams(exclude_round=None):
+def rank_teams(exclude_round=None, up_to_round=None):
     all_teams = Team.objects.all().prefetch_related(
         "gov_team",  # poorly named relation, gets rounds as gov team
         "opp_team",  # poorly named relation, rounds as opp team
@@ -42,7 +48,7 @@ def rank_teams(exclude_round=None):
         "debaters__team_set__no_shows",
         "debaters__team_set__byes",
     )
-    return sorted(TeamScore(d, exclude_round) for d in all_teams)
+    return sorted(TeamScore(d, exclude_round, up_to_round) for d in all_teams)
 
 
 class Stat:
@@ -60,6 +66,20 @@ DOUBLE_ADJUSTED_SPEAKS = Stat("Double adjusted speaks", -1)
 DOUBLE_ADJUSTED_RANKS = Stat("Double adjusted ranks")
 OPP_STRENGTH = Stat("Opp strength", -1)
 COIN_FLIP = Stat("Coin flip")
+
+
+def speaker_stat_priority(use_single_adjusted=None):
+    if use_single_adjusted is None:
+        use_single_adjusted = TabSettings.get(
+            SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 0
+        )
+    if use_single_adjusted:
+        return (SINGLE_ADJUSTED_SPEAKS, RANKS, SPEAKS,
+                SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS, DOUBLE_ADJUSTED_RANKS,
+                COIN_FLIP)
+    return (SPEAKS, RANKS, SINGLE_ADJUSTED_SPEAKS,
+            SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
+            DOUBLE_ADJUSTED_RANKS, COIN_FLIP)
 
 
 @total_ordering
@@ -81,27 +101,30 @@ class Score(ABC):
     def scoring_tuple(self):
         return tuple(
             map(lambda stat: stat.sort_coefficient * self[stat],
-                self.stat_priority))
+                self.get_stat_priority()))
 
     def get_tiebreaker(self, other):
-        for stat, self_val, other_val in zip(self.stat_priority,
+        for stat, self_val, other_val in zip(self.get_stat_priority(),
                                              self.scoring_tuple(),
                                              other.scoring_tuple()):
             if self_val != other_val:
                 return stat
         return None
 
+    def get_stat_priority(self):
+        return self.stat_priority
+
     def __getitem__(self, key):
         return self.stats[key] or 0
 
 
 class DebaterScore(Score):
-    stat_priority = (SPEAKS, RANKS, SINGLE_ADJUSTED_SPEAKS,
-                     SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
-                     DOUBLE_ADJUSTED_RANKS, COIN_FLIP)
+    stat_priority = speaker_stat_priority(False)
 
-    def __init__(self, debater):
+    def __init__(self, debater, stat_priority=None):
         super(DebaterScore, self).__init__()
+        if stat_priority is not None:
+            self.stat_priority = stat_priority
         self.debater = debater
         self.stats[SPEAKS] = tot_speaks_deb(debater)
         self.stats[RANKS] = tot_ranks_deb(debater)
@@ -120,24 +143,34 @@ class TeamScore(Score):
                      SINGLE_ADJUSTED_RANKS, DOUBLE_ADJUSTED_SPEAKS,
                      DOUBLE_ADJUSTED_RANKS, OPP_STRENGTH, COIN_FLIP)
 
-    def __init__(self, team, exclude_round=None):
+    def __init__(self, team, exclude_round=None, up_to_round=None):
         super(TeamScore, self).__init__()
         self.team = team
-        self.stats[WINS] = tot_wins(team, exclude_round)
-        self.stats[SPEAKS] = tot_speaks(team, exclude_round)
-        self.stats[RANKS] = tot_ranks(team, exclude_round)
-        self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks(team, exclude_round)
-        self.stats[SINGLE_ADJUSTED_RANKS] = single_adjusted_ranks(team, exclude_round)
-        self.stats[DOUBLE_ADJUSTED_SPEAKS] = double_adjusted_speaks(team, exclude_round)
-        self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(team, exclude_round)
-        self.stats[OPP_STRENGTH] = opp_strength(team, exclude_round)
+        self.stats[WINS] = tot_wins(team, exclude_round, up_to_round)
+        self.stats[SPEAKS] = tot_speaks(team, exclude_round, up_to_round)
+        self.stats[RANKS] = tot_ranks(team, exclude_round, up_to_round)
+        self.stats[SINGLE_ADJUSTED_SPEAKS] = single_adjusted_speaks(
+            team, exclude_round, up_to_round
+        )
+        self.stats[SINGLE_ADJUSTED_RANKS] = single_adjusted_ranks(
+            team, exclude_round, up_to_round
+        )
+        self.stats[DOUBLE_ADJUSTED_SPEAKS] = double_adjusted_speaks(
+            team, exclude_round, up_to_round
+        )
+        self.stats[DOUBLE_ADJUSTED_RANKS] = double_adjusted_ranks(
+            team, exclude_round, up_to_round
+        )
+        self.stats[OPP_STRENGTH] = opp_strength(
+            team, exclude_round, up_to_round
+        )
         self.stats[COIN_FLIP] = team.tiebreaker
 
-def get_team_rankings(request, public=False):
+def get_team_rankings(request, public=False, up_to_round=None):
     exclude_round = None
-    if public:
+    if public and up_to_round is None:
         exclude_round = TabSettings.get("cur_round", 0) - 1
-    ranked_teams = rank_teams(exclude_round=exclude_round)
+    ranked_teams = rank_teams(exclude_round=exclude_round, up_to_round=up_to_round)
     teams = []
     for i, team_stat in enumerate(ranked_teams):
         if public:

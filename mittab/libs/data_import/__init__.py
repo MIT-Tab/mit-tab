@@ -47,8 +47,9 @@ class Workbook:
 class WorkbookImporter(ABC):
     min_row_size = 1
 
-    def __init__(self, workbook):
+    def __init__(self, workbook, created_by=None):
         self.workbook = workbook
+        self.created_by = created_by
         self.errors = []
         self.created_objs = []
 
@@ -66,9 +67,13 @@ class WorkbookImporter(ABC):
     def create(self, obj):
         if isinstance(obj, ModelForm):
             self.created_objs.append(obj.instance)
+            try:
+                obj.save(actor=self.created_by)
+            except TypeError:
+                obj.save()
         else:
             self.created_objs.append(obj)
-        obj.save()
+            obj.save()
         return obj
 
     def rollback(self):

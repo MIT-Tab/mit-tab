@@ -148,6 +148,15 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_ballots")
 
 
+def invalidate_public_motions_cache(*_args, **_kwargs):
+    """
+    Invalidate cached public motions view.
+
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
+    _delete_key_for_all_auth_states("public_motions")
+
+
 def invalidate_all_public_caches(*_args, **_kwargs):
     """
     Invalidate all public view caches.
@@ -165,6 +174,7 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_speaker_rankings")
     _delete_key_for_all_auth_states("public_ballots")
     _delete_key_for_all_auth_states("e_ballot_search_page")
+    _delete_key_for_all_auth_states("public_motions")
 
     # Invalidate outrounds for both divisions
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1

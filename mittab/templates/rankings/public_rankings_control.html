@@ -53,6 +53,7 @@
                 <th scope="col">Public</th>
                 <th scope="col">Include Speaks</th>
                 <th scope="col">Max Visible</th>
+                <th scope="col">Up to Round</th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +74,18 @@
                          value="{{ ranking.max_visible }}"
                          min="1"
                          max="10000">
+                </td>
+                <td>
+                  <select name="{{ ranking.slug }}_up_to_round"
+                          id="{{ ranking.slug }}_up_to_round"
+                          class="form-control form-control-sm">
+                    <option value="0" {% if not ranking.up_to_round %}selected{% endif %}>None</option>
+                    {% for rnd in paired_rounds %}
+                    <option value="{{ rnd }}" {% if ranking.up_to_round == rnd %}selected{% endif %}>
+                      Round {{ rnd }}
+                    </option>
+                    {% endfor %}
+                  </select>
                 </td>
               </tr>
               {% endfor %}

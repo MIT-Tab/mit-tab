@@ -1,0 +1,88 @@
+{% extends "base/__wide.html" %}
+{% load bootstrap4 %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="col-12">
+  <div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">{{ school_obj.name }}</h3>
+      <a href="{% url 'apda_board_home' %}" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        {% bootstrap_form form %}
+        <button type="submit" class="btn btn-primary">Save APDA ID</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Teams</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-striped table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>Debaters</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for team in school_teams %}
+              <tr>
+                <td>{{ team.name }}</td>
+                <td>
+                  {% for debater in team.debaters.all %}
+                  <a href="{% url 'apda_board_debater_detail' debater.id %}">{{ debater.name }}</a>{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2">No teams for this school.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Hybrid Teams</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-striped table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>Primary School</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for team in school_hybrid_teams %}
+              <tr>
+                <td>{{ team.name }}</td>
+                <td>{{ team.school.name }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2">No hybrid teams for this school.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

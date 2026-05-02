@@ -91,15 +91,23 @@ class TestApiViews(TestCase):
                     f"Expected key '{item_key}' in {json_key}")
 
         stats_views = [
-            (reverse("team_stats", args=[round_obj.round_number]), dict, "seed"),
+            (
+                reverse("team_stats", args=[round_obj.round_number]),
+                dict,
+                ("seed", "debaters"),
+            ),
         ]
 
         if outround:
             stats_views.append(
-                (reverse("outround_team_stats", args=[outround.pk]), dict, "seed")
+                (
+                    reverse("outround_team_stats", args=[outround.pk]),
+                    dict,
+                    ("seed", "debaters"),
+                )
             )
 
-        for url, expected_type, item_key in stats_views:
+        for url, expected_type, item_keys in stats_views:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200,
                 f"Failed to render stats API {url}, got status {response.status_code}")
@@ -112,8 +120,24 @@ class TestApiViews(TestCase):
                 first_team_id = list(data.keys())[0]
                 self.assertIsInstance(data[first_team_id], dict,
                     f"Expected team data to be dict in {url}")
-                self.assertIn(item_key, data[first_team_id],
-                    f"Expected key '{item_key}' in team stats")
+                for item_key in item_keys:
+                    self.assertIn(item_key, data[first_team_id],
+                        f"Expected key '{item_key}' in team stats")
+
+    def test_team_stats_debaters_ignore_public_setting(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        TabSettings.set("debaters_public", 0)
+
+        response = self.client.get(reverse("team_stats", args=[round_obj.round_number]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        for team in (round_obj.gov_team, round_obj.opp_team):
+            expected_debaters = ", ".join(
+                debater.name for debater in team.debaters.all()
+            )
+            self.assertIn(str(team.id), data)
+            self.assertEqual(data[str(team.id)]["debaters"], expected_debaters)
 
     def test_debater_counts_supports_control_board(self):
         response = self.client.get(reverse("debater_counts_api"))

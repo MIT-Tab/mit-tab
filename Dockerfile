@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.10.16
 
 # install dependenices
 ARG DOCTL_VERSION=1.120.0

@@ -20,6 +20,11 @@ settings:
     description: "Check this box to make the judges list publicly visible"
     value: false
     type: boolean
+  - motions_enabled:
+    name: motions_enabled
+    description: "Check this box to enable the motions feature, which allows tournament directors to publish debate motions/resolutions"
+    value: false
+    type: boolean
   - gov_opp_display:
     name: gov_opp_display
     description: "Toggle to switch the outrounds view from displaying Gov and Opp (when enabled) and Team 1 and Team 2 (when disabled)"

@@ -594,3 +594,86 @@ class TestManualJudgeViews(TestCase):
         self.assertIn(neutral_judge.name, excluded_names | included_names)
         self.assertNotIn(conflict_judge.name, excluded_names)
         self.assertNotIn(conflict_judge.name, included_names)
+
+    def test_outround_alternative_judges_allows_rejudges(self):
+        TabSettings.set("allow_rejudges", False)
+        gov_team = self.make_team("Rejudge Gov", self.school_primary)
+        opp_team = self.make_team("Rejudge Opp", self.school_other)
+        room = Room.objects.create(name="Rejudge Room", rank=Decimal("5.00"))
+
+        prior_round = Round.objects.create(
+            round_number=1,
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+        )
+        outround = Outround.objects.create(
+            gov_team=gov_team,
+            opp_team=opp_team,
+            room=room,
+            num_teams=2,
+            type_of_round=Outround.VARSITY,
+        )
+
+        rejudge = self.make_judge("Outround Rejudge")
+        prior_round.judges.add(rejudge)
+        prior_round.chair = rejudge
+        prior_round.save()
+        CheckIn.objects.create(judge=rejudge, round_number=0)
+
+        response = self.client.get(
+            reverse("outround_alternative_judges", args=[outround.id])
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+        self.assertIn(rejudge.name, excluded_names | included_names)
+
+    def test_outround_alternative_judges_within_pairing_uses_selected_scope(self):
+        varsity_gov = self.make_team("Varsity Gov", self.school_primary)
+        varsity_opp = self.make_team("Varsity Opp", self.school_other)
+        novice_school = School.objects.create(name="View Novice")
+        novice_gov = self.make_team("Novice Gov", novice_school)
+        novice_opp = self.make_team("Novice Opp", self.school_other)
+
+        varsity_outround = Outround.objects.create(
+            gov_team=varsity_gov,
+            opp_team=varsity_opp,
+            num_teams=4,
+            type_of_round=Outround.VARSITY,
+        )
+        novice_outround = Outround.objects.create(
+            gov_team=novice_gov,
+            opp_team=novice_opp,
+            num_teams=2,
+            type_of_round=Outround.NOVICE,
+        )
+
+        current_scope_judge = self.make_judge("Scope Varsity Judge")
+        concurrent_scope_judge = self.make_judge("Scope Novice Judge")
+        available_judge = self.make_judge("Scope Available Judge")
+
+        CheckIn.objects.create(judge=current_scope_judge, round_number=0)
+        CheckIn.objects.create(judge=concurrent_scope_judge, round_number=0)
+        CheckIn.objects.create(judge=available_judge, round_number=0)
+
+        varsity_outround.judges.add(current_scope_judge)
+        novice_outround.judges.add(concurrent_scope_judge)
+
+        response = self.client.get(
+            reverse("outround_alternative_judges", args=[varsity_outround.id]),
+            {
+                "select_varsity": varsity_outround.num_teams,
+                "select_novice": novice_outround.num_teams,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        excluded_names = {judge[0] for judge in response.context["excluded_judges"]}
+        included_names = {judge[0] for judge in response.context["included_judges"]}
+
+        self.assertIn(current_scope_judge.name, included_names)
+        self.assertIn(concurrent_scope_judge.name, included_names)
+        self.assertIn(available_judge.name, excluded_names)
+        self.assertNotIn(concurrent_scope_judge.name, excluded_names)

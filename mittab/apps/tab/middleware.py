@@ -1,8 +1,12 @@
 import re
+from urllib.parse import urlsplit
 
+from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
+from django.utils.http import url_has_allowed_host_and_scheme
 
+from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
 from mittab.libs.backup import is_backup_active
@@ -38,6 +42,19 @@ API_ERROR_MESSAGES = {
     "team": "Team results not published",
     "shared": "Standings data not published",
 }
+APDA_BOARD_ALLOWED_PREFIXES = (
+    "/apda-board/",
+    "/public/",
+    "/accounts/logout/",
+    "/admin/logout/",
+    "/403/",
+    "/404/",
+    "/500/",
+    "/favicon.ico",
+    "/static/",
+    "/dynamic-media/",
+)
+APDA_BOARD_ALLOWED_EXACT_PATHS = ("/", "/archive/black_rod_bundle/")
 
 
 class Login:
@@ -48,6 +65,43 @@ class Login:
 
     def __call__(self, request):
         path = request.path
+        if request.user.is_authenticated and is_apda_board_user(request.user):
+            if not is_apda_board_access_open():
+                logout(request)
+                return redirect_and_flash_info(
+                    request,
+                    "APDA Board login activates after the final inround is paired.",
+                    path="/public/",
+                )
+            if path not in APDA_BOARD_ALLOWED_EXACT_PATHS and \
+                    not path.startswith(APDA_BOARD_ALLOWED_PREFIXES):
+                return redirect_and_flash_info(
+                    request,
+                    "APDA Board access is limited to APDA tools and public pages.",
+                    path="/403/",
+                )
+
+        should_store_return_to = (
+            request.method == "GET"
+            and not request.path.startswith("/api/")
+            and request.headers.get("X-Requested-With") != "XMLHttpRequest"
+        )
+        if should_store_return_to:
+            session_target = request.get_full_path()
+            referer = request.META.get("HTTP_REFERER")
+            if referer and url_has_allowed_host_and_scheme(
+                referer,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                parts = urlsplit(referer)
+                referer_path = parts.path or "/"
+                if parts.query:
+                    referer_path = f"{referer_path}?{parts.query}"
+                if referer_path != request.get_full_path():
+                    session_target = referer_path
+            request.session["_return_to"] = session_target
+
         whitelisted = (
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
