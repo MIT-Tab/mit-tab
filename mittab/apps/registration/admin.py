@@ -29,4 +29,3 @@ class RegistrationAdmin(admin.ModelAdmin):
 @admin.register(RegistrationConfig)
 class RegistrationConfigAdmin(admin.ModelAdmin):
     list_display = ("allow_new_registrations", "allow_registration_edits", "updated_at")
-

@@ -48,15 +48,14 @@ function initializeTooltips() {
 }
 
 function initializeSettingsForm() {
-  $("[data-toggle-label]").on(
-    "change",
-    function handleCustomControlInputChange() {
+  $("[data-toggle-label]")
+    .on("change", function handleCustomControlInputChange() {
       const label = $(this).siblings(".custom-control-label");
       const onText = $(this).data("label-on") || "Enabled";
       const offText = $(this).data("label-off") || "Disabled";
       label.text($(this).is(":checked") ? onText : offText);
-    },
-  ).trigger("change");
+    })
+    .trigger("change");
 }
 
 $(document).ready(() => {

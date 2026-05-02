@@ -1,13 +1,16 @@
 from typing import Type, cast
 
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
+from django.core.exceptions import ImproperlyConfigured
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Prefetch
 from django.forms import BaseFormSet, formset_factory
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.html import escape
 from django.views.decorators.http import require_http_methods
 from django.utils.functional import cached_property
 import requests
@@ -26,6 +29,7 @@ from mittab.apps.tab.helpers import (
     redirect_and_flash_success,
 )
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.email_service import EmailRequest, EmailService, EmailServiceError
 from .models import Registration, RegistrationConfig
 
 SCHOOL_ACTIVE_URL = "https://results.apda.online/api/schools/all/"
@@ -44,6 +48,17 @@ class RegistrationTeamFormSet(BaseFormSet):
 
     def clean(self):
         super().clean()
+        if any(self.errors):
+            return
+        free_seed_count = sum(
+            1
+            for form in self.forms
+            if form.cleaned_data
+            and not form.cleaned_data.get("DELETE")
+            and form.cleaned_data.get("seed_choice") == Team.FREE_SEED
+        )
+        if free_seed_count > 1:
+            raise forms.ValidationError("Select at most one free seed")
 
 
 TeamFormSet = cast(
@@ -316,10 +331,29 @@ def resolve_school(selection, cache=None):
             return school
         raise forms.ValidationError("Unknown school")
     if "apda_id" in selection:
-        school, _ = School.objects.get_or_create(
-            apda_id=selection["apda_id"],
-            defaults={"name": selection.get("name", "")},
-        )
+        apda_id = selection["apda_id"]
+        school = School.objects.filter(apda_id=apda_id).first()
+        if school:
+            cache[key] = school
+            return school
+        name = selection.get("name", "").strip()
+        if name:
+            school = School.objects.filter(name__iexact=name).first()
+            if school:
+                if school.apda_id in (None, -1):
+                    school.apda_id = apda_id
+                    school.save(update_fields=["apda_id"])
+                cache[key] = school
+                return school
+        try:
+            school, _ = School.objects.get_or_create(
+                apda_id=apda_id,
+                defaults={"name": name},
+            )
+        except IntegrityError:
+            school = School.objects.filter(name__iexact=name).first()
+            if not school:
+                raise forms.ValidationError("School already exists, select it instead")
         cache[key] = school
         return school
     name = selection.get("name", "").strip()
@@ -466,6 +500,162 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
     return registration
 
 
+def _seed_label(team):
+    return dict(Team.SEED_CHOICES).get(team.seed, str(team.seed))
+
+
+def _debater_status_label(debater):
+    return dict(Debater.NOVICE_CHOICES).get(debater.novice_status, "Unknown")
+
+
+def _format_available_rounds(checkins):
+    rounds = sorted(checkin.round_number for checkin in checkins)
+    if not rounds:
+        return "None selected"
+    labels = ["Outrounds" if round_number == 0 else f"Round {round_number}"
+              for round_number in rounds]
+    return ", ".join(labels)
+
+
+def _registration_for_email(registration):
+    return (
+        Registration.objects.select_related("school")
+        .prefetch_related(
+            Prefetch(
+                "teams",
+                queryset=Team.objects.select_related(
+                    "school", "hybrid_school"
+                ).prefetch_related("debaters__school"),
+            ),
+            Prefetch(
+                "judges",
+                queryset=Judge.objects.prefetch_related("schools", "checkin_set"),
+            ),
+        )
+        .get(pk=registration.pk)
+    )
+
+
+def build_registration_confirmation_email(registration, request):
+    registration = _registration_for_email(registration)
+    tournament_name = TabSettings.get("tournament_name", "Tournament")
+    edit_url = request.build_absolute_uri(
+        reverse("registration_portal_edit", args=[registration.herokunator_code])
+    )
+    subject = f"{tournament_name} Registration Confirmation"
+
+    text_lines = [
+        f"Your registration for {tournament_name} has been received.",
+        "",
+        f"Registration code: {registration.herokunator_code}",
+        f"Edit link: {edit_url}",
+        "",
+        "School and contact",
+        f"School: {registration.school.name}",
+        f"Email: {registration.email}",
+        "",
+        "Teams",
+    ]
+    html_lines = [
+        f"<p>Your registration for <strong>{escape(tournament_name)}</strong> has been received.</p>",
+        "<h3>Registration access</h3>",
+        "<ul>",
+        f"<li><strong>Registration code:</strong> {escape(registration.herokunator_code)}</li>",
+        f'<li><strong>Edit link:</strong> <a href="{escape(edit_url)}">{escape(edit_url)}</a></li>',
+        "</ul>",
+        "<h3>School and contact</h3>",
+        "<ul>",
+        f"<li><strong>School:</strong> {escape(registration.school.name)}</li>",
+        f"<li><strong>Email:</strong> {escape(registration.email)}</li>",
+        "</ul>",
+        "<h3>Teams</h3>",
+    ]
+
+    teams = list(registration.teams.all())
+    if teams:
+        html_lines.append("<ul>")
+        for team in teams:
+            text_lines.extend([
+                f"- {team.name}",
+                f"  School protection: {team.school.name}",
+                f"  Seed: {_seed_label(team)}",
+                "  Debaters:",
+            ])
+            html_lines.extend([
+                "<li>",
+                f"<strong>{escape(team.name)}</strong>",
+                "<ul>",
+                f"<li>School protection: {escape(team.school.name)}</li>",
+                f"<li>Seed: {escape(_seed_label(team))}</li>",
+                "<li>Debaters:<ul>",
+            ])
+            for debater in team.debaters.all():
+                school_name = debater.school.name if debater.school else "No school"
+                apda_id = debater.apda_id if debater.apda_id not in (None, -1) else "None"
+                qualified = "yes" if debater.qualified else "no"
+                text_lines.append(
+                    f"    - {debater.name} ({school_name}; "
+                    f"{_debater_status_label(debater)}; APDA ID: {apda_id}; "
+                    f"Qualified: {qualified})"
+                )
+                html_lines.append(
+                    f"<li>{escape(debater.name)} ({escape(school_name)}; "
+                    f"{escape(_debater_status_label(debater))}; APDA ID: {escape(apda_id)}; "
+                    f"Qualified: {escape(qualified)})</li>"
+                )
+            html_lines.extend(["</ul></li>", "</ul>", "</li>"])
+        html_lines.append("</ul>")
+    else:
+        text_lines.append("- None")
+        html_lines.append("<p>None</p>")
+
+    text_lines.extend(["", "Judges"])
+    html_lines.append("<h3>Judges</h3>")
+    judges = list(registration.judges.all())
+    if judges:
+        html_lines.append("<ul>")
+        for judge in judges:
+            schools = ", ".join(school.name for school in judge.schools.all()) or registration.school.name
+            availability = _format_available_rounds(judge.checkin_set.all())
+            text_lines.extend([
+                f"- {judge.name}",
+                f"  Email: {judge.email}",
+                f"  Experience: {judge.rank}",
+                f"  Schools: {schools}",
+                f"  Availability: {availability}",
+            ])
+            html_lines.extend([
+                "<li>",
+                f"<strong>{escape(judge.name)}</strong>",
+                "<ul>",
+                f"<li>Email: {escape(judge.email or '')}</li>",
+                f"<li>Experience: {escape(judge.rank)}</li>",
+                f"<li>Schools: {escape(schools)}</li>",
+                f"<li>Availability: {escape(availability)}</li>",
+                "</ul>",
+                "</li>",
+            ])
+        html_lines.append("</ul>")
+    else:
+        text_lines.append("- None")
+        html_lines.append("<p>None</p>")
+
+    text_lines.extend(["", "Thank you,", "Tab Staff"])
+    html_lines.append("<p>Thank you,<br>Tab Staff</p>")
+
+    return EmailRequest(
+        to_address=registration.email,
+        subject=subject,
+        text_body="\n".join(text_lines),
+        html_body="\n".join(html_lines),
+    )
+
+
+def send_registration_confirmation_email(registration, request):
+    email_request = build_registration_confirmation_email(registration, request)
+    return EmailService().send_bulk([email_request])
+
+
 @require_http_methods(["GET", "POST"])
 def registration_code_lookup(request):
     config = RegistrationConfig.get_or_create_active()
@@ -566,6 +756,13 @@ def registration_portal(request, code=None):
                         team_formset.error_class(error.messages)
                     )
                 else:
+                    try:
+                        send_registration_confirmation_email(saved, request)
+                    except (ImproperlyConfigured, EmailServiceError) as error:
+                        messages.warning(
+                            request,
+                            f"Registration saved, but the confirmation email could not be sent: {error}",
+                        )
                     return redirect(
                         reverse(
                             "registration_portal_edit", args=[saved.herokunator_code]
@@ -603,11 +800,6 @@ def registration_portal(request, code=None):
         "registration_lock_message": lock_message,
     }
     return render(request, "registration/portal.html", context)
-
-
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
-def registration_setup(request):
-    return redirect("registration_admin")
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")

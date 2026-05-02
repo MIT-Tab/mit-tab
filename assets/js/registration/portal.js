@@ -25,6 +25,23 @@ const getRegistrationSchoolLabel = () => {
   return getOptionLabel($select, $select.val());
 };
 
+const findSchoolValueByName = (name) => {
+  const normalized = name.trim().toLocaleLowerCase();
+  let match = "";
+  $("[data-school-select='registration']")
+    .first()
+    .find("option")
+    .each((_, option) => {
+      if (
+        !match &&
+        (option.textContent || "").trim().toLocaleLowerCase() === normalized
+      ) {
+        match = option.value;
+      }
+    });
+  return match;
+};
+
 const setPlaceholder = ($select, message, disabled = true) => {
   $select.empty().append(`<option value="">${message}</option>`);
   $select.prop("disabled", disabled);
@@ -116,7 +133,7 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
   if (customDebaters[schoolValue]) {
     customDebaters[schoolValue].forEach((debater) => {
       const option = document.createElement("option");
-      option.value = `custom:${debater.id}`;
+      option.value = debater.name;
       option.textContent = debater.name;
       option.dataset.debater = JSON.stringify(debater);
       $select.append(option);
@@ -137,7 +154,7 @@ const broadcastCustomDebater = (schoolValue, debater) => {
       setPlaceholder($debaterSelect, "Select a debater", false);
     }
     const option = document.createElement("option");
-    option.value = `custom:${debater.id}`;
+    option.value = debater.name;
     option.textContent = debater.name;
     option.dataset.debater = JSON.stringify(debater);
     $debaterSelect.append(option);
@@ -173,13 +190,6 @@ const loadDebaters = ($schoolSelect) => {
     .fail(() => {
       setPlaceholder($debaterSelect, "Unable to load debaters");
     });
-};
-
-const configureSchoolSelect = ($select) => {
-  syncSchoolOptionsFromRegistration($select);
-  toggleNewSchoolInput($select);
-  maybePrefillFromRegistration($select);
-  loadDebaters($select);
 };
 
 const toggleAddTeamButton = () => {
@@ -218,23 +228,6 @@ const updateManagementForm = (prefix, delta) => {
   $total.val(parseInt($total.val(), 10) + delta);
 };
 
-const addForm = (type, maxTeams) => {
-  const prefix = type === "team" ? "teams" : "judges";
-  const $template = $(`#${type}-empty-form`);
-  if (!$template.length) return;
-  const total = parseInt($(`[name="${prefix}-TOTAL_FORMS"]`).val(), 10);
-  if (type === "team" && total >= maxTeams) return;
-  const html = $template.html().replace(/__prefix__/g, total);
-  const $element = $(html);
-  $(`[data-formset-container="${type}"]`).append($element);
-  updateManagementForm(prefix, 1);
-  $element.find("[data-school-select]").each((_, el) => {
-    configureSchoolSelect($(el));
-  });
-  initJudgeSchoolSelect($element);
-  prefillTeamSchools();
-};
-
 const removeForm = (button) => {
   const $form = $(button).closest("[data-form]");
   const $deleteField = $form.find('input[name$="-DELETE"]');
@@ -265,7 +258,11 @@ const appendSchoolOption = (value, name) => {
 const ensureOptionExists = ($select, value, label) => {
   if (!value) return;
   if (!$select.find(`option[value="${value}"]`).length) {
-    $select.append($("<option>").val(value).text(label || "Selected School"));
+    $select.append(
+      $("<option>")
+        .val(value)
+        .text(label || "Selected School"),
+    );
   }
 };
 
@@ -339,6 +336,30 @@ const prefillTeamSchools = () => {
   });
 };
 
+const configureSchoolSelect = ($select) => {
+  syncSchoolOptionsFromRegistration($select);
+  toggleNewSchoolInput($select);
+  maybePrefillFromRegistration($select);
+  loadDebaters($select);
+};
+
+const addForm = (type, maxTeams) => {
+  const prefix = type === "team" ? "teams" : "judges";
+  const $template = $(`#${type}-empty-form`);
+  if (!$template.length) return;
+  const total = parseInt($(`[name="${prefix}-TOTAL_FORMS"]`).val(), 10);
+  if (type === "team" && total >= maxTeams) return;
+  const html = $template.html().replace(/__prefix__/g, total);
+  const $element = $(html);
+  $(`[data-formset-container="${type}"]`).append($element);
+  updateManagementForm(prefix, 1);
+  $element.find("[data-school-select]").each((_, el) => {
+    configureSchoolSelect($(el));
+  });
+  initJudgeSchoolSelect($element);
+  prefillTeamSchools();
+};
+
 const registerQuickActions = () => {
   const $newSchoolInput = $("#new-school-name");
   $("#create-school-btn").on("click", () => {
@@ -347,8 +368,13 @@ const registerQuickActions = () => {
       alert("Please enter a school name");
       return;
     }
+    const existingValue = findSchoolValueByName(name);
+    if (existingValue) {
+      alert(`School "${name}" is already available in the school list.`);
+      return;
+    }
     customSchools.push(name);
-    const value = `custom:-${customSchools.length}`;
+    const value = `custom:${encodeURIComponent(name)}`;
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
     alert(`School "${name}" added.`);
@@ -368,8 +394,8 @@ const registerQuickActions = () => {
       return;
     }
     const debater = {
-      id: -Date.now(),
-      apda_id: -Date.now(),
+      id: "",
+      apda_id: "",
       name,
       full_name: name,
       status: status === "1" ? "Novice" : "Varsity",
@@ -407,7 +433,7 @@ const initNewDebaterSelect = () => {
   observer.observe($mainSchool[0], { childList: true });
 };
 
-$(document).ready(() => {
+export default function initRegistrationPortal() {
   const $root = $("#registration-app");
   if (!$root.length) return;
   const maxTeams = parseInt($root.data("maxTeams") || "200", 10);
@@ -428,7 +454,10 @@ $(document).ready(() => {
     if ($select.is('[data-school-select="registration"]')) {
       toggleAddTeamButton();
       prefillTeamSchools();
-    } else if ($select.data("prefillFromRegistration") && !$select.data("prefillAuto")) {
+    } else if (
+      $select.data("prefillFromRegistration") &&
+      !$select.data("prefillAuto")
+    ) {
       $select.data("prefillManual", true);
     }
   });
@@ -437,12 +466,19 @@ $(document).ready(() => {
     syncDebater(this);
   });
 
-  $root.on("change", "[data-judge-school-select]", function onJudgeSchoolChange() {
-    const $select = $(this);
-    if ($select.data("prefillFromRegistration") && !$select.data("prefillAuto")) {
-      $select.data("prefillManual", true);
-    }
-  });
+  $root.on(
+    "change",
+    "[data-judge-school-select]",
+    function onJudgeSchoolChange() {
+      const $select = $(this);
+      if (
+        $select.data("prefillFromRegistration") &&
+        !$select.data("prefillAuto")
+      ) {
+        $select.data("prefillManual", true);
+      }
+    },
+  );
 
   $root.on("click", "[data-add-form]", function onAddClick(event) {
     event.preventDefault();
@@ -462,4 +498,4 @@ $(document).ready(() => {
       $select.val(NEW_VALUE).trigger("change");
     }
   });
-});
+}

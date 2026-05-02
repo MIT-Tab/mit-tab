@@ -1,3 +1,5 @@
+from urllib.parse import unquote
+
 from django import forms
 
 from mittab.apps.registration.models import RegistrationConfig
@@ -56,13 +58,13 @@ def parse_school(value, name):
             data["name"] = label
         return data
     if value.startswith("custom:"):
-        # Custom school created via the form - extract the name from the label
-        label = (name or "").strip()
-        custom_id = int(value.split(":", 1)[1])
-        data = {"apda_id": custom_id}  # Use negative ID as apda_id
-        if label:
-            data["name"] = label
-        return data
+        token = value.split(":", 1)[1]
+        label = unquote(token).strip()
+        if label.startswith("-") and label[1:].isdigit():
+            label = (name or "").strip()
+        if not label:
+            raise forms.ValidationError("Enter a school name")
+        return {"name": label}
     if value == NEW_CHOICE_VALUE:
         label = (name or "").strip()
         if not label:

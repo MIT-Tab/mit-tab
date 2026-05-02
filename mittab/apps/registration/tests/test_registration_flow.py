@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest import mock
 
 import pytest
 
@@ -78,7 +79,9 @@ def registration_payload(school, school_name, email, teams, judges):
 
 
 @pytest.mark.django_db
-def test_registration_flow_creates_objects(client):
+@mock.patch("mittab.apps.registration.views.EmailService")
+def test_registration_flow_creates_objects(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
     School.objects.create(name="Judge Hybrid", apda_id=999)
     teams = [
         team_entry(
@@ -140,6 +143,46 @@ def test_registration_flow_creates_objects(client):
         CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
     )
     assert checkins == {0, 1, 3}
+    email_service.return_value.send_bulk.assert_called_once()
+    email_request = email_service.return_value.send_bulk.call_args.args[0][0]
+    assert email_request.to_address == "contact@example.com"
+    assert registration.herokunator_code in email_request.text_body
+    assert "http://testserver/registration/" in email_request.text_body
+    assert "Registration U A" in email_request.text_body
+    assert "Reg Judge" in email_request.text_body
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.views.EmailService")
+def test_custom_school_reuses_existing_name(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
+    school = School.objects.create(name="Existing U", apda_id=-1)
+    judges = [
+        judge_entry(
+            0,
+            "Existing Judge",
+            "judge@example.com",
+            5,
+            availability_rounds=[1],
+            schools=["custom:Existing%20U"],
+        )
+    ]
+    data = registration_payload(
+        "custom:Existing%20U",
+        "",
+        "existing@example.com",
+        [],
+        judges,
+    )
+
+    response = client.post("/registration/", data=data, follow=True)
+
+    assert response.status_code == 200
+    registration = Registration.objects.get()
+    assert registration.school == school
+    assert School.objects.filter(name__iexact="Existing U").count() == 1
+    school.refresh_from_db()
+    assert school.apda_id == -1
 
 
 @pytest.mark.django_db
@@ -153,8 +196,8 @@ def test_registration_requires_single_free_seed(client):
         speaker("Speaker 4", "apda:50", "Test School"),
     ]
     teams = [
-        team_entry(0, "Team One", speakers),
-        team_entry(1, "Team Two", more_speakers),
+        team_entry(0, "Team One", speakers, seed_choice=Team.FREE_SEED),
+        team_entry(1, "Team Two", more_speakers, seed_choice=Team.FREE_SEED),
     ]
     data = registration_payload("apda:50", "Test School", "team@example.com", teams, [])
     response = client.post("/registration/", data=data)

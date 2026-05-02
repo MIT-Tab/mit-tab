@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
-from mittab.apps.registration.models import Registration
+from mittab.apps.registration.models import Registration, RegistrationConfig
 from mittab.apps.tab.models import Judge, School, Team
 
 
