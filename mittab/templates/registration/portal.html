@@ -3,7 +3,7 @@
 {% load tags %}
 
 {% block title %}Tournament Registration{% endblock %}
-{% block banner %}Tournament Registration{% endblock %}
+{% block banner %}<span class="registration-page-title">Tournament Registration</span>{% endblock %}
 
 {% block content %}
 {% render_bundle 'registrationPortal' %}
@@ -107,7 +107,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-link" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="create-school-btn">Add School</button>
                 </div>
             </div>
@@ -144,7 +144,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-link" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="create-debater-btn">Add Debater</button>
                 </div>
             </div>
@@ -162,8 +162,16 @@
     {% if summary %}
     <section class="registration-summary{% if not registration_saved %} mt-3{% endif %}">
         <div class="registration-summary__head">
-            <p class="registration-summary__kicker">{% if registration_saved %}Registration saved{% else %}Current registration{% endif %}</p>
-            <h2 class="registration-summary__title">{{ summary.school.name }}</h2>
+            <div>
+                <p class="registration-summary__kicker">{% if registration_saved %}Registration saved{% else %}Current registration{% endif %}</p>
+                <h2 class="registration-summary__title">{{ summary.school.name }}</h2>
+            </div>
+            {% if registration_saved %}
+            <a class="btn btn-outline-primary registration-summary__edit"
+               href="{% url 'registration_portal_edit' summary.herokunator_code %}">
+                Edit registration
+            </a>
+            {% endif %}
         </div>
         <div class="registration-summary-meta">
             <div class="registration-summary-meta__item">

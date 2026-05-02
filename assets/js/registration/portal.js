@@ -646,26 +646,22 @@ export default function initRegistrationPortal() {
     }
   });
 
-  // Warn the user before leaving with unsaved changes.
-  // Bound at the end of init so init-time programmatic change events
-  // (prefilling, debater list rebuilds) don't falsely mark the form dirty.
-  const $form = $root.find("[data-registration-form]");
-  if ($form.length) {
-    let dirty = false;
-    const markDirty = () => {
-      dirty = true;
-    };
-    $form.on("input change", "input, select, textarea", markDirty);
-    $form.on("click", "[data-add-form], [data-remove-form]", markDirty);
-    $("#create-school-btn, #create-debater-btn").on("click", markDirty);
-    $form.on("submit", () => {
-      dirty = false;
+  // Warn the user before leaving the registration page (reload, close, back,
+  // or follow a link). Only skip the prompt when the form is actually being
+  // submitted. Browsers also require at least one user interaction with the
+  // page before they'll show the prompt — the form itself supplies that.
+  const formEl = $root.find("[data-registration-form]")[0];
+  if (formEl) {
+    let allowUnload = false;
+    formEl.addEventListener("submit", () => {
+      allowUnload = true;
     });
-    $(window).on("beforeunload", (event) => {
-      if (!dirty) return undefined;
-      const native = event.originalEvent || event;
-      native.returnValue = "";
-      return "";
+    window.addEventListener("beforeunload", (event) => {
+      if (allowUnload) return;
+      event.preventDefault();
+      // returnValue is technically deprecated but remains the only reliable
+      // cross-browser way (Safari, Firefox) to trigger the "Leave site?" prompt.
+      event.returnValue = "";
     });
   }
 }
