@@ -5,10 +5,8 @@ from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
-    add_scratches_for_school_affil
 )
 from mittab.libs.tab_logic.rankings import get_team_rankings
 from mittab.libs.tab_logic.stats import num_govs
@@ -87,33 +85,6 @@ def is_pairing_possible(num_teams):
     have_properly_entered_data(round_to_check)
 
 
-def get_next_available_room(num_teams, type_of_break):
-    base_queryset = Outround.objects.filter(num_teams=num_teams,
-                                            type_of_round=type_of_break)
-
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
-
-    if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / var_to_nov)
-    else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
-
-    rooms = [r.room
-             for r in RoomCheckIn.objects.filter(round_number=0)
-             .prefetch_related("room")]
-    rooms.sort(key=lambda r: r.rank, reverse=True)
-
-    for room in rooms:
-        if not base_queryset.filter(room=room).exists() and \
-           not other_queryset.filter(room=room).exists():
-            return room
-    return None
-
-
 def gov_team(team_one, team_two):
     """
     Determine which team should be gov in an outround pairing.
@@ -154,8 +125,6 @@ def gov_team(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
-    add_scratches_for_school_affil()
-
     lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
 
     base_queryset = BreakingTeam.objects.filter(
@@ -209,7 +178,5 @@ def pair(type_of_break=BreakingTeam.VARSITY):
             type_of_round=type_of_break,
             gov_team=gov.team,
             opp_team=opp.team,
-            room=get_next_available_room(num_teams,
-                                         type_of_break=type_of_break),
             sidelock=sidelock
         )

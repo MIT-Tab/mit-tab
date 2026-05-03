@@ -1,10 +1,14 @@
 import re
+from urllib.parse import urlsplit
 
+from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
+from django.utils.http import url_has_allowed_host_and_scheme
 
+from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.helpers import redirect_and_flash_info
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.public_rankings import get_standings_publication_setting
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
@@ -13,13 +17,44 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/public/teams/",
                    "/public/judges/",
                    "/public/team-rankings/",
+                   "/public/speaker-rankings/",
+                   "/public/ballots/",
                    "/public/outrounds/0/", "/public/outrounds/1/",
                    "/json", "/api/varsity-speaker-awards",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
-                   "/api/new-debater-data", "/api/new-schools", "/favicon.ico")
+                   "/api/new-debater-data", "/api/new-schools",
+                   "/api/debater-counts", "/favicon.ico")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
+API_PATH_REQUIREMENTS = {
+    "/api/varsity-speaker-awards": "speaker",
+    "/api/novice-speaker-awards": "speaker",
+    "/api/varsity-team-placements": "team",
+    "/api/novice-team-placements": "team",
+    "/api/non-placing-teams": "team",
+    "/api/new-debater-data": "shared",
+    "/api/new-schools": "shared",
+    "/api/debater-counts": "shared",
+}
+API_ERROR_MESSAGES = {
+    "speaker": "Speaker results not published",
+    "team": "Team results not published",
+    "shared": "Standings data not published",
+}
+APDA_BOARD_ALLOWED_PREFIXES = (
+    "/apda-board/",
+    "/public/",
+    "/accounts/logout/",
+    "/admin/logout/",
+    "/403/",
+    "/404/",
+    "/500/",
+    "/favicon.ico",
+    "/static/",
+    "/dynamic-media/",
+)
+APDA_BOARD_ALLOWED_EXACT_PATHS = ("/", "/archive/black_rod_bundle/")
 
 
 class Login:
@@ -30,6 +65,43 @@ class Login:
 
     def __call__(self, request):
         path = request.path
+        if request.user.is_authenticated and is_apda_board_user(request.user):
+            if not is_apda_board_access_open():
+                logout(request)
+                return redirect_and_flash_info(
+                    request,
+                    "APDA Board login activates after the final inround is paired.",
+                    path="/public/",
+                )
+            if path not in APDA_BOARD_ALLOWED_EXACT_PATHS and \
+                    not path.startswith(APDA_BOARD_ALLOWED_PREFIXES):
+                return redirect_and_flash_info(
+                    request,
+                    "APDA Board access is limited to APDA tools and public pages.",
+                    path="/403/",
+                )
+
+        should_store_return_to = (
+            request.method == "GET"
+            and not request.path.startswith("/api/")
+            and request.headers.get("X-Requested-With") != "XMLHttpRequest"
+        )
+        if should_store_return_to:
+            session_target = request.get_full_path()
+            referer = request.META.get("HTTP_REFERER")
+            if referer and url_has_allowed_host_and_scheme(
+                referer,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
+                parts = urlsplit(referer)
+                referer_path = parts.path or "/"
+                if parts.query:
+                    referer_path = f"{referer_path}?{parts.query}"
+                if referer_path != request.get_full_path():
+                    session_target = referer_path
+            request.session["_return_to"] = session_target
+
         whitelisted = (
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
@@ -56,11 +128,31 @@ class TournamentStatusCheck:
         self.get_response = get_response
 
     def __call__(self, request):
-        if not request.path.startswith("/api/"):
+        path = request.path
+        if not path.startswith("/api/"):
             return self.get_response(request)
 
-        if not TabSettings.get("results_published", False):
-            return JsonResponse({"error": "Results not published"}, status=423)
+        requirement = API_PATH_REQUIREMENTS.get(path)
+        if not requirement:
+            return self.get_response(request)
+
+        speaker_published = bool(
+            get_standings_publication_setting("speaker_results")["published"]
+        )
+        team_published = bool(
+            get_standings_publication_setting("team_results")["published"]
+        )
+        published_state = {
+            "speaker": speaker_published,
+            "team": team_published,
+            "shared": speaker_published or team_published,
+        }
+
+        if not published_state[requirement]:
+            return JsonResponse(
+                {"error": API_ERROR_MESSAGES[requirement]},
+                status=423,
+            )
 
         return self.get_response(request)
 

@@ -1,5 +1,7 @@
 import os
 from django.db import IntegrityError
+from django.db.models import Q
+from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
@@ -9,26 +11,67 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.auth_roles import is_apda_board_user
+from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
-    UploadDataForm, ScratchForm, SettingsForm
+from mittab.apps.tab.forms import (
+    MiniRankingGroupForm,
+    MiniRoomTagForm,
+    DebaterApdaIdForm,
+    RankingGroupForm,
+    RoomTagForm,
+    SchoolApdaIdForm,
+    SchoolForm,
+    RoomForm,
+    UploadDataForm,
+    UploadApdaCsvForm,
+    ScratchForm,
+    SettingsForm,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
+from mittab.apps.tab.public_rankings import (
+    get_all_ballot_round_settings,
+    get_all_ranking_settings,
+    get_all_standings_publication_settings,
+    get_paired_round_numbers,
+    set_ballot_round_settings,
+    set_ranking_settings,
+    set_standings_publication_setting,
+)
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import (
-    invalidate_all_public_caches
+    invalidate_all_public_caches,
+    invalidate_public_rankings_cache,
 )
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.libs.data_import.apda_board_import import (
+    import_apda_board_debaters_csv as import_apda_board_debaters_csv_file,
+    import_apda_board_schools_csv as import_apda_board_schools_csv_file,
+)
+from mittab.libs.data_export.apda_board_export import (
+    export_apda_board_debaters_csv as export_apda_board_debaters_csv_file,
+    export_apda_board_schools_csv as export_apda_board_schools_csv_file,
+)
 from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
 def index(request):
     if not request.user.is_authenticated:
         return redirect("public_home")
+    if is_apda_board_user(request.user):
+        return redirect("apda_board_home")
+
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
 
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
@@ -40,7 +83,6 @@ def index(request):
     completed_finals = Outround.objects.filter(num_teams=2).exclude(
         victor=Outround.UNKNOWN
     ).count()
-    results_published = TabSettings.get("results_published", False)
 
     number_teams = len(team_list)
     number_judges = len(judge_list)
@@ -56,15 +98,196 @@ def index(request):
         "room_list": room_list,
         "expected_finals": expected_finals,
         "completed_finals": completed_finals,
-        "results_published": results_published,
         "number_teams": number_teams,
         "number_judges": number_judges,
         "number_schools": number_schools,
         "number_debaters": number_debaters,
         "number_rooms": number_rooms,
+        "schools_missing_apda_ids": [
+            school.pk for school in schools_missing_apda_qs
+        ],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
     }
 
     return render(request, "common/index.html", context)
+
+
+def apda_board_home(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    allowed_standing_slugs = ("speaker_results", "team_results")
+    if request.method == "POST":
+        for slug in allowed_standing_slugs:
+            published = bool(request.POST.get(f"standings_{slug}"))
+            set_standings_publication_setting(slug, published)
+        invalidate_public_rankings_cache()
+        return redirect_and_flash_success(
+            request,
+            "APDA standings publication settings saved.",
+            path=reverse("apda_board_home"),
+        )
+
+    standings_settings = [
+        setting for setting in get_all_standings_publication_settings()
+        if setting["slug"] in allowed_standing_slugs
+    ]
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+
+    context = {
+        "school_list": [(school.pk, school.name) for school in School.objects.all()],
+        "debater_list": [
+            (debater.pk, debater.display) for debater in Debater.objects.all()
+        ],
+        "standings_settings": standings_settings,
+        "schools_missing_apda_ids": [school.pk for school in schools_missing_apda_qs],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
+    }
+    return render(request, "apda_board/home.html", context)
+
+
+def export_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_schools_csv_file()
+
+
+def export_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_debaters_csv_file()
+
+
+def import_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for school APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_schools_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported school APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
+
+
+def import_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for debater APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_debaters_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported debater APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
+
+
+def apda_board_school_detail(request, school_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    school = School.objects.filter(pk=int(school_id)).first()
+    if not school:
+        return redirect_and_flash_error(request, "School not found")
+
+    if request.method == "POST":
+        form = SchoolApdaIdForm(request.POST, instance=school)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {school.name}.",
+                path=reverse("apda_board_school_detail", args=[school.id]),
+            )
+    else:
+        form = SchoolApdaIdForm(instance=school)
+
+    teams = Team.objects.filter(school=school).prefetch_related("debaters")
+    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related("debaters")
+
+    return render(
+        request,
+        "apda_board/school_detail.html",
+        {
+            "form": form,
+            "school_obj": school,
+            "school_teams": teams,
+            "school_hybrid_teams": hybrid_teams,
+            "title": f"APDA Board: {school.name}",
+        },
+    )
+
+
+def apda_board_debater_detail(request, debater_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    debater = Debater.objects.filter(pk=int(debater_id)).first()
+    if not debater:
+        return redirect_and_flash_error(request, "Debater not found")
+
+    if request.method == "POST":
+        form = DebaterApdaIdForm(request.POST, instance=debater)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {debater.name}.",
+                path=reverse("apda_board_debater_detail", args=[debater.id]),
+            )
+    else:
+        form = DebaterApdaIdForm(instance=debater)
+
+    teams = Team.objects.filter(debaters=debater).select_related("school", "hybrid_school")
+    return render(
+        request,
+        "apda_board/debater_detail.html",
+        {
+            "form": form,
+            "debater_obj": debater,
+            "teams": teams,
+            "title": f"APDA Board: {debater.name}",
+        },
+    )
 
 
 def tab_logout(request, *args):
@@ -98,7 +321,7 @@ def add_scratch(request):
         form = ScratchForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except IntegrityError:
                 return redirect_and_flash_error(request,
                                                 "This scratch already exists.")
@@ -402,6 +625,8 @@ def get_settings_from_yaml():
         for setting in all_settings:
             stored_value = stored_settings.get(setting["name"])
             if stored_value is None:
+                # Keep the YAML default for missing settings
+                # For choice fields with empty string default, this means it stays unset
                 continue
             if setting.get("type") == "boolean":
                 setting["value"] = stored_value == 1
@@ -461,11 +686,11 @@ def upload_data(request):
         if form.is_valid():
             if "team_file" in request.FILES:
                 team_info["errors"] = import_teams.import_teams(
-                    request.FILES["team_file"])
+                    request.FILES["team_file"], created_by=request.user)
                 team_info["uploaded"] = True
             if "judge_file" in request.FILES:
                 judge_info["errors"] = import_judges.import_judges(
-                    request.FILES["judge_file"])
+                    request.FILES["judge_file"], created_by=request.user)
                 judge_info["uploaded"] = True
             if "room_file" in request.FILES:
                 room_info["errors"] = import_rooms.import_rooms(
@@ -473,7 +698,7 @@ def upload_data(request):
                 room_info["uploaded"] = True
             if "scratch_file" in request.FILES:
                 scratch_info["errors"] = import_scratches.import_scratches(
-                    request.FILES["scratch_file"])
+                    request.FILES["scratch_file"], created_by=request.user)
                 scratch_info["uploaded"] = True
 
         if not team_info["errors"] + judge_info["errors"] + \
@@ -514,6 +739,25 @@ def generate_archive(request):
 
     response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
     response["Content-Length"] = len(xml)
+    response["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
+
+
+def generate_black_rod_bundle(request):
+    # Allow access for users with tab_settings.can_change permission or APDA board users
+    if not (
+        request.user.has_perm("tab.tab_settings.can_change")
+        or is_apda_board_user(request.user)
+    ):
+        return redirect("/403/")
+
+    tournament_name = request.META["SERVER_NAME"].split(".")[0]
+    filename = tournament_name + "-black-rod-bundle.json"
+
+    bundle = BlackRodBundleExporter(tournament_name).export_tournament()
+
+    response = HttpResponse(bundle, content_type="application/json; charset=utf-8")
+    response["Content-Length"] = len(bundle.encode("utf-8"))
     response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
@@ -572,6 +816,56 @@ def manage_room_tags(request):
     return render(request, "pairing/manage_room_tags.html",
                   {"room_tags": room_tags,
                    "form": form})
+
+
+def ranking_group(request, group_id=None):
+    group = None
+    if group_id is not None:
+        group = RankingGroup.objects.filter(pk=group_id).first()
+
+    if request.method == "POST":
+        if request.POST.get("_method") == "DELETE":
+            if group is not None:
+                group.delete()
+                return redirect_and_flash_success(
+                    request, "Ranking group deleted successfully"
+                )
+            return redirect_and_flash_error(request, "Ranking group does not exist")
+
+        form = RankingGroupForm(request.POST, instance=group)
+        if not form.is_valid():
+            return redirect_and_flash_error(request, "Error saving ranking group.")
+
+        ranking_group_instance = form.save()
+        path = reverse("manage_ranking_groups")
+        message = (
+            f"Ranking group {ranking_group_instance.name} "
+            f"{'updated' if group else 'created'} successfully"
+        )
+        return redirect_and_flash_success(request, message, path=path)
+
+    form = RankingGroupForm(instance=group)
+    return render(
+        request,
+        "common/data_entry.html",
+        {
+            "form": form,
+            "links": [],
+            "title": f"Viewing Ranking Group: {group.name}" if group else "Create Ranking Group",
+        },
+    )
+
+
+def manage_ranking_groups(request):
+    if request.method == "POST":
+        return ranking_group(request)
+    form = MiniRankingGroupForm(request.POST or None)
+    ranking_groups = RankingGroup.objects.all().order_by("name")
+    return render(
+        request,
+        "pairing/manage_ranking_groups.html",
+        {"ranking_groups": ranking_groups, "form": form},
+    )
 
 def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
@@ -670,27 +964,90 @@ def batch_checkin(request):
     })
 
 
-def publish_results(request, new_setting):
-    # Convert URL parameter: 0 = unpublish, 1 = publish
-    new_setting = bool(new_setting)
-    current_setting = TabSettings.get("results_published", False)
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def public_rankings_control(request):
+    tot_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
 
-    if new_setting != current_setting:
-        TabSettings.set("results_published", new_setting)
-        status = "published" if new_setting else "unpublished"
-        return redirect_and_flash_success(
-            request,
-            f"Results successfully {status}. Results are now "
-            f"{'visible' if new_setting else 'hidden'}.",
-            path="/",
-        )
-    else:
-        status = "published" if current_setting else "unpublished"
-        return redirect_and_flash_success(
-            request,
-            f"Results are already {status}.",
-            path="/",
-        )
+    if request.method == "POST":
+        validation_errors = []
+        standings_settings = get_all_standings_publication_settings()
+        for standing in standings_settings:
+            slug = standing["slug"]
+            published = bool(request.POST.get(f"standings_{slug}"))
+            set_standings_publication_setting(slug, published)
+
+        ranking_settings = get_all_ranking_settings()
+        for ranking in ranking_settings:
+            slug = ranking["slug"]
+            is_public = bool(request.POST.get(f"{slug}_public"))
+            include_speaks = bool(request.POST.get(f"{slug}_include_speaks"))
+            raw_max_visible = (request.POST.get(f"{slug}_max_visible") or "").strip()
+            if raw_max_visible:
+                try:
+                    parsed_max_visible = int(raw_max_visible)
+                except (TypeError, ValueError):
+                    parsed_max_visible = ranking["max_visible"]
+                    validation_errors.append(
+                        f"Invalid max visible value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+            else:
+                parsed_max_visible = ranking["max_visible"]
+            max_visible = max(1, parsed_max_visible)
+
+            up_to_round = ranking.get("up_to_round") or 0
+            raw_up_to_round = (request.POST.get(f"{slug}_up_to_round") or "").strip()
+            if raw_up_to_round:
+                try:
+                    up_to_round = int(raw_up_to_round)
+                except (TypeError, ValueError):
+                    validation_errors.append(
+                        f"Invalid 'up to round' value for {ranking['label']}. "
+                        "Keeping the previous value."
+                    )
+
+            set_ranking_settings(
+                slug,
+                public=is_public,
+                include_speaks=include_speaks,
+                max_visible=max_visible,
+                up_to_round=up_to_round,
+            )
+
+        for round_number in range(1, tot_rounds + 1):
+            set_ballot_round_settings(
+                round_number,
+                visible=bool(request.POST.get(f"round_{round_number}_visible")),
+                include_speaks=bool(
+                    request.POST.get(f"round_{round_number}_include_speaks")
+                ),
+                include_ranks=bool(
+                    request.POST.get(f"round_{round_number}_include_ranks")
+                ),
+            )
+
+        invalidate_public_rankings_cache()
+        for message_text in validation_errors:
+            messages.warning(request, message_text)
+        messages.success(request, "Public rankings settings saved.")
+        return redirect("public_rankings_control")
+
+    standings_settings = get_all_standings_publication_settings()
+    ranking_settings = get_all_ranking_settings()
+    ballot_settings = get_all_ballot_round_settings(tot_rounds)
+    paired_rounds = get_paired_round_numbers()
+
+    return render(
+        request,
+        "rankings/public_rankings_control.html",
+        {
+            "standings_settings": standings_settings,
+            "ranking_settings": ranking_settings,
+            "ballot_settings": ballot_settings,
+            "tot_rounds": tot_rounds,
+            "paired_rounds": paired_rounds,
+        },
+    )
 
 
 def forum_post(request):

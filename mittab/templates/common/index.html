@@ -25,18 +25,12 @@
       <span class="input-group-text" id="basic-addon1">Quick Search:</span>
     </div>
     <input type="text" class="form-control" id="quick-search" aria-describedby="basic-addon1">
-    <div class="input-group-append">
-      <a href="{% url 'publish_results' new_setting=results_published|yesno:'0,1' %}"
-         class="btn {% if results_published %}btn-warning{% else %}btn-primary{% endif %} text-nowrap">
-      {% if results_published %}Unpublish Results{% else %}Publish Results{% endif %}
-      </a>
-    </div>
   </div>
   <div class="row index_container">
 
     {% with count=number_schools model_name="Schools" list_data=school_list %}
       {% with html_id="school-list" list_path=view_schools %}
-        {% with enter_path=enter_school view_path_prefix="school" %}
+        {% with enter_path=enter_school view_path_prefix="school" flagged_item_ids=schools_missing_apda_ids flagged_count=schools_missing_apda_count %}
           {% include "common/_index_list.html" %}
         {% endwith %}
       {% endwith %}
@@ -60,7 +54,7 @@
 
     {% with count=number_debaters model_name="Debaters" list_data=debater_list %}
       {% with html_id="debater-list" list_path=view_debaters %}
-        {% with enter_path=enter_debater view_path_prefix="debater" %}
+        {% with enter_path=enter_debater view_path_prefix="debater" flagged_item_ids=debaters_missing_apda_ids flagged_count=debaters_missing_apda_count %}
           {% include "common/_index_list.html" %}
         {% endwith %}
       {% endwith %}

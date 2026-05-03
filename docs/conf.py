@@ -19,6 +19,21 @@
 
 # -- Project information -----------------------------------------------------
 
+from shibuya._sphinx import WrapLineFormatter
+
+
+def _patch_shibuya_linespans():
+    original_init = WrapLineFormatter.__init__
+
+    def patched_init(self, **options):
+        options.setdefault("linespans", "line")
+        original_init(self, **options)
+
+    WrapLineFormatter.__init__ = patched_init
+
+
+_patch_shibuya_linespans()
+
 project = 'MIT-Tab'
 copyright = '2025, Joey Lynch, Julia Boortz, Ben Muschol, and Joey Rubas'
 author = 'Joey Lynch, Julia Boortz, Ben Muschol, and Joey Rubas'
@@ -176,4 +191,9 @@ epub_exclude_files = ['search.html']
 # MyST parser configuration for Markdown support
 myst_enable_extensions = [
     "colon_fence",
+]
+
+# Ignore bad random CI warning
+linkcheck_ignore = [
+    r"https://www\.wikiwand\.com/en/articles/Blossom_algorithm",
 ]

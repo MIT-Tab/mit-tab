@@ -5,7 +5,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
-from mittab.apps.tab.public_rankings import PublicRankingMode
+from mittab.apps.tab.public_rankings import set_ranking_settings
 from mittab.libs.cacheing import cache_logic
 
 
@@ -59,11 +59,10 @@ class TestPublicCache(TestCase):
         TabSettings.set("pairing_released", 1)
         TabSettings.set("judges_public", 1)
         TabSettings.set("teams_public", 1)
-        TabSettings.set("public_ranking_mode", PublicRankingMode.TEAM)
-        TabSettings.set("public_ballot_show_speaks", 0)
         TabSettings.set("debaters_public", 1)
         TabSettings.set("var_teams_visible", 2)
         TabSettings.set("nov_teams_visible", 2)
+        set_ranking_settings("team", True, include_speaks=True, max_visible=1000)
 
     def tearDown(self):
         self.test_round.victor = self.original_victor
@@ -231,11 +230,12 @@ class TestPublicCache(TestCase):
                 'disabled': 0,
             },
             {
-                'setting': 'public_ranking_mode',
+                'setting': 'team_ranking_visibility',
                 'url': reverse("rank_teams_public"),
                 'visible_content': team.name,
-                'enabled': PublicRankingMode.TEAM,
-                'disabled': PublicRankingMode.NONE,
+                'enabled': True,
+                'disabled': False,
+                'toggle': lambda value: set_ranking_settings("team", value, True, 1000),
             },
         ]
 
@@ -244,7 +244,11 @@ class TestPublicCache(TestCase):
             self.cache.clear()
             enabled_value = test.get('enabled', 1)
             disabled_value = test.get('disabled', 0)
-            TabSettings.set(test['setting'], enabled_value)
+            toggle = test.get('toggle')
+            if toggle:
+                toggle(bool(enabled_value))
+            else:
+                TabSettings.set(test['setting'], enabled_value)
             response = self.client.get(test['url'])
             self.assertEqual(response.status_code, 200)
             self.assertIn(test['visible_content'], response.content.decode(),
@@ -252,7 +256,10 @@ class TestPublicCache(TestCase):
 
             # Test disabled state (should redirect)
             self.cache.clear()
-            TabSettings.set(test['setting'], disabled_value)
+            if toggle:
+                toggle(bool(disabled_value))
+            else:
+                TabSettings.set(test['setting'], disabled_value)
             response = self.client.get(test['url'])
             self.assertEqual(response.status_code, 302,
                 f"Should redirect when {test['setting']}={disabled_value}")

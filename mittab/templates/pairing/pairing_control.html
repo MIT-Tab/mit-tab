@@ -75,17 +75,21 @@
           </form>
           {% endif %}
 
-          <a class="btn btn-sm btn-success release {% if not pairing_released %}d-none{% endif %}" href="#"
-              id="close-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-closed"></i> Close Pairings
-          </a>
+          <div class="btn-group btn-group-sm {% if not pairing_released %}d-none{% endif %}" id="close-pairings-group">
+            <a class="btn btn-sm btn-success release" href="#"
+                id="close-pairings"
+                title="Release the pairings to the participants">
+              <i class="fas fa-door-closed"></i> Close Pairings
+            </a>
+          </div>
 
-          <a class="btn btn-sm btn-warning release {% if pairing_released %}d-none{% endif %}" href="#"
-              id="release-pairings"
-              title="Release the pairings to the participants">
-            <i class="fas fa-door-open"></i> Release Pairings
-          </a>
+          <div class="btn-group btn-group-sm {% if pairing_released %}d-none{% endif %}" id="release-pairings-group">
+            <a class="btn btn-sm btn-warning release" href="#"
+                id="release-pairings"
+                title="Release the pairings to the participants">
+              <i class="fas fa-door-open"></i> Release Pairings
+            </a>
+          </div>
 
           {% if round_number == tot_rounds %}
           <a class="btn btn-sm btn-info" href="{% url "break" %}" title="Break 'em">

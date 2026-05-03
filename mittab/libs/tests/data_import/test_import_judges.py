@@ -17,9 +17,14 @@ class TestImportingJudges(TestCase):
 
         TabSettings.set("tot_rounds", 2)
 
-        data = [["Judge 1", "9.5", "Harvard", "yes", ""],
-                ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern", "1", "0"],
-                ["Judge 3", "20", "", "", ""]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard", "yes", ""],
+            [
+                "Judge 2", "judge2@example.com", "10.5555",
+                "Yale", "Harvard", "Northeastern", "1", "0",
+            ],
+            ["Judge 3", "", "20", "", ""],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -30,18 +35,21 @@ class TestImportingJudges(TestCase):
         judge_1 = Judge.objects.get(name="Judge 1")
         assert float(judge_1.rank) == 9.5
         assert judge_1.name == "Judge 1"
+        assert judge_1.email == "judge1@example.com"
         assert sorted(map(lambda s: s.name,
                           judge_1.schools.all())) == ["Harvard"]
 
         judge_2 = Judge.objects.get(name="Judge 2")
         assert float(judge_2.rank) == 10.56
         assert judge_2.name == "Judge 2"
+        assert judge_2.email == "judge2@example.com"
         assert sorted(map(lambda s: s.name, judge_2.schools.all())) == \
             ["Harvard", "Northeastern", "Yale"]
 
         judge_3 = Judge.objects.get(name="Judge 3")
         assert float(judge_3.rank) == 20.0
         assert judge_3.name == "Judge 3"
+        assert judge_3.email is None
         assert not judge_3.schools.all()
         assert JudgeExpectedCheckIn.objects.filter(judge=judge_1,
                                                    round_number=1).exists()
@@ -52,9 +60,14 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "9.5", "Harvard"],
-                ["Judge 2", "10.5555", "Yale", "Harvard", "Northeastern"],
-                ["Judge 1", "20"]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard"],
+            [
+                "Judge 2", "judge2@example.com", "10.5555",
+                "Yale", "Harvard", "Northeastern",
+            ],
+            ["Judge 1", "judge3@example.com", "20"],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -68,9 +81,14 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 0
 
-        data = [["Judge 1", "9.5", "Harvard"],
-                ["Judge 2", "200", "Yale", "Harvard", "Northeastern"],
-                ["Judge 3", "20"]]
+        data = [
+            ["Judge 1", "judge1@example.com", "9.5", "Harvard"],
+            [
+                "Judge 2", "judge2@example.com", "200",
+                "Yale", "Harvard", "Northeastern",
+            ],
+            ["Judge 3", "judge3@example.com", "20"],
+        ]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -87,7 +105,7 @@ class TestImportingJudges(TestCase):
         assert Judge.objects.count() == 0
         assert School.objects.count() == 1
 
-        data = [["Judge 1", "10000", "NU"]]
+        data = [["Judge 1", "", "10000", "NU"]]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -100,7 +118,7 @@ class TestImportingJudges(TestCase):
     def test_expected_rounds_imported(self):
         TabSettings.set("tot_rounds", 3)
 
-        data = [["Judge 4", "9.5", "Harvard", "Y", "", "1"]]
+        data = [["Judge 4", "", "9.5", "Harvard", "Y", "", "1"]]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 
@@ -112,8 +130,17 @@ class TestImportingJudges(TestCase):
         )
         assert expected_rounds == [1, 3]
 
+    def test_empty_judge_email_is_normalized_to_none(self):
+        data = [["Judge 1", "   ", "9.5", "Harvard"]]
+
+        importer = JudgeImporter(MockWorkbook(data))
+        errors = importer.import_data()
+
+        assert not errors
+        assert Judge.objects.get(name="Judge 1").email is None
+
     def test_blank_school_cells_ignored(self):
-        data = [["Judge 5", "9.5", "", "  ", ""]]
+        data = [["Judge 5", "", "9.5", "", "  ", ""]]
         importer = JudgeImporter(MockWorkbook(data))
         errors = importer.import_data()
 

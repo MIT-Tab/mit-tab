@@ -1,0 +1,77 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Motions - {% tournament_name %}{% endblock %}
+
+{% block extra_head %}
+    {% render_bundle 'publicDisplay' %}
+{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block content %}
+<div class="col-12 public-table-root">
+    <div class="public-table-header">
+        <h1>Motions</h1>
+    </div>
+
+    {% if has_motions %}
+        {% if varsity_outrounds %}
+            <section class="mb-4">
+                <h3>Varsity Elimination Rounds</h3>
+                {% for motion in varsity_outrounds %}
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>{{ motion.round_display }}</strong></div>
+                        <div class="card-body">
+                            {% if motion.info_slide %}
+                                <p class="text-muted small mb-2"><strong>Info Slide:</strong> {{ motion.info_slide|escape|linebreaksbr }}</p>
+                            {% endif %}
+                            <p class="mb-0">{{ motion.motion_text|escape|linebreaksbr }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if novice_outrounds %}
+            <section class="mb-4">
+                <h3>Novice Elimination Rounds</h3>
+                {% for motion in novice_outrounds %}
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>{{ motion.round_display }}</strong></div>
+                        <div class="card-body">
+                            {% if motion.info_slide %}
+                                <p class="text-muted small mb-2"><strong>Info Slide:</strong> {{ motion.info_slide|escape|linebreaksbr }}</p>
+                            {% endif %}
+                            <p class="mb-0">{{ motion.motion_text|escape|linebreaksbr }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        {% if inround_motions %}
+            <section class="mb-4">
+                <h3>Preliminary Rounds</h3>
+                {% for motion in inround_motions %}
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>{{ motion.round_display }}</strong></div>
+                        <div class="card-body">
+                            {% if motion.info_slide %}
+                                <p class="text-muted small mb-2"><strong>Info Slide:</strong> {{ motion.info_slide|escape|linebreaksbr }}</p>
+                            {% endif %}
+                            <p class="mb-0">{{ motion.motion_text|escape|linebreaksbr }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </section>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5 text-muted">
+            <h2>No Motions Available</h2>
+            <p>Motions will appear here once they are released by the tournament directors.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

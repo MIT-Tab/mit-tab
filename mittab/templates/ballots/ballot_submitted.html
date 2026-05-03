@@ -1,0 +1,143 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Ballot Submitted{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block content %}
+
+<div class="col">
+  <div class="container-fluid">
+    {% if previous_ballots_url %}
+    <div class="d-flex justify-content-start mb-3">
+      <a class="btn btn-lg btn-outline-primary" href="{{ previous_ballots_url }}">
+        Previous Ballots
+      </a>
+    </div>
+    {% endif %}
+
+    {# ── Confirmation header ── #}
+    <div class="ballot-submitted-header d-flex align-items-center mb-4">
+      <div class="check-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div>
+        <h3>Ballot submitted</h3>
+        <p class="subtitle">This is a read-only record of what you submitted. To make changes, go to tab staff.</p>
+      </div>
+    </div>
+
+    {% if disclosure_message %}
+    <div class="alert alert-info mb-4">
+      <i class="fas fa-info-circle mr-1"></i>
+      <strong>Speaker Disclosure Policy:</strong> {{ disclosure_message }}
+    </div>
+    {% endif %}
+
+    {# ── Winner ── #}
+    <div class="row mb-4 winner-row">
+      <div class="col-md-6">
+        <div class="field-label">Winner</div>
+        <div class="submitted-field">{{ winner_display }}</div>
+      </div>
+    </div>
+
+    {% if rfd_enabled %}
+    <div class="card submitted-card rfd-card mb-4">
+      <div class="card-header">
+        <span>Reason for Decision</span>
+        {% if rfd_editable %}
+        <span class="readonly-badge">Editable</span>
+        {% else %}
+        <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if rfd_deadline_configured %}
+        <div class="alert alert-info">
+          You can edit this written RFD until {{ rfd_deadline_display }}. The ballot result, speaks, ranks, and debaters are not editable here.
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+          Tab has not configured the written RFD deadline, so this written RFD is read only here.
+        </div>
+        {% endif %}
+
+        {% if rfd_editable %}
+        <form method="post" action="">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="field-label" for="id_rfd">Why the winning team won</label>
+            <textarea class="form-control" id="id_rfd" name="rfd" rows="7">{{ rfd_text }}</textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Save Written RFD</button>
+        </form>
+        {% else %}
+        <div class="submitted-field rfd-display">{{ rfd_text|linebreaksbr|default:"No written RFD has been entered." }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Team cards ── #}
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <div class="card submitted-card">
+          <div class="card-header">
+            <span>Government: {{ gov_team.display }}</span>
+            <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
+          </div>
+          <div class="card-body">
+            {% for deb in gov_debaters %}
+            <div class="row pb-2 {% if not forloop.last %}border-bottom mb-2{% endif %}">
+              <div class="col-12 mb-1">
+                <div class="field-label">{{ deb.role }}</div>
+                <div class="submitted-field">{{ deb.name }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Speaks</div>
+                <div class="submitted-field">{{ deb.speaks }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Rank</div>
+                <div class="submitted-field">{{ deb.ranks }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <div class="card submitted-card">
+          <div class="card-header">
+            <span>Opposition: {{ opp_team.display }}</span>
+            <span class="readonly-badge"><i class="fas fa-lock mr-1"></i>Read only</span>
+          </div>
+          <div class="card-body">
+            {% for deb in opp_debaters %}
+            <div class="row pb-2 {% if not forloop.last %}border-bottom mb-2{% endif %}">
+              <div class="col-12 mb-1">
+                <div class="field-label">{{ deb.role }}</div>
+                <div class="submitted-field">{{ deb.name }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Speaks</div>
+                <div class="submitted-field">{{ deb.speaks }}</div>
+              </div>
+              <div class="col-md-6 mt-2">
+                <div class="field-label">Rank</div>
+                <div class="submitted-field">{{ deb.ranks }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

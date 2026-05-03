@@ -1,0 +1,78 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block extra_head %}
+    {% render_bundle 'publicDisplay' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12 public-table-root">
+  <div class="public-table-header">
+    <h1>Speaker Rankings</h1>
+  </div>
+
+  {% for section in speaker_sections %}
+    {% if section.show %}
+      <section class="mb-5">
+        <h3>{{ section.title }}</h3>
+        {% if not section.show_scores %}
+          <div class="alert alert-secondary" role="status">
+            Speaks and ranks are hidden for this section.
+          </div>
+        {% endif %}
+        <div class="public-table-wrap rounded-lg">
+          <table class="table table-striped table-sm table-bordered mb-0">
+            <thead>
+              <tr>
+                <th rowspan="{% if section.show_scores %}2{% else %}1{% endif %}">#</th>
+                <th rowspan="{% if section.show_scores %}2{% else %}1{% endif %}">Speaker</th>
+                <th rowspan="{% if section.show_scores %}2{% else %}1{% endif %}">Team</th>
+                {% if section.show_scores %}
+                  {% for score_column in section.rows.0.score_columns %}
+                    <th colspan="2">{{ score_column.label }}</th>
+                  {% endfor %}
+                {% endif %}
+              </tr>
+              {% if section.show_scores %}
+                <tr>
+                  {% for score_column in section.rows.0.score_columns %}
+                    <th>Speaks</th>
+                    <th>Ranks</th>
+                  {% endfor %}
+                </tr>
+              {% endif %}
+            </thead>
+            <tbody>
+              {% for row in section.rows %}
+                {% if section.show_scores %}
+                  <tr>
+                    <td>{{ row.place }}</td>
+                    <td>{{ row.debater.display }}</td>
+                    <td>{{ row.team.display_backend }}</td>
+                    {% for score_column in row.score_columns %}
+                      <td>{{ score_column.speaks|floatformat:2 }}</td>
+                      <td>{{ score_column.ranks|floatformat:2 }}</td>
+                    {% endfor %}
+                  </tr>
+                {% else %}
+                  <tr>
+                    <td>{{ row.place }}</td>
+                    <td>{{ row.debater.display }}</td>
+                    <td>{{ row.team.display_backend }}</td>
+                  </tr>
+                {% endif %}
+              {% empty %}
+                <tr>
+                  <td colspan="{% if section.show_scores %}7{% else %}3{% endif %}" class="text-center">
+                    {{ section.empty_message }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

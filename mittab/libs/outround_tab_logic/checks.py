@@ -1,8 +1,6 @@
 from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
-
 
 def lost_teams():
     return [outround.loser.id
@@ -30,26 +28,7 @@ def have_enough_judges_type(type_of_round):
         teams_count // 2
     ) * panel_size
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    num_teams = teams_count
-
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
-
-    other_round_type = BreakingTeam.VARSITY \
-        if type_of_round == BreakingTeam.NOVICE \
-        else BreakingTeam.NOVICE
-
-    num_in_use = Judge.objects.filter(
-        judges_outrounds__num_teams=other_round_num,
-        judges_outrounds__type_of_round=other_round_type
-    ).count()
-
-    num_judges = CheckIn.objects.filter(round_number=0).count() - num_in_use
+    num_judges = CheckIn.objects.filter(round_number=0).count()
 
     if num_judges < judges_needed:
         return False, (num_judges, judges_needed)
@@ -79,24 +58,7 @@ def have_enough_rooms_type(type_of_round):
         num_teams // 2
     )
 
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_round_num = num_teams / var_to_nov
-    if type_of_round == BreakingTeam.NOVICE:
-        other_round_num = num_teams * var_to_nov
-
-    other_round_type = BreakingTeam.VARSITY \
-        if type_of_round == BreakingTeam.NOVICE \
-        else BreakingTeam.NOVICE
-
-    num_in_use = Room.objects.filter(
-        rooms_outrounds__num_teams=other_round_num,
-        rooms_outrounds__type_of_round=other_round_type
-    ).count()
-
-    num_rooms = RoomCheckIn.objects.filter(round_number=0).count() - num_in_use
+    num_rooms = RoomCheckIn.objects.filter(round_number=0).count()
 
     if num_rooms < rooms_needed:
         return False, (num_rooms, rooms_needed)

@@ -1,10 +1,56 @@
 import random
 
 from haikunator import Haikunator
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
+
+
+_TABSETTING_MISSING = object()
+SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING = (
+    "speaker_rankings_use_single_adjusted"
+)
+
+
+class AuditAttributionMixin(models.Model):
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
+    audit_events = GenericRelation("AuditEvent")
+
+    class Meta:
+        abstract = True
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk:
+            existing = type(self).objects.filter(pk=self.pk).values(
+                "created_by_id"
+            ).first()
+            if existing and existing["created_by_id"] != self.created_by_id:
+                raise ValidationError("Creator attribution is immutable")
+        super(AuditAttributionMixin, self).save(
+            force_insert, force_update, using, update_fields)
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
 
 
 class TabSettings(models.Model):
@@ -21,7 +67,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=None):
+    def get(cls, key, default=_TABSETTING_MISSING):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -34,7 +80,7 @@ class TabSettings(models.Model):
             f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
-        if result is None and default is None:
+        if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default
@@ -62,6 +108,8 @@ class TabSettings(models.Model):
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
 
     def save(self,
@@ -71,7 +119,43 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+
+
+class PublicDisplaySetting(models.Model):
+    RANKING = "ranking"
+    STANDING = "standing"
+    BALLOT = "ballot"
+    DISPLAY_TYPE_CHOICES = (
+        (RANKING, "Ranking"),
+        (STANDING, "Standing"),
+        (BALLOT, "Ballot"),
+    )
+
+    slug = models.CharField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    display_type = models.CharField(max_length=20, choices=DISPLAY_TYPE_CHOICES)
+    is_enabled = models.BooleanField(default=False)
+    include_speaks = models.BooleanField(default=False)
+    include_ranks = models.BooleanField(default=False)
+    max_visible = models.PositiveIntegerField(default=10)
+    round_number = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "public display setting"
+
+    def __str__(self):
+        return self.label
+
+    @classmethod
+    def get_or_create_setting(cls, *, slug, label, display_type, defaults=None):
+        if defaults is None:
+            defaults = {}
+        payload = {"label": label, "display_type": display_type}
+        payload.update(defaults)
+        return cls.objects.get_or_create(slug=slug, defaults=payload)
 
 
 class School(models.Model):
@@ -105,6 +189,7 @@ class School(models.Model):
 
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -149,8 +234,8 @@ class Debater(models.Model):
         ordering = ["name"]
 
 
-class Team(models.Model):
-    name = models.CharField(max_length=30, unique=True)
+class Team(AuditAttributionMixin):
+    name = models.CharField(max_length=35, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
                                       blank=True,
@@ -202,6 +287,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     @classmethod
@@ -232,6 +318,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     def set_unique_team_code(self):
@@ -325,14 +412,29 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
-class Judge(models.Model):
+BALLOT_CODE_MAX_LENGTH = 30
+ballot_code_validator = RegexValidator(
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$",
+    message=(
+        "Ballot code must be either legacy alphanumeric text or a single-hyphen code "
+        "with letters on each side."
+    ),
+)
+
+
+class Judge(AuditAttributionMixin):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
+    email = models.EmailField(max_length=254, blank=True, null=True)
     ballot_code = models.CharField(max_length=255,
                                    blank=True,
                                    null=True,
-                                   unique=True)
+                                   unique=True,
+                                   validators=[
+                                       MaxLengthValidator(BALLOT_CODE_MAX_LENGTH),
+                                       ballot_code_validator,
+                                   ])
     is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
@@ -341,10 +443,32 @@ class Judge(models.Model):
         haikunator = Haikunator()
         code = haikunator.haikunate(token_length=0)
 
-        while Judge.objects.filter(ballot_code=code).first():
+        while (len(code) > BALLOT_CODE_MAX_LENGTH or
+               not self.is_valid_ballot_code(code, raise_error=False) or
+               Judge.objects.filter(ballot_code=code).first()):
             code = haikunator.haikunate(token_length=0)
 
         self.ballot_code = code
+
+    def is_valid_ballot_code(self, code=None, raise_error=True):
+        code = code or self.ballot_code
+        if not code:
+            return True
+
+        if len(code) > BALLOT_CODE_MAX_LENGTH:
+            if raise_error:
+                raise ValidationError(
+                    f"Ballot code must be at most {BALLOT_CODE_MAX_LENGTH} characters"
+                )
+            return False
+
+        try:
+            ballot_code_validator(code)
+        except ValidationError as exc:
+            if raise_error:
+                raise exc
+            return False
+        return True
 
     def save(self,
              force_insert=False,
@@ -354,6 +478,8 @@ class Judge(models.Model):
         # Generate a random ballot code for judges that don't have one
         if not self.ballot_code:
             self.set_unique_ballot_code()
+
+        self.is_valid_ballot_code(self.ballot_code)
 
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
@@ -383,7 +509,34 @@ class Judge(models.Model):
         ordering = ["name"]
 
 
-class Scratch(models.Model):
+class JudgeCodeEmailLog(models.Model):
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE, related_name="code_email_logs")
+    email = models.EmailField()
+    ballot_code = models.CharField(max_length=BALLOT_CODE_MAX_LENGTH)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "sent_at"]),
+            models.Index(fields=["judge", "sent_at"]),
+        ]
+
+
+class WrittenRFDEmailLog(models.Model):
+    round = models.ForeignKey(
+        "Round", on_delete=models.CASCADE, related_name="written_rfd_email_logs"
+    )
+    email = models.EmailField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["round", "sent_at"]),
+            models.Index(fields=["email", "sent_at"]),
+        ]
+
+
+class Scratch(AuditAttributionMixin):
     judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
     team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
@@ -459,6 +612,8 @@ class Outround(models.Model):
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
     room = models.ForeignKey(Room,
+                             blank=True,
+                             null=True,
                              on_delete=models.CASCADE,
                              related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -538,6 +693,7 @@ class Round(models.Model):
     room = models.ForeignKey(
         Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+    rfd = models.TextField(blank=True, default="")
 
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
@@ -547,6 +703,14 @@ class Round(models.Model):
         return (
             f"Round {self.round_number} between {self.gov_team} and {self.opp_team}"
         )
+
+    @property
+    def winner(self):
+        if self.victor in [self.GOV, self.GOV_VIA_FORFEIT]:
+            return self.gov_team
+        if self.victor in [self.OPP, self.OPP_VIA_FORFEIT]:
+            return self.opp_team
+        return None
 
     def save(self,
              force_insert=False,
@@ -581,6 +745,14 @@ class ManualJudgeAssignment(models.Model):
         on_delete=models.CASCADE,
         related_name="manual_round_assignments",
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -589,6 +761,86 @@ class ManualJudgeAssignment(models.Model):
 
     def __str__(self):
         return f"{self.judge} manually assigned to {self.round}"
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
+
+
+class AuditEvent(models.Model):
+    CREATE = "create"
+    EDIT = "edit"
+    MANUAL_JUDGE_ASSIGN = "manual_judge_assign"
+    MANUAL_JUDGE_REMOVE = "manual_judge_remove"
+    MANUAL_CHAIR_CHANGE = "manual_chair_change"
+    EVENT_CHOICES = (
+        (CREATE, "Created"),
+        (EDIT, "Edited"),
+        (MANUAL_JUDGE_ASSIGN, "Manual judge assignment"),
+        (MANUAL_JUDGE_REMOVE, "Manual judge removal"),
+        (MANUAL_CHAIR_CHANGE, "Manual chair change"),
+    )
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    event_type = models.CharField(max_length=40, choices=EVENT_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    object_repr = models.CharField(max_length=255, editable=False)
+    changes = models.JSONField(default=dict, blank=True, editable=False)
+    note = models.TextField(blank=True, editable=False)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id", "created_at"]),
+            models.Index(fields=["event_type", "created_at"]),
+        ]
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk and AuditEvent.objects.filter(pk=self.pk).exists():
+            raise ValidationError("Audit events are immutable")
+        super(AuditEvent, self).save(force_insert, force_update, using, update_fields)
+
+    @classmethod
+    def record(cls, obj, event_type, user=None, changes=None, note=""):
+        if obj is None or not obj.pk:
+            return None
+        return cls.objects.create(
+            content_object=obj,
+            event_type=event_type,
+            user=user if getattr(user, "is_authenticated", False) else None,
+            object_repr=str(obj),
+            changes=changes or {},
+            note=note,
+        )
+
+    @property
+    def user_display(self):
+        if self.user:
+            return self.user.get_username()
+        return "Unknown"
+
+    @property
+    def label(self):
+        return dict(self.EVENT_CHOICES).get(self.event_type, self.event_type)
+
+    def __str__(self):
+        return f"{self.label} {self.object_repr} by {self.user_display}"
 
 
 class Bye(models.Model):
@@ -693,3 +945,147 @@ class RoomTag(models.Model):
 
     def __str__(self):
         return self.tag
+
+
+class RankingGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    teams = models.ManyToManyField(
+        "Team",
+        blank=True,
+        related_name="ranking_groups",
+    )
+    debaters = models.ManyToManyField(
+        "Debater",
+        blank=True,
+        related_name="ranking_groups",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Motion(models.Model):
+    """
+    Represents a debate motion (topic) for a specific round.
+
+    Round identification:
+    - For inrounds: round_number is set (1, 2, 3, etc.)
+        - For outrounds: round_number is None, and outround_type + num_teams
+            identifies the round
+      (e.g., Varsity Quarterfinals = outround_type=0, num_teams=8)
+    """
+    VARSITY = 0
+    NOVICE = 1
+    OUTROUND_TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice"),
+    )
+
+    # Round identification - either round_number for inrounds,
+    # or outround fields for outrounds
+    round_number = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Round number for inrounds (1, 2, 3, etc.)",
+    )
+    outround_type = models.IntegerField(
+        null=True,
+        blank=True,
+        choices=OUTROUND_TYPE_CHOICES,
+        help_text="Type of outround (Varsity/Novice)",
+    )
+    num_teams = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of teams in outround (e.g., 8 for quarterfinals)",
+    )
+
+    # Motion content
+    info_slide = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional context/info slide text shown before the motion",
+    )
+    motion_text = models.TextField(help_text="The debate motion/resolution text")
+
+    # Publication status
+    is_published = models.BooleanField(
+        default=False,
+        help_text="Whether this motion is visible to the public",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["round_number", "outround_type", "-num_teams"]
+        verbose_name = "motion"
+        verbose_name_plural = "motions"
+
+    def __str__(self):
+        return f"Motion for {self.round_display}: {self.motion_text[:50]}..."
+
+    @property
+    def is_outround(self):
+        """Returns True if this is an outround motion."""
+        return self.round_number is None and self.num_teams is not None
+
+    @property
+    def round_display(self):
+        """Returns a human-readable round name."""
+        if self.round_number is not None:
+            return f"Round {self.round_number}"
+        elif self.num_teams is not None:
+            type_name = "Varsity" if self.outround_type == self.VARSITY else "Novice"
+            round_names = {
+                2: "Finals",
+                4: "Semifinals",
+                8: "Quarterfinals",
+                16: "Octofinals",
+                32: "Double Octofinals",
+                64: "Triple Octofinals",
+            }
+            round_name = round_names.get(self.num_teams, f"Round of {self.num_teams}")
+            return f"{type_name} {round_name}"
+        return "Unknown Round"
+
+    @property
+    def sort_key(self):
+        """Return a sort key for ordering motions."""
+        if self.round_number is not None:
+            # Inrounds: sort by round number
+            return (0, self.round_number, 0)
+        else:
+            # Outrounds: sort by type first, then by `num_teams` descending.
+            return (1, self.outround_type or 0, -(self.num_teams or 0))
+
+    @property
+    def round_selection_value(self):
+        """Returns the form value used in the round_selection dropdown."""
+        if self.round_number is not None:
+            return f"inround_{self.round_number}"
+        elif self.num_teams is not None:
+            return f"outround_{self.outround_type}_{self.num_teams}"
+        return ""
+
+    def clean(self):
+        """Validate that either inround or outround fields are set, not both."""
+        super().clean()
+        has_round_number = self.round_number is not None
+        has_outround = self.num_teams is not None
+
+        if has_round_number and has_outround:
+            raise ValidationError(
+                "A motion cannot have both a round number "
+                "(inround) and outround fields set."
+            )
+        if not has_round_number and not has_outround:
+            raise ValidationError(
+                "A motion must have either a round number "
+                "(inround) or outround fields set."
+            )
+        if has_outround and self.outround_type is None:
+            raise ValidationError(
+                "Outround motions must specify the outround type (Varsity/Novice)."
+            )

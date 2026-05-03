@@ -39,9 +39,6 @@ def pair_round():
     # Need a reproduceable random pairing order
     random.seed(0xBEEF)
 
-    # add scratches for teams/judges from the same school
-    # NOTE that this only happens if they haven't already been added
-    add_scratches_for_school_affil()
     all_pull_ups = []
 
     # Record no-shows
@@ -288,26 +285,6 @@ def validate_round_data(round_to_check):
     # If we have results, they should be entered and there should be no
     # byes or noshows for teams that debated
     have_properly_entered_data(round_to_check)
-
-
-def add_scratches_for_school_affil():
-    """
-    Add scratches for teams/judges from the same school
-    Only do this if they haven't already been added
-    """
-    all_judges = Judge.objects.all().prefetch_related("schools", "scratches__team")
-    all_teams = Team.objects.all().prefetch_related("school", "hybrid_school")
-
-    to_create = []
-
-    for judge in all_judges:
-        for team in all_teams:
-            judge_schools = judge.schools.all()
-            if team.school in judge_schools or team.hybrid_school in judge_schools:
-                if not any(s.team == team for s in judge.scratches.all()):
-                    to_create.append(Scratch(judge=judge, team=team, scratch_type=1))
-    Scratch.objects.bulk_create(to_create)
-
 
 def highest_seed(team1, team2):
     return max(team1.seed, team2.seed)

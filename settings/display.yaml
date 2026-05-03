@@ -20,6 +20,11 @@ settings:
     description: "Check this box to make the judges list publicly visible"
     value: false
     type: boolean
+  - motions_enabled:
+    name: motions_enabled
+    description: "Check this box to enable the motions feature, which allows tournament directors to publish debate motions/resolutions"
+    value: false
+    type: boolean
   - gov_opp_display:
     name: gov_opp_display
     description: "Toggle to switch the outrounds view from displaying Gov and Opp (when enabled) and Team 1 and Team 2 (when disabled)"
@@ -28,20 +33,5 @@ settings:
   - show_outs_bracket:
     name: show_outs_bracket
     description: "Toggle to display the bracket view for outrounds. When enabled, users can switch between list view and bracket view for outround pairings."
-    value: false
-    type: boolean
-  - public_ranking_mode:
-    name: public_ranking_mode
-    description: "Select what, if anything, you would like to display publicly once ballots are entered. Team rankings respect team-level opt outs. Ballot views never show the current round."
-    value: 0
-    type: choice
-    choices:
-      - [0, "None"]
-      - [1, "Team Rankings"]
-      - [2, "Last Round Ballots"]
-      - [3, "All Ballots"]
-  - public_ballot_show_speaks:
-    name: public_ballot_show_speaks
-    description: "Toggle to include speaks and ranks when displaying ballots or team rankings publicly. Winners are always shown."
     value: false
     type: boolean
