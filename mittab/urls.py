@@ -150,14 +150,9 @@ urlpatterns = [
         name="public_rankings_control",
     ),
     path(
-        "settings/homepage-setup/",
-        views.public_home_shortcuts,
-        name="homepage_setup",
-    ),
-    path(
-        "settings/public-home-shortcuts/",
-        views.public_home_shortcuts,
-        name="public_home_shortcuts",
+        "settings/public-homepage/",
+        views.public_homepage,
+        name="public_homepage",
     ),
 
     # Pairing related
@@ -327,7 +322,6 @@ urlpatterns = [
     re_path(r"^settings_form",
             views.settings_form,
             name="settings_form"),
-    path("info-links/", views.info_links_admin, name="info_links_admin"),
 
     # Motion management (admin)
     path("motions/",

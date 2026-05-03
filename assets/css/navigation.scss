@@ -4,16 +4,16 @@
   background-color: #003a74;
   background-color: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
   border-bottom: 1px solid rgba(9, 32, 61, 0.55);
-  color: rgba(255, 255, 255, 0.84);
+  color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.84);
 
   .navbar-brand {
-    color: #fff;
+    color: var(--theme-on-color, #fff);
     font-weight: 600;
     letter-spacing: -0.01em;
 
     &:hover,
     &:focus-visible {
-      color: #f6fbff;
+      color: var(--theme-on-color, #f6fbff);
     }
   }
 }
@@ -71,7 +71,7 @@
           position: absolute;
           inset: 0 auto 0 0;
           width: 1px;
-          background: rgba(255, 255, 255, 0.22);
+          background: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.22);
         }
       }
     }
@@ -88,13 +88,13 @@
       border-radius: 0.5rem;
       font-weight: 500;
       font-size: 0.95rem;
-      color: rgba(255, 255, 255, 0.84);
+      color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.84);
       transition: all 120ms ease;
 
       &:hover,
       &:focus-visible {
-        color: #fff;
-        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--theme-on-color, #fff);
+        background-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.08);
       }
 
       &:focus-visible {
@@ -103,7 +103,7 @@
       }
 
       &.active {
-        color: #fff;
+        color: var(--theme-on-color, #fff);
         background-color: #003a74;
         background-color: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
       }
@@ -119,7 +119,7 @@
       padding: 0.4rem;
       background: #0a2f55;
       background: color-mix(in srgb, var(--theme-color, #00438A) 65%, black);
-      border: 1px solid rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.14);
       border-radius: 0.5rem;
       min-width: 15rem;
       box-shadow: 0 10px 20px -16px rgba(8, 22, 45, 0.7);
@@ -127,15 +127,15 @@
 
     .dropdown-item {
       border-radius: 0.4rem;
-      color: rgba(255, 255, 255, 0.84);
+      color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.84);
       font-weight: 500;
       padding: 0.5rem 0.85rem;
       transition: all 120ms ease;
 
       &:hover,
       &:focus-visible {
-        color: #fff;
-        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--theme-on-color, #fff);
+        background-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.08);
       }
 
       &:focus-visible {
@@ -145,7 +145,7 @@
     }
 
     .dropdown-divider {
-      border-top-color: rgba(255, 255, 255, 0.22);
+      border-top-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.22);
     }
   }
 }
@@ -174,7 +174,7 @@
       display: grid;
       place-items: center;
       padding: 0.55rem 0.65rem;
-      border: 1px solid rgba(255, 255, 255, 0.32);
+      border: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.32);
       border-radius: 0.55rem;
       background: #003a74;
       background: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
@@ -187,7 +187,7 @@
       &:hover {
         background: #004fbe;
         background: color-mix(in srgb, var(--theme-color, #00438A) 80%, white);
-        border-color: rgba(255, 255, 255, 0.42);
+        border-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.42);
       }
 
       &:focus-visible {
@@ -198,9 +198,17 @@
         transform: scale(0.96);
       }
 
+      // Bootstrap renders the toggler bars as a hardcoded-white SVG
+      // background-image, which stays white even when the theme picks dark
+      // text. Replace it with a mask so the bars inherit currentColor and
+      // tracks --theme-on-color via the toggler's `color`.
       .navbar-toggler-icon {
         width: 1.35em;
         height: 1.35em;
+        background-image: none;
+        background-color: currentColor;
+        -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke='black' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/></svg>") center / 100% 100% no-repeat;
+        mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke='black' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/></svg>") center / 100% 100% no-repeat;
       }
     }
 
@@ -215,7 +223,7 @@
       padding: 3.5rem 1.5rem 2.5rem;
       margin: 0;
       background: var(--theme-color, #00438a);
-      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      border-right: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.2);
       overflow-y: auto;
       transform: translateX(-102%);
       transition: transform 140ms cubic-bezier(0.33, 1, 0.68, 1);
@@ -265,7 +273,7 @@
       padding: 0;
       margin: 0;
       width: 100%;
-      color: rgba(255, 255, 255, 0.85);
+      color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.85);
 
       &.mr-auto,
       &.ml-auto {
@@ -275,7 +283,7 @@
       + .navbar-nav {
         padding-top: 1.25rem;
         margin-top: 1.25rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.12);
       }
     }
 
@@ -292,12 +300,12 @@
         font-size: 1.1rem;
         font-weight: 600;
         letter-spacing: -0.01em;
-        color: rgba(255, 255, 255, 0.85);
+        color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.85);
         background: transparent;
         border-radius: 0;
         border: none;
         width: 100%;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        border-bottom: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.12);
         transition: all 140ms ease;
 
         &::before {
@@ -316,7 +324,7 @@
 
         &:hover,
         &:focus-visible {
-          color: #fff;
+          color: var(--theme-on-color, #fff);
           background: #003c75;
           background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
 
@@ -334,7 +342,7 @@
         }
 
         &.active {
-          color: #fff;
+          color: var(--theme-on-color, #fff);
           background: #003c75;
           background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
 
@@ -364,7 +372,7 @@
       margin: 0;
       background: #003c75;
       background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.2);
       border-radius: 0;
       box-shadow: none;
 
@@ -378,13 +386,13 @@
       font-size: 1.05rem;
       font-weight: 500;
       border-radius: 0;
-      color: rgba(255, 255, 255, 0.85);
+      color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.85);
       white-space: normal;
       transition: all 140ms ease;
 
       &:hover,
       &:focus-visible {
-        color: #fff;
+        color: var(--theme-on-color, #fff);
         background: rgba(var(--theme-color-rgb, 0, 67, 138), 0.68);
       }
 
@@ -397,7 +405,7 @@
       }
 
       &.active {
-        color: #fff;
+        color: var(--theme-on-color, #fff);
         background: #003c75;
         background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
       }

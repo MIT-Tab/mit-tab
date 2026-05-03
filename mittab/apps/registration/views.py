@@ -49,7 +49,7 @@ from .models import (
     RegistrationChangeLog,
     RegistrationConfig,
     RegistrationLink,
-)  # noqa: F401  (InfoLink imported for LINK_KINDS)
+)
 
 LINK_KINDS = {
     "info": {
@@ -57,7 +57,7 @@ LINK_KINDS = {
         "form": InfoLinkForm,
         "label": "info",
         "label_plural": "info links",
-        "redirect_url_name": "info_links_admin",
+        "redirect_url_name": "public_homepage",
     },
     "registration": {
         "model": RegistrationLink,

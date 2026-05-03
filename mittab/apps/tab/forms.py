@@ -687,37 +687,6 @@ class SettingsForm(forms.Form):
                         format="%Y-%m-%dT%H:%M",
                     ),
                 )
-            elif setting.get("type") == "color":
-                self.fields[field_name] = forms.RegexField(
-                    regex=r"^#[0-9a-fA-F]{6}$",
-                    label=label,
-                    help_text=setting["description"],
-                    initial=normalize_theme_color(
-                        setting["value"],
-                        default=DEFAULT_THEME_COLOR,
-                    ),
-                    error_messages={
-                        "invalid": "Please use a valid hex color (for example: #00438A).",
-                    },
-                    widget=forms.TextInput(attrs={
-                        "type": "text",
-                        "class": "form-control theme-color-input",
-                        "placeholder": "#00438A",
-                        "pattern": "^#[0-9a-fA-F]{6}$",
-                        "autocomplete": "off",
-                        "style": "max-width: 12rem;",
-                    })
-                )
-            elif setting.get("type") == "file":
-                self.fields[field_name] = forms.ImageField(
-                    label=label,
-                    help_text=setting["description"],
-                    required=False,
-                    widget=forms.ClearableFileInput(attrs={
-                        "class": "form-control-file",
-                        "accept": ",".join(logo_utils.LOGO_ALLOWED_MIME_TYPES),
-                    })
-                )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
@@ -727,25 +696,6 @@ class SettingsForm(forms.Form):
                         "class": "form-control"
                     })
                 )
-
-    def clean(self):
-        cleaned_data = super(SettingsForm, self).clean()
-
-        for setting in self.settings:
-            if setting.get("type") != "file":
-                continue
-
-            field_name = f"setting_{setting['name']}"
-            uploaded_logo = cleaned_data.get(field_name)
-            if not uploaded_logo:
-                continue
-
-            try:
-                logo_utils.validate_tournament_logo(uploaded_logo)
-            except ValidationError as exc:
-                self.add_error(field_name, exc)
-
-        return cleaned_data
 
     def save(self):
         for setting in self.settings:
@@ -757,42 +707,62 @@ class SettingsForm(forms.Form):
             elif "type" in setting and setting["type"] == "datetime":
                 value = self.cleaned_data[field]
                 value_to_set = value.strftime("%Y-%m-%d %H:%M") if value else ""
-            elif setting.get("type") == "color":
-                value_to_set = normalize_theme_color(
-                    self.cleaned_data[field],
-                    default=DEFAULT_THEME_COLOR,
-                )
-            elif setting.get("type") == "file":
-                uploaded_logo = self.cleaned_data.get(field)
-                if not uploaded_logo:
-                    continue
-                logo_utils.save_tournament_logo(uploaded_logo)
-                continue
             else:
                 value_to_set = self.cleaned_data[field]
 
             TabSettings.set(key, value_to_set)
 
 
-class PublicHomeShortcutsForm(forms.Form):
+class PublicHomepageForm(forms.Form):
     tournament_name = forms.CharField(
         label="Tournament Name",
         max_length=200,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "style": "min-width: 300px;",
-            }
+        required=False,
+        help_text=(
+            "Shown on the public homepage, in the page title, and on the staff login page."
         ),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    theme_color = forms.RegexField(
+        regex=r"^#[0-9a-fA-F]{6}$",
+        label="Theme Color",
+        help_text="Brand color used across navigation, homepage accents, and other theme elements.",
+        error_messages={
+            "invalid": "Please use a valid hex color (for example: #00438A).",
+        },
+        widget=forms.TextInput(attrs={
+            "type": "text",
+            "class": "form-control theme-color-input",
+            "placeholder": "#00438A",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "autocomplete": "off",
+            "style": "max-width: 12rem;",
+        }),
+    )
+    tournament_logo = forms.ImageField(
+        label="Tournament Logo",
+        required=False,
+        help_text=(
+            "Optional homepage logo (PNG, JPEG, or WebP; max 8MB; aspect ratio between 1:2 and 2:1)."
+        ),
+        widget=forms.ClearableFileInput(attrs={
+            "class": "form-control-file",
+            "accept": ",".join(logo_utils.LOGO_ALLOWED_MIME_TYPES),
+        }),
     )
 
     def __init__(self, *args, **kwargs):
-        super(PublicHomeShortcutsForm, self).__init__(*args, **kwargs)
+        super(PublicHomepageForm, self).__init__(*args, **kwargs)
 
-        definitions = PublicHomeShortcut.nav_definition_map()
         self.fields["tournament_name"].initial = TabSettings.get(
             "tournament_name", DEFAULT_TOURNAMENT_NAME
         )
+        self.fields["theme_color"].initial = normalize_theme_color(
+            TabSettings.get("theme_color", DEFAULT_THEME_COLOR),
+            default=DEFAULT_THEME_COLOR,
+        )
+
+        definitions = PublicHomeShortcut.nav_definition_map()
 
         page_options = list(PublicHomePage.objects.filter(is_active=True))
         if not page_options:
@@ -808,7 +778,10 @@ class PublicHomeShortcutsForm(forms.Form):
             for shortcut in PublicHomeShortcut.objects.all()
         })
 
-        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+        # Slot 1 is reserved: the public homepage auto-switches it between
+        # Registration (while open) and Released Pairings (otherwise), so it
+        # is intentionally not rendered as an editable choice.
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
             nav_item = configured_slots.get(slot)
             default_nav_item = default_slots.get(slot)
             if nav_item not in definitions:
@@ -822,6 +795,12 @@ class PublicHomeShortcutsForm(forms.Form):
                 widget=forms.Select(attrs={"class": "form-control"}),
             )
 
+    def clean_tournament_logo(self):
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.validate_tournament_logo(uploaded_logo)
+        return uploaded_logo
+
     def save(self):
         tournament_name = (
             self.cleaned_data["tournament_name"].strip()
@@ -829,7 +808,19 @@ class PublicHomeShortcutsForm(forms.Form):
         )
         TabSettings.set("tournament_name", tournament_name)
 
-        for slot in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+        TabSettings.set(
+            "theme_color",
+            normalize_theme_color(
+                self.cleaned_data["theme_color"],
+                default=DEFAULT_THEME_COLOR,
+            ),
+        )
+
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.save_tournament_logo(uploaded_logo)
+
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
             PublicHomeShortcut.objects.update_or_create(
                 position=slot,
                 defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},

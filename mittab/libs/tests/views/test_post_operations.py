@@ -127,11 +127,12 @@ class TestPostOperations(TestCase):
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
-    def test_public_home_shortcuts_update(self):
+    def test_public_homepage_update(self):
         response = self.client.post(
-            reverse("public_home_shortcuts"),
+            reverse("public_homepage"),
             {
                 "tournament_name": "MIT Invitational",
+                "theme_color": "#A14BC0",
                 "slot_1": "public_team_results",
                 "slot_2": "public_motions",
                 "slot_3": "public_ballots",
@@ -156,6 +157,7 @@ class TestPostOperations(TestCase):
             "public_ballots",
         )
         self.assertEqual(TabSettings.get("tournament_name"), "MIT Invitational")
+        self.assertEqual(TabSettings.get("theme_color"), "#A14BC0")
 
     def test_start_new_tourny_clears_homepage_configuration(self):
         PublicHomePage.ensure_defaults()

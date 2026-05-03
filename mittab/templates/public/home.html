@@ -11,16 +11,16 @@
 
 {% block banner %}{% endblock %}
 
+{# The public homepage is the public landing page and is response-cached for
+   60s. Suppress flash messages here so they don't bleed into the design and,
+   more importantly, can never be baked into a cached response served to
+   another visitor. #}
+{% block messages %}{% endblock %}
+
 {% block content %}
 {% tournament_logo_url as tournament_logo %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
-  <div class="public-home{% if not info_links %} public-home--single{% endif %}"
-       data-public-home
-       data-cur-round="{{ cur_round }}"
-       data-total-rounds="{{ tot_rounds }}"
-       data-pairing-released="{{ pairing_released|yesno:'true,false' }}"
-       data-in-outrounds="{{ in_outrounds|yesno:'true,false' }}"
-       data-current-outround-label="{{ current_outround_label|escape }}">
+  <div class="public-home{% if not info_links %} public-home--single{% endif %}">
 
     <header class="public-home-hero desktop-only">
       {% if tournament_logo %}
@@ -31,16 +31,17 @@
       </div>
       {% endif %}
       <h1 class="public-home-hero__title">Welcome to {% tournament_name %}!</h1>
-      <div class="status-block status-block--inline public-home-hero__status" data-status>
-        <div class="status-icon" aria-hidden="true" data-status-icon>
-          <i class="fas fa-clipboard-check"></i>
-        </div>
-        <span class="status-divider" aria-hidden="true"></span>
-        <div class="status-text" aria-live="polite">
-          <div class="status-primary" data-status-primary>{{ status_primary }}</div>
-          <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
-        </div>
+    </header>
+
+    <header class="public-home-hero-mobile mobile-only">
+      {% if tournament_logo %}
+      <div class="tournament-logo-shell tournament-logo-shell-mobile">
+        <img class="tournament-logo-image"
+             src="{{ tournament_logo }}"
+             alt="{% tournament_name %} logo">
       </div>
+      {% endif %}
+      <h1 class="public-home-hero-mobile__title">Welcome to {% tournament_name %}!</h1>
     </header>
 
     <div class="grid">
@@ -66,30 +67,6 @@
       {% endif %}
 
       <aside class="links" aria-labelledby="public-home-quick-links">
-        <header class="header mobile-only">
-          <h1 class="title" id="public-home-quick-links-mobile">Welcome to {% tournament_name %}!</h1>
-          {% if tournament_logo %}
-          <div class="tournament-logo-shell tournament-logo-shell-mobile">
-            <img class="tournament-logo-image"
-                 src="{{ tournament_logo }}"
-                 alt="{% tournament_name %} logo">
-          </div>
-          {% endif %}
-          {% if not registration_open %}
-          <h2 class="status-title mb-2">Status:</h2>
-          <div class="status-block status-block--inline" data-status>
-            <div class="status-icon" aria-hidden="true" data-status-icon>
-              <i class="fas fa-clipboard-check"></i>
-            </div>
-            <span class="status-divider" aria-hidden="true"></span>
-            <div class="status-text" aria-live="polite">
-              <div class="status-primary" data-status-primary>{{ status_primary }}</div>
-              <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
-            </div>
-          </div>
-          {% endif %}
-        </header>
-
         <h2 class="public-card-header desktop-only" id="public-home-quick-links">Tournament Pages</h2>
 
         {% if info_links %}
@@ -104,14 +81,14 @@
         </div>
         {% endif %}
 
-        {% if registration_open %}
+        {% if show_registration_lead %}
         <aside class="register-cta">
           <div class="register-cta__text">
             <p class="register-cta__title">Registration is open</p>
             <p class="register-cta__body">Sign up your teams and judges here.</p>
           </div>
           <div class="register-cta__actions">
-            <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register</a>
+            <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register new team</a>
             <a class="btn btn-outline-primary btn-sm register-cta__btn" href="{% url 'registration_code_lookup' %}">Edit existing</a>
           </div>
         </aside>

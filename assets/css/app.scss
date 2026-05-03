@@ -28,7 +28,7 @@ $font-size-base: 0.95rem !default;
 }
 
 .navbar-dark .nav-link {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.75);
 }
 
 // Layout utilities
@@ -73,12 +73,26 @@ $font-size-base: 0.95rem !default;
     margin-top: 0;
   }
 
-  // Remove excessive padding for home page
-  .public-home-wrapper & {
+  // Public homepage — strip the white card chrome so the hero (logo, title,
+  // status block) and the grid cards sit directly on the page background.
+  // Uses :has() so the rule applies to #container-main itself, not a
+  // descendant (the previous .public-home-wrapper & selector never matched).
+  &:has(.public-home-wrapper) {
     padding: 0;
-    background: transparent;
-    box-shadow: none;
+    background: transparent !important;
+    box-shadow: none !important;
     max-width: 100%;
+    margin-top: 0;
+
+    // The base layout reserves a row for {% block banner %}, but the public
+    // homepage leaves it empty — collapse the empty <h3> so the logo sits
+    // close to the navbar instead of below a phantom heading.
+    > .row > .col > h3:empty { display: none; }
+
+    // __wide.html applies Bootstrap's `mt-2` to the content row, which adds
+    // 0.5rem of dead space above the hero. Drop it on this page so the
+    // padding on .public-home is the sole top-gap source.
+    > .row.content { margin-top: 0 !important; }
   }
 }
 

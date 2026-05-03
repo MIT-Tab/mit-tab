@@ -86,7 +86,7 @@ body {
 }
 
 .public-home {
-  padding: 2rem 1rem;
+  padding: 1rem 1rem 2rem;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -110,63 +110,24 @@ body {
     }
   }
 
-  .header {
-    @include flex-column(0.5rem);
-    margin-bottom: 1.25rem;
+  .public-home-hero-mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+    text-align: center;
 
-    &.mobile-only {
-      align-items: center;
-      text-align: center;
+    @media (min-width: 992px) { display: none; }
 
-      .title {
-        text-align: inherit;
-        width: 100%;
-        position: relative;
-      }
-
-      .status-block {
-        width: auto;
-      }
-
-      .status-block--inline {
-        justify-content: center;
-        text-align: center;
-        width: auto;
-
-        .status-text {
-          align-items: center;
-          text-align: center;
-        }
-
-        .status-divider {
-          width: 1px;
-          height: 2.5rem;
-          background: rgba(31, 47, 74, 0.18);
-        }
-      }
-
-      @media (min-width: 992px) {
-        display: none;
-      }
-    }
-    .status-title {
+    &__title {
       margin: 0;
-      font-size: 0.8rem;
+      font-size: 1.65rem;
       font-weight: 700;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: rgba(31, 47, 74, 0.6);
+      letter-spacing: -0.015em;
+      line-height: 1.2;
+      color: #1f2f4a;
     }
-
-  }
-
-  .header .title {
-    margin: 0;
-    font-size: 1.85rem;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    line-height: 1.2;
-    color: #1f2f4a;
   }
 
   .divider {
@@ -181,22 +142,6 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
-
-
-    // Hide header on desktop (they only show on mobile)
-    @media (min-width: 992px) {
-      .header {
-        display: none;
-      }
-    }
-
-    .header {
-      margin-bottom: 1.25rem;
-    }
-
-    .title {
-      color: #1d2b44;
-    }
   }
 
   .sidebar {
@@ -313,31 +258,16 @@ body {
   &--mobile {
     display: none;
     flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
     gap: 0.4rem;
     padding: 0.15rem 0 0.45rem;
     margin: 0 0 0.65rem;
-    // min-width:0 prevents the chip strip's intrinsic content width from
-    // forcing its flex-column parent (.links) wider than the page.
-    // Without this, multiple chips were pushing the card past the wrapper.
     min-width: 0;
     width: 100%;
     max-width: 100%;
-    scrollbar-width: thin;
 
     @media (max-width: 991.98px) {
       display: flex;
-    }
-
-    &::-webkit-scrollbar {
-      height: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(28, 54, 94, 0.18);
-      border-radius: 4px;
     }
 
     .info-link-chip {
@@ -345,7 +275,7 @@ body {
       align-items: center;
       gap: 0.4rem;
       flex: 0 0 auto;
-      max-width: 70vw;
+      max-width: 100%;
       padding: 0.4rem 0.8rem;
       border-radius: 999px;
       border: 1px solid rgba(28, 54, 94, 0.18);
@@ -649,7 +579,7 @@ body {
         text-wrap: balance;
     }
   .public-home {
-    padding: 1.5rem 0.75rem;
+    padding: 0.5rem 0.75rem 1.5rem;
   }
 
   .info-links--mobile {

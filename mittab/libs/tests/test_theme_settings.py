@@ -1,11 +1,11 @@
 import pytest
+from django.contrib.auth import get_user_model
 from django.core.cache import caches
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
-from mittab.apps.tab.forms import SettingsForm
+from mittab.apps.tab.forms import PublicHomepageForm
 from mittab.apps.tab.models import TabSettings
-from mittab.apps.tab.views.views import get_settings_from_yaml
 from mittab.libs.cacheing import cache_logic
 
 
@@ -17,42 +17,48 @@ class TestThemeSettings(TestCase):
         super().setUp()
         caches["public"].clear()
         cache_logic.clear_cache()
+        self.client = Client()
+        self.user = get_user_model().objects.create_superuser(
+            username="testuser",
+            password="testpass123",
+            email="test@test.com",
+        )
+        self.client.login(username="testuser", password="testpass123")
 
-    def _build_settings_payload(self, settings):
-        payload = {}
-        for setting in settings:
-            key = f"setting_{setting['name']}"
-            setting_type = setting.get("type")
-            setting_value = setting.get("value")
+    def _shortcut_payload(self):
+        return {
+            "slot_1": "released_pairings",
+            "slot_2": "missing_ballots",
+            "slot_3": "submit_e_ballot",
+            "slot_4": "judge_list",
+            "slot_5": "team_list",
+            "slot_6": "varsity_outrounds",
+            "slot_7": "novice_outrounds",
+        }
 
-            if setting_type == "boolean":
-                if setting_value:
-                    payload[key] = "on"
-                continue
+    def test_public_homepage_form_saves_theme_color(self):
+        payload = {
+            "tournament_name": "MIT Invitational",
+            "theme_color": "#A14BC0",
+            **self._shortcut_payload(),
+        }
 
-            payload[key] = str(setting_value)
-
-        return payload
-
-    def test_settings_form_saves_theme_color(self):
-        yaml_settings, _, _ = get_settings_from_yaml()
-        payload = self._build_settings_payload(yaml_settings)
-        payload["setting_theme_color"] = "#A14BC0"
-
-        form = SettingsForm(payload, settings=yaml_settings)
+        form = PublicHomepageForm(payload)
         self.assertTrue(form.is_valid(), form.errors)
         form.save()
 
         self.assertEqual(TabSettings.get("theme_color"), "#A14BC0")
 
-    def test_settings_form_rejects_invalid_theme_color(self):
-        yaml_settings, _, _ = get_settings_from_yaml()
-        payload = self._build_settings_payload(yaml_settings)
-        payload["setting_theme_color"] = "#12ZZZZ"
+    def test_public_homepage_form_rejects_invalid_theme_color(self):
+        payload = {
+            "tournament_name": "MIT Invitational",
+            "theme_color": "#12ZZZZ",
+            **self._shortcut_payload(),
+        }
 
-        form = SettingsForm(payload, settings=yaml_settings)
+        form = PublicHomepageForm(payload)
         self.assertFalse(form.is_valid())
-        self.assertIn("setting_theme_color", form.errors)
+        self.assertIn("theme_color", form.errors)
 
     def test_theme_css_variables_are_rendered_in_base_template(self):
         TabSettings.set("theme_color", "#A14BC0")
