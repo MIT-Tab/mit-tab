@@ -1,0 +1,28 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Tournament Info Links{% endblock %}
+{% block banner %}<span class="registration-page-title">Tournament Info Links</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12 registration-admin">
+    <div class="registration-admin__header">
+        <div class="registration-admin__titles">
+            <h5>Tournament Info Links</h5>
+            <p>
+                Shown on the public homepage for the duration of the tournament. Use these for
+                things like a Discord invite, tournament packet, schedule, or feedback form.
+            </p>
+        </div>
+    </div>
+
+    <div class="registration-admin__panel">
+        {% include "registration/_tournament_link_table.html" with links=info_links link_kind="info" empty_message="No info links yet. Add the first one below." %}
+        {% include "registration/_tournament_link_form.html" with link_kind="info" submit_label="Add Info Link" %}
+    </div>
+</div>
+{% endblock %}

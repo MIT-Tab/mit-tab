@@ -673,6 +673,20 @@ def settings_form(request):
         })
 
 
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def info_links_admin(request):
+    # Local import to avoid a circular import between the tab and registration
+    # apps at module load.
+    from mittab.apps.registration.models import InfoLink
+    return render(
+        request,
+        "tab/info_links_admin.html",
+        {
+            "info_links": list(InfoLink.objects.all()),
+        },
+    )
+
+
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
     judge_info = {"errors": [], "uploaded": False}

@@ -2,7 +2,13 @@ from django.contrib import admin
 
 from mittab.apps.tab.models import Judge, Team
 
-from .models import Registration, RegistrationChangeLog, RegistrationConfig
+from .models import (
+    InfoLink,
+    Registration,
+    RegistrationChangeLog,
+    RegistrationConfig,
+    RegistrationLink,
+)
 
 
 class RegistrationTeamInline(admin.TabularInline):
@@ -82,3 +88,21 @@ class RegistrationChangeLogAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+class _TournamentLinkAdmin(admin.ModelAdmin):
+    list_display = ("title", "url", "is_active", "display_order", "updated_at")
+    list_editable = ("is_active", "display_order")
+    list_display_links = ("title",)
+    search_fields = ("title", "url")
+    ordering = ("display_order", "created_at")
+
+
+@admin.register(InfoLink)
+class InfoLinkAdmin(_TournamentLinkAdmin):
+    pass
+
+
+@admin.register(RegistrationLink)
+class RegistrationLinkAdmin(_TournamentLinkAdmin):
+    pass

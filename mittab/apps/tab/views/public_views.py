@@ -27,7 +27,7 @@ from mittab.apps.tab.public_rankings import (
     get_ranking_settings,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.registration.models import RegistrationConfig
+from mittab.apps.registration.models import InfoLink, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
@@ -76,6 +76,8 @@ def public_home(request):
     in_outrounds = False
     current_outround_label = ""
 
+    info_links = list(InfoLink.objects.filter(is_active=True))
+
     if cur_round_setting < 1:
         pairing_released = False
         status_primary = "Tournament"
@@ -88,6 +90,7 @@ def public_home(request):
                 "status_secondary": status_secondary,
                 "registration_open": registration_open,
                 "registration_url": reverse("registration_portal"),
+                "info_links": info_links,
             },
         )
 
@@ -146,6 +149,7 @@ def public_home(request):
             "status_secondary": status_secondary,
             "registration_open": registration_open,
             "registration_url": reverse("registration_portal"),
+            "info_links": info_links,
         },
     )
 
