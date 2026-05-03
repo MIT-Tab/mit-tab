@@ -1,0 +1,44 @@
+<div class="registration-subform" data-form="team">
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="registration-subform__header" data-subform-toggle role="button" tabindex="0" aria-expanded="true">
+        <span class="registration-subform__chevron" aria-hidden="true">
+            <i class="fas fa-chevron-down"></i>
+        </span>
+        <span class="registration-subform__summary">
+            <span class="registration-subform__name registration-subform__name--placeholder" data-subform-summary-name>Untitled team</span>
+            <span class="registration-subform__detail" data-subform-summary-detail></span>
+        </span>
+        <span class="registration-subform__actions">
+            <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="team">Remove</button>
+        </span>
+    </div>
+    {% for error in form.non_field_errors %}
+    <div class="alert alert-danger registration-subform__alert mb-0">{{ error }}</div>
+    {% endfor %}
+    <div class="registration-subform__body">
+        <div class="registration-team-grid">
+            <div class="registration-team-panel">
+                <h6 class="registration-team-panel__title">Team Info</h6>
+                {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors %}
+                <div class="registration-team-panel__secondary">
+                    <div class="registration-field registration-field--compact">
+                        <label class="registration-field__label" for="{{ form.team_school_source.id_for_label }}">School Protection</label>
+                        {{ form.team_school_source }}
+                        {% if form.team_school_source.errors %}
+                        <div class="registration-field__error">{{ form.team_school_source.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="registration-field registration-field--compact">
+                        <label class="registration-field__label" for="{{ form.seed_choice.id_for_label }}">Seed</label>
+                        {{ form.seed_choice }}
+                        {% if form.seed_choice.errors %}
+                        <div class="registration-field__error">{{ form.seed_choice.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% include "registration/_debater_card.html" with slot="first" title="First Debater" prefix="debater_one" %}
+            {% include "registration/_debater_card.html" with slot="second" title="Second Debater" prefix="debater_two" %}
+        </div>
+    </div>
+</div>

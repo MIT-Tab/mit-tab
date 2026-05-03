@@ -38,6 +38,7 @@
 {% url "view_scratches" as view_scratches %}
 {% url "add_scratch" as add_scratch %}
 {% url "settings_form" as settings_form %}
+{% url "registration_admin" as registration_admin %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -139,6 +140,7 @@
             {% if motions_enabled_flag %}
             <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
             {% endif %}
+            <a class="dropdown-item {% active request registration_admin %}" href="{{ registration_admin|with_return_to }}">Registrations</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny|with_return_to }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>

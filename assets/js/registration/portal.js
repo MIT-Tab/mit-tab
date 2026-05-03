@@ -1,0 +1,696 @@
+import $ from "jquery";
+import "select2";
+
+const DEB_URL = (id) => `/registration/api/debaters/${id}/`;
+
+const customDebaters = {};
+
+const getRegistrationSelect = () =>
+  $("[data-school-select='registration']").first();
+
+const getRegistrationSchoolValue = () => getRegistrationSelect().val() || "";
+
+const getOptionLabel = ($select, value) => {
+  if (!value) return "";
+  const option = $select.find(`option[value="${value}"]`);
+  return option.length ? option.text() : "";
+};
+
+const getRegistrationSchoolLabel = () => {
+  const $select = getRegistrationSelect();
+  return getOptionLabel($select, $select.val());
+};
+
+const findSchoolValueByName = (name) => {
+  const normalized = name.trim().toLocaleLowerCase();
+  let match = "";
+  $("[data-school-select='registration']")
+    .first()
+    .find("option")
+    .each((_, option) => {
+      if (
+        !match &&
+        (option.textContent || "").trim().toLocaleLowerCase() === normalized
+      ) {
+        match = option.value;
+      }
+    });
+  return match;
+};
+
+const setPlaceholder = ($select, message, disabled = true) => {
+  $select.empty().append(`<option value="">${message}</option>`);
+  $select.prop("disabled", disabled);
+};
+
+const insertAtTop = ($select, option) => {
+  const $first = $select.children("option").first();
+  if ($first.length && !$first.val()) {
+    $first.after(option);
+  } else {
+    $select.prepend(option);
+  }
+};
+
+const fillDebaterData = (selectEl, debaterData = null) => {
+  const { apdaTarget } = selectEl.dataset;
+  const noviceField = selectEl
+    .closest("[data-debater]")
+    ?.querySelector(`[name$="${selectEl.dataset.debaterInput}_novice_status"]`);
+  const qualifiedField = selectEl
+    .closest("[data-debater]")
+    ?.querySelector(
+      `input[name$="${selectEl.dataset.debaterInput}_qualified"]`,
+    );
+  const apdaField = apdaTarget ? document.getElementById(apdaTarget) : null;
+  if (apdaField) {
+    apdaField.value =
+      (debaterData && (debaterData.apda_id || debaterData.id)) || "";
+  }
+  if (noviceField) {
+    noviceField.value = debaterData?.status === "Novice" ? "1" : "0";
+  }
+  if (qualifiedField) {
+    qualifiedField.value = debaterData?.apda_id ? "on" : "";
+  }
+};
+
+const syncDebater = (selectEl) => {
+  const option = selectEl.selectedOptions && selectEl.selectedOptions[0];
+  if (option && option.dataset.debater) {
+    try {
+      fillDebaterData(selectEl, JSON.parse(option.dataset.debater));
+      return;
+    } catch (error) {
+      // ignore JSON parse errors
+    }
+  }
+  fillDebaterData(selectEl);
+};
+
+const renderDebaterList = ($select, entries = [], schoolValue = "") => {
+  const currentValue = $select.val() || $select.data("currentValue") || "";
+  $select.empty().append('<option value="">Select a debater</option>');
+  entries.forEach((entry) => {
+    const name = entry.name || entry.full_name || "";
+    const option = document.createElement("option");
+    option.value = name.startsWith("custom:") ? name : name;
+    option.textContent = name;
+    option.dataset.debater = JSON.stringify({
+      id: entry.id || entry.apda_id,
+      apda_id: entry.apda_id || entry.id,
+      name,
+      status: entry.status,
+    });
+    $select.append(option);
+  });
+  if (customDebaters[schoolValue]) {
+    customDebaters[schoolValue].forEach((debater) => {
+      const option = document.createElement("option");
+      option.value = debater.name;
+      option.textContent = debater.name;
+      option.dataset.debater = JSON.stringify(debater);
+      insertAtTop($select, option);
+    });
+  }
+  const restoredValue = $select.find(`option[value="${currentValue}"]`).length
+    ? currentValue
+    : "";
+  $select.val(restoredValue);
+  $select.prop("disabled", false);
+  syncDebater($select[0]);
+  // Notify listeners (summary header, etc.) that the value has changed
+  // — needed because programmatic .val() does not fire a change event.
+  $select.trigger("change");
+};
+
+const broadcastCustomDebater = (schoolValue, debater) => {
+  $("[data-school-select]").each((_, el) => {
+    if (el.value !== schoolValue) return;
+    const listId = el.dataset.nameId;
+    if (!listId) return;
+    const $debaterSelect = $(`#${listId}`);
+    if (!$debaterSelect.length) return;
+    if ($debaterSelect.prop("disabled")) {
+      setPlaceholder($debaterSelect, "Select a debater", false);
+    }
+    const option = document.createElement("option");
+    option.value = debater.name;
+    option.textContent = debater.name;
+    option.dataset.debater = JSON.stringify(debater);
+    insertAtTop($debaterSelect, option);
+  });
+};
+
+const loadDebaters = ($schoolSelect) => {
+  const listId = $schoolSelect.data("nameId");
+  if (!listId) return;
+  const $debaterSelect = $(`#${listId}`);
+  if (!$debaterSelect.length) return;
+  const value = $schoolSelect.val();
+  if (!value) {
+    $schoolSelect.removeData("loadedDebaterSchool");
+    setPlaceholder($debaterSelect, "Select a school first");
+    return;
+  }
+  if (
+    $schoolSelect.data("loadedDebaterSchool") === value &&
+    $debaterSelect.find("option").length > 1
+  ) {
+    return;
+  }
+  if (value.startsWith("custom:")) {
+    $schoolSelect.data("loadedDebaterSchool", value);
+    renderDebaterList($debaterSelect, [], value);
+    return;
+  }
+  if (!value.startsWith("apda:")) {
+    $schoolSelect.removeData("loadedDebaterSchool");
+    setPlaceholder($debaterSelect, "Select a school first");
+    return;
+  }
+  $schoolSelect.data("loadedDebaterSchool", value);
+  setPlaceholder($debaterSelect, "Loading debaters...");
+  $.getJSON(DEB_URL(value.split(":")[1]))
+    .done((data) => {
+      const entries = Array.isArray(data) ? data : data.debaters || [];
+      renderDebaterList($debaterSelect, entries, value);
+    })
+    .fail(() => {
+      $schoolSelect.removeData("loadedDebaterSchool");
+      setPlaceholder($debaterSelect, "Unable to load debaters");
+    });
+};
+
+const toggleAddTeamButton = () => {
+  const $addButton = $("[data-add-form='team']");
+  const hasSchool = Boolean(getRegistrationSchoolValue());
+  $addButton.prop("disabled", !hasSchool);
+};
+
+const initJudgeSchoolSelect = ($scope = $(document)) => {
+  $scope.find("[data-judge-school-select]").each((_, el) => {
+    const $select = $(el);
+    if ($select.data("select2")) return;
+    $select.find('option[value=""]').remove();
+    $select.select2({
+      theme: "bootstrap4",
+      width: "100%",
+      placeholder: "Select schools",
+      closeOnSelect: false,
+    });
+  });
+};
+
+const getSelectValues = ($select) => {
+  const value = $select.val();
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return value ? [value] : [];
+};
+
+const getAutoPrefillValues = ($select) => {
+  const values = $select.data("prefillAutoValues");
+  return Array.isArray(values) ? values : [];
+};
+
+const setPrefillValue = ($select, value) => {
+  let autoValues = [];
+  if (Array.isArray(value)) {
+    autoValues = value.filter(Boolean);
+  } else if (value) {
+    autoValues = [value];
+  }
+  $select.data("prefillAuto", true);
+  $select.val(value).trigger("change");
+  $select.data("prefillAuto", false);
+  $select.data("prefillAutoValues", autoValues);
+};
+
+const refreshJudgeSchoolSelects = () => {
+  $("[data-judge-school-select]").each((_, el) => {
+    const $select = $(el);
+    if ($select.data("select2")) {
+      $select.trigger("change.select2");
+    }
+  });
+};
+
+const updateManagementForm = (prefix, delta) => {
+  const $total = $(`[name="${prefix}-TOTAL_FORMS"]`);
+  $total.val(parseInt($total.val(), 10) + delta);
+};
+
+const removeForm = (button) => {
+  const $form = $(button).closest("[data-form]");
+  const $deleteField = $form.find('input[name$="-DELETE"]');
+  if ($deleteField.length) {
+    $deleteField.val("on");
+    $form.addClass("d-none");
+  } else {
+    $form.remove();
+  }
+};
+
+const truncate = (text, max = 60) => {
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1).trim()}…` : text;
+};
+
+const readSelectedText = ($el) => {
+  if (!$el || !$el.length) return "";
+  if ($el.is("select")) {
+    // Skip placeholder/loading options — they always have value=""
+    const value = $el.val();
+    if (!value) return "";
+    return ($el.find("option:selected").text() || "").trim();
+  }
+  return ($el.val() || "").toString().trim();
+};
+
+const updateSubformSummary = ($subform) => {
+  const $summaryName = $subform.find("[data-subform-summary-name]");
+  const $summaryDetail = $subform.find("[data-subform-summary-detail]");
+  if (!$summaryName.length) return;
+  const type = $subform.data("form");
+
+  if (type === "team") {
+    const teamName = readSelectedText(
+      $subform.find('input[name$="-name"]').first(),
+    );
+    const d1 = readSelectedText(
+      $subform.find('select[name$="debater_one_name"]'),
+    );
+    const d2 = readSelectedText(
+      $subform.find('select[name$="debater_two_name"]'),
+    );
+    $summaryName.text(teamName || "Untitled team");
+    $summaryName.toggleClass(
+      "registration-subform__name--placeholder",
+      !teamName,
+    );
+    const debaters = [d1, d2].filter(Boolean).join(" · ");
+    $summaryDetail.text(truncate(debaters));
+  } else if (type === "judge") {
+    const judgeName = readSelectedText(
+      $subform.find('input[name$="-name"]').first(),
+    );
+    const email = readSelectedText(
+      $subform.find('input[name$="-email"]').first(),
+    );
+    $summaryName.text(judgeName || "Untitled judge");
+    $summaryName.toggleClass(
+      "registration-subform__name--placeholder",
+      !judgeName,
+    );
+    $summaryDetail.text(truncate(email));
+  }
+};
+
+const subformHasErrors = ($subform) =>
+  $subform.find(
+    ".alert-danger, .registration-field__error, .text-danger, .invalid-feedback",
+  ).length > 0;
+
+const collapseSubformIfPopulated = ($subform) => {
+  if ($subform.data("forceExpanded")) return;
+  if (subformHasErrors($subform)) return;
+  const nameVal = (
+    $subform.find('input[name$="-name"]').first().val() || ""
+  ).trim();
+  if (nameVal) {
+    $subform.addClass("is-collapsed");
+    $subform.find("[data-subform-toggle]").attr("aria-expanded", "false");
+  }
+};
+
+const initSubforms = ($scope) => {
+  $scope.find("[data-form]").each((_, el) => {
+    const $subform = $(el);
+    if ($subform.data("subformInitialized")) return;
+    $subform.data("subformInitialized", true);
+    updateSubformSummary($subform);
+    collapseSubformIfPopulated($subform);
+  });
+};
+
+const appendSchoolOption = (value, name) => {
+  $("[data-school-select]").each((_, el) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = name;
+    insertAtTop($(el), option);
+  });
+  $("[data-judge-school-select]").each((_, el) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = name;
+    insertAtTop($(el), option);
+  });
+  refreshJudgeSchoolSelects();
+};
+
+const ensureOptionExists = ($select, value, label) => {
+  if (!value) return;
+  if (!$select.find(`option[value="${value}"]`).length) {
+    $select.append(
+      $("<option>")
+        .val(value)
+        .text(label || "Selected School"),
+    );
+  }
+};
+
+const syncSchoolOptionsFromRegistration = ($select) => {
+  if ($select.is('[data-school-select="registration"]')) return;
+  const $registration = getRegistrationSelect();
+  if (!$registration.length) return;
+  const regOptions = $registration.children();
+  if (regOptions.length <= 1) return;
+  const currentOptions = $select.children();
+  if (currentOptions.length > 2 && currentOptions.length >= regOptions.length) {
+    return;
+  }
+  const isMultiple = $select.prop("multiple");
+  const currentValues = getSelectValues($select);
+  const currentLabels = {};
+  currentValues.forEach((value) => {
+    currentLabels[value] = getOptionLabel($select, value);
+  });
+  $select.empty();
+  regOptions.each((_, option) => {
+    if (!isMultiple || option.value) {
+      $select.append($(option).clone());
+    }
+  });
+  if (isMultiple) {
+    currentValues.forEach((value) => {
+      ensureOptionExists($select, value, currentLabels[value]);
+    });
+    $select.val(currentValues);
+    return;
+  }
+  const currentValue = currentValues[0] || "";
+  if (currentValue) {
+    ensureOptionExists($select, currentValue, currentLabels[currentValue]);
+    $select.val(currentValue);
+  }
+};
+
+const maybePrefillFromRegistration = ($select) => {
+  if (!$select.data("prefillFromRegistration") || $select.val()) {
+    return;
+  }
+  syncSchoolOptionsFromRegistration($select);
+  const regValue = getRegistrationSchoolValue();
+  if (!regValue) return;
+  const regLabel = getRegistrationSchoolLabel();
+  ensureOptionExists($select, regValue, regLabel);
+  setPrefillValue($select, regValue);
+  $select.data("prefillManual", false);
+};
+
+const prefillTeamSchools = () => {
+  const regValue = getRegistrationSchoolValue();
+  if (!regValue) return;
+  const regLabel = getRegistrationSchoolLabel();
+  $("[data-prefill-from-registration='true']").each((_, element) => {
+    const $select = $(element);
+    syncSchoolOptionsFromRegistration($select);
+    if ($select.data("prefillManual")) {
+      return;
+    }
+    ensureOptionExists($select, regValue, regLabel);
+    const isMultiple = $select.prop("multiple");
+    const currentValue = $select.val();
+    if (isMultiple) {
+      const values = getSelectValues($select);
+      const autoValues = getAutoPrefillValues($select);
+      const manualValues = values.filter(
+        (value) => !autoValues.includes(value),
+      );
+      if (manualValues.length) {
+        $select.data("prefillManual", true);
+        return;
+      }
+      setPrefillValue($select, [regValue]);
+      return;
+    }
+    if (!isMultiple && currentValue === regValue) {
+      return;
+    }
+    setPrefillValue($select, regValue);
+  });
+};
+
+const configureSchoolSelect = ($select) => {
+  syncSchoolOptionsFromRegistration($select);
+  maybePrefillFromRegistration($select);
+  loadDebaters($select);
+};
+
+const addForm = (type, maxTeams) => {
+  const prefix = type === "team" ? "teams" : "judges";
+  const $template = $(`#${type}-empty-form`);
+  if (!$template.length) return;
+  const total = parseInt($(`[name="${prefix}-TOTAL_FORMS"]`).val(), 10);
+  if (type === "team" && total >= maxTeams) return;
+  const html = $template.html().replace(/__prefix__/g, total);
+  const $element = $(html);
+  $(`[data-formset-container="${type}"]`).append($element);
+  updateManagementForm(prefix, 1);
+  $element.find("[data-school-select]").each((_, el) => {
+    configureSchoolSelect($(el));
+  });
+  initJudgeSchoolSelect($element);
+  prefillTeamSchools();
+  $element.data("forceExpanded", true);
+  $element.data("subformInitialized", true);
+  updateSubformSummary($element);
+};
+
+// Hide a Bootstrap modal cleanly. Two cross-browser quirks to handle:
+//   1. iOS Safari leaves the modal/keyboard stuck if hide() is called
+//      while a child input still has focus — so we blur first.
+//   2. Bootstrap occasionally fails to remove the .modal-backdrop and the
+//      .modal-open class from <body> when hide() is triggered
+//      programmatically. We force-clean both on hidden.bs.modal as a
+//      backstop so the page doesn't stay greyed out.
+const hideModal = (selector) => {
+  if (
+    document.activeElement &&
+    typeof document.activeElement.blur === "function"
+  ) {
+    document.activeElement.blur();
+  }
+  const $modal = $(selector);
+  $modal.one("hidden.bs.modal", () => {
+    if (!$(".modal.show").length) {
+      $(".modal-backdrop").remove();
+      $("body").removeClass("modal-open").css("padding-right", "");
+    }
+  });
+  $modal.modal("hide");
+};
+
+const registerQuickActions = () => {
+  const $newSchoolInput = $("#new-school-name");
+  $("#create-school-btn").on("click", () => {
+    const name = ($newSchoolInput.val() || "").trim();
+    if (!name) {
+      alert("Please enter a school name");
+      return;
+    }
+    const existingValue = findSchoolValueByName(name);
+    if (existingValue) {
+      alert(`School "${name}" is already available in the school list.`);
+      return;
+    }
+    const value = `custom:${encodeURIComponent(name)}`;
+    appendSchoolOption(value, name);
+    $newSchoolInput.val("");
+    hideModal("#new-school-modal");
+  });
+
+  $("#create-debater-btn").on("click", () => {
+    const $school = $("#new-debater-school");
+    const schoolValue = $school.val();
+    const name = ($("#new-debater-name").val() || "").trim();
+    const status = $("#new-debater-status").val() || "0";
+    if (!schoolValue) {
+      alert("Please select a school");
+      return;
+    }
+    if (!name) {
+      alert("Please enter a debater name");
+      return;
+    }
+    const debater = {
+      id: "",
+      apda_id: "",
+      name,
+      full_name: name,
+      status: status === "1" ? "Novice" : "Varsity",
+      qualified: false,
+    };
+    if (!customDebaters[schoolValue]) {
+      customDebaters[schoolValue] = [];
+    }
+    customDebaters[schoolValue].push(debater);
+    broadcastCustomDebater(schoolValue, debater);
+    $("#new-debater-name").val("");
+    $("#new-debater-status").val("0");
+    hideModal("#new-debater-modal");
+  });
+};
+
+const initNewDebaterSelect = () => {
+  const $mainSchool = getRegistrationSelect();
+  const $target = $("#new-debater-school");
+  if (!$mainSchool.length || !$target.length) return;
+  const sync = () => {
+    const current = $target.val();
+    $target.empty().append('<option value="">Select school</option>');
+    $mainSchool.find("option").each((_, opt) => {
+      if (opt.value) {
+        $target.append($("<option>").val(opt.value).text(opt.textContent));
+      }
+    });
+    if (current) {
+      $target.val(current);
+    }
+  };
+  sync();
+  const observer = new MutationObserver(sync);
+  observer.observe($mainSchool[0], { childList: true });
+};
+
+export default function initRegistrationPortal() {
+  const $root = $("#registration-app");
+  if (!$root.length) return;
+  if ($root.data("registrationInitialized")) return;
+  $root.data("registrationInitialized", true);
+  const maxTeams = parseInt($root.data("maxTeams") || "200", 10);
+
+  $root.find("[data-school-select]").each((_, el) => {
+    configureSchoolSelect($(el));
+  });
+  initJudgeSchoolSelect($root);
+
+  toggleAddTeamButton();
+  prefillTeamSchools();
+  registerQuickActions();
+  initNewDebaterSelect();
+  initSubforms($root);
+
+  $root.on("change", "[data-school-select]", function onSchoolChange() {
+    const $select = $(this);
+    configureSchoolSelect($select);
+    if ($select.is('[data-school-select="registration"]')) {
+      toggleAddTeamButton();
+      prefillTeamSchools();
+    } else if (
+      $select.data("prefillFromRegistration") &&
+      !$select.data("prefillAuto")
+    ) {
+      $select.data("prefillManual", true);
+    }
+  });
+
+  $root.on("change", "[data-debater-input]", function onDebChange() {
+    syncDebater(this);
+  });
+
+  $root.on(
+    "change",
+    "[data-judge-school-select]",
+    function onJudgeSchoolChange() {
+      const $select = $(this);
+      if (
+        $select.data("prefillFromRegistration") &&
+        !$select.data("prefillAuto")
+      ) {
+        $select.data("prefillManual", true);
+      }
+    },
+  );
+
+  $root.on("click", "[data-add-form]", function onAddClick(event) {
+    event.preventDefault();
+    addForm($(this).data("addForm"), maxTeams);
+  });
+
+  $root.on("click", "[data-remove-form]", function onRemoveClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    removeForm(this);
+  });
+
+  const toggleSubform = (target) => {
+    const $subform = $(target).closest("[data-form]");
+    $subform.toggleClass("is-collapsed");
+    const isCollapsed = $subform.hasClass("is-collapsed");
+    $subform
+      .find("[data-subform-toggle]")
+      .attr("aria-expanded", isCollapsed ? "false" : "true");
+    if (!isCollapsed) {
+      $subform.data("forceExpanded", true);
+    }
+  };
+
+  $root.on("click", "[data-subform-toggle]", function onToggleClick(event) {
+    if ($(event.target).closest("[data-remove-form]").length) return;
+    event.preventDefault();
+    toggleSubform(this);
+  });
+
+  $root.on("keydown", "[data-subform-toggle]", function onToggleKey(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if ($(event.target).closest("[data-remove-form]").length) return;
+    event.preventDefault();
+    toggleSubform(this);
+  });
+
+  $root.on(
+    "input change",
+    "[data-form] input, [data-form] select",
+    function onFieldChange() {
+      const $subform = $(this).closest("[data-form]");
+      updateSubformSummary($subform);
+    },
+  );
+
+  $root.on(
+    "click",
+    "[data-availability-action]",
+    function onAvailabilityBulk(event) {
+      event.preventDefault();
+      const checked = $(this).data("availabilityAction") === "select";
+      $(this)
+        .closest("[data-availability-group]")
+        .find('input[type="checkbox"]')
+        .prop("checked", checked)
+        .trigger("change");
+    },
+  );
+
+  // Warn the user before leaving the registration page (reload, close, back,
+  // or follow a link). Only skip the prompt when the form is actually being
+  // submitted. Browsers also require at least one user interaction with the
+  // page before they'll show the prompt — the form itself supplies that.
+  const formEl = $root.find("[data-registration-form]")[0];
+  if (formEl) {
+    let allowUnload = false;
+    formEl.addEventListener("submit", () => {
+      allowUnload = true;
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (allowUnload) return;
+      event.preventDefault();
+      // Required for Safari/Firefox to trigger the "Leave site?" prompt.
+      // eslint-disable-next-line no-param-reassign
+      event.returnValue = "";
+    });
+  }
+}

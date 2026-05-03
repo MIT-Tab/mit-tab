@@ -1,5 +1,7 @@
 from django import template
 from django.forms.fields import FileField
+from django.utils.html import urlize
+from django.utils.safestring import mark_safe
 
 from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.helpers import get_redirect_target
@@ -90,9 +92,27 @@ def manual_judge_audit_events(context, round_id):
     events = context.get("manual_judge_audit_events", {})
     return events.get(round_id, [])
 
+
 @register.simple_tag
 def tournament_name():
     return TabSettings.get("tournament_name", "New Tournament")
+
+
+@register.filter(name="registration_text", needs_autoescape=True)
+def registration_text(value, autoescape=True):
+    if not value:
+        return ""
+    linked = urlize(value, nofollow=True, autoescape=autoescape)
+    return mark_safe(linked.replace("\n", "<br>"))
+
+
+@register.filter(name="get_field")
+def get_field(form, field_name):
+    """Get a form field by name dynamically."""
+    try:
+        return form[field_name]
+    except (KeyError, TypeError):
+        return None
 
 
 @register.simple_tag(takes_context=True)
