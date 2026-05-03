@@ -197,8 +197,13 @@ class Debater(models.Model):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    qualified = models.BooleanField(default=False)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
+    school = models.ForeignKey("School",
+                               null=True,
+                               blank=True,
+                               on_delete=models.SET_NULL)
 
     def save(self,
              force_insert=False,
@@ -243,6 +248,13 @@ class Team(AuditAttributionMixin):
                                       on_delete=models.SET_NULL,
                                       related_name="hybrid_school")
     debaters = models.ManyToManyField(Debater)
+    registration = models.ForeignKey(
+        "registration.Registration",
+        related_name="teams",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     UNSEEDED = 0
     FREE_SEED = 1
     HALF_SEED = 2
@@ -427,6 +439,13 @@ class Judge(AuditAttributionMixin):
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
     email = models.EmailField(max_length=254, blank=True, null=True)
+    registration = models.ForeignKey(
+        "registration.Registration",
+        related_name="judges",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     ballot_code = models.CharField(max_length=255,
                                    blank=True,
                                    null=True,

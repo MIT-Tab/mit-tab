@@ -1,0 +1,54 @@
+<div class="registration-subform" data-form="judge">
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="registration-subform__header" data-subform-toggle role="button" tabindex="0" aria-expanded="true">
+        <span class="registration-subform__chevron" aria-hidden="true">
+            <i class="fas fa-chevron-down"></i>
+        </span>
+        <span class="registration-subform__summary">
+            <span class="registration-subform__name registration-subform__name--placeholder" data-subform-summary-name>Untitled judge</span>
+            <span class="registration-subform__detail" data-subform-summary-detail></span>
+        </span>
+        <span class="registration-subform__actions">
+            <button type="button" class="btn btn-outline-danger btn-sm" data-remove-form="judge">Remove</button>
+        </span>
+    </div>
+    {% for error in form.non_field_errors %}
+    <div class="alert alert-danger registration-subform__alert mb-0">{{ error }}</div>
+    {% endfor %}
+    <div class="registration-subform__body">
+        <div class="registration-judge-grid">
+            {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors %}
+            {% include "registration/_input_group.html" with field=form.email label="Email" errors=form.email.errors %}
+            <div class="registration-judge-grid__item--exp">
+                {% include "registration/_input_group.html" with field=form.experience label="Experience" errors=form.experience.errors %}
+            </div>
+            <div class="registration-field registration-judge-grid__item--wide">
+                <label class="registration-field__label" for="{{ form.schools.id_for_label }}">Schools</label>
+                {{ form.schools }}
+                {% if form.schools.errors %}
+                <div class="registration-field__error">{{ form.schools.errors }}</div>
+                {% endif %}
+            </div>
+            {% if form.availability_fields %}
+            <div class="registration-field registration-judge-grid__item--wide" data-availability-group>
+                <div class="judge-availability__header">
+                    <label class="registration-field__label">Availability</label>
+                    <div class="judge-availability__bulk">
+                        <button type="button" class="judge-availability__bulk-btn" data-availability-action="select">Select all</button>
+                        <span class="judge-availability__bulk-divider" aria-hidden="true">·</span>
+                        <button type="button" class="judge-availability__bulk-btn" data-availability-action="clear">Clear</button>
+                    </div>
+                </div>
+                <div class="judge-availability">
+                    {% for availability in form.availability_fields %}
+                    <div class="custom-control custom-checkbox">
+                        {{ availability.field }}
+                        <label class="custom-control-label" for="{{ availability.field.id_for_label }}">{{ availability.label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

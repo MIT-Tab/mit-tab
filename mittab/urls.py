@@ -28,6 +28,7 @@ urlpatterns = [
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
+    path("registration/", include("mittab.apps.registration.urls")),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
     path(
         "apda-board/schools/export/",
