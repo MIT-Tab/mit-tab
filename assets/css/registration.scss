@@ -82,6 +82,47 @@
     align-items: center;
   }
 
+  // Subdued helper row for low-frequency actions (e.g. "+ Add new school")
+  // that should sit below their related fields rather than dominating the
+  // section header.
+  .registration-section-helper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+    color: var(--rg-text-muted);
+    line-height: 1.4;
+  }
+
+  .registration-section-helper__label {
+    color: var(--rg-text-soft);
+  }
+
+  .registration-section-helper__sep {
+    color: var(--rg-text-soft);
+  }
+
+  .registration-section-helper__link {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--rg-accent);
+    cursor: pointer;
+    line-height: 1.4;
+
+    &:hover,
+    &:focus {
+      color: #1d4d99;
+      text-decoration: underline;
+      outline: none;
+    }
+  }
+
   // ---------- Field (label above input) ----------
 
   .registration-field {

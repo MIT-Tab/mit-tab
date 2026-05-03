@@ -24,11 +24,7 @@
             <div class="registration-section-header">
                 <div class="registration-section-titles">
                     <h2 class="registration-section-title">School &amp; Contact</h2>
-                    <p class="registration-section-subtitle">Pick your school and the email we should reach you at. Missing a school or debater? Add them with the buttons on the right.</p>
-                </div>
-                <div class="registration-section-actions">
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-school-modal">+ New School</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-debater-modal">+ New Debater</button>
+                    <p class="registration-section-subtitle">Pick your school and the email we should reach you at.</p>
                 </div>
             </div>
             {% for error in registration_form.non_field_errors %}
@@ -37,6 +33,12 @@
             <div class="registration-field-row">
                 {% include "registration/_input_group.html" with field=registration_form.school label="School" errors=registration_form.school.errors %}
                 {% include "registration/_input_group.html" with field=registration_form.email label="Email" errors=registration_form.email.errors %}
+            </div>
+            <div class="registration-section-helper">
+                <span class="registration-section-helper__label">Don't see what you need?</span>
+                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-school-modal">+ Add new school</button>
+                <span class="registration-section-helper__sep" aria-hidden="true">·</span>
+                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-debater-modal">+ Add new debater</button>
             </div>
         </section>
 
