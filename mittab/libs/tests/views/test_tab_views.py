@@ -437,12 +437,26 @@ class TestTabViews(TestCase):
             sent_at=timezone.now() - EMAIL_RATE_LIMIT_WINDOW - timedelta(minutes=1)
         )
 
+        registration_sent_judge = Judge.objects.create(
+            name="Registration Sent Judge",
+            rank=3.5,
+            email=None,
+        )
+        registration_sent_judge.schools.add(School.objects.first())
+        JudgeCodeEmailLog.objects.create(
+            judge=registration_sent_judge,
+            email="",
+            ballot_code=registration_sent_judge.ballot_code,
+        )
+
         response = self.client.get(reverse("send_judge_codes"))
         self.assertEqual(response.status_code, 200)
 
         content = response.content.decode()
         self.assertIn("Select Never Received", content)
         self.assertIn("Select All", content)
+        self.assertIn("Registration Sent Judge", content)
+        self.assertIn("Missing email", content)
         self.assertRegex(
             content,
             rf'name="judge_ids" value="{never_sent_judge.id}" checked',

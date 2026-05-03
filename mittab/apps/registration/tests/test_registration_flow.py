@@ -188,11 +188,6 @@ def test_registration_flow_creates_objects(email_service, client):
     assert log.snapshot["teams"][0]["debaters"][0]["apda_id"] == 1000
     assert "email" not in log.snapshot["judges"][0]
     assert f"(Code: {judge.ballot_code})".encode() not in response.content
-    code_ui = client.get("/send_judge_codes/")
-    assert code_ui.status_code == 200
-    assert b"Reg Judge" in code_ui.content
-    assert b"Missing email" in code_ui.content
-    assert b"Default selection: 0 who have never received" in code_ui.content
 
 
 @pytest.mark.django_db
