@@ -53,7 +53,10 @@ def _registration_for_email(registration):
             ),
             Prefetch(
                 "judges",
-                queryset=Judge.objects.prefetch_related("schools", "checkin_set"),
+                queryset=Judge.objects.prefetch_related(
+                    "schools",
+                    "expected_checkins",
+                ),
             ),
         )
         .get(pk=registration.pk)
@@ -81,7 +84,7 @@ def _team_text_lines(team):
 
 def _judge_text_lines(judge, fallback_school):
     schools = ", ".join(s.name for s in judge.schools.all()) or fallback_school
-    availability = _format_available_rounds(judge.checkin_set.all())
+    availability = _format_available_rounds(judge.expected_checkins.all())
     return [
         f"- {judge.name}",
         f"  Experience: {judge.rank}",
@@ -149,7 +152,7 @@ def _team_html_lines(team):
 
 def _judge_html_lines(judge, fallback_school):
     schools = ", ".join(s.name for s in judge.schools.all()) or fallback_school
-    availability = _format_available_rounds(judge.checkin_set.all())
+    availability = _format_available_rounds(judge.expected_checkins.all())
     return [
         "<li style=\"margin-bottom:10px;\">",
         f"<strong>{escape(judge.name)}</strong>",
@@ -302,7 +305,9 @@ def _build_registration_judge_code_plan(registration, request):
 
     judges = {
         judge.pk: judge
-        for judge in Judge.objects.filter(pk__in=judge_ids).order_by("name")
+        for judge in Judge.objects.filter(pk__in=judge_ids)
+        .prefetch_related("expected_checkins")
+        .order_by("name")
     }
     recent_judge_ids = set(
         JudgeCodeEmailLog.objects.filter(
@@ -311,8 +316,8 @@ def _build_registration_judge_code_plan(registration, request):
         ).values_list("judge_id", flat=True)
     )
     tournament_name = TabSettings.get("tournament_name", "your tournament")
-    subject = f"{tournament_name} Judge Ballot Code"
-    eballot_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
+    subject = f"{tournament_name} Judge Portal and Ballots"
+    portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
     entries = []
 
     for judge_id in judge_ids:
@@ -333,15 +338,18 @@ def _build_registration_judge_code_plan(registration, request):
         if len(judge.ballot_code or "") > BALLOT_CODE_MAX_LENGTH:
             continue
 
-        ballot_url = request.build_absolute_uri(
-            reverse("enter_e_ballot", args=[judge.ballot_code])
+        portal_url = request.build_absolute_uri(
+            reverse("judge_portal", args=[judge.ballot_code])
         )
+        availability = _format_available_rounds(judge.expected_checkins.all())
         text_body = (
             f"Hi {judge.name},\n\n"
             "This email confirms that you have been registered for "
             f"{tournament_name}.\n\n"
-            f"Your ballot code for {tournament_name} is {judge.ballot_code}.\n"
-            f"Submit e-ballots at {ballot_url} or search at {eballot_search_url}.\n\n"
+            f"Your judge code for {tournament_name} is {judge.ballot_code}.\n"
+            f"Your current availability is: {availability}.\n\n"
+            f"Open the judge portal to change availability or submit ballots: {portal_url}\n"
+            f"You can also search by judge code at {portal_search_url}.\n\n"
             "Thank you,\n"
             "Tab Staff"
         )

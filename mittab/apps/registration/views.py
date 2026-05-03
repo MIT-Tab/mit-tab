@@ -152,7 +152,10 @@ def get_registration_forms(request, registration, school_choices, round_config):
         ]
         judges_initial = [
             registration_judge_initial(judge, round_config)
-            for judge in registration.judges.prefetch_related("checkin_set", "schools")
+            for judge in registration.judges.prefetch_related(
+                "expected_checkins",
+                "schools",
+            )
         ]
     else:
         reg_form = RegistrationForm(school_choices=school_choices)

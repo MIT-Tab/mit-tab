@@ -11,6 +11,11 @@
   <div class="container-fluid">
     {% if previous_ballots_url %}
     <div class="d-flex justify-content-start mb-3">
+      {% if ballot_code %}
+      <a class="btn btn-lg btn-outline-secondary mr-2" href="{% url 'judge_portal' ballot_code %}">
+        Judge Portal
+      </a>
+      {% endif %}
       <a class="btn btn-lg btn-outline-primary" href="{{ previous_ballots_url }}">
         Previous Ballots
       </a>

@@ -55,17 +55,17 @@ at any given moment.
 
 ### Judges
 1. Name - Name of the judge.
-2. Email - Optional email address used for sending ballot codes.
+2. Email - Optional email address used for sending judge portal links.
 3. Rank - A number from 0.0 - 99.99 that represents the relative ranking of this
 judge. Higher is a "better" judge.
 4. Affiliated Schools - A list of schools that this judge should be unable to
 judge. **Use this for team scratches as well as multiple affiliations**
 5. Wing Only - Check this box if the judge can only serve as a wing judge and not as a chair. Wing-only judges will be excluded from automatic chair assignment during both in-rounds and outrounds. This is useful for ensuring that less experienced judges are never assigned as the chair of a panel.
 
-**Note:** Judges automatically get assigned unique "ballot codes" (e.g., "wandering-tsunami", "icy-firefly") when created. These codes allow judges to submit e-ballots remotely. You can find a judge's ballot code:
+**Note:** Judges automatically get assigned unique judge codes (e.g., "wandering-tsunami", "icy-firefly") when created. These codes allow judges to open the judge portal, update expected availability, and submit e-ballots remotely. You can find a judge's code:
 - In the judge list view (appears in parentheses after the name)
 - On the judge detail page
-- Ballot codes can be used for online ballot submission Enter e-ballots from the mit-tab homepage under E-Ballots.
+- Judge codes can be used from the mit-tab homepage under Judge Portal and Ballots.
 
 ### Teams
 1. Name - Name of the team, e.g. "Yale A"

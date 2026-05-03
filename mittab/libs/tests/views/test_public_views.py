@@ -788,6 +788,35 @@ class TestPublicViews(TestCase):
         self.assertIn("&#10004;", row_html,
                       "Expected attendance indicator not shown for judge")
 
+    def test_judge_portal_updates_expected_checkins(self):
+        client = Client()
+        judge = Judge.objects.create(
+            name="Portal Judge",
+            rank=2.0,
+            ballot_code="portal-judge",
+        )
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.post(
+            reverse("judge_portal", args=[judge.ballot_code]),
+            {
+                "availability_round_2": "on",
+                "availability_round_4": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(
+                JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+                    "round_number",
+                    flat=True,
+                )
+            ),
+            {2, 4},
+        )
+
     def test_public_ballot_modes(self):
         client = Client()
 

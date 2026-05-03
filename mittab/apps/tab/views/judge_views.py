@@ -21,9 +21,20 @@ EMAILS_PER_ADDRESS_PER_WINDOW = 1
 EMAILS_PER_ADDRESS_PER_BATCH = 1
 
 
+def _format_available_rounds(expected_checkins):
+    rounds = sorted(checkin.round_number for checkin in expected_checkins)
+    if not rounds:
+        return "None selected"
+    labels = [
+        "Outrounds" if round_number == 0 else f"Round {round_number}"
+        for round_number in rounds
+    ]
+    return ", ".join(labels)
+
+
 def _prepare_judge_code_plan(judges, tournament_name, request):
-    eballot_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
-    subject = f"{tournament_name} Judge Ballot Code"
+    portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
+    subject = f"{tournament_name} Judge Portal and Ballots"
     now = timezone.now()
     cutoff = now - EMAIL_RATE_LIMIT_WINDOW
 
@@ -93,13 +104,16 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             skipped_invalid.append((judge, f"Code exceeds {BALLOT_CODE_MAX_LENGTH} characters"))
             continue
 
-        ballot_url = request.build_absolute_uri(
-            reverse("enter_e_ballot", args=[judge.ballot_code])
+        portal_url = request.build_absolute_uri(
+            reverse("judge_portal", args=[judge.ballot_code])
         )
+        availability = _format_available_rounds(judge.expected_checkins.all())
         text_body = (
             f"Hi {judge.name},\n\n"
-            f"Your ballot code for {tournament_name} is {judge.ballot_code}.\n"
-            f"Submit e-ballots at {ballot_url} or search at {eballot_search_url}.\n\n"
+            f"Your judge code for {tournament_name} is {judge.ballot_code}.\n"
+            f"Your current availability is: {availability}.\n\n"
+            f"Open the judge portal to change availability or submit ballots: {portal_url}\n"
+            f"You can also search by judge code at {portal_search_url}.\n\n"
             "Thank you,\n"
             "Tab Staff"
         )
@@ -475,7 +489,9 @@ def download_judge_codes(request):
 
 
 def send_judge_codes(request):
-    all_judges = list(Judge.objects.order_by("name"))
+    all_judges = list(
+        Judge.objects.prefetch_related("expected_checkins").order_by("name")
+    )
     missing_email_count = len([judge for judge in all_judges if not judge.email])
     rate_limit_hours = max(1, int(EMAIL_RATE_LIMIT_WINDOW.total_seconds() // 3600))
 
@@ -604,7 +620,7 @@ def send_judge_codes(request):
             len(plan["skipped_duplicate_email"]) +
             len(plan["skipped_missing_email"])
         )
-        message = f"Sent ballot codes to {sent} judge{'' if sent == 1 else 's'}."
+        message = f"Sent judge portal links to {sent} judge{'' if sent == 1 else 's'}."
         if skipped_total:
             message += f" Skipped {skipped_total} due to invalid codes or rate limiting."
 
