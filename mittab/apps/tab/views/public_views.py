@@ -16,6 +16,7 @@ from mittab.apps.tab.models import (
     Bye,
     Debater,
     Outround,
+    PublicHomeShortcut,
     TabSettings,
     Judge,
     Team,
@@ -38,6 +39,26 @@ from mittab.apps.tab.written_rfd import (
     written_rfd_deadline_display,
     written_rfd_editing_open,
 )
+
+
+def build_public_home_shortcuts():
+    definition_map = PublicHomeShortcut.nav_definition_map()
+    slot_to_slug = PublicHomeShortcut.default_slot_mapping()
+
+    for shortcut in PublicHomeShortcut.objects.all():
+        if shortcut.position in slot_to_slug:
+            slot_to_slug[shortcut.position] = shortcut.nav_item
+
+    shortcuts = []
+    for slot, default_slug in PublicHomeShortcut.default_slot_mapping().items():
+        slug = slot_to_slug.get(slot, default_slug)
+        definition = definition_map.get(slug) or definition_map[default_slug]
+        shortcuts.append({
+            "title": definition["title"],
+            "subtitle": definition["subtitle"],
+            "url": definition["url_path"],
+        })
+    return shortcuts
 
 
 @cache_public_view(timeout=300)
@@ -69,6 +90,7 @@ def _fallback_favicon_response():
 def public_home(request):
     registration_config = RegistrationConfig.get_or_create_active()
     registration_open = bool(registration_config and registration_config.can_create())
+    quick_links = build_public_home_shortcuts()
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
@@ -91,6 +113,7 @@ def public_home(request):
                 "registration_open": registration_open,
                 "registration_url": reverse("registration_portal"),
                 "info_links": info_links,
+                "quick_links": quick_links,
             },
         )
 
@@ -150,6 +173,7 @@ def public_home(request):
             "registration_open": registration_open,
             "registration_url": reverse("registration_portal"),
             "info_links": info_links,
+            "quick_links": quick_links,
         },
     )
 

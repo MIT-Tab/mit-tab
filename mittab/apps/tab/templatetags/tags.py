@@ -7,7 +7,7 @@ from django.utils.safestring import mark_safe
 from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab import logo_utils
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
 from mittab.apps.tab.theme import DEFAULT_THEME_COLOR, get_theme_css_variables
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
@@ -77,7 +77,7 @@ def manual_judge_audit_events(context, round_id):
 
 @register.simple_tag
 def tournament_name():
-    return TabSettings.get("tournament_name", "New Tournament")
+    return TabSettings.get("tournament_name", DEFAULT_TOURNAMENT_NAME)
 
 
 @register.filter(name="registration_text", needs_autoescape=True)
