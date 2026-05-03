@@ -1,3 +1,4 @@
+import logging
 from typing import Type, cast
 
 from django import forms
@@ -43,6 +44,7 @@ from mittab.libs.email_service import EmailServiceError
 from .models import Registration, RegistrationChangeLog, RegistrationConfig
 
 MAX_TEAMS = 200
+logger = logging.getLogger(__name__)
 
 
 class RegistrationTeamFormSet(BaseFormSet):
@@ -407,5 +409,9 @@ def proxy_debaters(request, school_id):
         return JsonResponse(
             {"error": "Failed to fetch debaters"}, status=response.status_code
         )
-    except RequestException as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    except RequestException:
+        logger.exception(
+            "Failed to fetch debaters from upstream API for school_id=%s",
+            school_id,
+        )
+        return JsonResponse({"error": "Failed to fetch debaters"}, status=500)

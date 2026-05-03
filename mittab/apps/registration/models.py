@@ -1,5 +1,6 @@
-from haikunator import Haikunator
 from django.db import models
+from haikunator import Haikunator
+
 from mittab.apps.tab.models import School
 
 
