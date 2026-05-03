@@ -192,9 +192,7 @@ const initJudgeSchoolSelect = ($scope = $(document)) => {
   $scope.find("[data-judge-school-select]").each((_, el) => {
     const $select = $(el);
     if ($select.data("select2")) return;
-    if (!$select.find('option[value=""]').length) {
-      $select.prepend('<option value=""></option>');
-    }
+    $select.find('option[value=""]').remove();
     $select.select2({
       theme: "bootstrap4",
       width: "100%",
@@ -202,6 +200,32 @@ const initJudgeSchoolSelect = ($scope = $(document)) => {
       closeOnSelect: false,
     });
   });
+};
+
+const getSelectValues = ($select) => {
+  const value = $select.val();
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  return value ? [value] : [];
+};
+
+const getAutoPrefillValues = ($select) => {
+  const values = $select.data("prefillAutoValues");
+  return Array.isArray(values) ? values : [];
+};
+
+const setPrefillValue = ($select, value) => {
+  let autoValues = [];
+  if (Array.isArray(value)) {
+    autoValues = value.filter(Boolean);
+  } else if (value) {
+    autoValues = [value];
+  }
+  $select.data("prefillAuto", true);
+  $select.val(value).trigger("change");
+  $select.data("prefillAuto", false);
+  $select.data("prefillAutoValues", autoValues);
 };
 
 const refreshJudgeSchoolSelects = () => {
@@ -348,19 +372,29 @@ const syncSchoolOptionsFromRegistration = ($select) => {
   if (currentOptions.length > 2 && currentOptions.length >= regOptions.length) {
     return;
   }
-  const currentValue = $select.val();
-  const currentLabel = getOptionLabel($select, currentValue);
+  const isMultiple = $select.prop("multiple");
+  const currentValues = getSelectValues($select);
+  const currentLabels = {};
+  currentValues.forEach((value) => {
+    currentLabels[value] = getOptionLabel($select, value);
+  });
   $select.empty();
   regOptions.each((_, option) => {
-    $select.append($(option).clone());
-  });
-  if (currentValue) {
-    if ($select.find(`option[value="${currentValue}"]`).length) {
-      $select.val(currentValue);
-    } else {
-      ensureOptionExists($select, currentValue, currentLabel);
-      $select.val(currentValue);
+    if (!isMultiple || option.value) {
+      $select.append($(option).clone());
     }
+  });
+  if (isMultiple) {
+    currentValues.forEach((value) => {
+      ensureOptionExists($select, value, currentLabels[value]);
+    });
+    $select.val(currentValues);
+    return;
+  }
+  const currentValue = currentValues[0] || "";
+  if (currentValue) {
+    ensureOptionExists($select, currentValue, currentLabels[currentValue]);
+    $select.val(currentValue);
   }
 };
 
@@ -373,9 +407,7 @@ const maybePrefillFromRegistration = ($select) => {
   if (!regValue) return;
   const regLabel = getRegistrationSchoolLabel();
   ensureOptionExists($select, regValue, regLabel);
-  $select.data("prefillAuto", true);
-  $select.val(regValue).trigger("change");
-  $select.data("prefillAuto", false);
+  setPrefillValue($select, regValue);
   $select.data("prefillManual", false);
 };
 
@@ -393,21 +425,22 @@ const prefillTeamSchools = () => {
     const isMultiple = $select.prop("multiple");
     const currentValue = $select.val();
     if (isMultiple) {
-      const values = Array.isArray(currentValue) ? [...currentValue] : [];
-      if (!values.includes(regValue)) {
-        values.push(regValue);
+      const values = getSelectValues($select);
+      const autoValues = getAutoPrefillValues($select);
+      const manualValues = values.filter(
+        (value) => !autoValues.includes(value),
+      );
+      if (manualValues.length) {
+        $select.data("prefillManual", true);
+        return;
       }
-      $select.data("prefillAuto", true);
-      $select.val(values).trigger("change");
-      $select.data("prefillAuto", false);
+      setPrefillValue($select, [regValue]);
       return;
     }
     if (!isMultiple && currentValue === regValue) {
       return;
     }
-    $select.data("prefillAuto", true);
-    $select.val(regValue).trigger("change");
-    $select.data("prefillAuto", false);
+    setPrefillValue($select, regValue);
   });
 };
 
