@@ -1,10 +1,13 @@
 body {
     background-color: #f4f9ff !important;
+    background-color: color-mix(in srgb, var(--theme-color, #00438A) 6%, white) !important;
     background-image: url("../img/az-subtle.png") !important;
     background-blend-mode: multiply;
 }
 :root {
   color-scheme: light;
+  --theme-color: #00438A;
+  --theme-color-rgb: 0, 67, 138;
 }
 $font-size-base: 0.95rem !default;
 
@@ -16,7 +19,7 @@ $font-size-base: 0.95rem !default;
 
 // Overrides
 .bg-dark {
-  background-color: #00438A !important;
+  background-color: var(--theme-color, #00438A) !important;
 }
 
 .navbar-brand {

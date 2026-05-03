@@ -9,6 +9,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab import logo_utils
+from mittab.apps.tab.theme import (
+    DEFAULT_THEME_COLOR,
+    normalize_theme_color,
+)
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_deadline_display,
@@ -682,6 +687,37 @@ class SettingsForm(forms.Form):
                         format="%Y-%m-%dT%H:%M",
                     ),
                 )
+            elif setting.get("type") == "color":
+                self.fields[field_name] = forms.RegexField(
+                    regex=r"^#[0-9a-fA-F]{6}$",
+                    label=label,
+                    help_text=setting["description"],
+                    initial=normalize_theme_color(
+                        setting["value"],
+                        default=DEFAULT_THEME_COLOR,
+                    ),
+                    error_messages={
+                        "invalid": "Please use a valid hex color (for example: #00438A).",
+                    },
+                    widget=forms.TextInput(attrs={
+                        "type": "text",
+                        "class": "form-control theme-color-input",
+                        "placeholder": "#00438A",
+                        "pattern": "^#[0-9a-fA-F]{6}$",
+                        "autocomplete": "off",
+                        "style": "max-width: 12rem;",
+                    })
+                )
+            elif setting.get("type") == "file":
+                self.fields[field_name] = forms.ImageField(
+                    label=label,
+                    help_text=setting["description"],
+                    required=False,
+                    widget=forms.ClearableFileInput(attrs={
+                        "class": "form-control-file",
+                        "accept": ",".join(logo_utils.LOGO_ALLOWED_MIME_TYPES),
+                    })
+                )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
@@ -691,6 +727,25 @@ class SettingsForm(forms.Form):
                         "class": "form-control"
                     })
                 )
+
+    def clean(self):
+        cleaned_data = super(SettingsForm, self).clean()
+
+        for setting in self.settings:
+            if setting.get("type") != "file":
+                continue
+
+            field_name = f"setting_{setting['name']}"
+            uploaded_logo = cleaned_data.get(field_name)
+            if not uploaded_logo:
+                continue
+
+            try:
+                logo_utils.validate_tournament_logo(uploaded_logo)
+            except ValidationError as exc:
+                self.add_error(field_name, exc)
+
+        return cleaned_data
 
     def save(self):
         for setting in self.settings:
@@ -702,6 +757,17 @@ class SettingsForm(forms.Form):
             elif "type" in setting and setting["type"] == "datetime":
                 value = self.cleaned_data[field]
                 value_to_set = value.strftime("%Y-%m-%d %H:%M") if value else ""
+            elif setting.get("type") == "color":
+                value_to_set = normalize_theme_color(
+                    self.cleaned_data[field],
+                    default=DEFAULT_THEME_COLOR,
+                )
+            elif setting.get("type") == "file":
+                uploaded_logo = self.cleaned_data.get(field)
+                if not uploaded_logo:
+                    continue
+                logo_utils.save_tournament_logo(uploaded_logo)
+                continue
             else:
                 value_to_set = self.cleaned_data[field]
 

@@ -1,3 +1,4 @@
+{% load tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +7,10 @@
     <meta name="color-scheme" content="light dark">
     {% load render_bundle from webpack_loader %}
     {% render_bundle 'main' %}
+    <style id="mittab-theme-vars">
+      :root { {% theme_css_variables %} }
+    </style>
+    <link rel="icon" href="{% favicon_url %}">
     {% block extra_head %}{% endblock extra_head %}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script type="text/javascript" src="/static/admin/js/jquery.init.js"></script>

@@ -2,6 +2,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   position: relative;
   background-color: #003a74;
+  background-color: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
   border-bottom: 1px solid rgba(9, 32, 61, 0.55);
   color: rgba(255, 255, 255, 0.84);
 
@@ -97,13 +98,14 @@
       }
 
       &:focus-visible {
-        outline: 2px solid rgba(104, 196, 255, 0.45);
+        outline: 2px solid rgba(var(--theme-color-rgb, 0, 67, 138), 0.45);
         outline-offset: 2px;
       }
 
       &.active {
         color: #fff;
-        background-color: rgba(12, 53, 99, 0.9);
+        background-color: #003a74;
+        background-color: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
       }
     }
 
@@ -116,6 +118,7 @@
       margin-top: 0.5rem;
       padding: 0.4rem;
       background: #0a2f55;
+      background: color-mix(in srgb, var(--theme-color, #00438A) 65%, black);
       border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 0.5rem;
       min-width: 15rem;
@@ -136,7 +139,7 @@
       }
 
       &:focus-visible {
-        outline: 2px solid rgba(104, 196, 255, 0.45);
+        outline: 2px solid rgba(var(--theme-color-rgb, 0, 67, 138), 0.45);
         outline-offset: 2px;
       }
     }
@@ -174,6 +177,7 @@
       border: 1px solid rgba(255, 255, 255, 0.32);
       border-radius: 0.55rem;
       background: #003a74;
+      background: color-mix(in srgb, var(--theme-color, #00438A) 85%, black);
       background-image: none;
       color: inherit;
       box-shadow: none;
@@ -182,6 +186,7 @@
 
       &:hover {
         background: #004fbe;
+        background: color-mix(in srgb, var(--theme-color, #00438A) 80%, white);
         border-color: rgba(255, 255, 255, 0.42);
       }
 
@@ -209,7 +214,7 @@
       gap: 1rem;
       padding: 3.5rem 1.5rem 2.5rem;
       margin: 0;
-      background: #00438a;
+      background: var(--theme-color, #00438a);
       border-right: 1px solid rgba(255, 255, 255, 0.2);
       overflow-y: auto;
       transform: translateX(-102%);
@@ -303,6 +308,7 @@
           width: 2px;
           height: 1.35rem;
           background: #68c4ff;
+          background: color-mix(in srgb, var(--theme-color, #00438A) 55%, white);
           opacity: 0;
           transform: translateY(-50%);
           transition: opacity 150ms ease;
@@ -312,6 +318,7 @@
         &:focus-visible {
           color: #fff;
           background: #003c75;
+          background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
 
           &::before {
             opacity: 1;
@@ -329,6 +336,7 @@
         &.active {
           color: #fff;
           background: #003c75;
+          background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
 
           &::before {
             opacity: 1;
@@ -355,6 +363,7 @@
       padding: 0.4rem;
       margin: 0;
       background: #003c75;
+      background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 0;
       box-shadow: none;
@@ -376,7 +385,7 @@
       &:hover,
       &:focus-visible {
         color: #fff;
-        background: rgba(12, 64, 118, 0.68);
+        background: rgba(var(--theme-color-rgb, 0, 67, 138), 0.68);
       }
 
       &:focus-visible {
@@ -390,6 +399,7 @@
       &.active {
         color: #fff;
         background: #003c75;
+        background: color-mix(in srgb, var(--theme-color, #00438A) 88%, black);
       }
     }
   }

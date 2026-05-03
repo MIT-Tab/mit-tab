@@ -643,7 +643,7 @@ def settings_form(request):
     yaml_settings, setting_dict, categories = get_settings_from_yaml()
 
     if request.method == "POST":
-        form = SettingsForm(request.POST, settings=yaml_settings)
+        form = SettingsForm(request.POST, request.FILES, settings=yaml_settings)
 
         if form.is_valid():
             form.save()
