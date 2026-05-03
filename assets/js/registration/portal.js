@@ -43,23 +43,12 @@ const setPlaceholder = ($select, message, disabled = true) => {
   $select.prop("disabled", disabled);
 };
 
-const sortOptions = ($select) => {
-  const current = $select.val();
-  const options = $select.find("option").get();
-  if (!options.length) return;
-  const [first, ...rest] = options;
-  rest.sort((a, b) =>
-    (a.text || "").localeCompare(b.text || "", undefined, {
-      sensitivity: "base",
-    }),
-  );
-  $select.empty();
-  if (first) {
-    $select.append(first);
-  }
-  rest.forEach((option) => $select.append(option));
-  if (current && $select.find(`option[value="${current}"]`).length) {
-    $select.val(current);
+const insertAtTop = ($select, option) => {
+  const $first = $select.children("option").first();
+  if ($first.length && !$first.val()) {
+    $first.after(option);
+  } else {
+    $select.prepend(option);
   }
 };
 
@@ -121,10 +110,9 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
       option.value = debater.name;
       option.textContent = debater.name;
       option.dataset.debater = JSON.stringify(debater);
-      $select.append(option);
+      insertAtTop($select, option);
     });
   }
-  sortOptions($select);
   const restoredValue = $select.find(`option[value="${currentValue}"]`).length
     ? currentValue
     : "";
@@ -150,8 +138,7 @@ const broadcastCustomDebater = (schoolValue, debater) => {
     option.value = debater.name;
     option.textContent = debater.name;
     option.dataset.debater = JSON.stringify(debater);
-    $debaterSelect.append(option);
-    sortOptions($debaterSelect);
+    insertAtTop($debaterSelect, option);
   });
 };
 
@@ -329,13 +316,13 @@ const appendSchoolOption = (value, name) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = name;
-    el.append(option);
+    insertAtTop($(el), option);
   });
   $("[data-judge-school-select]").each((_, el) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = name;
-    el.append(option);
+    insertAtTop($(el), option);
   });
   refreshJudgeSchoolSelects();
 };

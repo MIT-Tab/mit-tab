@@ -50,7 +50,6 @@ def build_school_choices():
             value = f"pk:{school.pk}"
         add_choice(value, school.name)
 
-    results.sort(key=lambda item: (item[1] or "").lower())
     return results
 
 
