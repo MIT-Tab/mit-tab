@@ -319,6 +319,7 @@ urlpatterns = [
     re_path(r"^settings_form",
             views.settings_form,
             name="settings_form"),
+    path("info-links/", views.info_links_admin, name="info_links_admin"),
 
     # Motion management (admin)
     path("motions/",

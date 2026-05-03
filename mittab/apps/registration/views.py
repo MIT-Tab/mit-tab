@@ -16,8 +16,10 @@ import requests
 from requests.exceptions import RequestException
 
 from mittab.apps.registration.forms import (
+    InfoLinkForm,
     JudgeForm,
     RegistrationForm,
+    RegistrationLinkForm,
     RegistrationSettingsForm,
     TeamForm,
 )
@@ -41,7 +43,37 @@ from mittab.apps.tab.helpers import (
 )
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 from mittab.libs.email_service import EmailServiceError
-from .models import Registration, RegistrationChangeLog, RegistrationConfig
+from .models import (
+    InfoLink,
+    Registration,
+    RegistrationChangeLog,
+    RegistrationConfig,
+    RegistrationLink,
+)  # noqa: F401  (InfoLink imported for LINK_KINDS)
+
+LINK_KINDS = {
+    "info": {
+        "model": InfoLink,
+        "form": InfoLinkForm,
+        "label": "info",
+        "label_plural": "info links",
+        "redirect_url_name": "info_links_admin",
+    },
+    "registration": {
+        "model": RegistrationLink,
+        "form": RegistrationLinkForm,
+        "label": "registration",
+        "label_plural": "registration links",
+        "redirect_url_name": "registration_admin",
+    },
+}
+
+
+def _link_kind_or_404(link_kind):
+    config = LINK_KINDS.get(link_kind)
+    if not config:
+        raise Http404()
+    return config
 
 MAX_TEAMS = 200
 logger = logging.getLogger(__name__)
@@ -316,13 +348,20 @@ def registration_portal(request, code=None):
             )
             .get(pk=registration.pk)
         )
+    registration_saved = request.GET.get("saved") == "1" and bool(summary)
+    post_reg_links = (
+        list(RegistrationLink.objects.filter(is_active=True))
+        if registration_saved
+        else []
+    )
     context = {
         "registration_form": reg_form,
         "team_formset": team_formset,
         "judge_formset": judge_formset,
         "config": config,
         "summary": summary,
-        "registration_saved": request.GET.get("saved") == "1" and bool(summary),
+        "registration_saved": registration_saved,
+        "post_registration_links": post_reg_links,
         "max_teams": MAX_TEAMS,
         "is_edit_mode": is_edit_mode,
         "can_create_registration": can_create,
@@ -395,8 +434,77 @@ def registration_admin(request):
             "form": form,
             "config": config,
             "recent_changes": recent_changes,
+            "registration_links": list(RegistrationLink.objects.all()),
         },
     )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def tournament_link_create(request, link_kind):
+    config = _link_kind_or_404(link_kind)
+    form = config["form"](request.POST)
+    if form.is_valid():
+        form.save()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            f"{config['label'].capitalize()} link added.",
+            path=reverse(config["redirect_url_name"]),
+        )
+    return redirect_and_flash_error(
+        request,
+        _summarize_form_errors(form, f"Could not add {config['label']} link."),
+        path=reverse(config["redirect_url_name"]),
+    )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def tournament_link_update(request, link_kind, link_id):
+    config = _link_kind_or_404(link_kind)
+    link = config["model"].objects.filter(pk=link_id).first()
+    if not link:
+        raise Http404()
+    form = config["form"](request.POST, instance=link)
+    if form.is_valid():
+        form.save()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            f"{config['label'].capitalize()} link updated.",
+            path=reverse(config["redirect_url_name"]),
+        )
+    return redirect_and_flash_error(
+        request,
+        _summarize_form_errors(form, f"Could not update {config['label']} link."),
+        path=reverse(config["redirect_url_name"]),
+    )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def tournament_link_delete(request, link_kind, link_id):
+    config = _link_kind_or_404(link_kind)
+    link = config["model"].objects.filter(pk=link_id).first()
+    if not link:
+        raise Http404()
+    link.delete()
+    invalidate_all_public_caches()
+    return redirect_and_flash_success(
+        request,
+        f"{config['label'].capitalize()} link removed.",
+        path=reverse(config["redirect_url_name"]),
+    )
+
+
+def _summarize_form_errors(form, fallback):
+    parts = []
+    for field, errors in form.errors.items():
+        label = form.fields[field].label or field.replace("_", " ").title()
+        for error in errors:
+            parts.append(f"{label}: {error}")
+    return " ".join(parts) if parts else fallback
 
 @require_http_methods(["GET"])
 def proxy_debaters(request, school_id):

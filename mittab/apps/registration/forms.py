@@ -2,7 +2,11 @@ from urllib.parse import unquote
 
 from django import forms
 
-from mittab.apps.registration.models import RegistrationConfig
+from mittab.apps.registration.models import (
+    InfoLink,
+    RegistrationConfig,
+    RegistrationLink,
+)
 from mittab.apps.tab.models import Debater, Team
 
 DEBATER_PREFIXES = ("debater_one", "debater_two")
@@ -408,3 +412,53 @@ class RegistrationSettingsForm(forms.Form):
         ]
         self.config.save()
         return self.config
+
+
+class _TournamentLinkForm(forms.ModelForm):
+    """Shared editor for tournament-side links (info + post-registration)."""
+
+    class Meta:
+        fields = ("title", "url", "description", "display_order", "is_active")
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "placeholder": "e.g. Tournament Discord",
+                    "maxlength": "80",
+                }
+            ),
+            "url": forms.URLInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "placeholder": "https://...",
+                    "inputmode": "url",
+                }
+            ),
+            "description": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "placeholder": "Short description (optional)",
+                    "maxlength": "160",
+                }
+            ),
+            "display_order": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "min": "0",
+                    "step": "1",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "custom-control-input"}
+            ),
+        }
+
+
+class InfoLinkForm(_TournamentLinkForm):
+    class Meta(_TournamentLinkForm.Meta):
+        model = InfoLink
+
+
+class RegistrationLinkForm(_TournamentLinkForm):
+    class Meta(_TournamentLinkForm.Meta):
+        model = RegistrationLink

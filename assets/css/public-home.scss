@@ -31,6 +31,54 @@ body {
   box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
 }
 
+// Shared visual base for every clickable "card link" on the public homepage —
+// info links, page tiles, and the registration CTA. Keeps height, padding,
+// border, radius, and font sizes consistent. Variants (chevron vs icon vs
+// buttons) layer on top of this without changing dimensions.
+@mixin public-card-link {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  // Lock height to match a 2-line card (title + subtitle) so that links
+  // without a description don't read shorter than their neighbors and break
+  // the column's symmetry. Mobile resets this where layout differs.
+  height: 4.4rem;
+  border: 1px solid rgba(28, 54, 94, 0.12);
+  border-left: 3px solid #2a66c4;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(28, 54, 94, 0.22);
+    box-shadow: 0 14px 30px -26px rgba(16, 34, 63, 0.32);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 3px solid #2a66c4;
+    outline-offset: 2px;
+  }
+}
+
+@mixin public-card-link-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2f4a;
+  line-height: 1.3;
+}
+
+@mixin public-card-link-subtitle {
+  font-size: 0.82rem;
+  color: rgba(28, 45, 70, 0.7);
+  line-height: 1.4;
+}
+
 .public-home-wrapper {
   width: 100%;
   padding: 0;
@@ -50,7 +98,15 @@ body {
 
     @media (min-width: 992px) {
       grid-template-columns: 1fr 1fr;
-      gap: 2.5rem;
+      gap: 0;
+      align-items: stretch;
+    }
+  }
+
+  &--single .grid {
+    @media (min-width: 992px) {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
     }
   }
 
@@ -104,7 +160,7 @@ body {
 
   }
 
-  .title {
+  .header .title {
     margin: 0;
     font-size: 1.85rem;
     font-weight: 700;
@@ -113,12 +169,6 @@ body {
     color: #1f2f4a;
   }
 
-  @media (min-width: 992px) {
-    .title {
-      font-size: 5.5rem;
-      line-height: 1.1;
-    }
-  }
   .divider {
     margin: 1.6rem 0;
     border: 0;
@@ -128,6 +178,9 @@ body {
     @include card-shell;
     padding: 1.5rem 1.75rem;
     color: #1d2b44;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 
 
     // Hide header on desktop (they only show on mobile)
@@ -147,43 +200,257 @@ body {
   }
 
   .sidebar {
+    display: flex;
+    flex-direction: column;
+
     @media (max-width: 991.98px) {
       display: none;
     }
   }
+
+  // On desktop, the two cards are visually a single connected panel:
+  // collapse the gap, drop the inner rounded corners, and trim the box-shadow
+  // along the shared edge so the seam reads as one panel rather than two
+  // glowing rectangles bumping into each other.
+  @media (min-width: 992px) {
+    &:not(.public-home--single) .sidebar .public-sidebar-card {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+      border-right: 1px solid rgba(21, 33, 61, 0.08);
+      height: 100%;
+      // Clip box-shadow on the shared (right) side. Using a clip-path
+      // that extends past the visible card preserves the soft drop
+      // shadow on the outer 3 sides while cutting it cleanly at the seam.
+      clip-path: inset(-40px 0 -40px -40px);
+    }
+
+    &:not(.public-home--single) .links {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      border-left: none;
+      height: 100%;
+      clip-path: inset(-40px -40px -40px 0);
+    }
+  }
 }
 
-.register-cta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.85rem 1.25rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid rgba(28, 54, 94, 0.12);
-  border-left: 3px solid #2a66c4;
-  border-radius: 0.5rem;
-  background: #ffffff;
-  margin-bottom: 1rem;
+.public-home-hero {
+  display: none;
 
-  &__text {
-    min-width: 0;
-    flex: 1 1 220px;
+  @media (min-width: 992px) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
   }
 
   &__title {
     margin: 0;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
     color: #1f2f4a;
-    line-height: 1.3;
+  }
+
+  // Hero status uses a stacked layout: icon centered, text centered below.
+  // The hide-the-divider override beats the .status-block--inline rule by
+  // matching two classes on the same element.
+  &__status.status-block--inline {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    gap: 0.55rem;
+    text-align: center;
+
+    .status-text {
+      align-items: center;
+      text-align: center;
+      gap: 0.15rem;
+    }
+
+    .status-divider {
+      display: none;
+    }
+
+    .status-icon {
+      width: 2.6rem;
+      height: 2.6rem;
+
+      i {
+        font-size: 1.15rem;
+      }
+    }
+  }
+}
+
+// Helper: show/hide blocks by viewport.
+.desktop-only {
+  @media (max-width: 991.98px) {
+    display: none !important;
+  }
+}
+
+// Card header used at the top of both desktop cards.
+.public-card-header {
+  margin: 0 0 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid rgba(0, 44, 92, 0.1);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: #1f2f4a;
+}
+
+.info-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+
+  &--mobile {
+    display: none;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.4rem;
+    padding: 0.15rem 0 0.45rem;
+    margin: 0 0 0.65rem;
+    // min-width:0 prevents the chip strip's intrinsic content width from
+    // forcing its flex-column parent (.links) wider than the page.
+    // Without this, multiple chips were pushing the card past the wrapper.
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    scrollbar-width: thin;
+
+    @media (max-width: 991.98px) {
+      display: flex;
+    }
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(28, 54, 94, 0.18);
+      border-radius: 4px;
+    }
+
+    .info-link-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex: 0 0 auto;
+      max-width: 70vw;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid rgba(28, 54, 94, 0.18);
+      background: #ffffff;
+      color: #1f2f4a;
+      font-size: 0.85rem;
+      font-weight: 600;
+      line-height: 1.2;
+      text-decoration: none;
+      box-shadow: 0 4px 10px -8px rgba(16, 34, 63, 0.25);
+
+      i {
+        color: #2a66c4;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+      }
+
+      &__title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      &:hover,
+      &:focus-visible {
+        text-decoration: none;
+        border-color: #2a66c4;
+        color: #1f2f4a;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #2a66c4;
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  .info-link {
+    @include public-card-link;
+    justify-content: space-between;
+  }
+
+  .info-link__icon {
+    flex-shrink: 0;
+    color: rgba(24, 44, 72, 0.35);
+    font-size: 0.9rem;
+    transition: color 140ms ease, transform 140ms ease;
+  }
+
+  .info-link:hover .info-link__icon,
+  .info-link:focus-visible .info-link__icon {
+    color: #2a66c4;
+    transform: translateX(2px);
+  }
+
+  .info-link__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .info-link__title {
+    @include public-card-link-title;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .info-link__subtitle {
+    @include public-card-link-subtitle;
+  }
+}
+
+.register-cta {
+  @include public-card-link;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.55rem;
+  cursor: default;
+
+  &:hover,
+  &:focus-visible {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(28, 54, 94, 0.12);
+  }
+
+  &__text {
+    min-width: 0;
+    flex: 1 1 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  &__title {
+    @include public-card-link-title;
+    margin: 0;
   }
 
   &__body {
-    margin: 0.1rem 0 0;
-    font-size: 0.85rem;
-    color: rgba(28, 45, 70, 0.7);
-    line-height: 1.4;
+    @include public-card-link-subtitle;
+    margin: 0;
   }
 
   &__actions {
@@ -204,6 +471,7 @@ body {
     border: 2px solid #2a66c4;
     border-radius: 0.25rem;
     padding: 0.75rem 0.85rem;
+    height: auto;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
 
@@ -240,75 +508,37 @@ body {
 
 .public-links {
   position: relative;
-  @include flex-column(1rem);
+  @include flex-column(0.55rem);
   margin: 0;
 
   .tile {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.25rem 1.5rem;
-    border-radius: 0.65rem;
-    border: 1px solid rgba(28, 54, 94, 0.12);
-    --tile-accent: #2a66c4;
-    --tile-bg-tint: rgba(88, 174, 238, 0.22);
-    border-left: 3px solid var(--tile-accent);
-    color: inherit;
-    text-decoration: none;
-    transition: all 140ms ease;
-
-    &:hover,
-    &:focus-visible {
-      transform: translateY(-2px);
-      border-color: rgba(28, 54, 94, 0.18);
-      box-shadow: 0 18px 42px -32px rgba(16, 34, 63, 0.35);
-      text-decoration: none;
-    }
-
-    &:focus-visible {
-      outline: 3px solid var(--tile-accent);
-      outline-offset: 3px;
-    }
-
-    &.primary,
-    &.warning,
-    &.info,
-    &.success,
-    &.neutral {
-      --tile-accent: #2a66c4;
-      --tile-bg-tint: rgba(88, 174, 238, 0.22);
-    }
+    @include public-card-link;
+    justify-content: space-between;
 
     .body {
-      @include flex-column(0.25rem);
+      @include flex-column(0.1rem);
       min-width: 0;
+      flex: 1;
     }
 
     .title {
-      font-weight: 600;
-      font-size: 0.95rem;
-      color: #1e2f47;
-      line-height: 1.3;
+      @include public-card-link-title;
     }
 
     .subtitle {
-      font-size: 0.82rem;
-      color: rgba(22, 38, 60, 0.7);
-      line-height: 1.4;
+      @include public-card-link-subtitle;
     }
 
     .chevron {
       color: rgba(24, 44, 72, 0.35);
       font-size: 0.9rem;
-      transition: all 140ms ease;
+      transition: color 140ms ease, transform 140ms ease;
       flex-shrink: 0;
     }
 
     &:hover .chevron,
     &:focus-visible .chevron {
-      color: var(--tile-accent, #2a66c4);
+      color: #2a66c4;
       transform: translateX(2px);
     }
   }
@@ -316,81 +546,10 @@ body {
 
 .public-sidebar-card {
   @include card-shell;
-  padding: 2rem 2.5rem;
+  padding: 1.5rem 1.75rem;
   height: 100%;
-
-  .title {
-    margin: 0 0 1.5rem 0;
-    font-size: 1.9rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-    color: #1f2f4a;
-    text-align: center;
-  }
-
-  @media (min-width: 992px) {
-    .title {
-      font-size: 3rem;
-      line-height: 1.05;
-    }
-  }
-
-  .content {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .item {
-    display: block;
-
-    .text {
-      flex: 1;
-
-      strong {
-        display: block;
-        margin-bottom: 0.35rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #1f2f4a;
-        line-height: 1.3;
-      }
-
-      p {
-        margin: 0;
-        font-size: 0.875rem;
-        line-height: 1.6;
-        color: rgba(28, 45, 70, 0.78);
-      }
-
-      a {
-        color: #2a66c4;
-        text-decoration: none;
-        font-weight: 500;
-
-        &:hover {
-          text-decoration: underline;
-        }
-      }
-    }
-  }
-
-  .divider {
-    margin: 1rem 0;
-    border: 0;
-    border-top: 1px solid rgba(0, 44, 92, 0.08);
-  }
-
-  &.status {
-    .content {
-      gap: 1.5rem;
-    }
-    
-    .status-block {
-      padding: 1.5rem 0;
-    }
-  }
+  display: flex;
+  flex-direction: column;
 }
 
 .status-block {
@@ -468,9 +627,19 @@ body {
     padding: 1.5rem 0.75rem;
   }
 
+  .info-links--mobile {
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.4rem;
+
+    .info-link-chip {
+      font-size: 0.82rem;
+      padding: 0.4rem 0.75rem;
+    }
+  }
+
   .public-home .links {
     padding: 1.1rem 1rem;
-    margin: 0 -0.25rem;
+    margin: 0;
   }
 
   .public-links {
@@ -481,13 +650,22 @@ body {
 
   .public-links .tile {
     padding: 0.75rem 0.85rem;
+    height: auto;
+    min-height: 0;
     border-radius: 0.25rem;
-    border: 2px solid var(--tile-accent);
+    border: 2px solid #2a66c4;
+    border-left-width: 2px;
     display: flex;
     flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
     gap: 0.25rem;
     background-color: white;
     text-align: center;
+  }
+
+  .public-links .tile .chevron {
+    display: none;
   }
 
   .public-links .tile:first-child {

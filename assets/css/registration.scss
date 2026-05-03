@@ -502,6 +502,97 @@
     color: #6b4d00;
   }
 
+  // ---------- Post-registration follow-up links ----------
+
+  .registration-followup {
+    margin-top: 1.25rem;
+    padding: 1.1rem 1.25rem 1.25rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--rg-border);
+    background: #ffffff;
+  }
+
+  .registration-followup__head {
+    margin-bottom: 0.85rem;
+  }
+
+  .registration-followup__title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2f4a;
+  }
+
+  .registration-followup__subtitle {
+    margin: 0.25rem 0 0;
+    color: rgba(28, 45, 70, 0.75);
+    font-size: 0.88rem;
+  }
+
+  .registration-followup__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .registration-followup__link {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 0.95rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(28, 54, 94, 0.14);
+    border-left: 3px solid #2a66c4;
+    background: #ffffff;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+
+    &:hover,
+    &:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(28, 54, 94, 0.22);
+      box-shadow: 0 14px 30px -22px rgba(16, 34, 63, 0.32);
+      text-decoration: none;
+    }
+
+    &:focus-visible {
+      outline: 3px solid #2a66c4;
+      outline-offset: 2px;
+    }
+  }
+
+  .registration-followup__link-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .registration-followup__link-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2f4a;
+    line-height: 1.3;
+  }
+
+  .registration-followup__link-subtitle {
+    font-size: 0.82rem;
+    color: rgba(28, 45, 70, 0.7);
+    line-height: 1.35;
+  }
+
+  .registration-followup__link-chevron {
+    color: rgba(24, 44, 72, 0.45);
+    flex-shrink: 0;
+  }
+
+  .registration-followup__link:hover .registration-followup__link-chevron,
+  .registration-followup__link:focus-visible .registration-followup__link-chevron {
+    color: #2a66c4;
+  }
+
   // ---------- Saved-registration summary ----------
 
   .registration-summary {
@@ -881,6 +972,70 @@
       font-size: 0.82rem;
     }
   }
+}
+
+// ---------- Tournament link admin ----------
+
+.tournament-link-form {
+  margin-top: 0.85rem;
+}
+
+.tournament-link-form__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.5fr) minmax(160px, 1.5fr) 80px auto auto;
+  align-items: center;
+  gap: 0.5rem;
+
+  @media (max-width: 991.98px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 575.98px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tournament-link-form__order {
+  width: 100%;
+  text-align: center;
+}
+
+.tournament-link-form__active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(28, 45, 70, 0.78);
+  white-space: nowrap;
+}
+
+.tournament-link-table {
+  td {
+    vertical-align: middle !important;
+  }
+
+  input[type="text"],
+  input[type="url"],
+  input[type="number"] {
+    min-width: 0;
+  }
+}
+
+.tournament-link-actions {
+  white-space: nowrap;
+
+  .btn + form {
+    margin-left: 0.25rem;
+  }
+}
+
+.tournament-link-empty {
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  color: rgba(28, 45, 70, 0.7);
+  background: rgba(244, 249, 255, 0.7);
+  border: 1px dashed rgba(28, 54, 94, 0.18);
 }
 
 // ---------- Page banner override ----------
