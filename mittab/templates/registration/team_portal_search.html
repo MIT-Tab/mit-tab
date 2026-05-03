@@ -1,0 +1,33 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+{% load tags %}
+
+{% block title %}Team Portal{% endblock %}
+{% block banner %}<span class="registration-page-title">Team Portal</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-6 col-md-8">
+  <p>
+    Enter the team code from your registration confirmation email to manage your
+    team name and discretionary scratches.
+  </p>
+  <form method="post" action="">
+    {% csrf_token %}
+    {% return_to_input request.path %}
+    <div class="form-group">
+      <label for="team_code">Team code</label>
+      <input type="text"
+             name="team_code"
+             id="team_code"
+             class="form-control"
+             placeholder="Example: Gentle River"
+             autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary">Open Team Portal</button>
+  </form>
+</div>
+{% endblock %}
