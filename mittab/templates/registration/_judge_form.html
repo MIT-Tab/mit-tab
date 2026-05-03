@@ -30,8 +30,15 @@
                 {% endif %}
             </div>
             {% if form.availability_fields %}
-            <div class="registration-field registration-judge-grid__item--wide">
-                <label class="registration-field__label">Availability</label>
+            <div class="registration-field registration-judge-grid__item--wide" data-availability-group>
+                <div class="judge-availability__header">
+                    <label class="registration-field__label">Availability</label>
+                    <div class="judge-availability__bulk">
+                        <button type="button" class="judge-availability__bulk-btn" data-availability-action="select">Select all</button>
+                        <span class="judge-availability__bulk-divider" aria-hidden="true">·</span>
+                        <button type="button" class="judge-availability__bulk-btn" data-availability-action="clear">Clear</button>
+                    </div>
+                </div>
                 <div class="judge-availability">
                     {% for availability in form.availability_fields %}
                     <div class="custom-control custom-checkbox">

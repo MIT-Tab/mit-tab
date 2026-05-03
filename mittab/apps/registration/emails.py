@@ -1,11 +1,25 @@
+from datetime import timedelta
+
+from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape
 
-from mittab.apps.tab.models import Debater, Judge, TabSettings, Team
-from mittab.libs.email_service import EmailRequest, EmailService
+from mittab.apps.tab.models import (
+    BALLOT_CODE_MAX_LENGTH,
+    Debater,
+    Judge,
+    JudgeCodeEmailLog,
+    TabSettings,
+    Team,
+)
+from mittab.libs.email_service import EmailRequest, EmailService, EmailServiceError
 
 from .models import Registration
+
+
+JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
 
 
 def _seed_label(team):
@@ -70,7 +84,6 @@ def _judge_text_lines(judge, fallback_school):
     availability = _format_available_rounds(judge.checkin_set.all())
     return [
         f"- {judge.name}",
-        f"  Email: {judge.email}",
         f"  Experience: {judge.rank}",
         f"  Schools: {schools}",
         f"  Availability: {availability}",
@@ -141,7 +154,6 @@ def _judge_html_lines(judge, fallback_school):
         "<li style=\"margin-bottom:10px;\">",
         f"<strong>{escape(judge.name)}</strong>",
         "<ul style=\"margin:4px 0 0;padding-left:20px;\">",
-        f"<li>Email: {escape(judge.email or '')}</li>",
         f"<li>Experience: {escape(judge.rank)}</li>",
         f"<li>Schools: {escape(schools)}</li>",
         f"<li>Availability: {escape(availability)}</li>",
@@ -277,3 +289,99 @@ def build_registration_confirmation_email(registration, request):
 def send_registration_confirmation_email(registration, request):
     email_request = build_registration_confirmation_email(registration, request)
     return EmailService().send_bulk([email_request])
+
+
+def _build_registration_judge_code_plan(registration, request):
+    judge_emails = {
+        item["judge_id"]: (item.get("email") or "").strip()
+        for item in getattr(registration, "transient_judge_emails", [])
+    }
+    judge_ids = [judge_id for judge_id, email in judge_emails.items() if email]
+    if not judge_ids:
+        return []
+
+    judges = {
+        judge.pk: judge
+        for judge in Judge.objects.filter(pk__in=judge_ids).order_by("name")
+    }
+    recent_judge_ids = set(
+        JudgeCodeEmailLog.objects.filter(
+            judge_id__in=judge_ids,
+            sent_at__gte=timezone.now() - JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW,
+        ).values_list("judge_id", flat=True)
+    )
+    tournament_name = TabSettings.get("tournament_name", "your tournament")
+    subject = f"{tournament_name} Judge Ballot Code"
+    eballot_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
+    entries = []
+
+    for judge_id in judge_ids:
+        judge = judges.get(judge_id)
+        email = judge_emails[judge_id]
+        if not judge or judge_id in recent_judge_ids:
+            continue
+
+        try:
+            judge.is_valid_ballot_code()
+        except ValidationError:
+            continue
+
+        if not judge.ballot_code:
+            judge.set_unique_ballot_code()
+            judge.save(update_fields=["ballot_code"])
+
+        if len(judge.ballot_code or "") > BALLOT_CODE_MAX_LENGTH:
+            continue
+
+        ballot_url = request.build_absolute_uri(
+            reverse("enter_e_ballot", args=[judge.ballot_code])
+        )
+        text_body = (
+            f"Hi {judge.name},\n\n"
+            "This email confirms that you have been registered for "
+            f"{tournament_name}.\n\n"
+            f"Your ballot code for {tournament_name} is {judge.ballot_code}.\n"
+            f"Submit e-ballots at {ballot_url} or search at {eballot_search_url}.\n\n"
+            "Thank you,\n"
+            "Tab Staff"
+        )
+        email_request = EmailRequest(
+            to_address=email,
+            subject=subject,
+            text_body=text_body,
+        )
+        entries.append(
+            {
+                "email_request": email_request,
+                "log_entry": JudgeCodeEmailLog(
+                    judge=judge,
+                    email="",
+                    ballot_code=judge.ballot_code,
+                ),
+            }
+        )
+
+    return entries
+
+
+def send_registration_judge_code_emails(registration, request):
+    entries = _build_registration_judge_code_plan(registration, request)
+    if not entries:
+        return 0
+
+    email_requests = [entry["email_request"] for entry in entries]
+    try:
+        sent = EmailService().send_bulk(email_requests)
+    except EmailServiceError as exc:
+        sent_request_ids = {id(email_request) for email_request in exc.sent_requests}
+        sent_log_entries = [
+            entry["log_entry"]
+            for entry in entries
+            if id(entry["email_request"]) in sent_request_ids
+        ]
+        if sent_log_entries:
+            JudgeCodeEmailLog.objects.bulk_create(sent_log_entries)
+        raise
+
+    JudgeCodeEmailLog.objects.bulk_create([entry["log_entry"] for entry in entries])
+    return sent

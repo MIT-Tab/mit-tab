@@ -151,7 +151,7 @@ def registration_judge_initial(judge, round_config):
         "registration_judge_id": judge.pk,
         "judge_id": judge.pk,
         "name": judge.name,
-        "email": judge.email,
+        "email": "",
         "experience": judge.rank,
         "schools": [school_value(school) for school in affiliated],
         "school_label_map": {
@@ -342,7 +342,6 @@ def registration_snapshot(registration):
             {
                 "id": judge.pk,
                 "name": judge.name,
-                "email": judge.email,
                 "experience": str(judge.rank),
                 "schools": [_school_snapshot(school) for school in judge.schools.all()],
                 "availability_rounds": sorted(
@@ -506,6 +505,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         team.delete()
 
     saved_judge_ids = []
+    registration_judge_emails = []
     for form in judge_formset:
         if form.cleaned_data.get("DELETE"):
             continue
@@ -515,7 +515,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         ).first() or Judge(registration=registration)
         judge.name = uniquify_name(Judge, payload["name"], exclude_pk=judge.pk)
         judge.rank = payload["experience"]
-        judge.email = payload["email"]
+        judge.email = None
         try:
             judge.save()
         except IntegrityError:
@@ -529,12 +529,17 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         judge.schools.set(resolved_schools)
         sync_judge_checkins(judge, payload["availability_rounds"])
         saved_judge_ids.append(judge.pk)
+        registration_judge_emails.append({
+            "judge_id": judge.pk,
+            "email": payload["email"],
+        })
     for judge in registration.judges.exclude(pk__in=saved_judge_ids):
         judge.delete()
 
     after = registration_snapshot(registration)
     action = RegistrationChangeLog.UPDATED if before else RegistrationChangeLog.CREATED
     log_registration_change(registration, action, before=before, after=after)
+    registration.transient_judge_emails = registration_judge_emails
     return registration
 
 

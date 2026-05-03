@@ -450,6 +450,30 @@ const addForm = (type, maxTeams) => {
   updateSubformSummary($element);
 };
 
+// Hide a Bootstrap modal cleanly. Two cross-browser quirks to handle:
+//   1. iOS Safari leaves the modal/keyboard stuck if hide() is called
+//      while a child input still has focus — so we blur first.
+//   2. Bootstrap occasionally fails to remove the .modal-backdrop and the
+//      .modal-open class from <body> when hide() is triggered
+//      programmatically. We force-clean both on hidden.bs.modal as a
+//      backstop so the page doesn't stay greyed out.
+const hideModal = (selector) => {
+  if (
+    document.activeElement &&
+    typeof document.activeElement.blur === "function"
+  ) {
+    document.activeElement.blur();
+  }
+  const $modal = $(selector);
+  $modal.one("hidden.bs.modal", () => {
+    if (!$(".modal.show").length) {
+      $(".modal-backdrop").remove();
+      $("body").removeClass("modal-open").css("padding-right", "");
+    }
+  });
+  $modal.modal("hide");
+};
+
 const registerQuickActions = () => {
   const $newSchoolInput = $("#new-school-name");
   $("#create-school-btn").on("click", () => {
@@ -466,7 +490,7 @@ const registerQuickActions = () => {
     const value = `custom:${encodeURIComponent(name)}`;
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
-    $("#new-school-modal").modal("hide");
+    hideModal("#new-school-modal");
   });
 
   $("#create-debater-btn").on("click", () => {
@@ -497,7 +521,7 @@ const registerQuickActions = () => {
     broadcastCustomDebater(schoolValue, debater);
     $("#new-debater-name").val("");
     $("#new-debater-status").val("0");
-    $("#new-debater-modal").modal("hide");
+    hideModal("#new-debater-modal");
   });
 };
 
@@ -614,6 +638,20 @@ export default function initRegistrationPortal() {
     function onFieldChange() {
       const $subform = $(this).closest("[data-form]");
       updateSubformSummary($subform);
+    },
+  );
+
+  $root.on(
+    "click",
+    "[data-availability-action]",
+    function onAvailabilityBulk(event) {
+      event.preventDefault();
+      const checked = $(this).data("availabilityAction") === "select";
+      $(this)
+        .closest("[data-availability-group]")
+        .find('input[type="checkbox"]')
+        .prop("checked", checked)
+        .trigger("change");
     },
   );
 

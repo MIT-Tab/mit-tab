@@ -20,7 +20,10 @@ from mittab.apps.registration.forms import (
     RegistrationSettingsForm,
     TeamForm,
 )
-from mittab.apps.registration.emails import send_registration_confirmation_email
+from mittab.apps.registration.emails import (
+    send_registration_confirmation_email,
+    send_registration_judge_code_emails,
+)
 from mittab.apps.registration.services import (
     build_school_choices,
     get_round_config,
@@ -272,6 +275,17 @@ def registration_portal(request, code=None):
                     except (ImproperlyConfigured, EmailServiceError) as error:
                         message = (
                             "Registration saved, but the confirmation email "
+                            f"could not be sent: {error}"
+                        )
+                        messages.warning(
+                            request,
+                            message,
+                        )
+                    try:
+                        send_registration_judge_code_emails(saved, request)
+                    except (ImproperlyConfigured, EmailServiceError) as error:
+                        message = (
+                            "Registration saved, but judge code email(s) "
                             f"could not be sent: {error}"
                         )
                         messages.warning(

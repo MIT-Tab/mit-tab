@@ -285,7 +285,7 @@ class JudgeForm(forms.Form):
         self.fields["email"].widget.attrs.update(
             {
                 "class": "form-control",
-                "placeholder": "Email",
+                "placeholder": "Email (sent to judge, not saved)",
             }
         )
         self.fields["experience"].widget.attrs.update(

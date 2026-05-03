@@ -339,6 +339,45 @@
 
   // ---------- Judge availability checkboxes ----------
 
+  .judge-availability__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+  }
+
+  .judge-availability__bulk {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .judge-availability__bulk-btn {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--rg-accent);
+    cursor: pointer;
+    line-height: 1;
+
+    &:hover,
+    &:focus {
+      color: #1d4d99;
+      text-decoration: underline;
+      outline: none;
+    }
+  }
+
+  .judge-availability__bulk-divider {
+    color: rgba(28, 45, 70, 0.3);
+    font-size: 0.78rem;
+  }
+
   .judge-availability {
     display: flex;
     flex-wrap: wrap;

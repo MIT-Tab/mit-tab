@@ -27,8 +27,8 @@
                     <p class="registration-section-subtitle">Pick your school and the email we should reach you at. Missing a school or debater? Add them with the buttons on the right.</p>
                 </div>
                 <div class="registration-section-actions">
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-school-modal">+ Add School</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-debater-modal">+ Add Debater</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-school-modal">+ New School</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#new-debater-modal">+ New Debater</button>
                 </div>
             </div>
             {% for error in registration_form.non_field_errors %}
@@ -223,10 +223,7 @@
             <div class="registration-summary-list">
                 {% for judge in summary.judges.all %}
                 <div class="registration-summary-list__item">
-                    <p class="registration-summary-list__name">{{ judge.name }}{% if judge.ballot_code %} <span class="registration-summary-list__sub">(Code: {{ judge.ballot_code }})</span>{% endif %}</p>
-                    {% if judge.email %}
-                    <p class="registration-summary-list__sub">{{ judge.email }}</p>
-                    {% endif %}
+                    <p class="registration-summary-list__name">{{ judge.name }}</p>
                 </div>
                 {% endfor %}
             </div>

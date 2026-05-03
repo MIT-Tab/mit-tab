@@ -6,7 +6,7 @@ import pytest
 from mittab.apps.registration.forms import DEBATER_PREFIXES
 from mittab.apps.registration.models import Registration, RegistrationChangeLog
 from mittab.apps.registration.views import MAX_TEAMS
-from mittab.apps.tab.models import CheckIn, Debater, School, Team
+from mittab.apps.tab.models import CheckIn, Debater, JudgeCodeEmailLog, School, Team
 
 
 def base_management(prefix, total, initial=0):
@@ -152,7 +152,7 @@ def test_registration_flow_creates_objects(email_service, client):
     judge = registration.judges.first()
     assert judge.name == "Reg Judge"
     assert judge.rank == Decimal("7")
-    assert judge.email == "judge@example.com"
+    assert judge.email is None
     assert {school.name for school in judge.schools.all()} == {
         "Registration U",
         "Judge Hybrid",
@@ -161,18 +161,38 @@ def test_registration_flow_creates_objects(email_service, client):
         CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
     )
     assert checkins == {0, 1, 3}
-    email_service.return_value.send_bulk.assert_called_once()
-    email_request = email_service.return_value.send_bulk.call_args.args[0][0]
+    assert email_service.return_value.send_bulk.call_count == 2
+    email_request = (
+        email_service.return_value.send_bulk.call_args_list[0].args[0][0]
+    )
     assert email_request.to_address == "contact@example.com"
     assert registration.herokunator_code in email_request.text_body
     assert "http://testserver/registration/" in email_request.text_body
     assert "Registration U A" in email_request.text_body
     assert "Reg Judge" in email_request.text_body
+    assert "judge@example.com" not in email_request.text_body
+    assert judge.ballot_code not in email_request.text_body
+    judge_code_request = (
+        email_service.return_value.send_bulk.call_args_list[1].args[0][0]
+    )
+    assert judge_code_request.to_address == "judge@example.com"
+    assert "you have been registered for" in judge_code_request.text_body
+    assert judge.ballot_code in judge_code_request.text_body
+    judge_code_log = JudgeCodeEmailLog.objects.get(judge=judge)
+    assert judge_code_log.email == ""
+    assert judge_code_log.ballot_code == judge.ballot_code
     log = RegistrationChangeLog.objects.get()
     assert log.action == RegistrationChangeLog.CREATED
     assert log.registration == registration
     assert log.snapshot["school"]["name"] == "Registration U"
     assert log.snapshot["teams"][0]["debaters"][0]["apda_id"] == 1000
+    assert "email" not in log.snapshot["judges"][0]
+    assert f"(Code: {judge.ballot_code})".encode() not in response.content
+    code_ui = client.get("/send_judge_codes/")
+    assert code_ui.status_code == 200
+    assert b"Reg Judge" in code_ui.content
+    assert b"Missing email" in code_ui.content
+    assert b"Default selection: 0 who have never received" in code_ui.content
 
 
 @pytest.mark.django_db
