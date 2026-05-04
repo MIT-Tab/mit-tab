@@ -111,7 +111,7 @@
             </span>
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
-                    <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
+          <a class="tile shadow-sm" href="{% url 'e_ballot_search' %}">
             <span class="body">
               <span class="title">Submit E-Ballot</span>
               <span class="subtitle">Judges enter ballot codes to file results.</span>
@@ -119,6 +119,13 @@
             <span class="chevron"><i class="fas fa-arrow-right"></i></span>
           </a>
           {% endif %}
+          <a class="tile shadow-sm" href="{% url 'team_portal_search' %}">
+            <span class="body">
+              <span class="title">Team Portal</span>
+              <span class="subtitle">Teams enter codes to manage names and scratches.</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
           <a class="tile shadow-sm" href="{% url 'public_judges' %}">
             <span class="body">
               <span class="title">Judge List</span>

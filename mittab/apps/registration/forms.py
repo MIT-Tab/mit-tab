@@ -3,7 +3,7 @@ from urllib.parse import unquote
 from django import forms
 
 from mittab.apps.registration.models import RegistrationConfig
-from mittab.apps.tab.models import Debater, Team
+from mittab.apps.tab.models import Debater, Judge, Scratch, Team
 
 DEBATER_PREFIXES = ("debater_one", "debater_two")
 
@@ -15,6 +15,7 @@ def _build_debater_fields():
             required=False, widget=forms.HiddenInput
         )
         fields[f"{prefix}_name"] = forms.CharField(required=False, max_length=30)
+        fields[f"{prefix}_email"] = forms.EmailField(required=False, max_length=254)
         fields[f"{prefix}_apda_id"] = forms.IntegerField(
             required=False, widget=forms.HiddenInput
         )
@@ -153,6 +154,12 @@ class TeamForm(ValueMixin, forms.Form):
                 choices=[("", "Select a school first")]
             )
             self.fields[name_field].widget.attrs["class"] = "form-control"
+            self.fields[f"{prefix}_email"].widget.attrs.update(
+                {
+                    "class": "form-control",
+                    "placeholder": "debater@example.com",
+                }
+            )
             self.fields[f"{prefix}_qualified"].widget.attrs.setdefault("value", "")
             self.fields[f"{prefix}_novice_status"].widget.attrs.update(
                 {"class": "form-control form-control-sm"}
@@ -171,7 +178,14 @@ class TeamForm(ValueMixin, forms.Form):
             return data
         has_content = any(
             data.get(field)
-            for field in ("team_id", "name", "debater_one_name", "debater_two_name")
+            for field in (
+                "team_id",
+                "name",
+                "debater_one_name",
+                "debater_two_name",
+                "debater_one_email",
+                "debater_two_email",
+            )
         )
         if not has_content:
             data["DELETE"] = True
@@ -180,6 +194,8 @@ class TeamForm(ValueMixin, forms.Form):
             raise forms.ValidationError("Team name required")
         if not data.get("debater_one_name") or not data.get("debater_two_name"):
             raise forms.ValidationError("Each team needs two debaters")
+        if not data.get("debater_one_email") or not data.get("debater_two_email"):
+            raise forms.ValidationError("Each debater needs an email")
         if data.get("seed_choice") is None:
             data["seed_choice"] = Team.UNSEEDED
         primary = data.get("team_school_source") or "debater_one"
@@ -200,6 +216,7 @@ class TeamForm(ValueMixin, forms.Form):
         return {
             "id": self.cleaned_data.get(f"{prefix}_id"),
             "name": self.cleaned_data[f"{prefix}_name"],
+            "email": self.cleaned_data[f"{prefix}_email"],
             "apda_id": self.cleaned_data.get(f"{prefix}_apda_id"),
             "novice_status": int(
                 self.cleaned_data[f"{prefix}_novice_status"] or Debater.VARSITY
@@ -389,15 +406,45 @@ class RegistrationSettingsForm(forms.Form):
         help_text="Controls whether existing registration links can modify their data.",
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
+    team_name_changes_allowed = forms.BooleanField(
+        label="Allow Team Name Changes",
+        required=False,
+        help_text=(
+            "Controls whether teams can change their own name in the team portal."
+        ),
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+    )
+    disc_scratches_open = forms.BooleanField(
+        label="Disc Scratches Open",
+        required=False,
+        help_text="Controls whether teams can submit or edit discretionary scratches.",
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+    )
+    disc_scratch_quantity = forms.IntegerField(
+        label="Disc Scratch Quantity",
+        min_value=0,
+        initial=0,
+        required=False,
+        help_text="Maximum number of discretionary scratches each team may submit.",
+        widget=forms.NumberInput(
+            attrs={"class": "form-control form-control-sm", "min": "0"}
+        ),
+    )
 
     def __init__(self, *args, config=None, **kwargs):
         self.config = config or RegistrationConfig.get_or_create_active()
         initial = {
             "allow_new_registrations": self.config.allow_new_registrations,
             "allow_registration_edits": self.config.allow_registration_edits,
+            "team_name_changes_allowed": self.config.team_name_changes_allowed,
+            "disc_scratches_open": self.config.disc_scratches_open,
+            "disc_scratch_quantity": self.config.disc_scratch_quantity,
         }
         kwargs.setdefault("initial", initial)
         super().__init__(*args, **kwargs)
+
+    def clean_disc_scratch_quantity(self):
+        return self.cleaned_data.get("disc_scratch_quantity") or 0
 
     def save(self):
         self.config.allow_new_registrations = self.cleaned_data[
@@ -406,5 +453,136 @@ class RegistrationSettingsForm(forms.Form):
         self.config.allow_registration_edits = self.cleaned_data[
             "allow_registration_edits"
         ]
+        self.config.team_name_changes_allowed = self.cleaned_data[
+            "team_name_changes_allowed"
+        ]
+        self.config.disc_scratches_open = self.cleaned_data["disc_scratches_open"]
+        self.config.disc_scratch_quantity = self.cleaned_data[
+            "disc_scratch_quantity"
+        ]
         self.config.save()
         return self.config
+
+
+class TeamNameChangeForm(forms.Form):
+    name = forms.CharField(max_length=35)
+
+    def __init__(self, *args, team=None, **kwargs):
+        self.team = team
+        initial = {"name": team.name} if team else {}
+        kwargs.setdefault("initial", initial)
+        super().__init__(*args, **kwargs)
+        self.fields["name"].widget.attrs.update({"class": "form-control"})
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        query = Team.objects.filter(name__iexact=name)
+        if self.team and self.team.pk:
+            query = query.exclude(pk=self.team.pk)
+        if query.exists():
+            raise forms.ValidationError("A team with this name already exists.")
+        return name
+
+    def save(self):
+        self.team.name = self.cleaned_data["name"]
+        self.team.save()
+        return self.team
+
+
+class TeamPortalScratchForm(forms.Form):
+    def __init__(self, *args, team=None, quantity=0, **kwargs):
+        self.team = team
+        self.quantity = max(int(quantity or 0), 0)
+        super().__init__(*args, **kwargs)
+        self.current_scratches = list(
+            Scratch.objects.filter(team=team, scratch_type=Scratch.TEAM_SCRATCH)
+            .select_related("judge")
+            .order_by("judge__name")
+        )
+        tab_scratch_judge_ids = set(
+            Scratch.objects.filter(
+                team=team,
+                scratch_type=Scratch.TAB_SCRATCH,
+            ).values_list("judge_id", flat=True)
+        )
+        self.allowed_judges = Judge.objects.exclude(
+            pk__in=tab_scratch_judge_ids
+        ).order_by("name")
+        choices = [("", "No scratch")] + [
+            (str(judge.pk), judge.name) for judge in self.allowed_judges
+        ]
+        initial_judge_ids = [
+            str(scratch.judge_id) for scratch in self.current_scratches[: self.quantity]
+        ]
+        for index in range(self.quantity):
+            field_name = self.field_name(index)
+            self.fields[field_name] = forms.ChoiceField(
+                choices=choices,
+                required=False,
+                label=f"Scratch {index + 1}",
+                initial=initial_judge_ids[index]
+                if index < len(initial_judge_ids)
+                else "",
+                widget=forms.Select(attrs={"class": "form-control"}),
+            )
+
+    def field_name(self, index):
+        return f"scratch_{index}"
+
+    def selected_judge_ids(self):
+        return [
+            int(self.cleaned_data[self.field_name(index)])
+            for index in range(self.quantity)
+            if self.cleaned_data.get(self.field_name(index))
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        selected = [
+            cleaned_data.get(self.field_name(index))
+            for index in range(self.quantity)
+            if cleaned_data.get(self.field_name(index))
+        ]
+        if len(selected) != len(set(selected)):
+            raise forms.ValidationError("Select each judge at most once.")
+        allowed_ids = {str(judge.pk) for judge in self.allowed_judges}
+        invalid = [judge_id for judge_id in selected if judge_id not in allowed_ids]
+        if invalid:
+            raise forms.ValidationError(
+                "One or more selected judges cannot be scratched."
+            )
+        return cleaned_data
+
+    def save(self):
+        selected_ids = set(self.selected_judge_ids())
+        existing = {
+            scratch.judge_id: scratch
+            for scratch in Scratch.objects.filter(
+                team=self.team,
+                scratch_type=Scratch.TEAM_SCRATCH,
+            )
+        }
+        Scratch.objects.filter(
+            pk__in=[
+                scratch.pk
+                for judge_id, scratch in existing.items()
+                if judge_id not in selected_ids
+            ]
+        ).delete()
+        new_scratches = [
+            Scratch(
+                team=self.team,
+                judge_id=judge_id,
+                scratch_type=Scratch.TEAM_SCRATCH,
+            )
+            for judge_id in selected_ids
+            if judge_id not in existing
+        ]
+        if new_scratches:
+            Scratch.objects.bulk_create(new_scratches)
+        return list(
+            Scratch.objects.filter(
+                team=self.team,
+                scratch_type=Scratch.TEAM_SCRATCH,
+            ).select_related("judge")
+        )
