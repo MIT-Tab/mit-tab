@@ -1,6 +1,5 @@
 import random
 
-from haikunator import Haikunator
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -9,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.haikunator import Haikunator
 
 
 _TABSETTING_MISSING = object()
@@ -337,7 +337,10 @@ class Team(AuditAttributionMixin):
         haikunator = Haikunator()
 
         def gen_haiku_and_clean():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
+            code = haikunator.haikunate(
+                token_length=TEAM_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            ).replace("-", " ").title()
 
             return code
 
@@ -424,12 +427,15 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
+HUMAN_READABLE_TOKEN_CHARS = "23456789abcdefghijkmnopqrstuvwxyz"
+TEAM_CODE_TOKEN_LENGTH = 4
 BALLOT_CODE_MAX_LENGTH = 30
+BALLOT_CODE_TOKEN_LENGTH = 9
 ballot_code_validator = RegexValidator(
-    regex=r"^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$",
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+(?:-[A-Za-z0-9]+)?|[A-Za-z0-9]+)$",
     message=(
-        "Ballot code must be either legacy alphanumeric text or a single-hyphen code "
-        "with letters on each side."
+        "Ballot code must be legacy alphanumeric text or a hyphenated word-word "
+        "code with an optional alphanumeric token."
     ),
 )
 
@@ -460,12 +466,18 @@ class Judge(AuditAttributionMixin):
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
-        code = haikunator.haikunate(token_length=0)
+        code = haikunator.haikunate(
+            token_length=BALLOT_CODE_TOKEN_LENGTH,
+            token_chars=HUMAN_READABLE_TOKEN_CHARS,
+        )
 
         while (len(code) > BALLOT_CODE_MAX_LENGTH or
                not self.is_valid_ballot_code(code, raise_error=False) or
                Judge.objects.filter(ballot_code=code).first()):
-            code = haikunator.haikunate(token_length=0)
+            code = haikunator.haikunate(
+                token_length=BALLOT_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            )
 
         self.ballot_code = code
 
