@@ -1,13 +1,16 @@
 import pytest
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.urls import reverse
 
+from mittab.apps.registration.emails import build_registration_confirmation_email
 from mittab.apps.registration.models import (
     InfoLink,
+    Registration,
     RegistrationLink,
     validate_safe_url,
 )
-from django.core.exceptions import ValidationError
+from mittab.apps.tab.models import School
 
 
 @pytest.fixture(autouse=True)
@@ -161,12 +164,6 @@ def test_public_home_escapes_link_title(client):
 
 @pytest.mark.django_db
 def test_confirmation_email_includes_followup_links(rf):
-    from mittab.apps.tab.models import School
-    from mittab.apps.registration.emails import (
-        build_registration_confirmation_email,
-    )
-    from mittab.apps.registration.models import Registration
-
     school = School.objects.create(name="Email U")
     registration = Registration.objects.create(
         school=school, email="contact@example.com"
