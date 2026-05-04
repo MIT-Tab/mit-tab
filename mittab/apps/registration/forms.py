@@ -409,7 +409,9 @@ class RegistrationSettingsForm(forms.Form):
     team_name_changes_allowed = forms.BooleanField(
         label="Allow Team Name Changes",
         required=False,
-        help_text="Controls whether teams can change their own name in the team portal.",
+        help_text=(
+            "Controls whether teams can change their own name in the team portal."
+        ),
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
     disc_scratches_open = forms.BooleanField(
