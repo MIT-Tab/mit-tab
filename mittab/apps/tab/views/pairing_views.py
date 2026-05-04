@@ -935,16 +935,6 @@ def enter_result(request,
                                               "Result entered successfully",
                                               path=redirect_to)
     else:
-        if not ballot_code and submitted_ballot_exists:
-            from mittab.apps.tab.views.public_views import _submitted_ballot_context
-
-            context = _submitted_ballot_context(
-                round_obj,
-                ballot_code=None,
-                allow_rfd_edit=True,
-            )
-            return render(request, "ballots/ballot_submitted.html", context)
-
         form_kwargs = {"round_instance": round_obj}
         if ballot_code:
             form_kwargs["ballot_code"] = ballot_code
