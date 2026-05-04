@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from datetime import timedelta
 from unittest import mock
 
@@ -131,7 +132,7 @@ class TestTabViews(TestCase):
             self.assertIn(expected_content, response.content.decode(),
                 f"Expected content '{expected_content}' not found in {url}")
 
-    def test_staff_ballot_view_shows_written_rfd(self):
+    def test_staff_ballot_view_allows_editing_submitted_ballot(self):
         round_obj = Round.objects.filter(round_number=1).first()
         round_obj.rfd = "Gov won because they controlled the weighing."
         round_obj.save(update_fields=["rfd"])
@@ -142,19 +143,44 @@ class TestTabViews(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn("Ballot submitted", content)
+        self.assertIn("Entering Ballot", content)
+        self.assertIn("Which team won the round?", content)
         self.assertIn("Reason for Decision", content)
-        self.assertIn("Save Written RFD", content)
         self.assertIn("Gov won because they controlled the weighing.", content)
 
+        stats = {
+            stat.debater_role: stat
+            for stat in RoundStats.objects.filter(round=round_obj)
+        }
         response = self.client.post(
             f"/round/{round_obj.id}/result/",
-            {"rfd": "Staff updated the RFD text."},
+            {
+                "winner": Round.GOV,
+                "round_instance": round_obj.id,
+                "pm_debater": stats["pm"].debater.id,
+                "pm_speaks": "30",
+                "pm_ranks": "1",
+                "mg_debater": stats["mg"].debater.id,
+                "mg_speaks": "29",
+                "mg_ranks": "2",
+                "lo_debater": stats["lo"].debater.id,
+                "lo_speaks": "28",
+                "lo_ranks": "3",
+                "mo_debater": stats["mo"].debater.id,
+                "mo_speaks": "27",
+                "mo_ranks": "4",
+                "rfd": "Staff updated the RFD text.",
+            },
         )
 
         self.assertEqual(response.status_code, 302)
         round_obj.refresh_from_db()
+        self.assertEqual(round_obj.victor, Round.GOV)
         self.assertEqual(round_obj.rfd, "Staff updated the RFD text.")
+        self.assertEqual(
+            RoundStats.objects.get(round=round_obj, debater_role="pm").speaks,
+            Decimal("30"),
+        )
 
     def test_staff_unsubmitted_ballot_form_shows_written_rfd_field(self):
         round_obj = Round.objects.filter(round_number=1).first()
@@ -171,6 +197,23 @@ class TestTabViews(TestCase):
         self.assertIn("Written RFD", content)
         self.assertIn("Reason for Decision", content)
         self.assertIn("Optional. You may submit the ballot without an RFD", content)
+
+    def test_audit_events_do_not_block_audited_object_deletion(self):
+        school = School.objects.create(name="Audit Delete School")
+        debaters = [
+            Debater.objects.create(name="Audit Delete Debater One", novice_status=0),
+            Debater.objects.create(name="Audit Delete Debater Two", novice_status=0),
+        ]
+        team = Team.objects.create(name="Audit Delete Team", school=school, seed=0)
+        team.debaters.set(debaters)
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+
+        self.assertEqual(list(team.audit_events.all()), [event])
+
+        team.delete()
+
+        self.assertFalse(Team.objects.filter(pk=team.pk).exists())
+        self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
 
     def test_n_plus_one(self):
         views_to_test = [

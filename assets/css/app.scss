@@ -311,6 +311,54 @@ $font-size-base: 0.95rem !default;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
+// Audit trail (collapsible history blocks)
+.audit-trail-summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+
+  &::-webkit-details-marker { display: none; }
+  &::marker { display: none; }
+
+  &::before {
+    content: "\25B8"; // right-pointing triangle
+    display: inline-block;
+    font-size: 0.7em;
+    margin-right: 0.35em;
+    transition: transform 0.15s ease;
+    color: #6c757d;
+  }
+}
+
+details[open] > .audit-trail-summary::before {
+  transform: rotate(90deg);
+}
+
+.audit-trail-table {
+  background: #fafbfc;
+  border-radius: 3px;
+
+  td { vertical-align: top; }
+}
+
+.audit-trail-label {
+  width: 30%;
+}
+
+.audit-events-inline summary {
+  display: inline-block;
+  font-size: 0.85em;
+}
+
+.manual-judge-history {
+  margin-top: 0.25rem;
+}
+
+.manual-judge-history-list {
+  margin: 0.25rem 0 0 0;
+  padding-left: 1.1rem;
+}
+
 // Utility classes
 .badge-wing-only {
   font-size: 0.6rem;

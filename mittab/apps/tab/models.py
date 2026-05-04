@@ -2,7 +2,7 @@ import random
 
 from haikunator import Haikunator
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -110,10 +110,18 @@ class AuditAttributionMixin(models.Model):
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
-    audit_events = GenericRelation("AuditEvent")
 
     class Meta:
         abstract = True
+
+    @property
+    def audit_events(self):
+        if not self.pk:
+            return AuditEvent.objects.none()
+        return AuditEvent.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+        )
 
     def save(self,
              force_insert=False,
