@@ -324,7 +324,7 @@ class TestTabViews(TestCase):
                 {"round_number": "2", "name": "Exploding Judge", "rank": "5"},
             )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"], "Save failed")
+        self.assertEqual(response.json()["error"], "Unable to create judge check-in")
 
     def test_team_creator_and_edit_audit_visible(self):
         school = School.objects.first()

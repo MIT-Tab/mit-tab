@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 import datetime
+import logging
 import os
 
 from django.shortcuts import render, get_object_or_404
@@ -37,6 +38,8 @@ from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
     invalidate_public_rankings_cache,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def invalidate_public_ballot_cache():
@@ -497,8 +500,12 @@ def quick_judge_checkin(request):
             if schools:
                 judge.schools.set(schools)
             CheckIn.objects.create(judge=judge, round_number=round_number)
-    except Exception as exc:  # pylint: disable=broad-except
-        return JsonResponse({"success": False, "error": str(exc)}, status=400)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("Failed to create quick judge check-in")
+        return JsonResponse(
+            {"success": False, "error": "Unable to create judge check-in"},
+            status=400,
+        )
 
     return JsonResponse({
         "success": True,
