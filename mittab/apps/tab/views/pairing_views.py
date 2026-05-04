@@ -474,7 +474,11 @@ def quick_judge_checkin(request):
                             status=400)
 
     school_ids = []
-    for raw in request.POST.getlist("school_ids[]") + request.POST.getlist("school_ids"):
+    school_id_values = (
+        request.POST.getlist("school_ids[]") +
+        request.POST.getlist("school_ids")
+    )
+    for raw in school_id_values:
         if raw and raw.isdigit():
             school_ids.append(int(raw))
     schools = list(School.objects.filter(pk__in=school_ids)) if school_ids else []
