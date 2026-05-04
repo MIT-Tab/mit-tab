@@ -7,7 +7,7 @@ function multiselectInit($elem) {
   let $select = $elem;
   if (!$select) {
     $select = $(
-      "#data-entry-form select[multiple], select[multiple].js-multiselect"
+      "#data-entry-form select[multiple], select[multiple].js-multiselect",
     );
   }
   $select.select2({ theme: "bootstrap4" });
