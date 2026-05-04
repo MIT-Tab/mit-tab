@@ -5,7 +5,10 @@
 {% block title %}Round Status{% endblock %}
 
 {% block content %}
-<div id="round-number" data-round-number={{ num_teams }} style="display: none;"></div>
+<div id="round-number"
+     data-round-number="{{ num_teams }}"
+     data-round-numbers="{% for rn in stats_round_numbers %}{{ rn }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     style="display: none;"></div>
     <div class="col">
   <div class="containter">
       <div class="row">
@@ -17,14 +20,28 @@
       </small>
         </h3>
     </div>
-    <div class="col">
-        <ul class="nav nav-tabs">
-      {% for outround in outround_options %}
-          <li class="nav-item">
-        <a class="nav-link {% active request outround.0 %}" href="{{ outround.0 }}">{{ outround.1 }}</a>
-          </li>
-      {% endfor %}
-        </ul>
+    <div class="col d-flex justify-content-end align-items-start">
+      <form method="get" class="form-inline">
+        <label class="mr-2" for="select-varsity">Varsity</label>
+        <select id="select-varsity" name="select_varsity" class="form-control form-control-sm mr-3" onchange="this.form.submit()">
+          <option value="">None</option>
+          {% for option in available_varsity_rounds %}
+          <option value="{{ option.num_teams }}" {% if selected_varsity == option.num_teams %}selected{% endif %}>
+            {{ option.label }}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label class="mr-2" for="select-novice">Novice</label>
+        <select id="select-novice" name="select_novice" class="form-control form-control-sm mr-3" onchange="this.form.submit()">
+          <option value="">None</option>
+          {% for option in available_novice_rounds %}
+          <option value="{{ option.num_teams }}" {% if selected_novice == option.num_teams %}selected{% endif %}>
+            {{ option.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
     </div>
       </div> <!-- end heading row -->
       <hr /> 
@@ -32,61 +49,98 @@
     <div class="col-8">
       <h6>Pairing Controls</h6>
       <div class="btn-group btn-group-sm">
-        <form action="/outround_pairing/assign_judges/{{ type_of_round }}/"
+        <form action="{% url 'outround_assign_judges' %}"
             method="post"
             onsubmit="return confirm('Do you really want to assign judges. All previous assignments will be lost.  If you are unsure, click cancel and back up')"
             class="d-inline"
           >
             {% csrf_token %}
-            {% return_to_input request.path %}
+            {% return_to_input return_path %}
+            <input type="hidden" name="selected_varsity" value="{{ selected_varsity|default_if_none:'' }}">
+            <input type="hidden" name="selected_novice" value="{{ selected_novice|default_if_none:'' }}">
             <button id="assign-judges" type="submit" class="mid btn btn-sm btn-warning" title="Assign judges to your pairing">
               <i class="fas fa-gavel"></i> Assign Judges
             </button>
           </form>
-          <a class="btn btn-success outround-release {% if not pairing_released %}d-none{% endif %}" href="#"
-             id="close-pairings"
-             data-num_teams="{{ num_teams }}"
-             data-type_of_round="{{ type_of_round }}"
-             title="Release the pairings to the participants">
-        <i class="fas fa-door-closed"></i> Close Pairings
-          </a>
-          <a class="btn btn-warning outround-release {% if pairing_released %}d-none{% endif %}" href="#"
-             id="release-pairings"
-             data-num_teams="{{ num_teams }}"
-             data-type_of_round="{{ type_of_round }}"
-             title="Release the pairings to the participants">
-        <i class="fas fa-door-open"></i> Release Pairings
-          </a>
-          {% if num_teams > 2 %}
-        <a class="btn btn-info" href="/outround_pairing/pair/{{ type_of_round }}/{{ num_teams }}"
-           title="Pair the next round of debate">
-            <i class="fas fa-arrow-right"></i> Prepare Next Round
-        </a>
-          {% endif %}
+          <form action="{% url 'outround_assign_rooms' %}"
+            method="post"
+            onsubmit="return confirm('Do you really want to assign rooms? All previous assignments will be lost. If you are unsure, click cancel and back up')"
+            class="d-inline"
+          >
+            {% csrf_token %}
+            {% return_to_input return_path %}
+            <input type="hidden" name="selected_varsity" value="{{ selected_varsity|default_if_none:'' }}">
+            <input type="hidden" name="selected_novice" value="{{ selected_novice|default_if_none:'' }}">
+            <button id="assign-rooms" type="submit" class="mid btn btn-sm btn-warning" title="Assign rooms to your pairing">
+              <i class="fas fa-chalkboard-teacher"></i> Assign Rooms
+            </button>
+          </form>
       </div>
-        </form>
-    </div>
-
-    <div class="col-4">
-        <h6>Display Options</h6>
-        <div class="btn-group btn-group-sm">
-      <a class="btn btn-secondary" href="{% url 'outround_pretty_pair' type_of_round %}" title="To display in GA">
-          <i class="fas fa-tv"></i> Announcement View
-      </a>
-      <a class="btn btn-secondary" href="/outround_pairings/export_csv/{{ type_of_round }}/" title="Export pairings as CSV">
-          <i class="fas fa-download"></i> Export CSV
-      </a>
-      <a class="btn btn-secondary" href="/outround_result/{{ type_of_round }}">
-          Forum View
-      </a>
-        </div>
     </div>
       </div> <!-- end control row -->
-      <div class="row">
-    {% for pairing in outrounds %}
-        <div class="col-xl-6">
-      {% include "outrounds/pairing_card.html" %}
+      {% if warnings %}
+      <div class="alert alert-danger warning-container">
+        <strong class="warning-text">Warning: Hover to see details.</strong>
+        <div class="alert alert-danger warning-popup">
+          <ul>
+            {% for warning in warnings %}
+              <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
         </div>
+      </div>
+      {% endif %}
+      <div class="row">
+    {% if not outround_sections %}
+      <div class="col-12">
+        <div class="alert alert-warning">No selected rounds to display.</div>
+      </div>
+    {% endif %}
+    {% for section in outround_sections %}
+        <div class="col-12 mt-2 mb-2 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">{{ section.label }}</h5>
+          <div class="btn-group btn-group-sm">
+            <a class="btn btn-success outround-release close-pairings-btn {% if not section.pairing_released %}d-none{% endif %}"
+               href="#"
+               data-release-key="{{ section.type_of_round }}-{{ section.num_teams }}"
+               data-num_teams="{{ section.num_teams }}"
+               data-type_of_round="{{ section.type_of_round }}"
+               title="Close pairings for this round">
+              <i class="fas fa-door-closed"></i> Close Pairings
+            </a>
+            <a class="btn btn-warning outround-release open-pairings-btn {% if section.pairing_released %}d-none{% endif %}"
+               href="#"
+               data-release-key="{{ section.type_of_round }}-{{ section.num_teams }}"
+               data-num_teams="{{ section.num_teams }}"
+               data-type_of_round="{{ section.type_of_round }}"
+               title="Release pairings for this round">
+              <i class="fas fa-door-open"></i> Release Pairings
+            </a>
+            {% if section.num_teams > 2 %}
+            <a class="btn btn-info"
+               href="/outround_pairing/pair/{{ section.type_of_round }}/{{ section.num_teams }}"
+               title="Pair the next round of debate for this bracket">
+              <i class="fas fa-arrow-right"></i> Prepare Next Round
+            </a>
+            {% endif %}
+            <a class="btn btn-secondary" href="{% url 'outround_pretty_pair' section.type_of_round %}" title="To display in GA">
+              <i class="fas fa-tv"></i> Announcement View
+            </a>
+            <a class="btn btn-secondary" href="/outround_pairings/export_csv/{{ section.type_of_round }}/" title="Export pairings as CSV">
+              <i class="fas fa-download"></i> Export CSV
+            </a>
+            <a class="btn btn-secondary" href="/outround_result/{{ section.type_of_round }}">
+              Forum View
+            </a>
+          </div>
+        </div>
+    {% for pairing in section.outrounds %}
+        <div class="col-xl-6">
+      {% with judge_slots=section.judge_slots %}
+      {% include "outrounds/pairing_card.html" %}
+      {% endwith %}
+        </div>
+    {% endfor %}
     {% endfor %}
       </div> <!-- end pairings row -->
       <div class="row mt-2 mb-2">

@@ -1,0 +1,979 @@
+// Registration UI
+// Sections sit directly on the page surface (no nested cards). Typography is
+// unified — one weight scale, sentence-case labels, uppercase reserved for
+// section titles only.
+
+:root {
+  color-scheme: light;
+}
+
+@mixin rg-card-shell {
+  background: #ffffff;
+  border: 1px solid rgba(21, 33, 61, 0.12);
+  border-radius: 0.75rem;
+  box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
+}
+
+#registration-app {
+  --rg-text: #1f2f4a;
+  --rg-text-muted: rgba(28, 45, 70, 0.7);
+  --rg-text-soft: rgba(28, 45, 70, 0.55);
+  --rg-accent: #2a66c4;
+  --rg-accent-soft: rgba(42, 102, 196, 0.08);
+  --rg-border: rgba(28, 54, 94, 0.12);
+  --rg-border-strong: rgba(21, 33, 61, 0.16);
+  --rg-tint: rgba(244, 249, 255, 0.65);
+  --rg-radius-inner: 0.5rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  width: 100%;
+  color: var(--rg-text);
+
+  // ---------- Section ----------
+
+  .registration-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    & + .registration-section {
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--rg-border);
+    }
+  }
+
+  .registration-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .registration-section-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1 1 280px;
+  }
+
+  .registration-section-title {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--rg-text);
+    letter-spacing: -0.005em;
+  }
+
+  .registration-section-subtitle {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--rg-text-muted);
+    line-height: 1.5;
+  }
+
+  .registration-section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  // Subdued helper row for low-frequency actions (e.g. "+ Add new school")
+  // that should sit below their related fields rather than dominating the
+  // section header.
+  .registration-section-helper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+    color: var(--rg-text-muted);
+    line-height: 1.4;
+  }
+
+  .registration-section-helper__label {
+    color: var(--rg-text-soft);
+  }
+
+  .registration-section-helper__sep {
+    color: var(--rg-text-soft);
+  }
+
+  .registration-section-helper__link {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--rg-accent);
+    cursor: pointer;
+    line-height: 1.4;
+
+    &:hover,
+    &:focus {
+      color: #1d4d99;
+      text-decoration: underline;
+      outline: none;
+    }
+  }
+
+  // ---------- Field (label above input) ----------
+
+  .registration-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .registration-field__label {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--rg-text-muted);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .registration-field .form-control,
+  .registration-field select.form-control {
+    width: 100%;
+    min-height: 2.3rem;
+    height: auto;
+    font-size: 0.92rem;
+    padding: 0.35rem 0.6rem;
+    line-height: 1.4;
+  }
+
+  .registration-field__error {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #c0392b;
+    line-height: 1.35;
+  }
+
+  // Compact variant — for fields that are secondary to the field above them
+  .registration-field--compact {
+    gap: 0.2rem;
+
+    .registration-field__label {
+      font-size: 0.76rem;
+      color: var(--rg-text-soft);
+      font-weight: 500;
+    }
+
+    .form-control,
+    select.form-control {
+      min-height: 2rem;
+      font-size: 0.85rem;
+      padding: 0.25rem 0.5rem;
+    }
+  }
+
+  // ---------- Multi-column field row ----------
+
+  .registration-field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+  }
+
+  // ---------- Sub-form list (teams / judges) ----------
+
+  .registration-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  // ---------- Collapsible subform (team / judge) ----------
+
+  .registration-subform {
+    border: 1px solid var(--rg-border);
+    border-radius: var(--rg-radius-inner);
+    background: #ffffff;
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: var(--rg-border-strong);
+    }
+  }
+
+  .registration-subform__header {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0.85rem;
+    background: var(--rg-tint);
+    border-bottom: 1px solid var(--rg-border);
+    color: var(--rg-text);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.12s ease;
+
+    &:hover {
+      background: rgba(232, 243, 255, 0.85);
+    }
+
+    &:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px rgba(42, 102, 196, 0.35);
+    }
+  }
+
+  .registration-subform__chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    color: var(--rg-text-soft);
+    font-size: 0.75rem;
+    transition: transform 0.15s ease;
+  }
+
+  .registration-subform.is-collapsed .registration-subform__chevron {
+    transform: rotate(-90deg);
+  }
+
+  .registration-subform.is-collapsed .registration-subform__body {
+    display: none;
+  }
+
+  .registration-subform.is-collapsed .registration-subform__header {
+    border-bottom-color: transparent;
+  }
+
+  .registration-subform__summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .registration-subform__name {
+    font-weight: 600;
+    color: var(--rg-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+  }
+
+  .registration-subform__name--placeholder {
+    color: var(--rg-text-soft);
+    font-weight: 500;
+  }
+
+  .registration-subform__detail {
+    color: var(--rg-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+
+    &::before {
+      content: "·";
+      margin-right: 0.5rem;
+      color: var(--rg-text-soft);
+    }
+
+    &:empty::before {
+      content: "";
+      margin-right: 0;
+    }
+  }
+
+  .registration-subform__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .registration-subform__alert {
+    margin: 0.55rem 0.85rem 0;
+  }
+
+  .registration-subform__body {
+    padding: 0.95rem 1rem;
+  }
+
+  // ---------- Team form layout ----------
+
+  .registration-team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+
+    > * {
+      min-width: 0;
+    }
+
+    @media (max-width: 991.98px) {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    @media (max-width: 575.98px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .registration-team-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .registration-team-panel__title {
+    margin: 0 0 0.1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--rg-text);
+  }
+
+  // Secondary fields: a short row of compact fields stacked below the
+  // primary Name field, separated by a faint divider.
+  .registration-team-panel__secondary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding-top: 0.45rem;
+    margin-top: 0.05rem;
+    border-top: 1px dashed var(--rg-border);
+  }
+
+  // ---------- Judge form layout ----------
+
+  .registration-judge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.7rem 0.85rem;
+
+    > * {
+      min-width: 0;
+    }
+  }
+
+  .registration-judge-grid__item--wide {
+    grid-column: 1 / -1;
+  }
+
+  .registration-judge-grid__item--exp {
+    max-width: 180px;
+  }
+
+  // ---------- Judge availability checkboxes ----------
+
+  .judge-availability__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.4rem;
+  }
+
+  .judge-availability__bulk {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .judge-availability__bulk-btn {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--rg-accent);
+    cursor: pointer;
+    line-height: 1;
+
+    &:hover,
+    &:focus {
+      color: #1d4d99;
+      text-decoration: underline;
+      outline: none;
+    }
+  }
+
+  .judge-availability__bulk-divider {
+    color: rgba(28, 45, 70, 0.3);
+    font-size: 0.78rem;
+  }
+
+  .judge-availability {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+
+    .custom-control {
+      padding-left: 1.5rem;
+    }
+
+    .custom-control-label {
+      font-size: 0.88rem;
+      color: var(--rg-text);
+    }
+  }
+
+  .judge-schools-select {
+    width: 100%;
+    min-height: 2.3rem;
+  }
+
+  // ---------- select2 polish ----------
+
+  .select2-container--bootstrap4 {
+    width: 100% !important;
+  }
+
+  .select2-container--bootstrap4 .select2-selection--multiple {
+    min-height: 2.3rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.3rem;
+    border-color: #ced4da;
+  }
+
+  .select2-container--bootstrap4
+    .select2-selection--multiple
+    .select2-selection__rendered {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0;
+  }
+
+  .select2-container--bootstrap4
+    .select2-selection--multiple
+    .select2-selection__choice {
+    margin-top: 0;
+    background-color: rgba(42, 102, 196, 0.12);
+    border: 1px solid rgba(42, 102, 196, 0.25);
+    color: var(--rg-text);
+    border-radius: 0.3rem;
+  }
+
+  // ---------- Submit bar ----------
+
+  .registration-submit-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.5rem;
+
+    .btn-primary {
+      padding: 0.5rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  }
+
+  .registration-submit-bar__meta {
+    color: var(--rg-text-muted);
+    font-size: 0.88rem;
+  }
+
+  // ---------- Lock / alert messaging ----------
+
+  .registration-lock-alert {
+    margin-bottom: 0;
+    border-radius: var(--rg-radius-inner);
+    border: 1px solid rgba(184, 134, 11, 0.35);
+    background: rgba(255, 243, 205, 0.6);
+    color: #6b4d00;
+  }
+
+  // ---------- Saved-registration summary ----------
+
+  .registration-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rg-border);
+  }
+
+  .registration-summary__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+
+    > div:first-child {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+  }
+
+  .registration-summary__edit {
+    flex-shrink: 0;
+    align-self: flex-start;
+    font-weight: 600;
+  }
+
+  .registration-summary__kicker {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--rg-text-muted);
+  }
+
+  .registration-summary__title {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--rg-text);
+  }
+
+  .registration-summary-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--rg-accent-soft);
+    border: 1px solid var(--rg-border);
+    border-radius: var(--rg-radius-inner);
+  }
+
+  .registration-summary-meta__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .registration-summary-meta__label {
+    font-size: 0.78rem;
+    color: var(--rg-text-muted);
+  }
+
+  .registration-summary-meta__value {
+    font-size: 0.95rem;
+    color: var(--rg-text);
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .registration-summary-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .registration-summary-section__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--rg-text);
+  }
+
+  .registration-summary-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .registration-summary-list__item {
+    border: 1px solid var(--rg-border);
+    border-radius: var(--rg-radius-inner);
+    padding: 0.65rem 0.85rem;
+    background: #fff;
+  }
+
+  .registration-summary-list__name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--rg-text);
+  }
+
+  .registration-summary-list__sub {
+    margin: 0.1rem 0 0;
+    font-size: 0.82rem;
+    color: var(--rg-text-muted);
+  }
+
+  .registration-summary-list ul {
+    margin: 0.35rem 0 0;
+    padding-left: 1rem;
+    font-size: 0.85rem;
+    color: var(--rg-text);
+  }
+}
+
+// ---------- Modal styling (modal lives outside #registration-app since
+//            Bootstrap moves it under <body>) ----------
+
+.registration-modal {
+  .modal-content {
+    border: 1px solid rgba(21, 33, 61, 0.12);
+    border-radius: 0.75rem;
+    box-shadow: 0 24px 60px -28px rgba(12, 31, 58, 0.4);
+  }
+
+  .modal-header {
+    border-bottom: 1px solid rgba(28, 54, 94, 0.1);
+    padding: 1rem 1.25rem;
+  }
+
+  .modal-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f2f4a;
+  }
+
+  .modal-body {
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .modal-footer {
+    border-top: 1px solid rgba(28, 54, 94, 0.1);
+    padding: 0.75rem 1.25rem;
+    gap: 0.5rem;
+
+    > * {
+      margin: 0;
+    }
+  }
+
+  .registration-modal__lead {
+    margin: 0;
+    font-size: 0.88rem;
+    color: rgba(28, 45, 70, 0.7);
+    line-height: 1.5;
+  }
+
+  .registration-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .registration-field__label {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: rgba(28, 45, 70, 0.7);
+  }
+
+  .form-control {
+    min-height: 2.4rem;
+    font-size: 0.95rem;
+  }
+
+  // Mobile: stack footer buttons full-width with primary on top
+  @media (max-width: 575.98px) {
+    .modal-dialog {
+      margin: 0.75rem;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 0.85rem 1rem;
+    }
+
+    .modal-footer {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      gap: 0.5rem;
+
+      .btn {
+        width: 100%;
+        padding: 0.55rem 1rem;
+        font-size: 0.95rem;
+        margin: 0;
+      }
+    }
+
+    .close {
+      padding: 0.5rem 0.75rem;
+      font-size: 1.5rem;
+    }
+  }
+}
+
+// ---------- Code-lookup standalone page ----------
+
+.registration-lookup {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+
+  .registration-lookup__card {
+    @include rg-card-shell;
+    padding: 1.6rem 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    @media (max-width: 575.98px) {
+      padding: 1.25rem 1.25rem;
+    }
+  }
+
+  .registration-lookup__title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #1f2f4a;
+    line-height: 1.25;
+  }
+
+  .registration-lookup__lead {
+    margin: 0;
+    color: rgba(28, 45, 70, 0.78);
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .registration-lookup__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .registration-lookup__label {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: rgba(28, 45, 70, 0.7);
+  }
+
+  .registration-lookup__input {
+    height: 2.6rem;
+    font-size: 1rem;
+  }
+
+  .registration-lookup__btn {
+    align-self: flex-start;
+    padding: 0.55rem 1.4rem;
+    font-weight: 600;
+  }
+}
+
+// ---------- Admin list page ----------
+
+.registration-admin {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+
+  .registration-admin__header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .registration-admin__titles h5 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1f2f4a;
+  }
+
+  .registration-admin__titles p {
+    margin: 0.25rem 0 0;
+    color: rgba(28, 45, 70, 0.7);
+    font-size: 0.9rem;
+  }
+
+  .registration-admin__settings,
+  .registration-admin__panel {
+    @include rg-card-shell;
+    padding: 1.1rem 1.3rem;
+  }
+
+  .registration-admin__settings-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem 2rem;
+  }
+
+  .registration-admin__settings-row .custom-switch {
+    margin-bottom: 0;
+  }
+
+  .registration-admin__settings-row .btn {
+    margin-left: auto;
+  }
+
+  .registration-admin__panel-title {
+    margin: 0 0 0.85rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2f4a;
+  }
+
+  .registration-admin__table-wrap {
+    overflow-x: auto;
+  }
+
+  .registration-admin__table {
+    width: 100%;
+    margin: 0;
+    background: #fff;
+
+    th {
+      background: rgba(244, 249, 255, 0.7);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: rgba(28, 45, 70, 0.75);
+      border-bottom: 1px solid rgba(28, 54, 94, 0.12);
+    }
+
+    td {
+      vertical-align: top;
+      font-size: 0.88rem;
+    }
+
+    .school-name {
+      font-weight: 600;
+      color: #1f2f4a;
+    }
+
+    .school-email {
+      color: rgba(28, 45, 70, 0.7);
+      font-size: 0.82rem;
+    }
+
+    .registration-admin__inline-list {
+      margin: 0.35rem 0 0;
+      padding-left: 1rem;
+      font-size: 0.82rem;
+      color: rgba(28, 45, 70, 0.85);
+    }
+
+    .registration-admin__code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+      background: rgba(42, 102, 196, 0.08);
+      border: 1px solid rgba(42, 102, 196, 0.18);
+      color: #1c3e7a;
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.3rem;
+      font-size: 0.82rem;
+    }
+  }
+}
+
+// ---------- Page banner override ----------
+// __wide.html wraps the banner block in <h3>; this span lets us tune sizing
+// on the registration pages without touching site-wide h3 styles.
+
+.registration-page-title {
+  display: inline-block;
+  font-weight: 600;
+  color: #1f2f4a;
+  letter-spacing: -0.005em;
+
+  @media (max-width: 767.98px) {
+    font-size: 1.7rem;
+    line-height: 1.2;
+  }
+}
+
+// ---------- Mobile (<= md) ----------
+// On phones and small tablets we want all primary CTAs to be the same
+// height and full-width so nothing reads as "giant" or "tiny" relative to
+// its neighbors. The btn-sm size only makes sense on desktop.
+
+@media (max-width: 767.98px) {
+  #registration-app {
+    gap: 1.25rem;
+
+    .registration-section-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.6rem;
+    }
+
+    .registration-section-titles {
+      flex: 1 1 auto;
+    }
+
+    .registration-section-actions {
+      width: 100%;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    // Override Bootstrap btn-sm for tap-friendliness; all section CTAs
+    // share one regular-sized footprint regardless of which class they had.
+    .registration-section-action-btn,
+    .registration-section-actions .btn,
+    .registration-submit-bar .btn {
+      width: 100%;
+      padding: 0.55rem 1rem;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      border-radius: 0.35rem;
+    }
+
+    .registration-submit-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.65rem;
+    }
+
+    .registration-submit-bar__meta {
+      text-align: center;
+    }
+
+    .registration-judge-grid__item--exp {
+      max-width: none;
+    }
+  }
+}
+
+@media (max-width: 575.98px) {
+  #registration-app {
+    // Keep the subform header on a single row on phones — Remove stays
+    // inline next to the summary so it reads as part of the same row,
+    // not a stray button below it.
+    .registration-subform__header {
+      padding: 0.5rem 0.65rem;
+      gap: 0.5rem;
+    }
+
+    .registration-subform__summary {
+      font-size: 0.88rem;
+    }
+
+    .registration-subform__detail::before {
+      margin-right: 0.35rem;
+    }
+
+    .registration-subform__actions .btn {
+      width: auto;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.82rem;
+    }
+  }
+}

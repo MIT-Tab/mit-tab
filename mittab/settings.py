@@ -22,7 +22,8 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
-                  "mittab.apps.tab", "sentry_sdk.integrations.django",
+                  "mittab.apps.tab", "mittab.apps.registration",
+                  "sentry_sdk.integrations.django",
                   "webpack_loader", "bootstrap4",)
 
 MIDDLEWARE = (
@@ -155,6 +156,9 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 # Login/Logout redirects
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/public/login/"
+AUTHENTICATION_BACKENDS = (
+    "mittab.apps.tab.auth_backends.TabAuthenticationBackend",
+)
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
@@ -202,3 +206,16 @@ if os.environ.get("MITTAB_LOG_QUERIES"):
             "handlers": ["console"],
         }
     }
+
+# Email / Amazon SES configuration
+AWS_SES_REGION = os.environ.get("AWS_SES_REGION", "us-east-1")
+AWS_SES_ACCESS_KEY_ID = os.environ.get("AWS_SES_ACCESS_KEY_ID")
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get("AWS_SES_SECRET_ACCESS_KEY")
+AWS_SES_CONFIGURATION_SET = os.environ.get("AWS_SES_CONFIGURATION_SET")
+
+AWS_MAILMANAGER_ADDRESS_LIST = os.environ.get("AWS_MAILMANAGER_ADDRESS_LIST")
+
+EMAIL_FROM_ADDRESS = os.environ.get("EMAIL_FROM_ADDRESS", "no-reply@example.com")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "MIT-TAB")
+DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>"
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO", EMAIL_FROM_ADDRESS)

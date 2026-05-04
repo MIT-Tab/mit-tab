@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 import os
 import itertools
 import pprint
@@ -8,6 +9,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_deadline_display,
+    written_rfd_editing_open,
+)
 from mittab.libs import errors
 from mittab import settings
 from mittab.libs.cacheing import cache_logic
@@ -24,6 +30,10 @@ class UploadDataForm(forms.Form):
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
 
 
+class UploadApdaCsvForm(forms.Form):
+    file = forms.FileField(label="CSV File")
+
+
 class SchoolForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(SchoolForm, self).__init__(*args, **kwargs)
@@ -31,6 +41,12 @@ class SchoolForm(forms.ModelForm):
     class Meta:
         model = School
         fields = "__all__"
+
+
+class SchoolApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = School
+        fields = ["apda_id"]
 
 
 class RoomForm(forms.ModelForm):
@@ -62,7 +78,7 @@ class RoomForm(forms.ModelForm):
     def save(self, commit=True):
         room = super(RoomForm, self).save(commit)
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
-        for i in range(num_rounds):
+        for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
             if field_name in self.cleaned_data:
                 should_be_checked_in = self.cleaned_data[field_name]
@@ -112,8 +128,19 @@ class JudgeForm(forms.ModelForm):
             except Exception:
                 pass
 
-    def save(self, commit=True):
-        judge = super(JudgeForm, self).save(commit)
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        judge = super(JudgeForm, self).save(commit=False)
+        is_create = judge.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not judge.created_by_id:
+            judge.created_by = actor
+        if commit:
+            judge.save()
+            self.save_m2m()
+        else:
+            return judge
+
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
@@ -129,6 +156,10 @@ class JudgeForm(forms.ModelForm):
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
 
+        if actor:
+            event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+            changes = {} if is_create else {"fields": changed_fields}
+            AuditEvent.record(judge, event_type, actor, changes=changes)
         return judge
 
     class Meta:
@@ -144,8 +175,10 @@ class JudgeForm(forms.ModelForm):
 
 
 class TeamForm(forms.ModelForm):
-    debaters = forms.ModelMultipleChoiceField(queryset=Debater.objects.all(),
-                                              required=False)
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False
+    )
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -165,6 +198,22 @@ class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
         exclude = ["tiebreaker"]
+
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        team = super(TeamForm, self).save(commit=False)
+        is_create = team.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not team.created_by_id:
+            team.created_by = actor
+        if commit:
+            team.save()
+            self.save_m2m()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(team, event_type, actor, changes=changes)
+        return team
 
     class Media:
         css = {
@@ -217,13 +266,22 @@ class ScratchForm(forms.ModelForm):
             self.fields["team"].initial = str(self.instance.team.id)
             self.fields["judge"].initial = str(self.instance.judge.id)
 
-    def save(self, commit=True):
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
         instance = super(ScratchForm, self).save(commit=False)
+        is_create = instance.pk is None
+        changed_fields = list(self.changed_data)
         # Convert string IDs to actual model instances
         instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
         instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
+        if is_create and actor and not instance.created_by_id:
+            instance.created_by = actor
         if commit:
             instance.save()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(instance, event_type, actor, changes=changes)
         return instance
 
     class Meta:
@@ -233,12 +291,15 @@ class ScratchForm(forms.ModelForm):
 
 
 class DebaterForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super(DebaterForm, self).__init__(*args, **kwargs)
-
     class Meta:
         model = Debater
         exclude = ["tiebreaker"]
+
+
+class DebaterApdaIdForm(forms.ModelForm):
+    class Meta:
+        model = Debater
+        fields = ["apda_id"]
 
 
 def validate_speaks(value):
@@ -307,6 +368,9 @@ class ResultEntryForm(forms.Form):
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
 
+        if not no_fill:
+            self.add_written_rfd_field(round_object)
+
         if round_object.victor == 0 or no_fill:
             return
 
@@ -318,6 +382,39 @@ class ResultEntryForm(forms.Form):
                 deb, "speaks")].initial = stats.speaks
             self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
                 round(stats.ranks))
+
+    def add_written_rfd_field(self, round_object):
+        if not round_allows_written_rfd(round_object):
+            return
+
+        deadline = written_rfd_deadline_display()
+        rfd_editing_open = written_rfd_editing_open(round_object)
+        if rfd_editing_open:
+            help_text = (
+                "Optional. You may submit the ballot without an RFD and edit "
+                "this text later"
+            )
+            if deadline:
+                help_text += f" until {deadline}."
+        elif deadline:
+            help_text = f"The written RFD deadline was {deadline}."
+        else:
+            help_text = "Tab has not configured the written RFD deadline yet."
+
+        rfd_attrs = {
+            "class": "form-control",
+            "rows": 6,
+        }
+        if not rfd_editing_open:
+            rfd_attrs["readonly"] = "readonly"
+
+        self.fields["rfd"] = forms.CharField(
+            label="Reason for decision",
+            required=False,
+            initial=round_object.rfd,
+            help_text=help_text,
+            widget=forms.Textarea(attrs=rfd_attrs),
+        )
 
     def clean(self):
         cleaned_data = self.cleaned_data
@@ -423,6 +520,9 @@ class ResultEntryForm(forms.Form):
                     old_stats.delete()
                 stats.save()
             round_obj.save()
+            if "rfd" in self.cleaned_data and written_rfd_editing_open(round_obj):
+                round_obj.rfd = self.cleaned_data.get("rfd", "")
+                round_obj.save(update_fields=["rfd"])
         return round_obj
 
     def deb_attr_val(self, position, attr, cast=None):
@@ -441,7 +541,7 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
-    ballot_code = forms.CharField(max_length=30, min_length=0)
+    ballot_code = forms.CharField(max_length=BALLOT_CODE_MAX_LENGTH, min_length=0)
 
     def __init__(self, *args, **kwargs):
         ballot_code = ""
@@ -505,7 +605,6 @@ class EBallotForm(ResultEntryForm):
 
         return super(EBallotForm, self).clean()
 
-
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
@@ -550,6 +649,39 @@ class SettingsForm(forms.Form):
                         "style": "min-width: 300px;"
                     })
                 )
+            elif setting.get("type") == "datetime":
+                initial_value = setting["value"]
+                if isinstance(initial_value, str) and initial_value:
+                    for date_format in (
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ):
+                        try:
+                            initial_value = datetime.strptime(
+                                initial_value, date_format
+                            )
+                            break
+                        except ValueError:
+                            continue
+                self.fields[field_name] = forms.DateTimeField(
+                    label=label,
+                    help_text=setting["description"],
+                    initial=initial_value,
+                    required=False,
+                    input_formats=[
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ],
+                    widget=forms.DateTimeInput(
+                        attrs={
+                            "class": "form-control",
+                            "type": "datetime-local",
+                        },
+                        format="%Y-%m-%dT%H:%M",
+                    ),
+                )
             else:
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
@@ -567,6 +699,9 @@ class SettingsForm(forms.Form):
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
+            elif "type" in setting and setting["type"] == "datetime":
+                value = self.cleaned_data[field]
+                value_to_set = value.strftime("%Y-%m-%d %H:%M") if value else ""
             else:
                 value_to_set = self.cleaned_data[field]
 
@@ -824,6 +959,49 @@ class MiniRoomTagForm(RoomTagForm):
         self.fields.pop("teams")
         self.fields.pop("judges")
         self.fields.pop("rooms")
+
+
+class RankingGroupForm(forms.ModelForm):
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+    )
+    debaters = forms.ModelMultipleChoiceField(
+        queryset=Debater.objects.all(),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["teams"].initial = self.instance.teams.all()
+            self.fields["debaters"].initial = self.instance.debaters.all()
+
+    def save(self, commit=True):
+        ranking_group = super().save(commit=False)
+
+        def save_m2m():
+            ranking_group.teams.set(self.cleaned_data.get("teams", []))
+            ranking_group.debaters.set(self.cleaned_data.get("debaters", []))
+
+        if commit:
+            ranking_group.save()
+            save_m2m()
+        else:
+            self._save_m2m = save_m2m
+
+        return ranking_group
+
+    class Meta:
+        model = RankingGroup
+        fields = ("name", "teams", "debaters")
+
+
+class MiniRankingGroupForm(RankingGroupForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("teams")
+        self.fields.pop("debaters")
 
 class BackupForm(forms.Form):
     backup_name = forms.CharField(

@@ -1,0 +1,237 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+{% load tags %}
+
+{% block title %}Tournament Registration{% endblock %}
+{% block banner %}<span class="registration-page-title">Tournament Registration</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
+{% block content %}
+{% render_bundle 'registrationPortal' %}
+<div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
+    {% if registration_lock_message %}
+    <div class="alert alert-warning registration-lock-alert">{{ registration_lock_message }}</div>
+    {% endif %}
+
+    {% if not registration_saved %}
+    <form method="post" novalidate data-registration-form>
+        {% csrf_token %}
+
+        <section class="registration-section">
+            <div class="registration-section-header">
+                <div class="registration-section-titles">
+                    <h2 class="registration-section-title">School &amp; Contact</h2>
+                    <p class="registration-section-subtitle">Pick your school and the email we should reach you at.</p>
+                </div>
+            </div>
+            {% for error in registration_form.non_field_errors %}
+            <div class="alert alert-danger mb-0">{{ error }}</div>
+            {% endfor %}
+            <div class="registration-field-row">
+                {% include "registration/_input_group.html" with field=registration_form.school label="School" errors=registration_form.school.errors %}
+                {% include "registration/_input_group.html" with field=registration_form.email label="Email" errors=registration_form.email.errors %}
+            </div>
+            <div class="registration-section-helper">
+                <span class="registration-section-helper__label">Don't see what you need?</span>
+                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-school-modal">+ Add new school</button>
+                <span class="registration-section-helper__sep" aria-hidden="true">·</span>
+                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-debater-modal">+ Add new debater</button>
+            </div>
+        </section>
+
+        <section class="registration-section">
+            <div class="registration-section-header">
+                <div class="registration-section-titles">
+                    <h2 class="registration-section-title">Teams</h2>
+                    <p class="registration-section-subtitle">Click any team header to expand or collapse.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm registration-section-action-btn" data-add-form="team" disabled>+ Add Team</button>
+            </div>
+            {{ team_formset.management_form }}
+            {% if team_formset.non_form_errors %}
+            <div class="alert alert-danger mb-0">
+                {% for error in team_formset.non_form_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="registration-list" data-formset-container="team">
+                {% for form in team_formset.forms %}
+                    {% include "registration/_team_form.html" with form=form %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="registration-section">
+            <div class="registration-section-header">
+                <div class="registration-section-titles">
+                    <h2 class="registration-section-title">Judges</h2>
+                    <p class="registration-section-subtitle">Add the judges your school is bringing along with their availability.</p>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm registration-section-action-btn" data-add-form="judge">+ Add Judge</button>
+            </div>
+            {{ judge_formset.management_form }}
+            {% if judge_formset.non_form_errors %}
+            <div class="alert alert-danger mb-0">
+                {% for error in judge_formset.non_form_errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="registration-list" data-formset-container="judge">
+                {% for form in judge_formset.forms %}
+                    {% include "registration/_judge_form.html" with form=form %}
+                {% endfor %}
+            </div>
+        </section>
+
+        <div class="registration-submit-bar">
+            <button type="submit" class="btn btn-primary" {% if not can_submit_registration %}disabled{% endif %}>Submit Registration</button>
+            {% if summary %}
+            <span class="registration-submit-bar__meta">Editing registration <strong>{{ summary.herokunator_code }}</strong></span>
+            {% endif %}
+        </div>
+    </form>
+
+    <div class="modal fade registration-modal" id="new-school-modal" tabindex="-1" role="dialog" aria-labelledby="new-school-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="new-school-modal-title">Add a New School</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="registration-modal__lead">Use this if your school isn't in the dropdown. We'll add it locally so you can register teams under it.</p>
+                    <div class="registration-field">
+                        <label class="registration-field__label" for="new-school-name">School name</label>
+                        <input type="text" id="new-school-name" class="form-control" placeholder="e.g. Massachusetts Institute of Technology">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="create-school-btn">Add School</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade registration-modal" id="new-debater-modal" tabindex="-1" role="dialog" aria-labelledby="new-debater-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="new-debater-modal-title">Add a New Debater</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="registration-modal__lead">Use this if a debater isn't in the school's dropdown. They'll appear in the debater pickers below.</p>
+                    <div class="registration-field">
+                        <label class="registration-field__label" for="new-debater-school">School</label>
+                        <select id="new-debater-school" class="form-control" data-school-select="new-debater">
+                            <option value="">Select school</option>
+                        </select>
+                    </div>
+                    <div class="registration-field">
+                        <label class="registration-field__label" for="new-debater-name">Name</label>
+                        <input type="text" id="new-debater-name" class="form-control" placeholder="Debater name">
+                    </div>
+                    <div class="registration-field">
+                        <label class="registration-field__label" for="new-debater-status">Status</label>
+                        <select id="new-debater-status" class="form-control">
+                            <option value="0">Varsity</option>
+                            <option value="1">Novice</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="create-debater-btn">Add Debater</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/template" id="team-empty-form">
+        {% include "registration/_team_form.html" with form=team_formset.empty_form %}
+    </script>
+    <script type="text/template" id="judge-empty-form">
+        {% include "registration/_judge_form.html" with form=judge_formset.empty_form %}
+    </script>
+    {% endif %}
+
+    {% if summary %}
+    <section class="registration-summary{% if not registration_saved %} mt-3{% endif %}">
+        <div class="registration-summary__head">
+            <div>
+                <p class="registration-summary__kicker">{% if registration_saved %}Registration saved{% else %}Current registration{% endif %}</p>
+                <h2 class="registration-summary__title">{{ summary.school.name }}</h2>
+            </div>
+            {% if registration_saved %}
+            <a class="btn btn-outline-primary registration-summary__edit"
+               href="{% url 'registration_portal_edit' summary.herokunator_code %}">
+                Edit registration
+            </a>
+            {% endif %}
+        </div>
+        <div class="registration-summary-meta">
+            <div class="registration-summary-meta__item">
+                <span class="registration-summary-meta__label">Code</span>
+                <span class="registration-summary-meta__value">{{ summary.herokunator_code }}</span>
+            </div>
+            <div class="registration-summary-meta__item">
+                <span class="registration-summary-meta__label">Email</span>
+                <span class="registration-summary-meta__value">{{ summary.email }}</span>
+            </div>
+            <div class="registration-summary-meta__item">
+                <span class="registration-summary-meta__label">Teams</span>
+                <span class="registration-summary-meta__value">{{ summary.teams.all|length }}</span>
+            </div>
+            <div class="registration-summary-meta__item">
+                <span class="registration-summary-meta__label">Judges</span>
+                <span class="registration-summary-meta__value">{{ summary.judges.all|length }}</span>
+            </div>
+        </div>
+        {% if summary.teams.all %}
+        <div class="registration-summary-section">
+            <h3 class="registration-summary-section__title">Teams</h3>
+            <div class="registration-summary-list">
+                {% for team in summary.teams.all %}
+                <div class="registration-summary-list__item">
+                    <p class="registration-summary-list__name">
+                        {{ team.name }}
+                        {% if team.seed == team.FREE_SEED %}
+                        <span class="badge badge-info ml-1">Free Seed</span>
+                        {% endif %}
+                    </p>
+                    <ul>
+                        {% for debater in team.debaters.all %}
+                        <li>{{ debater.name }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if summary.judges.all %}
+        <div class="registration-summary-section">
+            <h3 class="registration-summary-section__title">Judges</h3>
+            <div class="registration-summary-list">
+                {% for judge in summary.judges.all %}
+                <div class="registration-summary-list__item">
+                    <p class="registration-summary-list__name">{{ judge.name }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

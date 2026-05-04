@@ -1,6 +1,7 @@
 {% load tags %}
 
 {% url "index" as home %}
+{% url "apda_board_home" as apda_board_home %}
 {% url "logout" as logout %}
 
 {% url "enter_school" as enter_school %}
@@ -18,6 +19,7 @@
 {% url "rank_teams_ajax" as rank_teams %}
 {% url "all_tab_cards" as tab_cards %}
 {% url "download_archive" as download_archive %}
+{% url "download_black_rod_bundle" as download_black_rod_bundle %}
 {% url "round_stats" as round_stats %}
 {% url "forum_post" as forum_post %}
 
@@ -38,6 +40,7 @@
 {% url "settings_form" as settings_form %}
 {% url "homepage_setup" as homepage_setup %}
 {% url "tournament_todo" as tournament_todo %}
+{% url "registration_admin" as registration_admin %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -56,10 +59,11 @@
 {% url "public_motions" as public_motions %}
 {% public_display_flags as public_display_flags %}
 {% motions_enabled as motions_enabled_flag %}
+{% is_apda_board user as is_apda_board_user %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
-    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{{ home|with_return_to }}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
+    <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{% if is_apda_board_user %}{{ apda_board_home|with_return_to }}{% else %}{{ home|with_return_to }}{% endif %}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
 
     {% if user.is_authenticated %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,6 +71,18 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      {% if is_apda_board_user %}
+      <ul class="navbar-nav mr-auto order-0">
+        <li class="nav-item">
+          <a class="nav-link {% active request apda_board_home %}" href="{{ apda_board_home|with_return_to }}">APDA Board Home</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
+        </li>
+      </ul>
+      {% else %}
       <ul class="navbar-nav mr-auto order-0">
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
@@ -93,7 +109,7 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}{% active request download_black_rod_bundle %}">
             Backups
           </a>
 
@@ -101,6 +117,7 @@
             <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups|with_return_to }}">View Backups</a>
             <a class="dropdown-item {%active request tab_cards %}" href="{{ tab_cards|with_return_to }}">View Tab Cards</a>
             <a class="dropdown-item {%active request download_archive %}" href="{{ download_archive|with_return_to }}" title="DebateXML is an archive format to preserve tournaments and perform analyses.">Create DebateXML</a>
+            <a class="dropdown-item {% active request download_black_rod_bundle %}" href="{{ download_black_rod_bundle|with_return_to }}" title="Export a tournament bundle for Black Rod ingest.">Export Black-Rod Bundle</a>
           </div>
         </li>
 
@@ -127,6 +144,7 @@
             {% if motions_enabled_flag %}
             <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
             {% endif %}
+            <a class="dropdown-item {% active request registration_admin %}" href="{{ registration_admin|with_return_to }}">Registrations</a>
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny|with_return_to }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
           </div>
@@ -163,6 +181,7 @@
           <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
         </li>
       </ul>
+      {% endif %}
     </div>
     {% else %}
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">

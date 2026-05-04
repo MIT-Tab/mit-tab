@@ -69,6 +69,7 @@
       </div>
 
       <div class="col-4 judges">
+        {% load tags %}
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
           <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
@@ -93,6 +94,14 @@
         <br>
         {% endif %}
         {% endfor %}
+        {% manual_judge_audit_events pairing.id as manual_events %}
+        {% if manual_events %}
+          <div class="small text-muted mt-1">
+          {% for event in manual_events %}
+            <div>{{ event.label }} by {{ event.user_display }}{% if event.note %}: {{ event.note }}{% endif %}</div>
+          {% endfor %}
+          </div>
+        {% endif %}
       </div>
 
       <div class="col-3 text-center">
@@ -109,7 +118,8 @@
         {%endif%}
         <div class="dropdown room">
           <span 
-            room-id="{{pairing.room.id}}" 
+            class="{% if not pairing.room %}unassigned{% endif %}"
+            room-id="{{ pairing.room.id|default_if_none:'' }}" 
             round-id="{{pairing.id}}"
             outround="true">
             <a 
@@ -121,7 +131,7 @@
               aria-haspopup="true" 
               aria-expanded="false" 
               style="white-space: normal;">
-              <i class="far fa-building"></i> {{pairing.room.name}}
+              <i class="far fa-building"></i> {% if pairing.room %}{{ pairing.room.name }}{% else %}Assign Room{% endif %}
             </a>
             <div class="dropdown-menu" aria-labelledby="roomDropdown-{{pairing.id}}"></div>
           </span>
