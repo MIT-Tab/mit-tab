@@ -146,7 +146,7 @@ class TestPostOperations(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             PublicHomeShortcut.objects.get(position=1).nav_item,
-            "public_team_results",
+            "released_pairings",
         )
         self.assertEqual(
             PublicHomeShortcut.objects.get(position=2).nav_item,

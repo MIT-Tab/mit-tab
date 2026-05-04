@@ -716,7 +716,7 @@ class TestPublicViews(TestCase):
     def test_public_home_uses_shortcut_configuration(self):
         client = Client()
 
-        PublicHomeShortcut.objects.filter(position=1).update(
+        PublicHomeShortcut.objects.filter(position=2).update(
             nav_item="public_team_results"
         )
         caches["public"].clear()
@@ -730,8 +730,12 @@ class TestPublicViews(TestCase):
             f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
             content,
         )
-        self.assertNotIn(
+        self.assertIn(
             f'class="tile shadow-sm" href="{reverse("pretty_pair")}"',
+            content,
+        )
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
             content,
         )
 
@@ -771,7 +775,7 @@ class TestPublicViews(TestCase):
         TabSettings.set("motions_enabled", 1)
 
         defaults = PublicHomeShortcut.default_slot_mapping()
-        defaults[1] = "public_motions"
+        defaults[2] = "public_motions"
         for position, nav_item in defaults.items():
             PublicHomeShortcut.objects.update_or_create(
                 position=position,
