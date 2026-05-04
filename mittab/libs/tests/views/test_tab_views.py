@@ -326,7 +326,8 @@ class TestTabViews(TestCase):
 
         response = self.client.get(reverse("view_team", args=[team.id]))
         content = response.content.decode()
-        self.assertIn("Audit Trail", content)
+        self.assertIn("audit-trail", content)
+        self.assertIn("History", content)
         self.assertIn("testuser", content)
         self.assertIn("Edited", content)
 
