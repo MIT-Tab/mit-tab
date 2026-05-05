@@ -1,3 +1,4 @@
 - Environment uses `pipenv`. If pipenv misses the local virtualenv, run `source .venv/bin/activate && pipenv ...`; this is not always necessary.
 - Before handing off changes, run `pipenv run pylint mittab` and `npm run lint`.
 - Read failing CI with `gh pr list -R MIT-Tab/mit-tab --json number,title,statusCheckRollup` and CircleCI build logs from the failing `targetUrl`, e.g. `curl -fsSL https://circleci.com/api/v1.1/project/github/MIT-Tab/mit-tab/<build_num>`.
+- To wait for CI, run `bin/wait-for-ci all` or `bin/wait-for-ci '<check name>'` instead of manually polling and sleeping.
