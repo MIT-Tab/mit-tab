@@ -128,6 +128,10 @@ WEBPACK_LOADER = {
         "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats.json"),
     }
 }
+if os.environ.get("MITTAB_FAKE_WEBPACK_LOADER") == "1":
+    WEBPACK_LOADER["DEFAULT"]["LOADER_CLASS"] = (
+        "webpack_loader.loaders.FakeWebpackLoader"
+    )
 
 TEMPLATES = [
     {

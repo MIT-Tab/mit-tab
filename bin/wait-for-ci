@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""Wait for GitHub PR checks to finish without manual polling."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+
+
+DONE_CHECK_RUN_STATUSES = {"COMPLETED"}
+DONE_STATUS_CONTEXT_STATES = {"SUCCESS", "FAILURE", "ERROR"}
+SUCCESS_CHECK_RUN_CONCLUSIONS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+SUCCESS_STATUS_CONTEXT_STATES = {"SUCCESS"}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Poll GitHub PR checks until a named check, or all checks, are done."
+        )
+    )
+    parser.add_argument(
+        "check",
+        help='Check name to wait for, or "all" for every visible PR check.',
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="Optional PR number, PR URL, or branch. Defaults to the current branch PR.",
+    )
+    parser.add_argument(
+        "--repo",
+        default="MIT-Tab/mit-tab",
+        help="GitHub repository to query.",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=60,
+        help="Seconds between polls.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=0,
+        help="Maximum seconds to wait. 0 means wait forever.",
+    )
+    return parser.parse_args()
+
+
+def load_pr(target: str | None, repo: str) -> dict:
+    command = ["gh", "pr", "view"]
+    if target:
+        command.append(target)
+    command.extend(["--repo", repo, "--json", "number,headRefName,statusCheckRollup"])
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except FileNotFoundError:
+        sys.exit("gh is required but was not found on PATH")
+    except subprocess.CalledProcessError as exc:
+        sys.exit(exc.stderr.strip() or "failed to load PR checks")
+    return json.loads(result.stdout)
+
+
+def check_name(check: dict) -> str:
+    return check.get("name") or check.get("context") or "<unnamed check>"
+
+
+def is_done(check: dict) -> bool:
+    if check.get("__typename") == "CheckRun":
+        return check.get("status") in DONE_CHECK_RUN_STATUSES
+    return check.get("state") in DONE_STATUS_CONTEXT_STATES
+
+
+def is_success(check: dict) -> bool:
+    if check.get("__typename") == "CheckRun":
+        return check.get("conclusion") in SUCCESS_CHECK_RUN_CONCLUSIONS
+    return check.get("state") in SUCCESS_STATUS_CONTEXT_STATES
+
+
+def summarize(check: dict) -> str:
+    name = check_name(check)
+    if check.get("__typename") == "CheckRun":
+        status = check.get("status", "UNKNOWN")
+        conclusion = check.get("conclusion")
+        suffix = f"/{conclusion}" if conclusion else ""
+        return f"{name}: {status}{suffix}"
+    return f"{name}: {check.get('state', 'UNKNOWN')}"
+
+
+def selected_checks(checks: list[dict], requested: str) -> list[dict]:
+    if requested.lower() == "all":
+        return checks
+
+    exact = [check for check in checks if check_name(check) == requested]
+    if exact:
+        return exact
+
+    requested_lower = requested.lower()
+    return [
+        check
+        for check in checks
+        if requested_lower in check_name(check).lower()
+    ]
+
+
+def main() -> int:
+    args = parse_args()
+    if args.interval < 1:
+        sys.exit("--interval must be at least 1")
+
+    wait_for_all = args.check.lower() == "all"
+    done_signature: tuple[str, ...] | None = None
+    started = time.monotonic()
+    while True:
+        pr = load_pr(args.target, args.repo)
+        checks = selected_checks(pr.get("statusCheckRollup", []), args.check)
+
+        if not checks:
+            print(
+                f"PR #{pr['number']} has no visible checks matching {args.check!r}; "
+                f"checking again in {args.interval}s.",
+                flush=True,
+            )
+            done_signature = None
+        elif all(is_done(check) for check in checks):
+            current_signature = tuple(sorted(check_name(check) for check in checks))
+            if wait_for_all and done_signature != current_signature:
+                done_signature = current_signature
+                print(
+                    f"PR #{pr['number']} visible checks are done; confirming the "
+                    f"check set is stable in {args.interval}s.",
+                    flush=True,
+                )
+            else:
+                failed = [check for check in checks if not is_success(check)]
+                print(f"PR #{pr['number']} checks done:", flush=True)
+                for check in checks:
+                    print(f"  {summarize(check)}", flush=True)
+                return 1 if failed else 0
+        else:
+            pending = [summarize(check) for check in checks if not is_done(check)]
+            print(
+                f"PR #{pr['number']} waiting on {len(pending)} check(s): "
+                + "; ".join(pending),
+                flush=True,
+            )
+            done_signature = None
+
+        if args.timeout and time.monotonic() - started >= args.timeout:
+            sys.exit(f"timed out waiting for {args.check!r}")
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
