@@ -12,6 +12,7 @@ from nplusone.core import profiler
 from mittab.apps.tab.models import (
     Judge,
     Outround,
+    PublicHomePage,
     PublicHomeShortcut,
     Room,
     Round,
@@ -749,6 +750,27 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn(reverse("pretty_pair"), content)
+        self.assertIn(reverse("missing_ballots"), content)
+
+    def test_public_home_hides_inactive_configured_shortcuts(self):
+        client = Client()
+
+        PublicHomePage.ensure_defaults()
+        PublicHomePage.objects.filter(slug="public_team_results").update(
+            is_active=False
+        )
+        PublicHomeShortcut.objects.update_or_create(
+            position=2,
+            defaults={"nav_item": "public_team_results"},
+        )
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertNotIn("Public Team Results", content)
+        self.assertNotIn(reverse("rank_teams_public"), content)
         self.assertIn(reverse("missing_ballots"), content)
 
     def test_public_home_shows_only_eight_shortcuts_when_motions_enabled(self):

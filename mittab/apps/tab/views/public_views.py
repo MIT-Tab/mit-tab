@@ -43,7 +43,7 @@ from mittab.apps.tab.written_rfd import (
 
 
 def build_public_home_shortcuts():
-    definition_map = PublicHomeShortcut.nav_definition_map()
+    definition_map = PublicHomeShortcut.nav_definition_map(include_inactive=False)
     slot_to_slug = PublicHomeShortcut.default_slot_mapping()
 
     for shortcut in PublicHomeShortcut.objects.all():
@@ -53,7 +53,12 @@ def build_public_home_shortcuts():
     shortcuts = []
     for slot, default_slug in PublicHomeShortcut.default_slot_mapping().items():
         slug = slot_to_slug.get(slot, default_slug)
-        definition = definition_map.get(slug) or definition_map[default_slug]
+        definition = definition_map.get(slug)
+        if definition is None and slug != default_slug:
+            slug = default_slug
+            definition = definition_map.get(default_slug)
+        if definition is None:
+            continue
         shortcuts.append({
             "slug": slug,
             "title": definition["title"],
@@ -180,14 +185,15 @@ def public_home(request):
                 "url": reverse("registration_portal"),
             }
         else:
-            pages = PublicHomeShortcut.nav_definition_map()
+            pages = PublicHomeShortcut.nav_definition_map(include_inactive=False)
             rp = pages.get("released_pairings", {})
-            quick_links[0] = {
-                "slug": "released_pairings",
-                "title": rp.get("title", "Released Pairings"),
-                "subtitle": rp.get("subtitle", ""),
-                "url": rp.get("url_path", "/public/pairings/"),
-            }
+            if rp:
+                quick_links[0] = {
+                    "slug": "released_pairings",
+                    "title": rp.get("title", "Released Pairings"),
+                    "subtitle": rp.get("subtitle", ""),
+                    "url": rp.get("url_path", "/public/pairings/"),
+                }
 
     status_parts = []
     if status_primary and status_primary.strip().lower() != "tournament":

@@ -334,8 +334,11 @@ class PublicHomeShortcut(models.Model):
         invalidate_all_public_caches()
 
     @classmethod
-    def nav_definition_map(cls):
+    def nav_definition_map(cls, include_inactive=True):
         PublicHomePage.ensure_defaults()
+        pages = PublicHomePage.objects.all()
+        if not include_inactive:
+            pages = pages.filter(is_active=True)
         return {
             page.slug: {
                 "slug": page.slug,
@@ -343,7 +346,7 @@ class PublicHomeShortcut(models.Model):
                 "subtitle": page.subtitle,
                 "url_path": page.url_path,
             }
-            for page in PublicHomePage.objects.all()
+            for page in pages
         }
 
     @classmethod
