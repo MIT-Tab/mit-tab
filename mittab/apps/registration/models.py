@@ -1,7 +1,7 @@
 from django.db import models
-from haikunator import Haikunator
 
 from mittab.apps.tab.models import School
+from mittab.libs.haikunator import Haikunator
 
 
 class RegistrationConfig(models.Model):
