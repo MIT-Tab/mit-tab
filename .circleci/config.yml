@@ -86,15 +86,13 @@ jobs:
           file: ./cov.xml
   web-tests:
     docker:
-      - image: cimg/python:3.10.16-browsers
+      - image: cimg/python:3.10.16-node
         environment:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
-          MITTAB_FAKE_WEBPACK_LOADER: "1"
-          MITTAB_INITIALIZE_ARGS: --skip-backups
-          MITTAB_SKIP_WEBPACK_BUILD: "1"
+          MITTAB_NPM_INSTALL_COMMAND: npm ci --prefer-offline --no-audit
       - image: cimg/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
