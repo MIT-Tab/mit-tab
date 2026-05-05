@@ -1,9 +1,15 @@
 import random
+import os
 
+from django.contrib.messages import get_messages
 from django.db.models import Prefetch
+from django.http import FileResponse
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from mittab import settings
+from mittab.apps.tab import logo_utils
 from mittab.apps.tab.forms import EBallotForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import (
@@ -11,6 +17,7 @@ from mittab.apps.tab.models import (
     Bye,
     Debater,
     Outround,
+    PublicHomeShortcut,
     TabSettings,
     Judge,
     Team,
@@ -22,7 +29,7 @@ from mittab.apps.tab.public_rankings import (
     get_ranking_settings,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.registration.models import RegistrationConfig
+from mittab.apps.registration.models import InfoLink, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
@@ -35,16 +42,85 @@ from mittab.apps.tab.written_rfd import (
 )
 
 
+def build_public_home_shortcuts():
+    definition_map = PublicHomeShortcut.nav_definition_map(include_inactive=False)
+    slot_to_slug = PublicHomeShortcut.default_slot_mapping()
+
+    for shortcut in PublicHomeShortcut.objects.all():
+        if shortcut.position in slot_to_slug:
+            slot_to_slug[shortcut.position] = shortcut.nav_item
+
+    shortcuts = []
+    for slot, default_slug in PublicHomeShortcut.default_slot_mapping().items():
+        slug = slot_to_slug.get(slot, default_slug)
+        definition = definition_map.get(slug)
+        if definition is None and slug != default_slug:
+            slug = default_slug
+            definition = definition_map.get(default_slug)
+        if definition is None:
+            continue
+        shortcuts.append({
+            "slug": slug,
+            "title": definition["title"],
+            "subtitle": definition["subtitle"],
+            "url": definition["url_path"],
+        })
+    return shortcuts
+
+
 @cache_public_view(timeout=300)
 def public_access_error(request):
     return render(request, "public/access_error.html")
 
 
+def tournament_logo(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if not logo_path:
+        raise Http404("Tournament logo not found")
+    return _logo_response(logo_path)
+
+
+def favicon(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if logo_path:
+        return _logo_response(logo_path)
+
+    return _fallback_favicon_response()
+
+
+def _logo_response(logo_path):
+    response = FileResponse(open(logo_path, "rb"), content_type="image/png")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _fallback_favicon_response():
+    favicon_path = os.path.join(settings.BASE_DIR, "assets", "img", "favicon.ico")
+    return FileResponse(open(favicon_path, "rb"), content_type="image/x-icon")
+
+
 @cache_public_view(timeout=60)
 def public_home(request):
+    # Drain any pending flash messages (e.g. "Successfully logged out") before
+    # we render. The response is cached for 60s and shared across visitors, so
+    # a stale message baked into the HTML would be visible to anyone else who
+    # hits the page during that window. Iterating get_messages marks them as
+    # read so they neither render here nor persist into the cached payload.
+    list(get_messages(request))
+
     registration_config = RegistrationConfig.get_or_create_active()
     registration_open = bool(registration_config and registration_config.can_create())
+    quick_links = build_public_home_shortcuts()
+    info_links = list(InfoLink.objects.filter(is_active=True))
+
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
+    # Single source of truth for the pre-tournament state. RegistrationConfig
+    # tracks only the manual open/closed toggle and has no round awareness,
+    # so by itself it stays True forever once a round starts. Slot 1's swap
+    # and the Register/Edit CTA both key off this flag so they can never
+    # disagree (e.g. CTA hidden while slot 1 still says Registration).
+    tournament_in_progress = cur_round_setting >= 1
+    show_registration_lead = (not tournament_in_progress) and registration_open
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
     pairing_released = pairing_released_inround
@@ -52,66 +128,85 @@ def public_home(request):
     current_outround_label = ""
 
     if cur_round_setting < 1:
-        pairing_released = False
         status_primary = "Tournament"
         status_secondary = "Starting soon"
-        return render(
-            request,
-            "public/home.html",
-            {
-                "status_primary": status_primary,
-                "status_secondary": status_secondary,
-                "registration_open": registration_open,
-                "registration_url": reverse("registration_portal"),
-            },
-        )
-
-    outround_qs = Outround.objects.order_by("num_teams")
-
-    if outround_qs.exists():
-        varsity = (
-            outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
-            .order_by("num_teams")
-            .first()
-        )
-        novice = (
-            outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
-            .order_by("num_teams")
-            .first()
-        )
-
-        labels = []
-        release_flags = []
-
-        if varsity:
-            labels.append(f"[V] Ro{varsity.num_teams}")
-            release_flags.append(
-                TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
-            )
-        if novice:
-            labels.append(f"[N] Ro{novice.num_teams}")
-            release_flags.append(
-                TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
-            )
-
-        if labels:
-            in_outrounds = True
-            current_outround_label = " & ".join(labels)
-            pairing_released = bool(release_flags and all(release_flags))
-        else:
-            pairing_released = pairing_released_inround
-
-    pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
-
-    if in_outrounds:
-        status_primary = current_outround_label or "Elimination rounds"
-        status_secondary = pairing_text
-    elif cur_round_setting <= tot_rounds:
-        status_primary = f"Round {cur_round_setting}"
-        status_secondary = pairing_text
     else:
-        status_primary = "Tournament"
+        outround_qs = Outround.objects.order_by("num_teams")
+        if outround_qs.exists():
+            varsity = (
+                outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
+                .order_by("num_teams")
+                .first()
+            )
+            novice = (
+                outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
+                .order_by("num_teams")
+                .first()
+            )
+
+            labels = []
+            release_flags = []
+
+            if varsity:
+                labels.append(f"[V] Ro{varsity.num_teams}")
+                release_flags.append(
+                    TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
+                )
+            if novice:
+                labels.append(f"[N] Ro{novice.num_teams}")
+                release_flags.append(
+                    TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
+                )
+
+            if labels:
+                in_outrounds = True
+                current_outround_label = " & ".join(labels)
+                pairing_released = bool(release_flags and all(release_flags))
+
+        pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
+
+        if in_outrounds:
+            status_primary = current_outround_label or "Elimination rounds"
+        elif cur_round_setting <= tot_rounds:
+            status_primary = f"Round {cur_round_setting}"
+        else:
+            status_primary = "Tournament"
         status_secondary = pairing_text
+
+    # Slot 1 is reserved (and locked in the settings UI): pre-tournament
+    # with registration open it points at Registration; once round 1 starts
+    # (or registration is closed) it switches to Released Pairings.
+    if quick_links:
+        if show_registration_lead:
+            quick_links[0] = {
+                "slug": "registration",
+                "title": "Registration",
+                "subtitle": "Sign up your teams and judges.",
+                "url": reverse("registration_portal"),
+            }
+        else:
+            pages = PublicHomeShortcut.nav_definition_map(include_inactive=False)
+            rp = pages.get("released_pairings", {})
+            if rp:
+                quick_links[0] = {
+                    "slug": "released_pairings",
+                    "title": rp.get("title", "Released Pairings"),
+                    "subtitle": rp.get("subtitle", ""),
+                    "url": rp.get("url_path", "/public/pairings/"),
+                }
+
+    status_parts = []
+    if status_primary and status_primary.strip().lower() != "tournament":
+        status_parts.append(status_primary)
+    if status_secondary:
+        status_parts.append(status_secondary)
+    pairings_tile_subtitle = (
+        " · ".join(status_parts) or status_secondary or status_primary
+    )
+    for shortcut in quick_links:
+        if shortcut.get("slug") == "released_pairings":
+            shortcut["subtitle"] = pairings_tile_subtitle
+            break
 
     return render(
         request,
@@ -120,7 +215,10 @@ def public_home(request):
             "status_primary": status_primary,
             "status_secondary": status_secondary,
             "registration_open": registration_open,
+            "show_registration_lead": show_registration_lead,
             "registration_url": reverse("registration_portal"),
+            "info_links": info_links,
+            "quick_links": quick_links,
         },
     )
 

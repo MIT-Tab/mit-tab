@@ -1,7 +1,14 @@
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.db import models
 
 from mittab.apps.tab.models import School
 from mittab.libs.haikunator import Haikunator
+
+
+def validate_safe_url(value):
+    """Restrict URLs to http(s) so users can't store javascript: or data: URIs."""
+    URLValidator(schemes=["http", "https"])(value)
 
 
 class RegistrationConfig(models.Model):
@@ -88,3 +95,36 @@ class RegistrationChangeLog(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} {self.registration_code}"
+
+
+class TournamentLinkBase(models.Model):
+    title = models.CharField(max_length=80)
+    url = models.CharField(max_length=500, validators=[validate_safe_url])
+    description = models.CharField(max_length=160, blank=True)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["display_order", "created_at"]
+
+    def clean(self):
+        super().clean()
+        if self.url:
+            try:
+                validate_safe_url(self.url)
+            except ValidationError as exc:
+                raise ValidationError({"url": exc.messages}) from exc
+
+    def __str__(self):
+        return self.title
+
+
+class InfoLink(TournamentLinkBase):
+    """Tournament-wide link shown on the public homepage."""
+
+
+class RegistrationLink(TournamentLinkBase):
+    """Link surfaced after a successful registration and in the confirmation email."""

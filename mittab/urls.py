@@ -3,7 +3,6 @@ from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
 from django.contrib.auth.views import LoginView
-from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
 import mittab.apps.tab.views.views as views
@@ -21,9 +20,8 @@ import mittab.apps.registration.views as registration_views
 admin.autodiscover()
 
 urlpatterns = [
-    path("favicon.ico",
-         RedirectView.as_view(url=settings.STATIC_URL +
-                              "img/favicon.ico", permanent=True)),
+    path("favicon.ico", public_views.favicon, name="favicon"),
+    path("tournament-logo/", public_views.tournament_logo, name="tournament_logo"),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
@@ -161,6 +159,11 @@ urlpatterns = [
         "rankings/public-control/",
         views.public_rankings_control,
         name="public_rankings_control",
+    ),
+    path(
+        "settings/public-homepage/",
+        views.public_homepage,
+        name="public_homepage",
     ),
 
     # Pairing related

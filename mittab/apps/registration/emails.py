@@ -16,7 +16,7 @@ from mittab.apps.tab.models import (
 )
 from mittab.libs.email_service import EmailRequest, EmailService, EmailServiceError
 
-from .models import Registration
+from .models import Registration, RegistrationLink
 
 
 JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
@@ -111,7 +111,7 @@ def _judge_text_lines(judge, fallback_school):
     ]
 
 
-def _build_text_body(registration, tournament, edit_url, request):
+def _build_text_body(registration, tournament, edit_url, followup_links, request):
     lines = [
         f"Hi {registration.school.name},",
         "",
@@ -122,12 +122,22 @@ def _build_text_body(registration, tournament, edit_url, request):
         f"Edit your registration: {edit_url}",
         f"Registration code: {registration.herokunator_code}",
         "",
+    ]
+    if followup_links:
+        lines.append("Please complete these as well:")
+        for link in followup_links:
+            if link.description:
+                lines.append(f"- {link.title}: {link.url} ({link.description})")
+            else:
+                lines.append(f"- {link.title}: {link.url}")
+        lines.append("")
+    lines.extend([
         "School and contact",
         f"  School: {registration.school.name}",
         f"  Email:  {registration.email}",
         "",
         "Teams",
-    ]
+    ])
     teams = list(registration.teams.all())
     if teams:
         for team in teams:
@@ -225,7 +235,41 @@ border-radius:8px;">
 """
 
 
-def _build_html_body_inner(registration, tournament, edit_url, request):
+def _followup_links_html(followup_links):
+    if not followup_links:
+        return ""
+    items = []
+    for link in followup_links:
+        subtitle = ""
+        if link.description:
+            subtitle = (
+                "<div style=\"font-size:13px;color:#5b6b85;margin-top:2px;\">"
+                f"{escape(link.description)}</div>"
+            )
+        items.append(
+            "<li style=\"margin:0 0 8px;padding:10px 12px;background-color:#ffffff;"
+            "border:1px solid #d8e1ee;border-left:3px solid #2a66c4;border-radius:6px;"
+            "list-style:none;\">"
+            f"<a href=\"{escape(link.url)}\" "
+            "style=\"color:#1f2f4a;text-decoration:none;font-weight:600;\">"
+            f"{escape(link.title)}</a>"
+            f"{subtitle}"
+            "</li>"
+        )
+    return (
+        "<div style=\"margin:0 0 24px;padding:14px 16px;background-color:#f4f9ff;"
+        "border:1px solid rgba(42,102,196,0.25);border-radius:8px;\">"
+        "<p style=\"margin:0 0 10px;font-weight:600;color:#1f2f4a;\">"
+        "A few more things to do</p>"
+        "<p style=\"margin:0 0 12px;color:#5b6b85;font-size:14px;\">"
+        "Please take a moment to fill these out:</p>"
+        "<ul style=\"margin:0;padding:0;list-style:none;\">"
+        + "".join(items)
+        + "</ul></div>"
+    )
+
+
+def _build_html_body_inner(registration, tournament, edit_url, followup_links, request):
     parts = [
         f"<p style=\"margin:0 0 12px;\">Hi {escape(registration.school.name)},</p>",
         (
@@ -246,6 +290,7 @@ def _build_html_body_inner(registration, tournament, edit_url, request):
             f"Registration code: <strong>{escape(registration.herokunator_code)}"
             "</strong></p>"
         ),
+        _followup_links_html(followup_links),
         (
             "<h2 style=\"margin:24px 0 8px;font-size:16px;color:#1f2f4a;\">"
             "School and contact</h2>"
@@ -294,16 +339,24 @@ def build_registration_confirmation_email(registration, request):
     edit_url = request.build_absolute_uri(
         reverse("registration_portal_edit", args=[registration.herokunator_code])
     )
+    followup_links = list(RegistrationLink.objects.filter(is_active=True))
     subject = f"Registration confirmed for {tournament_name}"
     preheader = (
         f"Code {registration.herokunator_code}. "
         "Edit your registration any time before the tournament."
     )
-    text_body = _build_text_body(registration, tournament_name, edit_url, request)
+    text_body = _build_text_body(
+        registration,
+        tournament_name,
+        edit_url,
+        followup_links,
+        request,
+    )
     inner_html = _build_html_body_inner(
         registration,
         tournament_name,
         edit_url,
+        followup_links,
         request,
     )
     html_body = _HTML_TEMPLATE.format(

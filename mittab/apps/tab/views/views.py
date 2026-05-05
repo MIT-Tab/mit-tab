@@ -18,6 +18,7 @@ from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
     MiniRoomTagForm,
     DebaterApdaIdForm,
+    PublicHomepageForm,
     RankingGroupForm,
     RoomTagForm,
     SchoolApdaIdForm,
@@ -671,6 +672,50 @@ def settings_form(request):
             "categories": categories_with_fields,
             "title": "Tab Settings"
         })
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def public_homepage(request):
+    # Local import to avoid a circular import between the tab and registration
+    # apps at module load.
+    from mittab.apps.registration.models import InfoLink
+
+    if request.method == "POST":
+        form = PublicHomepageForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            invalidate_all_public_caches()
+            return redirect_and_flash_success(
+                request,
+                "Public homepage updated!",
+                path=reverse("public_homepage"),
+            )
+    else:
+        form = PublicHomepageForm()
+
+    nav_pages = PublicHomeShortcut.nav_definition_map()
+    shortcut_rows = []
+    for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+        field = form[f"slot_{slot}"]
+        slug = field.value()
+        meta = nav_pages.get(slug, {})
+        shortcut_rows.append({
+            "slot": slot,
+            "field": field,
+            "title": meta.get("title", slug),
+            "subtitle": meta.get("subtitle", ""),
+        })
+
+    return render(
+        request,
+        "tab/public_homepage.html",
+        {
+            "form": form,
+            "shortcut_rows": shortcut_rows,
+            "info_links": list(InfoLink.objects.all()),
+            "title": "Public Homepage",
+        },
+    )
 
 
 def upload_data(request):

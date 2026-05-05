@@ -1,11 +1,14 @@
 from django import template
 from django.forms.fields import FileField
+from django.urls import reverse
 from django.utils.html import urlize
 from django.utils.safestring import mark_safe
 
 from mittab.apps.tab.auth_roles import is_apda_board_user
 from mittab.apps.tab.helpers import get_redirect_target
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab import logo_utils
+from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
+from mittab.apps.tab.theme import DEFAULT_THEME_COLOR, get_theme_css_variables
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
@@ -74,7 +77,7 @@ def manual_judge_audit_events(context, round_id):
 
 @register.simple_tag
 def tournament_name():
-    return TabSettings.get("tournament_name", "New Tournament")
+    return TabSettings.get("tournament_name", DEFAULT_TOURNAMENT_NAME)
 
 
 @register.filter(name="registration_text", needs_autoescape=True)
@@ -122,6 +125,29 @@ def public_display_flags():
 def motions_enabled():
     """Returns True if motions feature is enabled."""
     return bool(TabSettings.get("motions_enabled", 0))
+
+
+@register.simple_tag
+def theme_css_variables():
+    theme_color = TabSettings.get("theme_color", DEFAULT_THEME_COLOR)
+    return get_theme_css_variables(theme_color)
+
+
+@register.simple_tag
+def tournament_logo_url():
+    if not logo_utils.has_tournament_logo():
+        return ""
+
+    mtime = logo_utils.get_tournament_logo_mtime()
+    url = reverse("tournament_logo")
+    if mtime is None:
+        return url
+    return f"{url}?v={mtime}"
+
+
+@register.simple_tag
+def favicon_url():
+    return reverse("favicon")
 
 
 @register.simple_tag

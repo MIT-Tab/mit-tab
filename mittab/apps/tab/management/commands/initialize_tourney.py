@@ -7,7 +7,10 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    TabSettings,
+)
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
 
 USER_MODEL = get_user_model()
@@ -85,7 +88,8 @@ class Command(BaseCommand):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-        TabSettings.set("tournament_name", "New Tournament")
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        TabSettings.set("theme_color", "#00438A")
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")

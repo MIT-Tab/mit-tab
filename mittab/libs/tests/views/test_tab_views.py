@@ -108,6 +108,7 @@ class TestTabViews(TestCase):
             (reverse("add_scratch"), "Add Scratch"),
             (reverse("view_scratches"), "Scratches"),
             (reverse("settings_form"), "Settings"),
+            (reverse("public_homepage"), "Public Homepage"),
             (reverse("view_backups"), "Backups"),
             (reverse("upload_data"), "Upload Data"),
             (reverse("confirm_start_tourny"), "Are you sure?"),

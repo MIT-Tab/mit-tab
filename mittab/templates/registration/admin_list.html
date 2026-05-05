@@ -63,6 +63,16 @@
         {% endif %}
     </form>
 
+    <div class="registration-admin__panel">
+        <h6 class="registration-admin__panel-title">Post-Registration Links</h6>
+        <p class="text-muted small mb-2">
+            Shown to registrants right after they submit, and included in their confirmation
+            email. Use for follow-up forms, hotel info, payment, etc.
+        </p>
+        {% include "registration/_tournament_link_table.html" with links=registration_links link_kind="registration" empty_message="No post-registration links yet." %}
+        {% include "registration/_tournament_link_form.html" with link_kind="registration" submit_label="Add Registration Link" %}
+    </div>
+
     {% if recent_changes %}
     <div class="registration-admin__panel">
         <h6 class="registration-admin__panel-title">Recent Registration Activity</h6>
