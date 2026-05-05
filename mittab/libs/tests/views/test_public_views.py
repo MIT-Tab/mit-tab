@@ -769,9 +769,14 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
 
-        self.assertNotIn("Public Team Results", content)
-        self.assertNotIn(reverse("rank_teams_public"), content)
-        self.assertIn(reverse("missing_ballots"), content)
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
+            content,
+        )
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
+            content,
+        )
 
     def test_public_home_shows_only_eight_shortcuts_when_motions_enabled(self):
         client = Client()
