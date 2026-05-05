@@ -13,6 +13,7 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
     BALLOT_CODE_MAX_LENGTH,
+    CheckIn,
     Room,
     RoomCheckIn,
     TabSettings,
@@ -268,6 +269,105 @@ class TestTabViews(TestCase):
         self.assertFalse(
             ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
         )
+
+    def test_quick_judge_checkin_validates_request(self):
+        url = reverse("quick_judge_checkin")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.json()["error"], "POST required")
+
+        response = self.client.post(url, {"round_number": "not-a-round"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid round")
+
+        response = self.client.post(url, {"round_number": "2", "judge_id": "999999"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Judge not found")
+
+        response = self.client.post(url, {"round_number": "2", "name": ""})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Name is required")
+
+    def test_quick_judge_checkin_checks_in_existing_judge(self):
+        judge = Judge.objects.first()
+        CheckIn.objects.filter(judge=judge, round_number=7).delete()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {"round_number": "7", "judge_id": str(judge.id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertFalse(payload["created"])
+        self.assertEqual(payload["judge"]["id"], judge.id)
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=7).exists())
+
+    def test_quick_judge_checkin_creates_judge(self):
+        school = School.objects.first()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {
+                "round_number": "8",
+                "name": "Quick Judge",
+                "rank": "4.25",
+                "school_ids[]": [str(school.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["created"])
+
+        judge = Judge.objects.get(name="Quick Judge")
+        self.assertEqual(judge.rank, 4.25)
+        self.assertEqual(judge.created_by, self.user)
+        self.assertEqual(list(judge.schools.all()), [school])
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=8).exists())
+
+    def test_quick_judge_checkin_rejects_invalid_new_judge_data(self):
+        url = reverse("quick_judge_checkin")
+        existing = Judge.objects.first()
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": existing.name, "rank": "5"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already exists", response.json()["error"])
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": "Bad Rank Judge", "rank": "bad"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid rank")
+
+        response = self.client.post(
+            url,
+            {
+                "round_number": "2",
+                "name": "Unknown School Judge",
+                "rank": "5",
+                "school_ids": ["999999"],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unknown school selected")
+
+        with mock.patch(
+            "mittab.apps.tab.views.pairing_views.Judge.save",
+            side_effect=ValueError("Save failed"),
+        ):
+            response = self.client.post(
+                url,
+                {"round_number": "2", "name": "Exploding Judge", "rank": "5"},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unable to create judge check-in")
 
     def test_team_creator_and_edit_audit_visible(self):
         school = School.objects.first()

@@ -1,5 +1,6 @@
 # pylint: disable=too-many-lines
 import datetime
+import logging
 import os
 
 from django.shortcuts import render, get_object_or_404
@@ -37,6 +38,8 @@ from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
     invalidate_public_rankings_cache,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def invalidate_public_ballot_cache():
@@ -431,6 +434,86 @@ def view_status(request):
     return view_round(request, current_round_number)
 
 
+def quick_judge_checkin(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST required"},
+                            status=405)
+
+    try:
+        round_number = int(request.POST.get("round_number", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"success": False, "error": "Invalid round"},
+                            status=400)
+
+    judge_id = request.POST.get("judge_id")
+    if judge_id:
+        try:
+            judge = Judge.objects.get(pk=int(judge_id))
+        except (ValueError, Judge.DoesNotExist):
+            return JsonResponse({"success": False, "error": "Judge not found"},
+                                status=404)
+        CheckIn.objects.get_or_create(judge=judge, round_number=round_number)
+        return JsonResponse({
+            "success": True,
+            "judge": {"id": judge.id, "name": judge.name, "rank": str(judge.rank)},
+            "created": False,
+        })
+
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"success": False, "error": "Name is required"},
+                            status=400)
+    if Judge.objects.filter(name__iexact=name).exists():
+        return JsonResponse(
+            {"success": False, "error": f"A judge named \"{name}\" already exists"},
+            status=400,
+        )
+
+    rank_raw = (request.POST.get("rank") or "").strip()
+    try:
+        rank = float(rank_raw) if rank_raw else 5.0
+    except ValueError:
+        return JsonResponse({"success": False, "error": "Invalid rank"},
+                            status=400)
+
+    school_ids = []
+    school_id_values = (
+        request.POST.getlist("school_ids[]") +
+        request.POST.getlist("school_ids")
+    )
+    for raw in school_id_values:
+        if raw and raw.isdigit():
+            school_ids.append(int(raw))
+    schools = list(School.objects.filter(pk__in=school_ids)) if school_ids else []
+    if school_ids and len(schools) != len(set(school_ids)):
+        return JsonResponse({"success": False, "error": "Unknown school selected"},
+                            status=400)
+
+    actor = request.user if getattr(request.user, "is_authenticated", False) else None
+
+    try:
+        with transaction.atomic():
+            judge = Judge(name=name, rank=rank)
+            if actor:
+                judge.created_by = actor
+            judge.save()
+            if schools:
+                judge.schools.set(schools)
+            CheckIn.objects.create(judge=judge, round_number=round_number)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("Failed to create quick judge check-in")
+        return JsonResponse(
+            {"success": False, "error": "Unable to create judge check-in"},
+            status=400,
+        )
+
+    return JsonResponse({
+        "success": True,
+        "judge": {"id": judge.id, "name": judge.name, "rank": str(judge.rank)},
+        "created": True,
+    })
+
+
 def view_round(request, round_number):
     errors, excluded_teams = [], []
 
@@ -589,6 +672,7 @@ def view_round(request, round_number):
         "manual_judge_assignments": manual_judge_assignments,
         "manual_judge_assignment_labels": manual_judge_assignment_labels,
         "manual_judge_audit_events": manual_judge_audit_events,
+        "all_schools": School.objects.order_by("name"),
     }
     return render(request, "pairing/pairing_control.html", context)
 

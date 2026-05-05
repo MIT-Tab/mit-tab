@@ -165,6 +165,9 @@ urlpatterns = [
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
+    path("pairings/quick_judge_checkin/",
+         pairing_views.quick_judge_checkin,
+         name="quick_judge_checkin"),
     path("pairings/view_rounds/",
          pairing_views.view_rounds,
          name="view_rounds"),
