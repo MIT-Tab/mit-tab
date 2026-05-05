@@ -8,6 +8,7 @@ from mittab.apps.tab.models import (
     Debater,
     DEFAULT_TOURNAMENT_NAME,
     Judge,
+    JudgeCodeEmailLog,
     Outround,
     Room,
     RoomCheckIn,
@@ -17,6 +18,7 @@ from mittab.apps.tab.models import (
     Scratch,
     TabSettings,
     Team,
+    WrittenRFDEmailLog,
 )
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
 
@@ -115,6 +117,10 @@ def rule_round_one_paired():
     return Round.objects.filter(round_number=1).exists()
 
 
+def rule_judge_codes_sent():
+    return JudgeCodeEmailLog.objects.exists()
+
+
 def rule_final_inround_completed():
     final_round_number = int(TabSettings.get("tot_rounds", 0) or 0)
     if final_round_number < 1:
@@ -146,6 +152,10 @@ def rule_outrounds_completed():
     )
 
 
+def rule_written_rfds_sent():
+    return WrittenRFDEmailLog.objects.exists()
+
+
 TOURNAMENT_TODO_RULES = {
     "tournament_name_set": rule_tournament_name_set,
     "settings_reviewed": rule_settings_reviewed,
@@ -153,10 +163,12 @@ TOURNAMENT_TODO_RULES = {
     "accessible_room_tags_added": rule_accessible_room_tags_added,
     "scratches_entered": rule_scratches_entered,
     "entities_checked_in": rule_entities_checked_in,
+    "judge_codes_sent": rule_judge_codes_sent,
     "round_one_paired": rule_round_one_paired,
     "final_inround_completed": rule_final_inround_completed,
     "speaker_results_published": rule_speaker_results_published,
     "team_results_published": rule_team_results_published,
     "outrounds_paired": rule_outrounds_paired,
     "outrounds_completed": rule_outrounds_completed,
+    "written_rfds_sent": rule_written_rfds_sent,
 }

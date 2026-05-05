@@ -100,6 +100,7 @@ def get_tournament_todo_steps():
             "slug": step_slug,
             "title": raw_step.get("title", step_slug),
             "description": raw_step.get("description", ""),
+            "optional_label": raw_step.get("optional_label", ""),
             "url": step_url,
             "checked": checked,
             "auto_completed": auto_completed,

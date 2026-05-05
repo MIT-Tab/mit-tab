@@ -51,6 +51,9 @@
             {% if step.url %}
             <a class="todo-step-item-link" href="{{ step.url|with_return_to }}">
               <span class="todo-step-title mb-0">{{ step.title }}</span>
+              {% if step.optional_label %}
+              <span class="badge badge-light todo-step-context">{{ step.optional_label }}</span>
+              {% endif %}
               {% if step.description %}
               <span
                 class="badge badge-info help-badge todo-step-help"
@@ -62,6 +65,9 @@
             {% else %}
             <div class="todo-step-item-link">
               <span class="todo-step-title mb-0">{{ step.title }}</span>
+              {% if step.optional_label %}
+              <span class="badge badge-light todo-step-context">{{ step.optional_label }}</span>
+              {% endif %}
               {% if step.description %}
               <span
                 class="badge badge-info help-badge todo-step-help"

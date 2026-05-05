@@ -119,6 +119,15 @@
     vertical-align: middle;
   }
 
+  .todo-step-context {
+    border: 1px solid rgba(82, 101, 127, 0.28);
+    color: #52657f;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: normal;
+  }
+
   .todo-step-check {
     margin: 0;
     position: relative;
