@@ -1,27 +1,29 @@
 {% if audited_obj %}
-<div class="team-record mt-4">
-  <h5>Audit Trail</h5>
-  <table class="table table-striped table-sm">
-    <tr>
-      <td>Created by</td>
-      <td>{{ audited_obj.created_by_display }}{% if audited_obj.created_at %} at {{ audited_obj.created_at }}{% endif %}</td>
-    </tr>
-    {% for event in audit_events %}
-    <tr>
-      <td>{{ event.label }}</td>
-      <td>
-        {{ event.user_display }} at {{ event.created_at }}
-        {% if event.note %}<br><small class="text-muted">{{ event.note }}</small>{% endif %}
-        {% if event.changes.fields %}
-          <br><small class="text-muted">Fields: {{ event.changes.fields|join:", " }}</small>
-        {% endif %}
-      </td>
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="2"><span class="text-muted">No audit events recorded</span></td>
-    </tr>
-    {% endfor %}
-  </table>
+<div class="audit-trail mt-3">
+  <details>
+    <summary class="text-muted small audit-trail-summary">
+      <i class="fas fa-history"></i>
+      History
+      <span class="ml-1">·
+        Created by {{ audited_obj.created_by_display }}{% if audited_obj.created_at %} at {{ audited_obj.created_at }}{% endif %}
+      </span>
+    </summary>
+    <table class="table table-sm small mt-2 mb-0 audit-trail-table">
+      <tbody>
+        {% for event in audit_events %}
+        <tr>
+          <td class="text-muted text-nowrap audit-trail-label">{{ event.label }}</td>
+          <td>
+            {{ event.user_display }} at {{ event.created_at }}
+            {% if event.note %}<br><span class="text-muted">{{ event.note }}</span>{% endif %}
+            {% if event.changes.fields %}<br><span class="text-muted">Fields: {{ event.changes.fields|join:", " }}</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="2" class="text-muted">No audit events recorded</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
 </div>
 {% endif %}

@@ -7,7 +7,7 @@ import mittab.apps.registration.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('registration', '0001_initial'),
+        ('registration', '0002_registrationconfig_disc_scratch_quantity_and_more'),
     ]
 
     operations = [

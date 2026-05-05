@@ -34,6 +34,7 @@ class TestThemeSettings(TestCase):
             "slot_5": "team_list",
             "slot_6": "varsity_outrounds",
             "slot_7": "novice_outrounds",
+            "slot_8": "team_portal",
         }
 
     def test_public_homepage_form_saves_theme_color(self):

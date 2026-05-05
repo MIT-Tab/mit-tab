@@ -72,15 +72,21 @@ def tournament_logo(request):
     logo_path = logo_utils.get_tournament_logo_abs_path()
     if not logo_path:
         raise Http404("Tournament logo not found")
-    return FileResponse(open(logo_path, "rb"), content_type="image/png")
+    return _logo_response(logo_path)
 
 
 def favicon(request):
     logo_path = logo_utils.get_tournament_logo_abs_path()
     if logo_path:
-        return FileResponse(open(logo_path, "rb"), content_type="image/png")
+        return _logo_response(logo_path)
 
     return _fallback_favicon_response()
+
+
+def _logo_response(logo_path):
+    response = FileResponse(open(logo_path, "rb"), content_type="image/png")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def _fallback_favicon_response():

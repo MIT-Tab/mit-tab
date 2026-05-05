@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from datetime import timedelta
 from unittest import mock
 
@@ -12,6 +13,7 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
     BALLOT_CODE_MAX_LENGTH,
+    CheckIn,
     Room,
     RoomCheckIn,
     TabSettings,
@@ -131,7 +133,7 @@ class TestTabViews(TestCase):
             self.assertIn(expected_content, response.content.decode(),
                 f"Expected content '{expected_content}' not found in {url}")
 
-    def test_staff_ballot_view_shows_written_rfd(self):
+    def test_staff_ballot_view_allows_editing_submitted_ballot(self):
         round_obj = Round.objects.filter(round_number=1).first()
         round_obj.rfd = "Gov won because they controlled the weighing."
         round_obj.save(update_fields=["rfd"])
@@ -142,19 +144,44 @@ class TestTabViews(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn("Ballot submitted", content)
+        self.assertIn("Entering Ballot", content)
+        self.assertIn("Which team won the round?", content)
         self.assertIn("Reason for Decision", content)
-        self.assertIn("Save Written RFD", content)
         self.assertIn("Gov won because they controlled the weighing.", content)
 
+        stats = {
+            stat.debater_role: stat
+            for stat in RoundStats.objects.filter(round=round_obj)
+        }
         response = self.client.post(
             f"/round/{round_obj.id}/result/",
-            {"rfd": "Staff updated the RFD text."},
+            {
+                "winner": Round.GOV,
+                "round_instance": round_obj.id,
+                "pm_debater": stats["pm"].debater.id,
+                "pm_speaks": "30",
+                "pm_ranks": "1",
+                "mg_debater": stats["mg"].debater.id,
+                "mg_speaks": "29",
+                "mg_ranks": "2",
+                "lo_debater": stats["lo"].debater.id,
+                "lo_speaks": "28",
+                "lo_ranks": "3",
+                "mo_debater": stats["mo"].debater.id,
+                "mo_speaks": "27",
+                "mo_ranks": "4",
+                "rfd": "Staff updated the RFD text.",
+            },
         )
 
         self.assertEqual(response.status_code, 302)
         round_obj.refresh_from_db()
+        self.assertEqual(round_obj.victor, Round.GOV)
         self.assertEqual(round_obj.rfd, "Staff updated the RFD text.")
+        self.assertEqual(
+            RoundStats.objects.get(round=round_obj, debater_role="pm").speaks,
+            Decimal("30"),
+        )
 
     def test_staff_unsubmitted_ballot_form_shows_written_rfd_field(self):
         round_obj = Round.objects.filter(round_number=1).first()
@@ -171,6 +198,23 @@ class TestTabViews(TestCase):
         self.assertIn("Written RFD", content)
         self.assertIn("Reason for Decision", content)
         self.assertIn("Optional. You may submit the ballot without an RFD", content)
+
+    def test_audit_events_do_not_block_audited_object_deletion(self):
+        school = School.objects.create(name="Audit Delete School")
+        debaters = [
+            Debater.objects.create(name="Audit Delete Debater One", novice_status=0),
+            Debater.objects.create(name="Audit Delete Debater Two", novice_status=0),
+        ]
+        team = Team.objects.create(name="Audit Delete Team", school=school, seed=0)
+        team.debaters.set(debaters)
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+
+        self.assertEqual(list(team.audit_events.all()), [event])
+
+        team.delete()
+
+        self.assertFalse(Team.objects.filter(pk=team.pk).exists())
+        self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
 
     def test_n_plus_one(self):
         views_to_test = [
@@ -226,6 +270,105 @@ class TestTabViews(TestCase):
         self.assertFalse(
             ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
         )
+
+    def test_quick_judge_checkin_validates_request(self):
+        url = reverse("quick_judge_checkin")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.json()["error"], "POST required")
+
+        response = self.client.post(url, {"round_number": "not-a-round"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid round")
+
+        response = self.client.post(url, {"round_number": "2", "judge_id": "999999"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Judge not found")
+
+        response = self.client.post(url, {"round_number": "2", "name": ""})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Name is required")
+
+    def test_quick_judge_checkin_checks_in_existing_judge(self):
+        judge = Judge.objects.first()
+        CheckIn.objects.filter(judge=judge, round_number=7).delete()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {"round_number": "7", "judge_id": str(judge.id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertFalse(payload["created"])
+        self.assertEqual(payload["judge"]["id"], judge.id)
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=7).exists())
+
+    def test_quick_judge_checkin_creates_judge(self):
+        school = School.objects.first()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {
+                "round_number": "8",
+                "name": "Quick Judge",
+                "rank": "4.25",
+                "school_ids[]": [str(school.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["created"])
+
+        judge = Judge.objects.get(name="Quick Judge")
+        self.assertEqual(judge.rank, 4.25)
+        self.assertEqual(judge.created_by, self.user)
+        self.assertEqual(list(judge.schools.all()), [school])
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=8).exists())
+
+    def test_quick_judge_checkin_rejects_invalid_new_judge_data(self):
+        url = reverse("quick_judge_checkin")
+        existing = Judge.objects.first()
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": existing.name, "rank": "5"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already exists", response.json()["error"])
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": "Bad Rank Judge", "rank": "bad"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid rank")
+
+        response = self.client.post(
+            url,
+            {
+                "round_number": "2",
+                "name": "Unknown School Judge",
+                "rank": "5",
+                "school_ids": ["999999"],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unknown school selected")
+
+        with mock.patch(
+            "mittab.apps.tab.views.pairing_views.Judge.save",
+            side_effect=ValueError("Save failed"),
+        ):
+            response = self.client.post(
+                url,
+                {"round_number": "2", "name": "Exploding Judge", "rank": "5"},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unable to create judge check-in")
 
     def test_team_creator_and_edit_audit_visible(self):
         school = School.objects.first()
@@ -284,7 +427,8 @@ class TestTabViews(TestCase):
 
         response = self.client.get(reverse("view_team", args=[team.id]))
         content = response.content.decode()
-        self.assertIn("Audit Trail", content)
+        self.assertIn("audit-trail", content)
+        self.assertIn("History", content)
         self.assertIn("testuser", content)
         self.assertIn("Edited", content)
 

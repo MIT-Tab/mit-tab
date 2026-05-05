@@ -1,8 +1,7 @@
 import random
 
-from haikunator import Haikunator
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -10,10 +9,15 @@ from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.haikunator import Haikunator
 
 
 DEFAULT_TOURNAMENT_NAME = "New Tournament"
-PUBLIC_HOME_SHORTCUT_SLOTS = 7
+PUBLIC_HOME_SHORTCUT_SLOTS = 8
+PUBLIC_HOME_URL_PATH_VALIDATOR = RegexValidator(
+    regex=r"^/(?!/)[^\\\s\x00-\x1f\x7f]*$",
+    message="Homepage destinations must be internal paths like /public/pairings/.",
+)
 PUBLIC_HOME_PAGE_DEFINITIONS = (
     {
         "slug": "released_pairings",
@@ -32,6 +36,12 @@ PUBLIC_HOME_PAGE_DEFINITIONS = (
         "title": "Submit E-Ballot",
         "subtitle": "Judges enter ballot codes to file results.",
         "url_path": "/public/e-ballots/",
+    },
+    {
+        "slug": "team_portal",
+        "title": "Team Portal",
+        "subtitle": "Teams enter codes to manage names and scratches.",
+        "url_path": "/team_portal/",
     },
     {
         "slug": "judge_list",
@@ -87,6 +97,7 @@ PUBLIC_HOME_SHORTCUT_DEFAULTS = (
     "released_pairings",
     "missing_ballots",
     "submit_e_ballot",
+    "team_portal",
     "judge_list",
     "team_list",
     "varsity_outrounds",
@@ -110,10 +121,18 @@ class AuditAttributionMixin(models.Model):
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
-    audit_events = GenericRelation("AuditEvent")
 
     class Meta:
         abstract = True
+
+    @property
+    def audit_events(self):
+        if not self.pk:
+            return AuditEvent.objects.none()
+        return AuditEvent.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+        )
 
     def save(self,
              force_insert=False,
@@ -245,7 +264,10 @@ class PublicHomePage(models.Model):
     slug = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=255, blank=True, default="")
-    url_path = models.CharField(max_length=200)
+    url_path = models.CharField(
+        max_length=200,
+        validators=[PUBLIC_HOME_URL_PATH_VALIDATOR],
+    )
     sort_order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -510,7 +532,10 @@ class Team(AuditAttributionMixin):
         haikunator = Haikunator()
 
         def gen_haiku_and_clean():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
+            code = haikunator.haikunate(
+                token_length=TEAM_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            ).replace("-", " ").title()
 
             return code
 
@@ -597,12 +622,15 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
+HUMAN_READABLE_TOKEN_CHARS = "23456789abcdefghijkmnopqrstuvwxyz"
+TEAM_CODE_TOKEN_LENGTH = 4
 BALLOT_CODE_MAX_LENGTH = 30
+BALLOT_CODE_TOKEN_LENGTH = 9
 ballot_code_validator = RegexValidator(
-    regex=r"^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$",
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+(?:-[A-Za-z0-9]+)?|[A-Za-z0-9]+)$",
     message=(
-        "Ballot code must be either legacy alphanumeric text or a single-hyphen code "
-        "with letters on each side."
+        "Ballot code must be legacy alphanumeric text or a hyphenated word-word "
+        "code with an optional alphanumeric token."
     ),
 )
 
@@ -633,12 +661,18 @@ class Judge(AuditAttributionMixin):
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
-        code = haikunator.haikunate(token_length=0)
+        code = haikunator.haikunate(
+            token_length=BALLOT_CODE_TOKEN_LENGTH,
+            token_chars=HUMAN_READABLE_TOKEN_CHARS,
+        )
 
         while (len(code) > BALLOT_CODE_MAX_LENGTH or
                not self.is_valid_ballot_code(code, raise_error=False) or
                Judge.objects.filter(ballot_code=code).first()):
-            code = haikunator.haikunate(token_length=0)
+            code = haikunator.haikunate(
+                token_length=BALLOT_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            )
 
         self.ballot_code = code
 

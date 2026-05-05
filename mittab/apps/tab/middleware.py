@@ -45,6 +45,7 @@ API_ERROR_MESSAGES = {
 APDA_BOARD_ALLOWED_PREFIXES = (
     "/apda-board/",
     "/public/",
+    "/team_portal/",
     "/accounts/logout/",
     "/admin/logout/",
     "/403/",
@@ -106,6 +107,7 @@ class Login:
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
             or path.startswith("/registration/")
+            or path.startswith("/team_portal/")
             or EBALLOT_REGEX.match(path)
         )
 

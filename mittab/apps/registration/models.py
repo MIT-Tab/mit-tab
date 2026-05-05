@@ -1,9 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
-from haikunator import Haikunator
 
 from mittab.apps.tab.models import School
+from mittab.libs.haikunator import Haikunator
 
 
 def validate_safe_url(value):
@@ -16,6 +16,9 @@ class RegistrationConfig(models.Model):
 
     allow_new_registrations = models.BooleanField(default=True)
     allow_registration_edits = models.BooleanField(default=True)
+    team_name_changes_allowed = models.BooleanField(default=False)
+    disc_scratches_open = models.BooleanField(default=False)
+    disc_scratch_quantity = models.PositiveSmallIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod

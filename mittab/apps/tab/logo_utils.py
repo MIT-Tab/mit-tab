@@ -23,23 +23,26 @@ def _get_pillow():
         from PIL import Image, UnidentifiedImageError
     except ImportError as exc:
         raise ValidationError("Image uploads require Pillow.") from exc
+    Image.MAX_IMAGE_PIXELS = LOGO_MAX_PIXELS
     return Image, UnidentifiedImageError
 
 
 def _open_and_decode_image(image_bytes):
     Image, UnidentifiedImageError = _get_pillow()
+    allowed_formats = tuple(sorted(LOGO_ALLOWED_FORMATS))
 
     try:
         image_stream = io.BytesIO(image_bytes)
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            image = Image.open(image_stream)
+            image = Image.open(image_stream, formats=allowed_formats)
             image.verify()
 
         image_stream = io.BytesIO(image_bytes)
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            image = Image.open(image_stream)
+            image = Image.open(image_stream, formats=allowed_formats)
+            _validate_logo_dimensions(image)
             image.load()
     except (
         Image.DecompressionBombError,
@@ -51,6 +54,24 @@ def _open_and_decode_image(image_bytes):
         raise ValidationError("Logo must be a real image file.") from exc
 
     return image
+
+
+def _validate_logo_dimensions(image):
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        raise ValidationError("Logo has invalid dimensions.")
+
+    if width > LOGO_MAX_WIDTH or height > LOGO_MAX_HEIGHT:
+        raise ValidationError(
+            f"Logo dimensions must be at most {LOGO_MAX_WIDTH}x{LOGO_MAX_HEIGHT}."
+        )
+
+    if width * height > LOGO_MAX_PIXELS:
+        raise ValidationError("Logo resolution is too large.")
+
+    aspect_ratio = width / float(height)
+    if not LOGO_MIN_ASPECT_RATIO <= aspect_ratio <= LOGO_MAX_ASPECT_RATIO:
+        raise ValidationError("Logo aspect ratio must be between 1:2 and 2:1.")
 
 
 def _validate_and_open_tournament_logo(uploaded_file):
@@ -73,25 +94,11 @@ def _validate_and_open_tournament_logo(uploaded_file):
         image.close()
         raise ValidationError("Animated logos are not supported.")
 
-    width, height = image.size
-    if width <= 0 or height <= 0:
+    try:
+        _validate_logo_dimensions(image)
+    except ValidationError:
         image.close()
-        raise ValidationError("Logo has invalid dimensions.")
-
-    if width > LOGO_MAX_WIDTH or height > LOGO_MAX_HEIGHT:
-        image.close()
-        raise ValidationError(
-            f"Logo dimensions must be at most {LOGO_MAX_WIDTH}x{LOGO_MAX_HEIGHT}."
-        )
-
-    if width * height > LOGO_MAX_PIXELS:
-        image.close()
-        raise ValidationError("Logo resolution is too large.")
-
-    aspect_ratio = width / float(height)
-    if not LOGO_MIN_ASPECT_RATIO <= aspect_ratio <= LOGO_MAX_ASPECT_RATIO:
-        image.close()
-        raise ValidationError("Logo aspect ratio must be between 1:2 and 2:1.")
+        raise
 
     return image
 

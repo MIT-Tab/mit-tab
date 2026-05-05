@@ -14,6 +14,7 @@ import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
+import mittab.apps.registration.views as registration_views
 
 
 admin.autodiscover()
@@ -27,6 +28,16 @@ urlpatterns = [
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
     path("registration/", include("mittab.apps.registration.urls")),
+    path(
+        "team_portal/",
+        registration_views.team_portal_search,
+        name="team_portal_search",
+    ),
+    path(
+        "team_portal/<str:team_code>/",
+        registration_views.team_portal,
+        name="team_portal",
+    ),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
     path(
         "apda-board/schools/export/",
@@ -157,6 +168,9 @@ urlpatterns = [
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
+    path("pairings/quick_judge_checkin/",
+         pairing_views.quick_judge_checkin,
+         name="quick_judge_checkin"),
     path("pairings/view_rounds/",
          pairing_views.view_rounds,
          name="view_rounds"),

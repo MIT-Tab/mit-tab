@@ -751,7 +751,7 @@ class TestPublicViews(TestCase):
         self.assertIn(reverse("pretty_pair"), content)
         self.assertIn(reverse("missing_ballots"), content)
 
-    def test_public_home_shows_only_seven_shortcuts_when_motions_enabled(self):
+    def test_public_home_shows_only_eight_shortcuts_when_motions_enabled(self):
         client = Client()
         TabSettings.set("motions_enabled", 1)
 
@@ -767,7 +767,7 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
 
-        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
         self.assertNotIn('<span class="title">Motions</span>', content)
 
     def test_public_home_can_show_motions_when_selected_as_shortcut(self):
@@ -787,7 +787,7 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
 
-        self.assertEqual(content.count('class="tile shadow-sm"'), 7)
+        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
         self.assertIn('<span class="title">Motions</span>', content)
         self.assertIn(reverse("public_motions"), content)
 

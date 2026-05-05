@@ -114,6 +114,9 @@ def registration_team_initial(team):
         "debater_one_name": (
             defaults[0]["debater"].name if defaults[0]["debater"] else ""
         ),
+        "debater_one_email": (
+            defaults[0]["debater"].email if defaults[0]["debater"] else ""
+        ),
         "debater_one_apda_id": (
             defaults[0]["debater"].apda_id if defaults[0]["debater"] else None
         ),
@@ -128,6 +131,9 @@ def registration_team_initial(team):
         "debater_two_id": defaults[1]["debater"].pk if defaults[1]["debater"] else None,
         "debater_two_name": (
             defaults[1]["debater"].name if defaults[1]["debater"] else ""
+        ),
+        "debater_two_email": (
+            defaults[1]["debater"].email if defaults[1]["debater"] else ""
         ),
         "debater_two_apda_id": (
             defaults[1]["debater"].apda_id if defaults[1]["debater"] else None
@@ -269,6 +275,7 @@ def get_or_create_debater(data, school, registration=None):
         raise forms.ValidationError("Debater name required")
     debater = _existing_registration_debater(registration, data.get("id")) or Debater()
     debater.name = uniquify_name(Debater, name, exclude_pk=debater.pk)
+    debater.email = (data.get("email") or "").strip() or None
     debater.novice_status = data["novice_status"]
     debater.qualified = data["qualified"]
     debater.apda_id = data.get("apda_id") or -1
@@ -295,6 +302,7 @@ def _debater_snapshot(debater):
     return {
         "id": debater.pk,
         "name": debater.name,
+        "email": debater.email,
         "apda_id": debater.apda_id,
         "novice_status": debater.novice_status,
         "qualified": debater.qualified,

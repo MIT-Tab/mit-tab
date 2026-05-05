@@ -916,6 +916,14 @@
     margin-left: auto;
   }
 
+  .registration-admin__hint {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(28, 45, 70, 0.7);
+    line-height: 1.35;
+  }
+
   .registration-admin__panel-title {
     margin: 0 0 0.85rem;
     font-size: 1rem;
@@ -923,8 +931,43 @@
     color: #1f2f4a;
   }
 
+  .registration-admin__panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .registration-admin__divider {
+    margin: 1rem 0;
+    border: 0;
+    border-top: 1px solid rgba(28, 54, 94, 0.12);
+  }
+
   .registration-admin__table-wrap {
     overflow-x: auto;
+  }
+
+  .registration-admin__inline-list {
+    margin: 0.35rem 0 0;
+    padding-left: 1rem;
+    font-size: 0.82rem;
+    color: rgba(28, 45, 70, 0.85);
+
+    li + li {
+      margin-top: 0.15rem;
+    }
+  }
+
+  .registration-admin__code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    background: rgba(42, 102, 196, 0.08);
+    border: 1px solid rgba(42, 102, 196, 0.18);
+    color: #1c3e7a;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.3rem;
+    font-size: 0.82rem;
   }
 
   .registration-admin__table {
@@ -954,22 +997,54 @@
       color: rgba(28, 45, 70, 0.7);
       font-size: 0.82rem;
     }
+  }
 
-    .registration-admin__inline-list {
-      margin: 0.35rem 0 0;
-      padding-left: 1rem;
-      font-size: 0.82rem;
-      color: rgba(28, 45, 70, 0.85);
+  // ---------- Mobile (<= md) ----------
+  // Stack the panel-head action below its title so the button isn't
+  // squeezed; promote any header CTA to full width for tap-friendliness.
+  @media (max-width: 767.98px) {
+    gap: 1rem;
+
+    .registration-admin__panel,
+    .registration-admin__settings {
+      padding: 0.9rem 1rem;
     }
 
-    .registration-admin__code {
-      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-      background: rgba(42, 102, 196, 0.08);
-      border: 1px solid rgba(42, 102, 196, 0.18);
-      color: #1c3e7a;
-      padding: 0.1rem 0.4rem;
-      border-radius: 0.3rem;
-      font-size: 0.82rem;
+    .registration-admin__panel-head {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.6rem;
+
+      .btn {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        font-size: 0.95rem;
+      }
+    }
+
+    .registration-admin__form-actions .btn {
+      width: 100%;
+      padding: 0.5rem 1rem;
+      font-size: 0.95rem;
+    }
+
+    .registration-admin__settings-row {
+      gap: 0.85rem 1.5rem;
+
+      .btn {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+
+    // Compact the previous-pairings table — tighten padding so 5 columns
+    // still read on a phone before falling back to horizontal scroll.
+    .registration-admin__table {
+      th,
+      td {
+        padding: 0.45rem 0.5rem;
+        font-size: 0.82rem;
+      }
     }
   }
 }

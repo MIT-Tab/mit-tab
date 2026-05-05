@@ -33,6 +33,23 @@ def test_validate_tournament_logo_accepts_non_square_jpeg():
     logo_utils.validate_tournament_logo(uploaded)
 
 
+def test_validate_tournament_logo_restricts_pillow_decoders(monkeypatch):
+    original_open = PIL_Image.open
+    observed_formats = []
+
+    def tracking_open(*args, **kwargs):
+        observed_formats.append(kwargs.get("formats"))
+        return original_open(*args, **kwargs)
+
+    monkeypatch.setattr(PIL_Image, "open", tracking_open)
+    uploaded = _make_uploaded_image(image_format="PNG", width=320, height=320)
+
+    logo_utils.validate_tournament_logo(uploaded)
+
+    assert observed_formats
+    assert set(observed_formats) == {tuple(sorted(logo_utils.LOGO_ALLOWED_FORMATS))}
+
+
 def test_validate_tournament_logo_rejects_extreme_aspect_ratio():
     uploaded = _make_uploaded_image(image_format="PNG", width=640, height=200)
     with pytest.raises(ValidationError, match="aspect ratio"):
@@ -41,7 +58,7 @@ def test_validate_tournament_logo_rejects_extreme_aspect_ratio():
 
 def test_validate_tournament_logo_rejects_unsupported_format():
     uploaded = _make_uploaded_image(image_format="GIF", width=320, height=320)
-    with pytest.raises(ValidationError, match="PNG, JPEG, or WebP"):
+    with pytest.raises(ValidationError, match="real image"):
         logo_utils.validate_tournament_logo(uploaded)
 
 

@@ -44,6 +44,7 @@
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
 {% url "e_ballot_search" as public_eballot %}
+{% url "team_portal_search" as public_team_portal %}
 {% url "public_judges" as public_judges %}
 {% url "public_teams" as public_teams %}
 {% url "rank_teams_public" as public_team_rankings %}
@@ -150,13 +151,14 @@
       </ul>
       <ul class="navbar-nav ml-auto">
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}{% active request public_motions %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_team_portal %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}{% active request public_motions %}">
             Public
           </a>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request public_pairings %}" href="{{ public_pairings|with_return_to }}">Released Pairings</a>
             <a class="dropdown-item {% active request public_missing_ballots %}" href="{{ public_missing_ballots|with_return_to }}">Missing Ballots</a>
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
+            <a class="dropdown-item {% active request public_team_portal %}" href="{{ public_team_portal|with_return_to }}">Team Portal</a>
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
             {% if public_display_flags.team_results %}
@@ -196,6 +198,9 @@
         </li>
         <li class="nav-item">
           <a class="nav-link {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Submit E-Ballot</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% active request public_team_portal %}" href="{{ public_team_portal|with_return_to }}">Team Portal</a>
         </li>
         <li class="nav-item">
           <a class="nav-link {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>

@@ -1,4 +1,5 @@
 import pytest
+from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -140,6 +141,7 @@ class TestPostOperations(TestCase):
                 "slot_5": "missing_ballots",
                 "slot_6": "varsity_outrounds",
                 "slot_7": "novice_outrounds",
+                "slot_8": "team_portal",
             },
             follow=True,
         )
@@ -206,3 +208,18 @@ class TestPostOperations(TestCase):
             PublicHomePage.objects.get(slug="released_pairings").title,
             "Custom Released Pairings",
         )
+
+    def test_public_home_page_rejects_external_or_script_urls(self):
+        page = PublicHomePage(
+            slug="bad_link",
+            title="Bad Link",
+            subtitle="Bad subtitle",
+            url_path="javascript:alert(1)",
+            sort_order=99,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Homepage destinations must be internal paths",
+        ):
+            page.full_clean()
