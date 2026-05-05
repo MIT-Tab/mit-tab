@@ -18,8 +18,8 @@ from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
     MiniRoomTagForm,
     DebaterApdaIdForm,
+    PublicHomepageForm,
     RankingGroupForm,
-    PublicHomeShortcutsForm,
     RoomTagForm,
     SchoolApdaIdForm,
     SchoolForm,
@@ -59,10 +59,6 @@ from mittab.libs.data_export.apda_board_export import (
     export_apda_board_schools_csv as export_apda_board_schools_csv_file,
 )
 from mittab.libs.tab_logic.rankings import get_team_rankings
-from mittab.libs.tournament_todo_rules import (
-    record_seen_settings_category_ids,
-    split_csv_values,
-)
 
 
 def index(request):
@@ -652,17 +648,6 @@ def settings_form(request):
 
         if form.is_valid():
             form.save()
-            visited_categories = split_csv_values(
-                request.POST.get("visited_categories", "")
-            )
-            valid_category_ids = {
-                category.get("id")
-                for category in categories
-                if category.get("id")
-            }
-            record_seen_settings_category_ids(
-                visited_categories.intersection(valid_category_ids)
-            )
             invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
@@ -690,26 +675,45 @@ def settings_form(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-def public_home_shortcuts(request):
+def public_homepage(request):
+    # Local import to avoid a circular import between the tab and registration
+    # apps at module load.
+    from mittab.apps.registration.models import InfoLink
+
     if request.method == "POST":
-        form = PublicHomeShortcutsForm(request.POST)
+        form = PublicHomepageForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             invalidate_all_public_caches()
             return redirect_and_flash_success(
                 request,
-                "Homepage setup updated!",
-                path=reverse("homepage_setup"),
+                "Public homepage updated!",
+                path=reverse("public_homepage"),
             )
     else:
-        form = PublicHomeShortcutsForm()
+        form = PublicHomepageForm()
+
+    nav_pages = PublicHomeShortcut.nav_definition_map()
+    shortcut_rows = []
+    for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+        field = form[f"slot_{slot}"]
+        slug = field.value()
+        meta = nav_pages.get(slug, {})
+        shortcut_rows.append({
+            "slot": slot,
+            "field": field,
+            "title": meta.get("title", slug),
+            "subtitle": meta.get("subtitle", ""),
+        })
 
     return render(
         request,
-        "tab/public_home_shortcuts_form.html",
+        "tab/public_homepage.html",
         {
             "form": form,
-            "title": "Homepage Setup",
+            "shortcut_rows": shortcut_rows,
+            "info_links": list(InfoLink.objects.all()),
+            "title": "Public Homepage",
         },
     )
 

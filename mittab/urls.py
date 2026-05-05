@@ -2,7 +2,6 @@ from django.views import i18n
 from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
-from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
 import mittab.apps.tab.views.views as views
@@ -15,20 +14,30 @@ import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
 import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
+import mittab.apps.registration.views as registration_views
 
 
 admin.autodiscover()
 
 urlpatterns = [
-    path("favicon.ico",
-         RedirectView.as_view(url=settings.STATIC_URL +
-                              "img/favicon.ico", permanent=True)),
+    path("favicon.ico", public_views.favicon, name="favicon"),
+    path("tournament-logo/", public_views.tournament_logo, name="tournament_logo"),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
     path("registration/", include("mittab.apps.registration.urls")),
+    path(
+        "team_portal/",
+        registration_views.team_portal_search,
+        name="team_portal_search",
+    ),
+    path(
+        "team_portal/<str:team_code>/",
+        registration_views.team_portal,
+        name="team_portal",
+    ),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
     path(
         "apda-board/schools/export/",
@@ -152,14 +161,9 @@ urlpatterns = [
         name="public_rankings_control",
     ),
     path(
-        "settings/homepage-setup/",
-        views.public_home_shortcuts,
-        name="homepage_setup",
-    ),
-    path(
-        "settings/public-home-shortcuts/",
-        views.public_home_shortcuts,
-        name="public_home_shortcuts",
+        "settings/public-homepage/",
+        views.public_homepage,
+        name="public_homepage",
     ),
     path(
         "setup/tournament-todo/",
@@ -174,6 +178,9 @@ urlpatterns = [
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
+    path("pairings/quick_judge_checkin/",
+         pairing_views.quick_judge_checkin,
+         name="quick_judge_checkin"),
     path("pairings/view_rounds/",
          pairing_views.view_rounds,
          name="view_rounds"),

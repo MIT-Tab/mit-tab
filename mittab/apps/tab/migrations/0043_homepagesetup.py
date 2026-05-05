@@ -1,3 +1,4 @@
+import django.core.validators
 from django.db import migrations, models
 
 
@@ -7,6 +8,7 @@ def create_default_home_shortcuts(apps, schema_editor):
         "released_pairings",
         "missing_ballots",
         "submit_e_ballot",
+        "team_portal",
         "judge_list",
         "team_list",
         "varsity_outrounds",
@@ -40,6 +42,12 @@ def create_default_home_pages(apps, schema_editor):
             "title": "Submit E-Ballot",
             "subtitle": "Judges enter ballot codes to file results.",
             "url_path": "/public/e-ballots/",
+        },
+        {
+            "slug": "team_portal",
+            "title": "Team Portal",
+            "subtitle": "Teams enter codes to manage names and scratches.",
+            "url_path": "/team_portal/",
         },
         {
             "slug": "judge_list",
@@ -83,6 +91,12 @@ def create_default_home_pages(apps, schema_editor):
             "subtitle": "Published ballots and detailed round results.",
             "url_path": "/public/ballots/",
         },
+        {
+            "slug": "public_motions",
+            "title": "Motions",
+            "subtitle": "View debate motions and info slides.",
+            "url_path": "/public/motions/",
+        },
     )
 
     for index, definition in enumerate(defaults, start=1):
@@ -100,7 +114,7 @@ def create_default_home_pages(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("tab", "0034_add_motion_model"),
+        ("tab", "0042_merge_0041_alter_judge_ballot_code_0041_registration_roster_fields"),
     ]
 
     operations = [
@@ -108,7 +122,7 @@ class Migration(migrations.Migration):
             name="PublicHomeShortcut",
             fields=[
                 ("id", models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("position", models.PositiveSmallIntegerField(choices=[(1, "Slot 1"), (2, "Slot 2"), (3, "Slot 3"), (4, "Slot 4"), (5, "Slot 5"), (6, "Slot 6"), (7, "Slot 7")], unique=True)),
+                ("position", models.PositiveSmallIntegerField(choices=[(1, "Slot 1"), (2, "Slot 2"), (3, "Slot 3"), (4, "Slot 4"), (5, "Slot 5"), (6, "Slot 6"), (7, "Slot 7"), (8, "Slot 8")], unique=True)),
                 ("nav_item", models.CharField(db_index=True, max_length=50)),
             ],
             options={
@@ -123,7 +137,7 @@ class Migration(migrations.Migration):
                 ("slug", models.CharField(max_length=50, unique=True)),
                 ("title", models.CharField(max_length=100)),
                 ("subtitle", models.CharField(blank=True, default="", max_length=255)),
-                ("url_path", models.CharField(max_length=200)),
+                ("url_path", models.CharField(max_length=200, validators=[django.core.validators.RegexValidator(message="Homepage destinations must be internal paths like /public/pairings/.", regex="^/(?!/)[^\\\\\\s\\x00-\\x1f\\x7f]*$")])),
                 ("sort_order", models.PositiveSmallIntegerField(default=0)),
                 ("is_active", models.BooleanField(default=True)),
             ],

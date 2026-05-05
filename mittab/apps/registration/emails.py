@@ -16,7 +16,7 @@ from mittab.apps.tab.models import (
 )
 from mittab.libs.email_service import EmailRequest, EmailService, EmailServiceError
 
-from .models import Registration
+from .models import Registration, RegistrationLink
 
 
 JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
@@ -60,11 +60,32 @@ def _registration_for_email(registration):
     )
 
 
-def _team_text_lines(team):
+def _team_portal_url(request, team):
+    return request.build_absolute_uri(reverse("team_portal", args=[team.team_code]))
+
+
+def _team_recipient_emails(team):
+    emails = []
+    seen = set()
+    for debater in team.debaters.all():
+        email = (debater.email or "").strip()
+        if not email:
+            continue
+        key = email.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        emails.append(email)
+    return emails
+
+
+def _team_text_lines(team, request):
     lines = [
         f"- {team.name}",
         f"  School protection: {team.school.name}",
         f"  Seed: {_seed_label(team)}",
+        f"  Team code: {team.team_code}",
+        f"  Team portal: {_team_portal_url(request, team)}",
         "  Debaters:",
     ]
     for debater in team.debaters.all():
@@ -90,26 +111,37 @@ def _judge_text_lines(judge, fallback_school):
     ]
 
 
-def _build_text_body(registration, tournament, edit_url):
+def _build_text_body(registration, tournament, edit_url, followup_links, request):
     lines = [
         f"Hi {registration.school.name},",
         "",
         f"Your registration for {tournament} has been received. "
+        "Your teams and judges have been registered. "
         "A copy is below for your records.",
         "",
         f"Edit your registration: {edit_url}",
         f"Registration code: {registration.herokunator_code}",
         "",
+    ]
+    if followup_links:
+        lines.append("Please complete these as well:")
+        for link in followup_links:
+            if link.description:
+                lines.append(f"- {link.title}: {link.url} ({link.description})")
+            else:
+                lines.append(f"- {link.title}: {link.url}")
+        lines.append("")
+    lines.extend([
         "School and contact",
         f"  School: {registration.school.name}",
         f"  Email:  {registration.email}",
         "",
         "Teams",
-    ]
+    ])
     teams = list(registration.teams.all())
     if teams:
         for team in teams:
-            lines.extend(_team_text_lines(team))
+            lines.extend(_team_text_lines(team, request))
     else:
         lines.append("- None")
 
@@ -125,13 +157,19 @@ def _build_text_body(registration, tournament, edit_url):
     return "\n".join(lines)
 
 
-def _team_html_lines(team):
+def _team_html_lines(team, request):
+    portal_url = _team_portal_url(request, team)
     out = [
         "<li style=\"margin-bottom:10px;\">",
         f"<strong>{escape(team.name)}</strong>",
         "<ul style=\"margin:4px 0 0;padding-left:20px;\">",
         f"<li>School protection: {escape(team.school.name)}</li>",
         f"<li>Seed: {escape(_seed_label(team))}</li>",
+        f"<li>Team code: <strong>{escape(team.team_code)}</strong></li>",
+        (
+            "<li>Team portal: "
+            f"<a href=\"{escape(portal_url)}\">{escape(portal_url)}</a></li>"
+        ),
         "<li>Debaters:<ul style=\"margin:4px 0 0;padding-left:20px;\">",
     ]
     for debater in team.debaters.all():
@@ -197,12 +235,47 @@ border-radius:8px;">
 """
 
 
-def _build_html_body_inner(registration, tournament, edit_url):
+def _followup_links_html(followup_links):
+    if not followup_links:
+        return ""
+    items = []
+    for link in followup_links:
+        subtitle = ""
+        if link.description:
+            subtitle = (
+                "<div style=\"font-size:13px;color:#5b6b85;margin-top:2px;\">"
+                f"{escape(link.description)}</div>"
+            )
+        items.append(
+            "<li style=\"margin:0 0 8px;padding:10px 12px;background-color:#ffffff;"
+            "border:1px solid #d8e1ee;border-left:3px solid #2a66c4;border-radius:6px;"
+            "list-style:none;\">"
+            f"<a href=\"{escape(link.url)}\" "
+            "style=\"color:#1f2f4a;text-decoration:none;font-weight:600;\">"
+            f"{escape(link.title)}</a>"
+            f"{subtitle}"
+            "</li>"
+        )
+    return (
+        "<div style=\"margin:0 0 24px;padding:14px 16px;background-color:#f4f9ff;"
+        "border:1px solid rgba(42,102,196,0.25);border-radius:8px;\">"
+        "<p style=\"margin:0 0 10px;font-weight:600;color:#1f2f4a;\">"
+        "A few more things to do</p>"
+        "<p style=\"margin:0 0 12px;color:#5b6b85;font-size:14px;\">"
+        "Please take a moment to fill these out:</p>"
+        "<ul style=\"margin:0;padding:0;list-style:none;\">"
+        + "".join(items)
+        + "</ul></div>"
+    )
+
+
+def _build_html_body_inner(registration, tournament, edit_url, followup_links, request):
     parts = [
         f"<p style=\"margin:0 0 12px;\">Hi {escape(registration.school.name)},</p>",
         (
             "<p style=\"margin:0 0 16px;\">Your registration for "
             f"<strong>{escape(tournament)}</strong> has been received. "
+            "Your teams and judges have been registered. "
             "A copy is below for your records.</p>"
         ),
         (
@@ -217,6 +290,7 @@ def _build_html_body_inner(registration, tournament, edit_url):
             f"Registration code: <strong>{escape(registration.herokunator_code)}"
             "</strong></p>"
         ),
+        _followup_links_html(followup_links),
         (
             "<h2 style=\"margin:24px 0 8px;font-size:16px;color:#1f2f4a;\">"
             "School and contact</h2>"
@@ -235,7 +309,7 @@ def _build_html_body_inner(registration, tournament, edit_url):
     if teams:
         parts.append("<ul style=\"margin:0;padding-left:20px;\">")
         for team in teams:
-            parts.extend(_team_html_lines(team))
+            parts.extend(_team_html_lines(team, request))
         parts.append("</ul>")
     else:
         parts.append("<p style=\"margin:0;\">None</p>")
@@ -265,13 +339,26 @@ def build_registration_confirmation_email(registration, request):
     edit_url = request.build_absolute_uri(
         reverse("registration_portal_edit", args=[registration.herokunator_code])
     )
+    followup_links = list(RegistrationLink.objects.filter(is_active=True))
     subject = f"Registration confirmed for {tournament_name}"
     preheader = (
         f"Code {registration.herokunator_code}. "
         "Edit your registration any time before the tournament."
     )
-    text_body = _build_text_body(registration, tournament_name, edit_url)
-    inner_html = _build_html_body_inner(registration, tournament_name, edit_url)
+    text_body = _build_text_body(
+        registration,
+        tournament_name,
+        edit_url,
+        followup_links,
+        request,
+    )
+    inner_html = _build_html_body_inner(
+        registration,
+        tournament_name,
+        edit_url,
+        followup_links,
+        request,
+    )
     html_body = _HTML_TEMPLATE.format(
         title=escape(subject),
         preheader=escape(preheader),
@@ -289,6 +376,49 @@ def build_registration_confirmation_email(registration, request):
 def send_registration_confirmation_email(registration, request):
     email_request = build_registration_confirmation_email(registration, request)
     return EmailService().send_bulk([email_request])
+
+
+def build_registration_team_portal_emails(registration, request):
+    registration = _registration_for_email(registration)
+    tournament_name = TabSettings.get("tournament_name", "Tournament")
+    email_requests = []
+
+    for team in registration.teams.all():
+        portal_url = _team_portal_url(request, team)
+        subject = f"{tournament_name} team portal for {team.name}"
+        recipient_emails = _team_recipient_emails(team)
+        if not recipient_emails:
+            continue
+        debater_names = ", ".join(debater.name for debater in team.debaters.all())
+        text_body = (
+            f"Hi {team.name},\n\n"
+            f"Your team has been registered for {tournament_name}.\n\n"
+            f"Team: {team.name}\n"
+            f"Debaters: {debater_names}\n"
+            f"Team code: {team.team_code}\n"
+            f"Team portal: {portal_url}\n\n"
+            "Use this portal for team-specific tournament actions, including "
+            "judge scratches when they are open.\n\n"
+            "Thank you,\n"
+            "Tab Staff"
+        )
+        for email in recipient_emails:
+            email_requests.append(
+                EmailRequest(
+                    to_address=email,
+                    subject=subject,
+                    text_body=text_body,
+                )
+            )
+
+    return email_requests
+
+
+def send_registration_team_portal_emails(registration, request):
+    email_requests = build_registration_team_portal_emails(registration, request)
+    if not email_requests:
+        return 0
+    return EmailService().send_bulk(email_requests)
 
 
 def _build_registration_judge_code_plan(registration, request):

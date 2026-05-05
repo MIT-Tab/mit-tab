@@ -1,0 +1,193 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Team Portal{% endblock %}
+{% block banner %}<span class="registration-page-title">Team Portal</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12 registration-admin">
+  <div class="registration-admin__panel">
+    <div class="registration-admin__panel-head">
+      <div class="registration-admin__titles">
+        <h5>{{ team.name }}</h5>
+        <p>
+          Team code <span class="registration-admin__code">{{ team.team_code }}</span>
+          {% if team.school %} · {{ team.school.name }}{% endif %}
+          · {{ team.get_seed_display }} seed
+        </p>
+      </div>
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'team_portal_search' %}">Use a Different Code</a>
+    </div>
+    <hr class="registration-admin__divider">
+    <h6 class="registration-admin__panel-title">Debaters</h6>
+    {% if team.debaters.all %}
+    <ul class="registration-admin__inline-list mb-0">
+      {% for debater in team.debaters.all %}
+      <li>
+        <strong>{{ debater.name }}</strong>
+        <span class="text-muted">— {{ debater.get_novice_status_display }}{% if debater.school %} · {{ debater.school.name }}{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <span class="text-muted small">No debaters are listed for this team.</span>
+    {% endif %}
+  </div>
+
+  <div class="registration-admin__panel">
+    <h6 class="registration-admin__panel-title">Team Name</h6>
+    {% if config.team_name_changes_allowed and not edits_locked_by_pairings %}
+    <form method="post" class="mb-0">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_name">
+      {% for error in name_form.non_field_errors %}
+      <div class="alert alert-danger">{{ error }}</div>
+      {% endfor %}
+      <div class="form-row align-items-end">
+        <div class="form-group col-md-8 mb-md-0">
+          <label for="{{ name_form.name.id_for_label }}">Team name</label>
+          {{ name_form.name }}
+          {% for error in name_form.name.errors %}
+          <div class="invalid-feedback d-block">{{ error }}</div>
+          {% endfor %}
+        </div>
+        <div class="form-group col-md-4 mb-0 registration-admin__form-actions">
+          <button type="submit" class="btn btn-primary">Save Team Name</button>
+        </div>
+      </div>
+    </form>
+    {% elif edits_locked_by_pairings %}
+    <p class="text-muted small mb-0">
+      Team name changes are auto-disabled once round 1 has been paired. Please contact the tab room if you need to make a change.
+    </p>
+    {% else %}
+    <p class="text-muted small mb-0">Team name changes are currently disabled.</p>
+    {% endif %}
+  </div>
+
+  <div class="registration-admin__panel">
+    <div class="registration-admin__panel-head">
+      <div>
+        <h6 class="registration-admin__panel-title mb-2">Disc Scratches</h6>
+        {% if scratches %}
+        <p class="mb-0">
+          Scratched judges:
+          {% for scratch in scratches %}<strong>{{ scratch.judge.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}
+        </p>
+        {% else %}
+        <p class="text-muted small mb-0">No disc scratches submitted.</p>
+        {% endif %}
+      </div>
+      {% if config.disc_scratches_open and config.disc_scratch_quantity and not edits_locked_by_pairings %}
+      <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#disc-scratch-modal">
+        {% if scratches %}Edit Disc Scratches{% else %}Add Disc Scratches{% endif %}
+      </button>
+      {% endif %}
+    </div>
+    {% if edits_locked_by_pairings %}
+    <p class="text-muted small mb-0 mt-2">
+      Disc scratch edits are auto-disabled once round 1 has been paired. Please contact the tab room if you need to make a change.
+    </p>
+    {% elif not config.disc_scratches_open %}
+    <p class="text-muted small mb-0 mt-2">Disc scratches are currently closed.</p>
+    {% elif not config.disc_scratch_quantity %}
+    <p class="text-muted small mb-0 mt-2">No disc scratches are available for this tournament.</p>
+    {% endif %}
+  </div>
+
+  {% if team_round_history %}
+  <div class="registration-admin__panel">
+    <h6 class="registration-admin__panel-title">Previous Pairings</h6>
+    <div class="registration-admin__table-wrap">
+      <table class="table table-sm registration-admin__table mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Round</th>
+            <th scope="col">Side</th>
+            <th scope="col">Opponent</th>
+            <th scope="col">Judges</th>
+            <th scope="col">Room</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in team_round_history %}
+          <tr>
+            <td>{{ r.round_number }}</td>
+            <td>{{ r.side }}</td>
+            <td>
+              {% if r.opponent %}
+                <div>{{ r.opponent.name }}</div>
+                {% if r.opponent.debaters.all %}
+                <div class="text-muted small">{% for debater in r.opponent.debaters.all %}{{ debater.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.chair or r.judges %}
+                {% if r.chair %}<strong>{{ r.chair.name }}</strong>{% endif %}
+                {% for judge in r.judges %}{% if judge != r.chair %}{% if r.chair or not forloop.first %}, {% endif %}{{ judge.name }}{% endif %}{% endfor %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{% if r.room %}{{ r.room.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if config.disc_scratches_open and config.disc_scratch_quantity and not edits_locked_by_pairings %}
+<div class="modal fade registration-modal" id="disc-scratch-modal" tabindex="-1" role="dialog" aria-labelledby="disc-scratch-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_scratches">
+        <div class="modal-header">
+          <h5 class="modal-title" id="disc-scratch-modal-title">Edit Disc Scratches</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="registration-modal__lead">Pick the judges you'd like to scratch. You can change these any time scratches are open.</p>
+          {% for error in scratch_form.non_field_errors %}
+          <div class="alert alert-danger mb-0">{{ error }}</div>
+          {% endfor %}
+          {% for field in scratch_form %}
+          <div class="registration-field">
+            <label class="registration-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for error in field.errors %}
+            <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Scratches</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% if scratch_form.errors %}
+<script>
+  (function ($) {
+    $(function () { $('#disc-scratch-modal').modal('show'); });
+  })(window.jQuery || window.django.jQuery);
+</script>
+{% endif %}
+{% endif %}
+{% endblock %}

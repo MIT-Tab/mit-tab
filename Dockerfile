@@ -4,8 +4,8 @@ FROM python:3.10.16
 ARG DOCTL_VERSION=1.120.0
 
 RUN apt-get update && \
-  apt-get upgrade -y && \
   apt-get install -y vim default-mysql-client openssl curl memcached && \
+  rm -rf /var/lib/apt/lists/* && \
   curl -sSL https://github.com/digitalocean/doctl/releases/download/v${DOCTL_VERSION}/doctl-${DOCTL_VERSION}-linux-amd64.tar.gz \
     | tar -xz -C /usr/local/bin doctl
 
@@ -27,10 +27,9 @@ RUN pip install pipenv
 RUN pipenv install --deploy --system
 
 RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
-RUN apt-get install -y nodejs aptitude
-RUN aptitude install -y npm
+RUN apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
 
-RUN npm install
+RUN npm ci --no-audit
 RUN ./node_modules/.bin/webpack --config webpack.config.js --mode production
 RUN python manage.py collectstatic --noinput
 

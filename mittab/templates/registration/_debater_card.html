@@ -1,9 +1,10 @@
 {% load tags %}
-{% with name_key=prefix|add:"_name" school_key=prefix|add:"_school" novice_key=prefix|add:"_novice_status" %}
-{% with name_field=form|get_field:name_key school_field=form|get_field:school_key novice_field=form|get_field:novice_key %}
+{% with name_key=prefix|add:"_name" email_key=prefix|add:"_email" school_key=prefix|add:"_school" novice_key=prefix|add:"_novice_status" %}
+{% with name_field=form|get_field:name_key email_field=form|get_field:email_key school_field=form|get_field:school_key novice_field=form|get_field:novice_key %}
 <div class="registration-team-panel" data-debater="{{ slot }}">
     <h6 class="registration-team-panel__title">{{ title }}</h6>
     {% include "registration/_input_group.html" with field=name_field label="Name" errors=name_field.errors %}
+    {% include "registration/_input_group.html" with field=email_field label="Email" errors=email_field.errors %}
     <div class="registration-team-panel__secondary">
         {% include "registration/_input_group.html" with field=novice_field label="Status" errors=novice_field.errors compact=True %}
         {% include "registration/_input_group.html" with field=school_field label="School" errors=school_field.errors compact=True %}

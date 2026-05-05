@@ -6,7 +6,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("tab", "0035_homepagesetup"),
+        ("tab", "0043_homepagesetup"),
     ]
 
     operations = [

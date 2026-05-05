@@ -166,6 +166,31 @@
     {% endif %}
 
     {% if summary %}
+    {% if registration_saved and post_registration_links %}
+    <section class="registration-followup">
+        <div class="registration-followup__head">
+            <h2 class="registration-followup__title">A few more things to do</h2>
+            <p class="registration-followup__subtitle">
+                Please take a moment to fill these out. We've also included them in your confirmation email.
+            </p>
+        </div>
+        <div class="registration-followup__list">
+            {% for link in post_registration_links %}
+            <a class="registration-followup__link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">
+                <span class="registration-followup__link-body">
+                    <span class="registration-followup__link-title">{{ link.title }}</span>
+                    {% if link.description %}
+                    <span class="registration-followup__link-subtitle">{{ link.description }}</span>
+                    {% endif %}
+                </span>
+                <span class="registration-followup__link-chevron" aria-hidden="true">
+                    <i class="fas fa-arrow-right"></i>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
     <section class="registration-summary{% if not registration_saved %} mt-3{% endif %}">
         <div class="registration-summary__head">
             <div>

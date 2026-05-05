@@ -47,28 +47,6 @@ class TeamAdmin(AttributionAdminMixin, admin.ModelAdmin):
     filter_horizontal = ("debaters", )
 
 
-class PublicHomeShortcutAdmin(admin.ModelAdmin):
-    list_display = ("position", "nav_item", "preview_destination")
-    list_editable = ("nav_item",)
-    ordering = ("position",)
-
-    def preview_destination(self, obj):
-        definition = models.PublicHomeShortcut.nav_definition_map().get(obj.nav_item)
-        if definition is None:
-            return "-"
-        url = definition["url_path"]
-        return format_html('<a href="{url}" target="_blank">{url}</a>', url=url)
-
-    preview_destination.short_description = "Destination"
-
-
-class PublicHomePageAdmin(admin.ModelAdmin):
-    list_display = ("title", "slug", "url_path", "sort_order", "is_active")
-    list_editable = ("url_path", "sort_order", "is_active")
-    search_fields = ("title", "slug", "url_path")
-    ordering = ("sort_order", "title")
-
-
 class JudgeAdmin(AttributionAdminMixin, admin.ModelAdmin):
     filter_horizontal = ("schools", "required_room_tags")
 
@@ -114,6 +92,28 @@ class AuditEventAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class PublicHomeShortcutAdmin(admin.ModelAdmin):
+    list_display = ("position", "nav_item", "preview_destination")
+    list_editable = ("nav_item",)
+    ordering = ("position",)
+
+    def preview_destination(self, obj):
+        definition = models.PublicHomeShortcut.nav_definition_map().get(obj.nav_item)
+        if definition is None:
+            return "-"
+        url = definition["url_path"]
+        return format_html('<a href="{url}" target="_blank">{url}</a>', url=url)
+
+    preview_destination.short_description = "Destination"
+
+
+class PublicHomePageAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "url_path", "sort_order", "is_active")
+    list_editable = ("url_path", "sort_order", "is_active")
+    search_fields = ("title", "slug", "url_path")
+    ordering = ("sort_order", "title")
 
 
 class MotionAdmin(admin.ModelAdmin):

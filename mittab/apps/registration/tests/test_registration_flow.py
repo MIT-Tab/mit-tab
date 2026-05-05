@@ -2,11 +2,24 @@ from decimal import Decimal
 from unittest import mock
 
 import pytest
+from django.urls import reverse
 
 from mittab.apps.registration.forms import DEBATER_PREFIXES
-from mittab.apps.registration.models import Registration, RegistrationChangeLog
+from mittab.apps.registration.models import (
+    Registration,
+    RegistrationChangeLog,
+    RegistrationConfig,
+)
 from mittab.apps.registration.views import MAX_TEAMS
-from mittab.apps.tab.models import CheckIn, Debater, JudgeCodeEmailLog, School, Team
+from mittab.apps.tab.models import (
+    CheckIn,
+    Debater,
+    Judge,
+    JudgeCodeEmailLog,
+    School,
+    Scratch,
+    Team,
+)
 
 
 def base_management(prefix, total, initial=0):
@@ -19,10 +32,16 @@ def base_management(prefix, total, initial=0):
     }
 
 
-def speaker(name, school, school_name, apda_id=""):
+def speaker(name, school, school_name, apda_id="", email=None):
+    if email is None:
+        email = (
+            f"{name.lower().replace(' ', '.')}@example.com"
+            if name else ""
+        )
     return {
         "id": "",
         "name": name,
+        "email": email,
         "apda_id": apda_id,
         "novice_status": "0",
         "school": school,
@@ -149,6 +168,17 @@ def test_registration_flow_creates_objects(email_service, client):
     }
     assert debater_schools["Registration U Speaker 1"] == "Registration U"
     assert debater_schools["Registration U Speaker 2"] == "Hybrid School"
+    debater_emails = {
+        d.name: d.email for d in team.debaters.all()
+    }
+    assert (
+        debater_emails["Registration U Speaker 1"] ==
+        "registration.u.speaker.1@example.com"
+    )
+    assert (
+        debater_emails["Registration U Speaker 2"] ==
+        "registration.u.speaker.2@example.com"
+    )
     judge = registration.judges.first()
     assert judge.name == "Reg Judge"
     assert judge.rank == Decimal("7")
@@ -161,19 +191,35 @@ def test_registration_flow_creates_objects(email_service, client):
         CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
     )
     assert checkins == {0, 1, 3}
-    assert email_service.return_value.send_bulk.call_count == 2
+    assert email_service.return_value.send_bulk.call_count == 3
     email_request = (
         email_service.return_value.send_bulk.call_args_list[0].args[0][0]
     )
     assert email_request.to_address == "contact@example.com"
     assert registration.herokunator_code in email_request.text_body
     assert "http://testserver/registration/" in email_request.text_body
+    assert team.team_code in email_request.text_body
+    assert "http://testserver/team_portal/" in email_request.text_body
     assert "Registration U A" in email_request.text_body
     assert "Reg Judge" in email_request.text_body
     assert "judge@example.com" not in email_request.text_body
     assert judge.ballot_code not in email_request.text_body
+    team_portal_requests = (
+        email_service.return_value.send_bulk.call_args_list[1].args[0]
+    )
+    assert {
+        request.to_address for request in team_portal_requests
+    } == {
+        "registration.u.speaker.1@example.com",
+        "registration.u.speaker.2@example.com",
+    }
+    assert all(
+        "http://testserver/team_portal/" in request.text_body
+        for request in team_portal_requests
+    )
+    assert all(team.team_code in request.text_body for request in team_portal_requests)
     judge_code_request = (
-        email_service.return_value.send_bulk.call_args_list[1].args[0][0]
+        email_service.return_value.send_bulk.call_args_list[2].args[0][0]
     )
     assert judge_code_request.to_address == "judge@example.com"
     assert "you have been registered for" in judge_code_request.text_body
@@ -186,6 +232,10 @@ def test_registration_flow_creates_objects(email_service, client):
     assert log.registration == registration
     assert log.snapshot["school"]["name"] == "Registration U"
     assert log.snapshot["teams"][0]["debaters"][0]["apda_id"] == 1000
+    assert (
+        log.snapshot["teams"][0]["debaters"][0]["email"] ==
+        "registration.u.speaker.1@example.com"
+    )
     assert "email" not in log.snapshot["judges"][0]
     assert f"(Code: {judge.ballot_code})".encode() not in response.content
 
@@ -241,6 +291,27 @@ def test_registration_requires_single_free_seed(client):
     response = client.post("/registration/", data=data)
     assert response.status_code == 200
     assert b"Select at most one free seed" in response.content
+
+
+@pytest.mark.django_db
+def test_registration_requires_debater_emails(client):
+    teams = [
+        team_entry(
+            0,
+            "No Email Team",
+            [
+                speaker("Speaker 1", "apda:50", "Test School", email=""),
+                speaker("Speaker 2", "apda:50", "Test School"),
+            ],
+        )
+    ]
+    data = registration_payload("apda:50", "Test School", "team@example.com", teams, [])
+
+    response = client.post("/registration/", data=data)
+
+    assert response.status_code == 200
+    assert b"Each debater needs an email" in response.content
+    assert not Registration.objects.exists()
 
 
 @pytest.mark.django_db
@@ -364,3 +435,103 @@ def test_registration_does_not_update_unrelated_debater_id(email_service, client
         for debater in team.debaters.all()
     }
     assert "Submitted Speaker" in names
+
+
+@pytest.mark.django_db
+def test_team_portal_updates_team_name_and_disc_scratches(client):
+    config = RegistrationConfig.get_or_create_active()
+    config.team_name_changes_allowed = True
+    config.disc_scratches_open = True
+    config.disc_scratch_quantity = 2
+    config.save()
+    school = School.objects.create(name="Portal U")
+    team = Team.objects.create(
+        name="Portal Team",
+        school=school,
+        seed=Team.UNSEEDED,
+    )
+    judge_one = Judge.objects.create(name="Judge One", rank=5)
+    judge_two = Judge.objects.create(name="Judge Two", rank=6)
+    judge_three = Judge.objects.create(name="Judge Three", rank=7)
+
+    response = client.post(
+        reverse("team_portal_search"),
+        {"team_code": team.team_code.lower()},
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("team_portal", args=[team.team_code])
+
+    response = client.post(
+        reverse("team_portal", args=[team.team_code]),
+        {"action": "update_name", "name": "Portal Team Renamed"},
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.name == "Portal Team Renamed"
+
+    response = client.post(
+        reverse("team_portal", args=[team.team_code]),
+        {
+            "action": "update_scratches",
+            "scratch_0": str(judge_one.pk),
+            "scratch_1": str(judge_two.pk),
+            "scratch_2": str(judge_three.pk),
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert set(
+        Scratch.objects.filter(team=team).values_list("judge_id", flat=True)
+    ) == {judge_one.pk, judge_two.pk}
+
+    response = client.post(
+        reverse("team_portal", args=[team.team_code]),
+        {
+            "action": "update_scratches",
+            "scratch_0": str(judge_three.pk),
+            "scratch_1": "",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert set(
+        Scratch.objects.filter(team=team).values_list("judge_id", flat=True)
+    ) == {judge_three.pk}
+
+
+@pytest.mark.django_db
+def test_team_portal_respects_closed_settings(client):
+    config = RegistrationConfig.get_or_create_active()
+    config.team_name_changes_allowed = False
+    config.disc_scratches_open = False
+    config.disc_scratch_quantity = 1
+    config.save()
+    school = School.objects.create(name="Closed Portal U")
+    team = Team.objects.create(
+        name="Closed Portal Team",
+        school=school,
+        seed=Team.UNSEEDED,
+    )
+    judge = Judge.objects.create(name="Closed Portal Judge", rank=5)
+
+    response = client.post(
+        reverse("team_portal", args=[team.team_code]),
+        {"action": "update_name", "name": "Should Not Save"},
+    )
+
+    assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.name == "Closed Portal Team"
+
+    response = client.post(
+        reverse("team_portal", args=[team.team_code]),
+        {"action": "update_scratches", "scratch_0": str(judge.pk)},
+    )
+
+    assert response.status_code == 200
+    assert not Scratch.objects.filter(team=team).exists()

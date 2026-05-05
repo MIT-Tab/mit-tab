@@ -25,7 +25,7 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools",
-                   "/api/debater-counts", "/favicon.ico")
+                   "/api/debater-counts", "/favicon.ico", "/tournament-logo/")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 API_PATH_REQUIREMENTS = {
@@ -46,6 +46,7 @@ API_ERROR_MESSAGES = {
 APDA_BOARD_ALLOWED_PREFIXES = (
     "/apda-board/",
     "/public/",
+    "/team_portal/",
     "/accounts/logout/",
     "/admin/logout/",
     "/403/",
@@ -107,6 +108,7 @@ class Login:
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
             or path.startswith("/registration/")
+            or path.startswith("/team_portal/")
             or EBALLOT_REGEX.match(path)
         )
 

@@ -11,85 +11,84 @@
 
 {% block banner %}{% endblock %}
 
+{# The public homepage is the public landing page and is response-cached for
+   60s. Suppress flash messages here so they don't bleed into the design and,
+   more importantly, can never be baked into a cached response served to
+   another visitor. #}
+{% block messages %}{% endblock %}
+
 {% block content %}
+{% tournament_logo_url as tournament_logo %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
-  <div class="public-home"
-       data-public-home
-       data-cur-round="{{ cur_round }}"
-       data-total-rounds="{{ tot_rounds }}"
-       data-pairing-released="{{ pairing_released|yesno:'true,false' }}"
-       data-in-outrounds="{{ in_outrounds|yesno:'true,false' }}"
-       data-current-outround-label="{{ current_outround_label|escape }}">
+  <div class="public-home{% if not info_links %} public-home--single{% endif %}">
+
+    <header class="public-home-hero desktop-only">
+      {% if tournament_logo %}
+      <div class="tournament-logo-shell tournament-logo-shell-hero">
+        <img class="tournament-logo-image"
+             src="{{ tournament_logo }}"
+             alt="{% tournament_name %} logo">
+      </div>
+      {% endif %}
+      <h1 class="public-home-hero__title">Welcome to {% tournament_name %}!</h1>
+    </header>
+
+    <header class="public-home-hero-mobile mobile-only">
+      {% if tournament_logo %}
+      <div class="tournament-logo-shell tournament-logo-shell-mobile">
+        <img class="tournament-logo-image"
+             src="{{ tournament_logo }}"
+             alt="{% tournament_name %} logo">
+      </div>
+      {% endif %}
+      <h1 class="public-home-hero-mobile__title">Welcome to {% tournament_name %}!</h1>
+    </header>
+
     <div class="grid">
-      <aside class="sidebar">
-        <div class="public-sidebar-card status">
-          <h3 class="title">Welcome to {% tournament_name %}!</h3>
-          <div class="content">
-            <div class="status-block" data-status>
-              <!-- Status will be dynamically updated by JavaScript -->
-              <div class="status-icon" aria-hidden="true" data-status-icon>
-                <i class="fas fa-clipboard-check"></i>
-              </div>
-              <div class="status-text" aria-live="polite">
-                <div class="status-primary" data-status-primary>{{ status_primary }}</div>
-                <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
-              </div>
-            </div>
-            <div class="divider"></div>
-            <div class="item">
-              <div class="text">
-                <strong>Tournament Updates</strong>
-                <p>Check back regularly for updated pairings, results, and standings throughout the tournament.</p>
-              </div>
-            </div>
-            <div class="item">
-              <div class="text">
-                <strong>For Judges</strong>
-                <p>Use your ballot code to submit results electronically via the E-Ballot link.</p>
-              </div>
-            </div>
-            <div class="item">
-              <div class="text">
-                <strong>For Teams</strong>
-                <p>View your matchups in Released Pairings and track your progress in Team Rankings.</p>
-              </div>
-            </div>
-            <div class="item">
-              <div class="text">
-                <strong>Staff Login</strong>
-                <p><a href="{% url 'tab_login' %}">Login here</a> if you're tournament staff to access admin features.</p>
-              </div>
-            </div>
+      {% if info_links %}
+      <aside class="sidebar" aria-labelledby="public-home-resources">
+        <div class="public-sidebar-card">
+          <h2 class="public-card-header" id="public-home-resources">External Resources</h2>
+          <div class="info-links" aria-label="Tournament resources">
+            {% for link in info_links %}
+            <a class="info-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">
+              <span class="info-link__body">
+                <span class="info-link__title">{{ link.title }}</span>
+                {% if link.description %}
+                <span class="info-link__subtitle">{{ link.description }}</span>
+                {% endif %}
+              </span>
+              <span class="info-link__icon" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+            </a>
+            {% endfor %}
           </div>
         </div>
       </aside>
-      
-      <aside class="links" aria-labelledby="public-home-quick-links">
-        <header class="header mobile-only">
-          <h1 class="title" id="public-home-quick-links">Welcome to {% tournament_name %}!</h1>
-          {% if not registration_open %}
-          <h2 class="status-title mb-2">Status:</h2>
-          <div class="status-block status-block--inline" data-status>
-            <div class="status-icon" aria-hidden="true" data-status-icon>
-              <i class="fas fa-clipboard-check"></i>
-            </div>
-            <span class="status-divider" aria-hidden="true"></span>
-            <div class="status-text" aria-live="polite">
-              <div class="status-primary" data-status-primary>{{ status_primary }}</div>
-              <div class="status-secondary" data-status-secondary>{{ status_secondary }}</div>
-            </div>
-          </div>
-          {% endif %}
-        </header>
+      {% endif %}
 
-        {% if registration_open %}
+      <aside class="links" aria-labelledby="public-home-quick-links">
+        <h2 class="public-card-header desktop-only" id="public-home-quick-links">Tournament Pages</h2>
+
+        {% if info_links %}
+        <div class="info-links info-links--mobile" aria-label="Tournament resources">
+          {% for link in info_links %}
+          <a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+             {% if link.description %}title="{{ link.description }}"{% endif %}>
+            <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+            <span class="info-link-chip__title">{{ link.title }}</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if show_registration_lead %}
         <aside class="register-cta">
           <div class="register-cta__text">
             <p class="register-cta__title">Registration is open</p>
             <p class="register-cta__body">Sign up your teams and judges here.</p>
           </div>
           <div class="register-cta__actions">
-            <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register</a>
+            <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register new team</a>
             <a class="btn btn-outline-primary btn-sm register-cta__btn" href="{% url 'registration_code_lookup' %}">Edit existing</a>
           </div>
         </aside>
@@ -97,13 +96,13 @@
 
         <nav class="public-links" aria-label="Quick links">
           {% for shortcut in quick_links %}
-            <a class="tile shadow-sm" href="{{ shortcut.url }}">
-              <span class="body">
-                <span class="title">{{ shortcut.title }}</span>
-                <span class="subtitle">{{ shortcut.subtitle }}</span>
-              </span>
-              <span class="chevron"><i class="fas fa-arrow-right"></i></span>
-            </a>
+          <a class="tile shadow-sm" href="{{ shortcut.url }}">
+            <span class="body">
+              <span class="title">{{ shortcut.title }}</span>
+              <span class="subtitle">{{ shortcut.subtitle }}</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
           {% endfor %}
         </nav>
       </aside>

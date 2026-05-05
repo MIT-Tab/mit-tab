@@ -1,10 +1,16 @@
 before_tournament_steps:
   - slug: set_tournament_name
-    title: Set Tournament Name
+    title: Customize Public Homepage
     description: >-
-      Go to the navigation bar and, under the Admin tab, select Homepage Setup. Update the tournament name so your public pages, exports, and backups all show the correct event title, then save and confirm the new name is visible.
-    url_name: homepage_setup
+      Go to the navigation bar and, under the Admin tab, select Public Homepage. Update the tournament name, theme color, logo, quick links, and info links so the public homepage matches the event and routes people to the right resources.
+    url_name: public_homepage
     completion_rule: tournament_name_set
+
+  - slug: configure_registration
+    title: Configure Registration and Team Portal
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Registrations. Review whether new registrations and edits are open, configure team name changes and discretionary scratches for the team portal, add any registration links, and send team portal codes when teams need access.
+    url_name: registration_admin
 
   - slug: configure_settings
     title: Configure Core Settings
@@ -49,6 +55,12 @@ day_of_steps:
     url_name: view_status
     completion_rule: round_one_paired
 
+  - slug: prepare_motions
+    title: Prepare and Publish Motions
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Manage Motions. Add the motions and any info slides for in-rounds or outrounds, then publish the motions that should be visible on the public motions page.
+    url_name: manage_motions
+
   - slug: finish_final_inround
     title: Finish Final Inround
     description: >-
@@ -63,9 +75,9 @@ day_of_steps:
     url_name: forum_post
 
   - slug: publish_speaker_rankings_to_standings
-    title: Publish Speaker Rankings to Standings
+    title: Publish Speaker Results
     description: >-
-      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Speaker Results so final speaker standings are available to public standings consumers, then save and confirm the public speaker page is visible.
+      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Speaker Results, choose whether speaks and ranks should be included, then save and confirm the public speaker page is visible.
     url_name: public_rankings_control
     completion_rule: speaker_results_published
 
@@ -84,8 +96,8 @@ day_of_steps:
     completion_rule: outrounds_completed
 
   - slug: publish_debater_rankings_to_standings
-    title: Publish Debater Rankings to Standings
+    title: Publish Team Results
     description: >-
-      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Team Results so final debater and team standings output is available publicly, then save and verify the public team results page is active.
+      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. Turn on Team Results, choose whether speaks and ranks should be included, then save and verify the public team results page is active.
     url_name: public_rankings_control
     completion_rule: team_results_published
