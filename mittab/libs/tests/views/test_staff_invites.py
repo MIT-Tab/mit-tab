@@ -7,6 +7,10 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from mittab.apps.tab.auth_roles import (
+    PRESET_DATA_ENTRY_HELPER,
+    STAFF_PERMISSION_PRESETS,
+)
 from mittab.libs.tournament_todo import get_tournament_todo_steps
 
 
@@ -109,6 +113,31 @@ class TestStaffInvites(TestCase):
         self.assertEqual(email_request.to_address, existing_user.email)
 
     @patch("mittab.apps.tab.staff_invites.EmailService")
+    def test_invite_can_assign_limited_permission_preset(self, email_service):
+        email_service.return_value.send_bulk.return_value = 1
+
+        response = self.client.post(
+            reverse("invite_staff"),
+            {
+                "email": "data.entry@example.com",
+                "username": "data_entry",
+                "permission_preset": PRESET_DATA_ENTRY_HELPER,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        invited_user = get_user_model().objects.get(email="data.entry@example.com")
+        self.assertTrue(invited_user.is_staff)
+        self.assertFalse(invited_user.is_superuser)
+        self.assertTrue(
+            invited_user.groups.filter(
+                name=STAFF_PERMISSION_PRESETS[
+                    PRESET_DATA_ENTRY_HELPER
+                ]["group"],
+            ).exists()
+        )
+
+    @patch("mittab.apps.tab.staff_invites.EmailService")
     def test_invite_rejects_existing_non_staff_account(self, email_service):
         get_user_model().objects.create_user(
             username="entry",
@@ -171,6 +200,20 @@ class TestStaffInvites(TestCase):
         response = self.client.get(reverse("invite_staff"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_invite_page_explains_permission_presets(self):
+        response = self.client.get(reverse("invite_staff"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Permission Presets")
+        self.assertContains(response, "One-purpose scratch entry role.")
+        self.assertContains(response, "Check-in desk role.")
+        self.assertContains(
+            response,
+            "View, create, edit, and delete debaters, teams, schools, "
+            "judges, and rooms.",
+        )
+        self.assertContains(response, "Change settings, pairings, rankings, backups")
 
     def _invite_path_from_email(self, text_body):
         match = re.search(r"https?://[^\s]+", text_body)

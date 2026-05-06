@@ -41,14 +41,20 @@
           {% endif %}
         </div>
         {% endif %}
-        {% bootstrap_form form %}
+        {% if read_only %}
+          <fieldset disabled>
+            {% bootstrap_form form %}
+          </fieldset>
+        {% else %}
+          {% bootstrap_form form %}
+        {% endif %}
       </div>
     </div>
     {% endfor %}
 
     {% return_to_input %}
 
-    {% if forms %}
+    {% if forms and not read_only %}
     <input type="submit" class="btn btn-primary" value="Submit"/>
     {% else %}
     <p class="text-center lead">No scratches</p>

@@ -4,6 +4,7 @@
 {% if team_obj %}
 <div class="col-md-1"></div>
 <div class="col-md-5">
+  {% if user.is_superuser %}
   <div class="team-record">
     <h5>Team Stats</h5>
     <table class="table table-striped">
@@ -14,6 +15,7 @@
     </table>
     <a href='/team/card/{{ team_obj.id }}/pretty/' class="btn btn-link">View Tab Card</a>
   </div>
+  {% endif %}
   
   <div class="team-record mt-4">
     <h5>Team Details</h5>
@@ -26,7 +28,7 @@
           {% endfor %}
         </td>
       </tr>
-      {% if team_obj.ranking_groups.count %}
+      {% if user.is_superuser and team_obj.ranking_groups.count %}
       <tr>
         <td>Ranking Groups</td>
         <td>

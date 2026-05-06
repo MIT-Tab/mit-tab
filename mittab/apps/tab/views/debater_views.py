@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.utils.text import slugify
 
+from mittab.apps.tab.auth_roles import CAP_DATA_ENTRY, user_has_staff_capability
 from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -101,6 +102,8 @@ def view_debater(request, debater_id):
             "school", "hybrid_school"
         )
         links = []
+        if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+            links.append((f"/debater/{debater_id}/delete/", "Delete"))
         team_schools = []
         has_hybrid_school = False
         for team in teams:
@@ -146,6 +149,27 @@ def enter_debater(request):
         "form": form,
         "title": "Create Debater:"
     })
+
+
+def delete_debater(request, debater_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(
+            request,
+            "You cannot delete debaters",
+            path="/403/",
+        )
+
+    try:
+        debater_id = int(debater_id)
+        debater = Debater.objects.get(pk=debater_id)
+        debater.delete()
+    except Debater.DoesNotExist:
+        return redirect_and_flash_error(request, "That debater does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Debater deleted successfully",
+                                      path="/")
 
 
 def rank_debaters_ajax(request):

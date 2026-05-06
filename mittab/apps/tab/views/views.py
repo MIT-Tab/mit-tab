@@ -1,5 +1,5 @@
 import os
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
@@ -11,7 +11,14 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
-from mittab.apps.tab.auth_roles import is_apda_board_user
+from mittab.apps.tab.auth_roles import (
+    CAP_ADD_SCRATCHES,
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    is_apda_board_user,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import (
@@ -320,14 +327,29 @@ def render_500(request, *args, **kwargs):
 def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
+        can_view_scratches = user_has_staff_capability(
+            request.user,
+            CAP_VIEW_SCRATCHES,
+        )
         if form.is_valid():
             try:
-                form.save(actor=request.user)
+                with transaction.atomic():
+                    form.save(actor=request.user)
             except IntegrityError:
+                if not can_view_scratches:
+                    return redirect_and_flash_success(
+                        request,
+                        "Scratch submitted.",
+                        path=reverse("add_scratch"),
+                    )
                 return redirect_and_flash_error(request,
                                                 "This scratch already exists.")
-        return redirect_and_flash_success(request,
-                                          "Scratch created successfully")
+        success_path = reverse("add_scratch") if not can_view_scratches else None
+        return redirect_and_flash_success(
+            request,
+            "Scratch created successfully",
+            path=success_path,
+        )
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
@@ -413,8 +435,10 @@ def enter_school(request):
     })
 
 
-@permission_required("tab.school.can_delete", login_url="/403/")
 def delete_school(request, school_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect("/403/")
+
     error_msg = None
     try:
         school_id = int(school_id)
@@ -468,7 +492,11 @@ def view_room(request, room_id):
     except Room.DoesNotExist:
         return redirect_and_flash_error(request, "Room not found")
     if request.method == "POST":
-        form = RoomForm(request.POST, instance=room)
+        form = RoomForm(
+            request.POST,
+            instance=room,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
                 form.save()
@@ -481,7 +509,10 @@ def view_room(request, room_id):
             return redirect_and_flash_success(
                 request, f"School {updated_name} updated successfully")
     else:
-        form = RoomForm(instance=room)
+        form = RoomForm(
+            instance=room,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
 
         # Get all rounds that happened in this room with related judges
         rounds = Round.objects.filter(room=room).select_related(
@@ -493,11 +524,28 @@ def view_room(request, room_id):
 
     return render(request, "tab/room_detail.html", {
         "form": form,
-        "links": [],
+        "links": [(f"/room/{room_id}/delete/", "Delete")],
         "room_rounds": rounds,
         "room_outrounds": outrounds,
         "title": f"Viewing Room: {room.name}"
     })
+
+
+def delete_room(request, room_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect("/403/")
+
+    try:
+        room_id = int(room_id)
+        room = Room.objects.get(pk=room_id)
+        room.delete()
+    except Room.DoesNotExist:
+        return redirect_and_flash_error(request, "That room does not exist")
+    except Exception as e:
+        return redirect_and_flash_error(request, str(e))
+    return redirect_and_flash_success(request,
+                                      "Room deleted successfully",
+                                      path="/")
 
 
 def enter_room(request):
@@ -722,10 +770,18 @@ def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
     judge_info = {"errors": [], "uploaded": False}
     room_info = {"errors": [], "uploaded": False}
-    scratch_info = {"errors": [], "uploaded": False}
+    allow_scratch_import = (
+        user_has_staff_capability(request.user, CAP_ADD_SCRATCHES) or
+        user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES)
+    )
+    scratch_info = {"errors": [], "uploaded": False} if allow_scratch_import else None
 
     if request.method == "POST":
-        form = UploadDataForm(request.POST, request.FILES)
+        form = UploadDataForm(
+            request.POST,
+            request.FILES,
+            allow_scratches=allow_scratch_import,
+        )
         if form.is_valid():
             if "team_file" in request.FILES:
                 team_info["errors"] = import_teams.import_teams(
@@ -739,17 +795,18 @@ def upload_data(request):
                 room_info["errors"] = import_rooms.import_rooms(
                     request.FILES["room_file"])
                 room_info["uploaded"] = True
-            if "scratch_file" in request.FILES:
+            if allow_scratch_import and "scratch_file" in request.FILES:
                 scratch_info["errors"] = import_scratches.import_scratches(
                     request.FILES["scratch_file"], created_by=request.user)
                 scratch_info["uploaded"] = True
 
+        scratch_errors = scratch_info["errors"] if scratch_info else []
         if not team_info["errors"] + judge_info["errors"] + \
-                room_info["errors"] + scratch_info["errors"]:
+                room_info["errors"] + scratch_errors:
             return redirect_and_flash_success(request,
                                               "Data imported successfully")
     else:
-        form = UploadDataForm()
+        form = UploadDataForm(allow_scratches=allow_scratch_import)
     return render(
         request, "common/data_upload.html", {
             "form": form,

@@ -77,6 +77,7 @@ urlpatterns = [
 
     # Judge related
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
+    re_path(r"^judge/(\d+)/delete/$", judge_views.delete_judge, name="delete_judge"),
     re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
             judge_views.add_scratches,
             name="add_scratches"),
@@ -100,6 +101,7 @@ urlpatterns = [
 
     # Room related
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
+    re_path(r"^room/(\d+)/delete/$", views.delete_room, name="delete_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
 
@@ -126,6 +128,7 @@ urlpatterns = [
 
     # Team related
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
+    re_path(r"^team/(\d+)/delete/$", team_views.delete_team, name="delete_team"),
     re_path(r"^team/(\d+)/scratches/add/(\d+)/",
             team_views.add_scratches,
             name="add_scratches"),
@@ -145,6 +148,9 @@ urlpatterns = [
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
+    re_path(r"^debater/(\d+)/delete/$",
+            debater_views.delete_debater,
+            name="delete_debater"),
     path("view_debaters/", debater_views.view_debaters,
          name="view_debaters"),
     path("enter_debater/", debater_views.enter_debater,

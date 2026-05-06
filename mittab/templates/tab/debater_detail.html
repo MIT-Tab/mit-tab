@@ -4,6 +4,7 @@
 {% if debater_obj %}
 
 <div class="col-md-6">
+  {% if user.is_superuser %}
   <div class="team-record">
     <h5>Debater Rounds</h5>
     <table class="table table-striped">
@@ -26,6 +27,7 @@
       {% endfor %}
     </table>
   </div>
+  {% endif %}
   
   {% if team_schools %}
   <div class="team-record mt-4">
@@ -50,7 +52,7 @@
     </table>
   </div>
   {% endif %}
-  {% if debater_obj.ranking_groups.count %}
+  {% if user.is_superuser and debater_obj.ranking_groups.count %}
   <div class="team-record mt-4">
     <h5>Ranking Groups</h5>
     <ul class="list-unstyled mb-0">

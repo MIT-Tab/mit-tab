@@ -4,7 +4,10 @@ from django.urls import reverse
 from django.utils.html import urlize
 from django.utils.safestring import mark_safe
 
-from mittab.apps.tab.auth_roles import is_apda_board_user
+from mittab.apps.tab.auth_roles import (
+    is_apda_board_user,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab import logo_utils
 from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
@@ -153,3 +156,8 @@ def favicon_url():
 @register.simple_tag
 def is_apda_board(user):
     return is_apda_board_user(user)
+
+
+@register.simple_tag
+def staff_can(user, capability):
+    return user_has_staff_capability(user, capability)

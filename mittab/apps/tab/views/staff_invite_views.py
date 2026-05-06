@@ -4,6 +4,11 @@ from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.views import PasswordResetCompleteView, PasswordResetConfirmView
 from django.shortcuts import redirect, render, reverse
 
+from mittab.apps.tab.auth_roles import (
+    PRESET_FULL_TAB_STAFF,
+    STAFF_PRESET_CHOICES,
+    STAFF_PRESET_DETAILS,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.staff_invites import (
     get_or_create_staff_invite_user,
@@ -26,12 +31,22 @@ class StaffInviteForm(forms.Form):
             "existing staff account, enter that account's current username."
         ),
     )
+    permission_preset = forms.ChoiceField(
+        label="Permission preset",
+        choices=STAFF_PRESET_CHOICES,
+        initial=PRESET_FULL_TAB_STAFF,
+        required=False,
+        help_text=(
+            "Choose the narrowest role this staffer needs. Only full power "
+            "tab staff can access the entire admin surface."
+        ),
+    )
 
     def clean_email(self):
         User = get_user_model()
         email = User.objects.normalize_email(self.cleaned_data["email"]).strip()
         user = User.objects.filter(email__iexact=email).first()
-        if user and (not user.is_staff or not user.is_superuser):
+        if user and not user.is_staff:
             raise forms.ValidationError(
                 "A non-staff account already uses this email. Update it in "
                 "the admin interface before sending an invite."
@@ -75,6 +90,9 @@ class StaffInviteForm(forms.Form):
             raise forms.ValidationError(exc.messages) from exc
         return username
 
+    def clean_permission_preset(self):
+        return self.cleaned_data["permission_preset"] or PRESET_FULL_TAB_STAFF
+
 
 @user_passes_test(is_superuser, login_url="/403/")
 def invite_staff(request):
@@ -84,8 +102,9 @@ def invite_staff(request):
             user, _created = get_or_create_staff_invite_user(
                 form.cleaned_data["email"],
                 form.cleaned_data["username"],
+                form.cleaned_data["permission_preset"],
             )
-            if not user.is_staff or not user.is_superuser:
+            if not user.is_staff:
                 return redirect_and_flash_error(
                     request,
                     "A non-staff account already uses this email. Update it in "
@@ -114,6 +133,7 @@ def invite_staff(request):
         {
             "title": "Invite Tab Staff",
             "form": form,
+            "staff_preset_details": STAFF_PRESET_DETAILS,
         },
     )
 

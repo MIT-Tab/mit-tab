@@ -18,9 +18,11 @@
     {% include "common/_upload_error.html" %}
   {% endwith %}
 
-  {% with obj_type="scratch" info_obj=scratch_info %}
-    {% include "common/_upload_error.html" %}
-  {% endwith %}
+  {% if scratch_info %}
+    {% with obj_type="scratch" info_obj=scratch_info %}
+      {% include "common/_upload_error.html" %}
+    {% endwith %}
+  {% endif %}
 
   <p class="text-center">
     Check out
