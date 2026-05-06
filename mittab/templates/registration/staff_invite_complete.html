@@ -1,0 +1,15 @@
+{% extends "base/__wide.html" %}
+
+{% block title %}Staff Password Set{% endblock %}
+
+{% block content %}
+<div class="col-12 col-lg-6 mx-auto">
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-4 text-center">
+      <h1 class="h4 mb-3">Staff Password Set</h1>
+      <p>Your staff account is ready.</p>
+      <a class="btn btn-primary" href="{% url 'tab_login' %}">Sign in</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
