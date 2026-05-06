@@ -1,0 +1,127 @@
+before_tournament_steps:
+  - slug: configure_settings
+    title: Configure Core Settings
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Settings Form. Review each settings section so pairing, rankings, and display behavior match your tournament format, then save after making any updates. Make sure to catch important settings like wing pairing mode and speaks warnings.
+    url_name: settings_form
+    completion_rule: settings_reviewed
+
+  - slug: configure_registration
+    title: Configure Registration and Team Portal
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Registrations. Review whether new registrations and edits are open, configure team name changes and the number of discretionary scratches teams may enter in the team portal, add any registration links, and send team portal codes when teams need access.
+    url_name: registration_admin
+
+  - slug: set_tournament_name
+    title: Configure Tournament Appearance
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Public Homepage. Update the tournament name, theme color, logo, quick links, and info links so the public homepage matches the event and routes people to the right resources.
+    url_name: public_homepage
+    completion_rule: tournament_name_set
+
+  - slug: add_tab_user_accounts
+    title: Add Tab User Accounts
+    description: >-
+      Go to the navigation bar and, under the Setup tab, select Invite Staff. Send invites to any other tab staff who need to log in so they can set their own passwords from a time-limited email link.
+    url_name: invite_staff
+
+  - slug: import_core_data
+    title: Import Rooms and Optional Bulk Data
+    optional_label: Partly optional
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Bulk Data Upload. Room imports are still needed for almost every tournament. School, team, debater, and judge imports are still supported, but registration usually replaces them for roster data; use those uploads when you are not collecting that data through registration.
+    url_name: upload_data
+    completion_rule: core_data_imported
+
+  - slug: add_accessible_room_tags
+    title: Add Accessible Room Tags
+    description: >-
+      Use this checklist link to open Manage Room Tags, then create and apply accessibility tags to the rooms that support those needs. Doing this early helps you honor accommodations during pairing without last-minute room changes.
+    url_name: manage_room_tags
+    completion_rule: accessible_room_tags_added
+
+  - slug: enter_tab_scratches
+    title: Enter Tab Scratches
+    description: >-
+      Go to the navigation bar and, under the Scratches tab, select Add Scratch. Enter tab-managed judge-team conflicts before pairing so tab avoids bad assignments, then check the scratches list to confirm everything was recorded. Team-entered discretionary scratches should usually come through registration and the team portal.
+    url_name: add_scratch
+    completion_rule: scratches_entered
+
+day_of_steps:
+  - slug: check_in_entities
+    title: Check In Teams, Judges, and Rooms
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Batch Checkin. Mark who is present for round 1 so pairings only use available teams, judges, and rooms, then verify the attendance totals look right.
+    url_name: batch_checkin
+    completion_rule: entities_checked_in
+
+  - slug: manage_judge_ballot_code_emails
+    title: Send Judge Ballot Codes
+    optional_label: For manually added judges
+    description: >-
+      Open Email Management. Send ballot codes to judges once judge emails and availability are current so they can submit e-ballots during the tournament.
+    url_name: email_management
+    completion_rule: judge_codes_sent
+
+  - slug: pair_round_one
+    title: Pair Round 1
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, open Current Round. Pair round 1, review rooms and judges for obvious issues, make any manual fixes needed, and release once it looks clean.
+    url_name: view_status
+    completion_rule: round_one_paired
+
+  - slug: prepare_motions
+    title: Prepare and Publish Motions
+    optional_label: Motion tournaments only
+    description: >-
+      Go to the navigation bar and, under the Admin tab, select Manage Motions. Use this for motion tournaments only; non-motion tournaments can skip it. Add the motions and any info slides for in-rounds or outrounds, then publish the motions that should be visible on the public motions page.
+    url_name: manage_motions
+
+  - slug: finish_final_inround
+    title: Finish Final Inround
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, use Current Round and All Rounds to verify results. Make sure every ballot from the last scheduled in-round is entered so standings and break logic are final and accurate.
+    url_name: view_status
+    completion_rule: final_inround_completed
+
+  - slug: announce_awards
+    title: Announce Awards
+    description: >-
+      Go to the navigation bar and, under the Rankings tab, select Forum Post Results. Review the rankings and champion output there so you have a clean, complete source for announcing awards and posting final results.
+    url_name: forum_post
+
+  - slug: publish_speaker_rankings_to_standings
+    title: Publish Speaker Results
+    description: >-
+      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Speaker Results for publishing to standings, then choose the public speaker results settings, save, and confirm the public speaker page is visible if you are publishing it publicly.
+    url_name: public_rankings_control
+    completion_rule: speaker_results_published
+
+  - slug: pair_outrounds
+    title: Pair Outrounds
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, select Outround Pairings. Run the break and generate elimination pairings so the bracket can proceed from the first outround through finals, then assign judges and rooms before release.
+    url_name: outround_pairing_view_default
+    completion_rule: outrounds_paired
+
+  - slug: finish_outrounds
+    title: Finish Outrounds
+    description: >-
+      Go to the navigation bar and, under the Pairings tab, return to Outround Pairings for each elimination round. Enter every outround result and advance the bracket until finals are complete so champions and final placements are correct.
+    url_name: outround_pairing_view_default
+    completion_rule: outrounds_completed
+
+  - slug: manage_written_rfd_emails
+    title: Send Written RFDs
+    optional_label: Written RFD tournaments only
+    description: >-
+      Open Email Management. Use this only for tournaments collecting written reasons for decision; send the emails after the relevant ballots have written RFDs entered and reviewed.
+    url_name: email_management
+    completion_rule: written_rfds_sent
+
+  - slug: publish_debater_rankings_to_standings
+    title: Publish Team Results
+    description: >-
+      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Team Results for publishing to standings, then choose the public team results settings, save, and verify the public team results page is active if you are publishing it publicly.
+    url_name: public_rankings_control
+    completion_rule: team_results_published

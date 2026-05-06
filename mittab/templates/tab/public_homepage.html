@@ -1,0 +1,420 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Public Homepage{% endblock %}
+
+{% block banner %}Public Homepage{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+<style>
+  .ph {
+    --ph-text: #1f2f4a;
+    --ph-text-muted: rgba(28, 45, 70, 0.7);
+    --ph-text-soft: rgba(28, 45, 70, 0.55);
+    --ph-border: rgba(28, 54, 94, 0.12);
+    --ph-tint: rgba(244, 249, 255, 0.7);
+    --ph-accent: #2a66c4;
+    max-width: 1180px;
+    color: var(--ph-text);
+    background: #fff;
+    border: 1px solid var(--ph-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 14px 40px -26px rgba(12, 31, 58, 0.32);
+    padding: 1.1rem 1.25rem 1.25rem;
+  }
+
+  .ph__section + .ph__section {
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--ph-border);
+  }
+
+  .ph__section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-bottom: 0.85rem;
+  }
+  .ph__section-title {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ph-text-soft);
+  }
+  .ph__section-sub {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--ph-text-soft);
+    flex: 1 1 auto;
+  }
+
+  /* ----- Top row: branding + tiles ----- */
+  .ph__top {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+  @media (max-width: 900px) { .ph__top { grid-template-columns: 1fr; } }
+
+  .ph__col + .ph__col {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--ph-border);
+  }
+  @media (max-width: 900px) {
+    .ph__col + .ph__col { padding-left: 0; padding-top: 1rem; border-left: none; border-top: 1px solid var(--ph-border); }
+  }
+
+  /* ----- Branding ----- */
+  .ph__field { display: flex; flex-direction: column; gap: 0.3rem; }
+  .ph__field + .ph__field { margin-top: 0.75rem; }
+  .ph__field label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ph-text);
+    margin: 0;
+  }
+  .ph__field-help {
+    font-size: 0.74rem;
+    color: var(--ph-text-soft);
+  }
+
+  .ph__color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .ph__color-row input[type="color"] {
+    width: 2.2rem;
+    height: 2.2rem;
+    min-width: 2.2rem;
+    padding: 0.18rem;
+    cursor: pointer;
+    border: 1px solid var(--ph-border);
+    border-radius: 0.35rem;
+    background: #fff;
+  }
+  .ph__color-row input[type="text"] {
+    max-width: 8rem;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    text-transform: uppercase;
+  }
+
+  .ph__logo-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 78px;
+    padding: 0.5rem;
+    border: 1px dashed rgba(28, 54, 94, 0.25);
+    border-radius: 0.45rem;
+    background: var(--ph-tint);
+    margin-bottom: 0.4rem;
+  }
+  .ph__logo-preview img { max-width: 100%; max-height: 70px; object-fit: contain; }
+  .ph__logo-empty {
+    color: var(--ph-text-soft);
+    font-size: 0.78rem;
+  }
+  .ph__logo input[type="file"] { font-size: 0.8rem; }
+
+  /* ----- Tiles ----- */
+  .ph__tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  @media (max-width: 1100px) { .ph__tiles { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 575px) { .ph__tiles { grid-template-columns: 1fr; } }
+
+  .ph__tile {
+    display: grid;
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 0.5rem;
+    row-gap: 0.2rem;
+    padding: 0.5rem 0.6rem 0.55rem;
+    border: 1px solid var(--ph-border);
+    border-radius: 0.45rem;
+    background: #fff;
+  }
+  .ph__tile--locked {
+    background: var(--ph-tint);
+    border-style: dashed;
+  }
+  .ph__tile-num {
+    grid-row: 1 / span 2;
+    align-self: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: rgba(42, 102, 196, 0.12);
+    color: var(--ph-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ph__tile--locked .ph__tile-num {
+    background: rgba(28, 45, 70, 0.08);
+    color: rgba(28, 45, 70, 0.55);
+  }
+  .ph__tile-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ph-text);
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ph__tile-title .fa-lock {
+    color: rgba(28, 45, 70, 0.45);
+    font-size: 0.72rem;
+    margin-left: 0.25rem;
+  }
+  .ph__tile select.form-control {
+    height: calc(1.4em + 0.4rem + 2px);
+    padding: 0.15rem 1.5rem 0.15rem 0.4rem;
+    font-size: 0.8rem;
+  }
+  .ph__tile-locked-msg {
+    font-size: 0.74rem;
+    color: var(--ph-text-soft);
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  /* ----- Save bar (top-right of tiles header) ----- */
+  .ph__save {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .ph__save .ph__save-hint {
+    font-size: 0.74rem;
+    color: var(--ph-text-soft);
+    margin: 0;
+  }
+
+  /* ----- Info links ----- */
+  .ph__links { display: flex; flex-direction: column; gap: 0.4rem; }
+  .ph__link-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1.6fr) 4.5rem auto;
+    gap: 0.4rem 0.5rem;
+    align-items: center;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--ph-border);
+    border-radius: 0.4rem;
+    background: #fff;
+  }
+  .ph__link-row--add { background: var(--ph-tint); }
+  @media (max-width: 900px) {
+    .ph__link-row { grid-template-columns: 1fr 1fr; }
+    .ph__link-row .ph__link-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  }
+  @media (max-width: 575px) { .ph__link-row { grid-template-columns: 1fr; } }
+  .ph__link-row input.form-control { font-size: 0.82rem; height: calc(1.4em + 0.4rem + 2px); padding: 0.2rem 0.5rem; }
+  .ph__link-row .ph__link-order { width: 100%; text-align: center; }
+  .ph__link-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--ph-text-muted);
+    white-space: nowrap;
+  }
+  .ph__link-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    justify-content: flex-end;
+  }
+  .ph__link-actions .btn { padding: 0.2rem 0.5rem; font-size: 0.8rem; line-height: 1.2; }
+  .ph__link-empty {
+    text-align: center;
+    color: var(--ph-text-soft);
+    font-size: 0.82rem;
+    background: var(--ph-tint);
+    border: 1px dashed rgba(28, 54, 94, 0.2);
+    border-radius: 0.4rem;
+    padding: 0.6rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="col-12 ph">
+
+  <form method="post" enctype="multipart/form-data" class="ph__form ph__section">
+    {% csrf_token %}
+    {% return_to_input %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2 mb-2">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="ph__section-head">
+      <h2 class="ph__section-title">Homepage</h2>
+      <p class="ph__section-sub">Branding and the seven quick-link tiles. Tile 1 is auto-managed.</p>
+      <div class="ph__save">
+        <span class="ph__save-hint">Saves branding &amp; tiles</span>
+        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      </div>
+    </div>
+
+    <div class="ph__top">
+      <div class="ph__col">
+        <div class="ph__field">
+          <label for="{{ form.tournament_name.id_for_label }}">Tournament name</label>
+          {{ form.tournament_name }}
+          {% if form.tournament_name.errors %}
+            <div class="text-danger small">{{ form.tournament_name.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="ph__field">
+          <label for="{{ form.theme_color.id_for_label }}">Theme color</label>
+          <div class="ph__color-row">
+            <input type="color"
+                   class="form-control form-control-color theme-color-picker"
+                   id="{{ form.theme_color.id_for_label }}_picker"
+                   value="{{ form.theme_color.value|default:'#00438A' }}"
+                   data-target-input="{{ form.theme_color.id_for_label }}"
+                   aria-label="Pick theme color">
+            {{ form.theme_color }}
+          </div>
+          {% if form.theme_color.errors %}
+            <div class="text-danger small">{{ form.theme_color.errors|striptags }}</div>
+          {% endif %}
+        </div>
+
+        <div class="ph__field ph__logo">
+          <label for="{{ form.tournament_logo.id_for_label }}">Tournament logo</label>
+          {% tournament_logo_url as current_logo %}
+          <div class="ph__logo-preview">
+            {% if current_logo %}
+              <img src="{{ current_logo }}" alt="Current tournament logo">
+            {% else %}
+              <span class="ph__logo-empty">No logo uploaded</span>
+            {% endif %}
+          </div>
+          {{ form.tournament_logo }}
+          {% if form.tournament_logo.errors %}
+            <div class="text-danger small">{{ form.tournament_logo.errors|striptags }}</div>
+          {% endif %}
+          <span class="ph__field-help">PNG, JPEG, WebP. Max 8 MB. Aspect ratio 1:2&ndash;2:1.</span>
+        </div>
+      </div>
+
+      <div class="ph__col">
+        <div class="ph__tiles">
+          <div class="ph__tile ph__tile--locked">
+            <span class="ph__tile-num">1</span>
+            <span class="ph__tile-title">
+              Auto-managed <i class="fas fa-lock" aria-hidden="true"></i>
+            </span>
+            <p class="ph__tile-locked-msg" style="grid-column: 2;">
+              Registration before round 1, then Released Pairings once the tournament starts.
+            </p>
+          </div>
+
+          {% for row in shortcut_rows %}
+            <div class="ph__tile">
+              <span class="ph__tile-num">{{ row.slot }}</span>
+              <span class="ph__tile-title" title="{{ row.title }}{% if row.subtitle %} — {{ row.subtitle }}{% endif %}">{{ row.title }}</span>
+              {{ row.field }}
+              {% if row.field.errors %}
+                <div class="text-danger small" style="grid-column: 2;">{{ row.field.errors|striptags }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <section class="ph__section">
+    <div class="ph__section-head">
+      <h2 class="ph__section-title">Info links</h2>
+      <p class="ph__section-sub">Sidebar resources on the public homepage (Discord, packet, schedule&hellip;). Each row saves on its own.</p>
+    </div>
+
+    <div class="ph__links">
+      {% for link in info_links %}
+        <div class="ph__link-row">
+          <form method="post"
+                action="{% url 'tournament_link_update' link_kind='info' link_id=link.pk %}"
+                id="ph-link-{{ link.pk }}">
+            {% csrf_token %}
+          </form>
+          <input type="text" name="title" form="ph-link-{{ link.pk }}"
+                 class="form-control form-control-sm"
+                 value="{{ link.title }}" maxlength="80" placeholder="Title" required>
+          <input type="url" name="url" form="ph-link-{{ link.pk }}"
+                 class="form-control form-control-sm"
+                 value="{{ link.url }}" placeholder="https://..." required>
+          <input type="text" name="description" form="ph-link-{{ link.pk }}"
+                 class="form-control form-control-sm"
+                 value="{{ link.description }}" maxlength="160"
+                 placeholder="Short description (optional)">
+          <input type="number" name="display_order" form="ph-link-{{ link.pk }}"
+                 class="form-control form-control-sm ph__link-order"
+                 value="{{ link.display_order }}" min="0" step="1"
+                 title="Display order (lowest first)">
+          <div class="ph__link-actions">
+            <label class="ph__link-toggle">
+              <input type="checkbox" name="is_active" form="ph-link-{{ link.pk }}"
+                     {% if link.is_active %}checked{% endif %}>
+              Active
+            </label>
+            <button type="submit" form="ph-link-{{ link.pk }}"
+                    class="btn btn-sm btn-outline-primary">Save</button>
+            <form method="post"
+                  action="{% url 'tournament_link_delete' link_kind='info' link_id=link.pk %}"
+                  class="d-inline"
+                  onsubmit="return confirm('Delete this link?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete link">
+                <i class="fas fa-trash" aria-hidden="true"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      {% empty %}
+        <div class="ph__link-empty">No info links yet. Add the first one below.</div>
+      {% endfor %}
+
+      <form method="post"
+            action="{% url 'tournament_link_create' link_kind='info' %}"
+            class="ph__link-row ph__link-row--add">
+        {% csrf_token %}
+        <input type="text" name="title" class="form-control form-control-sm"
+               placeholder="Title (e.g. Tournament Discord)" maxlength="80" required>
+        <input type="url" name="url" class="form-control form-control-sm"
+               placeholder="https://..." inputmode="url" required>
+        <input type="text" name="description" class="form-control form-control-sm"
+               placeholder="Short description (optional)" maxlength="160">
+        <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
+               value="0" min="0" step="1" title="Display order (lowest first)">
+        <div class="ph__link-actions">
+          <label class="ph__link-toggle">
+            <input type="checkbox" name="is_active" checked> Active
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm">Add link</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

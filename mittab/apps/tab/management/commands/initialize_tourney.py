@@ -7,7 +7,10 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    TabSettings,
+)
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
 
 USER_MODEL = get_user_model()
@@ -41,6 +44,12 @@ class Command(BaseCommand):
                   Disables backup before new tournament",
             action="store_true",
             default=False)
+        parser.add_argument(
+            "--skip-backups",
+            dest="skip_backups",
+            help="Skip backup creation during initialization.",
+            action="store_true",
+            default=False)
 
     def handle(self, *args, **options):
         apda_board_password = (
@@ -49,7 +58,9 @@ class Command(BaseCommand):
             or USER_MODEL.objects.make_random_password(length=16)
         )
 
-        if not options["first_init"]:
+        if options["skip_backups"]:
+            self.stdout.write("Skipping backups.")
+        elif not options["first_init"]:
             self.stdout.write("Backing up the previous tournament data")
             backup_round(btype=BEFORE_NEW_TOURNAMENT)
         else:
@@ -77,7 +88,8 @@ class Command(BaseCommand):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-        TabSettings.set("tournament_name", "New Tournament")
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        TabSettings.set("theme_color", "#00438A")
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")
@@ -94,5 +106,5 @@ class Command(BaseCommand):
             f"{'board'.ljust(10, ' ')} | "
             f"{apda_board_password.ljust(10, ' ')}"
         )
-        if options["first_init"]:
+        if options["first_init"] and not options["skip_backups"]:
             backup_round(name="initial-tournament", btype=INITIAL)

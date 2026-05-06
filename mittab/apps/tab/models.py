@@ -1,14 +1,108 @@
 import random
 
-from haikunator import Haikunator
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.haikunator import Haikunator
+
+
+DEFAULT_TOURNAMENT_NAME = "New Tournament"
+PUBLIC_HOME_SHORTCUT_SLOTS = 8
+PUBLIC_HOME_URL_PATH_VALIDATOR = RegexValidator(
+    regex=r"^/(?!/)[^\\\s\x00-\x1f\x7f]*$",
+    message="Homepage destinations must be internal paths like /public/pairings/.",
+)
+PUBLIC_HOME_PAGE_DEFINITIONS = (
+    {
+        "slug": "released_pairings",
+        "title": "Released Pairings",
+        "subtitle": "Latest rounds and room assignments.",
+        "url_path": "/public/pairings/",
+    },
+    {
+        "slug": "missing_ballots",
+        "title": "Missing Ballots",
+        "subtitle": "Outstanding ballots that need attention.",
+        "url_path": "/public/missing-ballots/",
+    },
+    {
+        "slug": "submit_e_ballot",
+        "title": "Judge Portal and Ballots",
+        "subtitle": "Judges enter codes to update availability and file results.",
+        "url_path": "/public/e-ballots/",
+    },
+    {
+        "slug": "team_portal",
+        "title": "Team Portal",
+        "subtitle": "Teams enter codes to manage names and scratches.",
+        "url_path": "/team_portal/",
+    },
+    {
+        "slug": "judge_list",
+        "title": "Judge List",
+        "subtitle": "Roster and check-in status.",
+        "url_path": "/public/judges/",
+    },
+    {
+        "slug": "team_list",
+        "title": "Team List",
+        "subtitle": "Registered teams and schools.",
+        "url_path": "/public/teams/",
+    },
+    {
+        "slug": "varsity_outrounds",
+        "title": "Varsity Outrounds",
+        "subtitle": "Varsity elimination brackets and pairings.",
+        "url_path": "/public/outrounds/0/",
+    },
+    {
+        "slug": "novice_outrounds",
+        "title": "Novice Outrounds",
+        "subtitle": "Novice elimination brackets and pairings.",
+        "url_path": "/public/outrounds/1/",
+    },
+    {
+        "slug": "public_team_results",
+        "title": "Public Team Results",
+        "subtitle": "Standings and published team records.",
+        "url_path": "/public/team-rankings/",
+    },
+    {
+        "slug": "public_speaker_results",
+        "title": "Public Speaker Results",
+        "subtitle": "Published speaker rankings and records.",
+        "url_path": "/public/speaker-rankings/",
+    },
+    {
+        "slug": "public_ballots",
+        "title": "Public Ballots",
+        "subtitle": "Published ballots and detailed round results.",
+        "url_path": "/public/ballots/",
+    },
+    {
+        "slug": "public_motions",
+        "title": "Motions",
+        "subtitle": "View debate motions and info slides.",
+        "url_path": "/public/motions/",
+    },
+)
+
+PUBLIC_HOME_SHORTCUT_DEFAULTS = (
+    "released_pairings",
+    "missing_ballots",
+    "submit_e_ballot",
+    "team_portal",
+    "judge_list",
+    "team_list",
+    "varsity_outrounds",
+    "novice_outrounds",
+)
 
 
 _TABSETTING_MISSING = object()
@@ -27,10 +121,18 @@ class AuditAttributionMixin(models.Model):
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
-    audit_events = GenericRelation("AuditEvent")
 
     class Meta:
         abstract = True
+
+    @property
+    def audit_events(self):
+        if not self.pk:
+            return AuditEvent.objects.none()
+        return AuditEvent.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+        )
 
     def save(self,
              force_insert=False,
@@ -124,6 +226,21 @@ class TabSettings(models.Model):
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 
+class UserTournamentSetupPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_setup_preference",
+    )
+    hide_tournament_todo = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "tournament setup preference"
+
+    def __str__(self):
+        return f"{self.user} hide checklist: {self.hide_tournament_todo}"
+
+
 class PublicDisplaySetting(models.Model):
     RANKING = "ranking"
     STANDING = "standing"
@@ -157,6 +274,102 @@ class PublicDisplaySetting(models.Model):
         payload.update(defaults)
         return cls.objects.get_or_create(slug=slug, defaults=payload)
 
+
+class PublicHomePage(models.Model):
+    slug = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=255, blank=True, default="")
+    url_path = models.CharField(
+        max_length=200,
+        validators=[PUBLIC_HOME_URL_PATH_VALIDATOR],
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "public home page"
+        ordering = ["sort_order", "title"]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        super(PublicHomePage, self).save(*args, **kwargs)
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomePage, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def ensure_defaults(cls):
+        for index, definition in enumerate(PUBLIC_HOME_PAGE_DEFINITIONS, start=1):
+            cls.objects.get_or_create(
+                slug=definition["slug"],
+                defaults={
+                    "title": definition["title"],
+                    "subtitle": definition["subtitle"],
+                    "url_path": definition["url_path"],
+                    "sort_order": index,
+                },
+            )
+
+
+class PublicHomeShortcut(models.Model):
+    position = models.PositiveSmallIntegerField(
+        choices=[(i, f"Slot {i}") for i in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1)],
+        unique=True,
+    )
+    nav_item = models.CharField(max_length=50, db_index=True)
+
+    class Meta:
+        verbose_name = "public home shortcut"
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"Slot {self.position}: {self.nav_item}"
+
+    def save(
+        self,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        super(PublicHomeShortcut, self).save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomeShortcut, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def nav_definition_map(cls, include_inactive=True):
+        PublicHomePage.ensure_defaults()
+        pages = PublicHomePage.objects.all()
+        if not include_inactive:
+            pages = pages.filter(is_active=True)
+        return {
+            page.slug: {
+                "slug": page.slug,
+                "title": page.title,
+                "subtitle": page.subtitle,
+                "url_path": page.url_path,
+            }
+            for page in pages
+        }
+
+    @classmethod
+    def default_slot_mapping(cls):
+        return {
+            index + 1: slug
+            for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
+        }
 
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -337,7 +550,10 @@ class Team(AuditAttributionMixin):
         haikunator = Haikunator()
 
         def gen_haiku_and_clean():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
+            code = haikunator.haikunate(
+                token_length=TEAM_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            ).replace("-", " ").title()
 
             return code
 
@@ -424,12 +640,15 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
+HUMAN_READABLE_TOKEN_CHARS = "23456789abcdefghijkmnopqrstuvwxyz"
+TEAM_CODE_TOKEN_LENGTH = 4
 BALLOT_CODE_MAX_LENGTH = 30
+BALLOT_CODE_TOKEN_LENGTH = 9
 ballot_code_validator = RegexValidator(
-    regex=r"^(?:[A-Za-z]+-[A-Za-z]+|[A-Za-z0-9]+)$",
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+(?:-[A-Za-z0-9]+)?|[A-Za-z0-9]+)$",
     message=(
-        "Ballot code must be either legacy alphanumeric text or a single-hyphen code "
-        "with letters on each side."
+        "Ballot code must be legacy alphanumeric text or a hyphenated word-word "
+        "code with an optional alphanumeric token."
     ),
 )
 
@@ -460,12 +679,18 @@ class Judge(AuditAttributionMixin):
 
     def set_unique_ballot_code(self):
         haikunator = Haikunator()
-        code = haikunator.haikunate(token_length=0)
+        code = haikunator.haikunate(
+            token_length=BALLOT_CODE_TOKEN_LENGTH,
+            token_chars=HUMAN_READABLE_TOKEN_CHARS,
+        )
 
         while (len(code) > BALLOT_CODE_MAX_LENGTH or
                not self.is_valid_ballot_code(code, raise_error=False) or
                Judge.objects.filter(ballot_code=code).first()):
-            code = haikunator.haikunate(token_length=0)
+            code = haikunator.haikunate(
+                token_length=BALLOT_CODE_TOKEN_LENGTH,
+                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+            )
 
         self.ballot_code = code
 

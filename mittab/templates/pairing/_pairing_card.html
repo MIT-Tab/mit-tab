@@ -105,11 +105,16 @@
         {% endfor %}
         {% manual_judge_audit_events pairing.id as manual_events %}
         {% if manual_events %}
-          <div class="small text-muted mt-1">
-          {% for event in manual_events %}
-            <div>{{ event.label }} by {{ event.user_display }}{% if event.note %}: {{ event.note }}{% endif %}</div>
-          {% endfor %}
-          </div>
+          <details class="manual-judge-history small text-muted">
+            <summary class="audit-trail-summary">
+              <i class="fas fa-history"></i> manual edits ({{ manual_events|length }})
+            </summary>
+            <ul class="manual-judge-history-list">
+              {% for event in manual_events %}
+                <li>{{ event.label }} by {{ event.user_display }}{% if event.note %}: {{ event.note }}{% endif %}</li>
+              {% endfor %}
+            </ul>
+          </details>
         {% endif %}
       </div>
 

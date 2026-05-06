@@ -9,6 +9,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab import logo_utils
+from mittab.apps.tab.theme import (
+    DEFAULT_THEME_COLOR,
+    normalize_theme_color,
+)
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_deadline_display,
@@ -28,6 +33,12 @@ class UploadDataForm(forms.Form):
     judge_file = forms.FileField(label="Judge Data File", required=False)
     room_file = forms.FileField(label="Room Data File", required=False)
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
+
+    def __init__(self, *args, **kwargs):
+        allow_scratches = kwargs.pop("allow_scratches", True)
+        super(UploadDataForm, self).__init__(*args, **kwargs)
+        if not allow_scratches:
+            self.fields.pop("scratch_file")
 
 
 class UploadApdaCsvForm(forms.Form):
@@ -54,8 +65,9 @@ class RoomForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(RoomForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 room = kwargs["instance"]
@@ -107,8 +119,9 @@ class JudgeForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(JudgeForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 judge = kwargs["instance"]
@@ -180,6 +193,12 @@ class TeamForm(forms.ModelForm):
         required=False
     )
 
+    def __init__(self, *args, **kwargs):
+        allow_checkins = kwargs.pop("allow_checkins", True)
+        super(TeamForm, self).__init__(*args, **kwargs)
+        if not allow_checkins:
+            self.fields.pop("checked_in", None)
+
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
         if len(data) not in [1, 2]:
@@ -226,6 +245,12 @@ class TeamForm(forms.ModelForm):
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?",
                                           initial=0)
+
+    def __init__(self, *args, **kwargs):
+        allow_initial_scratches = kwargs.pop("allow_initial_scratches", True)
+        super(TeamEntryForm, self).__init__(*args, **kwargs)
+        if not allow_initial_scratches:
+            self.fields.pop("number_scratches")
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -710,6 +735,120 @@ class SettingsForm(forms.Form):
                 value_to_set = self.cleaned_data[field]
 
             TabSettings.set(key, value_to_set)
+
+
+class PublicHomepageForm(forms.Form):
+    tournament_name = forms.CharField(
+        label="Tournament Name",
+        max_length=200,
+        required=False,
+        help_text=(
+            "Shown on the public homepage, in the page title, and on the staff login page."
+        ),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    theme_color = forms.RegexField(
+        regex=r"^#[0-9a-fA-F]{6}$",
+        label="Theme Color",
+        help_text="Brand color used across navigation, homepage accents, and other theme elements.",
+        error_messages={
+            "invalid": "Please use a valid hex color (for example: #00438A).",
+        },
+        widget=forms.TextInput(attrs={
+            "type": "text",
+            "class": "form-control theme-color-input",
+            "placeholder": "#00438A",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "autocomplete": "off",
+            "style": "max-width: 12rem;",
+        }),
+    )
+    tournament_logo = forms.ImageField(
+        label="Tournament Logo",
+        required=False,
+        help_text=(
+            "Optional homepage logo (PNG, JPEG, or WebP; max 8MB; aspect ratio between 1:2 and 2:1)."
+        ),
+        widget=forms.ClearableFileInput(attrs={
+            "class": "form-control-file",
+            "accept": ",".join(logo_utils.LOGO_ALLOWED_MIME_TYPES),
+        }),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(PublicHomepageForm, self).__init__(*args, **kwargs)
+
+        self.fields["tournament_name"].initial = TabSettings.get(
+            "tournament_name", DEFAULT_TOURNAMENT_NAME
+        )
+        self.fields["theme_color"].initial = normalize_theme_color(
+            TabSettings.get("theme_color", DEFAULT_THEME_COLOR),
+            default=DEFAULT_THEME_COLOR,
+        )
+
+        definitions = PublicHomeShortcut.nav_definition_map()
+
+        page_options = list(PublicHomePage.objects.filter(is_active=True))
+        if not page_options:
+            page_options = list(PublicHomePage.objects.all())
+        choices = [
+            (page.slug, page.title)
+            for page in page_options
+        ]
+        default_slots = PublicHomeShortcut.default_slot_mapping()
+        configured_slots = dict(default_slots)
+        configured_slots.update({
+            shortcut.position: shortcut.nav_item
+            for shortcut in PublicHomeShortcut.objects.all()
+        })
+
+        # Slot 1 is reserved: the public homepage auto-switches it between
+        # Registration (while open) and Released Pairings (otherwise), so it
+        # is intentionally not rendered as an editable choice.
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            nav_item = configured_slots.get(slot)
+            default_nav_item = default_slots.get(slot)
+            if nav_item not in definitions:
+                nav_item = default_nav_item
+            title = definitions.get(nav_item, {}).get("title", nav_item)
+            self.fields[f"slot_{slot}"] = forms.ChoiceField(
+                label=f"Shortcut {slot}",
+                choices=choices,
+                initial=nav_item,
+                help_text=f"Currently: {title}",
+                widget=forms.Select(attrs={"class": "form-control"}),
+            )
+
+    def clean_tournament_logo(self):
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.validate_tournament_logo(uploaded_logo)
+        return uploaded_logo
+
+    def save(self):
+        tournament_name = (
+            self.cleaned_data["tournament_name"].strip()
+            or DEFAULT_TOURNAMENT_NAME
+        )
+        TabSettings.set("tournament_name", tournament_name)
+
+        TabSettings.set(
+            "theme_color",
+            normalize_theme_color(
+                self.cleaned_data["theme_color"],
+                default=DEFAULT_THEME_COLOR,
+            ),
+        )
+
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.save_tournament_logo(uploaded_logo)
+
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            PublicHomeShortcut.objects.update_or_create(
+                position=slot,
+                defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},
+            )
 
 
 def validate_panel(result):

@@ -1,0 +1,11 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<p style="margin:0 0 12px;">Hello,</p>
+<p style="margin:0 0 16px;">You have been invited to join the MIT-TAB staff site as a tournament administrator.</p>
+<p style="margin:0 0 16px;">Username: <strong>{{ username }}</strong></p>
+<p style="margin:0 0 16px;">Use the button below to set your password and finish creating your account.</p>
+<p style="margin:0 0 20px;"><a href="{{ invite_url }}" style="display:inline-block;background-color:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:bold;">Set your password</a></p>
+<p style="margin:0 0 16px;color:#4b5563;font-size:14px;">If you were not expecting this invitation, you can safely ignore this email.</p>
+<p style="margin:28px 0 0;color:#4b5563;font-size:14px;">Thanks,<br />The Tab Team</p>
+{% endblock %}

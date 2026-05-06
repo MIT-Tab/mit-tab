@@ -5,12 +5,14 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/python:3.10.16-node
+      - image: cimg/python:3.10.16
         environment:
-          TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
           PIPENV_VENV_IN_PROJECT: true
+          MITTAB_FAKE_WEBPACK_LOADER: "1"
+          MITTAB_SKIP_ASSET_BUILD: "1"
+          MITTAB_INITIALIZE_ARGS: --skip-backups
       - image: cimg/mysql:5.7
         environment:
           MYSQL_ROOT_PASSWORD: secret
@@ -25,26 +27,20 @@ jobs:
       - checkout
       - restore_cache:
           key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
-      
+
       - restore_cache:
           keys:
             - test-timing-v1-{{ .Branch }}-{{ .Revision }}
             - test-timing-v1-{{ .Branch }}-
             - test-timing-v1-
       
-      - browser-tools/install-chrome
-      - browser-tools/install-chromedriver
       - run:
           name: install dependencies
           command: |
-            sudo apt-get update
-            sudo apt-get install -y default-mysql-client
-            python -m pip install --upgrade pip
-            python -m pip install --user pipenv
-            rm -rf .venv
-            pipenv --python 3.10.16
-            pipenv install --dev
-            npm install
+            if [ ! -d .venv ]; then
+              pipenv --python 3.10.16
+            fi
+            pipenv sync --dev
 
       - save_cache:
           paths:
@@ -71,7 +67,7 @@ jobs:
       - run:
           name: run tests
           command: |
-            pipenv run pytest --junitxml=test-reports/junit.xml --cov=mittab --cov-report xml:cov.xml --circleci-parallelize mittab/
+            pipenv run pytest --junitxml=test-reports/junit.xml --cov=mittab --cov-report xml:cov.xml --ignore=mittab/libs/tests/web --circleci-parallelize mittab/
           no_output_timeout: 20m
 
       - save_cache:
@@ -88,6 +84,94 @@ jobs:
 
       - codecov/upload:
           file: ./cov.xml
+  web-tests:
+    docker:
+      - image: cimg/python:3.10.16-browsers
+        environment:
+          TEST_BROWSER: chrome
+          MYSQL_PASSWORD: secret
+          MITTAB_DB_HOST: 127.0.0.1
+          PIPENV_VENV_IN_PROJECT: true
+          MITTAB_FAKE_WEBPACK_LOADER: "1"
+          MITTAB_INITIALIZE_ARGS: --skip-backups
+          MITTAB_SKIP_WEBPACK_BUILD: "1"
+      - image: cimg/mysql:5.7
+        environment:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: mittab
+          MYSQL_ROOT_HOST: 127.0.0.1
+
+    working_directory: ~/repo
+    parallelism: 2
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
+
+      - restore_cache:
+          keys:
+            - test-timing-v1-{{ .Branch }}-{{ .Revision }}
+            - test-timing-v1-{{ .Branch }}-
+            - test-timing-v1-
+
+      - browser-tools/install-chrome
+      - browser-tools/install-chromedriver
+      - run:
+          name: install dependencies
+          command: |
+            sudo mkdir -p /tmp/disabled-apt-sources
+            sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \
+              -exec mv {} /tmp/disabled-apt-sources/ \;
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends default-mysql-client
+            if [ ! -d .venv ]; then
+              pipenv --python 3.10.16
+            fi
+            pipenv sync --dev
+
+      - save_cache:
+          paths:
+            - .venv
+          key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
+
+      - run:
+          # Our primary container isn't MYSQL so run a sleep command until it's ready.
+          name: Waiting for MySQL to be ready
+          command: |
+            for i in `seq 1 10`;
+            do
+              nc -z 127.0.0.1 3306 && echo Success && exit 0
+              echo -n .
+              sleep 1
+            done
+            echo Failed waiting for MySQL && exit 1
+
+      - run:
+          name: setup db
+          command: |
+            pipenv run ./bin/setup password
+
+      - run:
+          name: run web tests
+          command: |
+            pipenv run pytest --junitxml=test-reports/junit.xml --cov=mittab --cov-report xml:cov-web.xml --circleci-parallelize mittab/libs/tests/web/
+          no_output_timeout: 20m
+
+      - save_cache:
+          paths:
+            - .test_durations
+          key: test-timing-v1-{{ .Branch }}-{{ .Revision }}
+
+      - store_test_results:
+          path: test-reports
+
+      - store_artifacts:
+          path: test-reports
+          destination: test-reports
+
+      - codecov/upload:
+          file: ./cov-web.xml
   lint:
     docker:
       - image: cimg/python:3.10.16-node
@@ -97,22 +181,24 @@ jobs:
       - checkout
       - restore_cache:
           key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
+      - restore_cache:
+          key: npm-v1-{{ checksum "package-lock.json" }}
       - run:
           name: install dependencies
           command: |
-            sudo apt-get update
-            sudo apt-get install -y default-mysql-client
-            python -m pip install --upgrade pip
-            python -m pip install --user pipenv
-            # Remove .venv if it exists from cache to avoid version mismatch
-            rm -rf .venv
-            pipenv --python 3.10.16
-            pipenv install --dev
-            npm install
+            if [ ! -d .venv ]; then
+              pipenv --python 3.10.16
+            fi
+            pipenv sync --dev
+            npm ci --prefer-offline --no-audit
       - save_cache:
           paths:
             - .venv
           key: deps-v3-3.10.16-{{ checksum "Pipfile.lock" }}
+      - save_cache:
+          paths:
+            - ~/.npm
+          key: npm-v1-{{ checksum "package-lock.json" }}
       - run:
           name: Lint -- Python
           command: |
@@ -122,25 +208,23 @@ jobs:
           command: npm run lint
   docs:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.10.16
     steps:
       - checkout
       - restore_cache:
           keys:
-            - v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
-            - v2-docs-dependencies-
+            - v3-docs-dependencies-{{ checksum "docs/requirements.txt" }}
+            - v3-docs-dependencies-
       - run:
           name: install dependencies
           command: |
-            sudo apt-get update
-            sudo apt-get install -y python3.10-venv
-            python3 -m venv venv
+            python -m venv venv
             . venv/bin/activate
-            pip install -r docs/requirements.txt
+            pip install --disable-pip-version-check -r docs/requirements.txt
       - save_cache:
           paths:
             - ./venv
-          key: v2-docs-dependencies-{{ checksum "docs/requirements.txt" }}
+          key: v3-docs-dependencies-{{ checksum "docs/requirements.txt" }}
       - run:
           name: Build docs
           command: |
@@ -182,5 +266,6 @@ workflows:
     jobs:
       - lint
       - build
+      - web-tests
       - docs
       - docker-build

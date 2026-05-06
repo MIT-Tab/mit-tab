@@ -15,7 +15,8 @@ module.exports = {
     publicHome: "./assets/js/publicHome",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
-    sendJudgeCodes: "./assets/js/sendJudgeCodes",
+    tournamentTodo: "./assets/js/tournamentTodo",
+    emailManagement: "./assets/js/emailManagement",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

@@ -4,6 +4,54 @@
 {% block title %}Round Status{% endblock %}
 
 {% block content %}
+<style>
+  #quick-judge-checkin .quick-checkin-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #quick-judge-checkin .quick-checkin-label {
+    flex: 1 1 100%;
+    margin-bottom: 0;
+  }
+  #quick-judge-checkin .quick-checkin-grow,
+  #quick-judge-checkin .select2-container--bootstrap4 {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+  /* Size select2 widget to match form-control-sm so heights line up */
+  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection--multiple {
+    min-height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.125rem 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+  }
+  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection__rendered {
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+  }
+  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection__choice {
+    margin-top: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  #quick-judge-checkin .select2-container--bootstrap4 .select2-search--inline .select2-search__field {
+    margin-top: 0;
+    height: 1.5em;
+    font-size: 0.875rem;
+  }
+  /* Stack each control on its own line on phones */
+  @media (max-width: 575.98px) {
+    #quick-judge-checkin .quick-checkin-row > * {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+  }
+</style>
 <div id="round-number" data-round-number={{ round_number }} style="display: none;"></div>
 
 <div class="col">
@@ -163,8 +211,47 @@
     </div> <!-- end pairings row -->
 
     <div class="row mt-2 mb-2">
+      <div class="col">
+        <div id="quick-judge-checkin" class="card card-body py-2">
+          {% csrf_token %}
+          <form id="quick-checkin-existing-form" class="quick-checkin-row mb-2">
+            <strong class="quick-checkin-label">Check in existing judge:</strong>
+            <select id="quick-checkin-judge" class="form-control form-control-sm quick-checkin-grow">
+              <option value="">-- select judge --</option>
+              {% for judge in non_checkins %}
+                <option value="{{ judge.id }}">{{ judge.name }}{% if judge.rank %} (rank {{ judge.rank }}){% endif %}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="fas fa-check"></i> Check In
+            </button>
+          </form>
+          <form id="quick-checkin-new-form" class="quick-checkin-row">
+            <strong class="quick-checkin-label">Add new judge &amp; check in:</strong>
+            <input id="quick-new-name" type="text" placeholder="Name" maxlength="30"
+                   class="form-control form-control-sm quick-checkin-grow" required>
+            <input id="quick-new-rank" type="number" step="0.01" placeholder="Rank"
+                   value="5"
+                   class="form-control form-control-sm" style="width: 5rem; flex: 0 0 5rem;">
+            <select id="quick-new-schools" multiple
+                    class="form-control form-control-sm js-multiselect quick-checkin-grow"
+                    data-placeholder="Schools (optional)">
+              {% for school in all_schools %}
+                <option value="{{ school.id }}">{{ school.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="fas fa-plus"></i> Create &amp; Check In
+            </button>
+          </form>
+          <div id="quick-checkin-feedback" class="small mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-2 mb-2">
       <div class="col not-paired-in overflow-auto border-bottom">
-        <h5>People Not Paired In</h5>
+        <h5 class="mb-1">People Not Paired In</h5>
         <table class="table table-striped table-sm">
           <thead>
             <th>Checked in Teams ({{ excluded_teams|length }})</th>
@@ -194,4 +281,93 @@
 
   </div>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById('quick-checkin-existing-form');
+  var newForm = document.getElementById('quick-checkin-new-form');
+  if (!form || !newForm) return;
+
+  var roundEl = document.getElementById('round-number');
+  var roundNumber = roundEl ? roundEl.dataset.roundNumber : '';
+  var feedback = document.getElementById('quick-checkin-feedback');
+
+  function csrfToken() {
+    var el = document.querySelector('#quick-judge-checkin [name=csrfmiddlewaretoken]')
+          || document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function setFeedback(msg, kind) {
+    if (!feedback) return;
+    feedback.textContent = msg || '';
+    feedback.className = 'small mt-1' + (msg ? ' text-' + (kind === 'error' ? 'danger' : 'success') : '');
+  }
+
+  function postCheckin(payload) {
+    var body = new URLSearchParams(payload).toString();
+    return fetch('{% url "quick_judge_checkin" %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': csrfToken(),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body,
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        return { ok: r.ok, data: data };
+      }).catch(function () {
+        return { ok: false, data: { error: 'Server error' } };
+      });
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var select = document.getElementById('quick-checkin-judge');
+    if (!select.value) {
+      setFeedback('Please pick a judge first.', 'error');
+      return;
+    }
+    setFeedback('Checking in...', 'success');
+    postCheckin({ judge_id: select.value, round_number: roundNumber }).then(function (res) {
+      if (!res.ok || !res.data.success) {
+        setFeedback(res.data.error || 'Check-in failed.', 'error');
+        return;
+      }
+      setFeedback('Checked in ' + res.data.judge.name + '. Refreshing...', 'success');
+      setTimeout(function () { window.location.reload(); }, 600);
+    });
+  });
+
+  newForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = document.getElementById('quick-new-name').value.trim();
+    if (!name) {
+      setFeedback('Name is required.', 'error');
+      return;
+    }
+    setFeedback('Creating judge...', 'success');
+    var params = new URLSearchParams();
+    params.append('name', name);
+    params.append('rank', document.getElementById('quick-new-rank').value);
+    params.append('round_number', roundNumber);
+    var schoolSel = document.getElementById('quick-new-schools');
+    if (schoolSel) {
+      Array.from(schoolSel.selectedOptions).forEach(function (opt) {
+        params.append('school_ids[]', opt.value);
+      });
+    }
+    postCheckin(params).then(function (res) {
+      if (!res.ok || !res.data.success) {
+        setFeedback(res.data.error || 'Could not create judge.', 'error');
+        return;
+      }
+      setFeedback('Created and checked in ' + res.data.judge.name + '. Refreshing...', 'success');
+      setTimeout(function () { window.location.reload(); }, 600);
+    });
+  });
+})();
+</script>
 {% endblock %}

@@ -4,11 +4,19 @@ from urllib.parse import urlsplit
 from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
+from django.urls import Resolver404, resolve
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
+from mittab.apps.tab.auth_roles import (
+    is_apda_board_access_open,
+    is_apda_board_user,
+    is_restricted_staff_user,
+    restricted_staff_can_access_view,
+    restricted_staff_landing_url,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
+from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
@@ -24,7 +32,7 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools",
-                   "/api/debater-counts", "/favicon.ico")
+                   "/api/debater-counts", "/favicon.ico", "/tournament-logo/")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 API_PATH_REQUIREMENTS = {
@@ -45,6 +53,7 @@ API_ERROR_MESSAGES = {
 APDA_BOARD_ALLOWED_PREFIXES = (
     "/apda-board/",
     "/public/",
+    "/team_portal/",
     "/accounts/logout/",
     "/admin/logout/",
     "/403/",
@@ -106,20 +115,49 @@ class Login:
             path in LOGIN_WHITELIST
             or path.startswith("/public/")
             or path.startswith("/registration/")
+            or path.startswith("/team_portal/")
             or EBALLOT_REGEX.match(path)
         )
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                view = LoginView.as_view(template_name="public/staff_login.html")
+                view = StaffLoginView.as_view()
                 return view(request)
-            else:
+            return redirect_and_flash_info(
+                request,
+                "You must be logged in to view that page",
+                path=f"/public/login/?next={request.path}")
+
+        if request.user.is_authenticated and is_restricted_staff_user(request.user):
+            if path.startswith(("/static/", "/dynamic-media/")):
+                return self.get_response(request)
+
+            try:
+                view_name = resolve(path).view_name
+            except Resolver404:
+                view_name = None
+
+            landing_url = restricted_staff_landing_url(request.user)
+            if path == "/" and landing_url != path:
                 return redirect_and_flash_info(
                     request,
-                    "You must be logged in to view that page",
-                    path=f"/public/login/?next={request.path}")
-        else:
-            return self.get_response(request)
+                    "Your staff account has limited access.",
+                    path=landing_url,
+                )
+
+            can_access = restricted_staff_can_access_view(
+                request.user,
+                view_name,
+                request.method,
+            )
+            if not can_access:
+                return redirect_and_flash_info(
+                    request,
+                    "Your staff account does not have access to that page.",
+                    path="/403/",
+                )
+
+        return self.get_response(request)
 
 
 class TournamentStatusCheck:

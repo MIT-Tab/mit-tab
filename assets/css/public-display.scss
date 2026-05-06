@@ -1,5 +1,3 @@
-$mittab-display-blue: #003a74;
-
 .content {
   font-size: 1rem;
   margin: 0;
@@ -48,7 +46,7 @@ $mittab-display-blue: #003a74;
   }
 
   th {
-    background: #9cf;
+    background: rgba(var(--theme-color-rgb, 0, 67, 138), 0.3);
     font-weight: 600;
     font-size: 0.85rem;
 
@@ -57,7 +55,7 @@ $mittab-display-blue: #003a74;
     }
   }
 
-  tr:nth-child(even) { background: #def; }
+  tr:nth-child(even) { background: rgba(var(--theme-color-rgb, 0, 67, 138), 0.12); }
 }
 
 .public-table-root {
@@ -66,7 +64,7 @@ $mittab-display-blue: #003a74;
   padding: 1.2rem;
   background: #fff;
   border-radius: 0.9rem;
-  box-shadow: 0 14px 28px -26px rgba(12, 42, 92, 0.28);
+  box-shadow: 0 14px 28px -26px rgba(var(--theme-color-rgb, 0, 67, 138), 0.28);
 }
 
 @media (max-width: 767.98px) {
@@ -126,6 +124,7 @@ $mittab-display-blue: #003a74;
   inset: auto 0 0 0;
   padding: 0.5em;
   background: #bdf;
+  background: color-mix(in srgb, var(--theme-color, #00438A) 25%, white);
   border-top: 0.15em solid #000;
   display: flex;
   align-items: center;

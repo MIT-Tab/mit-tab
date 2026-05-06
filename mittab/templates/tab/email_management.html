@@ -1,0 +1,239 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Email Management{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  {% render_bundle 'emailManagement' 'js' %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between mb-3">
+    <div>
+      <h1 class="h3 mb-1">Email Management</h1>
+      <div class="text-muted small">
+        <strong>{{ judge_email.sendable_count }}</strong> judge code{{ judge_email.sendable_count|pluralize }} ready.
+        <span class="ml-2"><strong>{{ written_rfd_email.sendable_count }}</strong> written RFD round{{ written_rfd_email.sendable_count|pluralize }} ready.</span>
+      </div>
+    </div>
+    <div class="text-muted small mt-2 mt-lg-0">
+      Judge code rate limit: 1 email per judge/email every {{ judge_email.rate_limit_hours }} hour{{ judge_email.rate_limit_hours|pluralize }}.
+    </div>
+  </div>
+
+  <div class="form-group mb-3">
+    <label class="font-weight-semibold" for="email-management-view">Email Type</label>
+    <select class="form-control form-control-sm w-auto" id="email-management-view">
+      <option value="judge-codes">Judge Codes</option>
+      <option value="written-rfds">Written RFDs</option>
+      <option value="sent-history">Sent Email History</option>
+    </select>
+  </div>
+
+  <form method="post" class="mb-4 email-management-panel" data-email-management-panel="judge-codes">
+    {% csrf_token %}
+    <input type="hidden" name="email_action" value="judge_codes">
+    <section class="mb-4">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-2">
+        <div>
+          <h2 class="h5 mb-1">Judge Codes</h2>
+          <div class="text-muted small">
+            Default selection: {{ judge_email.never_received_sendable_count }} never emailed.
+            {% if judge_email.missing_email_count %}
+            <span class="ml-2">{{ judge_email.missing_email_count }} missing email addresses.</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center mt-2 mt-md-0">
+          <button
+            class="btn btn-sm btn-outline-secondary mr-2 mb-2"
+            data-select-target="judge-code-table"
+            data-select-mode="never-received"
+            type="button"
+            {% if not judge_email.sendable_count %}disabled{% endif %}
+          >
+            Select Never Received
+          </button>
+          <button
+            class="btn btn-sm btn-outline-secondary mr-2 mb-2"
+            data-select-target="judge-code-table"
+            data-select-mode="all"
+            type="button"
+            {% if not judge_email.sendable_count %}disabled{% endif %}
+          >
+            Select All
+          </button>
+          <button class="btn btn-primary btn-sm mb-2" type="submit" {% if not judge_email.sendable_count %}disabled{% endif %}>
+            Send Judge Codes
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive shadow-sm rounded bg-white">
+        <table class="table table-sm table-hover align-middle mb-0 email-management-table" id="judge-code-table">
+          <thead class="thead-light">
+            <tr>
+              <th scope="col" style="width: 40px;">Send</th>
+              <th scope="col" data-sort-key="name" class="sortable">Judge <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="email" class="sortable">Email <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="code" class="sortable">Judge Code <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="status" class="sortable">Status <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="sent" class="sortable">Last Sent <span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in judge_email.rows %}
+            <tr
+              class="{% if not row.can_send %}text-muted{% endif %}"
+              data-can-send="{% if row.can_send %}true{% else %}false{% endif %}"
+              data-never-received="{% if row.never_received %}true{% else %}false{% endif %}"
+            >
+              <td>
+                {% if row.can_send %}
+                <input type="checkbox" name="judge_ids" value="{{ row.judge.id }}" {% if row.checked %}checked{% endif %}>
+                {% else %}
+                <input type="checkbox" disabled>
+                {% endif %}
+              </td>
+              <td data-sort-value="{{ row.judge.name|lower }}">
+                <a href="/judge/{{ row.judge.id }}/" class="text-primary">{{ row.judge.name }}</a>
+              </td>
+              <td data-sort-value="{{ row.email|default:''|lower }}">{{ row.email|default:"-" }}</td>
+              <td data-sort-value="{{ row.ballot_code|default:'' }}">{{ row.ballot_code|default:"-" }}</td>
+              <td data-sort-value="{{ row.status|lower }}">
+                {% if row.can_send %}
+                  <span class="text-success font-weight-semibold">Ready</span>
+                {% else %}
+                  <span class="text-muted">{{ row.status }}</span>
+                {% endif %}
+              </td>
+              <td data-sort-value="{{ row.last_sent|date:'U'|default:0 }}">
+                {% if row.last_sent %}
+                  {{ row.last_sent|date:"M j, g:i a" }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-muted text-center py-3">No judges found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </form>
+
+  <form method="post" class="mb-4 email-management-panel" data-email-management-panel="written-rfds" hidden>
+    {% csrf_token %}
+    <input type="hidden" name="email_action" value="written_rfds">
+    <section class="mb-4">
+      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-2">
+        <div>
+          <h2 class="h5 mb-1">Written RFDs</h2>
+          <div class="text-muted small">
+            Default selection: {{ written_rfd_email.never_received_sendable_count }} never emailed.
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center mt-2 mt-md-0">
+          <button class="btn btn-primary btn-sm mb-2" type="submit" {% if not written_rfd_email.sendable_count %}disabled{% endif %}>
+            Send Written RFDs
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive shadow-sm rounded bg-white">
+        <table class="table table-sm table-hover align-middle mb-0 email-management-table" id="written-rfd-table">
+          <thead class="thead-light">
+            <tr>
+              <th scope="col" style="width: 40px;">Send</th>
+              <th scope="col" data-sort-key="round" class="sortable">Round <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="gov" class="sortable">Government <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="opp" class="sortable">Opposition <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="winner" class="sortable">Winner <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="recipients" class="sortable">Recipients <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="status" class="sortable">Status <span class="sort-arrow"></span></th>
+              <th scope="col" data-sort-key="sent" class="sortable">Last Sent <span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in written_rfd_email.rows %}
+            <tr class="{% if not row.can_send %}text-muted{% endif %}">
+              <td>
+                {% if row.can_send %}
+                <input type="checkbox" name="round_ids" value="{{ row.round.id }}" {% if row.checked %}checked{% endif %}>
+                {% else %}
+                <input type="checkbox" disabled>
+                {% endif %}
+              </td>
+              <td data-sort-value="{{ row.round.round_number }}">Round {{ row.round.round_number }}</td>
+              <td data-sort-value="{{ row.round.gov_team.display|lower }}">{{ row.round.gov_team.display }}</td>
+              <td data-sort-value="{{ row.round.opp_team.display|lower }}">{{ row.round.opp_team.display }}</td>
+              <td data-sort-value="{{ row.winner|lower }}">{{ row.winner }}</td>
+              <td data-sort-value="{{ row.recipient_count }}">{{ row.recipient_count }}</td>
+              <td data-sort-value="{{ row.status|lower }}">
+                {% if row.can_send %}
+                  <span class="text-success font-weight-semibold">Ready</span>
+                {% else %}
+                  <span class="text-muted">{{ row.status }}</span>
+                {% endif %}
+              </td>
+              <td data-sort-value="{{ row.last_sent|date:'U'|default:0 }}">
+                {% if row.last_sent %}
+                  {{ row.last_sent|date:"M j, g:i a" }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-muted text-center py-3">No completed rounds with written RFDs found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </form>
+
+  <section class="email-management-panel" data-email-management-panel="sent-history" hidden>
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h2 class="h5 mb-0">Sent Email History</h2>
+      <span class="text-muted small">{{ history_rows|length }} recent record{{ history_rows|length|pluralize }}</span>
+    </div>
+    <div class="table-responsive shadow-sm rounded bg-white">
+      <table class="table table-sm table-hover align-middle mb-0 email-management-table" id="email-history-table">
+        <thead class="thead-light">
+          <tr>
+            <th scope="col" data-sort-key="type" class="sortable">Type <span class="sort-arrow"></span></th>
+            <th scope="col" data-sort-key="target" class="sortable">Target <span class="sort-arrow"></span></th>
+            <th scope="col" data-sort-key="recipient" class="sortable">Recipient <span class="sort-arrow"></span></th>
+            <th scope="col" data-sort-key="detail" class="sortable">Detail <span class="sort-arrow"></span></th>
+            <th scope="col" data-sort-key="sent" class="sortable">Sent At <span class="sort-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in history_rows %}
+          <tr>
+            <td data-sort-value="{{ row.type|lower }}">{{ row.type }}</td>
+            <td data-sort-value="{{ row.target|lower }}">
+              {% if row.target_url %}
+              <a href="{{ row.target_url }}" class="text-primary">{{ row.target }}</a>
+              {% else %}
+              {{ row.target }}
+              {% endif %}
+            </td>
+            <td data-sort-value="{{ row.recipient|lower }}">{{ row.recipient }}</td>
+            <td data-sort-value="{{ row.detail|lower }}">{{ row.detail }}</td>
+            <td data-sort-value="{{ row.sent_at|date:'U' }}">{{ row.sent_at|date:"M j, g:i a" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted text-center py-3">No sent email records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<p style="margin:0 0 12px;">Hi {{ school_name }},</p>
+<p style="margin:0 0 16px;">Your registration for <strong>{{ tournament_name }}</strong> has been received. A summary of the teams and judges you registered is included below for your records.</p>
+<p style="margin:0 0 20px;"><a href="{{ edit_url }}" style="display:inline-block;background-color:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:bold;">Edit your registration</a></p>
+<p style="margin:0 0 24px;color:#4b5563;font-size:14px;">You can edit your registration any time before the tournament. Confirmation code: <strong>{{ registration_code }}</strong></p>
+
+{% if followup_links %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background-color:#f8fafc;border:1px solid #dbeafe;border-collapse:collapse;">
+  <tr>
+    <td style="padding:14px 16px;">
+      <p style="margin:0 0 10px;font-weight:bold;color:#1f2937;">A few more things to complete</p>
+      <p style="margin:0 0 12px;color:#4b5563;font-size:14px;">When you have a moment, please take care of the following:</p>
+      {% for link in followup_links %}
+      <p style="margin:0 0 8px;">
+        <a href="{{ link.url }}" style="color:#1d4ed8;font-weight:bold;text-decoration:underline;">{{ link.title }}</a>{% if link.description %}<br /><span style="color:#4b5563;font-size:13px;">{{ link.description }}</span>{% endif %}
+      </p>
+      {% endfor %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+<h2 style="margin:24px 0 8px;font-size:16px;color:#111827;">School and contact</h2>
+<p style="margin:0 0 8px;"><strong>School:</strong> {{ school_name }}<br /><strong>Email:</strong> {{ contact_email }}</p>
+
+<h2 style="margin:24px 0 8px;font-size:16px;color:#111827;">Teams</h2>
+{% if teams %}
+<ul style="margin:0;padding-left:20px;">
+  {% for team in teams %}
+  <li style="margin-bottom:10px;">
+    <strong>{{ team.name }}</strong>
+    <ul style="margin:4px 0 0;padding-left:20px;">
+      <li>School protection: {{ team.school_name }}</li>
+      <li>Seed: {{ team.seed }}</li>
+      <li>Team code: <strong>{{ team.team_code }}</strong></li>
+      <li>Team portal: <a href="{{ team.portal_url }}" style="color:#1d4ed8;">{{ team.portal_url }}</a></li>
+      <li>Debaters:
+        <ul style="margin:4px 0 0;padding-left:20px;">
+          {% for debater in team.debaters %}
+          <li>{{ debater.name }} ({{ debater.school_name }}; {{ debater.status }}; APDA ID: {{ debater.apda_id }}; Qualified: {{ debater.qualified }})</li>
+          {% endfor %}
+        </ul>
+      </li>
+    </ul>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p style="margin:0;">None</p>
+{% endif %}
+
+<h2 style="margin:24px 0 8px;font-size:16px;color:#111827;">Judges</h2>
+{% if judges %}
+<ul style="margin:0;padding-left:20px;">
+  {% for judge in judges %}
+  <li style="margin-bottom:10px;">
+    <strong>{{ judge.name }}</strong>
+    <ul style="margin:4px 0 0;padding-left:20px;">
+      <li>Experience: {{ judge.rank }}</li>
+      <li>Schools: {{ judge.schools }}</li>
+      <li>Availability: {{ judge.availability }}</li>
+    </ul>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p style="margin:0;">None</p>
+{% endif %}
+
+<p style="margin:28px 0 0;color:#4b5563;font-size:14px;">Thanks,<br />The Tab Team</p>
+{% endblock %}

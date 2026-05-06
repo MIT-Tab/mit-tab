@@ -1,0 +1,27 @@
+{% extends "base/__wide.html" %}
+{% load bootstrap4 %}
+
+{% block title %}Set Staff Password{% endblock %}
+
+{% block content %}
+<div class="col-12 col-lg-6 mx-auto">
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+      {% if validlink %}
+      <h1 class="h4 text-center mb-4">Set Staff Password</h1>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% bootstrap_form form %}
+        <button type="submit" class="btn btn-primary btn-block mt-3">Set Password</button>
+      </form>
+      {% else %}
+      <h1 class="h4 text-center mb-3">Invite Link Expired</h1>
+      <p class="mb-0">
+        This invite link is invalid or has already been used. Ask a tournament
+        administrator to send a new invite.
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

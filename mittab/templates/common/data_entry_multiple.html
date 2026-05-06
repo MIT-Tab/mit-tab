@@ -24,7 +24,11 @@
         <div class="mb-3 small text-muted">
           Created by {{ metadata.created_by }}{% if metadata.created_at %} at {{ metadata.created_at }}{% endif %}
           {% if metadata.audit_events %}
-            <ul class="mt-2 mb-0">
+          <details class="audit-events-inline mt-1">
+            <summary class="audit-trail-summary">
+              <i class="fas fa-history"></i> History ({{ metadata.audit_events|length }})
+            </summary>
+            <ul class="mt-1 mb-0 pl-3">
               {% for event in metadata.audit_events %}
                 <li>
                   {{ event.label }} by {{ event.user_display }} at {{ event.created_at }}
@@ -33,17 +37,24 @@
                 </li>
               {% endfor %}
             </ul>
+          </details>
           {% endif %}
         </div>
         {% endif %}
-        {% bootstrap_form form %}
+        {% if read_only %}
+          <fieldset disabled>
+            {% bootstrap_form form %}
+          </fieldset>
+        {% else %}
+          {% bootstrap_form form %}
+        {% endif %}
       </div>
     </div>
     {% endfor %}
 
     {% return_to_input %}
 
-    {% if forms %}
+    {% if forms and not read_only %}
     <input type="submit" class="btn btn-primary" value="Submit"/>
     {% else %}
     <p class="text-center lead">No scratches</p>

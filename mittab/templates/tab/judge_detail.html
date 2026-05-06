@@ -3,7 +3,7 @@
 {% block detail_content %}
 <div class="col-md-1"></div>
 <div class="col-md-5">
-  {% if judge_rounds %}
+  {% if user.is_superuser and judge_rounds %}
   <div class="team-record">
     <h5>Rounds Judged</h5>
     <table class="table table-striped">

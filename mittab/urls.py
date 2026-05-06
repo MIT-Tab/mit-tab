@@ -2,8 +2,6 @@ from django.views import i18n
 from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
-from django.contrib.auth.views import LoginView
-from django.views.generic.base import RedirectView
 
 import mittab.settings as settings
 import mittab.apps.tab.views.views as views
@@ -15,20 +13,32 @@ import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
+import mittab.apps.tab.views.staff_invite_views as staff_invite_views
+import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
+import mittab.apps.registration.views as registration_views
 
 
 admin.autodiscover()
 
 urlpatterns = [
-    path("favicon.ico",
-         RedirectView.as_view(url=settings.STATIC_URL +
-                              "img/favicon.ico", permanent=True)),
+    path("favicon.ico", public_views.favicon, name="favicon"),
+    path("tournament-logo/", public_views.tournament_logo, name="tournament_logo"),
     path("admin/logout/", views.tab_logout, name="admin_logout"),
     path("accounts/logout/", views.tab_logout, name="logout"),
     re_path(r"^admin/", admin.site.urls, name="admin"),
     path("dynamic-media/jsi18n/", i18n.JavaScriptCatalog.as_view(), name="js18"),
     path("", views.index, name="index"),
     path("registration/", include("mittab.apps.registration.urls")),
+    path(
+        "team_portal/",
+        registration_views.team_portal_search,
+        name="team_portal_search",
+    ),
+    path(
+        "team_portal/<str:team_code>/",
+        registration_views.team_portal,
+        name="team_portal",
+    ),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
     path(
         "apda-board/schools/export/",
@@ -67,6 +77,7 @@ urlpatterns = [
 
     # Judge related
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
+    re_path(r"^judge/(\d+)/delete/$", judge_views.delete_judge, name="delete_judge"),
     re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
             judge_views.add_scratches,
             name="add_scratches"),
@@ -78,12 +89,9 @@ urlpatterns = [
     path("download_judge_codes/",
          judge_views.download_judge_codes,
          name="download_judge_codes"),
-    path("send_judge_codes/",
-         judge_views.send_judge_codes,
-         name="send_judge_codes"),
-    path("send_written_rfds/",
-         judge_views.send_written_rfds,
-         name="send_written_rfds"),
+    path("email_management/",
+         judge_views.email_management,
+         name="email_management"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
@@ -93,6 +101,7 @@ urlpatterns = [
 
     # Room related
     re_path(r"^room/(\d+)/$", views.view_room, name="view_room"),
+    re_path(r"^room/(\d+)/delete/$", views.delete_room, name="delete_room"),
     path("view_rooms/", views.view_rooms, name="view_rooms"),
     path("enter_room/", views.enter_room, name="enter_room"),
 
@@ -119,6 +128,7 @@ urlpatterns = [
 
     # Team related
     re_path(r"^team/(\d+)/$", team_views.view_team, name="view_team"),
+    re_path(r"^team/(\d+)/delete/$", team_views.delete_team, name="delete_team"),
     re_path(r"^team/(\d+)/scratches/add/(\d+)/",
             team_views.add_scratches,
             name="add_scratches"),
@@ -138,6 +148,9 @@ urlpatterns = [
 
     # Debater related
     re_path(r"^debater/(\d+)/$", debater_views.view_debater, name="view_debater"),
+    re_path(r"^debater/(\d+)/delete/$",
+            debater_views.delete_debater,
+            name="delete_debater"),
     path("view_debaters/", debater_views.view_debaters,
          name="view_debaters"),
     path("enter_debater/", debater_views.enter_debater,
@@ -151,9 +164,38 @@ urlpatterns = [
         views.public_rankings_control,
         name="public_rankings_control",
     ),
+    path(
+        "settings/public-homepage/",
+        views.public_homepage,
+        name="public_homepage",
+    ),
+    path(
+        "setup/tournament-todo/",
+        tournament_todo_views.tournament_todo,
+        name="tournament_todo",
+    ),
+    path(
+        "setup/tournament-todo/toggle/",
+        tournament_todo_views.tournament_todo_toggle,
+        name="tournament_todo_toggle",
+    ),
+    path("staff/invite/", staff_invite_views.invite_staff, name="invite_staff"),
+    path(
+        "public/staff-invite/<uidb64>/<token>/",
+        staff_invite_views.StaffInviteConfirmView.as_view(),
+        name="staff_invite_confirm",
+    ),
+    path(
+        "public/staff-invite/complete/",
+        staff_invite_views.StaffInviteCompleteView.as_view(),
+        name="staff_invite_complete",
+    ),
 
     # Pairing related
     path("pairings/status/", pairing_views.view_status, name="view_status"),
+    path("pairings/quick_judge_checkin/",
+         pairing_views.quick_judge_checkin,
+         name="quick_judge_checkin"),
     path("pairings/view_rounds/",
          pairing_views.view_rounds,
          name="view_rounds"),
@@ -403,7 +445,7 @@ urlpatterns = [
          public_views.public_access_error,
          name="public_access_error"),
     path("public/login/",
-         LoginView.as_view(template_name="public/staff_login.html"),
+         tournament_todo_views.StaffLoginView.as_view(),
          name="tab_login"),
     path("public/pairings/",
          public_views.pretty_pair,

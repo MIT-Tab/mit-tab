@@ -8,12 +8,22 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db.models import Q, Max
 from django.utils import timezone
 
+from mittab.apps.tab.auth_roles import (
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.libs.errors import *
 from mittab.libs.tab_logic import TabFlags
-from mittab.libs.email_service import EmailRequest, EmailService, EmailServiceError
+from mittab.libs.email_service import EmailService, EmailServiceError
+from mittab.libs.email_views import (
+    build_judge_ballot_code_email,
+    build_written_rfd_email,
+)
 
 
 EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
@@ -34,7 +44,6 @@ def _format_available_rounds(expected_checkins):
 
 def _prepare_judge_code_plan(judges, tournament_name, request):
     portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
-    subject = f"{tournament_name} Judge Portal and Ballots"
     now = timezone.now()
     cutoff = now - EMAIL_RATE_LIMIT_WINDOW
 
@@ -93,7 +102,9 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             continue
 
         if batch_email_counts[email_lower] >= EMAILS_PER_ADDRESS_PER_BATCH:
-            skipped_duplicate_email.append((judge, "Email already queued in this batch"))
+            skipped_duplicate_email.append(
+                (judge, "Email already queued in this batch")
+            )
             continue
 
         if not judge.ballot_code:
@@ -101,27 +112,20 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             judge.save(update_fields=["ballot_code"])
 
         if len(judge.ballot_code or "") > BALLOT_CODE_MAX_LENGTH:
-            skipped_invalid.append((judge, f"Code exceeds {BALLOT_CODE_MAX_LENGTH} characters"))
+            skipped_invalid.append(
+                (judge, f"Code exceeds {BALLOT_CODE_MAX_LENGTH} characters")
+            )
             continue
 
         portal_url = request.build_absolute_uri(
             reverse("judge_portal", args=[judge.ballot_code])
         )
-        availability = _format_available_rounds(judge.expected_checkins.all())
-        text_body = (
-            f"Hi {judge.name},\n\n"
-            f"Your judge code for {tournament_name} is {judge.ballot_code}.\n"
-            f"Your current availability is: {availability}.\n\n"
-            f"Open the judge portal to change availability or submit ballots: {portal_url}\n"
-            f"You can also search by judge code at {portal_search_url}.\n\n"
-            "Thank you,\n"
-            "Tab Staff"
-        )
-
-        email_request = EmailRequest(
-            to_address=email,
-            subject=subject,
-            text_body=text_body,
+        email_request = build_judge_ballot_code_email(
+            email,
+            judge,
+            tournament_name,
+            portal_url,
+            portal_search_url,
         )
 
         log_entry = JudgeCodeEmailLog(
@@ -134,7 +138,7 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             "judge": judge,
             "email": email,
             "ballot_code": judge.ballot_code,
-            "ballot_url": ballot_url,
+            "ballot_url": portal_url,
             "email_request": email_request,
             "log_entry": log_entry,
         })
@@ -210,23 +214,14 @@ def _prepare_written_rfd_plan(rounds, tournament_name):
         winner = round_obj.winner
         winner_name = winner.display if winner else round_obj.get_victor_display()
         judge_name = round_obj.chair.name if round_obj.chair else "Unknown"
-        subject = f"{tournament_name} Round {round_obj.round_number} RFD"
-        text_body = (
-            f"{tournament_name} Round {round_obj.round_number}\n\n"
-            f"Government: {round_obj.gov_team.display}\n"
-            f"Opposition: {round_obj.opp_team.display}\n"
-            f"Winner: {winner_name}\n\n"
-            f"Judge: {judge_name}\n\n"
-            "Reason for decision:\n"
-            f"{rfd_text}\n\n"
-            "Thank you,\n"
-            "Tab Staff"
-        )
         email_requests = [
-            EmailRequest(
-                to_address=email,
-                subject=subject,
-                text_body=text_body,
+            build_written_rfd_email(
+                email,
+                tournament_name,
+                round_obj,
+                winner_name,
+                judge_name,
+                rfd_text,
             )
             for email in recipient_emails
         ]
@@ -251,21 +246,26 @@ def _prepare_written_rfd_plan(rounds, tournament_name):
 def view_judges(request):
     # Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
-    checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
-    checked_in_judges = set([c.judge for c in checkins])
-    checked_in_judges_next = set([c.judge for c in checkins_next])
+    include_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
+    checked_in_judges = set()
+    checked_in_judges_next = set()
+    if include_checkins:
+        checkins = CheckIn.objects.filter(round_number=current_round)
+        checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
+        checked_in_judges = set([c.judge for c in checkins])
+        checked_in_judges_next = set([c.judge for c in checkins_next])
 
     def flags(judge):
         result = 0
-        if judge in checked_in_judges:
-            result |= TabFlags.JUDGE_CHECKED_IN_CUR
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
-        if judge in checked_in_judges_next:
-            result |= TabFlags.JUDGE_CHECKED_IN_NEXT
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
+        if include_checkins:
+            if judge in checked_in_judges:
+                result |= TabFlags.JUDGE_CHECKED_IN_CUR
+            else:
+                result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
+            if judge in checked_in_judges_next:
+                result |= TabFlags.JUDGE_CHECKED_IN_NEXT
+            else:
+                result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
 
         if judge.rank < 3.0:
             result |= TabFlags.LOW_RANKED_JUDGE
@@ -289,19 +289,18 @@ def view_judges(request):
         for judge in judges
     ]
 
-    all_flags = [
-        [
+    all_flags = [[
+        TabFlags.LOW_RANKED_JUDGE,
+        TabFlags.MID_RANKED_JUDGE,
+        TabFlags.HIGH_RANKED_JUDGE,
+    ]]
+    if include_checkins:
+        all_flags.insert(0, [
             TabFlags.JUDGE_CHECKED_IN_CUR,
             TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
             TabFlags.JUDGE_CHECKED_IN_NEXT,
             TabFlags.JUDGE_NOT_CHECKED_IN_NEXT,
-        ],
-        [
-            TabFlags.LOW_RANKED_JUDGE,
-            TabFlags.MID_RANKED_JUDGE,
-            TabFlags.HIGH_RANKED_JUDGE,
-        ]
-    ]
+        ])
     filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
@@ -320,7 +319,11 @@ def view_judge(request, judge_id):
     except Judge.DoesNotExist:
         return redirect_and_flash_error(request, "Judge not found")
     if request.method == "POST":
-        form = JudgeForm(request.POST, instance=judge)
+        form = JudgeForm(
+            request.POST,
+            instance=judge,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
                 form.save(actor=request.user)
@@ -331,12 +334,19 @@ def view_judge(request, judge_id):
             return redirect_and_flash_success(
                 request, f"Judge {updated_name} updated successfully")
     else:
-        form = JudgeForm(instance=judge)
+        form = JudgeForm(
+            instance=judge,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
             "gov_team", "opp_team", "room"))
     base_url = f"/judge/{judge_id}/"
     scratch_url = f"{base_url}scratches/view/"
-    links = [(scratch_url, f"Scratches for {judge.name}")]
+    links = []
+    if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        links.append((f"/judge/{judge_id}/delete/", "Delete"))
+    if user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES):
+        links.append((scratch_url, f"Scratches for {judge.name}"))
     return render(
         request, "tab/judge_detail.html", {
             "form": form,
@@ -368,6 +378,23 @@ def enter_judge(request):
         "form": form,
         "title": "Create Judge"
     })
+
+
+def delete_judge(request, judge_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(request, "You cannot delete judges", path="/403/")
+
+    try:
+        judge_id = int(judge_id)
+        judge = Judge.objects.get(pk=judge_id)
+        judge.delete()
+    except Judge.DoesNotExist:
+        return redirect_and_flash_error(request, "That judge does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Judge deleted successfully",
+                                      path="/")
 
 
 def add_scratches(request, judge_id, number_scratches):
@@ -455,10 +482,13 @@ def view_scratches(request, judge_id):
             )
             for i in range(len(scratches))
         ]
-    delete_links = [
-        f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
-    ]
+    read_only = not request.user.is_superuser
+    delete_links = [None] * len(scratches)
+    if not read_only:
+        delete_links = [
+            f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
+            for i in range(len(scratches))
+        ]
     metadata = [
         {
             "created_by": scratch.created_by_display,
@@ -474,6 +504,7 @@ def view_scratches(request, judge_id):
             "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
+            "read_only": read_only,
             "title": f"Viewing Scratch Information for {judge.name}"
         })
 
@@ -488,13 +519,12 @@ def download_judge_codes(request):
     return response
 
 
-def send_judge_codes(request):
+def _judge_email_management_context(request):
     all_judges = list(
         Judge.objects.prefetch_related("expected_checkins").order_by("name")
     )
     missing_email_count = len([judge for judge in all_judges if not judge.email])
     rate_limit_hours = max(1, int(EMAIL_RATE_LIMIT_WINDOW.total_seconds() // 3600))
-
     tournament_name = TabSettings.get("tournament_name", "your tournament")
     plan = _prepare_judge_code_plan(all_judges, tournament_name, request)
     sendable_by_id = {entry["judge"].id: entry for entry in plan["sendable"]}
@@ -505,7 +535,6 @@ def send_judge_codes(request):
         judge_id for judge_id in sendable_by_id.keys()
         if judge_id not in emailed_judge_ids
     ]
-    default_selected_id_set = set(default_selected_ids)
 
     if request.method == "POST":
         selected_ids = []
@@ -515,7 +544,7 @@ def send_judge_codes(request):
                 continue
 
             parsed_id = int(judge_id)
-            if parsed_id not in default_selected_id_set or parsed_id in seen_ids:
+            if parsed_id not in sendable_by_id or parsed_id in seen_ids:
                 continue
 
             selected_ids.append(parsed_id)
@@ -563,75 +592,9 @@ def send_judge_codes(request):
             "last_sent": last_sent_map.get(judge.id),
         })
 
-    if request.method == "POST":
-        selected_entries = [sendable_by_id[jid] for jid in selected_ids]
-
-        if not selected_entries:
-            skipped_total = (
-                len(plan["skipped_invalid"]) +
-                len(plan["skipped_rate_limited"]) +
-                len(plan["skipped_duplicate_email"]) +
-                len(plan["skipped_missing_email"])
-            )
-            reason = " due to rate limiting or invalid data" if skipped_total else ""
-            return redirect_and_flash_error(
-                request,
-                f"No judge codes were sent{reason}.",
-            )
-
-        email_requests = [entry["email_request"] for entry in selected_entries]
-        log_entries = [entry["log_entry"] for entry in selected_entries]
-
-        try:
-            sent = EmailService().send_bulk(email_requests)
-        except ImproperlyConfigured as exc:
-            return redirect_and_flash_error(
-                request,
-                f"Unable to send judge codes: {exc}",
-            )
-        except EmailServiceError as exc:
-            sent_request_ids = {id(email_request) for email_request in exc.sent_requests}
-            sent_log_entries = [
-                entry["log_entry"]
-                for entry in selected_entries
-                if id(entry["email_request"]) in sent_request_ids
-            ]
-            if sent_log_entries:
-                JudgeCodeEmailLog.objects.bulk_create(sent_log_entries)
-
-            partial_message = ""
-            if sent_log_entries:
-                sent_count = len(sent_log_entries)
-                partial_message = (
-                    f" after sending {sent_count} judge code"
-                    f"{'' if sent_count == 1 else 's'}"
-                )
-
-            return redirect_and_flash_error(
-                request,
-                f"Unable to send judge codes{partial_message}: {exc}",
-            )
-
-        JudgeCodeEmailLog.objects.bulk_create(log_entries)
-
-        skipped_total = (
-            len(plan["skipped_invalid"]) +
-            len(plan["skipped_rate_limited"]) +
-            len(plan["skipped_duplicate_email"]) +
-            len(plan["skipped_missing_email"])
-        )
-        message = f"Sent judge portal links to {sent} judge{'' if sent == 1 else 's'}."
-        if skipped_total:
-            message += f" Skipped {skipped_total} due to invalid codes or rate limiting."
-
-        return redirect_and_flash_success(
-            request,
-            message,
-        )
-
-    context = {
+    return {
         "missing_email_count": missing_email_count,
-        "judge_rows": judge_rows,
+        "rows": judge_rows,
         "rate_limit_hours": rate_limit_hours,
         "sendable_count": len(sendable_by_id),
         "never_received_sendable_count": len(default_selected_ids),
@@ -639,11 +602,84 @@ def send_judge_codes(request):
         "skipped_rate_limited": plan["skipped_rate_limited"],
         "skipped_duplicate_email": plan["skipped_duplicate_email"],
         "skipped_missing_email": plan["skipped_missing_email"],
+        "selected_entries": [sendable_by_id[jid] for jid in selected_ids],
     }
-    return render(request, "tab/send_judge_codes.html", context)
 
 
-def send_written_rfds(request):
+def _send_judge_code_emails(request, selected_entries, judge_context):
+    if not selected_entries:
+        skipped_total = (
+            len(judge_context["skipped_invalid"]) +
+            len(judge_context["skipped_rate_limited"]) +
+            len(judge_context["skipped_duplicate_email"]) +
+            len(judge_context["skipped_missing_email"])
+        )
+        reason = " due to rate limiting or invalid data" if skipped_total else ""
+        return redirect_and_flash_error(
+            request,
+            f"No judge codes were sent{reason}.",
+            path=reverse("email_management"),
+        )
+
+    email_requests = [entry["email_request"] for entry in selected_entries]
+    log_entries = [entry["log_entry"] for entry in selected_entries]
+
+    try:
+        sent = EmailService().send_bulk(email_requests)
+    except ImproperlyConfigured as exc:
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send judge codes: {exc}",
+            path=reverse("email_management"),
+        )
+    except EmailServiceError as exc:
+        sent_request_ids = {
+            id(email_request) for email_request in exc.sent_requests
+        }
+        sent_log_entries = [
+            entry["log_entry"]
+            for entry in selected_entries
+            if id(entry["email_request"]) in sent_request_ids
+        ]
+        if sent_log_entries:
+            JudgeCodeEmailLog.objects.bulk_create(sent_log_entries)
+
+        partial_message = ""
+        if sent_log_entries:
+            sent_count = len(sent_log_entries)
+            partial_message = (
+                f" after sending {sent_count} judge code"
+                f"{'' if sent_count == 1 else 's'}"
+            )
+
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send judge codes{partial_message}: {exc}",
+            path=reverse("email_management"),
+        )
+
+    JudgeCodeEmailLog.objects.bulk_create(log_entries)
+
+    skipped_total = (
+        len(judge_context["skipped_invalid"]) +
+        len(judge_context["skipped_rate_limited"]) +
+        len(judge_context["skipped_duplicate_email"]) +
+        len(judge_context["skipped_missing_email"])
+    )
+    message = f"Sent judge portal links to {sent} judge{'' if sent == 1 else 's'}."
+    if skipped_total:
+        message += (
+            f" Skipped {skipped_total} due to invalid codes or rate limiting."
+        )
+
+    return redirect_and_flash_success(
+        request,
+        message,
+        path=reverse("email_management"),
+    )
+
+
+def _written_rfd_email_management_context(request):
     rounds = list(_completed_rounds_with_written_rfds())
     tournament_name = TabSettings.get("tournament_name", "your tournament")
     plan = _prepare_written_rfd_plan(rounds, tournament_name)
@@ -656,7 +692,6 @@ def send_written_rfds(request):
         round_id for round_id in sendable_by_id.keys()
         if round_id not in emailed_round_ids
     ]
-    default_selected_id_set = set(default_selected_ids)
 
     if request.method == "POST":
         selected_ids = []
@@ -705,78 +740,165 @@ def send_written_rfds(request):
             "recipient_count": recipient_count,
             "can_send": can_send,
             "checked": checked,
-            "status": status_lookup.get(round_obj.id, "Ready" if can_send else "Not eligible"),
+            "status": status_lookup.get(
+                round_obj.id,
+                "Ready" if can_send else "Not eligible",
+            ),
             "reason": reason_lookup.get(round_obj.id),
             "never_received": round_obj.id not in emailed_round_ids,
             "last_sent": last_sent_map.get(round_obj.id),
         })
 
-    if request.method == "POST":
-        selected_entries = [sendable_by_id[round_id] for round_id in selected_ids]
-
-        if not selected_entries:
-            return redirect_and_flash_error(
-                request,
-                "No written RFD emails were sent.",
-            )
-
-        email_requests = [
-            email_request
-            for entry in selected_entries
-            for email_request in entry["email_requests"]
-        ]
-        log_entries_by_request_id = {
-            id(email_request): log_entry
-            for entry in selected_entries
-            for email_request, log_entry in zip(
-                entry["email_requests"], entry["log_entries"]
-            )
-        }
-
-        try:
-            sent = EmailService().send_bulk(email_requests)
-        except ImproperlyConfigured as exc:
-            return redirect_and_flash_error(
-                request,
-                f"Unable to send written RFDs: {exc}",
-            )
-        except EmailServiceError as exc:
-            sent_log_entries = [
-                log_entries_by_request_id[id(email_request)]
-                for email_request in exc.sent_requests
-                if id(email_request) in log_entries_by_request_id
-            ]
-            if sent_log_entries:
-                WrittenRFDEmailLog.objects.bulk_create(sent_log_entries)
-
-            partial_message = ""
-            if sent_log_entries:
-                sent_count = len(sent_log_entries)
-                partial_message = (
-                    f" after sending {sent_count} written RFD email"
-                    f"{'' if sent_count == 1 else 's'}"
-                )
-
-            return redirect_and_flash_error(
-                request,
-                f"Unable to send written RFDs{partial_message}: {exc}",
-            )
-
-        WrittenRFDEmailLog.objects.bulk_create(
-            [log_entries_by_request_id[id(email_request)]
-             for email_request in email_requests]
-        )
-
-        return redirect_and_flash_success(
-            request,
-            f"Sent {sent} written RFD email{'' if sent == 1 else 's'}.",
-        )
-
-    context = {
-        "round_rows": round_rows,
+    return {
+        "rows": round_rows,
         "sendable_count": len(sendable_by_id),
-        "never_received_sendable_count": len(default_selected_id_set),
+        "never_received_sendable_count": len(default_selected_ids),
         "skipped_missing_rfd": plan["skipped_missing_rfd"],
         "skipped_missing_email": plan["skipped_missing_email"],
+        "selected_entries": [
+            sendable_by_id[round_id] for round_id in selected_ids
+        ],
     }
-    return render(request, "tab/send_written_rfds.html", context)
+
+
+def _send_written_rfd_emails(request, selected_entries):
+    if not selected_entries:
+        return redirect_and_flash_error(
+            request,
+            "No written RFD emails were sent.",
+            path=reverse("email_management"),
+        )
+
+    email_requests = [
+        email_request
+        for entry in selected_entries
+        for email_request in entry["email_requests"]
+    ]
+    log_entries_by_request_id = {
+        id(email_request): log_entry
+        for entry in selected_entries
+        for email_request, log_entry in zip(
+            entry["email_requests"], entry["log_entries"]
+        )
+    }
+
+    try:
+        sent = EmailService().send_bulk(email_requests)
+    except ImproperlyConfigured as exc:
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send written RFDs: {exc}",
+            path=reverse("email_management"),
+        )
+    except EmailServiceError as exc:
+        sent_log_entries = [
+            log_entries_by_request_id[id(email_request)]
+            for email_request in exc.sent_requests
+            if id(email_request) in log_entries_by_request_id
+        ]
+        if sent_log_entries:
+            WrittenRFDEmailLog.objects.bulk_create(sent_log_entries)
+
+        partial_message = ""
+        if sent_log_entries:
+            sent_count = len(sent_log_entries)
+            partial_message = (
+                f" after sending {sent_count} written RFD email"
+                f"{'' if sent_count == 1 else 's'}"
+            )
+
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send written RFDs{partial_message}: {exc}",
+            path=reverse("email_management"),
+        )
+
+    WrittenRFDEmailLog.objects.bulk_create(
+        [
+            log_entries_by_request_id[id(email_request)]
+            for email_request in email_requests
+        ]
+    )
+
+    return redirect_and_flash_success(
+        request,
+        f"Sent {sent} written RFD email{'' if sent == 1 else 's'}.",
+        path=reverse("email_management"),
+    )
+
+
+def _judge_code_history_rows():
+    logs = (
+        JudgeCodeEmailLog.objects.select_related("judge")
+        .order_by("-sent_at")
+    )
+    rows = []
+    for log in logs:
+        rows.append({
+            "type": "Judge code",
+            "target": log.judge.name,
+            "target_url": reverse("view_judge", args=[log.judge_id]),
+            "recipient": log.email or "Registration judge email",
+            "detail": f"Ballot code {log.ballot_code}",
+            "sent_at": log.sent_at,
+        })
+    return rows
+
+
+def _written_rfd_history_rows():
+    logs = (
+        WrittenRFDEmailLog.objects.select_related(
+            "round",
+            "round__gov_team",
+            "round__opp_team",
+        )
+        .order_by("-sent_at")
+    )
+    rows = []
+    for log in logs:
+        round_obj = log.round
+        rows.append({
+            "type": "Written RFD",
+            "target": f"Round {round_obj.round_number}",
+            "target_url": "",
+            "recipient": log.email,
+            "detail": (
+                f"{round_obj.gov_team.display} vs "
+                f"{round_obj.opp_team.display}"
+            ),
+            "sent_at": log.sent_at,
+        })
+    return rows
+
+
+def _email_history_rows():
+    rows = _judge_code_history_rows() + _written_rfd_history_rows()
+    return sorted(rows, key=lambda row: row["sent_at"], reverse=True)
+
+
+def email_management(request):
+    judge_context = _judge_email_management_context(request)
+    rfd_context = _written_rfd_email_management_context(request)
+
+    if request.method == "POST":
+        action = request.POST.get("email_action")
+        if action == "written_rfds":
+            return _send_written_rfd_emails(
+                request,
+                rfd_context["selected_entries"],
+            )
+        return _send_judge_code_emails(
+            request,
+            judge_context["selected_entries"],
+            judge_context,
+        )
+
+    return render(
+        request,
+        "tab/email_management.html",
+        {
+            "judge_email": judge_context,
+            "written_rfd_email": rfd_context,
+            "history_rows": _email_history_rows(),
+        },
+    )
