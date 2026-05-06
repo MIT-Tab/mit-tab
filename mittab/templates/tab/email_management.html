@@ -23,7 +23,16 @@
     </div>
   </div>
 
-  <form method="post" class="mb-4">
+  <div class="form-group mb-3">
+    <label class="font-weight-semibold" for="email-management-view">Email Type</label>
+    <select class="form-control form-control-sm w-auto" id="email-management-view">
+      <option value="judge-codes">Judge Codes</option>
+      <option value="written-rfds">Written RFDs</option>
+      <option value="sent-history">Sent Email History</option>
+    </select>
+  </div>
+
+  <form method="post" class="mb-4 email-management-panel" data-email-management-panel="judge-codes">
     {% csrf_token %}
     <input type="hidden" name="email_action" value="judge_codes">
     <section class="mb-4">
@@ -117,7 +126,7 @@
     </section>
   </form>
 
-  <form method="post" class="mb-4">
+  <form method="post" class="mb-4 email-management-panel" data-email-management-panel="written-rfds" hidden>
     {% csrf_token %}
     <input type="hidden" name="email_action" value="written_rfds">
     <section class="mb-4">
@@ -188,7 +197,7 @@
     </section>
   </form>
 
-  <section>
+  <section class="email-management-panel" data-email-management-panel="sent-history" hidden>
     <div class="d-flex align-items-center justify-content-between mb-2">
       <h2 class="h5 mb-0">Sent Email History</h2>
       <span class="text-muted small">{{ history_rows|length }} recent record{{ history_rows|length|pluralize }}</span>

@@ -747,6 +747,10 @@ class TestTabViews(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
+        self.assertIn('id="email-management-view"', content)
+        self.assertIn('value="judge-codes"', content)
+        self.assertIn('value="written-rfds"', content)
+        self.assertIn('value="sent-history"', content)
         self.assertIn("Sent Email History", content)
         self.assertIn("Registration judge email", content)
         self.assertIn("debater@example.com", content)

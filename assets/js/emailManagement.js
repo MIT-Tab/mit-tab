@@ -2,6 +2,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const tables = Array.from(
     document.querySelectorAll(".email-management-table"),
   );
+  const viewSelect = document.getElementById("email-management-view");
+  const panels = Array.from(
+    document.querySelectorAll("[data-email-management-panel]"),
+  );
+
+  const showPanel = (panelName) => {
+    panels.forEach((panel) => {
+      const emailPanel = panel;
+      emailPanel.hidden = emailPanel.dataset.emailManagementPanel !== panelName;
+    });
+  };
+
+  if (viewSelect) {
+    showPanel(viewSelect.value);
+    viewSelect.addEventListener("change", () => {
+      showPanel(viewSelect.value);
+    });
+  }
 
   const getValue = (cell) =>
     cell?.dataset.sortValue ?? cell?.textContent?.trim().toLowerCase() ?? "";
