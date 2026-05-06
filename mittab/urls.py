@@ -88,12 +88,9 @@ urlpatterns = [
     path("download_judge_codes/",
          judge_views.download_judge_codes,
          name="download_judge_codes"),
-    path("send_judge_codes/",
-         judge_views.send_judge_codes,
-         name="send_judge_codes"),
-    path("send_written_rfds/",
-         judge_views.send_written_rfds,
-         name="send_written_rfds"),
+    path("email_management/",
+         judge_views.email_management,
+         name="email_management"),
 
     # School related
     re_path(r"^school/(\d+)/$", views.view_school, name="view_school"),
