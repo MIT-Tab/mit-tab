@@ -9,6 +9,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
+from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
@@ -113,7 +114,7 @@ class Login:
 
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
-                view = LoginView.as_view(template_name="public/staff_login.html")
+                view = StaffLoginView.as_view()
                 return view(request)
             else:
                 return redirect_and_flash_info(

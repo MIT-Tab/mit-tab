@@ -2,7 +2,6 @@ from django.views import i18n
 from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
-from django.contrib.auth.views import LoginView
 
 import mittab.settings as settings
 import mittab.apps.tab.views.views as views
@@ -14,6 +13,7 @@ import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
+import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
 import mittab.apps.registration.views as registration_views
 
 
@@ -164,6 +164,16 @@ urlpatterns = [
         "settings/public-homepage/",
         views.public_homepage,
         name="public_homepage",
+    ),
+    path(
+        "setup/tournament-todo/",
+        tournament_todo_views.tournament_todo,
+        name="tournament_todo",
+    ),
+    path(
+        "setup/tournament-todo/toggle/",
+        tournament_todo_views.tournament_todo_toggle,
+        name="tournament_todo_toggle",
     ),
 
     # Pairing related
@@ -420,7 +430,7 @@ urlpatterns = [
          public_views.public_access_error,
          name="public_access_error"),
     path("public/login/",
-         LoginView.as_view(template_name="public/staff_login.html"),
+         tournament_todo_views.StaffLoginView.as_view(),
          name="tab_login"),
     path("public/pairings/",
          public_views.pretty_pair,

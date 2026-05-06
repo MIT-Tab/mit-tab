@@ -226,6 +226,21 @@ class TabSettings(models.Model):
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
 
 
+class UserTournamentSetupPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_setup_preference",
+    )
+    hide_tournament_todo = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "tournament setup preference"
+
+    def __str__(self):
+        return f"{self.user} hide checklist: {self.hide_tournament_todo}"
+
+
 class PublicDisplaySetting(models.Model):
     RANKING = "ranking"
     STANDING = "standing"

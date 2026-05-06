@@ -40,6 +40,7 @@
 {% url "settings_form" as settings_form %}
 {% url "registration_admin" as registration_admin %}
 {% url "public_homepage" as public_homepage_admin %}
+{% url "tournament_todo" as tournament_todo %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -132,10 +133,11 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request settings_form %}{% active request public_homepage_admin %}{% active request registration_admin %}{% active request manage_motions %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}{% active request settings_form %}{% active request public_homepage_admin %}{% active request tournament_todo %}{% active request registration_admin %}{% active request manage_motions %}">
             Admin
           </a>
           <div class="dropdown-menu">
+            <a class="dropdown-item {% active request tournament_todo %}" href="{{ tournament_todo|with_return_to }}">Tournament To-Do List</a>
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin|with_return_to }}">Batch Checkin</a>
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data|with_return_to }}">Bulk Data Upload</a>
             <a class="dropdown-item {% active request settings_form %}" href="{{ settings_form|with_return_to }}">Settings Form</a>
