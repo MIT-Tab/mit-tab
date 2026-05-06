@@ -22,8 +22,8 @@ before_tournament_steps:
   - slug: add_tab_user_accounts
     title: Add Tab User Accounts
     description: >-
-      Go to the navigation bar and, under the Admin tab, select Admin Interface. Add Django user accounts for any other tab staff who need to log in, and assign staff/superuser status or permissions appropriate to their role.
-    url_path: /admin/auth/user/
+      Go to the navigation bar and, under the Setup tab, select Invite Staff. Send invites to any other tab staff who need to log in so they can set their own passwords from a time-limited email link.
+    url_name: invite_staff
 
   - slug: import_core_data
     title: Import Rooms and Optional Bulk Data
@@ -93,7 +93,7 @@ day_of_steps:
   - slug: publish_speaker_rankings_to_standings
     title: Publish Speaker Results
     description: >-
-      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. In the Standings Published section, turn on Speaker Results for publishing to standings, then choose the public speaker results settings, save, and confirm the public speaker page is visible if you are publishing it publicly.
+      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Speaker Results for publishing to standings, then choose the public speaker results settings, save, and confirm the public speaker page is visible if you are publishing it publicly.
     url_name: public_rankings_control
     completion_rule: speaker_results_published
 
@@ -122,6 +122,6 @@ day_of_steps:
   - slug: publish_debater_rankings_to_standings
     title: Publish Team Results
     description: >-
-      Go to the navigation bar and, under the Rankings tab, select Public Rankings Control. In the Standings Published section, turn on Team Results for publishing to standings, then choose the public team results settings, save, and verify the public team results page is active if you are publishing it publicly.
+      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Team Results for publishing to standings, then choose the public team results settings, save, and verify the public team results page is active if you are publishing it publicly.
     url_name: public_rankings_control
     completion_rule: team_results_published

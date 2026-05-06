@@ -1,0 +1,23 @@
+{% extends "base/__normal.html" %}
+{% load bootstrap4 %}
+
+{% block title %}Invite Tab Staff{% endblock %}
+{% block banner %}Invite Tab Staff{% endblock %}
+
+{% block content %}
+<div class="col-md-6">
+  <form action="" method="post" novalidate>
+    {% csrf_token %}
+    {% bootstrap_form form %}
+    <button type="submit" class="btn btn-primary">Send Invite</button>
+  </form>
+</div>
+<div class="col-md-6">
+  <p>
+    Invited users receive a single-use password setup link using Django's
+    built-in password reset tokens. The username entered here is the username
+    they will use to sign in. New invited accounts are created as full tab
+    staff accounts with no usable password until the recipient sets one.
+  </p>
+</div>
+{% endblock %}

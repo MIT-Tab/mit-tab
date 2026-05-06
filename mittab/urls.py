@@ -13,6 +13,7 @@ import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
+import mittab.apps.tab.views.staff_invite_views as staff_invite_views
 import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
 import mittab.apps.registration.views as registration_views
 
@@ -174,6 +175,17 @@ urlpatterns = [
         "setup/tournament-todo/toggle/",
         tournament_todo_views.tournament_todo_toggle,
         name="tournament_todo_toggle",
+    ),
+    path("staff/invite/", staff_invite_views.invite_staff, name="invite_staff"),
+    path(
+        "public/staff-invite/<uidb64>/<token>/",
+        staff_invite_views.StaffInviteConfirmView.as_view(),
+        name="staff_invite_confirm",
+    ),
+    path(
+        "public/staff-invite/complete/",
+        staff_invite_views.StaffInviteCompleteView.as_view(),
+        name="staff_invite_complete",
     ),
 
     # Pairing related
