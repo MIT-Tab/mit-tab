@@ -13,11 +13,44 @@
   </form>
 </div>
 <div class="col-md-6">
-  <p>
+  <p class="text-muted">
     Invited users receive a single-use password setup link using Django's
     built-in password reset tokens. The username entered here is the username
-    they will use to sign in. New invited accounts are created as full tab
-    staff accounts with no usable password until the recipient sets one.
+    they will use to sign in. New invited accounts are created with the selected
+    permission preset and no usable password until the recipient sets one.
   </p>
+  <h5>Permission Presets</h5>
+  <div class="list-group">
+    {% for preset in staff_preset_details %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h6 class="mb-1">{{ preset.label }}</h6>
+          <p class="mb-2 text-muted">{{ preset.summary }}</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <strong>Can</strong>
+          <ul class="mb-2 pl-3">
+            {% for item in preset.can %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% if preset.cannot %}
+        <div class="col-md-6">
+          <strong>Cannot</strong>
+          <ul class="mb-0 pl-3">
+            {% for item in preset.cannot %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endblock %}

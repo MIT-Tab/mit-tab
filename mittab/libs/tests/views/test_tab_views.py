@@ -2,6 +2,7 @@ import re
 from decimal import Decimal
 from datetime import timedelta
 from unittest import mock
+from urllib.parse import urlparse
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -29,6 +30,14 @@ from mittab.apps.tab.models import (
     WrittenRFDEmailLog,
     Scratch,
     AuditEvent,
+)
+from mittab.apps.tab.auth_roles import (
+    PRESET_ADD_SCRATCHES,
+    PRESET_CHECKIN_HELPER,
+    PRESET_DATA_ENTRY_HELPER,
+    PRESET_MANAGE_SCRATCHES,
+    PRESET_TAB_ASSISTANT,
+    apply_staff_permission_preset,
 )
 from mittab.libs.email_service import EmailServiceError
 from mittab.apps.tab.views.judge_views import EMAIL_RATE_LIMIT_WINDOW
@@ -133,6 +142,190 @@ class TestTabViews(TestCase):
                 f"Failed to render {url}, got status {response.status_code}")
             self.assertIn(expected_content, response.content.decode(),
                 f"Expected content '{expected_content}' not found in {url}")
+
+    def test_add_scratches_preset_only_adds_scratches_without_duplicate_leak(self):
+        self._login_with_staff_preset(PRESET_ADD_SCRATCHES)
+        team = Team.objects.first()
+        judge = Judge.objects.first()
+        Scratch.objects.get_or_create(
+            team=team,
+            judge=judge,
+            defaults={"scratch_type": Scratch.TEAM_SCRATCH},
+        )
+
+        response = self.client.get(reverse("add_scratch"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add Scratch")
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+        response = self.client.post(
+            reverse("add_scratch"),
+            {
+                "team": team.id,
+                "judge": judge.id,
+                "scratch_type": Scratch.TEAM_SCRATCH,
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "This scratch already exists")
+
+    def test_create_and_view_scratches_preset_cannot_modify_existing_scratches(self):
+        self._login_with_staff_preset(PRESET_MANAGE_SCRATCHES)
+        team = Team.objects.first()
+        judge = Judge.objects.first()
+        Scratch.objects.get_or_create(
+            team=team,
+            judge=judge,
+            defaults={"scratch_type": Scratch.TEAM_SCRATCH},
+        )
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Viewing All Scratches")
+
+        response = self.client.get(reverse("view_scratches_team", args=[team.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Viewing Scratch Information")
+        self.assertContains(response, "fieldset disabled")
+        self.assertNotContains(response, "btn-outline-danger")
+
+        response = self.client.post(
+            reverse("view_scratches_team", args=[team.id]),
+            {
+                "1-team": team.id,
+                "1-judge": judge.id,
+                "1-scratch_type": Scratch.TAB_SCRATCH,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_checkin_helper_preset_only_allows_checkin_pages(self):
+        self._login_with_staff_preset(PRESET_CHECKIN_HELPER)
+        team = Team.objects.first()
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("batch_checkin"))
+
+        response = self.client.get(reverse("batch_checkin"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Batch Check-In")
+
+        response = self.client.post(
+            reverse("bulk_check_in"),
+            {
+                "entity_type": "team",
+                "action": "check_in",
+                "entity_ids[]": [str(team.id)],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+
+        response = self.client.get(reverse("settings_form"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_data_entry_helper_preset_excludes_scratches_checkins_and_pairing(self):
+        self._login_with_staff_preset(PRESET_DATA_ENTRY_HELPER)
+        school = School.objects.create(name="Delete Me")
+        team = Team.objects.first()
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Schools")
+        self.assertNotContains(response, "Email Management")
+        self.assertNotContains(response, "Manage Ranking Groups")
+
+        response = self.client.get(reverse("enter_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "How many initial scratches?")
+        self.assertNotContains(response, "Checked in")
+
+        response = self.client.get(reverse("view_team", args=[team.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Scratches for")
+        self.assertNotContains(response, "View Tab Card")
+
+        response = self.client.get(reverse("upload_data"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Scratch Data File")
+
+        response = self.client.get(reverse("delete_school", args=[school.id]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(School.objects.filter(id=school.id).exists())
+
+        for url in [
+                reverse("batch_checkin"),
+                reverse("settings_form"),
+                reverse("view_scratches")]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_tab_assistant_combines_checkin_and_data_entry_without_scratches(self):
+        self._login_with_staff_preset(PRESET_TAB_ASSISTANT)
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse("batch_checkin"))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_restricted_staff_login_redirects_to_accessible_landing_page(self):
+        user = self._create_staff_preset_user(PRESET_ADD_SCRATCHES)
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {
+                "username": user.username,
+                "password": "presetpass123",
+                "next": reverse("settings_form"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("add_scratch"))
+
+    def test_restricted_staff_login_honors_accessible_next_page(self):
+        user = self._create_staff_preset_user(PRESET_CHECKIN_HELPER)
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {
+                "username": user.username,
+                "password": "presetpass123",
+                "next": reverse("batch_checkin"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("batch_checkin"))
+
+    def _login_with_staff_preset(self, preset):
+        user = self._create_staff_preset_user(preset)
+        self.client.force_login(user)
+        return user
+
+    def _create_staff_preset_user(self, preset):
+        self.client.logout()
+        user = get_user_model().objects.create_user(
+            username=f"{preset}_user",
+            password="presetpass123",
+            email=f"{preset}@example.com",
+        )
+        apply_staff_permission_preset(user, preset)
+        return user
 
     def test_staff_ballot_view_allows_editing_submitted_ballot(self):
         round_obj = Round.objects.filter(round_number=1).first()

@@ -63,6 +63,10 @@
 {% public_display_flags as public_display_flags %}
 {% motions_enabled as motions_enabled_flag %}
 {% is_apda_board user as is_apda_board_user %}
+{% staff_can user "add_scratches" as can_add_scratches %}
+{% staff_can user "view_scratches" as can_view_scratches %}
+{% staff_can user "checkins" as can_checkins %}
+{% staff_can user "data_entry" as can_data_entry %}
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
@@ -87,6 +91,7 @@
       </ul>
       {% else %}
       <ul class="navbar-nav mr-auto order-0">
+        {% if user.is_superuser %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
             Pairings
@@ -122,17 +127,25 @@
             <a class="dropdown-item {% active request download_black_rod_bundle %}" href="{{ download_black_rod_bundle|with_return_to }}" title="Export a tournament bundle for Black Rod ingest.">Export Black-Rod Bundle</a>
           </div>
         </li>
+        {% endif %}
 
+        {% if can_add_scratches or can_view_scratches %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
             Scratches
           </a>
           <div class="dropdown-menu">
+            {% if can_view_scratches %}
             <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches|with_return_to }}">View Scratches</a>
+            {% endif %}
+            {% if can_add_scratches %}
             <a class="dropdown-item {%active request add_scratch %}" href="{{ add_scratch|with_return_to }}">Add Scratch</a>
+            {% endif %}
           </div>
         </li>
+        {% endif %}
 
+        {% if user.is_superuser %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request settings_form %}{% active request public_homepage_admin %}{% active request public_rankings_control %}{% active request tournament_todo %}{% active request invite_staff %}{% active request email_management %}{% active request registration_admin %}{% active request manage_motions %}">
             Setup
@@ -150,20 +163,30 @@
             {% endif %}
           </div>
         </li>
+        {% endif %}
 
+        {% if user.is_superuser or can_checkins or can_data_entry %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
             Admin
           </a>
           <div class="dropdown-menu">
+            {% if can_checkins %}
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin|with_return_to }}">Batch Checkin</a>
+            {% endif %}
+            {% if can_data_entry %}
             <a class="dropdown-item {% active request upload_data %}" href="{{ upload_data|with_return_to }}">Bulk Data Upload</a>
+            {% endif %}
+            {% if user.is_superuser %}
             <a class="dropdown-item {% active request confirm_start_new_tourney %}" href="{{ confirm_start_new_tourny|with_return_to }}">New Tournament</a>
             <a class="dropdown-item" href="/admin">Admin Interface</a>
+            {% endif %}
           </div>
         </li>
+        {% endif %}
       </ul>
       <ul class="navbar-nav ml-auto">
+        {% if user.is_superuser %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request public_pairings %}{% active request public_missing_ballots %}{% active request public_eballot %}{% active request public_team_portal %}{% active request public_judges %}{% active request public_teams %}{% active request public_outround_varsity %}{% active request public_outround_novice %}{% active request public_motions %}">
             Public
@@ -191,6 +214,7 @@
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
           </div>
         </li>
+        {% endif %}
         <li class="nav-item">
           <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
         </li>

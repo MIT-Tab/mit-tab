@@ -4,9 +4,16 @@ from urllib.parse import urlsplit
 from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
+from django.urls import Resolver404, resolve
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
+from mittab.apps.tab.auth_roles import (
+    is_apda_board_access_open,
+    is_apda_board_user,
+    is_restricted_staff_user,
+    restricted_staff_can_access_view,
+    restricted_staff_landing_url,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
 from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
@@ -116,13 +123,41 @@ class Login:
             if request.POST:
                 view = StaffLoginView.as_view()
                 return view(request)
-            else:
+            return redirect_and_flash_info(
+                request,
+                "You must be logged in to view that page",
+                path=f"/public/login/?next={request.path}")
+
+        if request.user.is_authenticated and is_restricted_staff_user(request.user):
+            if path.startswith(("/static/", "/dynamic-media/")):
+                return self.get_response(request)
+
+            try:
+                view_name = resolve(path).view_name
+            except Resolver404:
+                view_name = None
+
+            landing_url = restricted_staff_landing_url(request.user)
+            if path == "/" and landing_url != path:
                 return redirect_and_flash_info(
                     request,
-                    "You must be logged in to view that page",
-                    path=f"/public/login/?next={request.path}")
-        else:
-            return self.get_response(request)
+                    "Your staff account has limited access.",
+                    path=landing_url,
+                )
+
+            can_access = restricted_staff_can_access_view(
+                request.user,
+                view_name,
+                request.method,
+            )
+            if not can_access:
+                return redirect_and_flash_info(
+                    request,
+                    "Your staff account does not have access to that page.",
+                    path="/403/",
+                )
+
+        return self.get_response(request)
 
 
 class TournamentStatusCheck:

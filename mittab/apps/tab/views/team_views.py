@@ -3,6 +3,13 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 from django.utils.text import slugify
 
+from mittab.apps.tab.auth_roles import (
+    CAP_ADD_SCRATCHES,
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
@@ -18,7 +25,11 @@ from mittab.libs.tab_logic import rankings
 
 
 def view_teams(request):
+    include_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
+
     def flags(team):
+        if not include_checkins:
+            return 0
         result = 0
         if team.checked_in:
             result |= TabFlags.TEAM_CHECKED_IN
@@ -36,8 +47,10 @@ def view_teams(request):
         )
         for team in Team.objects.prefetch_related("ranking_groups").all()
     ]
-    all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
-    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
+    filters, symbol_text = [], ""
+    if include_checkins:
+        all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
+        filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
             "item_type": "team",
@@ -63,7 +76,11 @@ def view_team(request, team_id):
     except Team.DoesNotExist:
         return redirect_and_flash_error(request, "Team not found")
     if request.method == "POST":
-        form = TeamForm(request.POST, instance=team)
+        form = TeamForm(
+            request.POST,
+            instance=team,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
                 form.save(actor=request.user)
@@ -75,13 +92,18 @@ def view_team(request, team_id):
             return redirect_and_flash_success(
                 request, f"Team {updated_name} updated successfully")
     else:
-        form = TeamForm(instance=team)
-        links = [
-            (
+        form = TeamForm(
+            instance=team,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
+        links = []
+        if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+            links.append((f"/team/{team_id}/delete/", "Delete"))
+        if user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES):
+            links.append((
                 f"/team/{team_id}/scratches/view/",
                 f"Scratches for {team.display_backend}",
-            )
-        ]
+            ))
         return render(
             request, "tab/team_detail.html", {
                 "title": f"Viewing Team: {team.display_backend}",
@@ -96,8 +118,17 @@ def view_team(request, team_id):
 
 
 def enter_team(request):
+    allow_initial_scratches = (
+        user_has_staff_capability(request.user, CAP_ADD_SCRATCHES) or
+        user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES)
+    )
+    allow_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
     if request.method == "POST":
-        form = TeamEntryForm(request.POST)
+        form = TeamEntryForm(
+            request.POST,
+            allow_initial_scratches=allow_initial_scratches,
+            allow_checkins=allow_checkins,
+        )
         if form.is_valid():
             try:
                 team = form.save(actor=request.user)
@@ -106,7 +137,7 @@ def enter_team(request):
                     request,
                     "Team name cannot be validated, most likely a duplicate school"
                 )
-            num_forms = form.cleaned_data["number_scratches"]
+            num_forms = form.cleaned_data.get("number_scratches", 0)
             if num_forms > 0:
                 return HttpResponseRedirect(
                     f"/team/{team.pk}/scratches/add/{num_forms}"
@@ -118,11 +149,31 @@ def enter_team(request):
                     f"Team {team_name} created successfully",
                     path="/")
     else:
-        form = TeamEntryForm()
+        form = TeamEntryForm(
+            allow_initial_scratches=allow_initial_scratches,
+            allow_checkins=allow_checkins,
+        )
     return render(request, "common/data_entry.html", {
         "form": form,
         "title": "Create Team"
     })
+
+
+def delete_team(request, team_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(request, "You cannot delete teams", path="/403/")
+
+    try:
+        team_id = int(team_id)
+        team = Team.objects.get(pk=team_id)
+        team.delete()
+    except Team.DoesNotExist:
+        return redirect_and_flash_error(request, "That team does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Team deleted successfully",
+                                      path="/")
 
 
 def add_scratches(request, team_id, number_scratches):
@@ -214,10 +265,13 @@ def view_scratches(request, team_id):
             )
             for i in range(len(scratches))
         ]
-    delete_links = [
-        f"/team/{team_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
-    ]
+    read_only = not request.user.is_superuser
+    delete_links = [None] * len(scratches)
+    if not read_only:
+        delete_links = [
+            f"/team/{team_id}/scratches/delete/{scratches[i].id}"
+            for i in range(len(scratches))
+        ]
     metadata = [
         {
             "created_by": scratch.created_by_display,
@@ -232,6 +286,7 @@ def view_scratches(request, team_id):
             "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
+            "read_only": read_only,
             "title": f"Viewing Scratch Information for {team.display_backend}"
         })
 

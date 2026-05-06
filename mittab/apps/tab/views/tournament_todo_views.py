@@ -2,6 +2,11 @@ from django.contrib.auth.views import LoginView
 from django.http import JsonResponse
 from django.shortcuts import redirect, render, reverse
 
+from mittab.apps.tab.auth_roles import (
+    is_restricted_staff_user,
+    restricted_staff_can_access_path,
+    restricted_staff_landing_url,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_success
 from mittab.apps.tab.models import UserTournamentSetupPreference
 from mittab.libs.tournament_todo import (
@@ -25,7 +30,14 @@ class StaffLoginView(LoginView):
     def get_success_url(self):
         redirect_url = self.get_redirect_url()
         if redirect_url:
+            if is_restricted_staff_user(self.request.user):
+                if restricted_staff_can_access_path(self.request.user, redirect_url):
+                    return redirect_url
+                return restricted_staff_landing_url(self.request.user)
             return redirect_url
+
+        if is_restricted_staff_user(self.request.user):
+            return restricted_staff_landing_url(self.request.user)
 
         preference, _ = UserTournamentSetupPreference.objects.get_or_create(
             user=self.request.user,

@@ -8,6 +8,12 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db.models import Q, Max
 from django.utils import timezone
 
+from mittab.apps.tab.auth_roles import (
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.forms import JudgeForm, ScratchForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -229,21 +235,26 @@ def _prepare_written_rfd_plan(rounds, tournament_name):
 def view_judges(request):
     # Get a list of (id,school_name) tuples
     current_round = TabSettings.objects.get(key="cur_round").value - 1
-    checkins = CheckIn.objects.filter(round_number=current_round)
-    checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
-    checked_in_judges = set([c.judge for c in checkins])
-    checked_in_judges_next = set([c.judge for c in checkins_next])
+    include_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
+    checked_in_judges = set()
+    checked_in_judges_next = set()
+    if include_checkins:
+        checkins = CheckIn.objects.filter(round_number=current_round)
+        checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
+        checked_in_judges = set([c.judge for c in checkins])
+        checked_in_judges_next = set([c.judge for c in checkins_next])
 
     def flags(judge):
         result = 0
-        if judge in checked_in_judges:
-            result |= TabFlags.JUDGE_CHECKED_IN_CUR
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
-        if judge in checked_in_judges_next:
-            result |= TabFlags.JUDGE_CHECKED_IN_NEXT
-        else:
-            result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
+        if include_checkins:
+            if judge in checked_in_judges:
+                result |= TabFlags.JUDGE_CHECKED_IN_CUR
+            else:
+                result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
+            if judge in checked_in_judges_next:
+                result |= TabFlags.JUDGE_CHECKED_IN_NEXT
+            else:
+                result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
 
         if judge.rank < 3.0:
             result |= TabFlags.LOW_RANKED_JUDGE
@@ -267,19 +278,18 @@ def view_judges(request):
         for judge in judges
     ]
 
-    all_flags = [
-        [
+    all_flags = [[
+        TabFlags.LOW_RANKED_JUDGE,
+        TabFlags.MID_RANKED_JUDGE,
+        TabFlags.HIGH_RANKED_JUDGE,
+    ]]
+    if include_checkins:
+        all_flags.insert(0, [
             TabFlags.JUDGE_CHECKED_IN_CUR,
             TabFlags.JUDGE_NOT_CHECKED_IN_CUR,
             TabFlags.JUDGE_CHECKED_IN_NEXT,
             TabFlags.JUDGE_NOT_CHECKED_IN_NEXT,
-        ],
-        [
-            TabFlags.LOW_RANKED_JUDGE,
-            TabFlags.MID_RANKED_JUDGE,
-            TabFlags.HIGH_RANKED_JUDGE,
-        ]
-    ]
+        ])
     filters, _symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
@@ -298,7 +308,11 @@ def view_judge(request, judge_id):
     except Judge.DoesNotExist:
         return redirect_and_flash_error(request, "Judge not found")
     if request.method == "POST":
-        form = JudgeForm(request.POST, instance=judge)
+        form = JudgeForm(
+            request.POST,
+            instance=judge,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
                 form.save(actor=request.user)
@@ -309,12 +323,19 @@ def view_judge(request, judge_id):
             return redirect_and_flash_success(
                 request, f"Judge {updated_name} updated successfully")
     else:
-        form = JudgeForm(instance=judge)
+        form = JudgeForm(
+            instance=judge,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         judging_rounds = list(Round.objects.filter(judges=judge).select_related(
             "gov_team", "opp_team", "room"))
     base_url = f"/judge/{judge_id}/"
     scratch_url = f"{base_url}scratches/view/"
-    links = [(scratch_url, f"Scratches for {judge.name}")]
+    links = []
+    if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        links.append((f"/judge/{judge_id}/delete/", "Delete"))
+    if user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES):
+        links.append((scratch_url, f"Scratches for {judge.name}"))
     return render(
         request, "tab/judge_detail.html", {
             "form": form,
@@ -346,6 +367,23 @@ def enter_judge(request):
         "form": form,
         "title": "Create Judge"
     })
+
+
+def delete_judge(request, judge_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(request, "You cannot delete judges", path="/403/")
+
+    try:
+        judge_id = int(judge_id)
+        judge = Judge.objects.get(pk=judge_id)
+        judge.delete()
+    except Judge.DoesNotExist:
+        return redirect_and_flash_error(request, "That judge does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Judge deleted successfully",
+                                      path="/")
 
 
 def add_scratches(request, judge_id, number_scratches):
@@ -433,10 +471,13 @@ def view_scratches(request, judge_id):
             )
             for i in range(len(scratches))
         ]
-    delete_links = [
-        f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
-    ]
+    read_only = not request.user.is_superuser
+    delete_links = [None] * len(scratches)
+    if not read_only:
+        delete_links = [
+            f"/judge/{judge_id}/scratches/delete/{scratches[i].id}"
+            for i in range(len(scratches))
+        ]
     metadata = [
         {
             "created_by": scratch.created_by_display,
@@ -452,6 +493,7 @@ def view_scratches(request, judge_id):
             "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
+            "read_only": read_only,
             "title": f"Viewing Scratch Information for {judge.name}"
         })
 

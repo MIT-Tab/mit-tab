@@ -34,6 +34,12 @@ class UploadDataForm(forms.Form):
     room_file = forms.FileField(label="Room Data File", required=False)
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
 
+    def __init__(self, *args, **kwargs):
+        allow_scratches = kwargs.pop("allow_scratches", True)
+        super(UploadDataForm, self).__init__(*args, **kwargs)
+        if not allow_scratches:
+            self.fields.pop("scratch_file")
+
 
 class UploadApdaCsvForm(forms.Form):
     file = forms.FileField(label="CSV File")
@@ -59,8 +65,9 @@ class RoomForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(RoomForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 room = kwargs["instance"]
@@ -112,8 +119,9 @@ class JudgeForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(JudgeForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 judge = kwargs["instance"]
@@ -185,6 +193,12 @@ class TeamForm(forms.ModelForm):
         required=False
     )
 
+    def __init__(self, *args, **kwargs):
+        allow_checkins = kwargs.pop("allow_checkins", True)
+        super(TeamForm, self).__init__(*args, **kwargs)
+        if not allow_checkins:
+            self.fields.pop("checked_in", None)
+
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
         if len(data) not in [1, 2]:
@@ -231,6 +245,12 @@ class TeamForm(forms.ModelForm):
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?",
                                           initial=0)
+
+    def __init__(self, *args, **kwargs):
+        allow_initial_scratches = kwargs.pop("allow_initial_scratches", True)
+        super(TeamEntryForm, self).__init__(*args, **kwargs)
+        if not allow_initial_scratches:
+            self.fields.pop("number_scratches")
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
