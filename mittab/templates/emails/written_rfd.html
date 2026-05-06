@@ -1,0 +1,17 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<p style="margin:0 0 12px;">Hello,</p>
+<p style="margin:0 0 16px;">The judge for your Round {{ round_number }} debate at <strong>{{ tournament_name }}</strong> has submitted a written reason for decision. The full text is included below.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;border-collapse:collapse;">
+  <tr><td style="padding:4px 0;font-weight:bold;width:120px;">Tournament</td><td style="padding:4px 0;">{{ tournament_name }}</td></tr>
+  <tr><td style="padding:4px 0;font-weight:bold;">Round</td><td style="padding:4px 0;">{{ round_number }}</td></tr>
+  <tr><td style="padding:4px 0;font-weight:bold;">Government</td><td style="padding:4px 0;">{{ gov_team }}</td></tr>
+  <tr><td style="padding:4px 0;font-weight:bold;">Opposition</td><td style="padding:4px 0;">{{ opp_team }}</td></tr>
+  <tr><td style="padding:4px 0;font-weight:bold;">Winner</td><td style="padding:4px 0;">{{ winner_name }}</td></tr>
+  <tr><td style="padding:4px 0;font-weight:bold;">Judge</td><td style="padding:4px 0;">{{ judge_name }}</td></tr>
+</table>
+<p style="margin:0 0 8px;font-weight:bold;">Reason for decision</p>
+<p style="margin:0 0 16px;">{{ rfd_text|linebreaksbr }}</p>
+<p style="margin:28px 0 0;color:#4b5563;font-size:14px;">Thanks,<br />The Tab Team</p>
+{% endblock %}

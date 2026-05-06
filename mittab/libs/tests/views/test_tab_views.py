@@ -544,25 +544,25 @@ class TestTabViews(TestCase):
         return match.group(0)
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
-    def test_send_judge_codes_view(self, email_service):
+    def test_email_management_sends_judge_codes(self, email_service):
         judge = Judge.objects.first()
         judge.email = "judge@example.com"
         judge.save()
 
         email_service.return_value.send_bulk.return_value = 1
 
-        response = self.client.get(reverse("send_judge_codes"))
+        response = self.client.get(reverse("email_management"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("judge@example.com", response.content.decode())
 
         response = self.client.post(
-            reverse("send_judge_codes"),
-            {"judge_ids": [str(judge.id)]},
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
         )
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_called_once()
 
-    def test_send_judge_codes_defaults_to_never_received(self):
+    def test_email_management_defaults_to_never_received_judge_codes(self):
         never_sent_judge = Judge.objects.first()
         never_sent_judge.email = "judge@example.com"
         never_sent_judge.save()
@@ -595,7 +595,7 @@ class TestTabViews(TestCase):
             ballot_code=registration_sent_judge.ballot_code,
         )
 
-        response = self.client.get(reverse("send_judge_codes"))
+        response = self.client.get(reverse("email_management"))
         self.assertEqual(response.status_code, 200)
 
         content = response.content.decode()
@@ -613,7 +613,7 @@ class TestTabViews(TestCase):
         )
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
-    def test_send_judge_codes_deduplicates_emails(self, email_service):
+    def test_email_management_deduplicates_judge_code_emails(self, email_service):
         email_service.return_value.send_bulk.return_value = 1
 
         judge = Judge.objects.first()
@@ -629,8 +629,11 @@ class TestTabViews(TestCase):
         other.save()
 
         response = self.client.post(
-            reverse("send_judge_codes"),
-            {"judge_ids": [str(judge.id), str(other.id)]},
+            reverse("email_management"),
+            {
+                "email_action": "judge_codes",
+                "judge_ids": [str(judge.id), str(other.id)],
+            },
         )
         self.assertEqual(response.status_code, 302)
         # Only one email should be queued for the shared address
@@ -639,7 +642,7 @@ class TestTabViews(TestCase):
         self.assertEqual(len(list(args[0])), 1)
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
-    def test_send_judge_codes_rate_limited(self, email_service):
+    def test_email_management_rate_limits_judge_codes(self, email_service):
         judge = Judge.objects.first()
         judge.email = "judge@example.com"
         judge.save()
@@ -652,14 +655,14 @@ class TestTabViews(TestCase):
         )
 
         response = self.client.post(
-            reverse("send_judge_codes"),
-            {"judge_ids": [str(judge.id)]},
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
         )
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_not_called()
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
-    def test_send_judge_codes_logs_partial_successes(self, email_service):
+    def test_email_management_logs_partial_judge_code_successes(self, email_service):
         judge = Judge.objects.first()
         judge.email = "judge1@example.com"
         judge.save()
@@ -677,8 +680,11 @@ class TestTabViews(TestCase):
         email_service.return_value.send_bulk.side_effect = fail_after_first
 
         response = self.client.post(
-            reverse("send_judge_codes"),
-            {"judge_ids": [str(judge.id), str(other.id)]},
+            reverse("email_management"),
+            {
+                "email_action": "judge_codes",
+                "judge_ids": [str(judge.id), str(other.id)],
+            },
         )
 
         self.assertEqual(response.status_code, 302)
@@ -686,7 +692,7 @@ class TestTabViews(TestCase):
         self.assertEqual(JudgeCodeEmailLog.objects.first().judge, judge)
 
     @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
-    def test_send_written_rfds_view(self, email_service):
+    def test_email_management_sends_written_rfds(self, email_service):
         round_obj = Round.objects.filter(round_number=1).first()
         round_obj.victor = Round.GOV
         round_obj.rfd = "Gov won the link debate."
@@ -702,14 +708,14 @@ class TestTabViews(TestCase):
 
         email_service.return_value.send_bulk.return_value = len(debaters)
 
-        response = self.client.get(reverse("send_written_rfds"))
+        response = self.client.get(reverse("email_management"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("Send Written RFDs", response.content.decode())
         self.assertIn(f"Round {round_obj.round_number}", response.content.decode())
 
         response = self.client.post(
-            reverse("send_written_rfds"),
-            {"round_ids": [str(round_obj.id)]},
+            reverse("email_management"),
+            {"email_action": "written_rfds", "round_ids": [str(round_obj.id)]},
         )
 
         self.assertEqual(response.status_code, 302)
@@ -720,6 +726,31 @@ class TestTabViews(TestCase):
             WrittenRFDEmailLog.objects.filter(round=round_obj).count(),
             len(debaters),
         )
+
+    def test_email_management_shows_historical_email_logs(self):
+        judge = Judge.objects.first()
+        judge.email = ""
+        judge.save()
+        JudgeCodeEmailLog.objects.create(
+            judge=judge,
+            email="",
+            ballot_code=judge.ballot_code,
+        )
+
+        round_obj = Round.objects.filter(round_number=1).first()
+        WrittenRFDEmailLog.objects.create(
+            round=round_obj,
+            email="debater@example.com",
+        )
+
+        response = self.client.get(reverse("email_management"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Sent Email History", content)
+        self.assertIn("Registration judge email", content)
+        self.assertIn("debater@example.com", content)
+        self.assertIn(f"Ballot code {judge.ballot_code}", content)
 
     def test_judge_ballot_code_validation(self):
         judge = Judge.objects.first()

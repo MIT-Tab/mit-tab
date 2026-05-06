@@ -1,30 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const table = document.getElementById("judge-email-table");
-  if (!table) {
-    return;
-  }
-  const selectNeverReceivedButton = document.getElementById(
-    "select-never-received",
+  const tables = Array.from(
+    document.querySelectorAll(".email-management-table"),
   );
-  const selectAllButton = document.getElementById("select-all-judges");
-
-  const headers = table.querySelectorAll("[data-sort-key]");
-  const checkboxRows = () =>
-    Array.from(table.querySelectorAll("tbody tr[data-can-send='true']"));
 
   const getValue = (cell) =>
     cell?.dataset.sortValue ?? cell?.textContent?.trim().toLowerCase() ?? "";
-
-  const setSelection = (predicate) => {
-    checkboxRows().forEach((row) => {
-      const checkbox = row.querySelector("input[name='judge_ids']");
-      if (!checkbox) {
-        return;
-      }
-
-      checkbox.checked = predicate(row);
-    });
-  };
 
   const setSortDirection = (cell, direction) => {
     const headerCell = cell;
@@ -41,13 +21,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const sortTable = (header) => {
+  const sortTable = (table, header) => {
     const key = header.dataset.sortKey;
     if (!key) return;
 
     const tbody = table.querySelector("tbody");
     if (!tbody) return;
 
+    const headers = table.querySelectorAll("[data-sort-key]");
     const rows = Array.from(tbody.rows);
     const currentDir = header.dataset.sortDir === "asc" ? "desc" : "asc";
 
@@ -63,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let aVal = getValue(aCell);
       let bVal = getValue(bCell);
 
-      if (key === "sent") {
+      if (key === "sent" || key === "round" || key === "recipients") {
         aVal = parseInt(aCell?.dataset.sortValue || "0", 10);
         bVal = parseInt(bCell?.dataset.sortValue || "0", 10);
       }
@@ -76,24 +57,35 @@ document.addEventListener("DOMContentLoaded", () => {
     rows.forEach((row) => tbody.appendChild(row));
   };
 
-  headers.forEach((th) => {
-    const header = th;
-    header.style.cursor = "pointer";
-    header.addEventListener("click", (event) => {
-      event.preventDefault();
-      sortTable(header);
+  tables.forEach((table) => {
+    table.querySelectorAll("[data-sort-key]").forEach((th) => {
+      const header = th;
+      header.style.cursor = "pointer";
+      header.addEventListener("click", (event) => {
+        event.preventDefault();
+        sortTable(table, header);
+      });
     });
   });
 
-  if (selectNeverReceivedButton) {
-    selectNeverReceivedButton.addEventListener("click", () => {
-      setSelection((row) => row.dataset.neverReceived === "true");
+  document.querySelectorAll("[data-select-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const table = document.getElementById(button.dataset.selectTarget);
+      if (!table) {
+        return;
+      }
+      const mode = button.dataset.selectMode;
+      const rows = Array.from(
+        table.querySelectorAll("tbody tr[data-can-send='true']"),
+      );
+      rows.forEach((row) => {
+        const checkbox = row.querySelector("input[type='checkbox']");
+        if (!checkbox) {
+          return;
+        }
+        checkbox.checked =
+          mode === "all" || row.dataset.neverReceived === "true";
+      });
     });
-  }
-
-  if (selectAllButton) {
-    selectAllButton.addEventListener("click", () => {
-      setSelection(() => true);
-    });
-  }
+  });
 });

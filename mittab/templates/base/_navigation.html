@@ -42,6 +42,7 @@
 {% url "public_homepage" as public_homepage_admin %}
 {% url "tournament_todo" as tournament_todo %}
 {% url "invite_staff" as invite_staff %}
+{% url "email_management" as email_management %}
 {% url "outround_pairing_view_default" as outround_pairings %}
 {% url "pretty_pair" as public_pairings %}
 {% url "missing_ballots" as public_missing_ballots %}
@@ -133,7 +134,7 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request settings_form %}{% active request public_homepage_admin %}{% active request public_rankings_control %}{% active request tournament_todo %}{% active request invite_staff %}{% active request registration_admin %}{% active request manage_motions %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request settings_form %}{% active request public_homepage_admin %}{% active request public_rankings_control %}{% active request tournament_todo %}{% active request invite_staff %}{% active request email_management %}{% active request registration_admin %}{% active request manage_motions %}">
             Setup
           </a>
           <div class="dropdown-menu">
@@ -143,6 +144,7 @@
             <a class="dropdown-item {% active request public_rankings_control %}" href="{{ public_rankings_control|with_return_to }}">Public Rankings Control</a>
             <a class="dropdown-item {% active request registration_admin %}" href="{{ registration_admin|with_return_to }}">Registrations</a>
             <a class="dropdown-item {% active request invite_staff %}" href="{{ invite_staff|with_return_to }}">Invite Staff</a>
+            <a class="dropdown-item {% active request email_management %}" href="{{ email_management|with_return_to }}">Email Management</a>
             {% if motions_enabled_flag %}
             <a class="dropdown-item {% active request manage_motions %}" href="{{ manage_motions|with_return_to }}">Manage Motions</a>
             {% endif %}

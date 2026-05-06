@@ -55,12 +55,12 @@ day_of_steps:
     url_name: batch_checkin
     completion_rule: entities_checked_in
 
-  - slug: send_judge_ballot_codes
+  - slug: manage_judge_ballot_code_emails
     title: Send Judge Ballot Codes
     optional_label: For manually added judges
     description: >-
-      Open the Judges list and select Send Judge Codes. Send ballot codes to judges once judge emails and availability are current so they can submit e-ballots during the tournament.
-    url_name: send_judge_codes
+      Open Email Management. Send ballot codes to judges once judge emails and availability are current so they can submit e-ballots during the tournament.
+    url_name: email_management
     completion_rule: judge_codes_sent
 
   - slug: pair_round_one
@@ -111,12 +111,12 @@ day_of_steps:
     url_name: outround_pairing_view_default
     completion_rule: outrounds_completed
 
-  - slug: send_written_rfds
+  - slug: manage_written_rfd_emails
     title: Send Written RFDs
     optional_label: Written RFD tournaments only
     description: >-
-      Open the Judges list and select Send Written RFDs. Use this only for tournaments collecting written reasons for decision; send the emails after the relevant ballots have written RFDs entered and reviewed.
-    url_name: send_written_rfds
+      Open Email Management. Use this only for tournaments collecting written reasons for decision; send the emails after the relevant ballots have written RFDs entered and reviewed.
+    url_name: email_management
     completion_rule: written_rfds_sent
 
   - slug: publish_debater_rankings_to_standings

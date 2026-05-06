@@ -50,11 +50,8 @@
       {% endif %}
       {% if view_path_prefix == "judge" %}
         <div class="text-center mb-2">
-          <a class="btn btn-sm btn-light" href="{% url 'send_judge_codes' %}">
-            Send Judge Codes
-          </a>
-          <a class="btn btn-sm btn-light" href="{% url 'send_written_rfds' %}">
-            Send Written RFDs
+          <a class="btn btn-sm btn-light" href="{% url 'email_management' %}">
+            Email Management
           </a>
         </div>
       {% endif %}

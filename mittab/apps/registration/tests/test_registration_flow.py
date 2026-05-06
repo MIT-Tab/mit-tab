@@ -222,7 +222,7 @@ def test_registration_flow_creates_objects(email_service, client):
         email_service.return_value.send_bulk.call_args_list[2].args[0][0]
     )
     assert judge_code_request.to_address == "judge@example.com"
-    assert "you have been registered for" in judge_code_request.text_body
+    assert "registered as a judge for" in judge_code_request.text_body
     assert judge.ballot_code in judge_code_request.text_body
     judge_code_log = JudgeCodeEmailLog.objects.get(judge=judge)
     assert judge_code_log.email == ""
