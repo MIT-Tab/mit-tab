@@ -5,10 +5,11 @@
 {% if include_registration_confirmation %}
 <p style="margin:0 0 16px;">You have been registered as a judge for <strong>{{ tournament_name }}</strong>.</p>
 {% endif %}
-<p style="margin:0 0 12px;">Your ballot code for <strong>{{ tournament_name }}</strong> is:</p>
+<p style="margin:0 0 12px;">Your judge code for <strong>{{ tournament_name }}</strong> is:</p>
 <p style="margin:0 0 20px;font-size:26px;line-height:1.2;font-weight:bold;color:#111827;letter-spacing:0.04em;">{{ ballot_code }}</p>
-<p style="margin:0 0 16px;">Use this code to submit your e-ballots. You can submit a ballot directly using the button below, or look it up at any time using the search page.</p>
-<p style="margin:0 0 20px;"><a href="{{ ballot_url }}" style="display:inline-block;background-color:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:bold;">Submit an e-ballot</a></p>
-<p style="margin:0 0 16px;color:#4b5563;font-size:14px;">E-ballot search: <a href="{{ eballot_search_url }}" style="color:#1d4ed8;">{{ eballot_search_url }}</a></p>
+<p style="margin:0 0 12px;">Your current availability is: {{ availability }}.</p>
+<p style="margin:0 0 16px;">Use this code to open the judge portal, update availability, and submit ballots.</p>
+<p style="margin:0 0 20px;"><a href="{{ portal_url }}" style="display:inline-block;background-color:#1d4ed8;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:bold;">Open judge portal</a></p>
+<p style="margin:0 0 16px;color:#4b5563;font-size:14px;">Judge code search: <a href="{{ portal_search_url }}" style="color:#1d4ed8;">{{ portal_search_url }}</a></p>
 <p style="margin:28px 0 0;color:#4b5563;font-size:14px;">Thanks,<br />The Tab Team</p>
 {% endblock %}

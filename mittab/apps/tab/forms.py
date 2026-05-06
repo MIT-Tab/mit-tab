@@ -566,7 +566,11 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
-    ballot_code = forms.CharField(max_length=BALLOT_CODE_MAX_LENGTH, min_length=0)
+    ballot_code = forms.CharField(
+        label="Judge code",
+        max_length=BALLOT_CODE_MAX_LENGTH,
+        min_length=0,
+    )
 
     def __init__(self, *args, **kwargs):
         ballot_code = ""
@@ -587,7 +591,7 @@ class EBallotForm(ResultEntryForm):
             judge = Judge.objects.filter(ballot_code=ballot_code).first()
 
             if not judge:
-                msg = "Incorrect ballot code. Enter again."
+                msg = "Incorrect judge code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
             elif round_obj.round_number != cur_round:
                 msg = (

@@ -39,8 +39,8 @@ def create_default_home_pages(apps, schema_editor):
         },
         {
             "slug": "submit_e_ballot",
-            "title": "Submit E-Ballot",
-            "subtitle": "Judges enter ballot codes to file results.",
+            "title": "Judge Portal and Ballots",
+            "subtitle": "Judges enter codes to update availability and file results.",
             "url_path": "/public/e-ballots/",
         },
         {

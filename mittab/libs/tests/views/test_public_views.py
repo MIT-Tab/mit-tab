@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -11,12 +13,14 @@ from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
     Judge,
+    JudgeExpectedCheckIn,
     Outround,
     PublicHomePage,
     PublicHomeShortcut,
     Room,
     Round,
     RoundStats,
+    School,
     SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
     TabSettings,
     Team,
@@ -110,7 +114,7 @@ class TestPublicViews(TestCase):
 
     def _set_disclosure_settings(self, open_speaks, open_ranks):
         """Set disclosure settings.
-        
+
         Values: None=unset, True=open (1), False=closed (2)
         """
         for key, value in (("open_speaks", open_speaks), ("open_ranks", open_ranks)):
@@ -188,7 +192,7 @@ class TestPublicViews(TestCase):
             (reverse("rank_teams_public"), [team.name]),
             (reverse("pretty_pair"), [round_obj.gov_team.name, gov_debater.name]),
             (reverse("missing_ballots"), [self.test_round.chair.name]),
-            (reverse("e_ballot_search"), ["Submit E-Ballot"]),
+            (reverse("e_ballot_search"), ["Judge Portal and Ballots"]),
             (reverse("outround_pretty_pair", args=[0]), [v_out.gov_team.name]),
             (reverse("outround_pretty_pair", args=[1]), [n_out.gov_team.name]),
             (reverse("public_home"), ["Released Pairings"]),
@@ -871,6 +875,55 @@ class TestPublicViews(TestCase):
         round2_settings = get_ballot_round_settings(2)
         self.assertFalse(round2_settings["visible"],
             "Rounds omitted from the form should remain hidden")
+
+    def test_public_judges_use_expectations(self):
+        client = Client()
+        school = School.objects.first()
+        judge = Judge.objects.create(name="Expectation Judge", rank=2.0)
+        judge.schools.add(school)
+
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.get(reverse("public_judges"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        row_start = content.find(judge.name)
+        self.assertNotEqual(row_start, -1, "Judge row not rendered")
+        row_end = content.find("</tr>", row_start)
+        self.assertNotEqual(row_end, -1, "Judge row not properly closed")
+        row_html = content[row_start:row_end]
+        self.assertIn("&#10004;", row_html,
+                      "Expected attendance indicator not shown for judge")
+
+    def test_judge_portal_updates_expected_checkins(self):
+        client = Client()
+        judge = Judge.objects.create(
+            name="Portal Judge",
+            rank=2.0,
+            ballot_code="portal-judge",
+        )
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.post(
+            reverse("judge_portal", args=[judge.ballot_code]),
+            {
+                "availability_round_2": "on",
+                "availability_round_4": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(
+                JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+                    "round_number",
+                    flat=True,
+                )
+            ),
+            {2, 4},
+        )
 
     def test_public_ballot_modes(self):
         client = Client()

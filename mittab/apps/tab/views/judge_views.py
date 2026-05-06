@@ -31,8 +31,19 @@ EMAILS_PER_ADDRESS_PER_WINDOW = 1
 EMAILS_PER_ADDRESS_PER_BATCH = 1
 
 
+def _format_available_rounds(expected_checkins):
+    rounds = sorted(checkin.round_number for checkin in expected_checkins)
+    if not rounds:
+        return "None selected"
+    labels = [
+        "Outrounds" if round_number == 0 else f"Round {round_number}"
+        for round_number in rounds
+    ]
+    return ", ".join(labels)
+
+
 def _prepare_judge_code_plan(judges, tournament_name, request):
-    eballot_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
+    portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
     now = timezone.now()
     cutoff = now - EMAIL_RATE_LIMIT_WINDOW
 
@@ -106,15 +117,15 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             )
             continue
 
-        ballot_url = request.build_absolute_uri(
-            reverse("enter_e_ballot", args=[judge.ballot_code])
+        portal_url = request.build_absolute_uri(
+            reverse("judge_portal", args=[judge.ballot_code])
         )
         email_request = build_judge_ballot_code_email(
             email,
             judge,
             tournament_name,
-            ballot_url,
-            eballot_search_url,
+            portal_url,
+            portal_search_url,
         )
 
         log_entry = JudgeCodeEmailLog(
@@ -127,7 +138,7 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             "judge": judge,
             "email": email,
             "ballot_code": judge.ballot_code,
-            "ballot_url": ballot_url,
+            "ballot_url": portal_url,
             "email_request": email_request,
             "log_entry": log_entry,
         })
@@ -509,7 +520,9 @@ def download_judge_codes(request):
 
 
 def _judge_email_management_context(request):
-    all_judges = list(Judge.objects.order_by("name"))
+    all_judges = list(
+        Judge.objects.prefetch_related("expected_checkins").order_by("name")
+    )
     missing_email_count = len([judge for judge in all_judges if not judge.email])
     rate_limit_hours = max(1, int(EMAIL_RATE_LIMIT_WINDOW.total_seconds() // 3600))
     tournament_name = TabSettings.get("tournament_name", "your tournament")
@@ -653,7 +666,7 @@ def _send_judge_code_emails(request, selected_entries, judge_context):
         len(judge_context["skipped_duplicate_email"]) +
         len(judge_context["skipped_missing_email"])
     )
-    message = f"Sent ballot codes to {sent} judge{'' if sent == 1 else 's'}."
+    message = f"Sent judge portal links to {sent} judge{'' if sent == 1 else 's'}."
     if skipped_total:
         message += (
             f" Skipped {skipped_total} due to invalid codes or rate limiting."

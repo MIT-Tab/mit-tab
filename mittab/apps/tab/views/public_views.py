@@ -20,6 +20,7 @@ from mittab.apps.tab.models import (
     PublicHomeShortcut,
     TabSettings,
     Judge,
+    JudgeExpectedCheckIn,
     Team,
     Round,
     RoundStats,
@@ -237,7 +238,7 @@ def public_view_judges(request):
         "public/judges.html",
         {
             "judges": Judge.objects.order_by("name")
-            .prefetch_related("schools", "checkin_set")
+            .prefetch_related("schools", "checkin_set", "expected_checkins")
             .all(),
             "rounds": rounds,
         },
@@ -570,14 +571,104 @@ def e_ballot_search(request):
     if request.method == "POST":
         ballot_code = (request.POST.get("ballot_code") or "").strip()
         if ballot_code:
-            return redirect("enter_e_ballot", ballot_code=ballot_code)
+            return redirect("judge_portal", ballot_code=ballot_code)
         return redirect_and_flash_error(
             request,
-            "Please enter the ballot code provided by tab.",
+            "Please enter the judge code provided by tab.",
             path=reverse("e_ballot_search"),
         )
 
     return e_ballot_search_page(request)
+
+
+def _judge_portal_rounds():
+    total_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
+    return [0] + list(range(1, total_rounds + 1))
+
+
+def _availability_rows_for_judge(judge):
+    expected_rounds = {
+        checkin.round_number for checkin in judge.expected_checkins.all()
+    }
+    rows = []
+    for round_number in _judge_portal_rounds():
+        rows.append({
+            "round_number": round_number,
+            "field_name": (
+                "availability_outround"
+                if round_number == 0
+                else f"availability_round_{round_number}"
+            ),
+            "label": "Outrounds" if round_number == 0 else f"Round {round_number}",
+            "checked": round_number in expected_rounds,
+        })
+    return rows
+
+
+def _sync_judge_expected_checkins(judge, desired_rounds):
+    desired = set(desired_rounds)
+    existing = set(
+        JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+            "round_number",
+            flat=True,
+        )
+    )
+    additions = [
+        JudgeExpectedCheckIn(judge=judge, round_number=round_number)
+        for round_number in desired - existing
+    ]
+    if additions:
+        JudgeExpectedCheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+    removals = existing - desired
+    if removals:
+        JudgeExpectedCheckIn.objects.filter(
+            judge=judge,
+            round_number__in=removals,
+        ).delete()
+
+
+def judge_portal(request, ballot_code):
+    judge = _judge_for_ballot_code(ballot_code)
+    if not judge:
+        message = (
+            f'No judges with the judge code "{ballot_code}." '
+            "Try submitting again, or go to tab to resolve the issue."
+        )
+        return redirect_and_flash_error(
+            request,
+            message,
+            path=reverse("e_ballot_search"),
+        )
+
+    if request.method == "POST":
+        allowed_rounds = _judge_portal_rounds()
+        desired_rounds = []
+        for round_number in allowed_rounds:
+            field_name = (
+                "availability_outround"
+                if round_number == 0
+                else f"availability_round_{round_number}"
+            )
+            if request.POST.get(field_name):
+                desired_rounds.append(round_number)
+        _sync_judge_expected_checkins(judge, desired_rounds)
+        return redirect_and_flash_success(
+            request,
+            "Availability saved.",
+            path=reverse("judge_portal", args=[ballot_code]),
+        )
+
+    return render(
+        request,
+        "public/judge_portal.html",
+        {
+            "judge": judge,
+            "ballot_code": ballot_code,
+            "availability_rows": _availability_rows_for_judge(judge),
+            "current_ballot_url": reverse("enter_e_ballot", args=[ballot_code]),
+            "previous_ballots_url": reverse("previous_ballots", args=[ballot_code]),
+        },
+    )
 
 
 def _build_disclosure_message():
@@ -721,6 +812,7 @@ def _submitted_ballot_context(
 def _judge_for_ballot_code(ballot_code):
     return Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
         "judges",
+        "expected_checkins",
     ).first()
 
 
@@ -748,7 +840,7 @@ def view_submitted_ballot(request, ballot_code, round_id=None):
 
     if not judge:
         message = (
-            f'No judges with the ballot code "{ballot_code}." '
+            f'No judges with the judge code "{ballot_code}." '
             "Try submitting again, or go to tab to resolve the issue."
         )
         return redirect_and_flash_error(
@@ -798,7 +890,7 @@ def previous_ballots(request, ballot_code):
     judge = _judge_for_ballot_code(ballot_code)
     if not judge:
         message = (
-            f'No judges with the ballot code "{ballot_code}." '
+            f'No judges with the judge code "{ballot_code}." '
             "Try submitting again, or go to tab to resolve the issue."
         )
         return redirect_and_flash_error(
@@ -901,7 +993,7 @@ def enter_e_ballot(request, ballot_code):
 
     if not judge:
         message = f"""
-                    No judges with the ballot code "{ballot_code}." Try submitting again, or
+                    No judges with the judge code "{ballot_code}." Try submitting again, or
                     go to tab to resolve the issue.
                     """
     elif TabSettings.get("pairing_released", 0) != 1:

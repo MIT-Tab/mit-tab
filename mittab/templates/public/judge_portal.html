@@ -1,0 +1,58 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+
+{% block title %}Judge Portal and Ballots{% endblock %}
+{% block banner %}Judge Portal and Ballots{% endblock %}
+
+{% block content %}
+<div class="col-lg-8 col-md-10">
+  <div class="mb-4">
+    <h2 class="h4 mb-1">{{ judge.name }}</h2>
+    <div class="text-muted">Judge code: <code>{{ ballot_code }}</code></div>
+  </div>
+
+  <div class="d-flex flex-column flex-md-row mb-4">
+    <a class="btn btn-primary mr-md-2 mb-2 mb-md-0" href="{{ current_ballot_url }}">
+      Current Ballot
+    </a>
+    <a class="btn btn-outline-primary" href="{{ previous_ballots_url }}">
+      Previous Ballots
+    </a>
+  </div>
+
+  <form method="post" action="">
+    {% csrf_token %}
+    {% return_to_input request.path %}
+    <div class="table-responsive shadow-sm rounded bg-white">
+      <table class="table mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th scope="col">Expected Availability</th>
+            <th scope="col" class="text-center">Available</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in availability_rows %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td class="text-center">
+              <div class="custom-control custom-checkbox d-inline-block">
+                <input class="custom-control-input"
+                       type="checkbox"
+                       id="{{ row.field_name }}"
+                       name="{{ row.field_name }}"
+                       {% if row.checked %}checked{% endif %}>
+                <label class="custom-control-label" for="{{ row.field_name }}">
+                  <span class="sr-only">{{ row.label }}</span>
+                </label>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="btn btn-success mt-3">Save Availability</button>
+  </form>
+</div>
+{% endblock %}

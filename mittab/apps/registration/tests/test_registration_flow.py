@@ -16,6 +16,7 @@ from mittab.apps.tab.models import (
     Debater,
     Judge,
     JudgeCodeEmailLog,
+    JudgeExpectedCheckIn,
     School,
     Scratch,
     Team,
@@ -187,10 +188,14 @@ def test_registration_flow_creates_objects(email_service, client):
         "Registration U",
         "Judge Hybrid",
     }
-    checkins = set(
-        CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
+    expected_checkins = set(
+        JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+            "round_number",
+            flat=True,
+        )
     )
-    assert checkins == {0, 1, 3}
+    assert expected_checkins == {0, 1, 3}
+    assert not CheckIn.objects.filter(judge=judge).exists()
     assert email_service.return_value.send_bulk.call_count == 3
     email_request = (
         email_service.return_value.send_bulk.call_args_list[0].args[0][0]
@@ -224,6 +229,13 @@ def test_registration_flow_creates_objects(email_service, client):
     assert judge_code_request.to_address == "judge@example.com"
     assert "registered as a judge for" in judge_code_request.text_body
     assert judge.ballot_code in judge_code_request.text_body
+    assert "Your current availability is: Outrounds, Round 1, Round 3" in (
+        judge_code_request.text_body
+    )
+    assert (
+        f"http://testserver/public/e-ballots/{judge.ballot_code}/"
+        in judge_code_request.text_body
+    )
     judge_code_log = JudgeCodeEmailLog.objects.get(judge=judge)
     assert judge_code_log.email == ""
     assert judge_code_log.ballot_code == judge.ballot_code
@@ -392,6 +404,66 @@ def test_registration_edit_logs_changes(email_service, client):
     ]
     assert "email" in logs[1].changes
     assert "teams" in logs[1].changes
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_edit_updates_judge_expected_checkins(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
+    judges = [
+        judge_entry(
+            0,
+            "Schedule Judge",
+            "judge@example.com",
+            5,
+            availability_rounds=[1, 2],
+            schools=["apda:88"],
+        )
+    ]
+    data = registration_payload(
+        "apda:88",
+        "Schedule School",
+        "schedule@example.com",
+        [],
+        judges,
+    )
+    response = client.post("/registration/", data=data, follow=True)
+    assert response.status_code == 200
+    registration = Registration.objects.get()
+    judge = registration.judges.get()
+
+    edited_judge = judge_entry(
+        0,
+        "Schedule Judge",
+        "judge@example.com",
+        5,
+        availability_rounds=[2, 3],
+        schools=["apda:88"],
+    )
+    edited_judge["judges-0-registration_judge_id"] = str(judge.pk)
+    edited_judge["judges-0-judge_id"] = str(judge.pk)
+    edited = registration_payload(
+        "apda:88",
+        "Schedule School",
+        "schedule@example.com",
+        [],
+        [edited_judge],
+    )
+
+    response = client.post(
+        f"/registration/{registration.herokunator_code}/",
+        data=edited,
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    assert set(
+        JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+            "round_number",
+            flat=True,
+        )
+    ) == {2, 3}
+    assert not CheckIn.objects.filter(judge=judge).exists()
 
 
 @pytest.mark.django_db

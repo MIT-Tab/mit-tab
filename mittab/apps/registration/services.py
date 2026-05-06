@@ -4,7 +4,14 @@ from django.db.models import Prefetch
 import requests
 from requests.exceptions import RequestException
 
-from mittab.apps.tab.models import CheckIn, Debater, Judge, School, TabSettings, Team
+from mittab.apps.tab.models import (
+    Debater,
+    Judge,
+    JudgeExpectedCheckIn,
+    School,
+    TabSettings,
+    Team,
+)
 
 from .models import Registration, RegistrationChangeLog
 
@@ -65,20 +72,26 @@ def get_round_config():
     }
 
 
-def sync_judge_checkins(judge, desired_rounds):
+def sync_judge_expected_checkins(judge, desired_rounds):
     desired = set(desired_rounds)
     existing = set(
-        CheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)
+        JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+            "round_number",
+            flat=True,
+        )
     )
     additions = [
-        CheckIn(judge=judge, round_number=round_number)
+        JudgeExpectedCheckIn(judge=judge, round_number=round_number)
         for round_number in desired - existing
     ]
     removals = existing - desired
     if additions:
-        CheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+        JudgeExpectedCheckIn.objects.bulk_create(additions, ignore_conflicts=True)
     if removals:
-        CheckIn.objects.filter(judge=judge, round_number__in=removals).delete()
+        JudgeExpectedCheckIn.objects.filter(
+            judge=judge,
+            round_number__in=removals,
+        ).delete()
 
 
 def school_value(school):
@@ -150,7 +163,9 @@ def registration_team_initial(team):
 
 
 def registration_judge_initial(judge, round_config):
-    checkins = {checkin.round_number for checkin in judge.checkin_set.all()}
+    expected_checkins = {
+        checkin.round_number for checkin in judge.expected_checkins.all()
+    }
     affiliated = list(judge.schools.all())
     initial = {
         "registration_judge_id": judge.pk,
@@ -165,9 +180,11 @@ def registration_judge_initial(judge, round_config):
     }
     outround = round_config.get("outround")
     if outround is not None:
-        initial["availability_outround"] = outround in checkins
+        initial["availability_outround"] = outround in expected_checkins
     for round_number in round_config.get("prelims", []):
-        initial[f"availability_round_{round_number}"] = round_number in checkins
+        initial[f"availability_round_{round_number}"] = (
+            round_number in expected_checkins
+        )
     return initial
 
 
@@ -324,7 +341,10 @@ def registration_snapshot(registration):
             ),
             Prefetch(
                 "judges",
-                queryset=Judge.objects.prefetch_related("schools", "checkin_set"),
+                queryset=Judge.objects.prefetch_related(
+                    "schools",
+                    "expected_checkins",
+                ),
             ),
         )
         .get(pk=registration.pk)
@@ -352,7 +372,7 @@ def registration_snapshot(registration):
                 "experience": str(judge.rank),
                 "schools": [_school_snapshot(school) for school in judge.schools.all()],
                 "availability_rounds": sorted(
-                    checkin.round_number for checkin in judge.checkin_set.all()
+                    checkin.round_number for checkin in judge.expected_checkins.all()
                 ),
             }
         )
@@ -534,7 +554,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
             for selection in selected_schools
         ]
         judge.schools.set(resolved_schools)
-        sync_judge_checkins(judge, payload["availability_rounds"])
+        sync_judge_expected_checkins(judge, payload["availability_rounds"])
         saved_judge_ids.append(judge.pk)
         registration_judge_emails.append({
             "judge_id": judge.pk,

@@ -37,7 +37,10 @@ def _registration_for_email(registration):
             ),
             Prefetch(
                 "judges",
-                queryset=Judge.objects.prefetch_related("schools", "checkin_set"),
+                queryset=Judge.objects.prefetch_related(
+                    "schools",
+                    "expected_checkins",
+                ),
             ),
         )
         .get(pk=registration.pk)
@@ -125,7 +128,9 @@ def _build_registration_judge_code_plan(registration, request):
 
     judges = {
         judge.pk: judge
-        for judge in Judge.objects.filter(pk__in=judge_ids).order_by("name")
+        for judge in Judge.objects.filter(pk__in=judge_ids)
+        .prefetch_related("expected_checkins")
+        .order_by("name")
     }
     recent_judge_ids = set(
         JudgeCodeEmailLog.objects.filter(
@@ -134,7 +139,7 @@ def _build_registration_judge_code_plan(registration, request):
         ).values_list("judge_id", flat=True)
     )
     tournament_name = TabSettings.get("tournament_name", "your tournament")
-    eballot_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
+    portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
     entries = []
 
     for judge_id in judge_ids:
@@ -155,15 +160,15 @@ def _build_registration_judge_code_plan(registration, request):
         if len(judge.ballot_code or "") > BALLOT_CODE_MAX_LENGTH:
             continue
 
-        ballot_url = request.build_absolute_uri(
-            reverse("enter_e_ballot", args=[judge.ballot_code])
+        portal_url = request.build_absolute_uri(
+            reverse("judge_portal", args=[judge.ballot_code])
         )
         email_request = build_judge_ballot_code_email(
             email,
             judge,
             tournament_name,
-            ballot_url,
-            eballot_search_url,
+            portal_url,
+            portal_search_url,
             include_registration_confirmation=True,
         )
         entries.append(

@@ -2,8 +2,8 @@
 {% load render_bundle from webpack_loader %}
 {% load tags %}
 
-{% block title %}Submit E-Ballot{% endblock %}
-{% block banner %}Submit E-Ballot{% endblock %}
+{% block title %}Judge Portal and Ballots{% endblock %}
+{% block banner %}Judge Portal and Ballots{% endblock %}
 
 {% block extra_head %}
   {% render_bundle 'publicDisplay' %}
@@ -12,14 +12,14 @@
 {% block content %}
 <div class="col-lg-6 col-md-8">
   <p>
-    Enter the ballot code provided by the tab staff to open your electronic ballot.
-    Only the chair of a panel can submit the ballot.
+    Enter the judge code provided by tab staff to open ballots and update
+    availability.
   </p>
   <form method="post" action="">
     {% csrf_token %}
     {% return_to_input request.path %}
     <div class="form-group">
-      <label for="ballot_code">Ballot code</label>
+      <label for="ballot_code">Judge code</label>
       <input type="text"
              name="ballot_code"
              id="ballot_code"
@@ -27,7 +27,7 @@
              placeholder="Example: gentle-river"
              autofocus>
     </div>
-    <button type="submit" class="btn btn-primary">Find Ballot</button>
+    <button type="submit" class="btn btn-primary">Open Portal</button>
   </form>
 </div>
 {% endblock %}

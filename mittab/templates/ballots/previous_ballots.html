@@ -12,9 +12,14 @@
         <h1 class="h3 mb-1">Previous Ballots</h1>
         <div class="text-muted">Submitted ballots for {{ judge.name }}</div>
       </div>
-      <a class="btn btn-outline-secondary mt-3 mt-md-0" href="{% url 'enter_e_ballot' ballot_code %}">
-        Current Ballot
-      </a>
+      <div class="mt-3 mt-md-0">
+        <a class="btn btn-outline-primary mr-2" href="{% url 'judge_portal' ballot_code %}">
+          Judge Portal
+        </a>
+        <a class="btn btn-outline-secondary" href="{% url 'enter_e_ballot' ballot_code %}">
+          Current Ballot
+        </a>
+      </div>
     </div>
 
     {% if ballot_rows %}

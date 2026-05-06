@@ -54,17 +54,18 @@ view.  The areas of importance are shown below:
   really should not need to ever delete a round, the various options for the
   results of a round should be sufficient.
 
-## E-Ballots
+## Judge Portal and Ballots
 
 MIT-Tab supports electronic ballot submission (e-ballots) for judges. Each judge
-has a unique ballot code that is automatically generated when they are created. This code
-can be found on the judge list view and in the judge detail page.
+has a unique judge code that is automatically generated when they are created.
+This code can be found on the judge list view and in the judge detail page.
 
-To use e-ballots:
+To use the judge portal and ballots:
 1. Ensure pairings are released (see "Releasing Pairings" below)
-2. Judges can access the e-ballot interface from the public homepage and enter their unique ballot code
+2. Judges can access the judge portal from the public homepage and enter their unique judge code
 3. Only the chair of a panel can submit e-ballot results
-4. E-ballots have configurable minimum and maximum speaker score limits (see Advanced Topics)
+4. Judges can update expected availability from the judge portal
+5. E-ballots have configurable minimum and maximum speaker score limits (see Advanced Topics)
    - Default minimum: 15 (configurable via `min_eballot_speak` setting)
    - Default maximum: 35 (configurable via `max_eballot_speak` setting)
    - Scores outside these bounds require justification to tab staff

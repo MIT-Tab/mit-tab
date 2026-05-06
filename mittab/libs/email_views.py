@@ -81,7 +81,7 @@ def _team_text_lines(team, request):
 
 def _judge_text_lines(judge, fallback_school):
     schools = ", ".join(s.name for s in judge.schools.all()) or fallback_school
-    availability = _format_available_rounds(judge.checkin_set.all())
+    availability = _format_available_rounds(judge.expected_checkins.all())
     return [
         f"- {judge.name}",
         f"  Experience: {judge.rank}",
@@ -122,7 +122,7 @@ def _registration_judge_context(judge, fallback_school):
         "rank": judge.rank,
         "schools": ", ".join(s.name for s in judge.schools.all())
         or fallback_school,
-        "availability": _format_available_rounds(judge.checkin_set.all()),
+        "availability": _format_available_rounds(judge.expected_checkins.all()),
     }
 
 
@@ -262,22 +262,24 @@ def build_judge_ballot_code_email(
         to_address,
         judge,
         tournament_name,
-        ballot_url,
-        eballot_search_url,
+        portal_url,
+        portal_search_url,
         include_registration_confirmation=False):
-    subject = f"Your judge ballot code for {tournament_name}"
+    subject = f"Your judge code for {tournament_name}"
     confirmation_text = ""
     if include_registration_confirmation:
         confirmation_text = (
             f"You have been registered as a judge for {tournament_name}.\n\n"
         )
+    availability = _format_available_rounds(judge.expected_checkins.all())
     text_body = (
         f"Hi {judge.name},\n\n"
         f"{confirmation_text}"
-        f"Your ballot code for {tournament_name} is: {judge.ballot_code}\n\n"
-        "Use this code to submit your e-ballots. You can submit a ballot "
-        f"directly at {ballot_url}, or look it up at any time using "
-        f"{eballot_search_url}.\n\n"
+        f"Your judge code for {tournament_name} is: {judge.ballot_code}\n"
+        f"Your current availability is: {availability}.\n\n"
+        "Use this code to open the judge portal, update availability, "
+        f"and submit ballots at {portal_url}. You can also search by "
+        f"judge code at {portal_search_url}.\n\n"
         "Thanks,\n"
         "The Tab Team"
     )
@@ -285,8 +287,9 @@ def build_judge_ballot_code_email(
         "judge_name": judge.name,
         "tournament_name": tournament_name,
         "ballot_code": judge.ballot_code,
-        "ballot_url": ballot_url,
-        "eballot_search_url": eballot_search_url,
+        "availability": availability,
+        "portal_url": portal_url,
+        "portal_search_url": portal_search_url,
         "include_registration_confirmation": include_registration_confirmation,
     }
     return build_email_request(
@@ -294,7 +297,7 @@ def build_judge_ballot_code_email(
         subject,
         text_body,
         "emails/judge_ballot_code.html",
-        f"Your ballot code for {tournament_name} is {judge.ballot_code}.",
+        f"Your judge code for {tournament_name} is {judge.ballot_code}.",
         context,
     )
 
