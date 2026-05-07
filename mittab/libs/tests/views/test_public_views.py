@@ -530,7 +530,10 @@ class TestPublicViews(TestCase):
         response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(
+            response.url,
+            reverse("judge_portal", args=[judge.ballot_code]),
+        )
 
     def test_enter_e_ballot_get_redirects_when_not_chair(self):
         client = Client()
@@ -923,6 +926,23 @@ class TestPublicViews(TestCase):
                 )
             ),
             {2, 4},
+        )
+
+    def test_current_ballot_redirects_unpaired_judge_back_to_portal(self):
+        client = Client()
+        TabSettings.set("pairing_released", 1)
+        judge = Judge.objects.create(
+            name="Unpaired Portal Judge",
+            rank=2.0,
+            ballot_code="unpaired-portal",
+        )
+
+        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            reverse("judge_portal", args=[judge.ballot_code]),
         )
 
     def test_public_ballot_modes(self):

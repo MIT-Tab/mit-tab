@@ -6,6 +6,7 @@ from .models import (
     InfoLink,
     Registration,
     RegistrationChangeLog,
+    RegistrationConfirmationEmailLog,
     RegistrationConfig,
     RegistrationLink,
 )
@@ -44,6 +45,23 @@ class RegistrationChangeLogInline(admin.TabularInline):
         return False
 
 
+class RegistrationConfirmationEmailLogInline(admin.TabularInline):
+    model = RegistrationConfirmationEmailLog
+    fk_name = "registration"
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "sent_at",
+        "email",
+        "successful",
+        "error_message",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Registration)
 class RegistrationAdmin(admin.ModelAdmin):
     list_display = ("school", "email", "herokunator_code", "created_at")
@@ -51,6 +69,7 @@ class RegistrationAdmin(admin.ModelAdmin):
     inlines = (
         RegistrationTeamInline,
         RegistrationJudgeInline,
+        RegistrationConfirmationEmailLogInline,
         RegistrationChangeLogInline,
     )
 
@@ -84,6 +103,23 @@ class RegistrationChangeLogAdmin(admin.ModelAdmin):
         "changes",
         "snapshot",
         "created_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(RegistrationConfirmationEmailLog)
+class RegistrationConfirmationEmailLogAdmin(admin.ModelAdmin):
+    list_display = ("sent_at", "registration", "email", "successful")
+    list_filter = ("successful",)
+    search_fields = ("registration__school__name", "email", "error_message")
+    readonly_fields = (
+        "registration",
+        "email",
+        "successful",
+        "error_message",
+        "sent_at",
     )
 
     def has_add_permission(self, request):

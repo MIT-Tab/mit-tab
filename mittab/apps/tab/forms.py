@@ -216,7 +216,7 @@ class TeamForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        exclude = ["tiebreaker"]
+        exclude = ["team_code", "tiebreaker"]
 
     def save(self, commit=True, actor=None):
         actor = actor if getattr(actor, "is_authenticated", False) else None
@@ -265,7 +265,7 @@ class TeamEntryForm(TeamForm):
 
     class Meta:
         model = Team
-        exclude = ["tiebreaker"]
+        exclude = ["team_code", "tiebreaker"]
 
 
 class ScratchForm(forms.ModelForm):

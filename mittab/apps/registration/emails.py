@@ -1,7 +1,7 @@
 from datetime import timedelta
 
-from django.core.exceptions import ValidationError
-from django.db.models import Prefetch
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.db.models import Prefetch, Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -19,7 +19,11 @@ from mittab.libs.email_views import (
     build_registration_team_portal_email,
 )
 
-from .models import Registration, RegistrationLink
+from .models import (
+    Registration,
+    RegistrationConfirmationEmailLog,
+    RegistrationLink,
+)
 
 
 JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
@@ -84,7 +88,23 @@ def build_registration_confirmation_email(registration, request):
 
 def send_registration_confirmation_email(registration, request):
     email_request = build_registration_confirmation_email(registration, request)
-    return EmailService().send_bulk([email_request])
+    try:
+        sent = EmailService().send_bulk([email_request])
+    except (ImproperlyConfigured, EmailServiceError) as exc:
+        RegistrationConfirmationEmailLog.objects.create(
+            registration=registration,
+            email=email_request.to_address,
+            successful=False,
+            error_message=str(exc),
+        )
+        raise
+
+    RegistrationConfirmationEmailLog.objects.create(
+        registration=registration,
+        email=email_request.to_address,
+        successful=True,
+    )
+    return sent
 
 
 def build_registration_team_portal_emails(registration, request):
@@ -132,12 +152,40 @@ def _build_registration_judge_code_plan(registration, request):
         .prefetch_related("expected_checkins")
         .order_by("name")
     }
-    recent_judge_ids = set(
-        JudgeCodeEmailLog.objects.filter(
-            judge_id__in=judge_ids,
-            sent_at__gte=timezone.now() - JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW,
-        ).values_list("judge_id", flat=True)
+    emails_lower = [email.lower() for email in judge_emails.values() if email]
+    email_query = Q()
+    for email in emails_lower:
+        email_query |= Q(email__iexact=email)
+    recent_logs = JudgeCodeEmailLog.objects.filter(
+        sent_at__gte=timezone.now() - JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW,
+    ).filter(
+        Q(judge_id__in=judge_ids) | email_query
     )
+    recent_judge_ids = set(recent_logs.values_list("judge_id", flat=True))
+    recent_email_counts = {}
+    for email in recent_logs.values_list("email", flat=True):
+        email_lower = email.lower()
+        recent_email_counts[email_lower] = (
+            recent_email_counts.get(email_lower, 0) + 1
+        )
+    batch_email_counts = {}
+
+    def email_rate_limited(email):
+        return recent_email_counts.get(email.lower(), 0) >= 1
+
+    def email_duplicate_in_batch(email):
+        return batch_email_counts.get(email.lower(), 0) >= 1
+
+    def record_email_queued(email):
+        email_lower = email.lower()
+        recent_email_counts[email_lower] = (
+            recent_email_counts.get(email_lower, 0) + 1
+        )
+        batch_email_counts[email_lower] = batch_email_counts.get(
+            email_lower,
+            0,
+        ) + 1
+
     tournament_name = TabSettings.get("tournament_name", "your tournament")
     portal_search_url = request.build_absolute_uri(reverse("e_ballot_search"))
     entries = []
@@ -145,7 +193,12 @@ def _build_registration_judge_code_plan(registration, request):
     for judge_id in judge_ids:
         judge = judges.get(judge_id)
         email = judge_emails[judge_id]
-        if not judge or judge_id in recent_judge_ids:
+        if (
+            not judge
+            or judge_id in recent_judge_ids
+            or email_rate_limited(email)
+            or email_duplicate_in_batch(email)
+        ):
             continue
 
         try:
@@ -176,11 +229,13 @@ def _build_registration_judge_code_plan(registration, request):
                 "email_request": email_request,
                 "log_entry": JudgeCodeEmailLog(
                     judge=judge,
-                    email="",
+                    email=email,
                     ballot_code=judge.ballot_code,
+                    source=JudgeCodeEmailLog.SOURCE_REGISTRATION,
                 ),
             }
         )
+        record_email_queued(email)
 
     return entries
 

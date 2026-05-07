@@ -62,7 +62,7 @@ judge. Higher is a "better" judge.
 judge. **Use this for team scratches as well as multiple affiliations**
 5. Wing Only - Check this box if the judge can only serve as a wing judge and not as a chair. Wing-only judges will be excluded from automatic chair assignment during both in-rounds and outrounds. This is useful for ensuring that less experienced judges are never assigned as the chair of a panel.
 
-**Note:** Judges automatically get assigned unique judge codes (e.g., "wandering-tsunami", "icy-firefly") when created. These codes allow judges to open the judge portal, update expected availability, and submit e-ballots remotely. You can find a judge's code:
+**Note:** Judges automatically get assigned unique judge codes (e.g., "wandering-tsunami-234567", "icy-firefly-89abcd") when created. These codes allow judges to open the judge portal, update expected availability, and submit e-ballots remotely. You can find a judge's code:
 - In the judge list view (appears in parentheses after the name)
 - On the judge detail page
 - Judge codes can be used from the mit-tab homepage under Judge Portal and Ballots.
@@ -88,9 +88,7 @@ into the rounds.
 add scratches.  Feel free to put zero and add scratches later (they can be
 added from either the judge page or the team page at any time).
 
-**Note:** Teams automatically get assigned unique "team codes" (fun names like
-"Icy Firefly" or "Wandering Tsunami") that can be used for anonymous display on public views if
-enabled in settings. These codes are automatically generated and are unique to each team.
+**Note:** Teams automatically get assigned unique team access codes in the same word-word-code format as judge and registration codes. Team codes are authentication tokens for the team portal and are not displayed on pairings or staff views.
 
 ### Debaters
 1. Name - Name of the debater, e.g. "Matt Smith".

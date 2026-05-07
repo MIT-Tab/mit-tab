@@ -34,8 +34,6 @@
     <ul style="margin:4px 0 0;padding-left:20px;">
       <li>School protection: {{ team.school_name }}</li>
       <li>Seed: {{ team.seed }}</li>
-      <li>Team code: <strong>{{ team.team_code }}</strong></li>
-      <li>Team portal: <a href="{{ team.portal_url }}" style="color:#1d4ed8;">{{ team.portal_url }}</a></li>
       <li>Debaters:
         <ul style="margin:4px 0 0;padding-left:20px;">
           {% for debater in team.debaters %}
