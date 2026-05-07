@@ -1,4 +1,7 @@
+import logging
+
 from django import forms
+from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Prefetch
 import requests
@@ -16,6 +19,7 @@ from mittab.apps.tab.models import (
 from .models import Registration, RegistrationChangeLog
 
 SCHOOL_ACTIVE_URL = "https://results.apda.online/api/schools/all/"
+logger = logging.getLogger(__name__)
 
 
 def fetch_remote_schools():
@@ -35,6 +39,69 @@ def fetch_remote_schools():
         seen.add(apda_id)
         results.append({"id": apda_id, "name": name})
     return results
+
+
+def mask_private_email(email):
+    value = (email or "").strip()
+    if "@" not in value:
+        return ""
+    local_part, domain = value.rsplit("@", 1)
+    local_part = local_part.strip()
+    domain = domain.strip()
+    if not local_part or not domain:
+        return ""
+    visible = local_part[: min(2, len(local_part))]
+    return f"{visible}***@{domain}"
+
+
+def fetch_private_debater_emails(debater_ids):
+    token = settings.BLACK_ROD_PRIVATE_API_TOKEN
+    if not token:
+        return {}
+    normalized_ids = []
+    seen = set()
+    for raw_id in debater_ids:
+        try:
+            debater_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if debater_id in seen:
+            continue
+        seen.add(debater_id)
+        normalized_ids.append(debater_id)
+    if not normalized_ids:
+        return {}
+
+    url = f"{settings.BLACK_ROD_API_BASE_URL}/api/private/debater-emails/"
+    try:
+        response = requests.post(
+            url,
+            json={"debater_ids": normalized_ids},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if not response.ok:
+            logger.warning(
+                "Black-rod debater email lookup failed status=%s",
+                response.status_code,
+            )
+            return {}
+        payload = response.json()
+    except (ValueError, RequestException):
+        logger.exception("Failed to fetch debater emails from black-rod")
+        return {}
+
+    email_map = {}
+    for row in payload.get("debaters", []):
+        if not isinstance(row, dict):
+            continue
+        try:
+            debater_id = int(row.get("id"))
+        except (TypeError, ValueError):
+            continue
+        email = (row.get("email") or "").strip()
+        email_map[debater_id] = email or None
+    return email_map
 
 
 def build_school_choices():
@@ -488,12 +555,34 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
     registration.email = reg_form.cleaned_data["email"]
     registration.save()
 
-    school_cache = {}
-    saved_team_ids = []
+    team_payloads = []
+    private_email_ids = []
     for form in team_formset:
         if form.cleaned_data.get("DELETE"):
             continue
         payload = form.get_payload()
+        team_payloads.append(payload)
+        for member in payload["members"]:
+            if (
+                not (member.get("email") or "").strip()
+                and member.get("use_private_email")
+                and member.get("apda_id")
+            ):
+                private_email_ids.append(member["apda_id"])
+
+    private_email_map = fetch_private_debater_emails(private_email_ids)
+    for payload in team_payloads:
+        for member in payload["members"]:
+            if (member.get("email") or "").strip():
+                continue
+            if member.get("use_private_email") and member.get("apda_id"):
+                member["email"] = private_email_map.get(int(member["apda_id"]))
+            if not (member.get("email") or "").strip():
+                raise forms.ValidationError("Each debater needs an email")
+
+    school_cache = {}
+    saved_team_ids = []
+    for payload in team_payloads:
         members = payload["members"]
         member_schools = [
             resolve_school(member["school"], cache=school_cache) for member in members

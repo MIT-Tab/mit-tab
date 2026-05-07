@@ -14,6 +14,11 @@ SECRET_KEY = "=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG")
+BLACK_ROD_API_BASE_URL = os.environ.get(
+    "BLACK_ROD_API_BASE_URL",
+    "https://results.apda.online",
+).rstrip("/")
+BLACK_ROD_PRIVATE_API_TOKEN = os.environ.get("BLACK_ROD_PRIVATE_API_TOKEN", "")
 
 ALLOWED_HOSTS = ["*"]
 
