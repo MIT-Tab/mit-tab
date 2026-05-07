@@ -44,6 +44,7 @@ class AttributionAdminMixin:
 
 
 class TeamAdmin(AttributionAdminMixin, admin.ModelAdmin):
+    exclude = ("team_code",)
     filter_horizontal = ("debaters", )
 
 

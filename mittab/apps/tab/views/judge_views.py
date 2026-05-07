@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db.models import Q, Max
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from mittab.apps.tab.auth_roles import (
@@ -23,6 +23,11 @@ from mittab.libs.email_service import EmailService, EmailServiceError
 from mittab.libs.email_views import (
     build_judge_ballot_code_email,
     build_written_rfd_email,
+)
+from mittab.apps.registration.emails import build_registration_confirmation_email
+from mittab.apps.registration.models import (
+    Registration,
+    RegistrationConfirmationEmailLog,
 )
 
 
@@ -60,12 +65,13 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
     judge_ids = [judge.id for judge in judges]
     emails_lower = [judge.email.lower() for judge in judges if judge.email]
 
-    recent_logs = JudgeCodeEmailLog.objects.filter(
-        sent_at__gte=cutoff,
-    )
+    recent_logs = JudgeCodeEmailLog.objects.filter(sent_at__gte=cutoff)
     if judge_ids or emails_lower:
+        email_query = Q()
+        for email in emails_lower:
+            email_query |= Q(email__iexact=email)
         recent_logs = recent_logs.filter(
-            Q(judge_id__in=judge_ids) | Q(email__in=emails_lower)
+            Q(judge_id__in=judge_ids) | email_query
         )
 
     recent_judges = set(recent_logs.values_list("judge_id", flat=True))
@@ -132,6 +138,7 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             judge=judge,
             email=email,
             ballot_code=judge.ballot_code,
+            source=JudgeCodeEmailLog.SOURCE_MANUAL,
         )
 
         sendable.append({
@@ -679,6 +686,167 @@ def _send_judge_code_emails(request, selected_entries, judge_context):
     )
 
 
+def _registration_confirmation_email_management_context(request):
+    registrations = list(
+        Registration.objects.select_related("school").order_by(
+            "school__name",
+            "-created_at",
+        )
+    )
+    last_log_map = {}
+    for log in RegistrationConfirmationEmailLog.objects.order_by("-sent_at"):
+        if log.registration_id not in last_log_map:
+            last_log_map[log.registration_id] = log
+    successful_registration_ids = set(
+        RegistrationConfirmationEmailLog.objects.filter(
+            successful=True,
+        ).values_list("registration_id", flat=True)
+    )
+
+    sendable_by_id = {}
+    for registration in registrations:
+        if not registration.email:
+            continue
+        email_request = build_registration_confirmation_email(
+            registration,
+            request,
+        )
+        sendable_by_id[registration.id] = {
+            "registration": registration,
+            "email_request": email_request,
+        }
+
+    default_selected_ids = [
+        registration_id for registration_id in sendable_by_id.keys()
+        if registration_id not in successful_registration_ids
+    ]
+
+    if request.method == "POST":
+        selected_ids = []
+        seen_ids = set()
+        for registration_id in request.POST.getlist("registration_ids"):
+            if not registration_id.isdigit():
+                continue
+
+            parsed_id = int(registration_id)
+            if parsed_id not in sendable_by_id or parsed_id in seen_ids:
+                continue
+
+            selected_ids.append(parsed_id)
+            seen_ids.add(parsed_id)
+    else:
+        selected_ids = default_selected_ids
+    selected_id_set = set(selected_ids)
+
+    rows = []
+    for registration in registrations:
+        can_send = registration.id in sendable_by_id
+        last_log = last_log_map.get(registration.id)
+        if not can_send:
+            status = "Missing email"
+        elif not last_log:
+            status = "Never sent"
+        elif last_log.successful:
+            status = "Sent"
+        else:
+            status = "Failed"
+        rows.append({
+            "registration": registration,
+            "can_send": can_send,
+            "checked": can_send and registration.id in selected_id_set,
+            "status": status,
+            "last_log": last_log,
+            "never_received": registration.id not in successful_registration_ids,
+        })
+
+    return {
+        "rows": rows,
+        "sendable_count": len(sendable_by_id),
+        "never_received_sendable_count": len(default_selected_ids),
+        "selected_entries": [
+            sendable_by_id[registration_id] for registration_id in selected_ids
+        ],
+    }
+
+
+def _registration_confirmation_log(entry, successful, error_message=""):
+    return RegistrationConfirmationEmailLog(
+        registration=entry["registration"],
+        email=entry["email_request"].to_address,
+        successful=successful,
+        error_message=error_message,
+    )
+
+
+def _send_registration_confirmation_emails(request, selected_entries):
+    if not selected_entries:
+        return redirect_and_flash_error(
+            request,
+            "No registration confirmation emails were sent.",
+            path=reverse("email_management"),
+        )
+
+    email_requests = [entry["email_request"] for entry in selected_entries]
+    entries_by_request_id = {
+        id(entry["email_request"]): entry for entry in selected_entries
+    }
+
+    try:
+        sent = EmailService().send_bulk(email_requests)
+    except ImproperlyConfigured as exc:
+        RegistrationConfirmationEmailLog.objects.bulk_create(
+            [
+                _registration_confirmation_log(entry, False, str(exc))
+                for entry in selected_entries
+            ]
+        )
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send registration confirmations: {exc}",
+            path=reverse("email_management"),
+        )
+    except EmailServiceError as exc:
+        sent_request_ids = {
+            id(email_request) for email_request in exc.sent_requests
+        }
+        RegistrationConfirmationEmailLog.objects.bulk_create(
+            [
+                _registration_confirmation_log(
+                    entry,
+                    id(entry["email_request"]) in sent_request_ids,
+                    "" if id(entry["email_request"]) in sent_request_ids else str(exc),
+                )
+                for entry in selected_entries
+            ]
+        )
+        sent_count = len([
+            email_request for email_request in exc.sent_requests
+            if id(email_request) in entries_by_request_id
+        ])
+        partial_message = (
+            f" after sending {sent_count} confirmation"
+            f"{'' if sent_count == 1 else 's'}"
+            if sent_count else ""
+        )
+        return redirect_and_flash_error(
+            request,
+            f"Unable to send registration confirmations{partial_message}: {exc}",
+            path=reverse("email_management"),
+        )
+
+    RegistrationConfirmationEmailLog.objects.bulk_create(
+        [
+            _registration_confirmation_log(entry, True)
+            for entry in selected_entries
+        ]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Sent {sent} registration confirmation email{'' if sent == 1 else 's'}.",
+        path=reverse("email_management"),
+    )
+
+
 def _written_rfd_email_management_context(request):
     rounds = list(_completed_rounds_with_written_rfds())
     tournament_name = TabSettings.get("tournament_name", "your tournament")
@@ -838,8 +1006,8 @@ def _judge_code_history_rows():
             "type": "Judge code",
             "target": log.judge.name,
             "target_url": reverse("view_judge", args=[log.judge_id]),
-            "recipient": log.email or "Registration judge email",
-            "detail": f"Ballot code {log.ballot_code}",
+            "recipient": log.email,
+            "detail": f"{log.get_source_display()} send; ballot code {log.ballot_code}",
             "sent_at": log.sent_at,
         })
     return rows
@@ -871,13 +1039,45 @@ def _written_rfd_history_rows():
     return rows
 
 
+def _registration_confirmation_history_rows():
+    logs = (
+        RegistrationConfirmationEmailLog.objects.select_related(
+            "registration",
+            "registration__school",
+        )
+        .order_by("-sent_at")
+    )
+    rows = []
+    for log in logs:
+        detail = "Sent successfully" if log.successful else "Failed"
+        if log.error_message:
+            detail = f"{detail}: {log.error_message[:120]}"
+        rows.append({
+            "type": "Registration confirmation",
+            "target": log.registration.school.name,
+            "target_url": reverse(
+                "registration_portal_edit",
+                args=[log.registration.herokunator_code],
+            ),
+            "recipient": log.email,
+            "detail": detail,
+            "sent_at": log.sent_at,
+        })
+    return rows
+
+
 def _email_history_rows():
-    rows = _judge_code_history_rows() + _written_rfd_history_rows()
+    rows = (
+        _judge_code_history_rows() +
+        _written_rfd_history_rows() +
+        _registration_confirmation_history_rows()
+    )
     return sorted(rows, key=lambda row: row["sent_at"], reverse=True)
 
 
 def email_management(request):
     judge_context = _judge_email_management_context(request)
+    registration_context = _registration_confirmation_email_management_context(request)
     rfd_context = _written_rfd_email_management_context(request)
 
     if request.method == "POST":
@@ -886,6 +1086,11 @@ def email_management(request):
             return _send_written_rfd_emails(
                 request,
                 rfd_context["selected_entries"],
+            )
+        if action == "registration_confirmations":
+            return _send_registration_confirmation_emails(
+                request,
+                registration_context["selected_entries"],
             )
         return _send_judge_code_emails(
             request,
@@ -898,6 +1103,7 @@ def email_management(request):
         "tab/email_management.html",
         {
             "judge_email": judge_context,
+            "registration_email": registration_context,
             "written_rfd_email": rfd_context,
             "history_rows": _email_history_rows(),
         },

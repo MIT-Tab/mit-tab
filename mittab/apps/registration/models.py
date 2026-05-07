@@ -3,7 +3,7 @@ from django.core.validators import URLValidator
 from django.db import models
 
 from mittab.apps.tab.models import School
-from mittab.libs.haikunator import Haikunator
+from mittab.libs.codes import generate_readable_auth_code
 
 
 def validate_safe_url(value):
@@ -56,11 +56,11 @@ class Registration(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.herokunator_code:
-            haikunator = Haikunator()
-            code = haikunator.haikunate(token_length=0)
-            while Registration.objects.filter(herokunator_code=code).exists():
-                code = haikunator.haikunate(token_length=0)
-            self.herokunator_code = code
+            self.herokunator_code = generate_readable_auth_code(
+                lambda code: Registration.objects.filter(
+                    herokunator_code=code,
+                ).exists()
+            )
         super().save(*args, **kwargs)
 
 
@@ -95,6 +95,29 @@ class RegistrationChangeLog(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} {self.registration_code}"
+
+
+class RegistrationConfirmationEmailLog(models.Model):
+    registration = models.ForeignKey(
+        Registration,
+        related_name="confirmation_email_logs",
+        on_delete=models.CASCADE,
+    )
+    email = models.EmailField(max_length=254)
+    successful = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["registration", "sent_at"]),
+            models.Index(fields=["email", "sent_at"]),
+        ]
+        ordering = ["-sent_at"]
+
+    def __str__(self):
+        status = "sent" if self.successful else "failed"
+        return f"Registration confirmation {status}: {self.email}"
 
 
 class TournamentLinkBase(models.Model):

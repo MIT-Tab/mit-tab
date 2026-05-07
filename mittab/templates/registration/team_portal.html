@@ -15,9 +15,7 @@
       <div class="registration-admin__titles">
         <h5>{{ team.name }}</h5>
         <p>
-          Team code <span class="registration-admin__code">{{ team.team_code }}</span>
-          {% if team.school %} · {{ team.school.name }}{% endif %}
-          · {{ team.get_seed_display }} seed
+          {% if team.school %}{{ team.school.name }} · {% endif %}{{ team.get_seed_display }} seed
         </p>
       </div>
       <a class="btn btn-outline-primary btn-sm" href="{% url 'team_portal_search' %}">Use a Different Code</a>

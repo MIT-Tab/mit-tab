@@ -238,7 +238,7 @@ def registration_judge_initial(judge, round_config):
         "registration_judge_id": judge.pk,
         "judge_id": judge.pk,
         "name": judge.name,
-        "email": "",
+        "email": judge.email or "",
         "experience": judge.rank,
         "schools": [school_value(school) for school in affiliated],
         "school_label_map": {
@@ -631,7 +631,7 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         ).first() or Judge(registration=registration)
         judge.name = uniquify_name(Judge, payload["name"], exclude_pk=judge.pk)
         judge.rank = payload["experience"]
-        judge.email = None
+        judge.email = payload["email"]
         try:
             judge.save()
         except IntegrityError:

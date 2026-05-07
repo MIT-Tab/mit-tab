@@ -43,7 +43,7 @@ from mittab.apps.registration.services import (
     save_registration,
     school_value,
 )
-from mittab.apps.tab.models import Judge, Round, Scratch, TabSettings, Team
+from mittab.apps.tab.models import Debater, Judge, Round, Scratch, TabSettings, Team
 from mittab.apps.tab.helpers import (
     redirect_and_flash_error,
     redirect_and_flash_success,
@@ -407,7 +407,13 @@ def registration_admin(request):
                 path=reverse("registration_admin"),
             )
         log_registration_deleted(registration)
+        debater_ids = list(
+            Debater.objects.filter(
+                team__registration=registration,
+            ).values_list("pk", flat=True)
+        )
         registration.delete()
+        Debater.objects.filter(pk__in=debater_ids, team__isnull=True).delete()
         invalidate_all_public_caches()
         return redirect_and_flash_success(
             request,
@@ -730,6 +736,12 @@ def _school_debater_ids(school_id):
 @require_http_methods(["POST"])
 def proxy_debater_email_status(request):
     """Return only masked private email availability for a school-scoped debater."""
+    if not RegistrationConfig.get_or_create_active().can_create():
+        return JsonResponse(
+            {"error": "Registration is closed."},
+            status=403,
+        )
+
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
     except (UnicodeDecodeError, json.JSONDecodeError):

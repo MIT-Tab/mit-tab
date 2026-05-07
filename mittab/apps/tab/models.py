@@ -9,7 +9,11 @@ from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
-from mittab.libs.haikunator import Haikunator
+from mittab.libs.codes import (
+    HUMAN_READABLE_TOKEN_CHARS as SHARED_HUMAN_READABLE_TOKEN_CHARS,
+    READABLE_AUTH_CODE_TOKEN_LENGTH,
+    generate_readable_auth_code,
+)
 
 
 DEFAULT_TOURNAMENT_NAME = "New Tournament"
@@ -390,11 +394,7 @@ class School(models.Model):
 
     @property
     def display(self):
-        schools_public = not TabSettings.get("use_team_codes", 0)
-
-        if schools_public:
-            return self.name
-        return ""
+        return self.name
 
     class Meta:
         ordering = ["name"]
@@ -547,22 +547,9 @@ class Team(AuditAttributionMixin):
         )
 
     def set_unique_team_code(self):
-        haikunator = Haikunator()
-
-        def gen_haiku_and_clean():
-            code = haikunator.haikunate(
-                token_length=TEAM_CODE_TOKEN_LENGTH,
-                token_chars=HUMAN_READABLE_TOKEN_CHARS,
-            ).replace("-", " ").title()
-
-            return code
-
-        code = gen_haiku_and_clean()
-
-        while Team.objects.filter(team_code=code).first():
-            code = gen_haiku_and_clean()
-
-        self.team_code = code
+        self.team_code = generate_readable_auth_code(
+            lambda code: Team.objects.filter(team_code=code).first()
+        )
 
     def save(self,
              force_insert=False,
@@ -581,24 +568,10 @@ class Team(AuditAttributionMixin):
 
     @property
     def display_backend(self):
-        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
-
-        if use_team_codes_backend:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
         return self.name
 
     @property
     def display(self):
-        use_team_codes = TabSettings.get("use_team_codes", 0)
-
-        if use_team_codes:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
         return self.name
 
     def __str__(self):
@@ -640,10 +613,10 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
-HUMAN_READABLE_TOKEN_CHARS = "23456789abcdefghijkmnopqrstuvwxyz"
-TEAM_CODE_TOKEN_LENGTH = 4
+HUMAN_READABLE_TOKEN_CHARS = SHARED_HUMAN_READABLE_TOKEN_CHARS
+TEAM_CODE_TOKEN_LENGTH = READABLE_AUTH_CODE_TOKEN_LENGTH
 BALLOT_CODE_MAX_LENGTH = 30
-BALLOT_CODE_TOKEN_LENGTH = 9
+BALLOT_CODE_TOKEN_LENGTH = READABLE_AUTH_CODE_TOKEN_LENGTH
 ballot_code_validator = RegexValidator(
     regex=r"^(?:[A-Za-z]+-[A-Za-z]+(?:-[A-Za-z0-9]+)?|[A-Za-z0-9]+)$",
     message=(
@@ -678,21 +651,13 @@ class Judge(AuditAttributionMixin):
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):
-        haikunator = Haikunator()
-        code = haikunator.haikunate(
-            token_length=BALLOT_CODE_TOKEN_LENGTH,
-            token_chars=HUMAN_READABLE_TOKEN_CHARS,
-        )
-
-        while (len(code) > BALLOT_CODE_MAX_LENGTH or
-               not self.is_valid_ballot_code(code, raise_error=False) or
-               Judge.objects.filter(ballot_code=code).first()):
-            code = haikunator.haikunate(
-                token_length=BALLOT_CODE_TOKEN_LENGTH,
-                token_chars=HUMAN_READABLE_TOKEN_CHARS,
+        self.ballot_code = generate_readable_auth_code(
+            lambda code: (
+                len(code) > BALLOT_CODE_MAX_LENGTH or
+                not self.is_valid_ballot_code(code, raise_error=False) or
+                Judge.objects.filter(ballot_code=code).first()
             )
-
-        self.ballot_code = code
+        )
 
     def is_valid_ballot_code(self, code=None, raise_error=True):
         code = code or self.ballot_code
@@ -754,9 +719,21 @@ class Judge(AuditAttributionMixin):
 
 
 class JudgeCodeEmailLog(models.Model):
+    SOURCE_MANUAL = "manual"
+    SOURCE_REGISTRATION = "registration"
+    SOURCE_CHOICES = (
+        (SOURCE_MANUAL, "Manual"),
+        (SOURCE_REGISTRATION, "Registration"),
+    )
+
     judge = models.ForeignKey(Judge, on_delete=models.CASCADE, related_name="code_email_logs")
     email = models.EmailField()
     ballot_code = models.CharField(max_length=BALLOT_CODE_MAX_LENGTH)
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+    )
     sent_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
