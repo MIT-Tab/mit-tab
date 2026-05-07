@@ -11,20 +11,21 @@ RUN apt-get update && \
 
 WORKDIR /var/www/tab
 
-COPY Pipfile ./
-COPY Pipfile.lock ./
+COPY pyproject.toml ./
+COPY uv.lock ./
 COPY package.json ./
 COPY package-lock.json ./
 COPY manage.py ./
-COPY setup.py ./
 COPY webpack.config.js ./
 COPY ./settings ./settings
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets
 
-RUN pip install pipenv
-RUN pipenv install --deploy --system
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+ENV UV_PROJECT_ENVIRONMENT=/usr/local
+RUN uv sync --frozen --no-dev --no-group docs
 
 RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
 RUN apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*

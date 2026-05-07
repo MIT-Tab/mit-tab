@@ -17,20 +17,17 @@ NC='\033[0m'
 
 echo -e "${BLUE}STEP 1: Installing dependencies${NC}"
 
-echo '' >> ~/.bashrc && echo 'source virtualenvwrapper.sh' >> ~/.bashrc
-source virtualenvwrapper.sh
-
-mkvirtualenv mittab
-workon mittab
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv sync --frozen --no-dev --no-group docs
 
 echo -e "${BLUE}STEP 2: Set up the tournament${NC}"
 printf "Please enter a password for the 'tab' user: "
 read tab_password
-python manage.py initialize_tourney --tab-password $tab_password $USER
+uv run python manage.py initialize_tourney --tab-password $tab_password $USER
 
 echo -e "${BLUE}STEP 3: Collecting HTML, CSS and JS files${NC}"
-python manage.py collectstatic
+uv run python manage.py collectstatic
 
 # Sets up WSGI with this gist:
 # https://gist.github.com/BenMusch/f3e950298001b2717882a39fc5ca3074
