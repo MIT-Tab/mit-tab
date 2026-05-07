@@ -1,7 +1,9 @@
+import json
 import logging
 from typing import Type, cast
 
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import ImproperlyConfigured
@@ -32,8 +34,10 @@ from mittab.apps.registration.emails import (
 )
 from mittab.apps.registration.services import (
     build_school_choices,
+    fetch_private_debater_emails,
     get_round_config,
     log_registration_deleted,
+    mask_private_email,
     registration_judge_initial,
     registration_team_initial,
     save_registration,
@@ -677,7 +681,7 @@ def team_portal(request, team_code):
 def proxy_debaters(request, school_id):
     """Proxy endpoint for school debaters to avoid CORS issues."""
     try:
-        url = f"https://results.apda.online/api/debaters/{school_id}/"
+        url = f"{settings.BLACK_ROD_API_BASE_URL}/api/debaters/{school_id}/"
         response = requests.get(url, timeout=10)
         if response.ok:
             return JsonResponse(response.json(), safe=False)
@@ -690,3 +694,63 @@ def proxy_debaters(request, school_id):
             school_id,
         )
         return JsonResponse({"error": "Failed to fetch debaters"}, status=500)
+
+
+def _school_debater_ids(school_id):
+    """Return APDA debater IDs from the public school debater list."""
+    url = f"{settings.BLACK_ROD_API_BASE_URL}/api/debaters/{school_id}/"
+    try:
+        response = requests.get(url, timeout=10)
+        if not response.ok:
+            return set()
+        payload = response.json()
+    except (ValueError, RequestException):
+        logger.exception(
+            "Failed to fetch debaters from upstream API for email status school_id=%s",
+            school_id,
+        )
+        return set()
+    entries = payload if isinstance(payload, list) else payload.get("debaters", [])
+    debater_ids = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        raw_id = (
+            entry.get("apda_id")
+            if entry.get("apda_id") is not None
+            else entry.get("id")
+        )
+        try:
+            debater_ids.add(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    return debater_ids
+
+
+@require_http_methods(["POST"])
+def proxy_debater_email_status(request):
+    """Return only masked private email availability for a school-scoped debater."""
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    try:
+        debater_id = int(payload.get("debater_id"))
+        school_id = int(payload.get("school_id"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Invalid debater or school"}, status=400)
+
+    if debater_id not in _school_debater_ids(school_id):
+        return JsonResponse(
+            {"id": debater_id, "has_email": False, "masked_email": ""},
+            status=404,
+        )
+
+    email = fetch_private_debater_emails([debater_id]).get(debater_id)
+    return JsonResponse(
+        {
+            "id": debater_id,
+            "has_email": bool(email),
+            "masked_email": mask_private_email(email),
+        }
+    )

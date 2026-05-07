@@ -1,7 +1,9 @@
+import json
 from decimal import Decimal
 from unittest import mock
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 
 from mittab.apps.registration.forms import DEBATER_PREFIXES
@@ -43,11 +45,111 @@ def speaker(name, school, school_name, apda_id="", email=None):
         "id": "",
         "name": name,
         "email": email,
+        "use_private_email": "",
         "apda_id": apda_id,
         "novice_status": "0",
         "school": school,
         "school_name": school_name,
     }
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_fills_missing_debater_email_from_private_lookup(
+    email_service, client
+):
+    email_service.return_value.send_bulk.return_value = 1
+    private_speaker = speaker(
+        "Private Lookup Speaker",
+        "apda:123",
+        "Registration U",
+        apda_id="1000",
+        email="",
+    )
+    private_speaker["use_private_email"] = "on"
+    teams = [
+        team_entry(
+            0,
+            "Registration U A",
+            [
+                private_speaker,
+                speaker(
+                    "Manual Email Speaker",
+                    "apda:123",
+                    "Registration U",
+                    apda_id="1001",
+                    email="manual@example.com",
+                ),
+            ],
+        )
+    ]
+    payload = registration_payload(
+        "apda:123",
+        "Registration U",
+        "contact@example.com",
+        teams,
+        [],
+    )
+
+    with mock.patch(
+        "mittab.apps.registration.services.fetch_private_debater_emails",
+        return_value={1000: "private@example.com"},
+    ) as fetch_private:
+        response = client.post("/registration/", data=payload)
+
+    assert response.status_code == 302
+    fetch_private.assert_called_once_with([1000])
+    debater = Debater.objects.get(name="Private Lookup Speaker")
+    assert debater.email == "private@example.com"
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_treats_masked_email_value_as_use_email_on_file(
+    email_service, client
+):
+    """If the masked prefill value reaches the server (e.g. JS didn't scrub it
+    on submit), the form should drop the masked value and fall back to the
+    private email lookup rather than rejecting it as invalid."""
+    email_service.return_value.send_bulk.return_value = 1
+    private_speaker = speaker(
+        "Private Lookup Speaker",
+        "apda:123",
+        "Registration U",
+        apda_id="1000",
+        email="jo***s@example.com",
+    )
+    private_speaker["use_private_email"] = "on"
+    teams = [
+        team_entry(
+            0,
+            "Registration U A",
+            [
+                private_speaker,
+                speaker(
+                    "Manual Email Speaker",
+                    "apda:123",
+                    "Registration U",
+                    apda_id="1001",
+                    email="manual@example.com",
+                ),
+            ],
+        )
+    ]
+    payload = registration_payload(
+        "apda:123", "Registration U", "contact@example.com", teams, [],
+    )
+
+    with mock.patch(
+        "mittab.apps.registration.services.fetch_private_debater_emails",
+        return_value={1000: "private@example.com"},
+    ) as fetch_private:
+        response = client.post("/registration/", data=payload)
+
+    assert response.status_code == 302
+    fetch_private.assert_called_once_with([1000])
+    debater = Debater.objects.get(name="Private Lookup Speaker")
+    assert debater.email == "private@example.com"
 
 
 def team_entry(index, name, speakers, seed_choice=Team.UNSEEDED,
@@ -107,6 +209,79 @@ def registration_payload(school, school_name, email, teams, judges):
     for entry in teams + judges:
         data.update(entry)
     return data
+
+
+@override_settings(
+    BLACK_ROD_API_BASE_URL="https://black-rod.test",
+    BLACK_ROD_PRIVATE_API_TOKEN="private-token",
+)
+@pytest.mark.django_db
+def test_debater_email_status_returns_only_masked_private_email(client):
+    debaters_response = mock.Mock()
+    debaters_response.ok = True
+    debaters_response.json.return_value = {
+        "debaters": [{"id": 1234, "name": "Private Debater"}],
+    }
+    response_mock = mock.Mock()
+    response_mock.ok = True
+    response_mock.json.return_value = {
+        "debaters": [{"id": 1234, "email": "debater@example.com"}],
+    }
+    with (
+        mock.patch(
+            "mittab.apps.registration.views.requests.get",
+            return_value=debaters_response,
+        ) as get,
+        mock.patch(
+            "mittab.apps.registration.services.requests.post",
+            return_value=response_mock,
+        ) as post,
+    ):
+        response = client.post(
+            "/registration/api/debater-email-status/",
+            data=json.dumps({"debater_id": 1234, "school_id": 55}),
+            content_type="application/json",
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 1234,
+        "has_email": True,
+        "masked_email": "de***@example.com",
+    }
+    get.assert_called_once_with("https://black-rod.test/api/debaters/55/", timeout=10)
+    post.assert_called_once_with(
+        "https://black-rod.test/api/private/debater-emails/",
+        json={"debater_ids": [1234]},
+        headers={"Authorization": "Bearer private-token"},
+        timeout=10,
+    )
+
+
+@override_settings(BLACK_ROD_PRIVATE_API_TOKEN="")
+@pytest.mark.django_db
+def test_debater_email_status_degrades_when_token_is_missing(client):
+    debaters_response = mock.Mock()
+    debaters_response.ok = True
+    debaters_response.json.return_value = {
+        "debaters": [{"id": 1234, "name": "Private Debater"}],
+    }
+    with (
+        mock.patch(
+            "mittab.apps.registration.views.requests.get",
+            return_value=debaters_response,
+        ),
+        mock.patch("mittab.apps.registration.services.requests.post") as post,
+    ):
+        response = client.post(
+            "/registration/api/debater-email-status/",
+            data=json.dumps({"debater_id": 1234, "school_id": 55}),
+            content_type="application/json",
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"id": 1234, "has_email": False, "masked_email": ""}
+    post.assert_not_called()
 
 
 @pytest.mark.django_db

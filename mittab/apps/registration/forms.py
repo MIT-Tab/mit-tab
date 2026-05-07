@@ -20,6 +20,9 @@ def _build_debater_fields():
         )
         fields[f"{prefix}_name"] = forms.CharField(required=False, max_length=30)
         fields[f"{prefix}_email"] = forms.EmailField(required=False, max_length=254)
+        fields[f"{prefix}_use_private_email"] = forms.BooleanField(
+            required=False, widget=forms.HiddenInput
+        )
         fields[f"{prefix}_apda_id"] = forms.IntegerField(
             required=False, widget=forms.HiddenInput
         )
@@ -138,6 +141,21 @@ class TeamForm(ValueMixin, forms.Form):
 
     def __init__(self, *args, school_choices=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # The portal prefills the email input with a masked value (e.g.
+        # "joe***s@example.com") and a hidden use_private_email flag; the JS
+        # is supposed to clear the masked value on submit. If JS doesn't run,
+        # strip the masked value here so EmailField doesn't reject it.
+        if self.is_bound:
+            data = self.data.copy()
+            mutated = False
+            for prefix in DEBATER_PREFIXES:
+                email_key = self.add_prefix(f"{prefix}_email")
+                flag_key = self.add_prefix(f"{prefix}_use_private_email")
+                if data.get(flag_key) and "***" in (data.get(email_key) or ""):
+                    data[email_key] = ""
+                    mutated = True
+            if mutated:
+                self.data = data
         school_choices = school_choices or []
         self.choice_map = dict(school_choices)
         base_choices = [("", "Select school")] + school_choices
@@ -198,7 +216,14 @@ class TeamForm(ValueMixin, forms.Form):
             raise forms.ValidationError("Team name required")
         if not data.get("debater_one_name") or not data.get("debater_two_name"):
             raise forms.ValidationError("Each team needs two debaters")
-        if not data.get("debater_one_email") or not data.get("debater_two_email"):
+        for prefix in DEBATER_PREFIXES:
+            if data.get(f"{prefix}_email"):
+                continue
+            if (
+                data.get(f"{prefix}_use_private_email")
+                and data.get(f"{prefix}_apda_id")
+            ):
+                continue
             raise forms.ValidationError("Each debater needs an email")
         if data.get("seed_choice") is None:
             data["seed_choice"] = Team.UNSEEDED
@@ -221,6 +246,9 @@ class TeamForm(ValueMixin, forms.Form):
             "id": self.cleaned_data.get(f"{prefix}_id"),
             "name": self.cleaned_data[f"{prefix}_name"],
             "email": self.cleaned_data[f"{prefix}_email"],
+            "use_private_email": bool(
+                self.cleaned_data.get(f"{prefix}_use_private_email")
+            ),
             "apda_id": self.cleaned_data.get(f"{prefix}_apda_id"),
             "novice_status": int(
                 self.cleaned_data[f"{prefix}_novice_status"] or Debater.VARSITY

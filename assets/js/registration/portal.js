@@ -2,6 +2,7 @@ import $ from "jquery";
 import "select2";
 
 const DEB_URL = (id) => `/registration/api/debaters/${id}/`;
+const DEB_EMAIL_STATUS_URL = "/registration/api/debater-email-status/";
 
 const customDebaters = {};
 
@@ -52,16 +53,39 @@ const insertAtTop = ($select, option) => {
   }
 };
 
+const getCsrfToken = () =>
+  document.querySelector('[name="csrfmiddlewaretoken"]')?.value || "";
+
+const getDebaterPrefix = (selectEl) => selectEl.dataset.debaterInput;
+
+const getTeamForm = (selectEl) => selectEl.closest("[data-form='team']");
+
+const getDebaterCard = (selectEl) => selectEl.closest("[data-debater]");
+
+const getDebaterEmailField = (selectEl) =>
+  getDebaterCard(selectEl)?.querySelector(
+    `input[name$="${getDebaterPrefix(selectEl)}_email"]`,
+  );
+
+const getPrivateEmailField = (selectEl) =>
+  getTeamForm(selectEl)?.querySelector(
+    `input[name$="${getDebaterPrefix(selectEl)}_use_private_email"]`,
+  );
+
+const getDebaterSchoolValue = (selectEl) =>
+  getTeamForm(selectEl)?.querySelector(
+    `select[name$="${getDebaterPrefix(selectEl)}_school"]`,
+  )?.value || "";
+
 const fillDebaterData = (selectEl, debaterData = null) => {
   const { apdaTarget } = selectEl.dataset;
-  const noviceField = selectEl
-    .closest("[data-debater]")
-    ?.querySelector(`[name$="${selectEl.dataset.debaterInput}_novice_status"]`);
-  const qualifiedField = selectEl
-    .closest("[data-debater]")
-    ?.querySelector(
-      `input[name$="${selectEl.dataset.debaterInput}_qualified"]`,
-    );
+  const debaterCard = getDebaterCard(selectEl);
+  const noviceField = debaterCard?.querySelector(
+    `[name$="${selectEl.dataset.debaterInput}_novice_status"]`,
+  );
+  const qualifiedField = debaterCard?.querySelector(
+    `input[name$="${selectEl.dataset.debaterInput}_qualified"]`,
+  );
   const apdaField = apdaTarget ? document.getElementById(apdaTarget) : null;
   if (apdaField) {
     apdaField.value =
@@ -75,17 +99,90 @@ const fillDebaterData = (selectEl, debaterData = null) => {
   }
 };
 
+const setUsePrivateEmail = (selectEl, enabled) => {
+  const privateEmailField = getPrivateEmailField(selectEl);
+  if (privateEmailField) {
+    privateEmailField.value = enabled ? "on" : "";
+  }
+};
+
+const clearPrivateEmailStatus = (selectEl) => {
+  const emailField = getDebaterEmailField(selectEl);
+  if (emailField) {
+    if (emailField.value === emailField.dataset.privateEmailMasked) {
+      emailField.value = "";
+    }
+    delete emailField.dataset.usingPrivateEmail;
+    delete emailField.dataset.privateEmailMasked;
+  }
+  setUsePrivateEmail(selectEl, false);
+};
+
+const applyPrivateEmailStatus = (selectEl, debaterId, data) => {
+  if ($(selectEl).data("emailStatusDebaterId") !== String(debaterId)) {
+    return;
+  }
+  const emailField = getDebaterEmailField(selectEl);
+  if (!emailField) return;
+  const hasMasked = data?.has_email && data.masked_email;
+  // Only prefill when the field is empty (or already showing the masked
+  // value from a previous fetch). Don't clobber what the user typed.
+  const fieldIsEmptyOrMasked =
+    !emailField.value || emailField.dataset.usingPrivateEmail === "true";
+  if (hasMasked && fieldIsEmptyOrMasked) {
+    emailField.value = data.masked_email;
+    emailField.dataset.usingPrivateEmail = "true";
+    emailField.dataset.privateEmailMasked = data.masked_email;
+    setUsePrivateEmail(selectEl, true);
+  } else {
+    clearPrivateEmailStatus(selectEl);
+  }
+};
+
+const loadDebaterEmailStatus = (selectEl, debaterData = null) => {
+  const debaterId = debaterData && (debaterData.apda_id || debaterData.id);
+  const $select = $(selectEl);
+  const schoolValue = getDebaterSchoolValue(selectEl);
+  if (!debaterId || !schoolValue.startsWith("apda:")) {
+    $select.removeData("emailStatusDebaterId");
+    clearPrivateEmailStatus(selectEl);
+    return;
+  }
+  $select.data("emailStatusDebaterId", String(debaterId));
+  $.ajax({
+    url: DEB_EMAIL_STATUS_URL,
+    method: "POST",
+    contentType: "application/json",
+    data: JSON.stringify({
+      debater_id: debaterId,
+      school_id: schoolValue.split(":")[1],
+    }),
+    headers: {
+      "X-CSRFToken": getCsrfToken(),
+    },
+  })
+    .done((data) => {
+      applyPrivateEmailStatus(selectEl, debaterId, data);
+    })
+    .fail(() => {
+      applyPrivateEmailStatus(selectEl, debaterId, null);
+    });
+};
+
 const syncDebater = (selectEl) => {
   const option = selectEl.selectedOptions && selectEl.selectedOptions[0];
   if (option && option.dataset.debater) {
     try {
-      fillDebaterData(selectEl, JSON.parse(option.dataset.debater));
+      const debaterData = JSON.parse(option.dataset.debater);
+      fillDebaterData(selectEl, debaterData);
+      loadDebaterEmailStatus(selectEl, debaterData);
       return;
     } catch (error) {
       // ignore JSON parse errors
     }
   }
   fillDebaterData(selectEl);
+  loadDebaterEmailStatus(selectEl);
 };
 
 const renderDebaterList = ($select, entries = [], schoolValue = "") => {
@@ -602,6 +699,44 @@ export default function initRegistrationPortal() {
     syncDebater(this);
   });
 
+  // When the field is showing the masked value, focusing it selects the whole
+  // value so the user's first keystroke replaces it (autofill-style).
+  $root.on(
+    "focus",
+    'input[name$="debater_one_email"], input[name$="debater_two_email"]',
+    function onDebaterEmailFocus() {
+      if (this.dataset.usingPrivateEmail === "true") {
+        this.select();
+      }
+    },
+  );
+
+  // Any actual edit means the user wants to type their own email — drop out
+  // of "use email on file" mode and let normal email entry take over.
+  $root.on(
+    "input",
+    'input[name$="debater_one_email"], input[name$="debater_two_email"]',
+    function onDebaterEmailInput() {
+      if (this.dataset.usingPrivateEmail !== "true") return;
+      // Stale fragments of the masked value that the user didn't fully
+      // replace — e.g. clicked into the middle and typed — would otherwise
+      // sneak through. Treat anything still containing "***" as junk.
+      if (this.value.includes("***")) {
+        this.value = "";
+      }
+      delete this.dataset.usingPrivateEmail;
+      delete this.dataset.privateEmailMasked;
+      const teamForm = this.closest("[data-form='team']");
+      const prefix = (this.name.match(/(debater_(?:one|two))_email$/) || [])[1];
+      if (teamForm && prefix) {
+        const flag = teamForm.querySelector(
+          `input[name$="${prefix}_use_private_email"]`,
+        );
+        if (flag) flag.value = "";
+      }
+    },
+  );
+
   $root.on(
     "change",
     "[data-judge-school-select]",
@@ -684,6 +819,15 @@ export default function initRegistrationPortal() {
     let allowUnload = false;
     formEl.addEventListener("submit", () => {
       allowUnload = true;
+      // Replace any masked-email prefill with empty so the server treats it as
+      // "use the email on file" rather than rejecting "joe***s@example.com" as
+      // an invalid email.
+      formEl
+        .querySelectorAll('input[data-using-private-email="true"]')
+        .forEach((input) => {
+          // eslint-disable-next-line no-param-reassign
+          input.value = "";
+        });
     });
     window.addEventListener("beforeunload", (event) => {
       if (allowUnload) return;
