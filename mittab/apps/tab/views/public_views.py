@@ -1014,6 +1014,11 @@ def enter_e_ballot(request, ballot_code):
                     Could not find a ballot for you this round. Go to tab
                     to resolve the issue if you believe you were paired in.
                     """
+            return redirect_and_flash_error(
+                request,
+                message,
+                path=reverse("judge_portal", args=[ballot_code]),
+            )
         elif rounds[0].chair != judge:
             message = """
                     You are not the chair of this round. If you are on a panel,

@@ -1,5 +1,4 @@
 from django.template.loader import render_to_string
-from django.urls import reverse
 
 from mittab.apps.tab.models import Debater, Team
 from mittab.libs.email_service import EmailRequest
@@ -35,10 +34,6 @@ def build_email_request(
     )
 
 
-def _team_portal_url(request, team):
-    return request.build_absolute_uri(reverse("team_portal", args=[team.team_code]))
-
-
 def _seed_label(team):
     return dict(Team.SEED_CHOICES).get(team.seed, str(team.seed))
 
@@ -63,8 +58,6 @@ def _team_text_lines(team, request):
         f"- {team.name}",
         f"  School protection: {team.school.name}",
         f"  Seed: {_seed_label(team)}",
-        f"  Team code: {team.team_code}",
-        f"  Team portal: {_team_portal_url(request, team)}",
         "  Debaters:",
     ]
     for debater in team.debaters.all():
@@ -95,8 +88,6 @@ def _registration_team_context(team, request):
         "name": team.name,
         "school_name": team.school.name,
         "seed": _seed_label(team),
-        "team_code": team.team_code,
-        "portal_url": _team_portal_url(request, team),
         "debaters": [
             {
                 "name": debater.name,
@@ -236,7 +227,6 @@ def build_registration_team_portal_email(
         "are open.\n\n"
         f"Team: {team.name}\n"
         f"Debaters: {debater_names}\n"
-        f"Team code: {team.team_code}\n"
         f"Team portal: {portal_url}\n\n"
         "Thanks,\n"
         "The Tab Team"
@@ -245,7 +235,6 @@ def build_registration_team_portal_email(
         "team_name": team.name,
         "tournament_name": tournament_name,
         "debater_names": debater_names,
-        "team_code": team.team_code,
         "portal_url": portal_url,
     }
     return build_email_request(
@@ -253,7 +242,7 @@ def build_registration_team_portal_email(
         subject,
         text_body,
         "emails/team_portal.html",
-        f"Team code {team.team_code}. Open your team portal for tournament actions.",
+        "Open your team portal for tournament actions.",
         context,
     )
 

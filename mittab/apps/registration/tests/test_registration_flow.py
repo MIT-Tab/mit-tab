@@ -10,6 +10,7 @@ from mittab.apps.registration.forms import DEBATER_PREFIXES
 from mittab.apps.registration.models import (
     Registration,
     RegistrationChangeLog,
+    RegistrationConfirmationEmailLog,
     RegistrationConfig,
 )
 from mittab.apps.registration.views import MAX_TEAMS
@@ -285,6 +286,21 @@ def test_debater_email_status_degrades_when_token_is_missing(client):
 
 
 @pytest.mark.django_db
+def test_debater_email_status_is_blocked_when_registration_is_closed(client):
+    config = RegistrationConfig.get_or_create_active()
+    config.allow_new_registrations = False
+    config.save()
+
+    response = client.post(
+        "/registration/api/debater-email-status/",
+        data=json.dumps({"debater_id": 1234, "school_id": 55}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
 @mock.patch("mittab.apps.registration.emails.EmailService")
 def test_registration_flow_creates_objects(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
@@ -358,7 +374,7 @@ def test_registration_flow_creates_objects(email_service, client):
     judge = registration.judges.first()
     assert judge.name == "Reg Judge"
     assert judge.rank == Decimal("7")
-    assert judge.email is None
+    assert judge.email == "judge@example.com"
     assert {school.name for school in judge.schools.all()} == {
         "Registration U",
         "Judge Hybrid",
@@ -378,8 +394,8 @@ def test_registration_flow_creates_objects(email_service, client):
     assert email_request.to_address == "contact@example.com"
     assert registration.herokunator_code in email_request.text_body
     assert "http://testserver/registration/" in email_request.text_body
-    assert team.team_code in email_request.text_body
-    assert "http://testserver/team_portal/" in email_request.text_body
+    assert team.team_code not in email_request.text_body
+    assert "http://testserver/team_portal/" not in email_request.text_body
     assert "Registration U A" in email_request.text_body
     assert "Reg Judge" in email_request.text_body
     assert "judge@example.com" not in email_request.text_body
@@ -397,7 +413,10 @@ def test_registration_flow_creates_objects(email_service, client):
         "http://testserver/team_portal/" in request.text_body
         for request in team_portal_requests
     )
-    assert all(team.team_code in request.text_body for request in team_portal_requests)
+    assert all(
+        "Team code:" not in request.text_body
+        for request in team_portal_requests
+    )
     judge_code_request = (
         email_service.return_value.send_bulk.call_args_list[2].args[0][0]
     )
@@ -412,8 +431,14 @@ def test_registration_flow_creates_objects(email_service, client):
         in judge_code_request.text_body
     )
     judge_code_log = JudgeCodeEmailLog.objects.get(judge=judge)
-    assert judge_code_log.email == ""
+    assert judge_code_log.email == "judge@example.com"
+    assert judge_code_log.source == JudgeCodeEmailLog.SOURCE_REGISTRATION
     assert judge_code_log.ballot_code == judge.ballot_code
+    confirmation_log = RegistrationConfirmationEmailLog.objects.get(
+        registration=registration,
+    )
+    assert confirmation_log.email == "contact@example.com"
+    assert confirmation_log.successful
     log = RegistrationChangeLog.objects.get()
     assert log.action == RegistrationChangeLog.CREATED
     assert log.registration == registration
@@ -606,6 +631,10 @@ def test_registration_edit_updates_judge_expected_checkins(email_service, client
     assert response.status_code == 200
     registration = Registration.objects.get()
     judge = registration.judges.get()
+
+    response = client.get(f"/registration/{registration.herokunator_code}/")
+    assert response.status_code == 200
+    assert b'value="judge@example.com"' in response.content
 
     edited_judge = judge_entry(
         0,

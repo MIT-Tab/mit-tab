@@ -8,7 +8,7 @@ from mittab.apps.registration.models import (
     RegistrationChangeLog,
     RegistrationConfig,
 )
-from mittab.apps.tab.models import Judge, School, Team
+from mittab.apps.tab.models import Debater, Judge, School, Team
 
 
 @pytest.fixture(name="logged_in_admin_client")
@@ -60,12 +60,21 @@ def test_admin_can_delete_registration(logged_in_admin_client):
         school=school,
         email="delete@example.com",
     )
-    Team.objects.create(
+    team = Team.objects.create(
         name="Delete Team",
         school=school,
         registration=registration,
         seed=Team.UNSEEDED,
     )
+    debater_one = Debater.objects.create(
+        name="Delete Speaker 1",
+        novice_status=Debater.VARSITY,
+    )
+    debater_two = Debater.objects.create(
+        name="Delete Speaker 2",
+        novice_status=Debater.VARSITY,
+    )
+    team.debaters.set([debater_one, debater_two])
     judge = Judge.objects.create(
         name="Delete Judge",
         rank=Decimal("5"),
@@ -84,6 +93,7 @@ def test_admin_can_delete_registration(logged_in_admin_client):
     assert response.status_code == 200
     assert Registration.objects.count() == 0
     assert Team.objects.count() == 0
+    assert Debater.objects.count() == 0
     assert Judge.objects.count() == 0
     log = RegistrationChangeLog.objects.get()
     assert log.action == RegistrationChangeLog.DELETED

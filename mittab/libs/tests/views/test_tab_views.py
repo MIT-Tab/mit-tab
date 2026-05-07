@@ -779,13 +779,14 @@ class TestTabViews(TestCase):
         registration_sent_judge = Judge.objects.create(
             name="Registration Sent Judge",
             rank=3.5,
-            email=None,
+            email="registration.judge@example.com",
         )
         registration_sent_judge.schools.add(School.objects.first())
         JudgeCodeEmailLog.objects.create(
             judge=registration_sent_judge,
-            email="",
+            email=registration_sent_judge.email,
             ballot_code=registration_sent_judge.ballot_code,
+            source=JudgeCodeEmailLog.SOURCE_REGISTRATION,
         )
 
         response = self.client.get(reverse("email_management"))
@@ -795,7 +796,7 @@ class TestTabViews(TestCase):
         self.assertIn("Select Never Received", content)
         self.assertIn("Select All", content)
         self.assertIn("Registration Sent Judge", content)
-        self.assertIn("Missing email", content)
+        self.assertIn("registration.judge@example.com", content)
         self.assertRegex(
             content,
             rf'name="judge_ids" value="{never_sent_judge.id}" checked',
@@ -851,6 +852,36 @@ class TestTabViews(TestCase):
             reverse("email_management"),
             {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
         )
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_not_called()
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_rate_limits_judge_codes_by_email_case_insensitive(
+        self,
+        email_service,
+    ):
+        previously_emailed_judge = Judge.objects.first()
+        previously_emailed_judge.email = "Judge@Example.com"
+        previously_emailed_judge.save()
+        JudgeCodeEmailLog.objects.create(
+            judge=previously_emailed_judge,
+            email=previously_emailed_judge.email,
+            ballot_code=previously_emailed_judge.ballot_code,
+            sent_at=timezone.now(),
+        )
+
+        judge = Judge.objects.create(
+            name="Case Match Judge",
+            rank=3.5,
+            email="judge@example.com",
+        )
+        judge.schools.add(School.objects.first())
+
+        response = self.client.post(
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
+        )
+
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_not_called()
 
@@ -945,9 +976,9 @@ class TestTabViews(TestCase):
         self.assertIn('value="written-rfds"', content)
         self.assertIn('value="sent-history"', content)
         self.assertIn("Sent Email History", content)
-        self.assertIn("Registration judge email", content)
+        self.assertIn("Manual send", content)
         self.assertIn("debater@example.com", content)
-        self.assertIn(f"Ballot code {judge.ballot_code}", content)
+        self.assertIn(f"ballot code {judge.ballot_code}", content)
 
     def test_judge_ballot_code_validation(self):
         judge = Judge.objects.first()
