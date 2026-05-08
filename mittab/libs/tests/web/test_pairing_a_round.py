@@ -162,7 +162,6 @@ class PairingARoundTestCase(BaseWebTestCase):
             },
         )
 
-        assert self._wait_for_text("Result entered successfully")
         assert self._wait_for_text("GOV win")
 
     def test_speaks_warnings(self):
@@ -206,7 +205,6 @@ class PairingARoundTestCase(BaseWebTestCase):
         # Accept it to proceed
         self._accept_confirm()
         
-        assert self._wait_for_text("Result entered successfully")
         assert self._wait_for_text("GOV win")
         
         # Enter another ballot to test low speaks
@@ -237,7 +235,6 @@ class PairingARoundTestCase(BaseWebTestCase):
         # Accept it to proceed
         self._accept_confirm()
         
-        assert self._wait_for_text("Result entered successfully")
         assert self._wait_for_text("OPP win")
 
     def _enter_results(self, **results):

@@ -16,11 +16,11 @@
 {% for round_stat in round_stats %}
 <tr>
     <td>{{forloop.counter}}</td>
-    {% ifequal forloop.counter bye_round %}
+    {% if forloop.counter == bye_round %}
     <td>BYE</td>
     {% else %}
     <td>{{round_stat.0}}</td>
-    {% endifequal %}
+    {% endif %}
     <td>{{round_stat.1}}</td>
     <td>{{round_stat.2}}</td>
     <td>{{round_stat.3}}</td>

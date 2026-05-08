@@ -27,7 +27,7 @@ ENV PATH="/root/.local/bin:$PATH"
 ENV UV_PROJECT_ENVIRONMENT=/usr/local
 RUN uv sync --frozen --no-dev --no-group docs
 
-RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash
 RUN apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
 
 RUN npm ci --no-audit
