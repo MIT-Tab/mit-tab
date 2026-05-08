@@ -8,17 +8,18 @@ RUN curl -sL https://deb.nodesource.com/setup_12.x | bash
 RUN apt-get install nodejs
 
 WORKDIR /var/www/tab
-COPY Pipfile ./
-COPY Pipfile.lock ./
+COPY pyproject.toml ./
+COPY uv.lock ./
 COPY package.json ./
 COPY package-lock.json ./
-RUN pip install pipenv
-RUN pipenv install --deploy --system
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
+ENV UV_PROJECT_ENVIRONMENT=/usr/local
+RUN uv sync --frozen --no-dev --no-group docs
 RUN mkdir /var/tmp/django_cache
 
 # setup django
 COPY manage.py ./
-COPY setup.py ./
 COPY ./mittab ./mittab
 COPY ./assets ./assets
 COPY ./settings ./settings
