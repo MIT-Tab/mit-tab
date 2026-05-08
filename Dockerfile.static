@@ -1,7 +1,7 @@
 FROM python:3.10.16
 
 # sets up nodejs to install npm
-RUN curl -sL https://deb.nodesource.com/setup_18.x | bash
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash
 RUN apt-get install -y nodejs aptitude
 RUN aptitude install -y npm
 
