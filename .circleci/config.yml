@@ -196,6 +196,10 @@ jobs:
             - ~/.npm
           key: npm-v1-{{ checksum "package-lock.json" }}
       - run:
+          name: Check dependency age
+          command: |
+            uv run --frozen python bin/check-dependency-age
+      - run:
           name: Lint -- Python
           command: |
             uv run --frozen pylint mittab
