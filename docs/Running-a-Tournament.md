@@ -68,6 +68,7 @@ To use the judge portal and ballots:
 5. E-ballots have configurable minimum and maximum speaker score limits (see Advanced Topics)
    - Default minimum: 15 (configurable via `min_eballot_speak` setting)
    - Default maximum: 35 (configurable via `max_eballot_speak` setting)
+   - Default precision: whole numbers only (configurable via `decimal_speaks`)
    - Scores outside these bounds require justification to tab staff
 
 ### Tracking Missing Ballots
