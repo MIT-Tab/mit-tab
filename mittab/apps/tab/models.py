@@ -202,14 +202,21 @@ class TabSettings(models.Model):
             value_num = value
             value_string = None
 
-        if cls.objects.filter(key=key).exists():
-            obj = cls.objects.get(key=key)
-            obj.value = value_num
-            obj.value_string = value_string
-            obj.save()
-        else:
-            obj = cls.objects.create(key=key, value=value_num,
-                                     value_string=value_string)
+        obj = cls.objects.filter(key=key).first()
+        if obj is None:
+            return cls.objects.create(
+                key=key,
+                value=value_num,
+                value_string=value_string,
+            )
+
+        if obj.value == value_num and obj.value_string == value_string:
+            return obj
+
+        obj.value = value_num
+        obj.value_string = value_string
+        obj.save(update_fields=["value", "value_string"])
+        return obj
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",

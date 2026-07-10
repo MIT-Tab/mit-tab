@@ -257,19 +257,27 @@ def view_judges(request):
     checked_in_judges = set()
     checked_in_judges_next = set()
     if include_checkins:
-        checkins = CheckIn.objects.filter(round_number=current_round)
-        checkins_next = CheckIn.objects.filter(round_number=current_round + 1)
-        checked_in_judges = set([c.judge for c in checkins])
-        checked_in_judges_next = set([c.judge for c in checkins_next])
+        checked_in_judges = set(
+            CheckIn.objects.filter(round_number=current_round).values_list(
+                "judge_id",
+                flat=True,
+            )
+        )
+        checked_in_judges_next = set(
+            CheckIn.objects.filter(round_number=current_round + 1).values_list(
+                "judge_id",
+                flat=True,
+            )
+        )
 
     def flags(judge):
         result = 0
         if include_checkins:
-            if judge in checked_in_judges:
+            if judge.id in checked_in_judges:
                 result |= TabFlags.JUDGE_CHECKED_IN_CUR
             else:
                 result |= TabFlags.JUDGE_NOT_CHECKED_IN_CUR
-            if judge in checked_in_judges_next:
+            if judge.id in checked_in_judges_next:
                 result |= TabFlags.JUDGE_CHECKED_IN_NEXT
             else:
                 result |= TabFlags.JUDGE_NOT_CHECKED_IN_NEXT
@@ -282,7 +290,7 @@ def view_judges(request):
             result |= TabFlags.HIGH_RANKED_JUDGE
         return result
 
-    judges = sorted(Judge.objects.all(), key=lambda j: (-j.rank, j.name))
+    judges = Judge.objects.order_by("-rank", "name")
 
     c_judge = [
         (

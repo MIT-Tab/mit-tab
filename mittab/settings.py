@@ -60,6 +60,8 @@ MYSQL_USER = os.environ.get("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
+DB_CONN_MAX_AGE = int(os.environ.get("DB_CONN_MAX_AGE", "0"))
+
 
 DB_OPTIONS = {"charset": "utf8mb4"}
 
@@ -87,7 +89,7 @@ DATABASES = {
         "PASSWORD": MYSQL_PASSWORD,
         "HOST":     MYSQL_HOST,
         "PORT":     MYSQL_PORT,
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
     }
 }
 
