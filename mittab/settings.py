@@ -21,6 +21,7 @@ BLACK_ROD_API_BASE_URL = os.environ.get(
 BLACK_ROD_PRIVATE_API_TOKEN = os.environ.get("BLACK_ROD_PRIVATE_API_TOKEN", "")
 
 ALLOWED_HOSTS = ["*"]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
 

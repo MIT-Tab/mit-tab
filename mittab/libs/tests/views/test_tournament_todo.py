@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 from unittest.mock import patch
 
@@ -33,6 +34,37 @@ class TestTournamentTodo(TestCase):
             reverse("tab_login"),
             {"username": "todo_user", "password": "todo_pass_123"},
         )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("tournament_todo"))
+
+    def test_login_accepts_https_origin_behind_proxy(self):
+        client = Client(enforce_csrf_checks=True)
+        login_url = reverse("tab_login")
+
+        response = client.get(
+            login_url,
+            HTTP_HOST="testserver",
+            HTTP_X_FORWARDED_PROTO="https",
+        )
+        csrf_match = re.search(
+            r'name="csrfmiddlewaretoken" value="([^"]+)"',
+            response.content.decode("utf-8"),
+        )
+        self.assertIsNotNone(csrf_match)
+
+        response = client.post(
+            login_url,
+            {
+                "username": "todo_user",
+                "password": "todo_pass_123",
+                "csrfmiddlewaretoken": csrf_match.group(1),
+            },
+            HTTP_HOST="testserver",
+            HTTP_ORIGIN="https://testserver",
+            HTTP_REFERER="https://testserver/public/login/",
+            HTTP_X_FORWARDED_PROTO="https",
+        )
+
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], reverse("tournament_todo"))
 
