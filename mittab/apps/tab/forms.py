@@ -410,8 +410,6 @@ class ResultEntryForm(forms.Form):
                     validators=[validate_speaks],
                     widget=forms.NumberInput(attrs={
                         "step": get_speak_step(),
-                        "min": TabSettings.get("min_speak", 0),
-                        "max": TabSettings.get("max_speak", 50),
                     }))
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
