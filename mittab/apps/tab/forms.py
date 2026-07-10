@@ -24,6 +24,14 @@ from mittab import settings
 from mittab.libs.cacheing import cache_logic
 
 
+def get_speak_step():
+    steps = ("1", "0.5", "0.1", "0.01")
+    try:
+        return steps[int(TabSettings.get("decimal_speaks", 0))]
+    except (IndexError, TypeError, ValueError):
+        return "1"
+
+
 class UploadBackupForm(forms.Form):
     file = forms.FileField(label="Your Backup File")
 
@@ -333,6 +341,16 @@ def validate_speaks(value):
         raise ValidationError(
             f"{value} is an entirely invalid speaker score, try again.")
 
+    step = Decimal(get_speak_step())
+    if value % step != 0:
+        if step == Decimal("0.5"):
+            raise ValidationError("Speaks must be in half-point increments")
+        if step == Decimal("0.1"):
+            raise ValidationError("Speaks may have at most 1 decimal digit")
+        if step == Decimal("0.01"):
+            raise ValidationError("Speaks may have at most 2 decimal digits")
+        raise ValidationError("Speaks must be whole numbers")
+
 
 class ResultEntryForm(forms.Form):
 
@@ -389,7 +407,10 @@ class ResultEntryForm(forms.Form):
             self.fields[self.deb_attr_name(
                 deb, "speaks")] = forms.DecimalField(
                     label=f"{self.NAMES[deb]} Speaks",
-                    validators=[validate_speaks])
+                    validators=[validate_speaks],
+                    widget=forms.NumberInput(attrs={
+                        "step": get_speak_step(),
+                    }))
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
 
@@ -443,6 +464,9 @@ class ResultEntryForm(forms.Form):
 
     def clean(self):
         cleaned_data = self.cleaned_data
+        if self.errors:
+            return cleaned_data
+
         try:
             speak_ranks = [(self.deb_attr_val(d, "speaks"),
                             self.deb_attr_val(d, "ranks"), d)
@@ -582,11 +606,13 @@ class EBallotForm(ResultEntryForm):
         self.fields["ballot_code"].initial = ballot_code
 
     def clean(self):
-        cleaned_data = self.cleaned_data
-        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
-        cur_round = TabSettings.get("cur_round", 0) - 1
+        cleaned_data = super(EBallotForm, self).clean()
+        if self.errors:
+            return cleaned_data
 
         try:
+            round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+            cur_round = TabSettings.get("cur_round", 0) - 1
             ballot_code = cleaned_data.get("ballot_code")
             judge = Judge.objects.filter(ballot_code=ballot_code).first()
 
@@ -617,11 +643,7 @@ class EBallotForm(ResultEntryForm):
 
             for deb in self.DEBATERS:
                 speaks = self.deb_attr_val(deb, "speaks", float)
-                _, decimal_val = str(speaks).split(".")
                 key = self.deb_attr_name(deb, "speaks")
-                if int(decimal_val) != 0:
-                    msg = "Speaks must be whole numbers"
-                    self._errors[key] = self.error_class([msg])
                 if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
                         speaks < float(TabSettings.get("min_eballot_speak", 15)):
                     msg = "Speaks must be justified to tab."
@@ -632,7 +654,7 @@ class EBallotForm(ResultEntryForm):
             self._errors["winner"] = self.error_class(
                 ["Non handled error, preventing data contamination"])
 
-        return super(EBallotForm, self).clean()
+        return cleaned_data
 
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
