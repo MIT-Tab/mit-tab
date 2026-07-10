@@ -724,6 +724,9 @@ class SettingsForm(forms.Form):
     def save(self):
         for setting in self.settings:
             field = f"setting_{setting['name']}"
+            if field not in self.changed_data:
+                continue
+
             key = setting["name"]
 
             if "type" in setting and setting["type"] == "boolean":

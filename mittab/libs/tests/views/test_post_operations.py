@@ -1,9 +1,12 @@
+from unittest import mock
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from mittab.apps.tab.forms import SettingsForm
 from mittab.apps.tab.models import (
     PUBLIC_HOME_PAGE_DEFINITIONS,
     Room,
@@ -81,6 +84,32 @@ class TestPostOperations(TestCase):
 
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
+
+    def test_settings_form_save_skips_unchanged_settings(self):
+        form = SettingsForm(
+            {
+                "setting_tot_rounds": "5",
+                "setting_lenient_late": "1",
+            },
+            settings=[
+                {
+                    "name": "tot_rounds",
+                    "value": 5,
+                    "description": "Total rounds",
+                },
+                {
+                    "name": "lenient_late",
+                    "value": 0,
+                    "description": "Lenient late round",
+                },
+            ],
+        )
+
+        self.assertTrue(form.is_valid())
+        with mock.patch.object(TabSettings, "set") as mock_set:
+            form.save()
+
+        mock_set.assert_called_once_with("lenient_late", 1)
 
     def test_action_operations(self):
         TabSettings.set("cur_round", 3)
