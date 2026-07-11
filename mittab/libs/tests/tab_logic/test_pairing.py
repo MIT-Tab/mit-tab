@@ -4,15 +4,17 @@ import pytest
 
 from mittab.apps.tab.models import (
     CheckIn,
+    Debater,
     Judge,
     Room,
     RoomCheckIn,
     Round,
+    RoundStats,
     School,
     TabSettings,
     Team,
 )
-from mittab.libs import assign_judges, assign_rooms
+from mittab.libs import assign_judges, assign_rooms, errors
 from mittab.libs import tab_logic
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.tests.helpers import generate_results
@@ -162,3 +164,139 @@ class TestPairingLogic(TestCase):
 
         self.re_pair_latest_round()
         self.assertEqual(self.pairings_for(second_round), baseline_pairings)
+
+
+@pytest.mark.django_db
+class TestRoundTwoRandomWithinBrackets(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        self.school = School.objects.create(name="Pairing Test School")
+        TabSettings.set("cur_round", 2)
+        TabSettings.set("tot_rounds", 5)
+        TabSettings.set("r2_random_within_brackets", 1)
+        cache_logic.clear_cache()
+
+    def make_teams(self, count):
+        teams = []
+        for team_num in range(count):
+            team = Team.objects.create(
+                name=f"Team {team_num}",
+                school=self.school,
+                seed=Team.FULL_SEED,
+            )
+            debaters = [
+                Debater.objects.create(
+                    name=f"Debater {team_num}-{debater_num}",
+                    novice_status=Debater.VARSITY,
+                    school=self.school,
+                )
+                for debater_num in range(2)
+            ]
+            team.debaters.add(*debaters)
+            teams.append(team)
+        return teams
+
+    def make_round_one(self, gov, opp, victor, gov_speaks, opp_speaks):
+        round_obj = Round.objects.create(
+            round_number=1,
+            gov_team=gov,
+            opp_team=opp,
+            victor=victor,
+        )
+        for team, speaks in ((gov, gov_speaks), (opp, opp_speaks)):
+            for rank, debater in enumerate(team.debaters.all(), start=1):
+                RoundStats.objects.create(
+                    debater=debater,
+                    round=round_obj,
+                    speaks=speaks / 2,
+                    ranks=rank,
+                    debater_role="pm" if rank == 1 else "mg",
+                )
+        return round_obj
+
+    def make_checkins(self, rooms):
+        judges = [
+            Judge.objects.create(name=f"Judge {judge_num}", rank=5)
+            for judge_num in range(rooms)
+        ]
+        rooms = [
+            Room.objects.create(name=f"Room {room_num}", rank=5)
+            for room_num in range(rooms)
+        ]
+        CheckIn.objects.bulk_create(
+            CheckIn(judge=judge, round_number=2) for judge in judges
+        )
+        RoomCheckIn.objects.bulk_create(
+            RoomCheckIn(room=room, round_number=2) for room in rooms
+        )
+
+    def pairing_sets(self):
+        return {
+            frozenset((round_obj.gov_team_id, round_obj.opp_team_id))
+            for round_obj in Round.objects.filter(round_number=2)
+        }
+
+    def test_round_two_random_brackets_do_not_rematch_round_one(self):
+        teams = self.make_teams(8)
+        self.make_checkins(4)
+        self.make_round_one(teams[0], teams[4], Round.GOV, 60, 52)
+        self.make_round_one(teams[1], teams[5], Round.GOV, 58, 50)
+        self.make_round_one(teams[2], teams[6], Round.GOV, 56, 48)
+        self.make_round_one(teams[3], teams[7], Round.GOV, 54, 46)
+
+        tab_logic.pair_round()
+
+        round_one_pairs = {
+            frozenset((teams[0].id, teams[4].id)),
+            frozenset((teams[1].id, teams[5].id)),
+            frozenset((teams[2].id, teams[6].id)),
+            frozenset((teams[3].id, teams[7].id)),
+        }
+        high_low_pairs = {
+            frozenset((teams[0].id, teams[3].id)),
+            frozenset((teams[1].id, teams[2].id)),
+            frozenset((teams[4].id, teams[7].id)),
+            frozenset((teams[5].id, teams[6].id)),
+        }
+        self.assertEqual(Round.objects.filter(round_number=2).count(), 4)
+        self.assertFalse(self.pairing_sets() & round_one_pairs)
+        self.assertNotEqual(self.pairing_sets(), high_low_pairs)
+
+    def test_round_two_pullup_uses_lowest_lower_bracket_team(self):
+        teams = self.make_teams(6)
+        self.make_checkins(3)
+        self.make_round_one(teams[0], teams[3], Round.GOV, 60, 54)
+        self.make_round_one(teams[1], teams[4], Round.GOV, 58, 52)
+        self.make_round_one(teams[2], teams[5], Round.GOV, 56, 50)
+
+        tab_logic.pair_round()
+
+        pullup_round = Round.objects.get(round_number=2, pullup__in=[
+            Round.GOV,
+            Round.OPP,
+        ])
+        pullup_team = (
+            pullup_round.gov_team
+            if pullup_round.pullup == Round.GOV
+            else pullup_round.opp_team
+        )
+        round_one_pairs = {
+            frozenset((teams[0].id, teams[3].id)),
+            frozenset((teams[1].id, teams[4].id)),
+            frozenset((teams[2].id, teams[5].id)),
+        }
+        pullup_pair = frozenset((
+            pullup_round.gov_team_id,
+            pullup_round.opp_team_id,
+        ))
+        self.assertEqual(pullup_team, teams[5])
+        self.assertNotIn(pullup_pair, round_one_pairs)
+
+    def test_random_pairing_no_repeats_raises_without_full_matching(self):
+        teams = self.make_teams(2)
+        self.make_round_one(teams[0], teams[1], Round.GOV, 60, 54)
+
+        with self.assertRaises(errors.NotEnoughTeamsError):
+            tab_logic.random_pairing_no_repeats(teams)

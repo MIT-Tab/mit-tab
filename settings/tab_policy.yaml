@@ -39,6 +39,11 @@ settings:
     name: lenient_late
     description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
     value: 0
+  - r2_random_within_brackets:
+    name: r2_random_within_brackets
+    description: "Pair round 2 randomly within win brackets while preventing teams from debating a team they have already debated. Later preliminary rounds continue to use speaks-based high-low pairing."
+    value: false
+    type: boolean
   - enable_room_seeding:
     name: enable_room_seeding
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
