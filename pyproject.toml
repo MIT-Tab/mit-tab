@@ -14,7 +14,7 @@ dependencies = [
   "gevent==24.10.3",
   "gunicorn==23.0.0",
   "mysqlclient==1.4.4",
-  "pillow==12.2.0",
+  "pillow==12.3.0",
   "pymemcache==4.0.0",
   "python-dotenv==1.2.2",
   "pyyaml==6.0.3",
