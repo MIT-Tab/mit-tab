@@ -6,9 +6,11 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
 from mittab.apps.tab.models import (
     DEFAULT_TOURNAMENT_NAME,
     TabSettings,
@@ -36,6 +38,42 @@ class TestTournamentTodo(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], reverse("tournament_todo"))
+
+    def test_board_login_redirects_to_board_home(self):
+        group = Group.objects.create(name=APDA_BOARD_GROUP_NAME)
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.add(group)
+
+        with patch(
+            "mittab.apps.tab.auth_backends.is_apda_board_access_open",
+            return_value=True,
+        ):
+            response = self.client.post(
+                reverse("tab_login"),
+                {"username": "todo_user", "password": "todo_pass_123"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("apda_board_home"))
+
+    def test_board_login_skips_explicit_todo_redirect(self):
+        group = Group.objects.create(name=APDA_BOARD_GROUP_NAME)
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.add(group)
+
+        with patch(
+            "mittab.apps.tab.auth_backends.is_apda_board_access_open",
+            return_value=True,
+        ):
+            response = self.client.post(
+                f'{reverse("tab_login")}?next={reverse("tournament_todo")}',
+                {"username": "todo_user", "password": "todo_pass_123"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("apda_board_home"))
 
     def test_login_accepts_https_origin_behind_proxy(self):
         client = Client(enforce_csrf_checks=True)

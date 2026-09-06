@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render, reverse
 
 from mittab.apps.tab.auth_roles import (
+    is_apda_board_user,
     is_restricted_staff_user,
     restricted_staff_can_access_path,
     restricted_staff_landing_url,
@@ -29,6 +30,11 @@ class StaffLoginView(LoginView):
 
     def get_success_url(self):
         redirect_url = self.get_redirect_url()
+        if is_apda_board_user(self.request.user) and (
+            not redirect_url or redirect_url == reverse("tournament_todo")
+        ):
+            return reverse("apda_board_home")
+
         if redirect_url:
             if is_restricted_staff_user(self.request.user):
                 if restricted_staff_can_access_path(self.request.user, redirect_url):
