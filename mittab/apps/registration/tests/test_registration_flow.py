@@ -304,6 +304,7 @@ def test_debater_email_status_is_blocked_when_registration_is_closed(client):
 @mock.patch("mittab.apps.registration.emails.EmailService")
 def test_registration_flow_creates_objects(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
+    School.objects.create(name="Registration U", apda_id=123)
     School.objects.create(name="Judge Hybrid", apda_id=999)
     teams = [
         team_entry(
@@ -610,6 +611,7 @@ def test_registration_edit_logs_changes(email_service, client):
 @mock.patch("mittab.apps.registration.emails.EmailService")
 def test_registration_edit_updates_judge_expected_checkins(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
+    School.objects.create(name="Schedule School", apda_id=88)
     judges = [
         judge_entry(
             0,
