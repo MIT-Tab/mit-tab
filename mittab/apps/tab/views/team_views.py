@@ -8,6 +8,7 @@ from mittab.apps.tab.auth_roles import (
     CAP_CHECKINS,
     CAP_DATA_ENTRY,
     CAP_VIEW_SCRATCHES,
+    is_apda_board_user,
     user_has_staff_capability,
 )
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
@@ -291,8 +292,13 @@ def view_scratches(request, team_id):
         })
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def all_tab_cards(request):
+    if not (
+        request.user.has_perm("tab.tab_settings.can_change")
+        or is_apda_board_user(request.user)
+    ):
+        return HttpResponseRedirect("/403/")
+
     all_teams = Team.objects.all()
     return render(request, "tab/all_tab_cards.html", {"all_teams": all_teams})
 

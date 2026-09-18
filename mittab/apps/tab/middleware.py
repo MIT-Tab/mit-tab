@@ -53,6 +53,7 @@ API_ERROR_MESSAGES = {
 APDA_BOARD_ALLOWED_PREFIXES = (
     "/apda-board/",
     "/public/",
+    "/team/card/",
     "/team_portal/",
     "/accounts/logout/",
     "/admin/logout/",
@@ -63,7 +64,12 @@ APDA_BOARD_ALLOWED_PREFIXES = (
     "/static/",
     "/dynamic-media/",
 )
-APDA_BOARD_ALLOWED_EXACT_PATHS = ("/", "/archive/black_rod_bundle/")
+APDA_BOARD_ALLOWED_EXACT_PATHS = (
+    "/",
+    "/all_tab_cards/",
+    "/archive/black_rod_bundle/",
+    "/forum_post",
+)
 
 
 class Login:
