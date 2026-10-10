@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10.16, <3.11"
 
 [[package]]
@@ -522,7 +522,7 @@ requires-dist = [
     { name = "exceptiongroup", specifier = "==1.3.0" },
     { name = "gevent", specifier = "==24.10.3" },
     { name = "gunicorn", specifier = "==23.0.0" },
-    { name = "mysqlclient", specifier = "==1.4.4" },
+    { name = "mysqlclient", specifier = "==2.2.8" },
     { name = "pillow", specifier = "==12.2.0" },
     { name = "pymemcache", specifier = "==4.0.0" },
     { name = "python-dotenv", specifier = "==1.2.2" },
@@ -565,9 +565,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/52/7edcd94f0afb721a2
 
 [[package]]
 name = "mysqlclient"
-version = "1.4.4"
+version = "2.2.8"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4d/38/c5f8bac9c50f3042c8f05615f84206f77f03db79781db841898fde1bb284/mysqlclient-1.4.4.tar.gz", hash = "sha256:9c737cc55a5dc8dd3583a942d5a9b21be58d16f00f5fefca4e575e7d9682e98c", size = 86245, upload-time = "2019-08-11T15:37:21.833Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/b0/9df076488cb2e536d40ce6dbd4273c1f20a386e31ffe6e7cb613902b3c2a/mysqlclient-2.2.8.tar.gz", hash = "sha256:8ed20c5615a915da451bb308c7d0306648a4fd9a2809ba95c992690006306199", size = 92287, upload-time = "2026-02-10T10:58:37.405Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/d0/22b896a2f8f797ee3517a0c1c1fe576cd38768cd25e2a7362a7277725ed4/mysqlclient-2.2.8-cp310-cp310-win_amd64.whl", hash = "sha256:86db31bba7b3480fec2751350e9790e24f016f89af33a87bab7e79f7196474e8", size = 206873, upload-time = "2026-02-10T10:58:40.996Z" },
+]
 
 [[package]]
 name = "myst-parser"
