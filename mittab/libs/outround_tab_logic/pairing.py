@@ -258,7 +258,9 @@ def save_challenge_pick(type_of_break, num_teams, challenger_id, challenged_id):
     )
 
 
+@transaction.atomic
 def save_current_challenger(type_of_break, num_teams, challenger_id):
+    list(BreakingTeam.objects.select_for_update().filter(type_of_team=type_of_break))
     challenge_context = get_challenge_setup_context(type_of_break, num_teams)
     if not challenge_context.get("enabled"):
         raise ValueError("Challenge entries are not available for this round.")
@@ -406,6 +408,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
 
 def _pair_experimental(type_of_break=BreakingTeam.VARSITY):
+    list(BreakingTeam.objects.select_for_update().filter(type_of_team=type_of_break))
     lost_outround = [t.loser.id for t in Outround.objects.filter(
         type_of_round=type_of_break) if t.loser]
 
