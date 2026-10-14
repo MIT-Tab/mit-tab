@@ -9,8 +9,10 @@ from django.http import HttpResponse
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.utils.html import escape
 from nplusone.core import profiler
 
+from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.tab.models import (
     Judge,
     JudgeExpectedCheckIn,
@@ -746,6 +748,80 @@ class TestPublicViews(TestCase):
             f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
             content,
         )
+
+    def test_public_home_promotes_outrounds_when_they_begin(self):
+        client = Client()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        varsity_url = reverse("outround_pretty_pair", args=[0])
+        inround_url = reverse("pretty_pair")
+        varsity_tile = f'class="tile shadow-sm" href="{varsity_url}"'
+        inround_tile = f'class="tile shadow-sm" href="{inround_url}"'
+        self.assertLess(content.index(varsity_tile), content.index(inround_tile))
+        self.assertIn("[V] Ro2 paired", content)
+        self.assertIn(f'href="{varsity_url}"', content)
+
+    def test_public_home_does_not_duplicate_open_registration(self):
+        client = Client()
+        TabSettings.set("cur_round", 1)
+        config = RegistrationConfig.get_or_create_active()
+        config.allow_new_registrations = True
+        config.save()
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count("Registration is open"), 1)
+        self.assertNotIn('<span class="title">Registration</span>', content)
+
+    def test_outround_bracket_is_enabled_by_default(self):
+        client = Client()
+        TabSettings.objects.filter(key="show_outs_bracket").delete()
+        caches["public"].clear()
+
+        response = client.get(reverse("outround_pretty_pair", args=[0]))
+
+        self.assertContains(response, "Bracket View")
+
+    def test_previous_inround_pairings_are_public_by_default(self):
+        client = Client()
+        previous_round = Round.objects.filter(round_number=1).first()
+
+        current_response = client.get(reverse("pretty_pair"))
+        history_url = reverse("previous_pretty_pair", args=[1])
+        self.assertContains(current_response, history_url)
+
+        history_response = client.get(history_url)
+        self.assertEqual(history_response.status_code, 200)
+        self.assertContains(history_response, previous_round.gov_team.display)
+        self.assertContains(
+            history_response,
+            escape(previous_round.opp_team.display),
+        )
+        self.assertContains(
+            history_response,
+            (
+                f'<a class="btn btn-outline-primary btn-sm" '
+                f'href="{reverse("pretty_pair")}">Round 2</a>'
+            ),
+            html=True,
+        )
+        self.assertNotContains(history_response, "Current round")
+
+    def test_previous_inround_pairings_can_be_disabled(self):
+        client = Client()
+        TabSettings.set("show_previous_inround_pairings", 0)
+        caches["public"].clear()
+        history_url = reverse("previous_pretty_pair", args=[1])
+
+        current_response = client.get(reverse("pretty_pair"))
+        self.assertNotContains(current_response, history_url)
+        self.assertEqual(client.get(history_url).status_code, 404)
 
     def test_public_home_falls_back_to_defaults_when_shortcuts_missing(self):
         client = Client()
