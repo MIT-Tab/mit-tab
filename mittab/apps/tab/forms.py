@@ -152,6 +152,7 @@ class JudgeForm(forms.ModelForm):
     def save(self, commit=True, actor=None):
         actor = actor if getattr(actor, "is_authenticated", False) else None
         judge = super(JudgeForm, self).save(commit=False)
+        before_dino = Judge.objects.filter(pk=judge.pk).values("is_dino").first()
         is_create = judge.pk is None
         changed_fields = list(self.changed_data)
         if is_create and actor and not judge.created_by_id:
@@ -180,6 +181,10 @@ class JudgeForm(forms.ModelForm):
         if actor:
             event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
             changes = {} if is_create else {"fields": changed_fields}
+            if before_dino and before_dino["is_dino"] != judge.is_dino:
+                changes["is_dino"] = {
+                    "before": before_dino["is_dino"], "after": judge.is_dino,
+                }
             AuditEvent.record(judge, event_type, actor, changes=changes)
         return judge
 
@@ -380,6 +385,7 @@ class ResultEntryForm(forms.Form):
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
         round_object = kwargs.pop("round_instance")
+        self.round_object = round_object
         no_fill = False
         if "no_fill" in kwargs:
             kwargs.pop("no_fill")
@@ -536,7 +542,9 @@ class ResultEntryForm(forms.Form):
 
     def save(self, _commit=True):
         cleaned_data = self.cleaned_data
-        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+        if cleaned_data["round_instance"] != self.round_object.pk:
+            raise ValueError("Ballot target does not match the requested round")
+        round_obj = Round.objects.get(pk=self.round_object.pk)
 
         if not round_obj.victor == cleaned_data["winner"]:
             cache_logic.invalidate_cache("team_rankings")
@@ -973,6 +981,7 @@ class OutroundResultEntryForm(forms.Form):
     def __init__(self, *args, **kwargs):
         # Have to pop these off before sending to the super constructor
         round_object = kwargs.pop("round_instance")
+        self.round_object = round_object
         no_fill = False
         if "no_fill" in kwargs:
             kwargs.pop("no_fill")
@@ -1008,7 +1017,9 @@ class OutroundResultEntryForm(forms.Form):
 
     def save(self, _commit=True):
         cleaned_data = self.cleaned_data
-        round_obj = Outround.objects.get(pk=cleaned_data["round_instance"])
+        if cleaned_data["round_instance"] != self.round_object.pk:
+            raise ValueError("Ballot target does not match the requested round")
+        round_obj = Outround.objects.get(pk=self.round_object.pk)
 
         round_obj.victor = cleaned_data["winner"]
         round_obj.save()

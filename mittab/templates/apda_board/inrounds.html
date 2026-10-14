@@ -1,0 +1,11 @@
+{% extends "base/__wide.html" %}
+{% block title %}Inround Audit{% endblock %}
+{% block banner %}Inround Audit{% endblock %}
+{% block content %}
+<div class="col-12">
+  <nav class="mb-3">{% for number in round_numbers %}<a class="btn btn-sm {% if number == round_number %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'board_inrounds' number %}">Round {{ number }}</a> {% endfor %}</nav>
+  <p>Pairings and outcomes are read-only. Manual edits show the recorded changes; older actions may have no recorded history.</p>
+  {% for pairing in pairings %}{% include "apda_board/_pairing.html" %}{% empty %}<p>No pairings available.</p>{% endfor %}
+  {% if deleted %}<h4>Removed pairings</h4>{% for pairing in deleted %}{% include "apda_board/_pairing.html" %}{% endfor %}{% endif %}
+</div>
+{% endblock %}

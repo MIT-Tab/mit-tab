@@ -12,6 +12,7 @@ from django.shortcuts import redirect, reverse
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
 from mittab.libs import assign_judges, assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -25,6 +26,7 @@ from mittab.libs.cacheing.public_cache import (
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Outround, "staff outround pairing")
 def pair_next_outround(request, num_teams, type_of_round):
     if request.method == "POST":
         type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
@@ -282,6 +284,7 @@ def _existing_selected_specs(selected_specs):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Outround, "staff break")
 def break_teams(request):
     if request.method == "POST":
         # Perform the break
@@ -725,6 +728,7 @@ def alternative_teams(request, round_id, current_team_id, position):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_change(Outround, "staff team correction")
 def assign_team(request, round_id, position, team_id):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
@@ -752,6 +756,7 @@ def assign_team(request, round_id, position, team_id):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_change(Outround, "staff side correction")
 def switch_sides(request, round_id):
     try:
         round_obj = Outround.objects.select_related("gov_team",
@@ -838,6 +843,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     return JsonResponse(data)
 
 
+@audit_pairing_change(Outround, "staff outround result")
 def enter_result(request,
                  round_id,
                  form_class=OutroundResultEntryForm):
@@ -904,6 +910,7 @@ def toggle_pairing_released(request, type_of_round, num_teams):
     return JsonResponse(data)
 
 
+@audit_pairing_change(Outround, "staff choice correction")
 def update_choice(request, outround_id):
     outround = get_object_or_404(Outround, pk=outround_id)
 
@@ -1029,6 +1036,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
     })
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Outround, "staff judge assignment")
 def assign_judges_to_pairing(request, round_type=None):
     if request.method != "POST":
         return redirect_and_flash_error(request, "Invalid request method.")
@@ -1068,6 +1076,7 @@ def assign_judges_to_pairing(request, round_type=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Outround, "staff room assignment")
 def assign_rooms_to_pairing(request):
     if request.method != "POST":
         return redirect_and_flash_error(request, "Invalid request method.")

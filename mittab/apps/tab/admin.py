@@ -3,6 +3,32 @@ from django import forms
 from django.utils.html import format_html
 
 from mittab.apps.tab import models
+from mittab.apps.tab.board_audit import (
+    pairing_snapshot, record_pairing_change, record_pairing_removal,
+)
+
+
+class PairingAuditAdminMixin:
+    def save_model(self, request, obj, form, change):
+        previous = type(obj).objects.filter(pk=obj.pk).first() if change else None
+        form.pairing_before = pairing_snapshot(previous) if previous else None
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        record_pairing_change(form.instance, form.pairing_before, request.user, "admin correction")
+
+    def delete_model(self, request, obj):
+        model, object_id, before = type(obj), obj.pk, pairing_snapshot(obj)
+        super().delete_model(request, obj)
+        record_pairing_removal(model, object_id, before, request.user)
+
+    def delete_queryset(self, request, queryset):
+        model = queryset.model
+        before = {pairing.pk: pairing_snapshot(pairing) for pairing in queryset}
+        super().delete_queryset(request, queryset)
+        for object_id, snapshot in before.items():
+            record_pairing_removal(model, object_id, snapshot, request.user)
 
 
 class RoundAdminForm(forms.ModelForm):
@@ -21,14 +47,41 @@ class OutroundAdminForm(forms.ModelForm):
         fields = "__all__"
 
 
-class RoundAdmin(admin.ModelAdmin):
+class RoundAdmin(PairingAuditAdminMixin, admin.ModelAdmin):
     form = RoundAdminForm
     filter_horizontal = ("judges", )
 
 
-class OutroundAdmin(admin.ModelAdmin):
+class OutroundAdmin(PairingAuditAdminMixin, admin.ModelAdmin):
     form = OutroundAdminForm
     filter_horizontal = ("judges", )
+
+
+class RoundStatsAdmin(admin.ModelAdmin):
+    def save_model(self, request, obj, form, change):
+        round_ids = {obj.round_id}
+        if change:
+            old_id = models.RoundStats.objects.filter(pk=obj.pk).values_list(
+                "round_id", flat=True).first()
+            round_ids.add(old_id)
+        rounds = list(models.Round.objects.filter(pk__in=round_ids))
+        before = {pairing.pk: pairing_snapshot(pairing) for pairing in rounds}
+        super().save_model(request, obj, form, change)
+        for pairing in rounds:
+            record_pairing_change(pairing, before[pairing.pk], request.user, "admin scores")
+
+    def delete_model(self, request, obj):
+        pairing = obj.round
+        before = pairing_snapshot(pairing)
+        super().delete_model(request, obj)
+        record_pairing_change(pairing, before, request.user, "admin scores")
+
+    def delete_queryset(self, request, queryset):
+        rounds = list(models.Round.objects.filter(pk__in=queryset.values("round_id")))
+        before = {pairing.pk: pairing_snapshot(pairing) for pairing in rounds}
+        super().delete_queryset(request, queryset)
+        for pairing in rounds:
+            record_pairing_change(pairing, before[pairing.pk], request.user, "admin scores")
 
 
 class AttributionAdminMixin:
@@ -37,9 +90,13 @@ class AttributionAdminMixin:
     def save_model(self, request, obj, form, change):
         if not change and hasattr(obj, "created_by") and not obj.created_by_id:
             obj.created_by = request.user
+        before_dino = (models.Judge.objects.filter(pk=obj.pk).values("is_dino").first()
+                       if isinstance(obj, models.Judge) and change else None)
         super(AttributionAdminMixin, self).save_model(request, obj, form, change)
         event_type = models.AuditEvent.EDIT if change else models.AuditEvent.CREATE
         changes = {"fields": list(form.changed_data)} if change else {}
+        if before_dino and before_dino["is_dino"] != obj.is_dino:
+            changes["is_dino"] = {"before": before_dino["is_dino"], "after": obj.is_dino}
         models.AuditEvent.record(obj, event_type, request.user, changes=changes)
 
 
@@ -136,7 +193,7 @@ admin.site.register(models.JudgeCodeEmailLog)
 admin.site.register(models.WrittenRFDEmailLog)
 admin.site.register(models.Scratch, ScratchAdmin)
 admin.site.register(models.Round, RoundAdmin)
-admin.site.register(models.RoundStats)
+admin.site.register(models.RoundStats, RoundStatsAdmin)
 admin.site.register(models.CheckIn)
 admin.site.register(models.RoomCheckIn)
 admin.site.register(models.TabSettings)

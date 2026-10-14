@@ -17,6 +17,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -50,6 +51,7 @@ def invalidate_public_ballot_cache():
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Round, "staff pairing")
 def pair_round(request):
     cache_logic.clear_cache()
     current_round = TabSettings.objects.get(key="cur_round")
@@ -135,6 +137,7 @@ def pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Round, "staff re-pairing")
 def re_pair_round(request):
     """
     Re-pair the current round by clearing existing pairings and
@@ -198,6 +201,7 @@ def re_pair_round(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Round, "staff judge assignment")
 def assign_judges_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
@@ -216,6 +220,7 @@ def assign_judges_to_pairing(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_generation(Round, "staff room assignment")
 def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
@@ -269,6 +274,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_change(None, "staff room correction")
 def assign_room(request, round_id, new_room_id, outround=False):
     try:
         if outround:
@@ -818,6 +824,7 @@ def team_stats(request, round_number, outround=False):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_change(Round, "staff team correction")
 def assign_team(request, round_id, position, team_id):
     try:
         round_obj = Round.objects.get(id=int(round_id))
@@ -845,6 +852,7 @@ def assign_team(request, round_id, position, team_id):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
+@audit_pairing_change(Round, "staff side correction")
 def switch_sides(request, round_id):
     try:
         round_obj = Round.objects.select_related("gov_team",
@@ -965,6 +973,7 @@ def view_rounds(request):
 
 
 
+@audit_pairing_change(Round, "ballot entry")
 def enter_result(request,
                  round_id,
                  form_class=ResultEntryForm,
@@ -1044,6 +1053,7 @@ def enter_result(request,
         })
 
 
+@audit_pairing_change(Round, "panel ballot entry")
 def enter_multiple_results(request, round_id, num_entered):
     round_obj = Round.objects.get(id=round_id)
     num_entered = max(int(num_entered), 1)

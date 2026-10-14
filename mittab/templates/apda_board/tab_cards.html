@@ -1,0 +1,17 @@
+{% extends "base/__wide.html" %}
+{% block title %}Board Tab Cards{% endblock %}
+{% block banner %}Tab Cards{% if team %}: {{ team.name }}{% endif %}{% endblock %}
+{% block content %}
+<div class="col-12">
+{% if team %}
+<a href="{% url 'board_tab_cards' %}" class="btn btn-outline-secondary mb-3">All teams</a>
+<p>{% for debater in debaters %}{{ debater.name }} ({% if debater.novice_status %}Novice{% else %}Varsity{% endif %}){% if not forloop.last %}, {% endif %}{% endfor %}</p>
+<p>Team totals: {{ totals.speaks }} speaks, {{ totals.ranks }} ranks.</p>
+<ul>{% for debater in debaters %}<li>{{ debater.name }}: {{ debater.speaks }} speaks, {{ debater.ranks }} ranks.</li>{% endfor %}</ul>
+{% if byes %}<p>Byes: {{ byes|join:", " }}</p>{% endif %}{% if no_shows %}<p>No-shows: {{ no_shows|join:", " }}</p>{% endif %}
+{% for pairing in pairings %}<h5>Round {{ pairing.round_number }}</h5>{% include "apda_board/_pairing.html" %}
+<table class="table table-sm"><thead><tr><th>Speaker</th><th>Role</th><th>Speaks</th><th>Rank</th></tr></thead><tbody>{% for score in pairing.scores %}<tr><td>{{ score.name }}</td><td>{{ score.role|upper }}</td><td>{{ score.speaks }}</td><td>{{ score.ranks }}</td></tr>{% empty %}<tr><td colspan="4">No scores entered.</td></tr>{% endfor %}</tbody></table>
+{% endfor %}
+{% else %}<ul>{% for item in teams %}<li><a href="{% url 'board_tab_card' item.id %}">{{ item.name }}</a></li>{% endfor %}</ul>{% endif %}
+</div>
+{% endblock %}
