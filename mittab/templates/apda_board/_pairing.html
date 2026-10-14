@@ -1,0 +1,10 @@
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-4"><strong>GOV</strong> {{ pairing.gov_team.name }}<br><strong>OPP</strong> {{ pairing.opp_team.name }}</div>
+      <div class="col-md-4">{% for judge in pairing.judges %}{{ judge.name }}{% if judge.id == pairing.chair %} (chair){% endif %}{% if not forloop.last %}<br>{% endif %}{% empty %}No judges assigned{% endfor %}</div>
+      <div class="col-md-4">Room: {{ pairing.room.name|default:"Unassigned" }}<br>Outcome: {{ pairing.outcome }}</div>
+    </div>
+    {% include "apda_board/_history.html" %}
+  </div>
+</div>

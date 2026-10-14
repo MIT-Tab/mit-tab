@@ -1,0 +1,36 @@
+{% extends "base/__wide.html" %}
+{% block title %}Board Outrounds{% endblock %}
+{% block banner %}Board Outrounds{% endblock %}
+{% block content %}
+<div class="col-12">
+  <p>Pair teams and rooms, correct outcomes, or swap sides and teams. Team swaps clear the affected outcomes. Review later rounds after a correction.</p>
+  {% for division in divisions %}
+  <section class="mb-4">
+    <h4>{{ division.label }}</h4>
+    {% for problem in division.problems %}<div class="alert alert-warning">{{ problem }} Correct the later round's teams and outcomes before advancing.</div>{% endfor %}
+    <form method="post" action="{% url 'board_pair_outround' %}" class="mb-3">{% csrf_token %}<input type="hidden" name="division" value="{{ division.id }}"><button class="btn btn-primary">Pair next {{ division.label|lower }} round (teams and rooms)</button></form>
+    {% for stage in division.stages %}
+    <h5>Round of {{ stage.size }}</h5>
+    {% for pairing in stage.pairings %}
+    {% include "apda_board/_pairing.html" %}
+    <div class="card card-body mb-4">
+      <form method="post" action="{% url 'board_outround_edit' pairing.id %}" class="form-inline mb-2">{% csrf_token %}<input type="hidden" name="revision" value="{{ pairing.revision }}"><input type="hidden" name="action" value="result">
+        <label class="mr-2" for="outcome-{{ pairing.id }}">Outcome</label><select class="form-control mr-2" name="victor" id="outcome-{{ pairing.id }}">{% for value,label in outcomes %}<option value="{{ value }}" {% if value == pairing.victor %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><button class="btn btn-success">Save outcome</button>
+      </form>
+      <form method="post" action="{% url 'board_outround_edit' pairing.id %}" class="mb-2">{% csrf_token %}<input type="hidden" name="revision" value="{{ pairing.revision }}"><input type="hidden" name="action" value="sides"><button class="btn btn-outline-primary">Switch sides (preserve winner)</button></form>
+      <form method="post" action="{% url 'board_outround_edit' pairing.id %}" class="form-inline mb-2">{% csrf_token %}<input type="hidden" name="revision" value="{{ pairing.revision }}"><input type="hidden" name="action" value="team">
+        <label class="mr-2" for="position-{{ pairing.id }}">Replace or swap</label><select name="position" id="position-{{ pairing.id }}" class="form-control mr-2"><option value="gov">GOV</option><option value="opp">OPP</option></select><label class="sr-only" for="team-{{ pairing.id }}">Team</label><select name="team" id="team-{{ pairing.id }}" class="form-control mr-2">{% for team in division.teams %}<option value="{{ team.team_id }}">[{{ team.seed }}] {{ team.team__name }}</option>{% endfor %}</select><button class="btn btn-outline-primary">Save teams</button>
+      </form>
+      <form method="post" action="{% url 'board_outround_edit' pairing.id %}" class="form-inline mb-2">{% csrf_token %}<input type="hidden" name="revision" value="{{ pairing.revision }}"><input type="hidden" name="action" value="room">
+        <label class="mr-2" for="room-{{ pairing.id }}">Room</label><select name="room" id="room-{{ pairing.id }}" class="form-control mr-2"><option value="">Unassigned</option>{% for room in rooms %}<option value="{{ room.id }}" {% if room.id == pairing.room.id %}selected{% endif %}>{{ room.name }}</option>{% endfor %}</select><button class="btn btn-outline-primary">Save room</button>
+      </form>
+      <form method="post" action="{% url 'board_outround_edit' pairing.id %}" class="form-inline">{% csrf_token %}<input type="hidden" name="revision" value="{{ pairing.revision }}"><input type="hidden" name="action" value="choice">
+        <label class="mr-2" for="choice-{{ pairing.id }}">Choice</label><select name="choice" id="choice-{{ pairing.id }}" class="form-control mr-2"><option value="0" {% if pairing.choice == 0 %}selected{% endif %}>No choice</option><option value="1" {% if pairing.choice == 1 %}selected{% endif %}>GOV</option><option value="2" {% if pairing.choice == 2 %}selected{% endif %}>OPP</option></select><button class="btn btn-outline-primary">Save choice</button>
+      </form>
+    </div>
+    {% endfor %}{% endfor %}
+    {% if division.deleted %}<h5>Removed pairings</h5>{% for pairing in division.deleted %}<p>Round of {{ pairing.num_teams }}</p>{% include "apda_board/_pairing.html" %}{% endfor %}{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}
