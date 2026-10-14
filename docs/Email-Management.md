@@ -2,7 +2,9 @@
 
 Full tab staff can use **Admin > Email Management** to preview and send team
 codes, judge codes, registration confirmations, and written RFDs. Choose an email
-type, review its current preview, select recipients, and send. **Sent Email
+type, open its HTML preview, select recipients, and send. Previews open in a
+dialog that must be dismissed to return to the table. Team and RFD previews list
+all recipients and show the shared email once. **Sent Email
 History** shows recorded attempts and previews the saved content, including staff
 invitations. A current preview describes what would be sent now; a recorded
 preview preserves what was submitted to the email service at that time. Successful
@@ -28,24 +30,18 @@ share the cooldown. Failed attempts are recorded but do not start a cooldown;
 partial success starts a cooldown for that team and successful addresses. The
 server rechecks eligibility when staff submit a selection.
 
-## Updating a running tournament
+## Deployment
 
-Back up the tournament database, apply the normal deployment with migrations
-(`uv run python manage.py migrate`), and rebuild the frontend assets as usual.
-Both the `tab` and `registration` apps have additive migrations. These migrations
-preserve registrations, team codes, relationships, and existing email logs; they
-do not send emails. Deploy the migrations before directing requests to the new
-application code, and avoid roster writes while the baseline is being recorded.
+Apply the migrations (`uv run python manage.py migrate`) and rebuild frontend
+assets as usual. The new migration removes the unused legacy delivery flag and
+roster baseline. Registrations, team codes, and email logs remain intact.
 
-Older team emails had no delivery log. Existing teams therefore start with
-**Earlier delivery unknown**, and are excluded from the default send selection
-and **Select Never Sent**. Directors can deliberately select them to send their
-current codes. The migration records a baseline of the current roster, so later
-edits can still trigger **Needs resend** without pretending the earlier email was
-successfully delivered. After a logged successful send, normal snapshot tracking
-applies.
+Teams without a recorded successful send show **Never sent** and are selected by
+default when eligible. **Needs resend** compares the current team information and
+recipients with recorded successful sends.
 
 Older judge, registration-confirmation, and RFD logs remain visible. Their original
 content was not saved, so history explicitly reports that the original content is
 unavailable. Historical team emails and staff invitations cannot be reconstructed.
-New sends save both plain text and HTML for previews. HTML previews are sandboxed.
+New sends save both plain text and HTML, and previews display the sandboxed HTML
+version only.

@@ -5,6 +5,7 @@
 
 {% block extra_head %}
   {{ block.super }}
+  {% render_bundle 'emailManagement' 'css' %}
   {% render_bundle 'emailManagement' 'js' %}
 {% endblock %}
 
@@ -279,7 +280,7 @@
               <td data-sort-value="{{ row.round.gov_team.display|lower }}">{{ row.round.gov_team.display }}</td>
               <td data-sort-value="{{ row.round.opp_team.display|lower }}">{{ row.round.opp_team.display }}</td>
               <td data-sort-value="{{ row.winner|lower }}">{{ row.winner }}</td>
-              <td data-sort-value="{{ row.recipient_count }}">{{ row.recipient_count }}{% for email in row.previews %}{% include "tab/_email_preview.html" %}{% endfor %}</td>
+              <td data-sort-value="{{ row.recipient_count }}">{{ row.recipient_count }}{% include "tab/_email_preview.html" with email=row.preview recipients=row.recipients %}</td>
               <td data-sort-value="{{ row.status|lower }}">
                 {% if row.can_send %}
                   <span class="text-success font-weight-semibold">Ready</span>
@@ -349,4 +350,18 @@
     </div>
   </section>
 </div>
+<dialog id="email-preview-dialog" class="email-preview-dialog" aria-labelledby="email-preview-title">
+  <div class="email-preview-header">
+    <h2 class="h5 mb-0" id="email-preview-title">Email preview</h2>
+    <button class="close" type="button" data-close-email-preview aria-label="Close email preview"><span aria-hidden="true">&times;</span></button>
+  </div>
+  <div class="email-preview-envelope">
+    <div><strong>To:</strong> <span id="email-preview-recipients"></span></div>
+    <div><strong>Subject:</strong> <span id="email-preview-subject"></span></div>
+  </div>
+  <iframe id="email-preview-frame" title="Email HTML preview" sandbox="" referrerpolicy="no-referrer"></iframe>
+  <div class="email-preview-footer">
+    <button class="btn btn-secondary" type="button" data-close-email-preview autofocus>Close</button>
+  </div>
+</dialog>
 {% endblock %}

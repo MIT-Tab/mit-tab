@@ -1,4 +1,4 @@
-"""Team code email management, including legacy delivery uncertainty."""
+"""Team code email management and resend eligibility."""
 from collections import Counter, defaultdict
 
 from django.core.exceptions import ImproperlyConfigured
@@ -48,11 +48,7 @@ def team_email_management_context(request):
         # A removed recipient also changes what directors should review.
         if successful_logs and successful_logs[0].team_snapshot != snapshot:
             needs_resend = True
-        unknown = team.code_email_history_unknown and not successful_logs
-        if (unknown and team.code_email_baseline
-                and team.code_email_baseline != snapshot):
-            needs_resend = True
-        never_received = not successful_logs and not unknown
+        never_received = not successful_logs
         if not team.team_code:
             status = "Missing team code"
         elif not previews:
@@ -61,8 +57,6 @@ def team_email_management_context(request):
             status = "Needs resend"
         elif logs and not logs[0].successful:
             status = "Failed"
-        elif unknown:
-            status = "Earlier delivery unknown"
         elif never_received:
             status = "Never sent"
         else:
@@ -77,7 +71,7 @@ def team_email_management_context(request):
             "checked": can_send and (
                 team.pk in selected_ids if request.method == "POST" else never_received
             ),
-            "previews": previews,
+            "preview": previews[0] if previews else None,
             "recipients": ", ".join(item.to_address for item in previews),
             "last_log": logs[0] if logs else None,
             "cooldown": bool(previews) and not can_send,
