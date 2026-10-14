@@ -1,3 +1,5 @@
+# pylint: disable=too-many-lines
+
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -7,10 +9,24 @@ from django.http import HttpResponse
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from django.utils.html import escape
 from nplusone.core import profiler
 
-from mittab.apps.tab.models import (Judge, Room, TabSettings, Team,
-                                    Round, Outround, RoundStats)
+from mittab.apps.registration.models import RegistrationConfig
+from mittab.apps.tab.models import (
+    Judge,
+    JudgeExpectedCheckIn,
+    Outround,
+    PublicHomePage,
+    PublicHomeShortcut,
+    Room,
+    Round,
+    RoundStats,
+    School,
+    SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
+    TabSettings,
+    Team,
+)
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
     get_public_display_flags,
@@ -100,7 +116,7 @@ class TestPublicViews(TestCase):
 
     def _set_disclosure_settings(self, open_speaks, open_ranks):
         """Set disclosure settings.
-        
+
         Values: None=unset, True=open (1), False=closed (2)
         """
         for key, value in (("open_speaks", open_speaks), ("open_ranks", open_ranks)):
@@ -178,7 +194,7 @@ class TestPublicViews(TestCase):
             (reverse("rank_teams_public"), [team.name]),
             (reverse("pretty_pair"), [round_obj.gov_team.name, gov_debater.name]),
             (reverse("missing_ballots"), [self.test_round.chair.name]),
-            (reverse("e_ballot_search"), ["Submit E-Ballot"]),
+            (reverse("e_ballot_search"), ["Judge Portal and Ballots"]),
             (reverse("outround_pretty_pair", args=[0]), [v_out.gov_team.name]),
             (reverse("outround_pretty_pair", args=[1]), [n_out.gov_team.name]),
             (reverse("public_home"), ["Released Pairings"]),
@@ -331,6 +347,89 @@ class TestPublicViews(TestCase):
         self.assertIn("Speaker Disclosure Policy", content)
         self.assertIn("open speaks but closed ranks", content)
 
+    def test_submitted_ballot_allows_written_rfd_until_deadline(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+        TabSettings.set("written_rfd_first_round", round_obj.round_number)
+        TabSettings.set("written_rfd_deadline", "2099-01-01 12:00")
+
+        response = client.get(
+            reverse("view_submitted_ballot", args=[judge.ballot_code])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Reason for Decision", content)
+        self.assertIn("Save Written RFD", content)
+        self.assertIn("You can edit this written RFD until", content)
+
+        response = client.post(
+            reverse("view_submitted_ballot", args=[judge.ballot_code]),
+            {"rfd": "Gov won the central weighing clash."},
+        )
+        self.assertEqual(response.status_code, 302)
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.rfd, "Gov won the central weighing clash.")
+
+    def test_submitted_ballot_blocks_written_rfd_after_deadline(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+        round_obj.rfd = "Original RFD"
+        round_obj.save(update_fields=["rfd"])
+        TabSettings.set("written_rfd_first_round", round_obj.round_number)
+        TabSettings.set("written_rfd_deadline", "2000-01-01 12:00")
+
+        response = client.post(
+            reverse("view_submitted_ballot", args=[judge.ballot_code]),
+            {"rfd": "Changed too late"},
+        )
+        self.assertEqual(response.status_code, 302)
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.rfd, "Original RFD")
+
+    def test_previous_ballots_lists_submitted_prior_rounds(self):
+        client = Client()
+        judge, _ = self._prepare_ballot_round()
+        previous_round = Round.objects.filter(round_number=1).first()
+        previous_round.chair = judge
+        previous_round.save()
+        previous_round.judges.add(judge)
+        self._create_round_stats(previous_round)
+        TabSettings.set("written_rfd_first_round", previous_round.round_number)
+
+        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Previous Ballots", content)
+        self.assertIn(f"Round {previous_round.round_number}", content)
+        self.assertIn(
+            reverse(
+                "view_submitted_ballot_round",
+                args=[judge.ballot_code, previous_round.id],
+            ),
+            content,
+        )
+
+    def test_previous_ballots_lists_submitted_current_ballot_round(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        self._create_round_stats(round_obj)
+
+        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(f"Round {round_obj.round_number}", content)
+        self.assertIn(
+            reverse(
+                "view_submitted_ballot_round",
+                args=[judge.ballot_code, round_obj.id],
+            ),
+            content,
+        )
+
     def test_enter_e_ballot_post_missing_round_id_redirects(self):
         client = Client()
         judge, _ = self._prepare_ballot_round()
@@ -409,7 +508,9 @@ class TestPublicViews(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("tab_login"))
 
-    def test_enter_e_ballot_get_redirects_when_pairings_not_released(self):
+    def test_enter_e_ballot_redirects_to_previous_ballots_when_pairings_not_released(
+        self,
+    ):
         client = Client()
         judge, _ = self._prepare_ballot_round()
         TabSettings.set("pairing_released", 0)
@@ -417,7 +518,10 @@ class TestPublicViews(TestCase):
         response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(
+            response.url,
+            reverse("previous_ballots", args=[judge.ballot_code]),
+        )
 
     def test_enter_e_ballot_get_redirects_when_no_round_found(self):
         client = Client()
@@ -428,7 +532,10 @@ class TestPublicViews(TestCase):
         response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(
+            response.url,
+            reverse("judge_portal", args=[judge.ballot_code]),
+        )
 
     def test_enter_e_ballot_get_redirects_when_not_chair(self):
         client = Client()
@@ -594,6 +701,206 @@ class TestPublicViews(TestCase):
         self.assertNotIn("Novice Speakers", content,
             "Hidden divisions should not render a section")
 
+    def test_public_speaker_rankings_orders_display_score_columns_by_setting(self):
+        client = Client()
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 0)
+        caches["public"].clear()
+        response = client.get(reverse("public_speaker_rankings"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Unadjusted"),
+            content.index("Single adjusted"),
+        )
+
+        TabSettings.set(SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING, 1)
+        caches["public"].clear()
+        response = client.get(reverse("public_speaker_rankings"))
+        content = response.content.decode()
+        self.assertNotIn("Score Type", content)
+        self.assertLess(
+            content.index("Single adjusted"),
+            content.index("Unadjusted"),
+        )
+
+    def test_public_home_uses_shortcut_configuration(self):
+        client = Client()
+
+        PublicHomeShortcut.objects.filter(position=2).update(
+            nav_item="public_team_results"
+        )
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertIn("Public Team Results", content)
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
+            content,
+        )
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("pretty_pair")}"',
+            content,
+        )
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
+            content,
+        )
+
+    def test_public_home_promotes_outrounds_when_they_begin(self):
+        client = Client()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        varsity_url = reverse("outround_pretty_pair", args=[0])
+        inround_url = reverse("pretty_pair")
+        varsity_tile = f'class="tile shadow-sm" href="{varsity_url}"'
+        inround_tile = f'class="tile shadow-sm" href="{inround_url}"'
+        self.assertLess(content.index(varsity_tile), content.index(inround_tile))
+        self.assertIn("[V] Ro2 paired", content)
+        self.assertIn(f'href="{varsity_url}"', content)
+
+    def test_public_home_does_not_duplicate_open_registration(self):
+        client = Client()
+        TabSettings.set("cur_round", 1)
+        config = RegistrationConfig.get_or_create_active()
+        config.allow_new_registrations = True
+        config.save()
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count("Registration is open"), 1)
+        self.assertNotIn('<span class="title">Registration</span>', content)
+
+    def test_outround_bracket_is_enabled_by_default(self):
+        client = Client()
+        TabSettings.objects.filter(key="show_outs_bracket").delete()
+        caches["public"].clear()
+
+        response = client.get(reverse("outround_pretty_pair", args=[0]))
+
+        self.assertContains(response, "Bracket View")
+
+    def test_previous_inround_pairings_are_public_by_default(self):
+        client = Client()
+        previous_round = Round.objects.filter(round_number=1).first()
+
+        current_response = client.get(reverse("pretty_pair"))
+        history_url = reverse("previous_pretty_pair", args=[1])
+        self.assertContains(current_response, history_url)
+
+        history_response = client.get(history_url)
+        self.assertEqual(history_response.status_code, 200)
+        self.assertContains(history_response, previous_round.gov_team.display)
+        self.assertContains(
+            history_response,
+            escape(previous_round.opp_team.display),
+        )
+        self.assertContains(
+            history_response,
+            (
+                f'<a class="btn btn-outline-primary btn-sm" '
+                f'href="{reverse("pretty_pair")}">Round 2</a>'
+            ),
+            html=True,
+        )
+        self.assertNotContains(history_response, "Current round")
+
+    def test_previous_inround_pairings_can_be_disabled(self):
+        client = Client()
+        TabSettings.set("show_previous_inround_pairings", 0)
+        caches["public"].clear()
+        history_url = reverse("previous_pretty_pair", args=[1])
+
+        current_response = client.get(reverse("pretty_pair"))
+        self.assertNotContains(current_response, history_url)
+        self.assertEqual(client.get(history_url).status_code, 404)
+
+    def test_public_home_falls_back_to_defaults_when_shortcuts_missing(self):
+        client = Client()
+
+        PublicHomeShortcut.objects.all().delete()
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn(reverse("pretty_pair"), content)
+        self.assertIn(reverse("missing_ballots"), content)
+
+    def test_public_home_hides_inactive_configured_shortcuts(self):
+        client = Client()
+
+        PublicHomePage.ensure_defaults()
+        PublicHomePage.objects.filter(slug="public_team_results").update(
+            is_active=False
+        )
+        PublicHomeShortcut.objects.update_or_create(
+            position=2,
+            defaults={"nav_item": "public_team_results"},
+        )
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertNotIn(
+            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
+            content,
+        )
+        self.assertIn(
+            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
+            content,
+        )
+
+    def test_public_home_shows_only_eight_shortcuts_when_motions_enabled(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
+        self.assertNotIn('<span class="title">Motions</span>', content)
+
+    def test_public_home_can_show_motions_when_selected_as_shortcut(self):
+        client = Client()
+        TabSettings.set("motions_enabled", 1)
+
+        defaults = PublicHomeShortcut.default_slot_mapping()
+        defaults[2] = "public_motions"
+        for position, nav_item in defaults.items():
+            PublicHomeShortcut.objects.update_or_create(
+                position=position,
+                defaults={"nav_item": nav_item},
+            )
+
+        caches["public"].clear()
+        response = client.get(reverse("public_home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+
+        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
+        self.assertIn('<span class="title">Motions</span>', content)
+        self.assertIn(reverse("public_motions"), content)
+
     def test_public_rankings_control_updates_display_settings(self):
         client = Client()
         user = get_user_model().objects.create_superuser(
@@ -647,6 +954,72 @@ class TestPublicViews(TestCase):
         round2_settings = get_ballot_round_settings(2)
         self.assertFalse(round2_settings["visible"],
             "Rounds omitted from the form should remain hidden")
+
+    def test_public_judges_use_expectations(self):
+        client = Client()
+        school = School.objects.first()
+        judge = Judge.objects.create(name="Expectation Judge", rank=2.0)
+        judge.schools.add(school)
+
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.get(reverse("public_judges"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        row_start = content.find(judge.name)
+        self.assertNotEqual(row_start, -1, "Judge row not rendered")
+        row_end = content.find("</tr>", row_start)
+        self.assertNotEqual(row_end, -1, "Judge row not properly closed")
+        row_html = content[row_start:row_end]
+        self.assertIn("&#10004;", row_html,
+                      "Expected attendance indicator not shown for judge")
+
+    def test_judge_portal_updates_expected_checkins(self):
+        client = Client()
+        judge = Judge.objects.create(
+            name="Portal Judge",
+            rank=2.0,
+            ballot_code="portal-judge",
+        )
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+
+        response = client.post(
+            reverse("judge_portal", args=[judge.ballot_code]),
+            {
+                "availability_round_2": "on",
+                "availability_round_4": "on",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(
+                JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+                    "round_number",
+                    flat=True,
+                )
+            ),
+            {2, 4},
+        )
+
+    def test_current_ballot_redirects_unpaired_judge_back_to_portal(self):
+        client = Client()
+        TabSettings.set("pairing_released", 1)
+        judge = Judge.objects.create(
+            name="Unpaired Portal Judge",
+            rank=2.0,
+            ballot_code="unpaired-portal",
+        )
+
+        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            reverse("judge_portal", args=[judge.ballot_code]),
+        )
 
     def test_public_ballot_modes(self):
         client = Client()

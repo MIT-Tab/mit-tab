@@ -1,6 +1,8 @@
 import math
 import random
 
+from django.db import transaction
+
 from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
@@ -11,6 +13,7 @@ from mittab.libs.tab_logic import (
 from mittab.libs.tab_logic.rankings import get_team_rankings
 from mittab.libs.tab_logic.stats import num_govs
 from mittab.libs import errors
+from mittab.libs.tab_logic import team_pair_is_scratched
 import mittab.libs.cacheing.cache_logic as cache_logic
 
 
@@ -26,7 +29,8 @@ def perform_the_break():
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
         return False, "Please check your break tab settings"
 
     # This forces a refresh of the breaking teams
@@ -62,8 +66,10 @@ def perform_the_break():
 
         current_seed += 1
 
-    pair(BreakingTeam.VARSITY)
-    pair(BreakingTeam.NOVICE)
+    if var_teams_to_break:
+        pair(BreakingTeam.VARSITY)
+    if nov_teams_to_break:
+        pair(BreakingTeam.NOVICE)
 
     return True, "Success!"
 
@@ -125,6 +131,20 @@ def gov_team(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
+    if TabSettings.get("enable_team_team_scratches", 0) != 1:
+        return _pair_standard(type_of_break)
+    with transaction.atomic():
+        _pair_standard(type_of_break)
+        for pairing in Outround.objects.filter(
+                type_of_round=type_of_break, victor=Outround.UNKNOWN):
+            if team_pair_is_scratched(pairing.gov_team, pairing.opp_team):
+                raise errors.NotEnoughTeamsError(
+                    "The fixed outround bracket contains a team–team scratch. "
+                    "Review the bracket before pairing."
+                )
+
+
+def _pair_standard(type_of_break=BreakingTeam.VARSITY):
     lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
 
     base_queryset = BreakingTeam.objects.filter(

@@ -103,49 +103,35 @@ nvm use
 
 If there's no `.nvmrc` file, check `package.json` for the required Node version.
 
-#### Step 6: Install Python
+#### Step 6: Install UV and Python Dependencies
 
-Install pyenv to manage Python versions. This is similar to NVM but for Python - it lets you install and switch between different Python versions. Installation instructions are available in the [pyenv documentation](https://github.com/pyenv/pyenv).
-
-Once pyenv is installed, install the Python version required by the project (check the `Pipfile` for the required version):
+Install UV, which manages the project Python version and Python dependencies:
 
 ```bash
-pyenv install <version>
-pyenv local <version>
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv sync --all-groups
 ```
 
-The `local` command sets the Python version for this project directory.
-
-#### Step 7: Set Up Python Environment
-
-Install pipenv and the project dependencies:
-
-```bash
-pip install pipenv
-pipenv install
-```
-
-If the install fails, try running it a second time.
-
-#### Step 8: Install JavaScript Dependencies
+#### Step 7: Install JavaScript Dependencies
 
 ```bash
 npm install
 ```
 
-#### Step 9: Initialize the Database
+#### Step 8: Initialize the Database
 
 Run migrations and load test data:
 
 ```bash
-pipenv run python manage.py migrate
-pipenv run python manage.py loaddata testing_db
+uv run python manage.py migrate
+uv run python manage.py loaddata testing_db
 ```
 
-#### Step 10: Start the Development Server
+#### Step 9: Start the Development Server
 
 ```bash
-pipenv run ./bin/dev-server
+uv run ./bin/dev-server
 ```
 
 The application should now be running at `http://0.0.0.0:8001`
@@ -241,55 +227,41 @@ nvm use
 
 If there's no `.nvmrc` file, check `package.json` for the required Node version.
 
-#### Step 5: Install Python
+#### Step 5: Install UV and Python Dependencies
 
-First, install dependencies needed to build Python:
-
-```bash
-sudo apt-get install libffi-dev python3-venv python3-pip
-```
-
-Install pyenv to manage Python versions. This is similar to NVM but for Python - it lets you install and switch between different Python versions. Installation instructions are available in the [pyenv documentation](https://github.com/pyenv/pyenv).
-
-Once pyenv is installed, install the Python version required by the project (check the `Pipfile` for the required version):
+First, install dependencies needed to build Python packages:
 
 ```bash
-pyenv install <version>
-pyenv local <version>
+sudo apt-get install libffi-dev libmysqlclient-dev curl
 ```
 
-The `local` command sets the Python version for this project directory.
-
-#### Step 6: Set Up Python Environment
-
-Install pipenv and the project dependencies:
+Install UV, which manages the project Python version and Python dependencies:
 
 ```bash
-pip install pipenv
-pipenv install
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv sync --all-groups
 ```
 
-If the install fails, try running it a second time.
-
-#### Step 7: Install JavaScript Dependencies
+#### Step 6: Install JavaScript Dependencies
 
 ```bash
 npm install
 ```
 
-#### Step 8: Initialize the Database
+#### Step 7: Initialize the Database
 
 Run migrations and load test data:
 
 ```bash
-pipenv run python manage.py migrate
-pipenv run python manage.py loaddata testing_db
+uv run python manage.py migrate
+uv run python manage.py loaddata testing_db
 ```
 
-#### Step 9: Start the Development Server
+#### Step 8: Start the Development Server
 
 ```bash
-pipenv run ./bin/dev-server
+uv run ./bin/dev-server
 ```
 
 The application should now be running at `http://0.0.0.0:8001`
@@ -323,9 +295,8 @@ Note: Docker simulates the production environment, which can be less convenient 
 The project uses PyLint for linting. Before submitting a PR, format and check your code:
 
 ```bash
-pip install black pylint
-black .
-pylint your_changed_files.py
+uv run pylint mittab
+npm run lint
 ```
 
 The CI pipeline automatically runs PyLint checks on all PRs.
@@ -343,7 +314,7 @@ Before submitting a PR:
 
 Some libraries in this project may be several years behind their current versions. When searching for documentation:
 - Pay careful attention to version numbers
-- Check the `Pipfile` and `package.json` for exact versions
+- Check `pyproject.toml`, `uv.lock`, and `package.json` for exact versions
 - Older documentation may be more relevant than the latest guides
 
 #### Django ORM Best Practices

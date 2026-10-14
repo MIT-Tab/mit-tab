@@ -256,6 +256,7 @@ class TestOutroundPanelScratchViability(TestCase):
         TabSettings.set("outround_judge_priority", 0)
 
     def test_assign_outround_judges_avoids_dead_end_chair_assignments(self):
+        TabSettings.set("enable_judge_judge_scratches", 1)
         JudgeJudgeScratch.objects.create(
             judge_one=self.bridge_judge,
             judge_two=self.spare_judge_a,

@@ -2,22 +2,33 @@
   <h5 class="text-center">{{ table_title }}</h5>
   <table class="table table-striped table-sm table-bordered">
     <thead>
-      <th>#</th>
-      <th>Name</th>
-      <th>Speaks</th>
-      <th>Ranks</th>
-      <th>Team</th>
-      <th title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
+      <tr>
+        <th rowspan="2">#</th>
+        <th rowspan="2">Name</th>
+        {% for score_column in debaters.0.score_columns %}
+          <th colspan="2">{{ score_column.label }}</th>
+        {% endfor %}
+        <th rowspan="2">Team</th>
+        <th rowspan="2" title="Tiebreaker between the debater and the next-best debater">Tiebreaker</th>
+      </tr>
+      <tr>
+        {% for score_column in debaters.0.score_columns %}
+          <th>Speaks</th>
+          <th>Ranks</th>
+        {% endfor %}
+      </tr>
     </thead>
-    {% for debater, speaks, ranks, team, tiebreaker in debaters %}
-    <tr>
-      <td>{{ forloop.counter }}</td>
-      <td><a href="/debater/{{ debater.id }}">{{ debater.name }}</a></td>
-      <td>{{ speaks|floatformat:2 }}</td>
-      <td>{{ ranks|floatformat:2 }}</td>
-      <td><a href="/team/{{ team.id }}/">{{ team.name }}</a></td>
-      <td>{{ tiebreaker }}</td>
-    </tr>
+    {% for entry in debaters %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td><a href="/debater/{{ entry.debater.id }}">{{ entry.debater.name }}</a></td>
+        {% for score_column in entry.score_columns %}
+          <td>{{ score_column.speaks|floatformat:2 }}</td>
+          <td>{{ score_column.ranks|floatformat:2 }}</td>
+        {% endfor %}
+        <td><a href="/team/{{ entry.team.id }}/">{{ entry.team.name }}</a></td>
+        <td>{{ entry.tiebreaker }}</td>
+      </tr>
     {% endfor %}
   </table>
 </div>

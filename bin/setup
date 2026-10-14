@@ -7,7 +7,11 @@ if [ -x "$(command -v mysqladmin)" ]; then
   mysqladmin ping -h $MITTAB_DB_HOST -u root --password=$MYSQL_ROOT_PASSWORD --wait=30
 fi
 python manage.py migrate --noinput
-npm install
-./node_modules/.bin/webpack --config webpack.config.js --mode production
-python manage.py collectstatic --noinput
-python manage.py initialize_tourney --tab-password $1
+if [ "${MITTAB_SKIP_ASSET_BUILD:-0}" != "1" ]; then
+  if [ "${MITTAB_SKIP_WEBPACK_BUILD:-0}" != "1" ]; then
+    eval "${MITTAB_NPM_INSTALL_COMMAND:-npm install}"
+    ./node_modules/.bin/webpack --config webpack.config.js --mode production
+  fi
+  python manage.py collectstatic --noinput
+fi
+python manage.py initialize_tourney --tab-password $1 ${MITTAB_INITIALIZE_ARGS:-}

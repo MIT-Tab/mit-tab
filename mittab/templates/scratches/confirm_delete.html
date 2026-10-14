@@ -1,0 +1,5 @@
+{% extends "base/__normal.html" %}
+{% block banner %}Delete Experimental Scratch{% endblock %}
+{% block content %}<form method="post">{% csrf_token %}
+<p>Delete {{ scratch }}?</p><button class="btn btn-danger" type="submit">Delete</button>
+</form>{% endblock %}

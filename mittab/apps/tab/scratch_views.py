@@ -1,3 +1,6 @@
+from functools import wraps
+
+from django.http import Http404
 from django.contrib.auth.decorators import permission_required
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -14,12 +17,29 @@ from mittab.apps.tab.helpers import (
     redirect_and_flash_success,
 )
 from mittab.apps.tab.models import (
+    TabSettings,
     Judge,
     Team,
     Scratch,
     JudgeJudgeScratch,
     TeamTeamScratch,
 )
+
+
+def experimental_scratches(view):
+    @wraps(view)
+    def guarded(request, *args, **kwargs):
+        team_enabled = TabSettings.get("enable_team_team_scratches", 0) == 1
+        judge_enabled = TabSettings.get("enable_judge_judge_scratches", 0) == 1
+        scratch_type = kwargs.get("scratch_type")
+        object_type = kwargs.get("object_type")
+        if (not (team_enabled or judge_enabled)
+                or (scratch_type == "team-team" or object_type == "team") and not team_enabled
+                or (scratch_type == "judge-judge" or object_type == "judge") and not judge_enabled):
+            raise Http404("Experimental scratches are disabled.")
+        return view(request, *args, **kwargs)
+    return guarded
+
 
 SCRATCH_OBJECTS = {
     "judge-team": Scratch,
@@ -115,7 +135,7 @@ def _build_object_forms(entries, data=None):
             (
                 form,
                 reverse(
-                    "scratch_delete",
+                    "experimental_scratch_delete",
                     args=(entry["scratch_type"], entry["instance"].id),
                 ),
             )
@@ -125,11 +145,13 @@ def _build_object_forms(entries, data=None):
 
 def _parse_scratch_count(raw_count):
     try:
-        return max(1, int(raw_count))
+        return max(1, min(50, int(raw_count)))
     except (TypeError, ValueError):
         return 1
 
 
+@experimental_scratches
+@permission_required("tab.scratch.can_add", login_url="/403/")
 def add_scratch(request):
     judges = Judge.objects.order_by("name")
     teams = Team.objects.order_by("name")
@@ -188,13 +210,27 @@ def add_scratch(request):
         ),
     }
 
+    enabled_tabs = {"judge_team"}
+    if TabSettings.get("enable_team_team_scratches", 0) == 1:
+        enabled_tabs.add("team_team")
+    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+        enabled_tabs.add("judge_judge")
+    if active_tab not in enabled_tabs:
+        raise Http404("This experimental scratch type is disabled.")
+    forms_by_type = {
+    key: value for key,
+     value in forms_by_type.items() if key in enabled_tabs}
+
     if is_post:
         forms = forms_by_type[active_tab]
         if all(f.is_valid() for f in forms):
             try:
                 with transaction.atomic():
                     for f in forms:
-                        f.save()
+                        if isinstance(f, ScratchForm):
+                            f.save(actor=request.user)
+                        else:
+                            f.save()
             except IntegrityError:
                 for f in forms:
                     f.add_error(None, "This scratch already exists.")
@@ -211,6 +247,9 @@ def add_scratch(request):
         "team_team": "Team ↔ Team",
     }
 
+    tab_labels = {
+    key: value for key,
+     value in tab_labels.items() if key in enabled_tabs}
     return render(
         request,
         "scratches/add_scratches.html",
@@ -233,6 +272,8 @@ SCRATCH_FILTER_DEFS = {
 }
 
 
+@experimental_scratches
+@permission_required("tab.scratch.can_change", login_url="/403/")
 def view_scratches(request):
     def build_items(qs, type_key, labels):
         """Build (id, name, bitmask, symbols) tuples for each scratch type."""
@@ -280,6 +321,9 @@ def view_scratches(request):
         ),
     ]
 
+    configs = [config for config in configs if config[0] == "judge-team"
+               or config[0] == "judge-judge" and TabSettings.get("enable_judge_judge_scratches", 0) == 1
+               or config[0] == "team-team" and TabSettings.get("enable_team_team_scratches", 0) == 1]
     # Flatten all items
     item_list = [
         item for key, qs, labels in configs for item in build_items(qs, key, labels)
@@ -292,14 +336,16 @@ def view_scratches(request):
         request,
         "common/list_data.html",
         {
-            "title": "Scratches",
-            "item_type": "scratch",
+            "title": "Experimental Scratches",
+            "item_type": "experimental/scratch",
             "item_list": item_list,
             "filters": [filters_group],
         },
     )
 
 
+@experimental_scratches
+@permission_required("tab.scratch.can_change", login_url="/403/")
 def view_scratches_for_object(request, object_id, object_type):
     try:
         object_id = int(object_id)
@@ -325,7 +371,10 @@ def view_scratches_for_object(request, object_id, object_type):
         try:
             with transaction.atomic():
                 for form, _ in forms:
-                    form.save()
+                    if isinstance(form, ScratchForm):
+                        form.save(actor=request.user)
+                    else:
+                        form.save()
         except IntegrityError:
             for form, _ in forms:
                 form.add_error(None, "This scratch already exists.")
@@ -342,15 +391,19 @@ def view_scratches_for_object(request, object_id, object_type):
         {
             "title": f"Viewing Scratch Information for {obj}",
             "data_type": "Scratch",
-            "forms": forms,
-            "links": [(reverse("add_scratch") + add_query, "Add Scratch")],
+            "forms": [(form, delete_link, None) for form, delete_link in forms],
+            "links": [(reverse("experimental_add_scratch") + add_query, "Add Scratch")],
         },
     )
+
+
+@experimental_scratches
+@permission_required("tab.scratch.can_change", login_url="/403/")
 def scratch_detail(request, scratch_type, scratch_id):
     model = SCRATCH_OBJECTS.get(scratch_type)
     if not model:
         return redirect_and_flash_error(
-            request, "Unknown scratch type", path=reverse("view_scratches")
+            request, "Unknown scratch type", path=reverse("experimental_view_scratches")
         )
     scratch_obj = get_object_or_404(model, pk=scratch_id)
     form_obj = _build_form_for_instance(
@@ -360,7 +413,10 @@ def scratch_detail(request, scratch_type, scratch_id):
     )
     if request.method == "POST" and form_obj.is_valid():
         try:
-            form_obj.save()
+            if isinstance(form_obj, ScratchForm):
+                form_obj.save(actor=request.user)
+            else:
+                form_obj.save()
         except IntegrityError:
             form_obj.add_error(None, "This scratch already exists.")
         else:
@@ -371,31 +427,35 @@ def scratch_detail(request, scratch_type, scratch_id):
             )
     return render(
         request,
-        "common/data_entry.html",
+        "scratches/detail.html",
         {
             "title": f"Viewing Scratch: {scratch_obj}",
             "data_type": "Scratch",
             "form": form_obj,
-            "delete_link": reverse("scratch_delete", args=(scratch_type, scratch_id)),
+            "delete_link": reverse("experimental_scratch_delete", args=(scratch_type, scratch_id)),
         },
     )
 
 
 @permission_required("tab.scratch.can_delete", login_url="/403/")
+@experimental_scratches
+@permission_required("tab.scratch.can_delete", login_url="/403/")
 def scratch_delete(request, scratch_type, scratch_id):
     model = SCRATCH_OBJECTS.get(scratch_type)
     if not model:
         return redirect_and_flash_error(
-            request, "Unknown scratch type", path=reverse("view_scratches")
+            request, "Unknown scratch type", path=reverse("experimental_view_scratches")
         )
     try:
         scratch = model.objects.get(pk=scratch_id)
     except model.DoesNotExist:
         return redirect_and_flash_error(
-            request, "Scratch not found", path=reverse("view_scratches")
+            request, "Scratch not found", path=reverse("experimental_view_scratches")
         )
 
+    if request.method != "POST":
+        return render(request, "scratches/confirm_delete.html", {"scratch": scratch})
     scratch.delete()
     return redirect_and_flash_success(
-        request, "Scratch deleted successfully", path=reverse("view_scratches")
+        request, "Scratch deleted successfully", path=reverse("experimental_view_scratches")
     )

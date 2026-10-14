@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('tab', '0032_judgejudgescratch_teamteamscratch'),
-        ('tab', '0036_alter_outround_room_nullable'),
+        ('tab', '0046_judgecodeemaillog_source'),
     ]
 
     operations = [

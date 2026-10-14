@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
@@ -26,23 +27,11 @@ from mittab.libs.cacheing.public_cache import (
 
 
 def _scratched_team_ids(team):
-    if not team:
-        return set()
-    scratched_team_ids = set()
-    for team_one_id, team_two_id in TeamTeamScratch.objects.filter(
-        Q(team_one_id=team.id) | Q(team_two_id=team.id)
-    ).values_list("team_one_id", "team_two_id"):
-        if team_one_id == team.id:
-            scratched_team_ids.add(team_two_id)
-        else:
-            scratched_team_ids.add(team_one_id)
-    return scratched_team_ids
+    return tab_logic.scratched_team_ids(team)
 
 
 def _team_pair_is_scratched(team_one, team_two):
-    if not team_one or not team_two:
-        return False
-    return team_two.id in _scratched_team_ids(team_one)
+    return tab_logic.team_pair_is_scratched(team_one, team_two)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -133,10 +122,12 @@ def pair_next_outround(request, num_teams, type_of_round):
 def get_outround_options(var_teams_to_break, nov_teams_to_break):
     outround_options = []
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
+    while (var_teams_to_break > 0 and
+           not math.log(var_teams_to_break, 2) % 1 == 0):
         var_teams_to_break += 1
 
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
+    while (nov_teams_to_break > 0 and
+           not math.log(nov_teams_to_break, 2) % 1 == 0):
         nov_teams_to_break += 1
 
     while var_teams_to_break > 1:
@@ -375,23 +366,33 @@ def outround_pairing_view(request,
 
     choice = TabSettings.get("choice", 0)
 
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
+        return redirect_and_flash_error(request,
+                                        "Please check your break tab settings",
+                                        path="/")
+
     if num_teams is None:
-        num_teams = TabSettings.get("var_teams_to_break", 8)
+        if var_teams_to_break:
+            num_teams = var_teams_to_break
+            type_of_round = BreakingTeam.VARSITY
+        elif nov_teams_to_break:
+            num_teams = nov_teams_to_break
+            type_of_round = BreakingTeam.NOVICE
+        else:
+            return redirect_and_flash_error(
+                request, "No outround breaks are configured", path="/"
+            )
 
         while not math.log(num_teams, 2) % 1 == 0:
             num_teams += 1
 
         return redirect("outround_pairing_view",
-                        type_of_round=BreakingTeam.VARSITY,
+                        type_of_round=type_of_round,
                         num_teams=num_teams)
-
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
-
-    if not nov_teams_to_break or not var_teams_to_break:
-        return redirect_and_flash_error(request,
-                                        "Please check your break tab settings",
-                                        path="/")
 
     outround_options = get_outround_options(var_teams_to_break,
                                             nov_teams_to_break)
@@ -419,6 +420,7 @@ def outround_pairing_view(request,
 
     outround_sections = []
     excluded_teams_map = {}
+    outround_ids = []
     for selected_type, selected_num in selected_specs:
         section_outrounds = list(
             Outround.objects.filter(
@@ -431,6 +433,7 @@ def outround_pairing_view(request,
                 "judges__required_room_tags",
             )
         )
+        outround_ids.extend(outround.id for outround in section_outrounds)
         judges_per_panel = (
             TabSettings.get("var_panel_size", 3)
             if selected_type == BreakingTeam.VARSITY
@@ -479,6 +482,20 @@ def outround_pairing_view(request,
         for team in section_excluded_teams:
             excluded_teams_map[team.id] = team
     excluded_teams = list(excluded_teams_map.values())
+    manual_judge_audit_events = {}
+    if outround_ids:
+        outround_content_type = ContentType.objects.get_for_model(Outround)
+        audit_entries = AuditEvent.objects.filter(
+            content_type=outround_content_type,
+            object_id__in=outround_ids,
+            event_type__in=[
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                AuditEvent.MANUAL_JUDGE_REMOVE,
+                AuditEvent.MANUAL_CHAIR_CHANGE,
+            ],
+        ).select_related("user")
+        for entry in audit_entries:
+            manual_judge_audit_events.setdefault(entry.object_id, []).append(entry)
 
     page_label = "Selected Outrounds"
     if len(outround_sections) == 1:
@@ -606,6 +623,7 @@ def outround_pairing_view(request,
             dict.fromkeys([spec[1] for spec in selected_specs])
         ),
         "return_path": request.get_full_path(),
+        "manual_judge_audit_events": manual_judge_audit_events,
     }
 
     return render(
@@ -827,13 +845,14 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         panel_judge_ids = set(
             round_obj.judges.exclude(id=removed_judge_id).values_list("id", flat=True)
         )
-        if not assign_judges.can_assign_judge(
+        if (TabSettings.get("enable_judge_judge_scratches", 0) == 1
+                and not assign_judges.can_assign_judge(
             judge_obj,
             round_obj.gov_team,
             round_obj.opp_team,
             allow_rejudges=True,
             panel_judge_ids=panel_judge_ids,
-        ):
+        )):
             return JsonResponse({
                 "success": False,
                 "message": "Judge conflicts with the current round or panel.",
@@ -843,11 +862,36 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=removed_judge_id)
             round_obj.judges.remove(remove_obj)
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={
+                    "assigned_judge": judge_obj.name,
+                    "removed_judge": remove_obj.name,
+                },
+                note=f"Swapped {remove_obj.name} for {judge_obj.name}",
+            )
 
             if remove_obj == round_obj.chair:
                 round_obj.chair = round_obj.judges.order_by("-rank").first()
         elif not round_obj.chair:
             round_obj.chair = judge_obj
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
+        else:
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
 
         round_obj.save()
         data = {

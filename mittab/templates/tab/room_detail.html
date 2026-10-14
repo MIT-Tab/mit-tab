@@ -1,6 +1,7 @@
 {% extends "common/data_entry.html" %}
 
 {% block detail_content %}
+{% if user.is_superuser %}
 {% if room_rounds or room_outrounds %}
 <div class="col-md-1"></div>
 <div class="col-md-5">
@@ -52,5 +53,6 @@
   </div>
   {% endif %}
 </div>
+{% endif %}
 {% endif %}
 {% endblock %}

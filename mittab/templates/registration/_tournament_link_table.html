@@ -1,0 +1,67 @@
+{% if links %}
+<div class="registration-admin__table-wrap">
+    <table class="table table-sm registration-admin__table tournament-link-table">
+        <thead>
+            <tr>
+                <th scope="col">Title</th>
+                <th scope="col">URL</th>
+                <th scope="col">Description</th>
+                <th scope="col" class="text-center">Order</th>
+                <th scope="col" class="text-center">Active</th>
+                <th scope="col" class="text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for link in links %}
+            <tr>
+                <form method="post"
+                      action="{% url 'tournament_link_update' link_kind=link_kind link_id=link.pk %}"
+                      id="link-{{ link_kind }}-{{ link.pk }}">
+                    {% csrf_token %}
+                </form>
+                <td>
+                    <input type="text" name="title" form="link-{{ link_kind }}-{{ link.pk }}"
+                           class="form-control form-control-sm"
+                           value="{{ link.title }}" maxlength="80" required>
+                </td>
+                <td>
+                    <input type="url" name="url" form="link-{{ link_kind }}-{{ link.pk }}"
+                           class="form-control form-control-sm"
+                           value="{{ link.url }}" required>
+                </td>
+                <td>
+                    <input type="text" name="description" form="link-{{ link_kind }}-{{ link.pk }}"
+                           class="form-control form-control-sm"
+                           value="{{ link.description }}" maxlength="160">
+                </td>
+                <td class="text-center">
+                    <input type="number" name="display_order"
+                           form="link-{{ link_kind }}-{{ link.pk }}"
+                           class="form-control form-control-sm tournament-link-form__order"
+                           value="{{ link.display_order }}" min="0" step="1">
+                </td>
+                <td class="text-center">
+                    <input type="checkbox" name="is_active"
+                           form="link-{{ link_kind }}-{{ link.pk }}"
+                           {% if link.is_active %}checked{% endif %}>
+                </td>
+                <td class="text-right tournament-link-actions">
+                    <button type="submit"
+                            form="link-{{ link_kind }}-{{ link.pk }}"
+                            class="btn btn-sm btn-outline-primary">Save</button>
+                    <form method="post"
+                          action="{% url 'tournament_link_delete' link_kind=link_kind link_id=link.pk %}"
+                          class="d-inline"
+                          onsubmit="return confirm('Delete this link?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-light tournament-link-empty">{{ empty_message }}</div>
+{% endif %}

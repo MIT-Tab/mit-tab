@@ -1,29 +1,37 @@
+# pylint: disable=too-many-lines
 import random
 from itertools import combinations
 from types import SimpleNamespace
+from django.db import transaction
 from django.db.models import Min, Q
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
+
 
 class JudgePairingMode:
     DEFAULT = 0
     CLASSIC = 1
 
+
 class InroundRoundPriority:
     STANDARD = 0
     BUBBLE_ROUNDS = 1
+
 
 class OutroundJudgePairingMode:
     SNAKE_DRAFT = 0
     STRAIGHT = 1
 
+
 class OutroundRoundPriority:
     TOP_OF_BRACKET = 0
     MIDDLE_OF_BRACKET = 1
 
+
 class OutroundJudgePriority:
     VARSITY_WINGS = 0
     NOVICE_CHAIRS = 1
+
 
 class WingPairingMode:
     HELP_CHAIRS = 0
@@ -83,6 +91,7 @@ def sort_outround_pairings(pairings, round_priority):
         )
     )
 
+
 def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
     if mode == JudgePairingMode.CLASSIC:
         return list(range(len(judges)))
@@ -97,27 +106,16 @@ def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
     return judge_scores
 
 
-def build_judge_pair_blocks():
-    judge_pair_blocks = {}
-    for judge_one_id, judge_two_id in JudgeJudgeScratch.objects.values_list(
-        "judge_one_id", "judge_two_id"
-    ):
-        judge_pair_blocks.setdefault(judge_one_id, set()).add(judge_two_id)
-        judge_pair_blocks.setdefault(judge_two_id, set()).add(judge_one_id)
-    return judge_pair_blocks
-
-
-def populate_panel_scratch_ids(judges, judge_pair_blocks=None):
-    if judge_pair_blocks is None:
-        judge_pair_blocks = build_judge_pair_blocks()
-    for judge in judges:
-        judge.panel_scratch_ids = judge_pair_blocks.get(judge.id, set())
-    return judges
-
-
 def add_judges():
+    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+        with transaction.atomic():
+            return _add_judges_experimental()
+    return _add_judges_standard()
+
+
+def _add_judges_standard():
     round_number = TabSettings.get("cur_round") - 1
-    settings = get_inround_settings()
+    pairing_settings = get_inround_settings()
 
     Round.judges.through.objects.filter(
         round__round_number=round_number
@@ -135,7 +133,6 @@ def add_judges():
             "schools",
         )
     )
-    populate_panel_scratch_ids(all_judges)
 
     # Sort all_judges once before creating filtered subsets
     random.seed(1337)
@@ -149,9 +146,11 @@ def add_judges():
     random.seed(1337)
     random.shuffle(pairings)
 
-    chair_scores = construct_judge_scores(chairs, settings.mode)
+    chair_scores = construct_judge_scores(chairs, pairing_settings.mode)
 
-    bubble_priority = settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
+    bubble_priority = (
+        pairing_settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
+    )
     if bubble_priority and round_number > 1:
         bubble_rounds = [p for p in pairings if is_bubble_round(p, round_number)]
         non_bubble_rounds = [p for p in pairings if p not in bubble_rounds]
@@ -172,207 +171,174 @@ def add_judges():
     for pairing in pairings:
         all_teams.extend((pairing.gov_team, pairing.opp_team))
     rejudge_counts = {}
-    if settings.allow_rejudges:
+    if pairing_settings.allow_rejudges:
         rejudge_counts = judge_team_rejudge_counts(chairs, all_teams)
 
-    banned_chair_edges = set()
-    while True:
-        panel_members_by_pair = [set() for _ in range(num_rounds)]
-        graph_edges = []
-        for chair_i, chair in enumerate(chairs):
-            chair_score = chair_scores[chair_i]
+    graph_edges = []
+    for chair_i, chair in enumerate(chairs):
+        chair_score = chair_scores[chair_i]
 
-            for pairing_i, pairing in enumerate(pairings):
-                if (pairing_i, chair_i) in banned_chair_edges:
-                    continue
-                has_conflict = judge_conflict(
-                    chair,
-                    pairing.gov_team,
-                    pairing.opp_team,
-                    settings.allow_rejudges,
+        for pairing_i, pairing in enumerate(pairings):
+            has_conflict = judge_conflict(
+                chair,
+                pairing.gov_team,
+                pairing.opp_team,
+                pairing_settings.allow_rejudges,
+            )
+            if has_conflict:
+                continue
+            weight = calc_weight(chair_score, pairing_i, pairing_settings.mode)
+            judge_counts = rejudge_counts.get(chair.id)
+            rejudge_sum = 0
+            if judge_counts:
+                rejudge_sum = (
+                    judge_counts.get(pairing.gov_team.id, 0)
+                    + judge_counts.get(pairing.opp_team.id, 0)
                 )
-                if has_conflict:
-                    continue
-                weight = calc_weight(chair_score, pairing_i, settings.mode)
-                judge_counts = rejudge_counts.get(chair.id)
-                rejudge_sum = 0
-                if judge_counts:
-                    rejudge_sum = (
-                        judge_counts.get(pairing.gov_team.id, 0)
-                        + judge_counts.get(pairing.opp_team.id, 0)
-                    )
-                if rejudge_sum > 0 and settings.rejudge_penalty > 0:
-                    penalty = settings.rejudge_penalty * (1 + 0.1 * chair_score)
-                    weight -= penalty * rejudge_sum
+            if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                penalty = (
+                    pairing_settings.rejudge_penalty *
+                    (1 + 0.1 * chair_score)
+                )
+                weight -= penalty * rejudge_sum
 
-                graph_edges.append((pairing_i, num_rounds + chair_i, weight))
-        judge_assignments = mwmatching.maxWeightMatching(
-            graph_edges, maxcardinality=True
+            graph_edges.append((pairing_i, num_rounds + chair_i, weight))
+    judge_assignments = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+
+    if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
+        if not graph_edges:
+            # Check if we have enough judges including wing_only judges
+            if len(all_judges) >= num_rounds:
+                raise errors.JudgeAssignmentError(
+                    "Impossible to assign chairs to all rounds. You have enough "
+                    "checked-in judges, but some are marked as wing-only and cannot "
+                    "chair. Either check in more non-wing judges or unmark some "
+                    "wing-only judges to allow them to chair."
+                )
+            else:
+                raise errors.JudgeAssignmentError(
+                    "Impossible to assign judges, consider reducing your gaps if you"
+                    " are making panels, otherwise find some more judges."
+                )
+        elif -1 in judge_assignments[:num_rounds]:
+            pairing_list = judge_assignments[: len(pairings)]
+            bad_pairing = pairings[pairing_list.index(-1)]
+            # Check if we have enough judges including wing_only judges
+            if len(all_judges) >= num_rounds and len(chairs) < num_rounds:
+                raise errors.JudgeAssignmentError(
+                    "Impossible to assign chairs to all rounds. You have enough "
+                    "checked-in judges, but some are marked as wing-only and cannot "
+                    "chair. Either check in more non-wing judges or unmark some "
+                    "wing-only judges to allow them to chair."
+                )
+            else:
+                raise errors.JudgeAssignmentError(
+                    f"Could not find a judge for: {bad_pairing}"
+                )
+        else:
+            raise errors.JudgeAssignmentError()
+
+    judge_round_joins, chair_by_pairing = [], [None] * num_rounds
+    assigned_judge_objects = set()  # Track actual Judge objects by ID
+    for pairing_i, padded_chair_i in enumerate(judge_assignments[:num_rounds]):
+        chair_i = padded_chair_i - num_rounds
+
+        round_obj = pairings[pairing_i]
+        chair = chairs[chair_i]
+
+        round_obj.chair = chair
+        chair_by_pairing[pairing_i] = chair_i
+        assigned_judge_objects.add(chair.id)  # Track by judge ID
+        judge_round_joins.append(
+            Round.judges.through(judge=chair, round=round_obj)
         )
 
-        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
-            if not graph_edges:
-                # Check if we have enough judges including wing_only judges
-                if len(all_judges) >= num_rounds:
-                    raise errors.JudgeAssignmentError(
-                        "Impossible to assign chairs to all rounds. You have enough "
-                        "checked-in judges, but some are marked as wing-only and cannot "
-                        "chair. Either check in more non-wing judges or unmark some "
-                        "wing-only judges to allow them to chair."
-                    )
-                else:
-                    raise errors.JudgeAssignmentError(
-                        "Impossible to assign judges, consider reducing your gaps if you"
-                        " are making panels, otherwise find some more judges."
-                    )
-            elif -1 in judge_assignments[:num_rounds]:
-                pairing_list = list(judge_assignments[: len(pairings)])
-                while len(pairing_list) < len(pairings):
-                    pairing_list.append(-1)
-                bad_pairing = pairings[pairing_list.index(-1)]
-                # Check if we have enough judges including wing_only judges
-                if len(all_judges) >= num_rounds and len(chairs) < num_rounds:
-                    raise errors.JudgeAssignmentError(
-                        "Impossible to assign chairs to all rounds. You have enough "
-                        "checked-in judges, but some are marked as wing-only and cannot "
-                        "chair. Either check in more non-wing judges or unmark some "
-                        "wing-only judges to allow them to chair."
-                    )
-                else:
-                    raise errors.JudgeAssignmentError(
-                        f"Could not find a judge for: {bad_pairing}"
-                    )
-            else:
-                raise errors.JudgeAssignmentError()
+    Round.objects.bulk_update(pairings, ["chair"])
+    if (
+            pairing_settings.pair_wings
+            and num_rounds
+            and len(all_judges) > num_rounds):
+        max_per_round = min(3, len(all_judges) // num_rounds + 1)
+        for _ in range(1, max_per_round):
+            # Build wing pool from all_judges excluding already assigned
+            wing_judges = [
+                j for j in all_judges
+                if j.id not in assigned_judge_objects
+            ]
+            if not wing_judges:
+                break
 
-        judge_round_joins, chair_by_pairing = [], [None] * num_rounds
-        assigned_judge_objects = set()  # Track actual Judge objects by ID
-        for pairing_i, padded_chair_i in enumerate(judge_assignments[:num_rounds]):
-            chair_i = padded_chair_i - num_rounds
+            wing_pool = list(range(len(wing_judges)))
+            pairing_indices = list(range(num_rounds))
+            if pairing_settings.wing_mode == WingPairingMode.RANDOM:
+                random.shuffle(wing_pool)
+                random.shuffle(pairing_indices)
 
-            round_obj = pairings[pairing_i]
-            chair = chairs[chair_i]
-
-            round_obj.chair = chair
-            chair_by_pairing[pairing_i] = chair_i
-            assigned_judge_objects.add(chair.id)  # Track by judge ID
-            panel_members_by_pair[pairing_i].add(chair.id)
-            judge_round_joins.append(
-                Round.judges.through(judge=chair, round=round_obj)
+            wing_edges = []
+            wing_judge_scores = construct_judge_scores(
+                wing_judges,
+                pairing_settings.mode,
             )
-
-        failed_pairings = set()
-        if settings.pair_wings and num_rounds and len(all_judges) > num_rounds:
-            max_per_round = min(3, len(all_judges) // num_rounds + 1)
-            for _ in range(1, max_per_round):
-                # Build wing pool from all_judges excluding already assigned
-                wing_judges = [
-                    j for j in all_judges if j.id not in assigned_judge_objects
-                ]
-                if not wing_judges:
-                    break
-
-                wing_pool = list(range(len(wing_judges)))
-                pairing_indices = list(range(num_rounds))
-                if settings.wing_mode == WingPairingMode.RANDOM:
-                    random.shuffle(wing_pool)
-                    random.shuffle(pairing_indices)
-
-                wing_edges = []
-                wing_judge_scores = construct_judge_scores(wing_judges, settings.mode)
-                for relative_rank, wing_judge_i in enumerate(wing_pool):
-                    judge = wing_judges[wing_judge_i]
-                    judge_score = wing_judge_scores[wing_judge_i]
-                    for pairing_i in pairing_indices:
-                        pairing = pairings[pairing_i]
-                        if judge.panel_scratch_ids and any(
-                            blocked_id in panel_members_by_pair[pairing_i]
-                            for blocked_id in judge.panel_scratch_ids
-                        ):
-                            continue
-                        has_conflict = judge_conflict(
-                            judge,
-                            pairing.gov_team,
-                            pairing.opp_team,
-                            settings.allow_rejudges,
-                        )
-                        if has_conflict:
-                            continue
-                        judge_counts = rejudge_counts.get(judge.id)
-                        rejudge_sum = 0
-                        if judge_counts:
-                            rejudge_sum = (
-                                judge_counts.get(pairing.gov_team.id, 0)
-                                + judge_counts.get(pairing.opp_team.id, 0)
-                            )
-                        weight = calc_weight(
-                            judge_score,
-                            pairing_i,
-                            settings.mode,
-                            num_rounds=num_rounds,
-                            is_assigning_wings=True,
-                            wing_mode=settings.wing_mode,
-                            chair_judge_i=chair_by_pairing[pairing_i],
-                            relative_judge_rank=relative_rank,
-                            judge_index=wing_judge_i,
-                        )
-                        if rejudge_sum > 0 and settings.rejudge_penalty > 0:
-                            penalty = settings.rejudge_penalty * (1 + 0.1 * judge_score)
-                            weight -= penalty * rejudge_sum
-
-                        wing_edges.append(
-                            (pairing_i, num_rounds + wing_judge_i, weight)
-                        )
-
-                if not wing_edges:
-                    if len(wing_judges) >= num_rounds:
-                        failed_pairings.update(range(num_rounds))
-                    break
-
-                wing_matches = mwmatching.maxWeightMatching(
-                    wing_edges, maxcardinality=True
-                )
-                unmatched_pairings = set()
-                for pairing_i, padded_wing_judge_i in enumerate(wing_matches[:num_rounds]):
-                    if padded_wing_judge_i == -1:
-                        unmatched_pairings.add(pairing_i)
-                        continue
-                    wing_judge_i = padded_wing_judge_i - num_rounds
-                    judge = wing_judges[wing_judge_i]
-                    if judge.id in assigned_judge_objects:
-                        unmatched_pairings.add(pairing_i)
-                        continue
-                    if judge.panel_scratch_ids and any(
-                        blocked_id in panel_members_by_pair[pairing_i]
-                        for blocked_id in judge.panel_scratch_ids
-                    ):
-                        unmatched_pairings.add(pairing_i)
-                        continue
-                    judge_round_joins.append(
-                        Round.judges.through(
-                            judge=judge,
-                            round=pairings[pairing_i],
-                        )
+            for relative_rank, wing_judge_i in enumerate(wing_pool):
+                judge = wing_judges[wing_judge_i]
+                judge_score = wing_judge_scores[wing_judge_i]
+                for pairing_i in pairing_indices:
+                    pairing = pairings[pairing_i]
+                    has_conflict = judge_conflict(
+                        judge,
+                        pairing.gov_team,
+                        pairing.opp_team,
+                        pairing_settings.allow_rejudges,
                     )
-                    assigned_judge_objects.add(judge.id)
-                    panel_members_by_pair[pairing_i].add(judge.id)
+                    if has_conflict:
+                        continue
+                    judge_counts = rejudge_counts.get(judge.id)
+                    rejudge_sum = 0
+                    if judge_counts:
+                        rejudge_sum = (
+                            judge_counts.get(pairing.gov_team.id, 0)
+                            + judge_counts.get(pairing.opp_team.id, 0)
+                        )
+                    weight = calc_weight(
+                        judge_score,
+                        pairing_i,
+                        pairing_settings.mode,
+                        num_rounds=num_rounds,
+                        is_assigning_wings=True,
+                        wing_mode=pairing_settings.wing_mode,
+                        chair_judge_i=chair_by_pairing[pairing_i],
+                        relative_judge_rank=relative_rank,
+                        judge_index=wing_judge_i,
+                    )
+                    if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                        penalty = (
+                            pairing_settings.rejudge_penalty *
+                            (1 + 0.1 * judge_score)
+                        )
+                        weight -= penalty * rejudge_sum
 
-                if unmatched_pairings and len(wing_judges) >= num_rounds:
-                    failed_pairings.update(unmatched_pairings)
-                    break
+                    wing_edges.append((pairing_i, num_rounds + wing_judge_i, weight))
 
-        next_bans = {
-            (pairing_i, chair_by_pairing[pairing_i])
-            for pairing_i in failed_pairings
-            if chair_by_pairing[pairing_i] is not None
-            and (pairing_i, chair_by_pairing[pairing_i]) not in banned_chair_edges
-        }
-        if not next_bans:
-            Round.objects.bulk_update(pairings, ["chair"])
-            Round.judges.through.objects.bulk_create(judge_round_joins)
-            break
+            if not wing_edges:
+                break
 
-        banned_chair_edges.update(next_bans)
+            wing_matches = mwmatching.maxWeightMatching(wing_edges, maxcardinality=True)
+            for pairing_i, padded_wing_judge_i in enumerate(wing_matches[:num_rounds]):
+                if padded_wing_judge_i == -1:
+                    continue
+                wing_judge_i = padded_wing_judge_i - num_rounds
+                judge = wing_judges[wing_judge_i]
+                if judge.id in assigned_judge_objects:
+                    continue
+                judge_round_joins.append(
+                    Round.judges.through(
+                        judge=judge,
+                        round=pairings[pairing_i],
+                    )
+                )
+                assigned_judge_objects.add(judge.id)
+
+    Round.judges.through.objects.bulk_create(judge_round_joins)
 
 
 def _normalize_round_specs(round_specs=None, round_type=None):
@@ -442,73 +408,22 @@ def _build_active_pairings(
     return active_pairings
 
 
-def _panel_is_compatible(panel_indices, judges, existing_panel_ids=None):
-    existing_panel_ids = set(existing_panel_ids or ())
-    for judge_i in panel_indices:
-        if judge_panel_conflict(judges[judge_i], existing_panel_ids):
-            return False
-    for judge_one_i, judge_two_i in combinations(panel_indices, 2):
-        judge_one = judges[judge_one_i]
-        judge_two = judges[judge_two_i]
-        if judge_two.id in _panel_scratch_ids_for_judge(judge_one):
-            return False
-    return True
-
-
-def _can_complete_future_panel(
-        round_obj,
-        candidate_judge_i,
-        judges,
-        available_indices,
-        current_panel_ids,
-        remaining_slots):
-    if remaining_slots <= 0:
-        return True
-
-    next_panel_ids = set(current_panel_ids)
-    next_panel_ids.add(judges[candidate_judge_i].id)
-
-    eligible_future_indices = []
-    for future_judge_i in available_indices:
-        if future_judge_i == candidate_judge_i:
-            continue
-        future_judge = judges[future_judge_i]
-        if judge_conflict(future_judge, round_obj.gov_team, round_obj.opp_team, True):
-            continue
-        if judge_panel_conflict(future_judge, next_panel_ids):
-            continue
-        eligible_future_indices.append(future_judge_i)
-
-    if len(eligible_future_indices) < remaining_slots:
-        return False
-
-    if remaining_slots == 1:
-        return True
-
-    return any(
-        _panel_is_compatible(panel_indices, judges, next_panel_ids)
-        for panel_indices in combinations(eligible_future_indices, remaining_slots)
-    )
-
-
-def _assign_outround_judges_with_slot_matching(
+def _assign_outround_judges_standard(
         round_specs,
         pairings_by_spec,
         panel_size_by_spec,
         judges,
         judge_scores,
-        settings,
+        pairing_settings,
         available_indices,
         force_novice_last=False):
     link_outround = Outround.judges.through
     judge_round_joins = []
 
     max_panel_size = max(panel_size_by_spec.values()) if panel_size_by_spec else 0
-    snake_draft_mode = settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
-    panel_members_by_round_id = {}  # round_id -> set of assigned judge IDs
-    chairs_by_round_id = {}
-    used_indices = set()
-    local_available_indices = list(available_indices)
+    snake_draft_mode = (
+        pairing_settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
+    )
 
     for panel_member in range(max_panel_size):
         active_pairings = _build_active_pairings(
@@ -524,20 +439,9 @@ def _assign_outround_judges_with_slot_matching(
             continue
 
         graph_edges = []
-        for judge_i in local_available_indices:
+        for judge_i in available_indices:
             judge = judges[judge_i]
             for pairing_i, pairing in enumerate(active_pairings):
-                panel_size = panel_size_by_spec.get(
-                    (pairing.type_of_round, pairing.num_teams),
-                    0,
-                )
-                remaining_slots = panel_size - panel_member - 1
-                current_panel_ids = panel_members_by_round_id.get(pairing.id, set())
-                if getattr(judge, "panel_scratch_ids", None) and any(
-                    blocked_id in current_panel_ids
-                    for blocked_id in judge.panel_scratch_ids
-                ):
-                    continue
                 has_conflict = judge_conflict(
                     judge,
                     pairing.gov_team,
@@ -546,24 +450,18 @@ def _assign_outround_judges_with_slot_matching(
                 )
                 if has_conflict:
                     continue
-                if not _can_complete_future_panel(
-                    round_obj=pairing,
-                    candidate_judge_i=judge_i,
-                    judges=judges,
-                    available_indices=local_available_indices,
-                    current_panel_ids=current_panel_ids,
-                    remaining_slots=remaining_slots,
-                ):
-                    continue
                 weight = calc_weight(
                     judge_scores[judge_i],
                     pairing_i,
-                    settings.mode,
+                    pairing_settings.mode,
                     num_rounds=num_rounds,
                 )
                 graph_edges.append((pairing_i, num_rounds + judge_i, weight))
 
-        panel_matches = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+        panel_matches = mwmatching.maxWeightMatching(
+            graph_edges,
+            maxcardinality=True,
+        )
         if -1 in panel_matches[:num_rounds] or (num_rounds > 0 and not graph_edges):
             if not graph_edges:
                 raise errors.JudgeAssignmentError("Impossible to assign judges.")
@@ -573,59 +471,18 @@ def _assign_outround_judges_with_slot_matching(
                 f"Could not find a judge for: {bad_pairing}"
             )
 
-        assigned_this_slot = []
         for pairing_i, padded_judge_i in enumerate(panel_matches[:num_rounds]):
             judge_i = padded_judge_i - num_rounds
             round_obj = active_pairings[pairing_i]
             judge = judges[judge_i]
 
             if panel_member == 0:
-                chairs_by_round_id[round_obj.id] = judge
+                round_obj.chair = judge
 
-            panel_members_by_round_id.setdefault(round_obj.id, set()).add(judge.id)
             judge_round_joins.append(link_outround(judge=judge, outround=round_obj))
-            assigned_this_slot.append(judge_i)
+            available_indices.remove(judge_i)
 
-        for judge_i in assigned_this_slot:
-            local_available_indices.remove(judge_i)
-            used_indices.add(judge_i)
-
-    return SimpleNamespace(
-        chairs_by_round_id=chairs_by_round_id,
-        judge_round_joins=judge_round_joins,
-        used_indices=used_indices,
-    )
-
-
-def _assign_outround_judges_for_specs(
-        round_specs,
-        pairings_by_spec,
-        panel_size_by_spec,
-        judges,
-        judge_scores,
-        settings,
-        available_indices,
-        force_novice_last=False):
-    assignment = _assign_outround_judges_with_slot_matching(
-        round_specs=round_specs,
-        pairings_by_spec=pairings_by_spec,
-        panel_size_by_spec=panel_size_by_spec,
-        judges=judges,
-        judge_scores=judge_scores,
-        settings=settings,
-        available_indices=available_indices,
-        force_novice_last=force_novice_last,
-    )
-
-    for pairings in pairings_by_spec.values():
-        for round_obj in pairings:
-            if round_obj.id in assignment.chairs_by_round_id:
-                round_obj.chair = assignment.chairs_by_round_id[round_obj.id]
-
-    for judge_i in assignment.used_indices:
-        available_indices.remove(judge_i)
-
-    return assignment.judge_round_joins
+    return judge_round_joins
 
 
 def _collect_outround_pairing_data(round_specs, round_priority):
@@ -652,14 +509,21 @@ def _collect_outround_pairing_data(round_specs, round_priority):
 
 
 def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
+    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+        with transaction.atomic():
+            return _add_outround_judges(round_type, round_specs)
+    return _add_outround_judges(round_type, round_specs)
+
+
+def _add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     normalized_specs = _normalize_round_specs(round_specs, round_type=round_type)
     if not normalized_specs:
         return
 
-    settings = get_outround_settings(normalized_specs[0][0])
+    pairing_settings = get_outround_settings(normalized_specs[0][0])
     pairings_by_spec, panel_size_by_spec = _collect_outround_pairing_data(
         normalized_specs,
-        settings.round_priority,
+        pairing_settings.round_priority,
     )
 
     active_round_ids = [
@@ -683,7 +547,8 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
             "schools",
         )
     )
-    populate_panel_scratch_ids(judges)
+    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+        populate_panel_scratch_ids(judges)
     random.seed(1337)
     random.shuffle(judges)
     judges = sorted(judges, key=lambda j: j.rank, reverse=True)
@@ -695,7 +560,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     run_joint_novice_chairs = (
         has_varsity
         and has_novice
-        and settings.judge_priority == OutroundJudgePriority.NOVICE_CHAIRS
+        and pairing_settings.judge_priority == OutroundJudgePriority.NOVICE_CHAIRS
     )
 
     judge_round_joins = []
@@ -707,7 +572,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
                 panel_size_by_spec=panel_size_by_spec,
                 judges=judges,
                 judge_scores=judge_scores,
-                settings=settings,
+                pairing_settings=pairing_settings,
                 available_indices=available_indices,
                 force_novice_last=True,
             )
@@ -725,7 +590,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
                     panel_size_by_spec=panel_size_by_spec,
                     judges=judges,
                     judge_scores=judge_scores,
-                    settings=settings,
+                    pairing_settings=pairing_settings,
                     available_indices=available_indices,
                     force_novice_last=False,
                 )
@@ -739,6 +604,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
         Outround.objects.bulk_update(rounds_to_update, ["chair"])
     if judge_round_joins:
         Outround.judges.through.objects.bulk_create(judge_round_joins)
+
 
 def calc_weight(
         judge_i,
@@ -808,6 +674,7 @@ def judge_conflict(judge, team1, team2, allow_rejudges=None):
     else:
         return has_scratches or has_school_conflict
 
+
 def is_bubble_round(pairing, round_number):
     gov_losses = round_number - tab_logic.stats.tot_wins(pairing.gov_team)
     opp_losses = round_number - tab_logic.stats.tot_wins(pairing.opp_team)
@@ -840,7 +707,247 @@ def can_judge_teams(
     return result
 
 
+def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
+    """Judges must have prefetch_related('judges') to prevent N+1
+        before calling this function"""
+    result = {}
+    team_ids = [team.id for team in teams]
+
+    for judge in judges:
+        result[judge.id] = {}
+        for round_obj in judge.judges.all():
+            if exclude_round_id and round_obj.id == exclude_round_id:
+                continue
+
+            if round_obj.gov_team_id in team_ids:
+                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(
+                    round_obj.gov_team_id, 0) + 1
+            if round_obj.opp_team_id in team_ids:
+                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
+                    round_obj.opp_team_id, 0) + 1
+
+    return result
+
+
+def _assign_outround_judges_for_specs(
+        round_specs,
+        pairings_by_spec,
+        panel_size_by_spec,
+        judges,
+        judge_scores,
+        pairing_settings,
+        available_indices,
+        force_novice_last=False):
+    if TabSettings.get("enable_judge_judge_scratches", 0) != 1:
+        return _assign_outround_judges_standard(
+            round_specs, pairings_by_spec, panel_size_by_spec, judges,
+            judge_scores, pairing_settings, available_indices, force_novice_last,
+        )
+    try:
+        assignment = _assign_outround_judges_with_slot_matching(
+            round_specs, pairings_by_spec, panel_size_by_spec, judges,
+            judge_scores, pairing_settings, available_indices, force_novice_last,
+        )
+    except errors.JudgeAssignmentError:
+        assignment = _search_outround_panels(
+            round_specs, pairings_by_spec, panel_size_by_spec, judges,
+            judge_scores, pairing_settings, available_indices, force_novice_last,
+        )
+
+    for pairings in pairings_by_spec.values():
+        for round_obj in pairings:
+            if round_obj.id in assignment.chairs_by_round_id:
+                round_obj.chair = assignment.chairs_by_round_id[round_obj.id]
+
+    for judge_i in assignment.used_indices:
+        available_indices.remove(judge_i)
+
+    return assignment.judge_round_joins
+
+
+def build_judge_pair_blocks():
+    if TabSettings.get("enable_judge_judge_scratches", 0) != 1:
+        return {}
+    judge_pair_blocks = {}
+    for judge_one_id, judge_two_id in JudgeJudgeScratch.objects.values_list(
+        "judge_one_id", "judge_two_id"
+    ):
+        judge_pair_blocks.setdefault(judge_one_id, set()).add(judge_two_id)
+        judge_pair_blocks.setdefault(judge_two_id, set()).add(judge_one_id)
+    return judge_pair_blocks
+
+
+def populate_panel_scratch_ids(judges, judge_pair_blocks=None):
+    if judge_pair_blocks is None:
+        judge_pair_blocks = build_judge_pair_blocks()
+    for judge in judges:
+        judge.panel_scratch_ids = judge_pair_blocks.get(judge.id, set())
+    return judges
+
+
+def _panel_is_compatible(panel_indices, judges, existing_panel_ids=None):
+    existing_panel_ids = set(existing_panel_ids or ())
+    for judge_i in panel_indices:
+        if judge_panel_conflict(judges[judge_i], existing_panel_ids):
+            return False
+    for judge_one_i, judge_two_i in combinations(panel_indices, 2):
+        judge_one = judges[judge_one_i]
+        judge_two = judges[judge_two_i]
+        if judge_two.id in _panel_scratch_ids_for_judge(judge_one):
+            return False
+    return True
+
+
+def _can_complete_future_panel(
+        round_obj,
+        candidate_judge_i,
+        judges,
+        available_indices,
+        current_panel_ids,
+        remaining_slots):
+    if remaining_slots <= 0:
+        return True
+
+    next_panel_ids = set(current_panel_ids)
+    next_panel_ids.add(judges[candidate_judge_i].id)
+
+    eligible_future_indices = []
+    for future_judge_i in available_indices:
+        if future_judge_i == candidate_judge_i:
+            continue
+        future_judge = judges[future_judge_i]
+        if judge_conflict(future_judge, round_obj.gov_team, round_obj.opp_team, True):
+            continue
+        if judge_panel_conflict(future_judge, next_panel_ids):
+            continue
+        eligible_future_indices.append(future_judge_i)
+
+    if len(eligible_future_indices) < remaining_slots:
+        return False
+
+    if remaining_slots == 1:
+        return True
+
+    return any(
+        _panel_is_compatible(panel_indices, judges, next_panel_ids)
+        for panel_indices in combinations(eligible_future_indices, remaining_slots)
+    )
+
+
+def _assign_outround_judges_with_slot_matching(
+        round_specs,
+        pairings_by_spec,
+        panel_size_by_spec,
+        judges,
+        judge_scores,
+        pairing_settings,
+        available_indices,
+        force_novice_last=False):
+    link_outround = Outround.judges.through
+    judge_round_joins = []
+
+    max_panel_size = max(panel_size_by_spec.values()) if panel_size_by_spec else 0
+    snake_draft_mode = (
+        pairing_settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT
+    )
+    panel_members_by_round_id = {}  # round_id -> set of assigned judge IDs
+    chairs_by_round_id = {}
+    used_indices = set()
+    local_available_indices = list(available_indices)
+
+    for panel_member in range(max_panel_size):
+        active_pairings = _build_active_pairings(
+            round_specs=round_specs,
+            pairings_by_spec=pairings_by_spec,
+            panel_size_by_spec=panel_size_by_spec,
+            panel_member=panel_member,
+            snake_draft_mode=snake_draft_mode,
+            force_novice_last=force_novice_last,
+        )
+        num_rounds = len(active_pairings)
+        if num_rounds == 0:
+            continue
+
+        graph_edges = []
+        for judge_i in local_available_indices:
+            judge = judges[judge_i]
+            for pairing_i, pairing in enumerate(active_pairings):
+                if panel_member == 0 and judge.wing_only:
+                    continue
+                panel_size = panel_size_by_spec.get(
+                    (pairing.type_of_round, pairing.num_teams),
+                    0,
+                )
+                remaining_slots = panel_size - panel_member - 1
+                current_panel_ids = panel_members_by_round_id.get(pairing.id, set())
+                if getattr(judge, "panel_scratch_ids", None) and any(
+                    blocked_id in current_panel_ids
+                    for blocked_id in judge.panel_scratch_ids
+                ):
+                    continue
+                has_conflict = judge_conflict(
+                    judge,
+                    pairing.gov_team,
+                    pairing.opp_team,
+                    True,
+                )
+                if has_conflict:
+                    continue
+                if not _can_complete_future_panel(
+                    round_obj=pairing,
+                    candidate_judge_i=judge_i,
+                    judges=judges,
+                    available_indices=local_available_indices,
+                    current_panel_ids=current_panel_ids,
+                    remaining_slots=remaining_slots,
+                ):
+                    continue
+                weight = calc_weight(
+                    judge_scores[judge_i],
+                    pairing_i,
+                    pairing_settings.mode,
+                    num_rounds=num_rounds,
+                )
+                graph_edges.append((pairing_i, num_rounds + judge_i, weight))
+
+        panel_matches = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+        if len(panel_matches) < num_rounds or -1 in panel_matches[:num_rounds]:
+            if not graph_edges:
+                raise errors.JudgeAssignmentError("Impossible to assign judges.")
+            pairing_list = list(panel_matches[:num_rounds])
+            pairing_list.extend([-1] * (num_rounds - len(pairing_list)))
+            bad_pairing = active_pairings[pairing_list.index(-1)]
+            raise errors.JudgeAssignmentError(
+                f"Could not find a judge for: {bad_pairing}"
+            )
+
+        assigned_this_slot = []
+        for pairing_i, padded_judge_i in enumerate(panel_matches[:num_rounds]):
+            judge_i = padded_judge_i - num_rounds
+            round_obj = active_pairings[pairing_i]
+            judge = judges[judge_i]
+
+            if panel_member == 0:
+                chairs_by_round_id[round_obj.id] = judge
+
+            panel_members_by_round_id.setdefault(round_obj.id, set()).add(judge.id)
+            judge_round_joins.append(link_outround(judge=judge, outround=round_obj))
+            assigned_this_slot.append(judge_i)
+
+        for judge_i in assigned_this_slot:
+            local_available_indices.remove(judge_i)
+            used_indices.add(judge_i)
+
+    return SimpleNamespace(
+        chairs_by_round_id=chairs_by_round_id,
+        judge_round_joins=judge_round_joins,
+        used_indices=used_indices,
+    )
+
+
 def _panel_scratch_ids_for_judge(judge):
+    if TabSettings.get("enable_judge_judge_scratches", 0) != 1:
+        return set()
     panel_scratch_ids = getattr(judge, "panel_scratch_ids", None)
     if panel_scratch_ids is not None:
         return set(panel_scratch_ids)
@@ -873,23 +980,335 @@ def can_assign_judge(
         and not judge_panel_conflict(judge, panel_judge_ids)
     )
 
-def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
-    """Judges must have prefetch_related('judges') to prevent N+1
-        before calling this function"""
-    result = {}
-    team_ids = [team.id for team in teams]
 
-    for judge in judges:
-        result[judge.id] = {}
-        for round_obj in judge.judges.all():
-            if exclude_round_id and round_obj.id == exclude_round_id:
+def _add_judges_experimental():
+    round_number = TabSettings.get("cur_round") - 1
+    pairing_settings = get_inround_settings()
+
+    Round.judges.through.objects.filter(
+        round__round_number=round_number
+    ).delete()
+    ManualJudgeAssignment.objects.filter(
+        round__round_number=round_number
+    ).delete()
+    # Get all checked-in judges
+    all_judges = list(
+        Judge.objects.filter(
+            checkin__round_number=round_number
+        ).prefetch_related(
+            "judges",  # poorly named relation for the round
+            "scratches",
+            "schools",
+        )
+    )
+    populate_panel_scratch_ids(all_judges)
+
+    # Sort all_judges once before creating filtered subsets
+    random.seed(1337)
+    random.shuffle(all_judges)
+    all_judges = sorted(all_judges, key=lambda j: j.rank, reverse=True)
+
+    chairs = [j for j in all_judges if not j.wing_only]
+
+    pairings = tab_logic.sorted_pairings(round_number)
+
+    random.seed(1337)
+    random.shuffle(pairings)
+
+    chair_scores = construct_judge_scores(chairs, pairing_settings.mode)
+
+    bubble_priority = (
+        pairing_settings.round_priority == InroundRoundPriority.BUBBLE_ROUNDS
+    )
+    if bubble_priority and round_number > 1:
+        bubble_rounds = [p for p in pairings if is_bubble_round(p, round_number)]
+        non_bubble_rounds = [p for p in pairings if p not in bubble_rounds]
+
+        def pairing_sort_key(pairing):
+            return tab_logic.team_comp(pairing, round_number)
+
+        bubble_rounds.sort(key=pairing_sort_key, reverse=True)
+        non_bubble_rounds.sort(key=pairing_sort_key, reverse=True)
+        pairings = bubble_rounds + non_bubble_rounds
+    else:
+        pairings.sort(
+            key=lambda x: tab_logic.team_comp(x, round_number), reverse=True
+        )
+
+    num_rounds = len(pairings)
+    all_teams = []
+    for pairing in pairings:
+        all_teams.extend((pairing.gov_team, pairing.opp_team))
+    rejudge_counts = {}
+    if pairing_settings.allow_rejudges:
+        rejudge_counts = judge_team_rejudge_counts(chairs, all_teams)
+
+    banned_chair_edges = set()
+    while True:
+        panel_members_by_pair = [set() for _ in range(num_rounds)]
+        graph_edges = []
+        for chair_i, chair in enumerate(chairs):
+            chair_score = chair_scores[chair_i]
+
+            for pairing_i, pairing in enumerate(pairings):
+                if (pairing_i, chair_i) in banned_chair_edges:
+                    continue
+                has_conflict = judge_conflict(
+                    chair,
+                    pairing.gov_team,
+                    pairing.opp_team,
+                    pairing_settings.allow_rejudges,
+                )
+                if has_conflict:
+                    continue
+                weight = calc_weight(chair_score, pairing_i, pairing_settings.mode)
+                judge_counts = rejudge_counts.get(chair.id)
+                rejudge_sum = 0
+                if judge_counts:
+                    rejudge_sum = (
+                        judge_counts.get(pairing.gov_team.id, 0)
+                        + judge_counts.get(pairing.opp_team.id, 0)
+                    )
+                if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                    penalty = pairing_settings.rejudge_penalty * (1 + 0.1 * chair_score)
+                    weight -= penalty * rejudge_sum
+
+                graph_edges.append((pairing_i, num_rounds + chair_i, weight))
+        judge_assignments = mwmatching.maxWeightMatching(
+            graph_edges, maxcardinality=True
+        )
+
+        if -1 in judge_assignments[:num_rounds] or (num_rounds > 0 and not graph_edges):
+            if not graph_edges:
+                # Check if we have enough judges including wing_only judges
+                if len(all_judges) >= num_rounds:
+                    raise errors.JudgeAssignmentError(
+    "Impossible to assign chairs to all rounds. You have enough "
+    "checked-in judges, but some are marked as wing-only and cannot "
+    "chair. Either check in more non-wing judges or unmark some "
+    "wing-only judges to allow them to chair." )
+                else:
+                    raise errors.JudgeAssignmentError(
+    "Impossible to assign judges, consider reducing your gaps if you"
+    " are making panels, otherwise find some more judges." )
+            elif -1 in judge_assignments[:num_rounds]:
+                pairing_list = list(judge_assignments[: len(pairings)])
+                while len(pairing_list) < len(pairings):
+                    pairing_list.append(-1)
+                bad_pairing = pairings[pairing_list.index(-1)]
+                # Check if we have enough judges including wing_only judges
+                if len(all_judges) >= num_rounds and len(chairs) < num_rounds:
+                    raise errors.JudgeAssignmentError(
+    "Impossible to assign chairs to all rounds. You have enough "
+    "checked-in judges, but some are marked as wing-only and cannot "
+    "chair. Either check in more non-wing judges or unmark some "
+    "wing-only judges to allow them to chair." )
+                else:
+                    raise errors.JudgeAssignmentError(
+                        f"Could not find a judge for: {bad_pairing}"
+                    )
+            else:
+                raise errors.JudgeAssignmentError()
+
+        judge_round_joins, chair_by_pairing = [], [None] * num_rounds
+        assigned_judge_objects = set()  # Track actual Judge objects by ID
+        for pairing_i, padded_chair_i in enumerate(judge_assignments[:num_rounds]):
+            chair_i = padded_chair_i - num_rounds
+
+            round_obj = pairings[pairing_i]
+            chair = chairs[chair_i]
+
+            round_obj.chair = chair
+            chair_by_pairing[pairing_i] = chair_i
+            assigned_judge_objects.add(chair.id)  # Track by judge ID
+            panel_members_by_pair[pairing_i].add(chair.id)
+            judge_round_joins.append(
+                Round.judges.through(judge=chair, round=round_obj)
+            )
+
+        failed_pairings = set()
+        if pairing_settings.pair_wings and num_rounds and len(all_judges) > num_rounds:
+            max_per_round = min(3, len(all_judges) // num_rounds + 1)
+            for _ in range(1, max_per_round):
+                # Build wing pool from all_judges excluding already assigned
+                wing_judges = [
+                    j for j in all_judges if j.id not in assigned_judge_objects
+                ]
+                if not wing_judges:
+                    break
+
+                wing_pool = list(range(len(wing_judges)))
+                pairing_indices = list(range(num_rounds))
+                if pairing_settings.wing_mode == WingPairingMode.RANDOM:
+                    random.shuffle(wing_pool)
+                    random.shuffle(pairing_indices)
+
+                wing_edges = []
+                wing_judge_scores = construct_judge_scores(
+                    wing_judges, pairing_settings.mode)
+                for relative_rank, wing_judge_i in enumerate(wing_pool):
+                    judge = wing_judges[wing_judge_i]
+                    judge_score = wing_judge_scores[wing_judge_i]
+                    for pairing_i in pairing_indices:
+                        pairing = pairings[pairing_i]
+                        if judge.panel_scratch_ids and any(
+                            blocked_id in panel_members_by_pair[pairing_i]
+                            for blocked_id in judge.panel_scratch_ids
+                        ):
+                            continue
+                        has_conflict = judge_conflict(
+                            judge,
+                            pairing.gov_team,
+                            pairing.opp_team,
+                            pairing_settings.allow_rejudges,
+                        )
+                        if has_conflict:
+                            continue
+                        judge_counts = rejudge_counts.get(judge.id)
+                        rejudge_sum = 0
+                        if judge_counts:
+                            rejudge_sum = (
+                                judge_counts.get(pairing.gov_team.id, 0)
+                                + judge_counts.get(pairing.opp_team.id, 0)
+                            )
+                        weight = calc_weight(
+                            judge_score,
+                            pairing_i,
+                            pairing_settings.mode,
+                            num_rounds=num_rounds,
+                            is_assigning_wings=True,
+                            wing_mode=pairing_settings.wing_mode,
+                            chair_judge_i=chair_by_pairing[pairing_i],
+                            relative_judge_rank=relative_rank,
+                            judge_index=wing_judge_i,
+                        )
+                        if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
+                            penalty = pairing_settings.rejudge_penalty * \
+                                (1 + 0.1 * judge_score)
+                            weight -= penalty * rejudge_sum
+
+                        wing_edges.append(
+                            (pairing_i, num_rounds + wing_judge_i, weight)
+                        )
+
+                if not wing_edges:
+                    if len(wing_judges) >= num_rounds:
+                        failed_pairings.update(range(num_rounds))
+                    break
+
+                wing_matches = mwmatching.maxWeightMatching(
+                    wing_edges, maxcardinality=True
+                )
+                unmatched_pairings = set()
+                for pairing_i, padded_wing_judge_i in enumerate(
+                    wing_matches[:num_rounds]):
+                    if padded_wing_judge_i == -1:
+                        unmatched_pairings.add(pairing_i)
+                        continue
+                    wing_judge_i = padded_wing_judge_i - num_rounds
+                    judge = wing_judges[wing_judge_i]
+                    if judge.id in assigned_judge_objects:
+                        unmatched_pairings.add(pairing_i)
+                        continue
+                    if judge.panel_scratch_ids and any(
+                        blocked_id in panel_members_by_pair[pairing_i]
+                        for blocked_id in judge.panel_scratch_ids
+                    ):
+                        unmatched_pairings.add(pairing_i)
+                        continue
+                    judge_round_joins.append(
+                        Round.judges.through(
+                            judge=judge,
+                            round=pairings[pairing_i],
+                        )
+                    )
+                    assigned_judge_objects.add(judge.id)
+                    panel_members_by_pair[pairing_i].add(judge.id)
+
+                if unmatched_pairings and len(wing_judges) >= num_rounds:
+                    failed_pairings.update(unmatched_pairings)
+                    break
+
+        next_bans = {
+            (pairing_i, chair_by_pairing[pairing_i])
+            for pairing_i in failed_pairings
+            if chair_by_pairing[pairing_i] is not None
+            and (pairing_i, chair_by_pairing[pairing_i]) not in banned_chair_edges
+        }
+        if not next_bans:
+            Round.objects.bulk_update(pairings, ["chair"])
+            Round.judges.through.objects.bulk_create(judge_round_joins)
+            break
+
+        banned_chair_edges.update(next_bans)
+
+
+def _search_outround_panels(
+        round_specs, pairings_by_spec, panel_size_by_spec, judges,
+        judge_scores, pairing_settings, available_indices, force_novice_last):
+    """Backtrack across slots when greedy matching strands a compatible panel."""
+    slots = []
+    max_size = max(panel_size_by_spec.values(), default=0)
+    for member in range(max_size):
+        active = _build_active_pairings(
+            round_specs, pairings_by_spec, panel_size_by_spec, member,
+            pairing_settings.draft_mode == OutroundJudgePairingMode.SNAKE_DRAFT,
+            force_novice_last,
+        )
+        slots.extend((pairing, member, index, len(active))
+                     for index, pairing in enumerate(active))
+    panels = {}
+    choices = []
+    failed_states = set()
+
+    def search(slot_index, remaining):
+        if slot_index == len(slots):
+            return True
+        state = (slot_index, tuple(remaining), tuple((key, tuple(sorted(value)))
+                 for key, value in sorted(panels.items())))
+        if state in failed_states:
+            return False
+        pairing, member, index, num_rounds = slots[slot_index]
+        panel = panels.setdefault(pairing.id, set())
+        panel_size = panel_size_by_spec[(pairing.type_of_round, pairing.num_teams)]
+        candidates = sorted(remaining, key=lambda judge_i: calc_weight(
+            judge_scores[judge_i], index, pairing_settings.mode, num_rounds=num_rounds,
+        ), reverse=True)
+        for judge_i in candidates:
+            judge = judges[judge_i]
+            if member == 0 and judge.wing_only:
                 continue
+            if not can_assign_judge(
+                    judge, pairing.gov_team, pairing.opp_team, True, panel):
+                continue
+            if not _can_complete_future_panel(
+    pairing,
+    judge_i,
+    judges,
+    remaining,
+    panel,
+    panel_size -
+    member -
+     1):
+                continue
+            panel.add(judge.id)
+            choices.append((pairing, member, judge_i))
+            if search(slot_index + 1, [i for i in remaining if i != judge_i]):
+                return True
+            choices.pop()
+            panel.remove(judge.id)
+        failed_states.add(state)
+        return False
 
-            if round_obj.gov_team_id in team_ids:
-                result[judge.id][round_obj.gov_team_id] = result[judge.id].get(
-                    round_obj.gov_team_id, 0) + 1
-            if round_obj.opp_team_id in team_ids:
-                result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
-                    round_obj.opp_team_id, 0) + 1
-
-    return result
+    if not search(0, list(available_indices)):
+        raise errors.JudgeAssignmentError(
+            "Could not assign complete panels respecting judge–judge scratches."
+        )
+    return SimpleNamespace(
+        chairs_by_round_id={pairing.id: judges[judge_i]
+                            for pairing, member, judge_i in choices if member == 0},
+        judge_round_joins=[Outround.judges.through(
+            judge=judges[judge_i], outround=pairing)
+                           for pairing, _, judge_i in choices],
+        used_indices={judge_i for _, _, judge_i in choices},
+    )

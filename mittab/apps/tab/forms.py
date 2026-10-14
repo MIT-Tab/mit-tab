@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 import os
 import itertools
 import pprint
@@ -8,9 +9,27 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab import logo_utils
+from mittab.apps.tab.theme import (
+    DEFAULT_THEME_COLOR,
+    normalize_theme_color,
+)
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_deadline_display,
+    written_rfd_editing_open,
+)
 from mittab.libs import errors
 from mittab import settings
 from mittab.libs.cacheing import cache_logic
+
+
+def get_speak_step():
+    steps = ("1", "0.5", "0.1", "0.01")
+    try:
+        return steps[int(TabSettings.get("decimal_speaks", 0))]
+    except (IndexError, TypeError, ValueError):
+        return "1"
 
 
 class UploadBackupForm(forms.Form):
@@ -22,6 +41,16 @@ class UploadDataForm(forms.Form):
     judge_file = forms.FileField(label="Judge Data File", required=False)
     room_file = forms.FileField(label="Room Data File", required=False)
     scratch_file = forms.FileField(label="Scratch Data File", required=False)
+
+    def __init__(self, *args, **kwargs):
+        allow_scratches = kwargs.pop("allow_scratches", True)
+        super(UploadDataForm, self).__init__(*args, **kwargs)
+        if not allow_scratches:
+            self.fields.pop("scratch_file")
+
+
+class UploadApdaCsvForm(forms.Form):
+    file = forms.FileField(label="CSV File")
 
 
 class SchoolForm(forms.ModelForm):
@@ -44,8 +73,9 @@ class RoomForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(RoomForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 room = kwargs["instance"]
@@ -97,8 +127,9 @@ class JudgeForm(forms.ModelForm):
         entry = "first_entry" in kwargs
         if entry:
             kwargs.pop("first_entry")
+        allow_checkins = kwargs.pop("allow_checkins", True)
         super(JudgeForm, self).__init__(*args, **kwargs)
-        if not entry:
+        if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
                 judge = kwargs["instance"]
@@ -118,8 +149,19 @@ class JudgeForm(forms.ModelForm):
             except Exception:
                 pass
 
-    def save(self, commit=True):
-        judge = super(JudgeForm, self).save(commit)
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        judge = super(JudgeForm, self).save(commit=False)
+        is_create = judge.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not judge.created_by_id:
+            judge.created_by = actor
+        if commit:
+            judge.save()
+            self.save_m2m()
+        else:
+            return judge
+
         num_rounds = TabSettings.objects.get(key="tot_rounds").value
         for i in range(-1, num_rounds):
             field_name = f"checkin_{i}"
@@ -135,6 +177,10 @@ class JudgeForm(forms.ModelForm):
                 elif checked_in and not should_be_checked_in:
                     checked_in.delete()
 
+        if actor:
+            event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+            changes = {} if is_create else {"fields": changed_fields}
+            AuditEvent.record(judge, event_type, actor, changes=changes)
         return judge
 
     class Meta:
@@ -155,6 +201,12 @@ class TeamForm(forms.ModelForm):
         required=False
     )
 
+    def __init__(self, *args, **kwargs):
+        allow_checkins = kwargs.pop("allow_checkins", True)
+        super(TeamForm, self).__init__(*args, **kwargs)
+        if not allow_checkins:
+            self.fields.pop("checked_in", None)
+
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
         if len(data) not in [1, 2]:
@@ -172,7 +224,23 @@ class TeamForm(forms.ModelForm):
 
     class Meta:
         model = Team
-        exclude = ["tiebreaker"]
+        exclude = ["team_code", "tiebreaker"]
+
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
+        team = super(TeamForm, self).save(commit=False)
+        is_create = team.pk is None
+        changed_fields = list(self.changed_data)
+        if is_create and actor and not team.created_by_id:
+            team.created_by = actor
+        if commit:
+            team.save()
+            self.save_m2m()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(team, event_type, actor, changes=changes)
+        return team
 
     class Media:
         css = {
@@ -185,6 +253,12 @@ class TeamForm(forms.ModelForm):
 class TeamEntryForm(TeamForm):
     number_scratches = forms.IntegerField(label="How many initial scratches?",
                                           initial=0)
+
+    def __init__(self, *args, **kwargs):
+        allow_initial_scratches = kwargs.pop("allow_initial_scratches", True)
+        super(TeamEntryForm, self).__init__(*args, **kwargs)
+        if not allow_initial_scratches:
+            self.fields.pop("number_scratches")
 
     def clean_debaters(self):
         data = self.cleaned_data["debaters"]
@@ -199,7 +273,7 @@ class TeamEntryForm(TeamForm):
 
     class Meta:
         model = Team
-        exclude = ["tiebreaker"]
+        exclude = ["team_code", "tiebreaker"]
 
 
 class ScratchForm(forms.ModelForm):
@@ -225,13 +299,22 @@ class ScratchForm(forms.ModelForm):
             self.fields["team"].initial = str(self.instance.team.id)
             self.fields["judge"].initial = str(self.instance.judge.id)
 
-    def save(self, commit=True):
+    def save(self, commit=True, actor=None):
+        actor = actor if getattr(actor, "is_authenticated", False) else None
         instance = super(ScratchForm, self).save(commit=False)
+        is_create = instance.pk is None
+        changed_fields = list(self.changed_data)
         # Convert string IDs to actual model instances
         instance.team = Team.objects.get(pk=int(self.cleaned_data["team"]))
         instance.judge = Judge.objects.get(pk=int(self.cleaned_data["judge"]))
+        if is_create and actor and not instance.created_by_id:
+            instance.created_by = actor
         if commit:
             instance.save()
+            if actor:
+                event_type = AuditEvent.CREATE if is_create else AuditEvent.EDIT
+                changes = {} if is_create else {"fields": changed_fields}
+                AuditEvent.record(instance, event_type, actor, changes=changes)
         return instance
 
     class Meta:
@@ -298,6 +381,16 @@ def validate_speaks(value):
         raise ValidationError(
             f"{value} is an entirely invalid speaker score, try again.")
 
+    step = Decimal(get_speak_step())
+    if value % step != 0:
+        if step == Decimal("0.5"):
+            raise ValidationError("Speaks must be in half-point increments")
+        if step == Decimal("0.1"):
+            raise ValidationError("Speaks may have at most 1 decimal digit")
+        if step == Decimal("0.01"):
+            raise ValidationError("Speaks may have at most 2 decimal digits")
+        raise ValidationError("Speaks must be whole numbers")
+
 
 class ResultEntryForm(forms.Form):
 
@@ -354,9 +447,15 @@ class ResultEntryForm(forms.Form):
             self.fields[self.deb_attr_name(
                 deb, "speaks")] = forms.DecimalField(
                     label=f"{self.NAMES[deb]} Speaks",
-                    validators=[validate_speaks])
+                    validators=[validate_speaks],
+                    widget=forms.NumberInput(attrs={
+                        "step": get_speak_step(),
+                    }))
             self.fields[self.deb_attr_name(deb, "ranks")] = forms.ChoiceField(
                 label=f"{self.NAMES[deb]} Rank", choices=self.RANKS)
+
+        if not no_fill:
+            self.add_written_rfd_field(round_object)
 
         if round_object.victor == 0 or no_fill:
             return
@@ -370,8 +469,44 @@ class ResultEntryForm(forms.Form):
             self.fields[self.deb_attr_name(deb, "ranks")].initial = int(
                 round(stats.ranks))
 
+    def add_written_rfd_field(self, round_object):
+        if not round_allows_written_rfd(round_object):
+            return
+
+        deadline = written_rfd_deadline_display()
+        rfd_editing_open = written_rfd_editing_open(round_object)
+        if rfd_editing_open:
+            help_text = (
+                "Optional. You may submit the ballot without an RFD and edit "
+                "this text later"
+            )
+            if deadline:
+                help_text += f" until {deadline}."
+        elif deadline:
+            help_text = f"The written RFD deadline was {deadline}."
+        else:
+            help_text = "Tab has not configured the written RFD deadline yet."
+
+        rfd_attrs = {
+            "class": "form-control",
+            "rows": 6,
+        }
+        if not rfd_editing_open:
+            rfd_attrs["readonly"] = "readonly"
+
+        self.fields["rfd"] = forms.CharField(
+            label="Reason for decision",
+            required=False,
+            initial=round_object.rfd,
+            help_text=help_text,
+            widget=forms.Textarea(attrs=rfd_attrs),
+        )
+
     def clean(self):
         cleaned_data = self.cleaned_data
+        if self.errors:
+            return cleaned_data
+
         try:
             speak_ranks = [(self.deb_attr_val(d, "speaks"),
                             self.deb_attr_val(d, "ranks"), d)
@@ -474,6 +609,9 @@ class ResultEntryForm(forms.Form):
                     old_stats.delete()
                 stats.save()
             round_obj.save()
+            if "rfd" in self.cleaned_data and written_rfd_editing_open(round_obj):
+                round_obj.rfd = self.cleaned_data.get("rfd", "")
+                round_obj.save(update_fields=["rfd"])
         return round_obj
 
     def deb_attr_val(self, position, attr, cast=None):
@@ -492,7 +630,11 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
-    ballot_code = forms.CharField(max_length=30, min_length=0)
+    ballot_code = forms.CharField(
+        label="Judge code",
+        max_length=BALLOT_CODE_MAX_LENGTH,
+        min_length=0,
+    )
 
     def __init__(self, *args, **kwargs):
         ballot_code = ""
@@ -504,16 +646,18 @@ class EBallotForm(ResultEntryForm):
         self.fields["ballot_code"].initial = ballot_code
 
     def clean(self):
-        cleaned_data = self.cleaned_data
-        round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
-        cur_round = TabSettings.get("cur_round", 0) - 1
+        cleaned_data = super(EBallotForm, self).clean()
+        if self.errors:
+            return cleaned_data
 
         try:
+            round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
+            cur_round = TabSettings.get("cur_round", 0) - 1
             ballot_code = cleaned_data.get("ballot_code")
             judge = Judge.objects.filter(ballot_code=ballot_code).first()
 
             if not judge:
-                msg = "Incorrect ballot code. Enter again."
+                msg = "Incorrect judge code. Enter again."
                 self._errors["ballot_code"] = self.error_class([msg])
             elif round_obj.round_number != cur_round:
                 msg = (
@@ -539,11 +683,7 @@ class EBallotForm(ResultEntryForm):
 
             for deb in self.DEBATERS:
                 speaks = self.deb_attr_val(deb, "speaks", float)
-                _, decimal_val = str(speaks).split(".")
                 key = self.deb_attr_name(deb, "speaks")
-                if int(decimal_val) != 0:
-                    msg = "Speaks must be whole numbers"
-                    self._errors[key] = self.error_class([msg])
                 if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
                         speaks < float(TabSettings.get("min_eballot_speak", 15)):
                     msg = "Speaks must be justified to tab."
@@ -554,8 +694,7 @@ class EBallotForm(ResultEntryForm):
             self._errors["winner"] = self.error_class(
                 ["Non handled error, preventing data contamination"])
 
-        return super(EBallotForm, self).clean()
-
+        return cleaned_data
 
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
@@ -601,11 +740,48 @@ class SettingsForm(forms.Form):
                         "style": "min-width: 300px;"
                     })
                 )
+            elif setting.get("type") == "datetime":
+                initial_value = setting["value"]
+                if isinstance(initial_value, str) and initial_value:
+                    for date_format in (
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ):
+                        try:
+                            initial_value = datetime.strptime(
+                                initial_value, date_format
+                            )
+                            break
+                        except ValueError:
+                            continue
+                self.fields[field_name] = forms.DateTimeField(
+                    label=label,
+                    help_text=setting["description"],
+                    initial=initial_value,
+                    required=False,
+                    input_formats=[
+                        "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d %H:%M",
+                        "%Y-%m-%d %H:%M:%S",
+                    ],
+                    widget=forms.DateTimeInput(
+                        attrs={
+                            "class": "form-control",
+                            "type": "datetime-local",
+                        },
+                        format="%Y-%m-%dT%H:%M",
+                    ),
+                )
             else:
+                minimum = 0 if setting["name"] in {
+                    "nov_teams_to_break", "var_teams_to_break"
+                } else None
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
+                    min_value=minimum,
                     widget=forms.NumberInput(attrs={
                         "class": "form-control"
                     })
@@ -614,14 +790,134 @@ class SettingsForm(forms.Form):
     def save(self):
         for setting in self.settings:
             field = f"setting_{setting['name']}"
+            if field not in self.changed_data:
+                continue
+
             key = setting["name"]
 
             if "type" in setting and setting["type"] == "boolean":
                 value_to_set = 1 if self.cleaned_data[field] else 0
+            elif "type" in setting and setting["type"] == "datetime":
+                value = self.cleaned_data[field]
+                value_to_set = value.strftime("%Y-%m-%d %H:%M") if value else ""
             else:
                 value_to_set = self.cleaned_data[field]
 
             TabSettings.set(key, value_to_set)
+
+
+class PublicHomepageForm(forms.Form):
+    tournament_name = forms.CharField(
+        label="Tournament Name",
+        max_length=200,
+        required=False,
+        help_text=(
+            "Shown on the public homepage, in the page title, and on the staff login page."
+        ),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    theme_color = forms.RegexField(
+        regex=r"^#[0-9a-fA-F]{6}$",
+        label="Theme Color",
+        help_text="Brand color used across navigation, homepage accents, and other theme elements.",
+        error_messages={
+            "invalid": "Please use a valid hex color (for example: #00438A).",
+        },
+        widget=forms.TextInput(attrs={
+            "type": "text",
+            "class": "form-control theme-color-input",
+            "placeholder": "#00438A",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "autocomplete": "off",
+            "style": "max-width: 12rem;",
+        }),
+    )
+    tournament_logo = forms.ImageField(
+        label="Tournament Logo",
+        required=False,
+        help_text=(
+            "Optional homepage logo (PNG, JPEG, or WebP; max 8MB; aspect ratio between 1:2 and 2:1)."
+        ),
+        widget=forms.ClearableFileInput(attrs={
+            "class": "form-control-file",
+            "accept": ",".join(logo_utils.LOGO_ALLOWED_MIME_TYPES),
+        }),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(PublicHomepageForm, self).__init__(*args, **kwargs)
+
+        self.fields["tournament_name"].initial = TabSettings.get(
+            "tournament_name", DEFAULT_TOURNAMENT_NAME
+        )
+        self.fields["theme_color"].initial = normalize_theme_color(
+            TabSettings.get("theme_color", DEFAULT_THEME_COLOR),
+            default=DEFAULT_THEME_COLOR,
+        )
+
+        definitions = PublicHomeShortcut.nav_definition_map()
+
+        page_options = list(PublicHomePage.objects.filter(is_active=True))
+        if not page_options:
+            page_options = list(PublicHomePage.objects.all())
+        choices = [
+            (page.slug, page.title)
+            for page in page_options
+        ]
+        default_slots = PublicHomeShortcut.default_slot_mapping()
+        configured_slots = dict(default_slots)
+        configured_slots.update({
+            shortcut.position: shortcut.nav_item
+            for shortcut in PublicHomeShortcut.objects.all()
+        })
+
+        # Slot 1 is reserved: the public homepage auto-switches it between
+        # Registration (while open) and Released Pairings (otherwise), so it
+        # is intentionally not rendered as an editable choice.
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            nav_item = configured_slots.get(slot)
+            default_nav_item = default_slots.get(slot)
+            if nav_item not in definitions:
+                nav_item = default_nav_item
+            title = definitions.get(nav_item, {}).get("title", nav_item)
+            self.fields[f"slot_{slot}"] = forms.ChoiceField(
+                label=f"Shortcut {slot}",
+                choices=choices,
+                initial=nav_item,
+                help_text=f"Currently: {title}",
+                widget=forms.Select(attrs={"class": "form-control"}),
+            )
+
+    def clean_tournament_logo(self):
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.validate_tournament_logo(uploaded_logo)
+        return uploaded_logo
+
+    def save(self):
+        tournament_name = (
+            self.cleaned_data["tournament_name"].strip()
+            or DEFAULT_TOURNAMENT_NAME
+        )
+        TabSettings.set("tournament_name", tournament_name)
+
+        TabSettings.set(
+            "theme_color",
+            normalize_theme_color(
+                self.cleaned_data["theme_color"],
+                default=DEFAULT_THEME_COLOR,
+            ),
+        )
+
+        uploaded_logo = self.cleaned_data.get("tournament_logo")
+        if uploaded_logo:
+            logo_utils.save_tournament_logo(uploaded_logo)
+
+        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+            PublicHomeShortcut.objects.update_or_create(
+                position=slot,
+                defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},
+            )
 
 
 def validate_panel(result):

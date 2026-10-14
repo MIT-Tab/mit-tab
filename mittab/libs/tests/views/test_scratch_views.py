@@ -7,6 +7,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from mittab.apps.tab.models import (
+    TabSettings,
     Judge,
     School,
     Team,
@@ -30,6 +31,8 @@ class TestScratchViews(TestCase):
 
     def setUp(self):
         super().setUp()
+        TabSettings.set("enable_team_team_scratches", 1)
+        TabSettings.set("enable_judge_judge_scratches", 1)
         self.client = Client()
         self.user = get_user_model().objects.create_superuser(
             username="testuser",
@@ -40,7 +43,7 @@ class TestScratchViews(TestCase):
 
     def test_add_scratch_view_loads(self):
         """Test that the add scratch view loads successfully"""
-        response = self.client.get(reverse("add_scratch"))
+        response = self.client.get(reverse("experimental_add_scratch"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("forms_by_type", response.context)
         self.assertIn("judge_team", response.context["forms_by_type"])
@@ -53,7 +56,7 @@ class TestScratchViews(TestCase):
         team = Team.objects.first()
 
         response = self.client.post(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {
                 "form_type": "judge_team",
                 "judge_team_0-judge": judge.id,
@@ -73,7 +76,7 @@ class TestScratchViews(TestCase):
     def test_add_scratch_view_honors_requested_count(self):
         """Test the add scratch view builds the requested number of forms"""
         response = self.client.get(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {"team_id": Team.objects.first().id, "count": 2},
         )
 
@@ -86,7 +89,7 @@ class TestScratchViews(TestCase):
         teams = list(Team.objects.all()[:2])
 
         response = self.client.post(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {
                 "form_type": "judge_team",
                 "count": 2,
@@ -115,7 +118,7 @@ class TestScratchViews(TestCase):
         judge_one, judge_two = judges[0], judges[1]
 
         response = self.client.post(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {
                 "form_type": "judge_judge",
                 "judge_judge_0-judge_one": judge_one.id,
@@ -140,7 +143,7 @@ class TestScratchViews(TestCase):
         team_one, team_two = teams[0], teams[1]
 
         response = self.client.post(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {
                 "form_type": "team_team",
                 "team_team_0-team_one": team_one.id,
@@ -168,7 +171,7 @@ class TestScratchViews(TestCase):
             judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH
         )
 
-        response = self.client.get(reverse("view_scratches"))
+        response = self.client.get(reverse("experimental_view_scratches"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("item_list", response.context)
 
@@ -180,7 +183,11 @@ class TestScratchViews(TestCase):
             judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH
         )
 
-        response = self.client.get(reverse("view_scratches_judge", args=[judge.id]))
+        response = self.client.get(
+    reverse(
+        "experimental_view_scratches_judge",
+        args=[
+            judge.id]))
         self.assertEqual(response.status_code, 200)
 
     def test_view_scratches_for_team(self):
@@ -191,7 +198,11 @@ class TestScratchViews(TestCase):
             judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH
         )
 
-        response = self.client.get(reverse("view_scratches_team", args=[team.id]))
+        response = self.client.get(
+    reverse(
+        "experimental_view_scratches_team",
+        args=[
+            team.id]))
         self.assertEqual(response.status_code, 200)
 
     def test_view_scratches_for_team_saves_edits(self):
@@ -211,7 +222,7 @@ class TestScratchViews(TestCase):
         )
 
         response = self.client.post(
-            reverse("view_scratches_team", args=[team.id]),
+            reverse("experimental_view_scratches_team", args=[team.id]),
             {
                 "1-judge": judges[1].id,
                 "1-team": team.id,
@@ -233,7 +244,7 @@ class TestScratchViews(TestCase):
         )
 
         response = self.client.get(
-            reverse("scratch_detail", args=["judge-team", scratch.id])
+            reverse("experimental_scratch_detail", args=["judge-team", scratch.id])
         )
         self.assertEqual(response.status_code, 200)
 
@@ -245,7 +256,7 @@ class TestScratchViews(TestCase):
         )
 
         response = self.client.get(
-            reverse("scratch_detail", args=["judge-judge", scratch.id])
+            reverse("experimental_scratch_detail", args=["judge-judge", scratch.id])
         )
         self.assertEqual(response.status_code, 200)
 
@@ -257,7 +268,7 @@ class TestScratchViews(TestCase):
         )
 
         response = self.client.get(
-            reverse("scratch_detail", args=["team-team", scratch.id])
+            reverse("experimental_scratch_detail", args=["team-team", scratch.id])
         )
         self.assertEqual(response.status_code, 200)
 
@@ -270,7 +281,7 @@ class TestScratchViews(TestCase):
         )
 
         response = self.client.post(
-            reverse("scratch_detail", args=["judge-team", scratch.id]),
+            reverse("experimental_scratch_detail", args=["judge-team", scratch.id]),
             {
                 "judge": judge.id,
                 "team": team.id,
@@ -290,8 +301,8 @@ class TestScratchViews(TestCase):
             judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH
         )
 
-        response = self.client.get(
-            reverse("scratch_delete", args=["judge-team", scratch.id])
+        response = self.client.post(
+            reverse("experimental_scratch_delete", args=["judge-team", scratch.id])
         )
 
         # Should redirect on success
@@ -307,8 +318,8 @@ class TestScratchViews(TestCase):
             judge_one=judges[0], judge_two=judges[1]
         )
 
-        response = self.client.get(
-            reverse("scratch_delete", args=["judge-judge", scratch.id])
+        response = self.client.post(
+            reverse("experimental_scratch_delete", args=["judge-judge", scratch.id])
         )
 
         # Should redirect on success
@@ -326,8 +337,8 @@ class TestScratchViews(TestCase):
             team_one=teams[0], team_two=teams[1]
         )
 
-        response = self.client.get(
-            reverse("scratch_delete", args=["team-team", scratch.id])
+        response = self.client.post(
+            reverse("experimental_scratch_delete", args=["team-team", scratch.id])
         )
 
         # Should redirect on success
@@ -350,7 +361,7 @@ class TestScratchViews(TestCase):
 
         # Try to create duplicate
         response = self.client.post(
-            reverse("add_scratch"),
+            reverse("experimental_add_scratch"),
             {
                 "form_type": "judge_team",
                 "judge_team_0-judge": judge.id,
@@ -375,5 +386,5 @@ class TestScratchViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            reverse("view_scratches_team", args=[team.id]),
+            reverse("experimental_view_scratches_team", args=[team.id]),
         )

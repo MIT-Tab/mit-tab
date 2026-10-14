@@ -113,6 +113,7 @@ class TestMinimalSchoolConflictScenarios(TestCase):
         )
 
     def test_add_judges_retries_chair_choices_when_panel_scratches_dead_end(self):
+        TabSettings.set("enable_judge_judge_scratches", 1)
         TabSettings.set("cur_round", 2)
         TabSettings.set("pair_wings", 1)
 
@@ -223,6 +224,8 @@ class TestDynamicSchoolConflicts(TestCase):
 
     def setUp(self):
         super().setUp()
+        TabSettings.set("enable_team_team_scratches", 1)
+        TabSettings.set("enable_judge_judge_scratches", 1)
         TabSettings.set("cur_round", 1)
         clear_all_scratches()
 
@@ -582,6 +585,8 @@ class TestManualJudgeViews(TestCase):
 
     def setUp(self):
         super().setUp()
+        TabSettings.set("enable_team_team_scratches", 1)
+        TabSettings.set("enable_judge_judge_scratches", 1)
         self.client = Client()
         self.user = get_user_model().objects.create_superuser(
             username="viewtester",

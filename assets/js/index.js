@@ -48,17 +48,50 @@ function initializeTooltips() {
 }
 
 function initializeSettingsForm() {
-  $(".custom-control-input").on(
-    "change",
-    function handleCustomControlInputChange() {
+  $("[data-toggle-label]")
+    .on("change", function handleCustomControlInputChange() {
       const label = $(this).siblings(".custom-control-label");
-      if ($(this).is(":checked")) {
-        label.text("Enabled");
-      } else {
-        label.text("Disabled");
+      const onText = $(this).data("label-on") || "Enabled";
+      const offText = $(this).data("label-off") || "Disabled";
+      label.text($(this).is(":checked") ? onText : offText);
+    })
+    .trigger("change");
+}
+
+function initializeThemeColorPicker() {
+  const hexPattern = /^#[0-9a-fA-F]{6}$/;
+
+  $(".theme-color-picker").each((_, pickerEl) => {
+    const picker = $(pickerEl);
+    const targetId = picker.data("target-input");
+    const textInput = $(`#${targetId}`);
+
+    if (!textInput.length) {
+      return;
+    }
+
+    const syncPickerFromText = () => {
+      const value = (textInput.val() || "").toString().trim();
+      if (hexPattern.test(value)) {
+        picker.val(value);
       }
-    },
-  );
+    };
+
+    const syncTextFromPicker = () => {
+      textInput.val((picker.val() || "").toString().toUpperCase());
+    };
+
+    syncPickerFromText();
+
+    textInput.on("input", syncPickerFromText);
+    textInput.on("blur", () => {
+      const value = (textInput.val() || "").toString().trim();
+      if (hexPattern.test(value)) {
+        textInput.val(value.toUpperCase());
+      }
+    });
+    picker.on("input change", syncTextFromPicker);
+  });
 }
 
 $(document).ready(() => {
@@ -69,6 +102,7 @@ $(document).ready(() => {
   bsCustomFileInput.init();
   initializeTooltips();
   initializeSettingsForm();
+  initializeThemeColorPicker();
 
   initializeConfirms();
   initializeRevealButtons();

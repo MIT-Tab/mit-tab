@@ -5,6 +5,16 @@ category:
   order: 3
 
 settings:
+  - enable_team_team_scratches:
+    name: enable_team_team_scratches
+    description: "Experimental: enforce team–team scratches in preliminary pairings and manual team changes. Off by default. Fixed outround brackets cannot be rearranged automatically to avoid these scratches."
+    value: false
+    type: boolean
+  - enable_judge_judge_scratches:
+    name: enable_judge_judge_scratches
+    description: "Experimental: enforce judge–judge scratches on panels and manual judge changes. Off by default."
+    value: false
+    type: boolean
   - tot_rounds:
     name: tot_rounds
     description: "The total number of preliminary rounds in the tournament"
@@ -39,6 +49,11 @@ settings:
     name: lenient_late
     description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."
     value: 0
+  - r2_random_within_brackets:
+    name: r2_random_within_brackets
+    description: "Pair round 2 randomly within win brackets while preventing teams from debating a team they have already debated. Later preliminary rounds continue to use speaks-based high-low pairing."
+    value: false
+    type: boolean
   - enable_room_seeding:
     name: enable_room_seeding
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."
@@ -62,3 +77,17 @@ settings:
       - [0, "Unset (No Policy)"]
       - [1, "Open (Disclose Ranks)"]
       - [2, "Closed (Do Not Disclose)"]
+  - speaker_rankings_use_single_adjusted:
+    name: speaker_rankings_use_single_adjusted
+    description: "Use single adjusted speaker points before unadjusted speaker points when sorting speaker rankings. This does not change rank priority and does not affect team rankings or pairing."
+    value: false
+    type: boolean
+  - written_rfd_first_round:
+    name: written_rfd_first_round
+    description: "The first preliminary round where judges' ballots include written reasons for decision. Use -1 to disable written RFDs."
+    value: -1
+  - written_rfd_deadline:
+    name: written_rfd_deadline
+    description: "Deadline for judges to edit written RFDs. This is interpreted in EST and applies to all rounds with written RFDs."
+    value: ""
+    type: datetime

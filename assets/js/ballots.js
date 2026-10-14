@@ -1,7 +1,7 @@
 import $ from "jquery";
 
 function selectInfo() {
-  const div = $(`div[data-option=${$(this).val()}]`);
+  const div = $(`div[data-option="${$(this).val()}"]`);
   $(".winner").each((_, el) => $(el).addClass("hidden"));
   $(div).removeClass("hidden");
 }

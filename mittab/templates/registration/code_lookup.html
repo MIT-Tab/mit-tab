@@ -1,0 +1,48 @@
+{% extends "base/__wide.html" %}
+{% load tags %}
+{% load render_bundle from webpack_loader %}
+
+{% block title %}Edit Registration{% endblock %}
+{% block banner %}<span class="registration-page-title">Edit Registration</span>{% endblock %}
+
+{% block extra_head %}
+{% render_bundle 'registrationStyles' 'css' %}
+{% endblock %}
+
+{% block content %}
+<div class="col-12 registration-lookup">
+  <div class="registration-lookup__card">
+    {% if not can_modify_registration %}
+    <div class="alert alert-warning mb-0">
+      Registration editing is currently disabled. Check back later or contact tab staff.
+    </div>
+    {% endif %}
+
+    <div>
+      <p class="registration-lookup__eyebrow">Edit Registration</p>
+      <h2 class="registration-lookup__title">Find your registration</h2>
+    </div>
+    <p class="registration-lookup__lead">Enter the registration code from your confirmation email to edit your submission.</p>
+
+    <form method="post" action="">
+      {% csrf_token %}
+      {% return_to_input request.path %}
+      <div class="registration-lookup__field">
+        <label class="registration-lookup__label" for="registration_code">Registration code</label>
+        <input type="text"
+               name="registration_code"
+               id="registration_code"
+               class="form-control registration-lookup__input"
+               placeholder="Example: bold-frog"
+               {% if not can_modify_registration %}disabled{% endif %}
+               autofocus>
+      </div>
+      <button type="submit"
+              class="btn btn-primary registration-lookup__btn mt-2"
+              {% if not can_modify_registration %}disabled{% endif %}>
+        Find Registration
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,23 +1,46 @@
 import re
+from decimal import Decimal
+from datetime import timedelta
+from unittest import mock
+from urllib.parse import urlparse
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
+    BALLOT_CODE_MAX_LENGTH,
+    CheckIn,
     Room,
     RoomCheckIn,
     TabSettings,
     Team,
     Round,
+    RoundStats,
     Judge,
     School,
     Debater,
     Outround,
     ManualJudgeAssignment,
+    JudgeCodeEmailLog,
+    WrittenRFDEmailLog,
+    Scratch,
+    AuditEvent,
 )
+from mittab.apps.tab.auth_roles import (
+    PRESET_ADD_SCRATCHES,
+    PRESET_CHECKIN_HELPER,
+    PRESET_DATA_ENTRY_HELPER,
+    PRESET_MANAGE_SCRATCHES,
+    PRESET_TAB_ASSISTANT,
+    apply_staff_permission_preset,
+)
+from mittab.libs.email_service import EmailServiceError
+from mittab.apps.tab.views.judge_views import EMAIL_RATE_LIMIT_WINDOW
 
 
 @pytest.mark.django_db(transaction=True)
@@ -68,7 +91,7 @@ class TestTabViews(TestCase):
             (reverse("view_judges"), judge.name),
             (reverse("view_judge", args=[judge.pk]), judge.name),
             (reverse("enter_judge"), "Create Judge"),
-            (reverse("view_scratches_judge", args=[judge.pk]), "Scratches"),
+            (reverse("view_scratches", args=[judge.pk]), "Scratches"),
             (reverse("view_schools"), school.name),
             (reverse("view_school", args=[school.pk]), school.name),
             (reverse("enter_school"), "Create School"),
@@ -94,6 +117,8 @@ class TestTabViews(TestCase):
             (reverse("add_scratch"), "Add Scratch"),
             (reverse("view_scratches"), "Scratches"),
             (reverse("settings_form"), "Settings"),
+            (reverse("public_homepage"), "Public Homepage"),
+            (reverse("tournament_todo"), "Tournament Checklist"),
             (reverse("view_backups"), "Backups"),
             (reverse("upload_data"), "Upload Data"),
             (reverse("confirm_start_tourny"), "Are you sure?"),
@@ -117,6 +142,273 @@ class TestTabViews(TestCase):
                 f"Failed to render {url}, got status {response.status_code}")
             self.assertIn(expected_content, response.content.decode(),
                 f"Expected content '{expected_content}' not found in {url}")
+
+    def test_add_scratches_preset_only_adds_scratches_without_duplicate_leak(self):
+        self._login_with_staff_preset(PRESET_ADD_SCRATCHES)
+        team = Team.objects.first()
+        judge = Judge.objects.first()
+        Scratch.objects.get_or_create(
+            team=team,
+            judge=judge,
+            defaults={"scratch_type": Scratch.TEAM_SCRATCH},
+        )
+
+        response = self.client.get(reverse("add_scratch"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add Scratch")
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+        response = self.client.post(
+            reverse("add_scratch"),
+            {
+                "team": team.id,
+                "judge": judge.id,
+                "scratch_type": Scratch.TEAM_SCRATCH,
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "This scratch already exists")
+
+    def test_create_and_view_scratches_preset_cannot_modify_existing_scratches(self):
+        self._login_with_staff_preset(PRESET_MANAGE_SCRATCHES)
+        team = Team.objects.first()
+        judge = Judge.objects.first()
+        Scratch.objects.get_or_create(
+            team=team,
+            judge=judge,
+            defaults={"scratch_type": Scratch.TEAM_SCRATCH},
+        )
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Viewing All Scratches")
+
+        response = self.client.get(reverse("view_scratches_team", args=[team.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Viewing Scratch Information")
+        self.assertContains(response, "fieldset disabled")
+        self.assertNotContains(response, "btn-outline-danger")
+
+        response = self.client.post(
+            reverse("view_scratches_team", args=[team.id]),
+            {
+                "1-team": team.id,
+                "1-judge": judge.id,
+                "1-scratch_type": Scratch.TAB_SCRATCH,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_checkin_helper_preset_only_allows_checkin_pages(self):
+        self._login_with_staff_preset(PRESET_CHECKIN_HELPER)
+        team = Team.objects.first()
+
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("batch_checkin"))
+
+        response = self.client.get(reverse("batch_checkin"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Batch Check-In")
+
+        response = self.client.post(
+            reverse("bulk_check_in"),
+            {
+                "entity_type": "team",
+                "action": "check_in",
+                "entity_ids[]": [str(team.id)],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+
+        response = self.client.get(reverse("settings_form"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_data_entry_helper_preset_excludes_scratches_checkins_and_pairing(self):
+        self._login_with_staff_preset(PRESET_DATA_ENTRY_HELPER)
+        school = School.objects.create(name="Delete Me")
+        team = Team.objects.first()
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Schools")
+        self.assertNotContains(response, "Email Management")
+        self.assertNotContains(response, "Manage Ranking Groups")
+
+        response = self.client.get(reverse("enter_team"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "How many initial scratches?")
+        self.assertNotContains(response, "Checked in")
+
+        response = self.client.get(reverse("view_team", args=[team.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Scratches for")
+        self.assertNotContains(response, "View Tab Card")
+
+        response = self.client.get(reverse("upload_data"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Scratch Data File")
+
+        response = self.client.get(reverse("delete_school", args=[school.id]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(School.objects.filter(id=school.id).exists())
+
+        for url in [
+                reverse("batch_checkin"),
+                reverse("settings_form"),
+                reverse("view_scratches")]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_tab_assistant_combines_checkin_and_data_entry_without_scratches(self):
+        self._login_with_staff_preset(PRESET_TAB_ASSISTANT)
+
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(reverse("batch_checkin"))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(reverse("view_scratches"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, "/403/")
+
+    def test_restricted_staff_login_redirects_to_accessible_landing_page(self):
+        user = self._create_staff_preset_user(PRESET_ADD_SCRATCHES)
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {
+                "username": user.username,
+                "password": "presetpass123",
+                "next": reverse("settings_form"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("add_scratch"))
+
+    def test_restricted_staff_login_honors_accessible_next_page(self):
+        user = self._create_staff_preset_user(PRESET_CHECKIN_HELPER)
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("tab_login"),
+            {
+                "username": user.username,
+                "password": "presetpass123",
+                "next": reverse("batch_checkin"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlparse(response["Location"]).path, reverse("batch_checkin"))
+
+    def _login_with_staff_preset(self, preset):
+        user = self._create_staff_preset_user(preset)
+        self.client.force_login(user)
+        return user
+
+    def _create_staff_preset_user(self, preset):
+        self.client.logout()
+        user = get_user_model().objects.create_user(
+            username=f"{preset}_user",
+            password="presetpass123",
+            email=f"{preset}@example.com",
+        )
+        apply_staff_permission_preset(user, preset)
+        return user
+
+    def test_staff_ballot_view_allows_editing_submitted_ballot(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.rfd = "Gov won because they controlled the weighing."
+        round_obj.save(update_fields=["rfd"])
+        TabSettings.set("written_rfd_first_round", 1)
+        TabSettings.set("written_rfd_deadline", "2099-01-01 12:00")
+
+        response = self.client.get(f"/round/{round_obj.id}/result/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Entering Ballot", content)
+        self.assertIn("Which team won the round?", content)
+        self.assertIn("Reason for Decision", content)
+        self.assertIn("Gov won because they controlled the weighing.", content)
+
+        stats = {
+            stat.debater_role: stat
+            for stat in RoundStats.objects.filter(round=round_obj)
+        }
+        response = self.client.post(
+            f"/round/{round_obj.id}/result/",
+            {
+                "winner": Round.GOV,
+                "round_instance": round_obj.id,
+                "pm_debater": stats["pm"].debater.id,
+                "pm_speaks": "30",
+                "pm_ranks": "1",
+                "mg_debater": stats["mg"].debater.id,
+                "mg_speaks": "29",
+                "mg_ranks": "2",
+                "lo_debater": stats["lo"].debater.id,
+                "lo_speaks": "28",
+                "lo_ranks": "3",
+                "mo_debater": stats["mo"].debater.id,
+                "mo_speaks": "27",
+                "mo_ranks": "4",
+                "rfd": "Staff updated the RFD text.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        round_obj.refresh_from_db()
+        self.assertEqual(round_obj.victor, Round.GOV)
+        self.assertEqual(round_obj.rfd, "Staff updated the RFD text.")
+        self.assertEqual(
+            RoundStats.objects.get(round=round_obj, debater_role="pm").speaks,
+            Decimal("30"),
+        )
+
+    def test_staff_unsubmitted_ballot_form_shows_written_rfd_field(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        RoundStats.objects.filter(round=round_obj).delete()
+        round_obj.victor = Round.NONE
+        round_obj.save(update_fields=["victor"])
+        TabSettings.set("written_rfd_first_round", 1)
+        TabSettings.set("written_rfd_deadline", "2099-01-01 12:00")
+
+        response = self.client.get(f"/round/{round_obj.id}/result/")
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Written RFD", content)
+        self.assertIn("Reason for Decision", content)
+        self.assertIn("Optional. You may submit the ballot without an RFD", content)
+
+    def test_audit_events_do_not_block_audited_object_deletion(self):
+        school = School.objects.create(name="Audit Delete School")
+        debaters = [
+            Debater.objects.create(name="Audit Delete Debater One", novice_status=0),
+            Debater.objects.create(name="Audit Delete Debater Two", novice_status=0),
+        ]
+        team = Team.objects.create(name="Audit Delete Team", school=school, seed=0)
+        team.debaters.set(debaters)
+        event = AuditEvent.record(team, AuditEvent.CREATE, self.user)
+
+        self.assertEqual(list(team.audit_events.all()), [event])
+
+        team.delete()
+
+        self.assertFalse(Team.objects.filter(pk=team.pk).exists())
+        self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
 
     def test_n_plus_one(self):
         views_to_test = [
@@ -173,6 +465,245 @@ class TestTabViews(TestCase):
             ManualJudgeAssignment.objects.filter(round=round_obj, judge=judge).exists()
         )
 
+    def test_quick_judge_checkin_validates_request(self):
+        url = reverse("quick_judge_checkin")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.json()["error"], "POST required")
+
+        response = self.client.post(url, {"round_number": "not-a-round"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid round")
+
+        response = self.client.post(url, {"round_number": "2", "judge_id": "999999"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "Judge not found")
+
+        response = self.client.post(url, {"round_number": "2", "name": ""})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Name is required")
+
+    def test_quick_judge_checkin_checks_in_existing_judge(self):
+        judge = Judge.objects.first()
+        CheckIn.objects.filter(judge=judge, round_number=7).delete()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {"round_number": "7", "judge_id": str(judge.id)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertFalse(payload["created"])
+        self.assertEqual(payload["judge"]["id"], judge.id)
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=7).exists())
+
+    def test_quick_judge_checkin_creates_judge(self):
+        school = School.objects.first()
+
+        response = self.client.post(
+            reverse("quick_judge_checkin"),
+            {
+                "round_number": "8",
+                "name": "Quick Judge",
+                "rank": "4.25",
+                "school_ids[]": [str(school.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["created"])
+
+        judge = Judge.objects.get(name="Quick Judge")
+        self.assertEqual(judge.rank, 4.25)
+        self.assertEqual(judge.created_by, self.user)
+        self.assertEqual(list(judge.schools.all()), [school])
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=8).exists())
+
+    def test_quick_judge_checkin_rejects_invalid_new_judge_data(self):
+        url = reverse("quick_judge_checkin")
+        existing = Judge.objects.first()
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": existing.name, "rank": "5"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already exists", response.json()["error"])
+
+        response = self.client.post(
+            url,
+            {"round_number": "2", "name": "Bad Rank Judge", "rank": "bad"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Invalid rank")
+
+        response = self.client.post(
+            url,
+            {
+                "round_number": "2",
+                "name": "Unknown School Judge",
+                "rank": "5",
+                "school_ids": ["999999"],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unknown school selected")
+
+        with mock.patch(
+            "mittab.apps.tab.views.pairing_views.Judge.save",
+            side_effect=ValueError("Save failed"),
+        ):
+            response = self.client.post(
+                url,
+                {"round_number": "2", "name": "Exploding Judge", "rank": "5"},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Unable to create judge check-in")
+
+    def test_team_creator_and_edit_audit_visible(self):
+        school = School.objects.first()
+        debaters = [
+            Debater.objects.create(
+                name="Audit Debater One",
+                novice_status=Debater.VARSITY,
+            ),
+            Debater.objects.create(
+                name="Audit Debater Two",
+                novice_status=Debater.VARSITY,
+            ),
+        ]
+
+        response = self.client.post(reverse("enter_team"), {
+            "name": "Audit Team",
+            "school": school.id,
+            "debaters": [debater.id for debater in debaters],
+            "seed": Team.UNSEEDED,
+            "break_preference": Team.VARSITY,
+            "checked_in": "on",
+            "ranking_public": "on",
+            "number_scratches": 0,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        team = Team.objects.get(name="Audit Team")
+        self.assertEqual(team.created_by, self.user)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                content_type__model="team",
+                object_id=team.id,
+                event_type=AuditEvent.CREATE,
+                user=self.user,
+            ).exists()
+        )
+
+        response = self.client.post(reverse("view_team", args=[team.id]), {
+            "name": "Audit Team Renamed",
+            "school": school.id,
+            "debaters": [debater.id for debater in debaters],
+            "seed": Team.UNSEEDED,
+            "break_preference": Team.VARSITY,
+            "checked_in": "on",
+            "ranking_public": "on",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        edit_event = AuditEvent.objects.get(
+            content_type__model="team",
+            object_id=team.id,
+            event_type=AuditEvent.EDIT,
+            user=self.user,
+        )
+        self.assertIn("name", edit_event.changes["fields"])
+
+        response = self.client.get(reverse("view_team", args=[team.id]))
+        content = response.content.decode()
+        self.assertIn("audit-trail", content)
+        self.assertIn("History", content)
+        self.assertIn("testuser", content)
+        self.assertIn("Edited", content)
+
+    def test_scratch_creator_and_edit_audit_visible(self):
+        school = School.objects.first()
+        debaters = [
+            Debater.objects.create(
+                name="Scratch Audit Debater One",
+                novice_status=Debater.VARSITY,
+            ),
+            Debater.objects.create(
+                name="Scratch Audit Debater Two",
+                novice_status=Debater.VARSITY,
+            ),
+        ]
+        team = Team.objects.create(
+            name="Scratch Audit Team",
+            school=school,
+            seed=Team.UNSEEDED,
+            break_preference=Team.VARSITY,
+        )
+        team.debaters.add(*debaters)
+        judge = Judge.objects.first()
+
+        response = self.client.post(reverse("add_scratch"), {
+            "team": team.id,
+            "judge": judge.id,
+            "scratch_type": Scratch.TEAM_SCRATCH,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        scratch = Scratch.objects.get(team=team, judge=judge)
+        self.assertEqual(scratch.created_by, self.user)
+
+        response = self.client.post(
+            reverse("view_scratches_team", args=[team.id]),
+            {
+                "1-team": team.id,
+                "1-judge": judge.id,
+                "1-scratch_type": Scratch.TAB_SCRATCH,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        edit_event = AuditEvent.objects.get(
+            content_type__model="scratch",
+            object_id=scratch.id,
+            event_type=AuditEvent.EDIT,
+            user=self.user,
+        )
+        self.assertIn("scratch_type", edit_event.changes["fields"])
+
+        response = self.client.get(reverse("view_scratches_team", args=[team.id]))
+        content = response.content.decode()
+        self.assertIn("Created by testuser", content)
+        self.assertIn("Edited by testuser", content)
+
+    def test_manual_judge_assignment_tracks_actor(self):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.judges.clear()
+        judge = Judge.objects.first()
+
+        response = self.client.get(
+            reverse("assign_judge", args=[round_obj.id, judge.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        assignment = ManualJudgeAssignment.objects.get(round=round_obj, judge=judge)
+        self.assertEqual(assignment.created_by, self.user)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                content_type__model="round",
+                object_id=round_obj.id,
+                event_type=AuditEvent.MANUAL_JUDGE_ASSIGN,
+                user=self.user,
+            ).exists()
+        )
+
+        response = self.client.get(reverse("view_status"))
+        self.assertIn("Manually assigned by testuser", response.content.decode())
+
     def test_view_room_saves_outround_checkin(self):
         room = Room.objects.first()
         url = reverse("view_room", args=[room.pk])
@@ -204,3 +735,263 @@ class TestTabViews(TestCase):
         )
         self.assertIsNotNone(match, f"Round card for round {round_id} not found")
         return match.group(0)
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_sends_judge_codes(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        email_service.return_value.send_bulk.return_value = 1
+
+        response = self.client.get(reverse("email_management"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("judge@example.com", response.content.decode())
+
+        response = self.client.post(
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
+        )
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_called_once()
+
+    def test_email_management_defaults_to_never_received_judge_codes(self):
+        never_sent_judge = Judge.objects.first()
+        never_sent_judge.email = "judge@example.com"
+        never_sent_judge.save()
+
+        previously_sent_judge = Judge.objects.create(
+            name="Previously Sent Judge",
+            rank=3.5,
+            email="prior@example.com",
+        )
+        previously_sent_judge.schools.add(School.objects.first())
+
+        JudgeCodeEmailLog.objects.create(
+            judge=previously_sent_judge,
+            email=previously_sent_judge.email,
+            ballot_code=previously_sent_judge.ballot_code,
+        )
+        JudgeCodeEmailLog.objects.filter(judge=previously_sent_judge).update(
+            sent_at=timezone.now() - EMAIL_RATE_LIMIT_WINDOW - timedelta(minutes=1)
+        )
+
+        registration_sent_judge = Judge.objects.create(
+            name="Registration Sent Judge",
+            rank=3.5,
+            email="registration.judge@example.com",
+        )
+        registration_sent_judge.schools.add(School.objects.first())
+        JudgeCodeEmailLog.objects.create(
+            judge=registration_sent_judge,
+            email=registration_sent_judge.email,
+            ballot_code=registration_sent_judge.ballot_code,
+            source=JudgeCodeEmailLog.SOURCE_REGISTRATION,
+        )
+
+        response = self.client.get(reverse("email_management"))
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode()
+        self.assertIn("Select Never Received", content)
+        self.assertIn("Select All", content)
+        self.assertIn("Registration Sent Judge", content)
+        self.assertIn("registration.judge@example.com", content)
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{never_sent_judge.id}" checked',
+        )
+        self.assertRegex(
+            content,
+            rf'name="judge_ids" value="{previously_sent_judge.id}" >',
+        )
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_deduplicates_judge_code_emails(self, email_service):
+        email_service.return_value.send_bulk.return_value = 1
+
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        other = Judge.objects.create(
+            name="Extra Judge",
+            rank=3.5,
+        )
+        other.schools.add(School.objects.first())
+        other.email = "judge@example.com"
+        other.save()
+
+        response = self.client.post(
+            reverse("email_management"),
+            {
+                "email_action": "judge_codes",
+                "judge_ids": [str(judge.id), str(other.id)],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        # Only one email should be queued for the shared address
+        email_service.return_value.send_bulk.assert_called_once()
+        args, _kwargs = email_service.return_value.send_bulk.call_args
+        self.assertEqual(len(list(args[0])), 1)
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_rate_limits_judge_codes(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge@example.com"
+        judge.save()
+
+        JudgeCodeEmailLog.objects.create(
+            judge=judge,
+            email=judge.email,
+            ballot_code=judge.ballot_code,
+            sent_at=timezone.now()
+        )
+
+        response = self.client.post(
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
+        )
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_not_called()
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_rate_limits_judge_codes_by_email_case_insensitive(
+        self,
+        email_service,
+    ):
+        previously_emailed_judge = Judge.objects.first()
+        previously_emailed_judge.email = "Judge@Example.com"
+        previously_emailed_judge.save()
+        JudgeCodeEmailLog.objects.create(
+            judge=previously_emailed_judge,
+            email=previously_emailed_judge.email,
+            ballot_code=previously_emailed_judge.ballot_code,
+            sent_at=timezone.now(),
+        )
+
+        judge = Judge.objects.create(
+            name="Case Match Judge",
+            rank=3.5,
+            email="judge@example.com",
+        )
+        judge.schools.add(School.objects.first())
+
+        response = self.client.post(
+            reverse("email_management"),
+            {"email_action": "judge_codes", "judge_ids": [str(judge.id)]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_not_called()
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_logs_partial_judge_code_successes(self, email_service):
+        judge = Judge.objects.first()
+        judge.email = "judge1@example.com"
+        judge.save()
+
+        other = Judge.objects.create(
+            name="Extra Partial Judge",
+            rank=3.5,
+            email="judge2@example.com",
+        )
+        other.schools.add(School.objects.first())
+
+        def fail_after_first(requests):
+            raise EmailServiceError("boom", sent_requests=list(requests[:1]))
+
+        email_service.return_value.send_bulk.side_effect = fail_after_first
+
+        response = self.client.post(
+            reverse("email_management"),
+            {
+                "email_action": "judge_codes",
+                "judge_ids": [str(judge.id), str(other.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(JudgeCodeEmailLog.objects.count(), 1)
+        self.assertEqual(JudgeCodeEmailLog.objects.first().judge, judge)
+
+    @mock.patch("mittab.apps.tab.views.judge_views.EmailService")
+    def test_email_management_sends_written_rfds(self, email_service):
+        round_obj = Round.objects.filter(round_number=1).first()
+        round_obj.victor = Round.GOV
+        round_obj.rfd = "Gov won the link debate."
+        round_obj.save()
+        TabSettings.set("written_rfd_first_round", 1)
+
+        debaters = list(round_obj.gov_team.debaters.all()) + list(
+            round_obj.opp_team.debaters.all()
+        )
+        for index, debater in enumerate(debaters):
+            debater.email = f"debater{index}@example.com"
+            debater.save()
+
+        email_service.return_value.send_bulk.return_value = len(debaters)
+
+        response = self.client.get(reverse("email_management"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Send Written RFDs", response.content.decode())
+        self.assertIn(f"Round {round_obj.round_number}", response.content.decode())
+
+        response = self.client.post(
+            reverse("email_management"),
+            {"email_action": "written_rfds", "round_ids": [str(round_obj.id)]},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        email_service.return_value.send_bulk.assert_called_once()
+        sent_requests = list(email_service.return_value.send_bulk.call_args.args[0])
+        self.assertIn(f"Judge: {round_obj.chair.name}", sent_requests[0].text_body)
+        self.assertEqual(
+            WrittenRFDEmailLog.objects.filter(round=round_obj).count(),
+            len(debaters),
+        )
+
+    def test_email_management_shows_historical_email_logs(self):
+        judge = Judge.objects.first()
+        judge.email = ""
+        judge.save()
+        JudgeCodeEmailLog.objects.create(
+            judge=judge,
+            email="",
+            ballot_code=judge.ballot_code,
+        )
+
+        round_obj = Round.objects.filter(round_number=1).first()
+        WrittenRFDEmailLog.objects.create(
+            round=round_obj,
+            email="debater@example.com",
+        )
+
+        response = self.client.get(reverse("email_management"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('id="email-management-view"', content)
+        self.assertIn('value="judge-codes"', content)
+        self.assertIn('value="written-rfds"', content)
+        self.assertIn('value="sent-history"', content)
+        self.assertIn("Sent Email History", content)
+        self.assertIn("Manual send", content)
+        self.assertIn("debater@example.com", content)
+        self.assertIn(f"ballot code {judge.ballot_code}", content)
+
+    def test_judge_ballot_code_validation(self):
+        judge = Judge.objects.first()
+        judge.ballot_code = "alpha-bravo"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "TEST123"
+        self.assertTrue(judge.is_valid_ballot_code())
+
+        judge.ballot_code = "alpha-123"
+        with self.assertRaises(ValidationError):
+            judge.is_valid_ballot_code()
+
+        judge.ballot_code = "a" * (BALLOT_CODE_MAX_LENGTH + 1)
+        with self.assertRaises(ValidationError):
+            judge.is_valid_ballot_code()
