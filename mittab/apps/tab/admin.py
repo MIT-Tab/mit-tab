@@ -1,8 +1,10 @@
 from django.contrib import admin
+
 from django import forms
 from django.utils.html import format_html
 
 from mittab.apps.tab import models
+from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
 
 
 class RoundAdminForm(forms.ModelForm):
@@ -158,6 +160,13 @@ class ExperimentalAdmin(admin.ModelAdmin):
 class OutroundChallengeAdmin(ExperimentalAdmin):
     setting_key = "outround_pairing_mode"
     enabled_values = (1, 2)
+
+    def save_model(self, request, obj, form, change):
+        list(models.BreakingTeam.objects.select_for_update().filter(
+            type_of_team=obj.type_of_round,
+        ))
+        prepare_challenge_edits(obj.type_of_round)
+        super().save_model(request, obj, form, change)
 
 
 admin.site.register(models.Debater)

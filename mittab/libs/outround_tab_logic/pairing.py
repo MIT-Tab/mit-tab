@@ -32,12 +32,37 @@ def _is_power_of_two(value):
     return value > 0 and (value & (value - 1)) == 0
 
 
+def _challenge_generation(type_of_round):
+    return BreakingTeam.objects.filter(type_of_team=type_of_round).order_by(
+        "pk",
+    ).values_list("pk", flat=True).first() or 0
+
+
+def _current_challenge_picks(type_of_round, num_teams, team_ids):
+    generation_key = f"challenge_pick_generation_{type_of_round}"
+    if TabSettings.get(generation_key, 0) != _challenge_generation(type_of_round):
+        return OutroundChallenge.objects.none()
+    return OutroundChallenge.objects.filter(
+        type_of_round=type_of_round, num_teams=num_teams, challenger_id__in=team_ids,
+    )
+
+
+def prepare_challenge_edits(type_of_round):
+    generation_key = f"challenge_pick_generation_{type_of_round}"
+    generation = _challenge_generation(type_of_round)
+    if TabSettings.get(generation_key, 0) != generation:
+        OutroundChallenge.objects.filter(type_of_round=type_of_round).delete()
+        TabSettings.set(generation_key, generation)
+
+
 def _setting_key_for_current_challenger(type_of_round, num_teams):
-    return f"challenge_current_{type_of_round}_{num_teams}"
+    generation = _challenge_generation(type_of_round)
+    return f"challenge_current_{type_of_round}_{num_teams}_{generation}"
 
 
 def _setting_key_for_challenge_once(type_of_round):
-    return f"challenge_once_applied_{type_of_round}"
+    generation = _challenge_generation(type_of_round)
+    return f"challenge_once_applied_{type_of_round}_{generation}"
 
 
 def _get_challenge_settings():
@@ -94,10 +119,8 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, challenge_sett
     remaining = ordered[:]
     picks = {
         entry.challenger_id: entry.challenged_id
-        for entry in OutroundChallenge.objects.filter(
-            type_of_round=type_of_break,
-            num_teams=num_teams,
-            challenger_id__in=[b.team.id for b in ordered],
+        for entry in _current_challenge_picks(
+            type_of_break, num_teams, [entry.team_id for entry in ordered],
         )
     }
     picked_ids = list(picks) + list(picks.values())
@@ -176,10 +199,8 @@ def get_challenge_setup_context(type_of_break, num_teams):
     ordered = _ordered_breaking_teams(base_queryset, seed_basis)
     challenge_map = {
         entry.challenger_id: entry.challenged_id
-        for entry in OutroundChallenge.objects.filter(
-            type_of_round=type_of_break,
-            num_teams=num_teams,
-            challenger_id__in=[b.team.id for b in ordered],
+        for entry in _current_challenge_picks(
+            type_of_break, num_teams, [entry.team_id for entry in ordered],
         )
     }
     current_challenger_id = int(TabSettings.get(
@@ -240,6 +261,7 @@ def save_challenge_pick(type_of_break, num_teams, challenger_id, challenged_id):
     if challenger_id not in valid_team_ids or challenged_id not in valid_team_ids:
         raise ValueError("Selected teams are not in this challenge pool.")
 
+    prepare_challenge_edits(type_of_break)
     conflicting = OutroundChallenge.objects.filter(
         type_of_round=type_of_break,
         num_teams=num_teams,
@@ -268,11 +290,11 @@ def save_current_challenger(type_of_break, num_teams, challenger_id):
     valid_team_ids = set(challenge_context["pending_ids"])
     if challenger_id and challenger_id not in valid_team_ids:
         raise ValueError("Selected current challenger is invalid.")
+    prepare_challenge_edits(type_of_break)
     TabSettings.set(
-    _setting_key_for_current_challenger(
-        type_of_break,
-        num_teams),
-         challenger_id or 0)
+        _setting_key_for_current_challenger(type_of_break, num_teams),
+        challenger_id or 0,
+    )
 
 
 def perform_the_break():
@@ -295,14 +317,12 @@ def _perform_the_break_experimental():
 
     if (nov_teams_to_break is None or var_teams_to_break is None or
             nov_teams_to_break < 0 or var_teams_to_break < 0):
-        return False, "Please check your break tab challenge_settings"
+        return False, "Please check your break tab settings"
 
     # This forces a refresh of the breaking teams
     Outround.objects.all().delete()
     OutroundChallenge.objects.all().delete()
     BreakingTeam.objects.all().delete()
-    TabSettings.set(_setting_key_for_challenge_once(BreakingTeam.VARSITY), 0)
-    TabSettings.set(_setting_key_for_challenge_once(BreakingTeam.NOVICE), 0)
 
     current_seed = 1
     for team in teams:

@@ -181,3 +181,7 @@ Upset winners inherit their opponent's bracket slot in both modes; original brea
 seeds remain unchanged. Partial breaks use standard pairings until a complete
 power-of-two pool is available. Finals use standard pairings. Pairings and judges
 still use the existing side, room, and judge-conflict rules.
+
+Challenge picks, challenger overrides, and the challenge-once marker belong to the
+current break. Rebreaking while Standard Bracket is selected does not carry old
+challenge state into a later experimental break.

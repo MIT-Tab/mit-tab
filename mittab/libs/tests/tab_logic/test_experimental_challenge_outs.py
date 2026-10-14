@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+# pylint: disable=protected-access
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -169,6 +171,7 @@ class TestExperimentalChallengeOuts(TestCase):
         teams = self.teams()
         outround_tab_logic.pair(0)
         baseline = self.pairs(8)
+        TabSettings.set("challenge_pick_generation_0", pairing._challenge_generation(0))
         OutroundChallenge.objects.create(
             num_teams=8, type_of_round=0,
             challenger=teams[0].team, challenged=teams[1].team,
@@ -194,3 +197,35 @@ class TestExperimentalChallengeOuts(TestCase):
     def test_finals_do_not_offer_challenge_picks(self):
         self.perform_break(1)
         self.assertFalse(pairing.get_challenge_setup_context(0, 2)["enabled"])
+
+
+    def test_rebreak_while_disabled_does_not_reuse_old_experimental_state(self):
+        self.perform_break(2)
+        teams = self.teams()
+        pairing.save_challenge_pick(0, 8, teams[0].team_id, teams[1].team_id)
+        outround_tab_logic.pair(0)
+        old_generation = pairing._challenge_generation(0)
+        self.perform_break(0)
+        TabSettings.set("outround_pairing_mode", 2)
+        self.assertNotEqual(pairing._challenge_generation(0), old_generation)
+        context = pairing.get_challenge_setup_context(0, 8)
+        self.assertTrue(context["enabled"])
+        self.assertTrue(all(item["challenged_id"] is None for item in context["challenges"]))
+        teams = self.teams()
+        pairing.save_challenge_pick(0, 8, teams[0].team_id, teams[2].team_id)
+        self.assertEqual(OutroundChallenge.objects.filter(type_of_round=0).count(), 1)
+        outround_tab_logic.pair(0)
+        self.assertIn(tuple(sorted((teams[0].team_id, teams[2].team_id))), self.pairs(8))
+
+
+    def test_admin_pick_belongs_to_current_break(self):
+        self.perform_break(1)
+        teams = self.teams()
+        response = self.client.post(reverse("admin:tab_outroundchallenge_add"), {
+            "num_teams": 8, "type_of_round": 0,
+            "challenger": teams[0].team_id, "challenged": teams[1].team_id,
+            "_save": "Save",
+        })
+        self.assertEqual(response.status_code, 302)
+        outround_tab_logic.pair(0)
+        self.assertIn(tuple(sorted((teams[0].team_id, teams[1].team_id))), self.pairs(8))
