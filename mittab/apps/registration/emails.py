@@ -16,13 +16,18 @@ from mittab.libs.email_service import EmailService, EmailServiceError
 from mittab.libs.email_views import (
     build_judge_ballot_code_email,
     build_registration_confirmation_email as build_confirmation_email_request,
-    build_registration_team_portal_email,
 )
 
 from .models import (
     Registration,
     RegistrationConfirmationEmailLog,
     RegistrationLink,
+)
+
+from .team_emails import (
+    build_team_code_emails,
+    prepare_team_code_plan,
+    send_team_code_entries,
 )
 
 
@@ -51,25 +56,6 @@ def _registration_for_email(registration):
     )
 
 
-def _team_portal_url(request, team):
-    return request.build_absolute_uri(reverse("team_portal", args=[team.team_code]))
-
-
-def _team_recipient_emails(team):
-    emails = []
-    seen = set()
-    for debater in team.debaters.all():
-        email = (debater.email or "").strip()
-        if not email:
-            continue
-        key = email.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        emails.append(email)
-    return emails
-
-
 def build_registration_confirmation_email(registration, request):
     registration = _registration_for_email(registration)
     tournament_name = TabSettings.get("tournament_name", "Tournament")
@@ -94,6 +80,7 @@ def send_registration_confirmation_email(registration, request):
         RegistrationConfirmationEmailLog.objects.create(
             registration=registration,
             email=email_request.to_address,
+            email_payload=email_request.snapshot,
             successful=False,
             error_message=str(exc),
         )
@@ -102,6 +89,7 @@ def send_registration_confirmation_email(registration, request):
     RegistrationConfirmationEmailLog.objects.create(
         registration=registration,
         email=email_request.to_address,
+        email_payload=email_request.snapshot,
         successful=True,
     )
     return sent
@@ -109,32 +97,19 @@ def send_registration_confirmation_email(registration, request):
 
 def build_registration_team_portal_emails(registration, request):
     registration = _registration_for_email(registration)
-    tournament_name = TabSettings.get("tournament_name", "Tournament")
-    email_requests = []
-
-    for team in registration.teams.all():
-        portal_url = _team_portal_url(request, team)
-        recipient_emails = _team_recipient_emails(team)
-        if not recipient_emails:
-            continue
-        for email in recipient_emails:
-            email_requests.append(
-                build_registration_team_portal_email(
-                    email,
-                    team,
-                    tournament_name,
-                    portal_url,
-                )
-            )
-
-    return email_requests
+    return [
+        email_request
+        for team in registration.teams.all()
+        for email_request in build_team_code_emails(team, request)
+    ]
 
 
 def send_registration_team_portal_emails(registration, request):
-    email_requests = build_registration_team_portal_emails(registration, request)
-    if not email_requests:
-        return 0
-    return EmailService().send_bulk(email_requests)
+    registration = _registration_for_email(registration)
+    entries = prepare_team_code_plan(registration.teams.all(), request)
+    return send_team_code_entries(
+        entries, source="registration", service_factory=EmailService,
+    )
 
 
 def _build_registration_judge_code_plan(registration, request):
@@ -232,6 +207,7 @@ def _build_registration_judge_code_plan(registration, request):
                     email=email,
                     ballot_code=judge.ballot_code,
                     source=JudgeCodeEmailLog.SOURCE_REGISTRATION,
+                    email_payload=email_request.snapshot,
                 ),
             }
         )

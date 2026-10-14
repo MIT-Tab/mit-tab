@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
 
-from mittab.apps.tab.models import School
+from mittab.apps.tab.models import EmailContentLog, School
 from mittab.libs.codes import generate_readable_auth_code
 
 
@@ -97,7 +97,7 @@ class RegistrationChangeLog(models.Model):
         return f"{self.get_action_display()} {self.registration_code}"
 
 
-class RegistrationConfirmationEmailLog(models.Model):
+class RegistrationConfirmationEmailLog(EmailContentLog):
     registration = models.ForeignKey(
         Registration,
         related_name="confirmation_email_logs",

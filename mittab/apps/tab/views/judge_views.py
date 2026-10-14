@@ -30,6 +30,12 @@ from mittab.apps.registration.models import (
     RegistrationConfirmationEmailLog,
 )
 
+from mittab.apps.tab.views.team_email_views import (
+    send_team_code_emails,
+    team_code_history_rows,
+    team_email_management_context,
+)
+
 
 EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
 EMAILS_PER_ADDRESS_PER_WINDOW = 1
@@ -139,6 +145,7 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             email=email,
             ballot_code=judge.ballot_code,
             source=JudgeCodeEmailLog.SOURCE_MANUAL,
+            email_payload=email_request.snapshot,
         )
 
         sendable.append({
@@ -233,8 +240,11 @@ def _prepare_written_rfd_plan(rounds, tournament_name):
             for email in recipient_emails
         ]
         log_entries = [
-            WrittenRFDEmailLog(round=round_obj, email=email)
-            for email in recipient_emails
+            WrittenRFDEmailLog(
+                round=round_obj, email=email_request.to_address,
+                email_payload=email_request.snapshot,
+            )
+            for email_request in email_requests
         ]
         sendable.append({
             "round": round_obj,
@@ -596,6 +606,12 @@ def _judge_email_management_context(request):
         status = status_lookup.get(judge.id, "Ready" if can_send else "Not eligible")
         judge_rows.append({
             "judge": judge,
+            "preview": build_judge_ballot_code_email(
+                judge.email, judge, tournament_name,
+                request.build_absolute_uri(reverse("judge_portal", args=[judge.ballot_code])),
+                request.build_absolute_uri(reverse("e_ballot_search")),
+            ) if (judge.email and judge.ballot_code
+                  and judge.is_valid_ballot_code(raise_error=False)) else None,
             "email": judge.email or "",
             "ballot_code": judge.ballot_code,
             "can_send": can_send,
@@ -760,6 +776,7 @@ def _registration_confirmation_email_management_context(request):
             status = "Failed"
         rows.append({
             "registration": registration,
+            "preview": sendable_by_id.get(registration.id, {}).get("email_request"),
             "can_send": can_send,
             "checked": can_send and registration.id in selected_id_set,
             "status": status,
@@ -781,6 +798,7 @@ def _registration_confirmation_log(entry, successful, error_message=""):
     return RegistrationConfirmationEmailLog(
         registration=entry["registration"],
         email=entry["email_request"].to_address,
+        email_payload=entry["email_request"].snapshot,
         successful=successful,
         error_message=error_message,
     )
@@ -912,6 +930,7 @@ def _written_rfd_email_management_context(request):
         winner = round_obj.winner
         round_rows.append({
             "round": round_obj,
+            "previews": sendable_by_id.get(round_obj.id, {}).get("email_requests", []),
             "winner": winner.display if winner else round_obj.get_victor_display(),
             "recipient_count": recipient_count,
             "can_send": can_send,
@@ -1017,6 +1036,7 @@ def _judge_code_history_rows():
             "recipient": log.email,
             "detail": f"{log.get_source_display()} send; ballot code {log.ballot_code}",
             "sent_at": log.sent_at,
+            "email_payload": log.email_payload,
         })
     return rows
 
@@ -1043,6 +1063,7 @@ def _written_rfd_history_rows():
                 f"{round_obj.opp_team.display}"
             ),
             "sent_at": log.sent_at,
+            "email_payload": log.email_payload,
         })
     return rows
 
@@ -1070,26 +1091,44 @@ def _registration_confirmation_history_rows():
             "recipient": log.email,
             "detail": detail,
             "sent_at": log.sent_at,
+            "email_payload": log.email_payload,
         })
     return rows
+
+
+def _staff_invite_history_rows():
+    return [{
+        "type": "Staff invitation",
+        "target": log.username,
+        "target_url": "",
+        "recipient": log.email,
+        "detail": "Sent successfully" if log.successful else f"Failed: {log.error_message}",
+        "sent_at": log.sent_at,
+        "email_payload": log.email_payload,
+    } for log in StaffInviteEmailLog.objects.order_by("-sent_at")]
 
 
 def _email_history_rows():
     rows = (
         _judge_code_history_rows() +
         _written_rfd_history_rows() +
-        _registration_confirmation_history_rows()
+        _registration_confirmation_history_rows() +
+        team_code_history_rows() +
+        _staff_invite_history_rows()
     )
     return sorted(rows, key=lambda row: row["sent_at"], reverse=True)
 
 
 def email_management(request):
+    team_context = team_email_management_context(request)
     judge_context = _judge_email_management_context(request)
     registration_context = _registration_confirmation_email_management_context(request)
     rfd_context = _written_rfd_email_management_context(request)
 
     if request.method == "POST":
         action = request.POST.get("email_action")
+        if action == "team_codes":
+            return send_team_code_emails(request, team_context["selected_entries"])
         if action == "written_rfds":
             return _send_written_rfd_emails(
                 request,
@@ -1110,6 +1149,7 @@ def email_management(request):
         request,
         "tab/email_management.html",
         {
+            "team_email": team_context,
             "judge_email": judge_context,
             "registration_email": registration_context,
             "written_rfd_email": rfd_context,

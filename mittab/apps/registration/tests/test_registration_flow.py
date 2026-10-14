@@ -415,7 +415,7 @@ def test_registration_flow_creates_objects(email_service, client):
         for request in team_portal_requests
     )
     assert all(
-        "Team code:" not in request.text_body
+        f"Team code: {team.team_code}" in request.text_body
         for request in team_portal_requests
     )
     judge_code_request = (

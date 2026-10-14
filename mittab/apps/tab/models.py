@@ -487,6 +487,8 @@ class Team(AuditAttributionMixin):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
+    code_email_history_unknown = models.BooleanField(default=False)
+    code_email_baseline = models.JSONField(default=dict, blank=True)
     team_code = models.CharField(max_length=255,
                                  blank=True,
                                  null=True,
@@ -725,7 +727,40 @@ class Judge(AuditAttributionMixin):
         ordering = ["name"]
 
 
-class JudgeCodeEmailLog(models.Model):
+class EmailContentLog(models.Model):
+    """Immutable email content; empty for records created before tracking began."""
+
+    email_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        abstract = True
+
+
+class TeamCodeEmailLog(EmailContentLog):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="code_email_logs")
+    email = models.EmailField()
+    team_snapshot = models.JSONField(default=dict)
+    source = models.CharField(max_length=20, default="manual")
+    successful = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["team", "sent_at"]),
+            models.Index(fields=["email", "sent_at"]),
+        ]
+
+
+class StaffInviteEmailLog(EmailContentLog):
+    username = models.CharField(max_length=150)
+    email = models.EmailField()
+    successful = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+
+class JudgeCodeEmailLog(EmailContentLog):
     SOURCE_MANUAL = "manual"
     SOURCE_REGISTRATION = "registration"
     SOURCE_CHOICES = (
@@ -750,7 +785,7 @@ class JudgeCodeEmailLog(models.Model):
         ]
 
 
-class WrittenRFDEmailLog(models.Model):
+class WrittenRFDEmailLog(EmailContentLog):
     round = models.ForeignKey(
         "Round", on_delete=models.CASCADE, related_name="written_rfd_email_logs"
     )

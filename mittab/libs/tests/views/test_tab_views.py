@@ -754,6 +754,7 @@ class TestTabViews(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         email_service.return_value.send_bulk.assert_called_once()
+        self.assertTrue(JudgeCodeEmailLog.objects.get(judge=judge).email_payload)
 
     def test_email_management_defaults_to_never_received_judge_codes(self):
         never_sent_judge = Judge.objects.first()
@@ -950,6 +951,8 @@ class TestTabViews(TestCase):
             WrittenRFDEmailLog.objects.filter(round=round_obj).count(),
             len(debaters),
         )
+        log = WrittenRFDEmailLog.objects.filter(round=round_obj).first()
+        self.assertEqual(log.email_payload, sent_requests[0].snapshot)
 
     def test_email_management_shows_historical_email_logs(self):
         judge = Judge.objects.first()
