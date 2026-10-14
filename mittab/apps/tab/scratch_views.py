@@ -389,7 +389,7 @@ def view_scratches_for_object(request, object_id, object_type):
         request,
         "common/data_entry_multiple.html",
         {
-            "title": f"Viewing Scratch Information for {obj}",
+            "title": f"Experimental: Viewing Scratch Information for {obj}",
             "data_type": "Scratch",
             "forms": [(form, delete_link, None) for form, delete_link in forms],
             "links": [(reverse("experimental_add_scratch") + add_query, "Add Scratch")],
@@ -429,7 +429,7 @@ def scratch_detail(request, scratch_type, scratch_id):
         request,
         "scratches/detail.html",
         {
-            "title": f"Viewing Scratch: {scratch_obj}",
+            "title": f"Experimental: Viewing Scratch: {scratch_obj}",
             "data_type": "Scratch",
             "form": form_obj,
             "delete_link": reverse("experimental_scratch_delete", args=(scratch_type, scratch_id)),

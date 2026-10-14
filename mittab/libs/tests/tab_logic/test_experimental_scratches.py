@@ -120,3 +120,18 @@ class TestExperimentalScratchDefaults(TestCase):
         TabSettings.set("enable_judge_judge_scratches", 1)
         response = self.client.get(reverse("admin:tab_judgejudgescratch_add"))
         self.assertEqual(response.status_code, 200)
+
+
+    def test_enabled_features_without_scratches_keep_standard_pairing_paths(self):
+        TabSettings.set("enable_team_team_scratches", 1)
+        TabSettings.set("enable_judge_judge_scratches", 1)
+        TeamTeamScratch.objects.all().delete()
+        JudgeJudgeScratch.objects.all().delete()
+        with patch.object(tab_logic, "_pair_round_experimental") as team_path, \
+                patch.object(assign_judges, "_add_judges_experimental") as judge_path:
+            tab_logic.pair_round()
+            TabSettings.set("cur_round", 2)
+            assign_judges.add_judges()
+            team_path.assert_not_called()
+            judge_path.assert_not_called()
+            self.assertTrue(Round.objects.filter(round_number=1).exists())

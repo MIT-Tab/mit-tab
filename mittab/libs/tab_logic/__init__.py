@@ -14,7 +14,8 @@ from mittab.libs.tab_logic.rankings import *
 
 
 def pair_round():
-    if TabSettings.get("enable_team_team_scratches", 0) == 1:
+    if (TabSettings.get("enable_team_team_scratches", 0) == 1
+            and TeamTeamScratch.objects.exists()):
         with transaction.atomic():
             return _pair_round_experimental()
     return _pair_round_standard()

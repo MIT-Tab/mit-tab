@@ -107,7 +107,8 @@ def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
 
 
 def add_judges():
-    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+    if (TabSettings.get("enable_judge_judge_scratches", 0) == 1
+            and JudgeJudgeScratch.objects.exists()):
         with transaction.atomic():
             return _add_judges_experimental()
     return _add_judges_standard()
@@ -738,7 +739,8 @@ def _assign_outround_judges_for_specs(
         pairing_settings,
         available_indices,
         force_novice_last=False):
-    if TabSettings.get("enable_judge_judge_scratches", 0) != 1:
+    if (TabSettings.get("enable_judge_judge_scratches", 0) != 1
+            or not JudgeJudgeScratch.objects.exists()):
         return _assign_outround_judges_standard(
             round_specs, pairings_by_spec, panel_size_by_spec, judges,
             judge_scores, pairing_settings, available_indices, force_novice_last,
