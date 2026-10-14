@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
-from mittab.apps.tab.models import Debater, Round, School, TabSettings
+from mittab.apps.tab.models import Debater, Round, School, TabSettings, Team
 from mittab.apps.tab.public_rankings import (
     get_standings_publication_setting,
     set_standings_publication_setting,
@@ -38,16 +38,27 @@ class TestApdaBoardViews(TestCase):
     def test_apda_board_allowed_pages_render(self):
         school = School.objects.first()
         debater = Debater.objects.first()
+        team = Team.objects.first()
 
         urls = [
             reverse("apda_board_home"),
             reverse("apda_board_school_detail", args=[school.id]),
             reverse("apda_board_debater_detail", args=[debater.id]),
+            reverse("all_tab_cards"),
+            reverse("tab_card", args=[team.id]),
+            reverse("pretty_tab_card", args=[team.id]),
+            reverse("forum_post"),
             reverse("public_home"),
         ]
         for url in urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
+
+    def test_apda_board_navigation_includes_tab_cards_and_forum_post(self):
+        response = self.client.get(reverse("apda_board_home"))
+
+        self.assertContains(response, f'href="{reverse("all_tab_cards")}"')
+        self.assertContains(response, f'href="{reverse("forum_post")}"')
 
     def test_apda_board_blocked_pages_redirect_to_403(self):
         school = School.objects.first()
