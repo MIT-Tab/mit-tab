@@ -23,6 +23,13 @@
     {{ form.media }}
     <form action="" method="post" id="data-entry-form">
         {% csrf_token %}
+        {% if form.errors %}
+            <div class="alert alert-danger" role="alert">
+                <strong>Settings were not saved.</strong>
+                Correct the highlighted field{{ form.errors|length|pluralize }} and try again.
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
         <input type="hidden" name="visited_categories" id="visited-categories">
         <div class="tab-content">
             {% for category in categories %}
@@ -109,6 +116,19 @@
 
     document.getElementById("data-entry-form").addEventListener("submit", syncVisited);
     syncVisited();
+
+    const firstError = document.querySelector('.invalid-feedback');
+    if (firstError) {
+      const errorTabPane = firstError.closest('.tab-pane');
+      if (errorTabPane) {
+        const errorTab = document.querySelector(
+          '.nav-link[href="#' + errorTabPane.id + '"]'
+        );
+        if (errorTab) {
+          $(errorTab).tab('show');
+        }
+      }
+    }
   })();
 </script>
 {% endblock %}

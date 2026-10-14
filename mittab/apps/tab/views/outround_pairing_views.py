@@ -112,10 +112,12 @@ def pair_next_outround(request, num_teams, type_of_round):
 def get_outround_options(var_teams_to_break, nov_teams_to_break):
     outround_options = []
 
-    while not math.log(var_teams_to_break, 2) % 1 == 0:
+    while (var_teams_to_break > 0 and
+           not math.log(var_teams_to_break, 2) % 1 == 0):
         var_teams_to_break += 1
 
-    while not math.log(nov_teams_to_break, 2) % 1 == 0:
+    while (nov_teams_to_break > 0 and
+           not math.log(nov_teams_to_break, 2) % 1 == 0):
         nov_teams_to_break += 1
 
     while var_teams_to_break > 1:
@@ -354,23 +356,33 @@ def outround_pairing_view(request,
 
     choice = TabSettings.get("choice", 0)
 
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
+        return redirect_and_flash_error(request,
+                                        "Please check your break tab settings",
+                                        path="/")
+
     if num_teams is None:
-        num_teams = TabSettings.get("var_teams_to_break", 8)
+        if var_teams_to_break:
+            num_teams = var_teams_to_break
+            type_of_round = BreakingTeam.VARSITY
+        elif nov_teams_to_break:
+            num_teams = nov_teams_to_break
+            type_of_round = BreakingTeam.NOVICE
+        else:
+            return redirect_and_flash_error(
+                request, "No outround breaks are configured", path="/"
+            )
 
         while not math.log(num_teams, 2) % 1 == 0:
             num_teams += 1
 
         return redirect("outround_pairing_view",
-                        type_of_round=BreakingTeam.VARSITY,
+                        type_of_round=type_of_round,
                         num_teams=num_teams)
-
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
-
-    if not nov_teams_to_break or not var_teams_to_break:
-        return redirect_and_flash_error(request,
-                                        "Please check your break tab settings",
-                                        path="/")
 
     outround_options = get_outround_options(var_teams_to_break,
                                             nov_teams_to_break)

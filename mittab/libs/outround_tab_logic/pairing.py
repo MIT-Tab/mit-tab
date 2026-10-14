@@ -26,7 +26,8 @@ def perform_the_break():
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
-    if not nov_teams_to_break or not var_teams_to_break:
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
         return False, "Please check your break tab settings"
 
     # This forces a refresh of the breaking teams
@@ -62,8 +63,10 @@ def perform_the_break():
 
         current_seed += 1
 
-    pair(BreakingTeam.VARSITY)
-    pair(BreakingTeam.NOVICE)
+    if var_teams_to_break:
+        pair(BreakingTeam.VARSITY)
+    if nov_teams_to_break:
+        pair(BreakingTeam.NOVICE)
 
     return True, "Success!"
 
