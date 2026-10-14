@@ -111,6 +111,41 @@ class TestPostOperations(TestCase):
 
         mock_set.assert_called_once_with("lenient_late", 1)
 
+    def test_settings_form_accepts_zero_breaks(self):
+        form = SettingsForm(
+            {
+                "setting_var_teams_to_break": "0",
+                "setting_nov_teams_to_break": "0",
+            },
+            settings=[
+                {
+                    "name": "var_teams_to_break",
+                    "value": 8,
+                    "description": "Varsity break size",
+                },
+                {
+                    "name": "nov_teams_to_break",
+                    "value": 4,
+                    "description": "Novice break size",
+                },
+            ],
+        )
+
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.assertEqual(TabSettings.get("var_teams_to_break"), 0)
+        self.assertEqual(TabSettings.get("nov_teams_to_break"), 0)
+
+    def test_settings_form_surfaces_errors_without_claiming_success(self):
+        response = self.client.post(
+            reverse("settings_form"),
+            {"setting_var_teams_to_break": "not a number"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Settings were not saved.")
+        self.assertContains(response, "Enter a whole number")
+
     def test_action_operations(self):
         TabSettings.set("cur_round", 3)
         school = School.objects.create(name="School To Delete")

@@ -734,10 +734,14 @@ class SettingsForm(forms.Form):
                     ),
                 )
             else:
+                minimum = 0 if setting["name"] in {
+                    "nov_teams_to_break", "var_teams_to_break"
+                } else None
                 self.fields[field_name] = forms.IntegerField(
                     label=label,
                     help_text=setting["description"],
                     initial=setting["value"],
+                    min_value=minimum,
                     widget=forms.NumberInput(attrs={
                         "class": "form-control"
                     })

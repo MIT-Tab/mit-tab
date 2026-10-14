@@ -29,6 +29,34 @@ class TestOutroundPairingLogic(TestCase):
         outround_tab_logic.pair(BreakingTeam.NOVICE)
         outround_tab_logic.pair(BreakingTeam.VARSITY)
 
+    def test_break_can_disable_novice_break(self):
+        self.generate_checkins()
+        TabSettings.set("nov_teams_to_break", 0)
+
+        success, message = outround_tab_logic.perform_the_break()
+
+        self.assertTrue(success, message)
+        self.assertFalse(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.NOVICE
+        ).exists())
+        self.assertTrue(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.VARSITY
+        ).exists())
+
+    def test_break_can_disable_varsity_break(self):
+        self.generate_checkins()
+        TabSettings.set("var_teams_to_break", 0)
+
+        success, message = outround_tab_logic.perform_the_break()
+
+        self.assertTrue(success, message)
+        self.assertFalse(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.VARSITY
+        ).exists())
+        self.assertTrue(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.NOVICE
+        ).exists())
+
     def enter_results(self, type_of_round):
         outrounds = Outround.objects.filter(type_of_round=type_of_round).all()
 
