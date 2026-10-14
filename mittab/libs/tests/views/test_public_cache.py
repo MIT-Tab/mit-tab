@@ -1,4 +1,6 @@
 # pylint: disable=W0212
+from unittest.mock import MagicMock
+
 import pytest
 from django.core.cache import caches
 from django.test import TestCase, Client
@@ -7,7 +9,10 @@ from django.urls import reverse
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
 from mittab.apps.tab.public_rankings import set_ranking_settings
 from mittab.libs.cacheing import cache_logic
-from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.cacheing.public_cache import (
+    _advance_generation,
+    invalidate_all_public_caches,
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -80,6 +85,25 @@ class TestPublicCache(TestCase):
         except AttributeError:
             # Fallback for different cache backends
             return -1
+
+    def test_advancing_an_existing_cache_generation(self):
+        cache = MagicMock()
+        cache.add.return_value = False
+
+        _advance_generation(cache, "pretty_pair")
+
+        cache.incr.assert_called_once_with("pv:pretty_pair:generation")
+
+    def test_advancing_generation_recovers_if_key_disappears(self):
+        cache = MagicMock()
+        cache.add.return_value = False
+        cache.incr.side_effect = ValueError
+
+        _advance_generation(cache, "pretty_pair")
+
+        cache.set.assert_called_once_with(
+            "pv:pretty_pair:generation", 1, timeout=None
+        )
 
     def test_caching_behavior_and_cdn_headers(self):
         """Test that responses are cached, reused, and have correct CDN headers."""
