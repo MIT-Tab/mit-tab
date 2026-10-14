@@ -102,7 +102,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         checkbox.checked =
-          mode === "all" || row.dataset.neverReceived === "true";
+          mode === "all" ||
+          (mode === "needs-resend"
+            ? row.dataset.needsResend === "true"
+            : row.dataset.neverReceived === "true");
       });
     });
   });

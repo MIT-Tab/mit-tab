@@ -61,3 +61,5 @@ class TestRegistrationEmailManagement(TestCase):
         )
         self.assertEqual(log.email, "registration@example.com")
         self.assertTrue(log.successful)
+        sent_request = email_service.return_value.send_bulk.call_args.args[0][0]
+        self.assertEqual(log.email_payload, sent_request.snapshot)

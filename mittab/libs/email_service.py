@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Iterable, List, Optional, Sequence, Set
 
 import boto3
@@ -28,6 +28,11 @@ class EmailRequest:
     html_body: Optional[str] = None
     reply_to: Optional[Sequence[str]] = None
     from_address: Optional[str] = None
+
+    @property
+    def snapshot(self):
+        """Store the actual payload rather than reconstructing past email content."""
+        return asdict(self)
 
 
 class EmailService:

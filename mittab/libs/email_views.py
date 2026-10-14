@@ -227,12 +227,14 @@ def build_registration_team_portal_email(
         "are open.\n\n"
         f"Team: {team.name}\n"
         f"Debaters: {debater_names}\n"
+        f"Team code: {team.team_code}\n"
         f"Team portal: {portal_url}\n\n"
         "Thanks,\n"
         "The Tab Team"
     )
     context = {
         "team_name": team.name,
+        "team_code": team.team_code,
         "tournament_name": tournament_name,
         "debater_names": debater_names,
         "portal_url": portal_url,
