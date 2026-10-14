@@ -1,11 +1,13 @@
 import math
 import random
 
+from django.db import transaction
+from django.db.models import Q
+
 from mittab.apps.tab.models import *
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
-from mittab.libs.outround_tab_logic.helpers import offset_to_quotient
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
 )
@@ -39,8 +41,12 @@ def _setting_key_for_challenge_once(type_of_round):
 
 
 def _get_challenge_settings():
+    mode = int(TabSettings.get("outround_pairing_mode", OutroundPairingMode.STANDARD))
+    if mode not in (OutroundPairingMode.CHALLENGE_EACH_ROUND,
+                    OutroundPairingMode.CHALLENGE_ONCE):
+        mode = OutroundPairingMode.STANDARD
     return {
-        "mode": int(TabSettings.get("outround_pairing_mode", OutroundPairingMode.STANDARD)),
+        "mode": mode,
         "seed_basis": int(TabSettings.get(
             "challenge_seed_basis",
             ChallengeSeedBasis.PREVIOUS_ROUND,
@@ -49,13 +55,15 @@ def _get_challenge_settings():
 
 
 def _ordered_breaking_teams(base_queryset, seed_basis):
-    order_field = "seed" if seed_basis == ChallengeSeedBasis.ORIGINAL else "effective_seed"
+    order_field = (
+        "seed" if seed_basis == ChallengeSeedBasis.ORIGINAL else "effective_seed"
+    )
     return list(base_queryset.select_related("team").order_by(order_field, "team__id"))
 
 
 def challenge_round_enabled(type_of_break, num_teams, actual_num_teams):
-    settings = _get_challenge_settings()
-    mode = settings["mode"]
+    challenge_settings = _get_challenge_settings()
+    mode = challenge_settings["mode"]
     if mode == OutroundPairingMode.STANDARD:
         return False
     if num_teams < 4 or actual_num_teams != num_teams:
@@ -72,13 +80,14 @@ def challenge_round_enabled(type_of_break, num_teams, actual_num_teams):
 def _resolve_current_challenger(remaining_teams, current_override_id):
     remaining_ids = {entry.team.id for entry in remaining_teams}
     if current_override_id in remaining_ids:
-        return next(entry for entry in remaining_teams if entry.team.id == current_override_id)
+        return next(entry for entry in remaining_teams if entry.team.id ==
+                    current_override_id)
     return remaining_teams[0]
 
 
-def _get_challenge_pairs(type_of_break, num_teams, base_queryset, settings):
-    seed_basis = settings["seed_basis"]
-    if settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE:
+def _get_challenge_pairs(type_of_break, num_teams, base_queryset, challenge_settings):
+    seed_basis = challenge_settings["seed_basis"]
+    if challenge_settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE:
         seed_basis = ChallengeSeedBasis.PREVIOUS_ROUND
 
     ordered = _ordered_breaking_teams(base_queryset, seed_basis)
@@ -91,6 +100,12 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, settings):
             challenger_id__in=[b.team.id for b in ordered],
         )
     }
+    picked_ids = list(picks) + list(picks.values())
+    if len(picked_ids) != len(set(picked_ids)):
+        raise ValueError("Challenge picks must use each team at most once.")
+    if any(team_id not in {entry.team.id for entry in ordered}
+           for team_id in picked_ids):
+        raise ValueError("A challenge pick refers to a team outside the active pool.")
     current_override = int(TabSettings.get(
         _setting_key_for_current_challenger(type_of_break, num_teams), 0
     ) or 0)
@@ -98,16 +113,27 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, settings):
     result = []
     seed_updates = []
     while remaining:
-        challenger = _resolve_current_challenger(remaining, current_override)
+        # A team already selected as an opponent cannot become a challenger.
+        eligible_challengers = [entry for entry in remaining
+                               if entry.team.id not in set(picks.values())]
+        challenger = _resolve_current_challenger(eligible_challengers, current_override)
         current_override = 0
-        remaining_ids = {entry.team.id for entry in remaining if entry.team.id != challenger.team.id}
+        remaining_ids = {
+    entry.team.id for entry in remaining if entry.team.id != challenger.team.id}
         challenged_id = picks.get(challenger.team.id)
         if challenged_id not in remaining_ids:
             # Default challenge policy when no challenge was explicitly entered:
             # challenge the currently lowest-ranked available seed.
-            challenged = remaining[-1]
+            reserved_ids = set(picks) | set(picks.values())
+            candidates = [entry for entry in remaining
+                          if entry.team.id != challenger.team.id
+                          and entry.team.id not in reserved_ids]
+            if not candidates:
+                raise ValueError("Challenge picks do not leave a valid opponent.")
+            challenged = candidates[-1]
         else:
-            challenged = next(entry for entry in remaining if entry.team.id == challenged_id)
+            challenged = next(
+    entry for entry in remaining if entry.team.id == challenged_id)
 
         high_seed = len(result) + 1
         low_seed = num_teams - len(result)
@@ -122,8 +148,8 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, settings):
 
 
 def get_challenge_setup_context(type_of_break, num_teams):
-    settings = _get_challenge_settings()
-    mode = settings["mode"]
+    challenge_settings = _get_challenge_settings()
+    mode = challenge_settings["mode"]
     enabled = mode != OutroundPairingMode.STANDARD and _is_power_of_two(num_teams) \
         and num_teams >= 4
     if mode == OutroundPairingMode.CHALLENGE_ONCE and TabSettings.get(
@@ -133,7 +159,8 @@ def get_challenge_setup_context(type_of_break, num_teams):
     if not enabled:
         return {"enabled": False}
 
-    lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
+    lost_outround = [t.loser.id for t in Outround.objects.filter(
+        type_of_round=type_of_break) if t.loser]
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
     ).exclude(
@@ -142,7 +169,7 @@ def get_challenge_setup_context(type_of_break, num_teams):
     if base_queryset.count() != num_teams:
         return {"enabled": False}
 
-    seed_basis = settings["seed_basis"]
+    seed_basis = challenge_settings["seed_basis"]
     if mode == OutroundPairingMode.CHALLENGE_ONCE:
         seed_basis = ChallengeSeedBasis.PREVIOUS_ROUND
 
@@ -159,7 +186,10 @@ def get_challenge_setup_context(type_of_break, num_teams):
         _setting_key_for_current_challenger(type_of_break, num_teams), 0
     ) or 0)
     used_targets = set(challenge_map.values())
-    pending = [b for b in ordered if b.team.id not in challenge_map and b.team.id not in used_targets]
+    pending = [
+        entry for entry in ordered
+        if entry.team.id not in challenge_map and entry.team.id not in used_targets
+    ]
 
     return {
         "enabled": True,
@@ -196,7 +226,9 @@ def get_challenge_setup_context(type_of_break, num_teams):
     }
 
 
+@transaction.atomic
 def save_challenge_pick(type_of_break, num_teams, challenger_id, challenged_id):
+    list(BreakingTeam.objects.select_for_update().filter(type_of_team=type_of_break))
     if challenger_id == challenged_id:
         raise ValueError("A team cannot challenge itself.")
 
@@ -211,10 +243,12 @@ def save_challenge_pick(type_of_break, num_teams, challenger_id, challenged_id):
     conflicting = OutroundChallenge.objects.filter(
         type_of_round=type_of_break,
         num_teams=num_teams,
-        challenged_id=challenged_id,
-    ).exclude(challenger_id=challenger_id).exists()
+    ).exclude(challenger_id=challenger_id).filter(
+        Q(challenger_id__in=[challenger_id, challenged_id])
+        | Q(challenged_id__in=[challenger_id, challenged_id])
+    ).exists()
     if conflicting:
-        raise ValueError("That team has already been challenged.")
+        raise ValueError("One of these teams already has a challenge pick.")
 
     OutroundChallenge.objects.update_or_create(
         type_of_round=type_of_break,
@@ -229,13 +263,24 @@ def save_current_challenger(type_of_break, num_teams, challenger_id):
     if not challenge_context.get("enabled"):
         raise ValueError("Challenge entries are not available for this round.")
 
-    valid_team_ids = {option["id"] for option in challenge_context["team_options"]}
+    valid_team_ids = set(challenge_context["pending_ids"])
     if challenger_id and challenger_id not in valid_team_ids:
         raise ValueError("Selected current challenger is invalid.")
-    TabSettings.set(_setting_key_for_current_challenger(type_of_break, num_teams), challenger_id or 0)
+    TabSettings.set(
+    _setting_key_for_current_challenger(
+        type_of_break,
+        num_teams),
+         challenger_id or 0)
 
 
 def perform_the_break():
+    if _get_challenge_settings()["mode"] == OutroundPairingMode.STANDARD:
+        return _perform_the_break_standard()
+    with transaction.atomic():
+        return _perform_the_break_experimental()
+
+
+def _perform_the_break_experimental():
     teams, nov_teams = cache_logic.cache_fxn_key(
         get_team_rankings,
         "team_rankings",
@@ -246,8 +291,9 @@ def perform_the_break():
     nov_teams_to_break = TabSettings.get("nov_teams_to_break")
     var_teams_to_break = TabSettings.get("var_teams_to_break")
 
-    if not nov_teams_to_break or not var_teams_to_break:
-        return False, "Please check your break tab settings"
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
+        return False, "Please check your break tab challenge_settings"
 
     # This forces a refresh of the breaking teams
     Outround.objects.all().delete()
@@ -285,8 +331,13 @@ def perform_the_break():
 
         current_seed += 1
 
-    pair(BreakingTeam.VARSITY)
-    pair(BreakingTeam.NOVICE)
+    for round_type, size in [(BreakingTeam.VARSITY, var_teams_to_break),
+                             (BreakingTeam.NOVICE, nov_teams_to_break)]:
+        if not size:
+            continue
+        actual_size = BreakingTeam.objects.filter(type_of_team=round_type).count()
+        if not challenge_round_enabled(round_type, size, actual_size):
+            pair(round_type)
 
     return True, "Success!"
 
@@ -306,33 +357,6 @@ def is_pairing_possible(num_teams):
     # byes or noshows for teams that debated
     round_to_check = TabSettings.get("tot_rounds", 5)
     have_properly_entered_data(round_to_check)
-
-
-def get_next_available_room(num_teams, type_of_break):
-    base_queryset = Outround.objects.filter(num_teams=num_teams,
-                                            type_of_round=type_of_break)
-
-    var_to_nov = TabSettings.get("var_to_nov", 2)
-
-    var_to_nov = offset_to_quotient(var_to_nov)
-
-    other_queryset = Outround.objects.filter(type_of_round=not type_of_break)
-
-    if type_of_break == BreakingTeam.VARSITY:
-        other_queryset = other_queryset.filter(num_teams=num_teams / var_to_nov)
-    else:
-        other_queryset = other_queryset.filter(num_teams=num_teams * var_to_nov)
-
-    rooms = [r.room
-             for r in RoomCheckIn.objects.filter(round_number=0)
-             .prefetch_related("room")]
-    rooms.sort(key=lambda r: r.rank, reverse=True)
-
-    for room in rooms:
-        if not base_queryset.filter(room=room).exists() and \
-           not other_queryset.filter(room=room).exists():
-            return room
-    return None
 
 
 def gov_team(team_one, team_two):
@@ -375,7 +399,15 @@ def gov_team(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
-    lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
+    if _get_challenge_settings()["mode"] == OutroundPairingMode.STANDARD:
+        return _pair_standard(type_of_break)
+    with transaction.atomic():
+        return _pair_experimental(type_of_break)
+
+
+def _pair_experimental(type_of_break=BreakingTeam.VARSITY):
+    lost_outround = [t.loser.id for t in Outround.objects.filter(
+        type_of_round=type_of_break) if t.loser]
 
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
@@ -448,10 +480,123 @@ def pair(type_of_break=BreakingTeam.VARSITY):
             type_of_round=type_of_break,
             gov_team=gov.team,
             opp_team=opp.team,
-            room=get_next_available_room(num_teams,
-                                         type_of_break=type_of_break),
             sidelock=sidelock
         )
 
-    if challenge_settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE and challenge_pairs:
+    if (challenge_settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE
+            and challenge_pairs):
         TabSettings.set(_setting_key_for_challenge_once(type_of_break), 1)
+
+
+def _pair_standard(type_of_break=BreakingTeam.VARSITY):
+    lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
+
+    base_queryset = BreakingTeam.objects.filter(
+        type_of_team=type_of_break
+    ).exclude(
+        team__id__in=lost_outround
+    )
+
+    num_teams = base_queryset.count()
+
+    teams_for_bracket = num_teams
+
+    while not math.log(teams_for_bracket, 2) % 1 == 0:
+        teams_for_bracket += 1
+
+    num_teams = teams_for_bracket
+
+    is_pairing_possible(num_teams)
+
+    Outround.objects.filter(
+        num_teams=num_teams
+    ).filter(
+        type_of_round=type_of_break
+    ).all().delete()
+
+    if type_of_break == BreakingTeam.VARSITY:
+        TabSettings.set("var_outrounds_public", 0)
+    else:
+        TabSettings.set("nov_outrounds_public", 0)
+
+    bracket = gen_bracket(num_teams)
+
+    for pairing in bracket:
+        team_one = base_queryset.filter(
+            effective_seed=pairing[0]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
+        team_two = base_queryset.filter(
+            effective_seed=pairing[1]).prefetch_related(
+                "team__gov_team",
+                "team__gov_team_outround").first()
+
+        if not team_one or not team_two:
+            continue
+
+        sidelock, gov = gov_team(team_one, team_two)
+        opp = team_one if gov == team_two else team_two
+
+        Outround.objects.create(
+            num_teams=num_teams,
+            type_of_round=type_of_break,
+            gov_team=gov.team,
+            opp_team=opp.team,
+            sidelock=sidelock
+        )
+
+
+def _perform_the_break_standard():
+    teams, nov_teams = cache_logic.cache_fxn_key(
+        get_team_rankings,
+        "team_rankings",
+        cache_logic.DEFAULT,
+        None
+    )
+
+    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
+    var_teams_to_break = TabSettings.get("var_teams_to_break")
+
+    if (nov_teams_to_break is None or var_teams_to_break is None or
+            nov_teams_to_break < 0 or var_teams_to_break < 0):
+        return False, "Please check your break tab settings"
+
+    # This forces a refresh of the breaking teams
+    Outround.objects.all().delete()
+    BreakingTeam.objects.all().delete()
+
+    current_seed = 1
+    for team in teams:
+        if not team[0].break_preference == Team.VARSITY:
+            continue
+
+        if current_seed > var_teams_to_break:
+            break
+
+        BreakingTeam.objects.create(team=team[0],
+                                    seed=current_seed,
+                                    effective_seed=current_seed,
+                                    type_of_team=BreakingTeam.VARSITY)
+        current_seed += 1
+
+    current_seed = 1
+    for nov_team in nov_teams:
+        if current_seed > nov_teams_to_break:
+            break
+
+        if BreakingTeam.objects.filter(team=nov_team[0]).exists():
+            continue
+
+        BreakingTeam.objects.create(team=nov_team[0],
+                                    seed=current_seed,
+                                    effective_seed=current_seed,
+                                    type_of_team=BreakingTeam.NOVICE)
+
+        current_seed += 1
+
+    if var_teams_to_break:
+        pair(BreakingTeam.VARSITY)
+    if nov_teams_to_break:
+        pair(BreakingTeam.NOVICE)
+
+    return True, "Success!"

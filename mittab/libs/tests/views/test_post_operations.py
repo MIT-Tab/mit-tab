@@ -1,10 +1,22 @@
+from unittest import mock
+
 import pytest
+from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from mittab.apps.tab.forms import SettingsForm
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Judge, School, Debater
+    PUBLIC_HOME_PAGE_DEFINITIONS,
+    Room,
+    TabSettings,
+    Team,
+    Judge,
+    School,
+    Debater,
+    PublicHomePage,
+    PublicHomeShortcut,
 )
 
 
@@ -73,6 +85,67 @@ class TestPostOperations(TestCase):
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
+    def test_settings_form_save_skips_unchanged_settings(self):
+        form = SettingsForm(
+            {
+                "setting_tot_rounds": "5",
+                "setting_lenient_late": "1",
+            },
+            settings=[
+                {
+                    "name": "tot_rounds",
+                    "value": 5,
+                    "description": "Total rounds",
+                },
+                {
+                    "name": "lenient_late",
+                    "value": 0,
+                    "description": "Lenient late round",
+                },
+            ],
+        )
+
+        self.assertTrue(form.is_valid())
+        with mock.patch.object(TabSettings, "set") as mock_set:
+            form.save()
+
+        mock_set.assert_called_once_with("lenient_late", 1)
+
+    def test_settings_form_accepts_zero_breaks(self):
+        form = SettingsForm(
+            {
+                "setting_var_teams_to_break": "0",
+                "setting_nov_teams_to_break": "0",
+            },
+            settings=[
+                {
+                    "name": "var_teams_to_break",
+                    "value": 8,
+                    "description": "Varsity break size",
+                },
+                {
+                    "name": "nov_teams_to_break",
+                    "value": 4,
+                    "description": "Novice break size",
+                },
+            ],
+        )
+
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.assertEqual(TabSettings.get("var_teams_to_break"), 0)
+        self.assertEqual(TabSettings.get("nov_teams_to_break"), 0)
+
+    def test_settings_form_surfaces_errors_without_claiming_success(self):
+        response = self.client.post(
+            reverse("settings_form"),
+            {"setting_var_teams_to_break": "not a number"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Settings were not saved.")
+        self.assertContains(response, "Enter a whole number")
+
     def test_action_operations(self):
         TabSettings.set("cur_round", 3)
         school = School.objects.create(name="School To Delete")
@@ -118,3 +191,99 @@ class TestPostOperations(TestCase):
                     f"(expected 200 after redirects) for {method} to {url}")
 
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
+
+    def test_public_homepage_update(self):
+        response = self.client.post(
+            reverse("public_homepage"),
+            {
+                "tournament_name": "MIT Invitational",
+                "theme_color": "#A14BC0",
+                "slot_1": "public_team_results",
+                "slot_2": "public_motions",
+                "slot_3": "public_ballots",
+                "slot_4": "released_pairings",
+                "slot_5": "missing_ballots",
+                "slot_6": "varsity_outrounds",
+                "slot_7": "novice_outrounds",
+                "slot_8": "team_portal",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=1).nav_item,
+            "released_pairings",
+        )
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=2).nav_item,
+            "public_motions",
+        )
+        self.assertEqual(
+            PublicHomeShortcut.objects.get(position=3).nav_item,
+            "public_ballots",
+        )
+        self.assertEqual(TabSettings.get("tournament_name"), "MIT Invitational")
+        self.assertEqual(TabSettings.get("theme_color"), "#A14BC0")
+
+    def test_start_new_tourny_clears_homepage_configuration(self):
+        PublicHomePage.ensure_defaults()
+        PublicHomeShortcut.objects.update_or_create(
+            position=1,
+            defaults={"nav_item": "public_team_results"},
+        )
+        PublicHomePage.objects.update_or_create(
+            slug="custom_link",
+            defaults={
+                "title": "Custom Link",
+                "subtitle": "Custom subtitle",
+                "url_path": "/public/custom-link/",
+                "sort_order": 99,
+                "is_active": True,
+            },
+        )
+
+        response = self.client.post(reverse("start_tourny"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PublicHomeShortcut.objects.count(), 0)
+        self.assertEqual(PublicHomePage.objects.count(), 0)
+
+    def test_public_home_page_ensure_defaults_is_idempotent(self):
+        PublicHomePage.objects.all().delete()
+        PublicHomePage.objects.create(
+            slug="released_pairings",
+            title="Custom Released Pairings",
+            subtitle="custom subtitle",
+            url_path="/public/pairings/",
+            sort_order=15,
+        )
+
+        PublicHomePage.ensure_defaults()
+        PublicHomePage.ensure_defaults()
+
+        self.assertEqual(
+            PublicHomePage.objects.count(),
+            len(PUBLIC_HOME_PAGE_DEFINITIONS),
+        )
+        self.assertEqual(
+            PublicHomePage.objects.values_list("slug", flat=True).distinct().count(),
+            len(PUBLIC_HOME_PAGE_DEFINITIONS),
+        )
+        self.assertEqual(
+            PublicHomePage.objects.get(slug="released_pairings").title,
+            "Custom Released Pairings",
+        )
+
+    def test_public_home_page_rejects_external_or_script_urls(self):
+        page = PublicHomePage(
+            slug="bad_link",
+            title="Bad Link",
+            subtitle="Bad subtitle",
+            url_path="javascript:alert(1)",
+            sort_order=99,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Homepage destinations must be internal paths",
+        ):
+            page.full_clean()

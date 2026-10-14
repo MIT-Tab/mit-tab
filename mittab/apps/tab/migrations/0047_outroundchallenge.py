@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tab', '0033_publicdisplaysetting'),
+        ('tab', '0046_judgecodeemaillog_source'),
     ]
 
     operations = [

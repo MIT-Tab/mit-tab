@@ -1,10 +1,162 @@
 import random
 
-from haikunator import Haikunator
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxLengthValidator, RegexValidator
 
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.codes import (
+    HUMAN_READABLE_TOKEN_CHARS as SHARED_HUMAN_READABLE_TOKEN_CHARS,
+    READABLE_AUTH_CODE_TOKEN_LENGTH,
+    generate_readable_auth_code,
+)
+
+
+DEFAULT_TOURNAMENT_NAME = "New Tournament"
+PUBLIC_HOME_SHORTCUT_SLOTS = 8
+PUBLIC_HOME_URL_PATH_VALIDATOR = RegexValidator(
+    regex=r"^/(?!/)[^\\\s\x00-\x1f\x7f]*$",
+    message="Homepage destinations must be internal paths like /public/pairings/.",
+)
+PUBLIC_HOME_PAGE_DEFINITIONS = (
+    {
+        "slug": "released_pairings",
+        "title": "Released Pairings",
+        "subtitle": "Latest rounds and room assignments.",
+        "url_path": "/public/pairings/",
+    },
+    {
+        "slug": "missing_ballots",
+        "title": "Missing Ballots",
+        "subtitle": "Outstanding ballots that need attention.",
+        "url_path": "/public/missing-ballots/",
+    },
+    {
+        "slug": "submit_e_ballot",
+        "title": "Judge Portal and Ballots",
+        "subtitle": "Judges enter codes to update availability and file results.",
+        "url_path": "/public/e-ballots/",
+    },
+    {
+        "slug": "team_portal",
+        "title": "Team Portal",
+        "subtitle": "Teams enter codes to manage names and scratches.",
+        "url_path": "/team_portal/",
+    },
+    {
+        "slug": "judge_list",
+        "title": "Judge List",
+        "subtitle": "Roster and check-in status.",
+        "url_path": "/public/judges/",
+    },
+    {
+        "slug": "team_list",
+        "title": "Team List",
+        "subtitle": "Registered teams and schools.",
+        "url_path": "/public/teams/",
+    },
+    {
+        "slug": "varsity_outrounds",
+        "title": "Varsity Outrounds",
+        "subtitle": "Varsity elimination brackets and pairings.",
+        "url_path": "/public/outrounds/0/",
+    },
+    {
+        "slug": "novice_outrounds",
+        "title": "Novice Outrounds",
+        "subtitle": "Novice elimination brackets and pairings.",
+        "url_path": "/public/outrounds/1/",
+    },
+    {
+        "slug": "public_team_results",
+        "title": "Public Team Results",
+        "subtitle": "Standings and published team records.",
+        "url_path": "/public/team-rankings/",
+    },
+    {
+        "slug": "public_speaker_results",
+        "title": "Public Speaker Results",
+        "subtitle": "Published speaker rankings and records.",
+        "url_path": "/public/speaker-rankings/",
+    },
+    {
+        "slug": "public_ballots",
+        "title": "Public Ballots",
+        "subtitle": "Published ballots and detailed round results.",
+        "url_path": "/public/ballots/",
+    },
+    {
+        "slug": "public_motions",
+        "title": "Motions",
+        "subtitle": "View debate motions and info slides.",
+        "url_path": "/public/motions/",
+    },
+)
+
+PUBLIC_HOME_SHORTCUT_DEFAULTS = (
+    "released_pairings",
+    "missing_ballots",
+    "submit_e_ballot",
+    "team_portal",
+    "judge_list",
+    "team_list",
+    "varsity_outrounds",
+    "novice_outrounds",
+)
+
+
+_TABSETTING_MISSING = object()
+SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING = (
+    "speaker_rankings_use_single_adjusted"
+)
+
+
+class AuditAttributionMixin(models.Model):
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def audit_events(self):
+        if not self.pk:
+            return AuditEvent.objects.none()
+        return AuditEvent.objects.filter(
+            content_type=ContentType.objects.get_for_model(self),
+            object_id=self.pk,
+        )
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk:
+            existing = type(self).objects.filter(pk=self.pk).values(
+                "created_by_id"
+            ).first()
+            if existing and existing["created_by_id"] != self.created_by_id:
+                raise ValidationError("Creator attribution is immutable")
+        super(AuditAttributionMixin, self).save(
+            force_insert, force_update, using, update_fields)
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
 
 
 class TabSettings(models.Model):
@@ -21,7 +173,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=None):
+    def get(cls, key, default=_TABSETTING_MISSING):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -34,7 +186,7 @@ class TabSettings(models.Model):
             f"tab_settings_{key}",
             cache_logic.PERSISTENT,
         )
-        if result is None and default is None:
+        if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
         elif result is None:
             return default
@@ -50,18 +202,27 @@ class TabSettings(models.Model):
             value_num = value
             value_string = None
 
-        if cls.objects.filter(key=key).exists():
-            obj = cls.objects.get(key=key)
-            obj.value = value_num
-            obj.value_string = value_string
-            obj.save()
-        else:
-            obj = cls.objects.create(key=key, value=value_num,
-                                     value_string=value_string)
+        obj = cls.objects.filter(key=key).first()
+        if obj is None:
+            return cls.objects.create(
+                key=key,
+                value=value_num,
+                value_string=value_string,
+            )
+
+        if obj.value == value_num and obj.value_string == value_string:
+            return obj
+
+        obj.value = value_num
+        obj.value_string = value_string
+        obj.save(update_fields=["value", "value_string"])
+        return obj
 
     def delete(self, using=None, keep_parents=False):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
 
     def save(self,
@@ -71,7 +232,24 @@ class TabSettings(models.Model):
              update_fields=None):
         cache_logic.invalidate_cache(f"tab_settings_{self.key}",
                                      cache_logic.PERSISTENT)
+        if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
+            cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+
+
+class UserTournamentSetupPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_setup_preference",
+    )
+    hide_tournament_todo = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "tournament setup preference"
+
+    def __str__(self):
+        return f"{self.user} hide checklist: {self.hide_tournament_todo}"
 
 
 class PublicDisplaySetting(models.Model):
@@ -108,6 +286,102 @@ class PublicDisplaySetting(models.Model):
         return cls.objects.get_or_create(slug=slug, defaults=payload)
 
 
+class PublicHomePage(models.Model):
+    slug = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=100)
+    subtitle = models.CharField(max_length=255, blank=True, default="")
+    url_path = models.CharField(
+        max_length=200,
+        validators=[PUBLIC_HOME_URL_PATH_VALIDATOR],
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "public home page"
+        ordering = ["sort_order", "title"]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        super(PublicHomePage, self).save(*args, **kwargs)
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomePage, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def ensure_defaults(cls):
+        for index, definition in enumerate(PUBLIC_HOME_PAGE_DEFINITIONS, start=1):
+            cls.objects.get_or_create(
+                slug=definition["slug"],
+                defaults={
+                    "title": definition["title"],
+                    "subtitle": definition["subtitle"],
+                    "url_path": definition["url_path"],
+                    "sort_order": index,
+                },
+            )
+
+
+class PublicHomeShortcut(models.Model):
+    position = models.PositiveSmallIntegerField(
+        choices=[(i, f"Slot {i}") for i in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1)],
+        unique=True,
+    )
+    nav_item = models.CharField(max_length=50, db_index=True)
+
+    class Meta:
+        verbose_name = "public home shortcut"
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"Slot {self.position}: {self.nav_item}"
+
+    def save(
+        self,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        super(PublicHomeShortcut, self).save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(PublicHomeShortcut, self).delete(using=using, keep_parents=keep_parents)
+        invalidate_all_public_caches()
+
+    @classmethod
+    def nav_definition_map(cls, include_inactive=True):
+        PublicHomePage.ensure_defaults()
+        pages = PublicHomePage.objects.all()
+        if not include_inactive:
+            pages = pages.filter(is_active=True)
+        return {
+            page.slug: {
+                "slug": page.slug,
+                "title": page.title,
+                "subtitle": page.subtitle,
+                "url_path": page.url_path,
+            }
+            for page in pages
+        }
+
+    @classmethod
+    def default_slot_mapping(cls):
+        return {
+            index + 1: slug
+            for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
+        }
+
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
@@ -127,11 +401,7 @@ class School(models.Model):
 
     @property
     def display(self):
-        schools_public = not TabSettings.get("use_team_codes", 0)
-
-        if schools_public:
-            return self.name
-        return ""
+        return self.name
 
     class Meta:
         ordering = ["name"]
@@ -139,6 +409,7 @@ class School(models.Model):
 
 class Debater(models.Model):
     name = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)
     VARSITY = 0
     NOVICE = 1
     NOVICE_CHOICES = (
@@ -146,8 +417,13 @@ class Debater(models.Model):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    qualified = models.BooleanField(default=False)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
+    school = models.ForeignKey("School",
+                               null=True,
+                               blank=True,
+                               on_delete=models.SET_NULL)
 
     def save(self,
              force_insert=False,
@@ -183,8 +459,8 @@ class Debater(models.Model):
         ordering = ["name"]
 
 
-class Team(models.Model):
-    name = models.CharField(max_length=30, unique=True)
+class Team(AuditAttributionMixin):
+    name = models.CharField(max_length=35, unique=True)
     school = models.ForeignKey("School", on_delete=models.CASCADE)
     hybrid_school = models.ForeignKey("School",
                                       blank=True,
@@ -192,6 +468,13 @@ class Team(models.Model):
                                       on_delete=models.SET_NULL,
                                       related_name="hybrid_school")
     debaters = models.ManyToManyField(Debater)
+    registration = models.ForeignKey(
+        "registration.Registration",
+        related_name="teams",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     UNSEEDED = 0
     FREE_SEED = 1
     HALF_SEED = 2
@@ -236,6 +519,7 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     @classmethod
@@ -266,22 +550,13 @@ class Team(models.Model):
             "debaters__roundstats_set__round",
             "debaters__team_set",
             "debaters__team_set__no_shows",
+            "ranking_groups",
         )
 
     def set_unique_team_code(self):
-        haikunator = Haikunator()
-
-        def gen_haiku_and_clean():
-            code = haikunator.haikunate(token_length=0).replace("-", " ").title()
-
-            return code
-
-        code = gen_haiku_and_clean()
-
-        while Team.objects.filter(team_code=code).first():
-            code = gen_haiku_and_clean()
-
-        self.team_code = code
+        self.team_code = generate_readable_auth_code(
+            lambda code: Team.objects.filter(team_code=code).first()
+        )
 
     def save(self,
              force_insert=False,
@@ -300,24 +575,10 @@ class Team(models.Model):
 
     @property
     def display_backend(self):
-        use_team_codes_backend = TabSettings.get("team_codes_backend", 0)
-
-        if use_team_codes_backend:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
         return self.name
 
     @property
     def display(self):
-        use_team_codes = TabSettings.get("use_team_codes", 0)
-
-        if use_team_codes:
-            if not self.team_code:
-                self.set_unique_team_code()
-                self.save()
-            return self.team_code
         return self.name
 
     def __str__(self):
@@ -359,26 +620,71 @@ class BreakingTeam(models.Model):
                                        choices=TYPE_CHOICES)
 
 
-class Judge(models.Model):
+HUMAN_READABLE_TOKEN_CHARS = SHARED_HUMAN_READABLE_TOKEN_CHARS
+TEAM_CODE_TOKEN_LENGTH = READABLE_AUTH_CODE_TOKEN_LENGTH
+BALLOT_CODE_MAX_LENGTH = 30
+BALLOT_CODE_TOKEN_LENGTH = READABLE_AUTH_CODE_TOKEN_LENGTH
+ballot_code_validator = RegexValidator(
+    regex=r"^(?:[A-Za-z]+-[A-Za-z]+(?:-[A-Za-z0-9]+)?|[A-Za-z0-9]+)$",
+    message=(
+        "Ballot code must be legacy alphanumeric text or a hyphenated word-word "
+        "code with an optional alphanumeric token."
+    ),
+)
+
+
+class Judge(AuditAttributionMixin):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
     schools = models.ManyToManyField(School)
+    email = models.EmailField(max_length=254, blank=True, null=True)
+    registration = models.ForeignKey(
+        "registration.Registration",
+        related_name="judges",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     ballot_code = models.CharField(max_length=255,
                                    blank=True,
                                    null=True,
-                                   unique=True)
+                                   unique=True,
+                                   validators=[
+                                       MaxLengthValidator(BALLOT_CODE_MAX_LENGTH),
+                                       ballot_code_validator,
+                                   ])
     is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):
-        haikunator = Haikunator()
-        code = haikunator.haikunate(token_length=0)
+        self.ballot_code = generate_readable_auth_code(
+            lambda code: (
+                len(code) > BALLOT_CODE_MAX_LENGTH or
+                not self.is_valid_ballot_code(code, raise_error=False) or
+                Judge.objects.filter(ballot_code=code).first()
+            )
+        )
 
-        while Judge.objects.filter(ballot_code=code).first():
-            code = haikunator.haikunate(token_length=0)
+    def is_valid_ballot_code(self, code=None, raise_error=True):
+        code = code or self.ballot_code
+        if not code:
+            return True
 
-        self.ballot_code = code
+        if len(code) > BALLOT_CODE_MAX_LENGTH:
+            if raise_error:
+                raise ValidationError(
+                    f"Ballot code must be at most {BALLOT_CODE_MAX_LENGTH} characters"
+                )
+            return False
+
+        try:
+            ballot_code_validator(code)
+        except ValidationError as exc:
+            if raise_error:
+                raise exc
+            return False
+        return True
 
     def save(self,
              force_insert=False,
@@ -389,12 +695,18 @@ class Judge(models.Model):
         if not self.ballot_code:
             self.set_unique_ballot_code()
 
+        self.is_valid_ballot_code(self.ballot_code)
+
         super(Judge, self).save(force_insert, force_update, using,
                                 update_fields)
 
     def is_checked_in_for_round(self, round_number):
         return any(checkin.round_number == round_number
                    for checkin in self.checkin_set.all())
+
+    def is_expected_for_round(self, round_number):
+        return any(expectation.round_number == round_number
+                   for expectation in self.expected_checkins.all())
 
     def __str__(self):
         return self.name
@@ -413,7 +725,46 @@ class Judge(models.Model):
         ordering = ["name"]
 
 
-class Scratch(models.Model):
+class JudgeCodeEmailLog(models.Model):
+    SOURCE_MANUAL = "manual"
+    SOURCE_REGISTRATION = "registration"
+    SOURCE_CHOICES = (
+        (SOURCE_MANUAL, "Manual"),
+        (SOURCE_REGISTRATION, "Registration"),
+    )
+
+    judge = models.ForeignKey(Judge, on_delete=models.CASCADE, related_name="code_email_logs")
+    email = models.EmailField()
+    ballot_code = models.CharField(max_length=BALLOT_CODE_MAX_LENGTH)
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "sent_at"]),
+            models.Index(fields=["judge", "sent_at"]),
+        ]
+
+
+class WrittenRFDEmailLog(models.Model):
+    round = models.ForeignKey(
+        "Round", on_delete=models.CASCADE, related_name="written_rfd_email_logs"
+    )
+    email = models.EmailField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["round", "sent_at"]),
+            models.Index(fields=["email", "sent_at"]),
+        ]
+
+
+class Scratch(AuditAttributionMixin):
     judge = models.ForeignKey(Judge, related_name="scratches", on_delete=models.CASCADE)
     team = models.ForeignKey(Team, related_name="scratches", on_delete=models.CASCADE)
     TEAM_SCRATCH = 0
@@ -489,6 +840,8 @@ class Outround(models.Model):
         (OPP_VIA_FORFEIT, "OPP via Forfeit"),
     )
     room = models.ForeignKey(Room,
+                             blank=True,
+                             null=True,
                              on_delete=models.CASCADE,
                              related_name="rooms_outrounds")
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
@@ -552,7 +905,15 @@ class OutroundChallenge(models.Model):
             models.UniqueConstraint(
                 fields=["num_teams", "type_of_round", "challenger"],
                 name="unique_challenger_per_outround_size",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["num_teams", "type_of_round", "challenged"],
+                name="unique_target_per_outround_size",
+            ),
+            models.CheckConstraint(
+                check=~models.Q(challenger=models.F("challenged")),
+                name="challenge_distinct_teams",
+            ),
         ]
 
     def __str__(self):
@@ -601,6 +962,7 @@ class Round(models.Model):
     room = models.ForeignKey(
         Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+    rfd = models.TextField(blank=True, default="")
 
     def clean(self):
         if self.pk and self.chair not in self.judges.all():
@@ -610,6 +972,14 @@ class Round(models.Model):
         return (
             f"Round {self.round_number} between {self.gov_team} and {self.opp_team}"
         )
+
+    @property
+    def winner(self):
+        if self.victor in [self.GOV, self.GOV_VIA_FORFEIT]:
+            return self.gov_team
+        if self.victor in [self.OPP, self.OPP_VIA_FORFEIT]:
+            return self.opp_team
+        return None
 
     def save(self,
              force_insert=False,
@@ -644,6 +1014,14 @@ class ManualJudgeAssignment(models.Model):
         on_delete=models.CASCADE,
         related_name="manual_round_assignments",
     )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -652,6 +1030,86 @@ class ManualJudgeAssignment(models.Model):
 
     def __str__(self):
         return f"{self.judge} manually assigned to {self.round}"
+
+    @property
+    def created_by_display(self):
+        if self.created_by:
+            return self.created_by.get_username()
+        return "Unknown"
+
+
+class AuditEvent(models.Model):
+    CREATE = "create"
+    EDIT = "edit"
+    MANUAL_JUDGE_ASSIGN = "manual_judge_assign"
+    MANUAL_JUDGE_REMOVE = "manual_judge_remove"
+    MANUAL_CHAIR_CHANGE = "manual_chair_change"
+    EVENT_CHOICES = (
+        (CREATE, "Created"),
+        (EDIT, "Edited"),
+        (MANUAL_JUDGE_ASSIGN, "Manual judge assignment"),
+        (MANUAL_JUDGE_REMOVE, "Manual judge removal"),
+        (MANUAL_CHAIR_CHANGE, "Manual chair change"),
+    )
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+    event_type = models.CharField(max_length=40, choices=EVENT_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    object_repr = models.CharField(max_length=255, editable=False)
+    changes = models.JSONField(default=dict, blank=True, editable=False)
+    note = models.TextField(blank=True, editable=False)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id", "created_at"]),
+            models.Index(fields=["event_type", "created_at"]),
+        ]
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk and AuditEvent.objects.filter(pk=self.pk).exists():
+            raise ValidationError("Audit events are immutable")
+        super(AuditEvent, self).save(force_insert, force_update, using, update_fields)
+
+    @classmethod
+    def record(cls, obj, event_type, user=None, changes=None, note=""):
+        if obj is None or not obj.pk:
+            return None
+        return cls.objects.create(
+            content_object=obj,
+            event_type=event_type,
+            user=user if getattr(user, "is_authenticated", False) else None,
+            object_repr=str(obj),
+            changes=changes or {},
+            note=note,
+        )
+
+    @property
+    def user_display(self):
+        if self.user:
+            return self.user.get_username()
+        return "Unknown"
+
+    @property
+    def label(self):
+        return dict(self.EVENT_CHOICES).get(self.event_type, self.event_type)
+
+    def __str__(self):
+        return f"{self.label} {self.object_repr} by {self.user_display}"
 
 
 class Bye(models.Model):
@@ -714,6 +1172,26 @@ class CheckIn(models.Model):
         ]
 
 
+class JudgeExpectedCheckIn(models.Model):
+    judge = models.ForeignKey(
+        Judge,
+        on_delete=models.CASCADE,
+        related_name="expected_checkins",
+    )
+    round_number = models.IntegerField()
+
+    def __str__(self):
+        return f"Judge {self.judge} is expected for round {self.round_number}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["judge", "round_number"],
+                name="unique_judge_expectation_per_round",
+            )
+        ]
+
+
 class RoomCheckIn(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     round_number = models.IntegerField()
@@ -736,3 +1214,147 @@ class RoomTag(models.Model):
 
     def __str__(self):
         return self.tag
+
+
+class RankingGroup(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    teams = models.ManyToManyField(
+        "Team",
+        blank=True,
+        related_name="ranking_groups",
+    )
+    debaters = models.ManyToManyField(
+        "Debater",
+        blank=True,
+        related_name="ranking_groups",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Motion(models.Model):
+    """
+    Represents a debate motion (topic) for a specific round.
+
+    Round identification:
+    - For inrounds: round_number is set (1, 2, 3, etc.)
+        - For outrounds: round_number is None, and outround_type + num_teams
+            identifies the round
+      (e.g., Varsity Quarterfinals = outround_type=0, num_teams=8)
+    """
+    VARSITY = 0
+    NOVICE = 1
+    OUTROUND_TYPE_CHOICES = (
+        (VARSITY, "Varsity"),
+        (NOVICE, "Novice"),
+    )
+
+    # Round identification - either round_number for inrounds,
+    # or outround fields for outrounds
+    round_number = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Round number for inrounds (1, 2, 3, etc.)",
+    )
+    outround_type = models.IntegerField(
+        null=True,
+        blank=True,
+        choices=OUTROUND_TYPE_CHOICES,
+        help_text="Type of outround (Varsity/Novice)",
+    )
+    num_teams = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of teams in outround (e.g., 8 for quarterfinals)",
+    )
+
+    # Motion content
+    info_slide = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional context/info slide text shown before the motion",
+    )
+    motion_text = models.TextField(help_text="The debate motion/resolution text")
+
+    # Publication status
+    is_published = models.BooleanField(
+        default=False,
+        help_text="Whether this motion is visible to the public",
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["round_number", "outround_type", "-num_teams"]
+        verbose_name = "motion"
+        verbose_name_plural = "motions"
+
+    def __str__(self):
+        return f"Motion for {self.round_display}: {self.motion_text[:50]}..."
+
+    @property
+    def is_outround(self):
+        """Returns True if this is an outround motion."""
+        return self.round_number is None and self.num_teams is not None
+
+    @property
+    def round_display(self):
+        """Returns a human-readable round name."""
+        if self.round_number is not None:
+            return f"Round {self.round_number}"
+        elif self.num_teams is not None:
+            type_name = "Varsity" if self.outround_type == self.VARSITY else "Novice"
+            round_names = {
+                2: "Finals",
+                4: "Semifinals",
+                8: "Quarterfinals",
+                16: "Octofinals",
+                32: "Double Octofinals",
+                64: "Triple Octofinals",
+            }
+            round_name = round_names.get(self.num_teams, f"Round of {self.num_teams}")
+            return f"{type_name} {round_name}"
+        return "Unknown Round"
+
+    @property
+    def sort_key(self):
+        """Return a sort key for ordering motions."""
+        if self.round_number is not None:
+            # Inrounds: sort by round number
+            return (0, self.round_number, 0)
+        else:
+            # Outrounds: sort by type first, then by `num_teams` descending.
+            return (1, self.outround_type or 0, -(self.num_teams or 0))
+
+    @property
+    def round_selection_value(self):
+        """Returns the form value used in the round_selection dropdown."""
+        if self.round_number is not None:
+            return f"inround_{self.round_number}"
+        elif self.num_teams is not None:
+            return f"outround_{self.outround_type}_{self.num_teams}"
+        return ""
+
+    def clean(self):
+        """Validate that either inround or outround fields are set, not both."""
+        super().clean()
+        has_round_number = self.round_number is not None
+        has_outround = self.num_teams is not None
+
+        if has_round_number and has_outround:
+            raise ValidationError(
+                "A motion cannot have both a round number "
+                "(inround) and outround fields set."
+            )
+        if not has_round_number and not has_outround:
+            raise ValidationError(
+                "A motion must have either a round number "
+                "(inround) or outround fields set."
+            )
+        if has_outround and self.outround_type is None:
+            raise ValidationError(
+                "Outround motions must specify the outround type (Varsity/Novice)."
+            )

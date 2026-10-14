@@ -49,7 +49,7 @@ if [[ $TOURNAMENT_NAME == *-test ]]; then
 fi
 
 GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
-GUNICORN_CONNECTIONS=${GUNICORN_CONNECTIONS:-512}
+GUNICORN_CONNECTIONS=${GUNICORN_CONNECTIONS:-16}
 
 /usr/local/bin/gunicorn mittab.wsgi:application \
   --worker-class gevent \

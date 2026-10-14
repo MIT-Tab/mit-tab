@@ -3,12 +3,12 @@ from mittab.apps.tab.forms import ScratchForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
 
 
-def import_scratches(file_to_import):
+def import_scratches(file_to_import, created_by=None):
     try:
         workbook = Workbook(file_to_import, 3)
     except InvalidWorkbookException:
         return ["Scratches file is not a valid .xlsx file"]
-    return ScratchImporter(workbook).import_data()
+    return ScratchImporter(workbook, created_by=created_by).import_data()
 
 
 class ScratchImporter(WorkbookImporter):

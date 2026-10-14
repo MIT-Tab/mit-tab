@@ -1,10 +1,13 @@
 body {
     background-color: #f4f9ff !important;
+    background-color: color-mix(in srgb, var(--theme-color, #00438A) 6%, white) !important;
     background-image: url("../img/az-subtle.png") !important;
     background-blend-mode: multiply;
 }
 :root {
   color-scheme: light;
+  --theme-color: #00438A;
+  --theme-color-rgb: 0, 67, 138;
 }
 $font-size-base: 0.95rem !default;
 
@@ -16,7 +19,7 @@ $font-size-base: 0.95rem !default;
 
 // Overrides
 .bg-dark {
-  background-color: #00438A !important;
+  background-color: var(--theme-color, #00438A) !important;
 }
 
 .navbar-brand {
@@ -25,7 +28,7 @@ $font-size-base: 0.95rem !default;
 }
 
 .navbar-dark .nav-link {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.75);
 }
 
 // Layout utilities
@@ -70,12 +73,26 @@ $font-size-base: 0.95rem !default;
     margin-top: 0;
   }
 
-  // Remove excessive padding for home page
-  .public-home-wrapper & {
+  // Public homepage — strip the white card chrome so the hero (logo, title,
+  // status block) and the grid cards sit directly on the page background.
+  // Uses :has() so the rule applies to #container-main itself, not a
+  // descendant (the previous .public-home-wrapper & selector never matched).
+  &:has(.public-home-wrapper) {
     padding: 0;
-    background: transparent;
-    box-shadow: none;
+    background: transparent !important;
+    box-shadow: none !important;
     max-width: 100%;
+    margin-top: 0;
+
+    // The base layout reserves a row for {% block banner %}, but the public
+    // homepage leaves it empty — collapse the empty <h3> so the logo sits
+    // close to the navbar instead of below a phantom heading.
+    > .row > .col > h3:empty { display: none; }
+
+    // __wide.html applies Bootstrap's `mt-2` to the content row, which adds
+    // 0.5rem of dead space above the hero. Drop it on this page so the
+    // padding on .public-home is the sole top-gap source.
+    > .row.content { margin-top: 0 !important; }
   }
 }
 
@@ -86,6 +103,90 @@ $font-size-base: 0.95rem !default;
 
 .ballot-form {
   height: 100%;
+}
+
+.ballot-submitted-header {
+  border-left: 5px solid #28a745;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background-color: rgba(40, 167, 69, 0.06);
+  border-radius: 0 4px 4px 0;
+
+  .check-icon {
+    color: #28a745;
+    font-size: 2rem;
+    line-height: 1;
+    margin-right: 1rem;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  .subtitle {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin: 0.2rem 0 0;
+  }
+}
+
+.submitted-card {
+  border-color: #b8daff;
+
+  .card-header {
+    background-color: #e8f0fe;
+    border-bottom-color: #b8daff;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.readonly-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6c757d;
+  border: 1px solid #ced4da;
+  border-radius: 3px;
+  padding: 1px 6px;
+  background: #fff;
+}
+
+.submitted-field {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: #495057;
+  min-height: 38px;
+}
+
+.winner-row .submitted-field {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.rfd-display {
+  min-height: 120px;
+  white-space: normal;
+}
+
+.rfd-card textarea {
+  min-height: 160px;
+}
+
+.field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c757d;
+  margin-bottom: 3px;
 }
 
 .not-paired-in {
@@ -182,6 +283,12 @@ $font-size-base: 0.95rem !default;
   height: 38px;
 }
 
+.index-info-trigger {
+  vertical-align: baseline;
+  line-height: 1;
+  cursor: help;
+}
+
 // Warning popups
 .warning-container {
   width: 500px;
@@ -202,6 +309,54 @@ $font-size-base: 0.95rem !default;
   transform: translateX(-50%);
   z-index: 10;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+// Audit trail (collapsible history blocks)
+.audit-trail-summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+
+  &::-webkit-details-marker { display: none; }
+  &::marker { display: none; }
+
+  &::before {
+    content: "\25B8"; // right-pointing triangle
+    display: inline-block;
+    font-size: 0.7em;
+    margin-right: 0.35em;
+    transition: transform 0.15s ease;
+    color: #6c757d;
+  }
+}
+
+details[open] > .audit-trail-summary::before {
+  transform: rotate(90deg);
+}
+
+.audit-trail-table {
+  background: #fafbfc;
+  border-radius: 3px;
+
+  td { vertical-align: top; }
+}
+
+.audit-trail-label {
+  width: 30%;
+}
+
+.audit-events-inline summary {
+  display: inline-block;
+  font-size: 0.85em;
+}
+
+.manual-judge-history {
+  margin-top: 0.25rem;
+}
+
+.manual-judge-history-list {
+  margin: 0.25rem 0 0 0;
+  padding-left: 1.1rem;
 }
 
 // Utility classes

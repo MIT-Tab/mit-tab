@@ -3,9 +3,14 @@ import sys
 
 from django.core.management import call_command
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
+from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    TabSettings,
+)
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
 
 USER_MODEL = get_user_model()
@@ -27,15 +32,35 @@ class Command(BaseCommand):
             nargs="?",
             default=USER_MODEL.objects.make_random_password(length=8))
         parser.add_argument(
+            "--apda-board-password",
+            dest="apda_board_password",
+            help="Password for the APDA Board user",
+            nargs="?",
+            default=None)
+        parser.add_argument(
             "--first-init",
             dest="first_init",
             help="Boolean specifying if this is the first initialization.\
                   Disables backup before new tournament",
             action="store_true",
             default=False)
+        parser.add_argument(
+            "--skip-backups",
+            dest="skip_backups",
+            help="Skip backup creation during initialization.",
+            action="store_true",
+            default=False)
 
     def handle(self, *args, **options):
-        if not options["first_init"]:
+        apda_board_password = (
+            options.get("apda_board_password")
+            or os.environ.get("BOARD_PASSWORD")
+            or USER_MODEL.objects.make_random_password(length=16)
+        )
+
+        if options["skip_backups"]:
+            self.stdout.write("Skipping backups.")
+        elif not options["first_init"]:
             self.stdout.write("Backing up the previous tournament data")
             backup_round(btype=BEFORE_NEW_TOURNAMENT)
         else:
@@ -48,19 +73,23 @@ class Command(BaseCommand):
             print(why)
             sys.exit(1)
 
-        self.stdout.write("Creating tab/entry users")
+        self.stdout.write("Creating tab/entry/APDA Board users")
         tab = USER_MODEL.objects.create_user("tab", None, options["tab_password"])
         tab.is_staff = True
         tab.is_admin = True
         tab.is_superuser = True
         tab.save()
         USER_MODEL.objects.create_user("entry", None, options["entry_password"])
+        apda_board = USER_MODEL.objects.create_user("board", None, apda_board_password)
+        apda_board_group, _ = Group.objects.get_or_create(name=APDA_BOARD_GROUP_NAME)
+        apda_board.groups.add(apda_board_group)
 
         self.stdout.write("Setting default tab settings")
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("cur_round", 1)
-        TabSettings.set("tournament_name", "New Tournament")
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        TabSettings.set("theme_color", "#00438A")
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")
@@ -73,5 +102,9 @@ class Command(BaseCommand):
         self.stdout.write(
             f"{'entry'.ljust(10, ' ')} | {options['entry_password'].ljust(10, ' ')}"
         )
-        if options["first_init"]:
+        self.stdout.write(
+            f"{'board'.ljust(10, ' ')} | "
+            f"{apda_board_password.ljust(10, ' ')}"
+        )
+        if options["first_init"] and not options["skip_backups"]:
             backup_round(name="initial-tournament", btype=INITIAL)

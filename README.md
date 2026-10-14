@@ -39,6 +39,10 @@ git clone https://github.com/MIT-Tab/mit-tab.git
 cd mit-tab
 
 # Follow the setup guide for your platform in CONTRIBUTING.md
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv sync --all-groups
+npm install
 ```
 
 ### Technology Stack
@@ -47,6 +51,7 @@ cd mit-tab
 - **Frontend**: JavaScript with Webpack
 - **Database**: MySQL
 - **Deployment**: Docker
+- **Python dependencies**: UV
 
 ### Testing
 

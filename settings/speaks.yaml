@@ -21,6 +21,16 @@ settings:
     name: max_eballot_speak
     description: "The maximum speaker score allowed to be submitted by an e-ballot Note: This value will be allowed. In other words, if the value is 35, a 35 does not have to be justified to tab staff but a 36 does"
     value: 35
+  - decimal_speaks:
+    name: decimal_speaks
+    description: "Controls which decimal speaker point increments can be entered on ballots."
+    value: 0
+    type: choice
+    choices:
+      - [0, "No Decimals"]
+      - [1, "Half Points (.5)"]
+      - [2, "1 Decimal Digit (.n)"]
+      - [3, "2 Decimal Digits (.nn)"]
   - low_speak_warning_threshold:
     name: low_speak_warning_threshold
     description: "The threshold for low speaker scores. Judges will be warned when submitting speaks at or below this value"

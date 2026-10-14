@@ -173,14 +173,22 @@ def pair_round():
                             len(list_of_teams[bracket]) // 2, team
                         )
 
+    r2_random_within_brackets = (
+        current_round == 2
+        and TabSettings.get("r2_random_within_brackets", 0) == 1
+    )
+
     # Pass in the prepared nodes to the perfect pairing logic
     # to get a pairing for the round
     pairings = []
     for bracket in range(current_round):
         if current_round == 1:
             temp = perfect_pairing(list_of_teams)
+        elif r2_random_within_brackets:
+            temp = random_pairing_no_repeats(list_of_teams[bracket])
         else:
             temp = perfect_pairing(list_of_teams[bracket])
+        if current_round != 1:
             print(f"Pairing bracket {bracket} of size {len(temp)}")
         for pair in temp:
             pairings.append([pair[0], pair[1]])
@@ -514,6 +522,30 @@ def perfect_pairing(list_of_teams):
 
             if pairing not in all_pairs:
                 all_pairs.append(pairing)
+    return determine_gov_opp(all_pairs)
+
+
+def random_pairing_no_repeats(list_of_teams):
+    if not list_of_teams:
+        return []
+
+    graph_edges = []
+    for i, team1 in enumerate(list_of_teams):
+        for j, team2 in enumerate(list_of_teams):
+            if i > j and not hit_before(team1, team2):
+                graph_edges.append((i, j, random.randint(0, 2**16)))
+
+    pairings_num = mwmatching.maxWeightMatching(graph_edges, maxcardinality=True)
+    if len(pairings_num) != len(list_of_teams) or -1 in pairings_num:
+        raise errors.NotEnoughTeamsError()
+
+    all_pairs = []
+    for team_i, matched_i in enumerate(pairings_num):
+        if team_i < matched_i:
+            all_pairs.append({
+                list_of_teams[team_i],
+                list_of_teams[matched_i],
+            })
     return determine_gov_opp(all_pairs)
 
 

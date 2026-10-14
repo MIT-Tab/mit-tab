@@ -1,10 +1,17 @@
-from urllib.parse import urlencode
-
 from django import template
 from django.forms.fields import FileField
+from django.urls import reverse
+from django.utils.html import urlize
+from django.utils.safestring import mark_safe
 
+from mittab.apps.tab.auth_roles import (
+    is_apda_board_user,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.helpers import get_redirect_target
-from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab import logo_utils
+from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
+from mittab.apps.tab.theme import DEFAULT_THEME_COLOR, get_theme_css_variables
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
@@ -44,6 +51,27 @@ def is_checked_in(judge, round_value):
     return judge.is_checked_in_for_round(round_value)
 
 
+@register.filter("is_expected")
+def is_expected(judge, round_value):
+    return judge.is_expected_for_round(round_value)
+
+
+@register.filter
+def lookup(sequence, index):
+    if sequence is None:
+        return None
+    if isinstance(sequence, str):
+        return None
+    try:
+        index = int(index)
+    except (TypeError, ValueError):
+        return None
+    try:
+        return sequence[index]
+    except (IndexError, TypeError, KeyError):
+        return None
+
+
 @register.simple_tag(takes_context=True)
 def judge_team_count(context, judge, pairing):
     judge_rejudge_counts = context.get("judge_rejudge_counts", {})
@@ -58,9 +86,39 @@ def is_manual_judge_assignment(context, round_id, judge_id):
     judges_for_round = manual_assignments.get(round_id, set())
     return judge_id in judges_for_round
 
+
+@register.simple_tag(takes_context=True)
+def manual_judge_assignment_label(context, round_id, judge_id):
+    labels = context.get("manual_judge_assignment_labels", {})
+    return labels.get((round_id, judge_id), "Manually assigned judge")
+
+
+@register.simple_tag(takes_context=True)
+def manual_judge_audit_events(context, round_id):
+    events = context.get("manual_judge_audit_events", {})
+    return events.get(round_id, [])
+
+
 @register.simple_tag
 def tournament_name():
-    return TabSettings.get("tournament_name", "New Tournament")
+    return TabSettings.get("tournament_name", DEFAULT_TOURNAMENT_NAME)
+
+
+@register.filter(name="registration_text", needs_autoescape=True)
+def registration_text(value, autoescape=True):
+    if not value:
+        return ""
+    linked = urlize(value, nofollow=True, autoescape=autoescape)
+    return mark_safe(linked.replace("\n", "<br>"))
+
+
+@register.filter(name="get_field")
+def get_field(form, field_name):
+    """Get a form field by name dynamically."""
+    try:
+        return form[field_name]
+    except (KeyError, TypeError):
+        return None
 
 
 @register.simple_tag(takes_context=True)
@@ -68,7 +126,7 @@ def return_to_value(context):
     request = context.get("request")
     if not request:
         return ""
-    return get_redirect_target(request, fallback=None) or ""
+    return get_redirect_target(request, fallback=None) or request.get_full_path()
 
 
 @register.inclusion_tag("common/_return_to_input.html", takes_context=True)
@@ -79,12 +137,48 @@ def return_to_input(context, target=None):
 
 @register.filter
 def with_return_to(url):
-    if not url:
-        return url
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}{urlencode({'return_to': url})}"
+    return url
 
 
 @register.simple_tag
 def public_display_flags():
     return get_public_display_flags()
+
+
+@register.simple_tag
+def motions_enabled():
+    """Returns True if motions feature is enabled."""
+    return bool(TabSettings.get("motions_enabled", 0))
+
+
+@register.simple_tag
+def theme_css_variables():
+    theme_color = TabSettings.get("theme_color", DEFAULT_THEME_COLOR)
+    return get_theme_css_variables(theme_color)
+
+
+@register.simple_tag
+def tournament_logo_url():
+    if not logo_utils.has_tournament_logo():
+        return ""
+
+    mtime = logo_utils.get_tournament_logo_mtime()
+    url = reverse("tournament_logo")
+    if mtime is None:
+        return url
+    return f"{url}?v={mtime}"
+
+
+@register.simple_tag
+def favicon_url():
+    return reverse("favicon")
+
+
+@register.simple_tag
+def is_apda_board(user):
+    return is_apda_board_user(user)
+
+
+@register.simple_tag
+def staff_can(user, capability):
+    return user_has_staff_capability(user, capability)

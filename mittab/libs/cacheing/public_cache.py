@@ -22,6 +22,26 @@ def build_cache_key(view_name, kwargs, is_authenticated):
     return f"pv:{view_name}:{digest}"
 
 
+def _generation_key(view_name):
+    return f"pv:{view_name}:generation"
+
+
+def _get_generation(cache, view_name):
+    return cache.get(_generation_key(view_name), 0)
+
+
+def _advance_generation(cache, view_name):
+    generation_key = _generation_key(view_name)
+    if cache.add(generation_key, 1, timeout=None):
+        return
+    try:
+        cache.incr(generation_key)
+    except ValueError:
+        # The key can disappear between add() and incr() when another process
+        # clears the cache. Recreate it so invalidation still takes effect.
+        cache.set(generation_key, 1, timeout=None)
+
+
 def cache_public_view(timeout=60):
     """
     Cache a public view with short CDN TTL and longer origin cache.
@@ -46,7 +66,11 @@ def cache_public_view(timeout=60):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             cache = caches[PUBLIC_CACHE_ALIAS]
-            cache_key = build_cache_key(view_func.__name__, kwargs,
+            cache_kwargs = {
+                **kwargs,
+                "_cache_generation": _get_generation(cache, view_func.__name__),
+            }
+            cache_key = build_cache_key(view_func.__name__, cache_kwargs,
                                          request.user.is_authenticated)
             cached_entry = cache.get(cache_key)
             now = time.time()
@@ -93,8 +117,18 @@ def cache_public_view(timeout=60):
 
 def _delete_key_for_all_auth_states(view_name, kwargs=None):
     cache = caches[PUBLIC_CACHE_ALIAS]
+    generation = _get_generation(cache, view_name)
     for is_authenticated in AUTH_STATES:
-        cache.delete(build_cache_key(view_name, kwargs or {}, is_authenticated))
+        cache_kwargs = {
+            **(kwargs or {}),
+            "_cache_generation": generation,
+        }
+        cache.delete(build_cache_key(view_name, cache_kwargs, is_authenticated))
+
+
+def _delete_all_keys_for_view(view_name):
+    """Invalidate every cached kwargs variant of a public view."""
+    _advance_generation(caches[PUBLIC_CACHE_ALIAS], view_name)
 
 
 def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
@@ -104,7 +138,7 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     Clears origin cache immediately. CDN will refresh within 10 seconds
     based on the short TTL configured in cache_public_view.
     """
-    _delete_key_for_all_auth_states("pretty_pair")
+    _delete_all_keys_for_view("pretty_pair")
     _delete_key_for_all_auth_states("missing_ballots")
     _delete_key_for_all_auth_states("public_home")
 
@@ -148,6 +182,15 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_ballots")
 
 
+def invalidate_public_motions_cache(*_args, **_kwargs):
+    """
+    Invalidate cached public motions view.
+
+    Clears origin cache immediately. CDN will refresh within 10 seconds.
+    """
+    _delete_key_for_all_auth_states("public_motions")
+
+
 def invalidate_all_public_caches(*_args, **_kwargs):
     """
     Invalidate all public view caches.
@@ -156,7 +199,7 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
     # Invalidate all view-specific caches
-    _delete_key_for_all_auth_states("pretty_pair")
+    _delete_all_keys_for_view("pretty_pair")
     _delete_key_for_all_auth_states("missing_ballots")
     _delete_key_for_all_auth_states("public_home")
     _delete_key_for_all_auth_states("public_view_judges")
@@ -165,6 +208,7 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_speaker_rankings")
     _delete_key_for_all_auth_states("public_ballots")
     _delete_key_for_all_auth_states("e_ballot_search_page")
+    _delete_key_for_all_auth_states("public_motions")
 
     # Invalidate outrounds for both divisions
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1

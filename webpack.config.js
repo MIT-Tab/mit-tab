@@ -10,9 +10,13 @@ module.exports = {
   entry: {
     main: "./assets/js/index",
     publicDisplay: "./assets/js/publicDisplay",
+    registrationStyles: "./assets/css/registration.scss",
+    registrationPortal: "./assets/js/registration/index",
     publicHome: "./assets/js/publicHome",
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
+    tournamentTodo: "./assets/js/tournamentTodo",
+    emailManagement: "./assets/js/emailManagement",
   },
   optimization: {
     minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],

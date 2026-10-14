@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""Check direct dependency release age for Python and NPM manifests."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
+
+try:
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+except ModuleNotFoundError:  # pragma: no cover - uv sync installs packaging
+    Requirement = None
+
+    def canonicalize_name(name: str) -> str:
+        return re.sub(r"[-_.]+", "-", name).lower()
+
+
+MIN_RELEASE_AGE = timedelta(days=30)
+MAX_RELEASE_AGE = timedelta(days=913)
+DEFAULT_BASE_REF = "origin/master"
+PYTHON_MANIFEST = Path("pyproject.toml")
+PYTHON_LOCK = Path("uv.lock")
+NPM_MANIFEST = Path("package.json")
+NPM_LOCK = Path("package-lock.json")
+NPM_DIRECT_SECTIONS = (
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+)
+
+
+@dataclass(frozen=True)
+class Dependency:
+    ecosystem: str
+    name: str
+    version: str | None
+    scope: str
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.ecosystem, self.name)
+
+    @property
+    def label(self) -> str:
+        version = self.version or "unresolved"
+        return f"{self.ecosystem}:{self.name}@{version}"
+
+
+@dataclass(frozen=True)
+class Finding:
+    dependency: Dependency
+    severity: str
+    reason: str
+    release_date: datetime | None
+    changed: bool
+
+
+def load_toml_bytes(raw: bytes) -> dict[str, Any]:
+    return tomllib.loads(raw.decode())
+
+
+def parse_datetime(value: str) -> datetime:
+    normalized = value.replace("Z", "+00:00")
+    fractional_match = re.match(r"^(.*T\d\d:\d\d:\d\d)\.(\d+)([+-]\d\d:\d\d)$", normalized)
+    if fractional_match:
+        base, fraction, offset = fractional_match.groups()
+        normalized = f"{base}.{fraction[:6].ljust(6, '0')}{offset}"
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def direct_python_dependencies(pyproject: dict[str, Any], lock: dict[str, Any]) -> dict[tuple[str, str], Dependency]:
+    resolved_versions = {
+        canonicalize_name(package["name"]): package["version"]
+        for package in lock.get("package", [])
+        if "name" in package and "version" in package
+    }
+    dependencies: dict[tuple[str, str], Dependency] = {}
+
+    for requirement in pyproject.get("project", {}).get("dependencies", []):
+        add_python_dependency(dependencies, requirement, "project.dependencies", resolved_versions)
+
+    for group, requirements in pyproject.get("dependency-groups", {}).items():
+        for requirement in requirements:
+            add_python_dependency(dependencies, requirement, f"dependency-groups.{group}", resolved_versions)
+
+    return dependencies
+
+
+def add_python_dependency(
+    dependencies: dict[tuple[str, str], Dependency],
+    requirement: str,
+    scope: str,
+    resolved_versions: dict[str, str],
+) -> None:
+    if Requirement is not None:
+        name = canonicalize_name(Requirement(requirement).name)
+    else:
+        name = canonicalize_name(re.split(r"[<>=!~;\\[]", requirement, maxsplit=1)[0].strip())
+    dependency = Dependency("python", name, resolved_versions.get(name), scope)
+    dependencies[dependency.key] = dependency
+
+
+def direct_npm_dependencies(package_json: dict[str, Any], package_lock: dict[str, Any]) -> dict[tuple[str, str], Dependency]:
+    packages = package_lock.get("packages", {})
+    dependencies: dict[tuple[str, str], Dependency] = {}
+    for section in NPM_DIRECT_SECTIONS:
+        for name in package_json.get(section, {}):
+            locked = packages.get(f"node_modules/{name}", {})
+            dependency = Dependency("npm", name, locked.get("version"), section)
+            dependencies[dependency.key] = dependency
+    return dependencies
+
+
+def python_release_dates(lock: dict[str, Any]) -> dict[tuple[str, str], datetime]:
+    dates: dict[tuple[str, str], datetime] = {}
+    for package in lock.get("package", []):
+        if "name" not in package or "version" not in package:
+            continue
+        upload_dates: list[datetime] = []
+        sdist = package.get("sdist")
+        if isinstance(sdist, dict) and sdist.get("upload-time"):
+            upload_dates.append(parse_datetime(sdist["upload-time"]))
+        for wheel in package.get("wheels", []):
+            if isinstance(wheel, dict) and wheel.get("upload-time"):
+                upload_dates.append(parse_datetime(wheel["upload-time"]))
+        if upload_dates:
+            dates[(canonicalize_name(package["name"]), package["version"])] = min(upload_dates)
+    return dates
+
+
+def npm_release_date(name: str, version: str, timeout: int) -> datetime | None:
+    encoded_name = urllib.parse.quote(name, safe="")
+    url = f"https://registry.npmjs.org/{encoded_name}"
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            metadata = json.load(response)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        print(f"WARNING: could not read npm metadata for {name}: {exc}", file=sys.stderr)
+        return None
+    published = metadata.get("time", {}).get(version)
+    return parse_datetime(published) if isinstance(published, str) else None
+
+
+def load_json_file(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text())
+
+
+def load_toml_file(path: Path) -> dict[str, Any]:
+    return load_toml_bytes(path.read_bytes())
+
+
+def git_file(base_ref: str, path: Path) -> bytes | None:
+    command = ["git", "show", f"{base_ref}:{path.as_posix()}"]
+    result = subprocess.run(command, check=False, capture_output=True)
+    if result.returncode == 0:
+        return result.stdout
+    return None
+
+
+def ensure_base_ref(base_ref: str) -> None:
+    if (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", base_ref],
+            check=False,
+            stdout=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    ):
+        return
+    if "/" not in base_ref:
+        return
+    remote, branch = base_ref.split("/", 1)
+    subprocess.run(
+        ["git", "fetch", "--quiet", remote, f"{branch}:refs/remotes/{remote}/{branch}"],
+        check=False,
+        timeout=60,
+    )
+
+
+def load_base_dependencies(base_ref: str) -> dict[tuple[str, str], Dependency] | None:
+    ensure_base_ref(base_ref)
+    pyproject_raw = git_file(base_ref, PYTHON_MANIFEST)
+    uv_lock_raw = git_file(base_ref, PYTHON_LOCK)
+    package_json_raw = git_file(base_ref, NPM_MANIFEST)
+    package_lock_raw = git_file(base_ref, NPM_LOCK)
+
+    if not all((pyproject_raw, uv_lock_raw, package_json_raw, package_lock_raw)):
+        return None
+
+    dependencies = direct_python_dependencies(load_toml_bytes(pyproject_raw), load_toml_bytes(uv_lock_raw))
+    dependencies.update(
+        direct_npm_dependencies(json.loads(package_json_raw), json.loads(package_lock_raw))
+    )
+    return dependencies
+
+
+def current_dependencies() -> tuple[dict[tuple[str, str], Dependency], dict[tuple[str, str], datetime]]:
+    pyproject = load_toml_file(PYTHON_MANIFEST)
+    uv_lock = load_toml_file(PYTHON_LOCK)
+    package_json = load_json_file(NPM_MANIFEST)
+    package_lock = load_json_file(NPM_LOCK)
+
+    dependencies = direct_python_dependencies(pyproject, uv_lock)
+    dependencies.update(direct_npm_dependencies(package_json, package_lock))
+    return dependencies, python_release_dates(uv_lock)
+
+
+def dependency_changed(dependency: Dependency, base_dependencies: dict[tuple[str, str], Dependency] | None) -> bool:
+    if base_dependencies is None:
+        return False
+    base_dependency = base_dependencies.get(dependency.key)
+    return base_dependency is None or base_dependency.version != dependency.version
+
+
+def classify_release_date(release_date: datetime | None, now: datetime) -> str | None:
+    if release_date is None:
+        return "has no resolvable release date"
+    age = now - release_date
+    if age < MIN_RELEASE_AGE:
+        return f"was released {age.days} days ago, below the {MIN_RELEASE_AGE.days}-day minimum"
+    if age > MAX_RELEASE_AGE:
+        return f"was released {age.days} days ago, above the {MAX_RELEASE_AGE.days}-day maximum"
+    return None
+
+
+def analyze(args: argparse.Namespace) -> list[Finding]:
+    dependencies, python_dates = current_dependencies()
+    base_dependencies = load_base_dependencies(args.base_ref)
+    if base_dependencies is None:
+        print(
+            f"WARNING: could not load {args.base_ref}; dependency age findings will be warning-only",
+            file=sys.stderr,
+        )
+
+    npm_dates: dict[tuple[str, str], datetime | None] = {}
+    findings: list[Finding] = []
+    for dependency in sorted(dependencies.values(), key=lambda item: item.label):
+        release_date: datetime | None
+        if dependency.version is None:
+            release_date = None
+        elif dependency.ecosystem == "python":
+            release_date = python_dates.get((dependency.name, dependency.version))
+        else:
+            cache_key = (dependency.name, dependency.version)
+            if cache_key not in npm_dates:
+                npm_dates[cache_key] = npm_release_date(dependency.name, dependency.version, args.timeout)
+            release_date = npm_dates[cache_key]
+
+        reason = classify_release_date(release_date, args.now)
+        if reason is None:
+            continue
+
+        changed = dependency_changed(dependency, base_dependencies)
+        severity = "ERROR" if changed else "WARNING"
+        findings.append(Finding(dependency, severity, reason, release_date, changed))
+    return findings
+
+
+def format_date(release_date: datetime | None) -> str:
+    return release_date.date().isoformat() if release_date else "unknown date"
+
+
+def parse_now(value: str | None) -> datetime:
+    if not value:
+        return datetime.now(timezone.utc)
+    return parse_datetime(value)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-ref", default=os.environ.get("DEPENDENCY_AGE_BASE", DEFAULT_BASE_REF))
+    parser.add_argument("--timeout", type=int, default=10)
+    parser.add_argument(
+        "--now",
+        type=parse_now,
+        default=parse_now(os.environ.get("DEPENDENCY_AGE_NOW")),
+        help="UTC timestamp override for tests, e.g. 2026-05-08T00:00:00Z",
+    )
+    args = parser.parse_args()
+
+    findings = analyze(args)
+    errors = [finding for finding in findings if finding.severity == "ERROR"]
+
+    for finding in findings:
+        dependency = finding.dependency
+        basis = "new or changed" if finding.changed else "unchanged"
+        print(
+            f"{finding.severity}: {dependency.label} ({dependency.scope}) "
+            f"{finding.reason}; release date {format_date(finding.release_date)}; "
+            f"{basis} relative to {args.base_ref}"
+        )
+
+    if errors:
+        print(
+            f"Dependency age check failed: {len(errors)} new or changed direct dependency "
+            f"version(s) are outside the allowed {MIN_RELEASE_AGE.days}-"
+            f"to-{MAX_RELEASE_AGE.days}-day release-age window.",
+            file=sys.stderr,
+        )
+        return 1
+
+    warning_count = len(findings)
+    print(
+        f"Dependency age check passed with {warning_count} warning(s). "
+        f"New or changed direct dependency versions must be between "
+        f"{MIN_RELEASE_AGE.days} and {MAX_RELEASE_AGE.days} days old."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -60,3 +60,11 @@ settings:
     choices:
       - [0, "Top of Bracket"]
       - [1, "Middle of Bracket"]
+  - outround_judge_priority:
+    name: outround_judge_priority
+    description: "Choose how judge priority is handled when assigning varsity and novice outrounds together. 'Varsity Wings' assigns varsity first, then novice with remaining judges. 'Novice Chairs' assigns both together each panel slot, with novice always receiving the lowest draft of that slot."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Varsity Wings"]
+      - [1, "Novice Chairs"]

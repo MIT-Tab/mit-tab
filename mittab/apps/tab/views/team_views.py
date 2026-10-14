@@ -1,7 +1,16 @@
 from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
+from django.utils.text import slugify
 
+from mittab.apps.tab.auth_roles import (
+    CAP_ADD_SCRATCHES,
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    is_apda_board_user,
+    user_has_staff_capability,
+)
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
@@ -17,7 +26,11 @@ from mittab.libs.tab_logic import rankings
 
 
 def view_teams(request):
+    include_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
+
     def flags(team):
+        if not include_checkins:
+            return 0
         result = 0
         if team.checked_in:
             result |= TabFlags.TEAM_CHECKED_IN
@@ -25,11 +38,20 @@ def view_teams(request):
             result |= TabFlags.TEAM_NOT_CHECKED_IN
         return result
 
-    c_teams = [(team.id, team.display_backend, flags(team),
-                TabFlags.flags_to_symbols(flags(team)))
-               for team in Team.objects.all()]
-    all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
-    filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
+    c_teams = [
+        (
+            team.id,
+            team.display_backend,
+            flags(team),
+            TabFlags.flags_to_symbols(flags(team)),
+            list(team.ranking_groups.order_by("name").values_list("name", flat=True)),
+        )
+        for team in Team.objects.prefetch_related("ranking_groups").all()
+    ]
+    filters, symbol_text = [], ""
+    if include_checkins:
+        all_flags = [[TabFlags.TEAM_CHECKED_IN, TabFlags.TEAM_NOT_CHECKED_IN]]
+        filters, symbol_text = TabFlags.get_filters_and_symbols(all_flags)
     return render(
         request, "common/list_data.html", {
             "item_type": "team",
@@ -55,10 +77,14 @@ def view_team(request, team_id):
     except Team.DoesNotExist:
         return redirect_and_flash_error(request, "Team not found")
     if request.method == "POST":
-        form = TeamForm(request.POST, instance=team)
+        form = TeamForm(
+            request.POST,
+            instance=team,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
-                form.save()
+                form.save(actor=request.user)
             except ValueError:
                 return redirect_and_flash_error(
                     request,
@@ -67,37 +93,52 @@ def view_team(request, team_id):
             return redirect_and_flash_success(
                 request, f"Team {updated_name} updated successfully")
     else:
-        form = TeamForm(instance=team)
-        links = [
-            (
+        form = TeamForm(
+            instance=team,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
+        links = []
+        if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+            links.append((f"/team/{team_id}/delete/", "Delete"))
+        if user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES):
+            links.append((
                 f"/team/{team_id}/scratches/view/",
                 f"Scratches for {team.display_backend}",
-            )
-        ]
+            ))
         return render(
             request, "tab/team_detail.html", {
                 "title": f"Viewing Team: {team.display_backend}",
                 "form": form,
                 "links": links,
                 "team_obj": team,
-                "team_stats": stats
+                "team_stats": stats,
+                "audit_events": team.audit_events.all(),
             })
 
     return render(request, "common/data_entry.html", {"form": form})
 
 
 def enter_team(request):
+    allow_initial_scratches = (
+        user_has_staff_capability(request.user, CAP_ADD_SCRATCHES) or
+        user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES)
+    )
+    allow_checkins = user_has_staff_capability(request.user, CAP_CHECKINS)
     if request.method == "POST":
-        form = TeamEntryForm(request.POST)
+        form = TeamEntryForm(
+            request.POST,
+            allow_initial_scratches=allow_initial_scratches,
+            allow_checkins=allow_checkins,
+        )
         if form.is_valid():
             try:
-                team = form.save()
+                team = form.save(actor=request.user)
             except ValueError:
                 return redirect_and_flash_error(
                     request,
                     "Team name cannot be validated, most likely a duplicate school"
                 )
-            num_forms = form.cleaned_data["number_scratches"]
+            num_forms = form.cleaned_data.get("number_scratches", 0)
             if num_forms > 0:
                 return HttpResponseRedirect(
                     f"/team/{team.pk}/scratches/add/{num_forms}"
@@ -109,11 +150,31 @@ def enter_team(request):
                     f"Team {team_name} created successfully",
                     path="/")
     else:
-        form = TeamEntryForm()
+        form = TeamEntryForm(
+            allow_initial_scratches=allow_initial_scratches,
+            allow_checkins=allow_checkins,
+        )
     return render(request, "common/data_entry.html", {
         "form": form,
         "title": "Create Team"
     })
+
+
+def delete_team(request, team_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(request, "You cannot delete teams", path="/403/")
+
+    try:
+        team_id = int(team_id)
+        team = Team.objects.get(pk=team_id)
+        team.delete()
+    except Team.DoesNotExist:
+        return redirect_and_flash_error(request, "That team does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Team deleted successfully",
+                                      path="/")
 
 
 def add_scratches(request, team_id, number_scratches):
@@ -143,7 +204,7 @@ def add_scratches(request, team_id, number_scratches):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches created successfully")
     else:
@@ -160,7 +221,7 @@ def add_scratches(request, team_id, number_scratches):
         ]
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, [None] * len(forms))),
+            "forms": list(zip(forms, [None] * len(forms), [None] * len(forms))),
             "data_type": "Scratch",
             "title": f"Adding Scratch(es) for {team.display_backend}"
         })
@@ -192,7 +253,7 @@ def view_scratches(request, team_id):
             all_good = all_good and form.is_valid()
         if all_good:
             for form in forms:
-                form.save()
+                form.save(actor=request.user)
             return redirect_and_flash_success(
                 request, "Scratches successfully modified")
     else:
@@ -205,22 +266,39 @@ def view_scratches(request, team_id):
             )
             for i in range(len(scratches))
         ]
-    delete_links = [
-        f"/team/{team_id}/scratches/delete/{scratches[i].id}"
-        for i in range(len(scratches))
+    read_only = not request.user.is_superuser
+    delete_links = [None] * len(scratches)
+    if not read_only:
+        delete_links = [
+            f"/team/{team_id}/scratches/delete/{scratches[i].id}"
+            for i in range(len(scratches))
+        ]
+    metadata = [
+        {
+            "created_by": scratch.created_by_display,
+            "created_at": scratch.created_at,
+            "audit_events": scratch.audit_events.all(),
+        }
+        for scratch in scratches
     ]
     links = [(f"/team/{team_id}/scratches/add/1/", "Add Scratch")]
     return render(
         request, "common/data_entry_multiple.html", {
-            "forms": list(zip(forms, delete_links)),
+            "forms": list(zip(forms, delete_links, metadata)),
             "data_type": "Scratch",
             "links": links,
+            "read_only": read_only,
             "title": f"Viewing Scratch Information for {team.display_backend}"
         })
 
 
-@permission_required("tab.tab_settings.can_change", login_url="/403/")
 def all_tab_cards(request):
+    if not (
+        request.user.has_perm("tab.tab_settings.can_change")
+        or is_apda_board_user(request.user)
+    ):
+        return HttpResponseRedirect("/403/")
+
     all_teams = Team.objects.all()
     return render(request, "tab/all_tab_cards.html", {"all_teams": all_teams})
 
@@ -384,9 +462,21 @@ def rank_teams(request):
         public=False
     )
 
+    ranking_group_tables = []
+    ranking_groups = RankingGroup.objects.prefetch_related("teams").order_by("name")
+    for ranking_group in ranking_groups:
+        team_ids = {team.id for team in ranking_group.teams.all()}
+        grouped_teams = [team for team in teams if team[0].id in team_ids]
+        if grouped_teams:
+            ranking_group_tables.append({
+                "title": f"{ranking_group.name} Rankings",
+                "anchor": f"team-ranking-group-{slugify(ranking_group.name)}",
+                "teams": grouped_teams,
+            })
+
     return render(request, "tab/rank_teams_component.html", {
         "varsity": teams,
         "novice": nov_teams,
+        "team_ranking_groups": ranking_group_tables,
         "title": "Team Rankings"
     })
-

@@ -6,7 +6,7 @@ from django.test import LiveServerTestCase
 from django.core.cache import cache
 from django.urls import reverse
 from selenium import webdriver
-from selenium.common.exceptions import NoAlertPresentException
+from selenium.common.exceptions import NoAlertPresentException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -66,9 +66,9 @@ class BaseWebTestCase(LiveServerTestCase):
 
     def _accept_confirm(self):
         try:
-            alert = self.browser.driver.switch_to.alert
+            alert = WebDriverWait(self.browser.driver, 5).until(EC.alert_is_present())
             alert.accept()
-        except NoAlertPresentException:
+        except (NoAlertPresentException, TimeoutException):
             pass
 
     def _visit(self, path):

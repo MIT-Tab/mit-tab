@@ -47,10 +47,12 @@ nosetests.xml
 
 # Dont commit the db files
 mittab/backups/
+mittab/uploads/
 *.sqlite3
 *.sqlite3-journal
 
-# venv
+# Local Python environments
+.venv/
 venv*/
 
 # IDEs

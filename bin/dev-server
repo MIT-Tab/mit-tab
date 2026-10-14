@@ -4,6 +4,11 @@ import os
 import signal
 import subprocess
 import sys
+import time
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 server_env = os.environ.copy()
 server_env["DEBUG"] = "1"
@@ -17,12 +22,32 @@ server_args = ["python", "manage.py", "runserver", "0.0.0.0:8001"]
 
 webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stderr, env=webpack_env)
 server_proc = subprocess.Popen(server_args, stdout=sys.stdout, stderr=sys.stderr, env=server_env)
+procs = [webpack_proc, server_proc]
+
+def stop_procs():
+  for proc in procs:
+    if proc.poll() is None:
+      proc.terminate()
+  for proc in procs:
+    try:
+      proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+      proc.kill()
+      proc.wait()
 
 def on_interrupt(*args):
-  webpack_proc.terminate()
-  server_proc.terminate()
+  stop_procs()
   sys.exit(0)
 
 signal.signal(signal.SIGINT, on_interrupt)
+signal.signal(signal.SIGTERM, on_interrupt)
 
-for p in [webpack_proc, server_proc]: p.communicate()
+while True:
+  return_codes = [proc.poll() for proc in procs]
+  failed_codes = [code for code in return_codes if code not in (None, 0)]
+  if failed_codes:
+    stop_procs()
+    sys.exit(failed_codes[0])
+  if all(code == 0 for code in return_codes):
+    sys.exit(0)
+  time.sleep(0.2)

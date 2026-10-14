@@ -1,0 +1,19 @@
+<form method="post"
+      action="{% url 'tournament_link_create' link_kind=link_kind %}"
+      class="tournament-link-form">
+    {% csrf_token %}
+    <div class="tournament-link-form__row">
+        <input type="text" name="title" class="form-control form-control-sm"
+               placeholder="Title (e.g. Tournament Discord)" maxlength="80" required>
+        <input type="url" name="url" class="form-control form-control-sm"
+               placeholder="https://..." inputmode="url" required>
+        <input type="text" name="description" class="form-control form-control-sm"
+               placeholder="Short description (optional)" maxlength="160">
+        <input type="number" name="display_order" class="form-control form-control-sm tournament-link-form__order"
+               value="0" min="0" step="1" title="Display order">
+        <label class="tournament-link-form__active">
+            <input type="checkbox" name="is_active" checked> Active
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm">{{ submit_label }}</button>
+    </div>
+</form>

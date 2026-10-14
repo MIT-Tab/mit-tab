@@ -1,8 +1,20 @@
-<div class="col-12">
-    <a href="{% url 'cache_refresh' %}?key=team_rankings&next={% url 'rank_teams_ajax' %}">
+<div class="col-12 d-flex flex-wrap align-items-center mb-2">
+    <a class="mr-3" href="{% url 'cache_refresh' %}?key=team_rankings&next={% url 'rank_teams_ajax' %}">
     Force Refresh
     </a>
+    <a class="btn btn-sm btn-light" href="{% url 'manage_ranking_groups' %}">Manage Ranking Groups</a>
 </div>
+{% if team_ranking_groups %}
+<div class="col-12 mb-3 ranking-groups-nav">
+    <span class="font-weight-bold mr-2">Ranking Groups:</span>
+    {% for ranking_group in team_ranking_groups %}
+        <a class="mr-3" href="#{{ ranking_group.anchor }}">{{ ranking_group.title }}</a>
+    {% endfor %}
+</div>
+{% endif %}
 {% include "tab/_rank_teams_table.html" with teams=varsity table_title="Varsity Rankings" %}
 {% include "tab/_rank_teams_table.html" with teams=novice table_title="Novice Rankings" %}
+{% for ranking_group in team_ranking_groups %}
+    {% include "tab/_rank_teams_table.html" with teams=ranking_group.teams table_title=ranking_group.title section_id=ranking_group.anchor %}
+{% endfor %}
 </div>

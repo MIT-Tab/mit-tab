@@ -8,16 +8,16 @@ production:
 	@true
 
 web:
-	python manage.py runserver
+	uv run python manage.py runserver
 
 tests: test
 
 test:
-	./bin/setup password
-	pytest --reuse-db mittab/
+	uv run ./bin/setup password
+	uv run pytest --reuse-db mittab/
 
 shell:
-	python manage.py shell
+	uv run python manage.py shell
 
 clean:
 	find . -name '*.pyc' -delete

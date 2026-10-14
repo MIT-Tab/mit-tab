@@ -1,12 +1,15 @@
 # pylint: disable=too-many-lines
 import datetime
+import logging
 import os
 
 from django.shortcuts import render, get_object_or_404
+from django.urls import reverse
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
@@ -14,6 +17,10 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_editing_open,
+)
 from mittab.libs import assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import BackupForm, ResultEntryForm, \
@@ -31,6 +38,8 @@ from mittab.libs.cacheing.public_cache import (
     invalidate_inround_public_pairings_cache,
     invalidate_public_rankings_cache,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def invalidate_public_ballot_cache():
@@ -425,6 +434,86 @@ def view_status(request):
     return view_round(request, current_round_number)
 
 
+def quick_judge_checkin(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST required"},
+                            status=405)
+
+    try:
+        round_number = int(request.POST.get("round_number", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"success": False, "error": "Invalid round"},
+                            status=400)
+
+    judge_id = request.POST.get("judge_id")
+    if judge_id:
+        try:
+            judge = Judge.objects.get(pk=int(judge_id))
+        except (ValueError, Judge.DoesNotExist):
+            return JsonResponse({"success": False, "error": "Judge not found"},
+                                status=404)
+        CheckIn.objects.get_or_create(judge=judge, round_number=round_number)
+        return JsonResponse({
+            "success": True,
+            "judge": {"id": judge.id, "name": judge.name, "rank": str(judge.rank)},
+            "created": False,
+        })
+
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"success": False, "error": "Name is required"},
+                            status=400)
+    if Judge.objects.filter(name__iexact=name).exists():
+        return JsonResponse(
+            {"success": False, "error": f"A judge named \"{name}\" already exists"},
+            status=400,
+        )
+
+    rank_raw = (request.POST.get("rank") or "").strip()
+    try:
+        rank = float(rank_raw) if rank_raw else 5.0
+    except ValueError:
+        return JsonResponse({"success": False, "error": "Invalid rank"},
+                            status=400)
+
+    school_ids = []
+    school_id_values = (
+        request.POST.getlist("school_ids[]") +
+        request.POST.getlist("school_ids")
+    )
+    for raw in school_id_values:
+        if raw and raw.isdigit():
+            school_ids.append(int(raw))
+    schools = list(School.objects.filter(pk__in=school_ids)) if school_ids else []
+    if school_ids and len(schools) != len(set(school_ids)):
+        return JsonResponse({"success": False, "error": "Unknown school selected"},
+                            status=400)
+
+    actor = request.user if getattr(request.user, "is_authenticated", False) else None
+
+    try:
+        with transaction.atomic():
+            judge = Judge(name=name, rank=rank)
+            if actor:
+                judge.created_by = actor
+            judge.save()
+            if schools:
+                judge.schools.set(schools)
+            CheckIn.objects.create(judge=judge, round_number=round_number)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("Failed to create quick judge check-in")
+        return JsonResponse(
+            {"success": False, "error": "Unable to create judge check-in"},
+            status=400,
+        )
+
+    return JsonResponse({
+        "success": True,
+        "judge": {"id": judge.id, "name": judge.name, "rank": str(judge.rank)},
+        "created": True,
+    })
+
+
 def view_round(request, round_number):
     errors, excluded_teams = [], []
 
@@ -455,12 +544,30 @@ def view_round(request, round_number):
     round_info = [pair for pair in round_pairing]
     round_ids = [pair.id for pair in round_info]
     manual_judge_assignments = {}
+    manual_judge_assignment_labels = {}
+    manual_judge_audit_events = {}
     if round_ids:
         manual_entries = ManualJudgeAssignment.objects.filter(
             round_id__in=round_ids
-        ).values_list("round_id", "judge_id")
-        for round_id, judge_id in manual_entries:
+        ).select_related("created_by")
+        for entry in manual_entries:
+            round_id, judge_id = entry.round_id, entry.judge_id
             manual_judge_assignments.setdefault(round_id, set()).add(judge_id)
+            manual_judge_assignment_labels[(round_id, judge_id)] = (
+                f"Manually assigned by {entry.created_by_display}"
+            )
+        round_content_type = ContentType.objects.get_for_model(Round)
+        audit_entries = AuditEvent.objects.filter(
+            content_type=round_content_type,
+            object_id__in=round_ids,
+            event_type__in=[
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                AuditEvent.MANUAL_JUDGE_REMOVE,
+                AuditEvent.MANUAL_CHAIR_CHANGE,
+            ],
+        ).select_related("user")
+        for entry in audit_entries:
+            manual_judge_audit_events.setdefault(entry.object_id, []).append(entry)
 
     all_judges_in_round = [j for pairing in round_info for j in pairing.judges.all()]
 
@@ -563,6 +670,9 @@ def view_round(request, round_number):
         "n_over_two": n_over_two,
         "paired_teams": paired_teams,
         "manual_judge_assignments": manual_judge_assignments,
+        "manual_judge_assignment_labels": manual_judge_assignment_labels,
+        "manual_judge_audit_events": manual_judge_audit_events,
+        "all_schools": School.objects.order_by("name"),
     }
     return render(request, "pairing/pairing_control.html", context)
 
@@ -686,6 +796,9 @@ def team_stats(request, round_number, outround=False):
         stats["total_speaks"] = tab_logic.tot_speaks(team)
         stats["govs"] = tab_logic.num_govs(team)
         stats["opps"] = tab_logic.num_opps(team)
+        stats["debaters"] = ", ".join(
+            debater.name for debater in team.debaters.all()
+        )
 
         if hasattr(team, "breaking_team"):
             stats["outround_seed"] = team.breaking_team.seed
@@ -768,15 +881,46 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
         round_obj.judges.add(judge_obj)
+        actor = request.user if getattr(request.user, "is_authenticated", False) else None
+        ManualJudgeAssignment.objects.update_or_create(
+            round=round_obj,
+            judge=judge_obj,
+            defaults={"created_by": actor},
+        )
 
         if remove_id is not None:
             remove_obj = Judge.objects.get(id=int(remove_id))
             round_obj.judges.remove(remove_obj)
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={
+                    "assigned_judge": judge_obj.name,
+                    "removed_judge": remove_obj.name,
+                },
+                note=f"Swapped {remove_obj.name} for {judge_obj.name}",
+            )
 
             if remove_obj == round_obj.chair:
                 round_obj.chair = round_obj.judges.order_by("-rank").first()
         elif not round_obj.chair:
             round_obj.chair = judge_obj
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
+        else:
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_JUDGE_ASSIGN,
+                request.user,
+                changes={"assigned_judge": judge_obj.name},
+                note=f"Assigned {judge_obj.name}",
+            )
 
         round_obj.save()
         data = {
@@ -837,7 +981,33 @@ def enter_result(request,
         "roundstats_set__debater",
     ).get(id=round_id)
 
+    submitted_ballot_exists = RoundStats.objects.filter(round=round_obj).exists()
+
     if request.method == "POST":
+        if (
+            not ballot_code
+            and submitted_ballot_exists
+            and "rfd" in request.POST
+            and "winner" not in request.POST
+        ):
+            if not (
+                round_allows_written_rfd(round_obj)
+                and written_rfd_editing_open(round_obj)
+            ):
+                return redirect_and_flash_error(
+                    request,
+                    "Written RFDs cannot be edited for this ballot.",
+                    path=request.path,
+                )
+
+            round_obj.rfd = request.POST.get("rfd", "").strip()
+            round_obj.save(update_fields=["rfd"])
+            return redirect_and_flash_success(
+                request,
+                "Written RFD saved.",
+                path=request.path,
+            )
+
         form = form_class(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
@@ -868,6 +1038,9 @@ def enter_result(request,
                 "low_speak_warning_threshold", 25),
             "high_speak_warning_threshold": TabSettings.get(
                 "high_speak_warning_threshold", 34),
+            "previous_ballots_url": reverse(
+                "previous_ballots", args=[ballot_code]
+            ) if ballot_code else "",
         })
 
 
@@ -965,7 +1138,7 @@ def start_new_tourny(request):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
-        TabSettings.set("tournament_name", "New Tournament")
+        TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(
@@ -975,8 +1148,8 @@ def start_new_tourny(request):
 
 def clear_db():
     obj_types = [
-        CheckIn, RoundStats, Round, Judge, Room, Scratch, TabSettings, Team,
-        School, Debater
+        CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
+        PublicHomePage, UserTournamentSetupPreference, TabSettings, Team, School, Debater
     ]
     list(map(delete_obj, obj_types))
 
@@ -995,6 +1168,13 @@ def remove_judge(request, round_id, judge_id, is_outround=False):
     if judge in all_judges:
         round_obj.judges.remove(judge)
         all_judges.remove(judge)
+        AuditEvent.record(
+            round_obj,
+            AuditEvent.MANUAL_JUDGE_REMOVE,
+            request.user,
+            changes={"removed_judge": judge.name},
+            note=f"Removed {judge.name}",
+        )
         if round_obj.chair == judge:
             if all_judges:
                 round_obj.chair = all_judges[0]
@@ -1011,8 +1191,19 @@ def assign_chair(request, round_id, chair_id, is_outround=False):
     chair = get_object_or_404(Judge, id=chair_id)
     if chair in round_obj.judges.all():
         try:
+            old_chair = round_obj.chair
             round_obj.chair = chair
             round_obj.save()
+            AuditEvent.record(
+                round_obj,
+                AuditEvent.MANUAL_CHAIR_CHANGE,
+                request.user,
+                changes={
+                    "old_chair": old_chair.name if old_chair else None,
+                    "new_chair": chair.name,
+                },
+                note=f"Assigned {chair.name} as chair",
+            )
             return JsonResponse({"success": True})
         except ValueError:
             return redirect_and_flash_error(request, "Chair could not be assigned")

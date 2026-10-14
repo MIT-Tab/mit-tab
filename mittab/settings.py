@@ -14,15 +14,22 @@ SECRET_KEY = "=#)rtpjhx_dl+p(1c8)1qu36%v2@wv@nhrg&6@kjw!ga2va!5$"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG")
+BLACK_ROD_API_BASE_URL = os.environ.get(
+    "BLACK_ROD_API_BASE_URL",
+    "https://results.apda.online",
+).rstrip("/")
+BLACK_ROD_PRIVATE_API_TOKEN = os.environ.get("BLACK_ROD_PRIVATE_API_TOKEN", "")
 
 ALLOWED_HOSTS = ["*"]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Application definition
 
 INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.contenttypes", "django.contrib.sessions",
                   "django.contrib.messages", "django.contrib.staticfiles",
-                  "mittab.apps.tab", "sentry_sdk.integrations.django",
+                  "mittab.apps.tab", "mittab.apps.registration",
+                  "sentry_sdk.integrations.django",
                   "webpack_loader", "bootstrap4",)
 
 MIDDLEWARE = (
@@ -53,6 +60,8 @@ MYSQL_USER = os.environ.get("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
+DB_CONN_MAX_AGE = int(os.environ.get("DB_CONN_MAX_AGE", "0"))
+
 
 DB_OPTIONS = {"charset": "utf8mb4"}
 
@@ -80,7 +89,7 @@ DATABASES = {
         "PASSWORD": MYSQL_PASSWORD,
         "HOST":     MYSQL_HOST,
         "PORT":     MYSQL_PORT,
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
     }
 }
 
@@ -127,6 +136,10 @@ WEBPACK_LOADER = {
         "STATS_FILE": os.path.join(BASE_DIR, "webpack-stats.json"),
     }
 }
+if os.environ.get("MITTAB_FAKE_WEBPACK_LOADER") == "1":
+    WEBPACK_LOADER["DEFAULT"]["LOADER_CLASS"] = (
+        "webpack_loader.loaders.FakeWebpackLoader"
+    )
 
 TEMPLATES = [
     {
@@ -155,6 +168,9 @@ MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 # Login/Logout redirects
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/public/login/"
+AUTHENTICATION_BACKENDS = (
+    "mittab.apps.tab.auth_backends.TabAuthenticationBackend",
+)
 
 SETTING_YAML_PATH = os.path.join(BASE_DIR, "settings.yaml")
 
@@ -202,3 +218,16 @@ if os.environ.get("MITTAB_LOG_QUERIES"):
             "handlers": ["console"],
         }
     }
+
+# Email / Amazon SES configuration
+AWS_SES_REGION = os.environ.get("AWS_SES_REGION", "us-east-1")
+AWS_SES_ACCESS_KEY_ID = os.environ.get("AWS_SES_ACCESS_KEY_ID")
+AWS_SES_SECRET_ACCESS_KEY = os.environ.get("AWS_SES_SECRET_ACCESS_KEY")
+AWS_SES_CONFIGURATION_SET = os.environ.get("AWS_SES_CONFIGURATION_SET")
+
+AWS_MAILMANAGER_ADDRESS_LIST = os.environ.get("AWS_MAILMANAGER_ADDRESS_LIST")
+
+EMAIL_FROM_ADDRESS = os.environ.get("EMAIL_FROM_ADDRESS", "no-reply@example.com")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "MIT-TAB")
+DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>"
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO", EMAIL_FROM_ADDRESS)

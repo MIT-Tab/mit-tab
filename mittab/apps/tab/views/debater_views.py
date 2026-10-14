@@ -1,5 +1,7 @@
 from django.shortcuts import render
+from django.utils.text import slugify
 
+from mittab.apps.tab.auth_roles import CAP_DATA_ENTRY, user_has_staff_capability
 from mittab.apps.tab.forms import DebaterForm
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
@@ -10,10 +12,60 @@ from mittab.libs.tab_logic import rankings
 from mittab.libs.errors import *
 
 
+class SpeakerRankingEntry:
+    """Tuple-compatible speaker row with display-only score columns."""
+
+    def __init__(self, debater, speaks, ranks, team, tiebreaker, score_columns):
+        self.debater = debater
+        self.speaks = speaks
+        self.ranks = ranks
+        self.team = team
+        self.tiebreaker = tiebreaker
+        self.score_columns = score_columns
+        self._tuple = (debater, speaks, ranks, team, tiebreaker)
+
+    def __iter__(self):
+        return iter(self._tuple)
+
+    def __len__(self):
+        return len(self._tuple)
+
+    def __getitem__(self, index):
+        return self._tuple[index]
+
+
+def _speaker_score_columns(debater_stats):
+    score_columns_by_stat = {
+        rankings.SINGLE_ADJUSTED_SPEAKS: {
+            "label": "Single adjusted",
+            "speaks": debater_stats[rankings.SINGLE_ADJUSTED_SPEAKS],
+            "ranks": debater_stats[rankings.SINGLE_ADJUSTED_RANKS],
+        },
+        rankings.SPEAKS: {
+            "label": "Unadjusted",
+            "speaks": debater_stats[rankings.SPEAKS],
+            "ranks": debater_stats[rankings.RANKS],
+        },
+    }
+    return [
+        score_columns_by_stat[stat]
+        for stat in debater_stats.get_stat_priority()
+        if stat in score_columns_by_stat
+    ]
+
+
 def view_debaters(request):
     # Get a list of (id,debater_name) tuples
-    c_debaters = [(debater.pk, debater.display, 0, "")
-                  for debater in Debater.objects.all()]
+    c_debaters = [
+        (
+            debater.pk,
+            debater.display,
+            0,
+            "",
+            list(debater.ranking_groups.order_by("name").values_list("name", flat=True)),
+        )
+        for debater in Debater.objects.prefetch_related("ranking_groups").all()
+    ]
     return render(
         request, "common/list_data.html", {
             "item_type": "debater",
@@ -25,7 +77,7 @@ def view_debaters(request):
 def view_debater(request, debater_id):
     debater_id = int(debater_id)
     try:
-        debater = Debater.objects.get(pk=debater_id)
+        debater = Debater.objects.prefetch_related("ranking_groups").get(pk=debater_id)
     except Debater.DoesNotExist:
         return redirect_and_flash_error(request, "No such debater")
     if request.method == "POST":
@@ -50,6 +102,8 @@ def view_debater(request, debater_id):
             "school", "hybrid_school"
         )
         links = []
+        if user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+            links.append((f"/debater/{debater_id}/delete/", "Delete"))
         team_schools = []
         has_hybrid_school = False
         for team in teams:
@@ -97,6 +151,27 @@ def enter_debater(request):
     })
 
 
+def delete_debater(request, debater_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect_and_flash_error(
+            request,
+            "You cannot delete debaters",
+            path="/403/",
+        )
+
+    try:
+        debater_id = int(debater_id)
+        debater = Debater.objects.get(pk=debater_id)
+        debater.delete()
+    except Debater.DoesNotExist:
+        return redirect_and_flash_error(request, "That debater does not exist")
+    except Exception as exc:
+        return redirect_and_flash_error(request, str(exc))
+    return redirect_and_flash_success(request,
+                                      "Debater deleted successfully",
+                                      path="/")
+
+
 def rank_debaters_ajax(request):
     return render(request, "tab/rank_debaters.html",
                   {"title": "Debater Rankings"})
@@ -114,9 +189,14 @@ def get_speaker_rankings(request=None):
                 tiebreaker = tiebreaker_stat.name
             else:
                 tiebreaker = "Tie not broken"
-        debaters.append((debater_stats.debater, debater_stats[rankings.SPEAKS],
-                         debater_stats[rankings.RANKS],
-                         debater_stats.debater.team(), tiebreaker))
+        debaters.append(SpeakerRankingEntry(
+            debater_stats.debater,
+            debater_stats[rankings.SPEAKS],
+            debater_stats[rankings.RANKS],
+            debater_stats.debater.team(),
+            tiebreaker,
+            _speaker_score_columns(debater_stats),
+        ))
 
     nov_debaters = list(filter(lambda s: s[0].novice_status == Debater.NOVICE,
                                debaters))
@@ -132,9 +212,25 @@ def rank_debaters(request):
         request
     )
 
+    ranking_group_tables = []
+    ranking_groups = RankingGroup.objects.prefetch_related("debaters").order_by("name")
+    for ranking_group in ranking_groups:
+        debater_ids = {debater.id for debater in ranking_group.debaters.all()}
+        grouped_debaters = [
+            debater_entry for debater_entry in debaters
+            if debater_entry[0].id in debater_ids
+        ]
+        if grouped_debaters:
+            ranking_group_tables.append({
+                "title": f"{ranking_group.name} Rankings",
+                "anchor": f"debater-ranking-group-{slugify(ranking_group.name)}",
+                "debaters": grouped_debaters,
+            })
+
     return render(
         request, "tab/rank_debaters_component.html", {
             "debaters": debaters,
             "nov_debaters": nov_debaters,
+            "debater_ranking_groups": ranking_group_tables,
             "title": "Speaker Rankings"
         })

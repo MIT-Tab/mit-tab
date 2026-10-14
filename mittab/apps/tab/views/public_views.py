@@ -1,18 +1,26 @@
 import random
+import os
 
+from django.contrib.messages import get_messages
 from django.db.models import Prefetch
+from django.http import FileResponse
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from mittab import settings
+from mittab.apps.tab import logo_utils
 from mittab.apps.tab.forms import EBallotForm
-from mittab.apps.tab.helpers import redirect_and_flash_error
+from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
 from mittab.apps.tab.models import (
     BreakingTeam,
     Bye,
     Debater,
     Outround,
+    PublicHomeShortcut,
     TabSettings,
     Judge,
+    JudgeExpectedCheckIn,
     Team,
     Round,
     RoundStats,
@@ -22,11 +30,43 @@ from mittab.apps.tab.public_rankings import (
     get_ranking_settings,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
+from mittab.apps.registration.models import InfoLink, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
-from mittab.libs.outround_tab_logic import OutroundPairingMode
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
+from mittab.apps.tab.written_rfd import (
+    round_allows_written_rfd,
+    written_rfd_deadline,
+    written_rfd_deadline_display,
+    written_rfd_editing_open,
+)
+
+
+def build_public_home_shortcuts():
+    definition_map = PublicHomeShortcut.nav_definition_map(include_inactive=False)
+    slot_to_slug = PublicHomeShortcut.default_slot_mapping()
+
+    for shortcut in PublicHomeShortcut.objects.all():
+        if shortcut.position in slot_to_slug:
+            slot_to_slug[shortcut.position] = shortcut.nav_item
+
+    shortcuts = []
+    for slot, default_slug in PublicHomeShortcut.default_slot_mapping().items():
+        slug = slot_to_slug.get(slot, default_slug)
+        definition = definition_map.get(slug)
+        if definition is None and slug != default_slug:
+            slug = default_slug
+            definition = definition_map.get(default_slug)
+        if definition is None:
+            continue
+        shortcuts.append({
+            "slug": slug,
+            "title": definition["title"],
+            "subtitle": definition["subtitle"],
+            "url": definition["url_path"],
+        })
+    return shortcuts
 
 
 @cache_public_view(timeout=300)
@@ -34,9 +74,54 @@ def public_access_error(request):
     return render(request, "public/access_error.html")
 
 
+def tournament_logo(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if not logo_path:
+        raise Http404("Tournament logo not found")
+    return _logo_response(logo_path)
+
+
+def favicon(request):
+    logo_path = logo_utils.get_tournament_logo_abs_path()
+    if logo_path:
+        return _logo_response(logo_path)
+
+    return _fallback_favicon_response()
+
+
+def _logo_response(logo_path):
+    response = FileResponse(open(logo_path, "rb"), content_type="image/png")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _fallback_favicon_response():
+    favicon_path = os.path.join(settings.BASE_DIR, "assets", "img", "favicon.ico")
+    return FileResponse(open(favicon_path, "rb"), content_type="image/x-icon")
+
+
 @cache_public_view(timeout=60)
 def public_home(request):
+    # Drain any pending flash messages (e.g. "Successfully logged out") before
+    # we render. The response is cached for 60s and shared across visitors, so
+    # a stale message baked into the HTML would be visible to anyone else who
+    # hits the page during that window. Iterating get_messages marks them as
+    # read so they neither render here nor persist into the cached payload.
+    list(get_messages(request))
+
+    registration_config = RegistrationConfig.get_or_create_active()
+    registration_open = bool(registration_config and registration_config.can_create())
+    quick_links = build_public_home_shortcuts()
+    info_links = list(InfoLink.objects.filter(is_active=True))
+
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
+    # Single source of truth for the pre-tournament state. RegistrationConfig
+    # tracks only the manual open/closed toggle and has no round awareness,
+    # so by itself it stays True forever once a round starts. Slot 1's swap
+    # and the Register/Edit CTA both key off this flag so they can never
+    # disagree (e.g. CTA hidden while slot 1 still says Registration).
+    tournament_in_progress = cur_round_setting >= 1
+    show_registration_lead = (not tournament_in_progress) and registration_open
     tot_rounds = TabSettings.get("tot_rounds", 5)
     pairing_released_inround = TabSettings.get("pairing_released", 0) == 1
     pairing_released = pairing_released_inround
@@ -44,64 +129,130 @@ def public_home(request):
     current_outround_label = ""
 
     if cur_round_setting < 1:
-        pairing_released = False
         status_primary = "Tournament"
         status_secondary = "Starting soon"
-        return render(
-            request,
-            "public/home.html",
-            {
-                "status_primary": status_primary,
-                "status_secondary": status_secondary,
-            },
-        )
-
-    outround_qs = Outround.objects.order_by("num_teams")
-
-    if outround_qs.exists():
-        varsity = (
-            outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
-            .order_by("num_teams")
-            .first()
-        )
-        novice = (
-            outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
-            .order_by("num_teams")
-            .first()
-        )
-
-        labels = []
-        release_flags = []
-
-        if varsity:
-            labels.append(f"[V] Ro{varsity.num_teams}")
-            release_flags.append(
-                TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
-            )
-        if novice:
-            labels.append(f"[N] Ro{novice.num_teams}")
-            release_flags.append(
-                TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
-            )
-
-        if labels:
-            in_outrounds = True
-            current_outround_label = " & ".join(labels)
-            pairing_released = bool(release_flags and all(release_flags))
-        else:
-            pairing_released = pairing_released_inround
-
-    pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
-
-    if in_outrounds:
-        status_primary = current_outround_label or "Elimination rounds"
-        status_secondary = pairing_text
-    elif cur_round_setting <= tot_rounds:
-        status_primary = f"Round {cur_round_setting}"
-        status_secondary = pairing_text
     else:
-        status_primary = "Tournament"
+        outround_qs = Outround.objects.order_by("num_teams")
+        if outround_qs.exists():
+            varsity = (
+                outround_qs.filter(type_of_round=BreakingTeam.VARSITY)
+                .order_by("num_teams")
+                .first()
+            )
+            novice = (
+                outround_qs.filter(type_of_round=BreakingTeam.NOVICE)
+                .order_by("num_teams")
+                .first()
+            )
+
+            labels = []
+            release_flags = []
+
+            if varsity:
+                labels.append(f"[V] Ro{varsity.num_teams}")
+                release_flags.append(
+                    TabSettings.get("var_teams_visible", 256) <= varsity.num_teams
+                )
+            if novice:
+                labels.append(f"[N] Ro{novice.num_teams}")
+                release_flags.append(
+                    TabSettings.get("nov_teams_visible", 256) <= novice.num_teams
+                )
+
+            if labels:
+                in_outrounds = True
+                current_outround_label = " & ".join(labels)
+                pairing_released = bool(release_flags and all(release_flags))
+
+        pairing_text = "Pairing released" if pairing_released else "Pairing in progress"
+
+        if in_outrounds:
+            status_primary = current_outround_label or "Elimination rounds"
+        elif cur_round_setting <= tot_rounds:
+            status_primary = f"Round {cur_round_setting}"
+        else:
+            status_primary = "Tournament"
         status_secondary = pairing_text
+
+    # Slot 1 is reserved (and locked in the settings UI): pre-tournament
+    # with registration open, the separate registration callout replaces it.
+    # Once round 1 starts (or registration is closed), it shows pairings.
+    if quick_links:
+        if show_registration_lead:
+            # Avoid showing Registration twice, especially in the stacked
+            # mobile layout where the callout and tile looked identical.
+            quick_links.pop(0)
+        else:
+            pages = PublicHomeShortcut.nav_definition_map(include_inactive=False)
+            rp = pages.get("released_pairings", {})
+            if rp:
+                quick_links[0] = {
+                    "slug": "released_pairings",
+                    "title": rp.get("title", "Released Pairings"),
+                    "subtitle": rp.get("subtitle", ""),
+                    "url": rp.get("url_path", "/public/pairings/"),
+                }
+
+    # As soon as outrounds exist, promote the active outround page to the
+    # first tile and move the inround pairings tile into its former position.
+    # This keeps an Ro8 status attached to a link that actually shows Ro8.
+    if in_outrounds:
+        released_index = next(
+            (index for index, link in enumerate(quick_links)
+             if link.get("slug") == "released_pairings"),
+            None,
+        )
+        active_outround_slugs = []
+        if varsity:
+            active_outround_slugs.append("varsity_outrounds")
+        if novice:
+            active_outround_slugs.append("novice_outrounds")
+        outround_index = next(
+            (index for index, link in enumerate(quick_links)
+             if link.get("slug") in active_outround_slugs),
+            None,
+        )
+        if released_index is not None and outround_index is not None:
+            quick_links[released_index], quick_links[outround_index] = (
+                quick_links[outround_index], quick_links[released_index]
+            )
+
+        outround_statuses = {
+            "varsity_outrounds": varsity,
+            "novice_outrounds": novice,
+        }
+        for shortcut in quick_links:
+            outround = outround_statuses.get(shortcut.get("slug"))
+            if outround:
+                prefix = "N" if outround.type_of_round == BreakingTeam.NOVICE else "V"
+                visibility_key = (
+                    "nov_teams_visible"
+                    if outround.type_of_round == BreakingTeam.NOVICE
+                    else "var_teams_visible"
+                )
+                is_visible = (
+                    TabSettings.get(visibility_key, 256) <= outround.num_teams
+                )
+                status = "paired" if is_visible else "pairing in progress"
+                shortcut["subtitle"] = (
+                    f"[{prefix}] Ro{outround.num_teams} {status}"
+                )
+
+    status_parts = []
+    if status_primary and status_primary.strip().lower() != "tournament":
+        status_parts.append(status_primary)
+    if status_secondary:
+        status_parts.append(status_secondary)
+    pairings_tile_subtitle = (
+        " · ".join(status_parts) or status_secondary or status_primary
+    )
+    for shortcut in quick_links:
+        if shortcut.get("slug") == "released_pairings":
+            shortcut["subtitle"] = (
+                "Preliminary round pairings" if in_outrounds
+                else pairings_tile_subtitle
+            )
+            break
 
     return render(
         request,
@@ -109,6 +260,11 @@ def public_home(request):
         {
             "status_primary": status_primary,
             "status_secondary": status_secondary,
+            "registration_open": registration_open,
+            "show_registration_lead": show_registration_lead,
+            "registration_url": reverse("registration_portal"),
+            "info_links": info_links,
+            "quick_links": quick_links,
         },
     )
 
@@ -127,7 +283,7 @@ def public_view_judges(request):
         "public/judges.html",
         {
             "judges": Judge.objects.order_by("name")
-            .prefetch_related("schools", "checkin_set")
+            .prefetch_related("schools", "checkin_set", "expected_checkins")
             .all(),
             "rounds": rounds,
         },
@@ -312,18 +468,24 @@ def build_public_team_rows(teams, show_scores):
 def build_public_speaker_rows(speakers, show_scores, max_visible):
     rows = []
     for idx, entry in enumerate(speakers[:max_visible], start=1):
-        # get_speaker_rankings now returns 5-tuples:
+        # get_speaker_rankings returns tuple-compatible entries:
         # (debater, speaks, ranks, team, tiebreaker). Older data may omit the
         # tiebreaker, so gracefully handle either shape.
         if len(entry) == 5:
             debater, speaks, ranks, team, _tiebreaker = entry
         else:
             debater, speaks, ranks, team = entry
+        score_columns = getattr(entry, "score_columns", [{
+            "label": "Unadjusted",
+            "speaks": speaks,
+            "ranks": ranks,
+        }])
         rows.append({
             "place": idx,
             "debater": debater,
             "speaks": speaks if show_scores else None,
             "ranks": ranks if show_scores else None,
+            "score_columns": score_columns if show_scores else [],
             "team": team,
         })
     return rows
@@ -373,10 +535,27 @@ def serialize_debaters(team, stats_by_debater):
     } for debater in team.debaters.all()]
 
 @cache_public_view(timeout=60)
-def pretty_pair(request):
+def pretty_pair(request, round_number=None):
     errors, byes = [], []
 
-    round_number = TabSettings.get("cur_round") - 1
+    current_round = TabSettings.get("cur_round") - 1
+    show_previous_pairings = TabSettings.get(
+        "show_previous_inround_pairings", True
+    )
+    if round_number is None:
+        round_number = current_round
+    elif (round_number < 1 or not show_previous_pairings or
+          round_number > current_round - 1):
+        raise Http404("Previous pairings are not available")
+
+    pairing_round_numbers = []
+    if show_previous_pairings:
+        pairing_round_numbers = list(
+            Round.objects.filter(round_number__lte=current_round)
+            .order_by("round_number")
+            .values_list("round_number", flat=True)
+            .distinct()
+        )
     round_pairing = list(
         Round.objects.filter(round_number=round_number).prefetch_related(
             "gov_team",
@@ -411,7 +590,10 @@ def pretty_pair(request):
             if present_team not in byes:
                 errors.append(present_team)
 
-    pairing_exists = TabSettings.get("pairing_released", 0) == 1
+    pairing_exists = (
+        round_number < current_round or
+        TabSettings.get("pairing_released", 0) == 1
+    )
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     context = {
         "errors": errors,
@@ -422,6 +604,8 @@ def pretty_pair(request):
         "team_count": team_count,
         "pairing_exists": pairing_exists,
         "debater_team_memberships_public": debater_team_memberships_public,
+        "pairing_round_numbers": pairing_round_numbers,
+        "current_round_number": current_round,
     }
     return render(request, "public/pairing_display.html", context)
 
@@ -454,14 +638,360 @@ def e_ballot_search(request):
     if request.method == "POST":
         ballot_code = (request.POST.get("ballot_code") or "").strip()
         if ballot_code:
-            return redirect("enter_e_ballot", ballot_code=ballot_code)
+            return redirect("judge_portal", ballot_code=ballot_code)
         return redirect_and_flash_error(
             request,
-            "Please enter the ballot code provided by tab.",
+            "Please enter the judge code provided by tab.",
             path=reverse("e_ballot_search"),
         )
 
     return e_ballot_search_page(request)
+
+
+def _judge_portal_rounds():
+    total_rounds = int(TabSettings.get("tot_rounds", 0) or 0)
+    return [0] + list(range(1, total_rounds + 1))
+
+
+def _availability_rows_for_judge(judge):
+    expected_rounds = {
+        checkin.round_number for checkin in judge.expected_checkins.all()
+    }
+    rows = []
+    for round_number in _judge_portal_rounds():
+        rows.append({
+            "round_number": round_number,
+            "field_name": (
+                "availability_outround"
+                if round_number == 0
+                else f"availability_round_{round_number}"
+            ),
+            "label": "Outrounds" if round_number == 0 else f"Round {round_number}",
+            "checked": round_number in expected_rounds,
+        })
+    return rows
+
+
+def _sync_judge_expected_checkins(judge, desired_rounds):
+    desired = set(desired_rounds)
+    existing = set(
+        JudgeExpectedCheckIn.objects.filter(judge=judge).values_list(
+            "round_number",
+            flat=True,
+        )
+    )
+    additions = [
+        JudgeExpectedCheckIn(judge=judge, round_number=round_number)
+        for round_number in desired - existing
+    ]
+    if additions:
+        JudgeExpectedCheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+    removals = existing - desired
+    if removals:
+        JudgeExpectedCheckIn.objects.filter(
+            judge=judge,
+            round_number__in=removals,
+        ).delete()
+
+
+def judge_portal(request, ballot_code):
+    judge = _judge_for_ballot_code(ballot_code)
+    if not judge:
+        message = (
+            f'No judges with the judge code "{ballot_code}." '
+            "Try submitting again, or go to tab to resolve the issue."
+        )
+        return redirect_and_flash_error(
+            request,
+            message,
+            path=reverse("e_ballot_search"),
+        )
+
+    if request.method == "POST":
+        allowed_rounds = _judge_portal_rounds()
+        desired_rounds = []
+        for round_number in allowed_rounds:
+            field_name = (
+                "availability_outround"
+                if round_number == 0
+                else f"availability_round_{round_number}"
+            )
+            if request.POST.get(field_name):
+                desired_rounds.append(round_number)
+        _sync_judge_expected_checkins(judge, desired_rounds)
+        return redirect_and_flash_success(
+            request,
+            "Availability saved.",
+            path=reverse("judge_portal", args=[ballot_code]),
+        )
+
+    return render(
+        request,
+        "public/judge_portal.html",
+        {
+            "judge": judge,
+            "ballot_code": ballot_code,
+            "availability_rows": _availability_rows_for_judge(judge),
+            "current_ballot_url": reverse("enter_e_ballot", args=[ballot_code]),
+            "previous_ballots_url": reverse("previous_ballots", args=[ballot_code]),
+        },
+    )
+
+
+def _build_disclosure_message():
+    """Return a disclosure message for the open/closed speaks and ranks settings.
+
+    Returns None if neither setting is configured.
+    Values: 0=Unset, 1=Open, 2=Closed
+    """
+    open_speaks = TabSettings.get("open_speaks", 0)
+    open_ranks = TabSettings.get("open_ranks", 0)
+
+    # Treat 0 as unset/not configured
+    if open_speaks == 0 and open_ranks == 0:
+        return None
+
+    # Only emit messages for configured settings (non-zero values)
+    speaks_set = open_speaks != 0
+    ranks_set = open_ranks != 0
+
+    if speaks_set and ranks_set:
+        if open_speaks == 1 and open_ranks == 1:
+            return (
+                "This tournament is open speaks and open ranks. "
+                "You are required to disclose both speaks and ranks to "
+                "debaters if they opt-in to hearing them."
+            )
+        elif open_speaks == 1 and open_ranks == 2:
+            return (
+                "This tournament is open speaks but closed ranks. "
+                "You are required to disclose speaks to debaters if they opt-in, "
+                "but you should not tell debaters their ranks."
+            )
+        elif open_speaks == 2 and open_ranks == 1:
+            return (
+                "This tournament is closed speaks but open ranks. "
+                "You should not tell speaks to debaters, "
+                "but are required to disclose ranks if debaters opt-in to hearing them."
+            )
+        else:  # open_speaks == 2 and open_ranks == 2
+            return (
+                "This tournament is closed speaks and closed ranks. "
+                "You should not tell debaters their speaks or ranks."
+            )
+    elif speaks_set:
+        if open_speaks == 1:
+            return (
+                "This tournament is open speaks. "
+                "You are required to disclose speaks to debaters if they "
+                "opt-in to hearing them."
+            )
+        else:  # open_speaks == 2
+            return (
+                "This tournament is closed speaks. "
+                "You should not tell debaters their speaks."
+            )
+    else:  # ranks_set
+        if open_ranks == 1:
+            return (
+                "This tournament is open ranks. "
+                "You are required to disclose ranks to debaters if they "
+                "opt-in to hearing them."
+            )
+        else:  # open_ranks == 2
+            return (
+                "This tournament is closed ranks. "
+                "You should not tell debaters their ranks."
+            )
+
+
+def _submitted_ballot_context(
+    round_obj,
+    ballot_code,
+    judge=None,
+    allow_rfd_edit=False,
+):
+    """Build context for the submitted (frozen) ballot view for the given round."""
+    role_names = {
+        "pm": "Prime Minister",
+        "mg": "Member of Government",
+        "lo": "Leader of the Opposition",
+        "mo": "Member of the Opposition",
+    }
+    victor_display = dict(Round.VICTOR_CHOICES)
+
+    stats = {
+        s.debater_role: s
+        for s in round_obj.roundstats_set.select_related("debater").all()
+    }
+
+    gov_debaters = []
+    for role in ["pm", "mg"]:
+        s = stats.get(role)
+        gov_debaters.append({
+            "role": role_names[role],
+            "name": s.debater.name if s else "—",
+            "speaks": s.speaks if s else "—",
+            "ranks": int(round(s.ranks)) if s else "—",
+        })
+
+    opp_debaters = []
+    for role in ["lo", "mo"]:
+        s = stats.get(role)
+        opp_debaters.append({
+            "role": role_names[role],
+            "name": s.debater.name if s else "—",
+            "speaks": s.speaks if s else "—",
+            "ranks": int(round(s.ranks)) if s else "—",
+        })
+
+    rfd_deadline = written_rfd_deadline()
+    rfd_enabled = round_allows_written_rfd(round_obj)
+    rfd_editable = (
+        rfd_enabled
+        and (
+            allow_rfd_edit
+            or (judge is not None and round_obj.chair_id == judge.id)
+        )
+        and written_rfd_editing_open(round_obj)
+    )
+    return {
+        "title": f"Ballot Submitted — {round_obj}",
+        "gov_team": round_obj.gov_team,
+        "opp_team": round_obj.opp_team,
+        "round_obj": round_obj,
+        "winner_display": victor_display.get(round_obj.victor, "Unknown"),
+        "gov_debaters": gov_debaters,
+        "opp_debaters": opp_debaters,
+        "ballot_code": ballot_code,
+        "disclosure_message": _build_disclosure_message(),
+        "rfd_enabled": rfd_enabled,
+        "rfd_text": round_obj.rfd,
+        "rfd_editable": rfd_editable,
+        "rfd_deadline_display": written_rfd_deadline_display(rfd_deadline),
+        "rfd_deadline_configured": rfd_deadline is not None,
+        "previous_ballots_url": (
+            reverse("previous_ballots", args=[ballot_code]) if ballot_code else ""
+        ),
+    }
+
+
+def _judge_for_ballot_code(ballot_code):
+    return Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
+        "judges",
+        "expected_checkins",
+    ).first()
+
+
+def _submitted_rounds_for_judge(judge):
+    return (
+        judge.judges.prefetch_related(
+            "chair",
+            "roundstats_set",
+            "roundstats_set__debater",
+            "gov_team",
+            "gov_team__debaters",
+            "opp_team",
+            "opp_team__debaters",
+        )
+        .filter(roundstats__isnull=False)
+        .distinct()
+    )
+
+
+def view_submitted_ballot(request, ballot_code, round_id=None):
+    """Show a read-only frozen view of the submitted ballot for a judge code."""
+    current_round = TabSettings.get(key="cur_round") - 1
+
+    judge = _judge_for_ballot_code(ballot_code)
+
+    if not judge:
+        message = (
+            f'No judges with the judge code "{ballot_code}." '
+            "Try submitting again, or go to tab to resolve the issue."
+        )
+        return redirect_and_flash_error(
+            request, message, path=reverse("tab_login")
+        )
+
+    rounds_qs = _submitted_rounds_for_judge(judge)
+    if round_id is None:
+        rounds_qs = rounds_qs.filter(round_number=current_round)
+    else:
+        rounds_qs = rounds_qs.filter(id=round_id)
+    rounds = list(rounds_qs.all())
+
+    if not rounds:
+        return redirect_and_flash_error(
+            request,
+            "No submitted ballot found for your code this round.",
+            path=reverse("e_ballot_search"),
+        )
+
+    round_obj = rounds[0]
+    if request.method == "POST":
+        if not (
+            round_allows_written_rfd(round_obj)
+            and round_obj.chair_id == judge.id
+            and written_rfd_editing_open(round_obj)
+        ):
+            return redirect_and_flash_error(
+                request,
+                "Written RFDs cannot be edited for this ballot.",
+                path=request.path,
+            )
+
+        round_obj.rfd = request.POST.get("rfd", "").strip()
+        round_obj.save(update_fields=["rfd"])
+        return redirect_and_flash_success(
+            request,
+            "Written RFD saved.",
+            path=request.path,
+        )
+
+    context = _submitted_ballot_context(round_obj, ballot_code, judge)
+    return render(request, "ballots/ballot_submitted.html", context)
+
+
+def previous_ballots(request, ballot_code):
+    judge = _judge_for_ballot_code(ballot_code)
+    if not judge:
+        message = (
+            f'No judges with the judge code "{ballot_code}." '
+            "Try submitting again, or go to tab to resolve the issue."
+        )
+        return redirect_and_flash_error(
+            request, message, path=reverse("tab_login")
+        )
+
+    current_round = TabSettings.get(key="cur_round") - 1
+    rounds = (
+        _submitted_rounds_for_judge(judge)
+        .filter(round_number__lte=current_round)
+        .order_by("-round_number", "gov_team__name", "opp_team__name")
+    )
+    ballot_rows = []
+    for round_obj in rounds:
+        ballot_rows.append({
+            "round": round_obj,
+            "winner": round_obj.winner,
+            "rfd_enabled": round_allows_written_rfd(round_obj),
+            "rfd_status": "Written" if round_obj.rfd.strip() else "Blank",
+            "url": reverse(
+                "view_submitted_ballot_round",
+                args=[ballot_code, round_obj.id],
+            ),
+        })
+
+    return render(
+        request,
+        "ballots/previous_ballots.html",
+        {
+            "ballot_code": ballot_code,
+            "judge": judge,
+            "ballot_rows": ballot_rows,
+        },
+    )
 
 
 def enter_e_ballot(request, ballot_code):
@@ -469,16 +999,57 @@ def enter_e_ballot(request, ballot_code):
         round_id = request.POST.get("round_instance")
 
         if round_id:
-            return enter_result(request,
-                                round_id,
-                                EBallotForm,
-                                ballot_code,
-                                redirect_to="/")
+            round_obj = Round.objects.prefetch_related(
+                "judges", "chair", "gov_team", "gov_team__debaters",
+                "opp_team", "opp_team__debaters", "roundstats_set",
+                "roundstats_set__debater",
+            ).get(id=round_id)
+
+            form = EBallotForm(request.POST, round_instance=round_obj)
+            if form.is_valid():
+                try:
+                    form.save()
+                except ValueError:
+                    return redirect_and_flash_error(
+                        request, "Invalid round result, could not remedy.",
+                        path=reverse("e_ballot_search"))
+                # Redirect to frozen ballot view
+                return redirect(
+                    reverse(
+                        "view_submitted_ballot",
+                        kwargs={"ballot_code": ballot_code},
+                    )
+                )
+            # Re-render the form with errors
+            return render(
+                request, "ballots/round_entry.html", {
+                    "form": form,
+                    "title": f"Entering Ballot for {round_obj}",
+                    "gov_team": round_obj.gov_team,
+                    "opp_team": round_obj.opp_team,
+                    "ballot_code": ballot_code,
+                    "action": request.path,
+                    "warn_judges_about_speaks": TabSettings.get(
+                        "warn_judges_about_speaks", True
+                    ),
+                    "low_speak_warning_threshold": TabSettings.get(
+                        "low_speak_warning_threshold", 25
+                    ),
+                    "high_speak_warning_threshold": TabSettings.get(
+                        "high_speak_warning_threshold", 34
+                    ),
+                    "previous_ballots_url": reverse(
+                        "previous_ballots", args=[ballot_code]
+                    ),
+                })
         else:
             message = """
                       Missing necessary form data. Please go to tab if this
                       error persists
                       """
+            return redirect_and_flash_error(
+                request, message, path=reverse("e_ballot_search")
+            )
 
     current_round = TabSettings.get(key="cur_round") - 1
 
@@ -489,14 +1060,16 @@ def enter_e_ballot(request, ballot_code):
 
     if not judge:
         message = f"""
-                    No judges with the ballot code "{ballot_code}." Try submitting again, or
+                    No judges with the judge code "{ballot_code}." Try submitting again, or
                     go to tab to resolve the issue.
                     """
     elif TabSettings.get("pairing_released", 0) != 1:
-        message = "Pairings for this round have not been released."
+        return redirect("previous_ballots", ballot_code=ballot_code)
     else:
         # see above, judge.judges is rounds
-        rounds = list(judge.judges.prefetch_related("chair")
+        rounds = list(judge.judges.prefetch_related("chair", "roundstats_set",
+                                                     "roundstats_set__debater",
+                                                     "gov_team", "opp_team")
                       .filter(round_number=current_round).all())
         if len(rounds) > 1:
             message = """
@@ -508,6 +1081,11 @@ def enter_e_ballot(request, ballot_code):
                     Could not find a ballot for you this round. Go to tab
                     to resolve the issue if you believe you were paired in.
                     """
+            return redirect_and_flash_error(
+                request,
+                message,
+                path=reverse("judge_portal", args=[ballot_code]),
+            )
         elif rounds[0].chair != judge:
             message = """
                     You are not the chair of this round. If you are on a panel,
@@ -515,6 +1093,10 @@ def enter_e_ballot(request, ballot_code):
                     panel, go to tab and make sure the chair is properly set for
                     the round.
                     """
+        elif RoundStats.objects.filter(round=rounds[0]).exists():
+            # Ballot already submitted — show frozen view
+            context = _submitted_ballot_context(rounds[0], ballot_code, judge)
+            return render(request, "ballots/ballot_submitted.html", context)
         else:
             return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
     return redirect_and_flash_error(request, message, path=reverse("tab_login"))
@@ -591,12 +1173,8 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
-    challenge_mode = int(TabSettings.get(
-        "outround_pairing_mode",
-        OutroundPairingMode.STANDARD,
-    ))
-    if challenge_mode != OutroundPairingMode.STANDARD:
+    show_outrounds_bracket = TabSettings.get("show_outs_bracket", True)
+    if TabSettings.get("outround_pairing_mode", 0) == 1:
         show_outrounds_bracket = False
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:

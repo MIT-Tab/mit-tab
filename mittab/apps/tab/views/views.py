@@ -1,5 +1,6 @@
 import os
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
@@ -10,9 +11,31 @@ from django.core.management import call_command
 import yaml
 
 from mittab.apps.tab.archive import ArchiveExporter
+from mittab.apps.tab.auth_roles import (
+    CAP_ADD_SCRATCHES,
+    CAP_CHECKINS,
+    CAP_DATA_ENTRY,
+    CAP_VIEW_SCRATCHES,
+    is_apda_board_user,
+    user_has_staff_capability,
+)
+from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.tab.forms import MiniRoomTagForm, RoomTagForm, SchoolForm, RoomForm, \
-    UploadDataForm, ScratchForm, SettingsForm
+from mittab.apps.tab.forms import (
+    MiniRankingGroupForm,
+    MiniRoomTagForm,
+    DebaterApdaIdForm,
+    PublicHomepageForm,
+    RankingGroupForm,
+    RoomTagForm,
+    SchoolApdaIdForm,
+    SchoolForm,
+    RoomForm,
+    UploadDataForm,
+    UploadApdaCsvForm,
+    ScratchForm,
+    SettingsForm,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
@@ -34,12 +57,29 @@ from mittab.libs.cacheing.public_cache import (
 from mittab.libs.tab_logic import TabFlags
 from mittab.libs.data_import import import_judges, import_rooms, import_teams, \
     import_scratches
+from mittab.libs.data_import.apda_board_import import (
+    import_apda_board_debaters_csv as import_apda_board_debaters_csv_file,
+    import_apda_board_schools_csv as import_apda_board_schools_csv_file,
+)
+from mittab.libs.data_export.apda_board_export import (
+    export_apda_board_debaters_csv as export_apda_board_debaters_csv_file,
+    export_apda_board_schools_csv as export_apda_board_schools_csv_file,
+)
 from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
 def index(request):
     if not request.user.is_authenticated:
         return redirect("public_home")
+    if is_apda_board_user(request.user):
+        return redirect("apda_board_home")
+
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
 
     school_list = [(school.pk, school.name) for school in School.objects.all()]
     judge_list = [(judge.pk, judge.name) for judge in Judge.objects.all()]
@@ -71,9 +111,191 @@ def index(request):
         "number_schools": number_schools,
         "number_debaters": number_debaters,
         "number_rooms": number_rooms,
+        "schools_missing_apda_ids": [
+            school.pk for school in schools_missing_apda_qs
+        ],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
     }
 
     return render(request, "common/index.html", context)
+
+
+def apda_board_home(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    allowed_standing_slugs = ("speaker_results", "team_results")
+    if request.method == "POST":
+        for slug in allowed_standing_slugs:
+            published = bool(request.POST.get(f"standings_{slug}"))
+            set_standings_publication_setting(slug, published)
+        invalidate_public_rankings_cache()
+        return redirect_and_flash_success(
+            request,
+            "APDA standings publication settings saved.",
+            path=reverse("apda_board_home"),
+        )
+
+    standings_settings = [
+        setting for setting in get_all_standings_publication_settings()
+        if setting["slug"] in allowed_standing_slugs
+    ]
+    schools_missing_apda_qs = School.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+    debaters_missing_apda_qs = Debater.objects.filter(
+        Q(apda_id__isnull=True) | Q(apda_id=-1)
+    )
+
+    context = {
+        "school_list": [(school.pk, school.name) for school in School.objects.all()],
+        "debater_list": [
+            (debater.pk, debater.display) for debater in Debater.objects.all()
+        ],
+        "standings_settings": standings_settings,
+        "schools_missing_apda_ids": [school.pk for school in schools_missing_apda_qs],
+        "debaters_missing_apda_ids": [
+            debater.pk for debater in debaters_missing_apda_qs
+        ],
+        "schools_missing_apda_count": schools_missing_apda_qs.count(),
+        "debaters_missing_apda_count": debaters_missing_apda_qs.count(),
+    }
+    return render(request, "apda_board/home.html", context)
+
+
+def export_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_schools_csv_file()
+
+
+def export_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    return export_apda_board_debaters_csv_file()
+
+
+def import_apda_board_schools_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for school APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_schools_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported school APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
+
+
+def import_apda_board_debaters_csv(request):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+    if request.method != "POST":
+        return redirect("apda_board_home")
+
+    form = UploadApdaCsvForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return redirect_and_flash_error(
+            request,
+            "Please upload a CSV file for debater APDA IDs.",
+            path=reverse("apda_board_home"),
+        )
+
+    updated_count, ignored_count = import_apda_board_debaters_csv_file(
+        form.cleaned_data["file"]
+    )
+    return redirect_and_flash_success(
+        request,
+        f"Imported debater APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
+        path=reverse("apda_board_home"),
+    )
+
+
+def apda_board_school_detail(request, school_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    school = School.objects.filter(pk=int(school_id)).first()
+    if not school:
+        return redirect_and_flash_error(request, "School not found")
+
+    if request.method == "POST":
+        form = SchoolApdaIdForm(request.POST, instance=school)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {school.name}.",
+                path=reverse("apda_board_school_detail", args=[school.id]),
+            )
+    else:
+        form = SchoolApdaIdForm(instance=school)
+
+    teams = Team.objects.filter(school=school).prefetch_related("debaters")
+    hybrid_teams = Team.objects.filter(hybrid_school=school).prefetch_related("debaters")
+
+    return render(
+        request,
+        "apda_board/school_detail.html",
+        {
+            "form": form,
+            "school_obj": school,
+            "school_teams": teams,
+            "school_hybrid_teams": hybrid_teams,
+            "title": f"APDA Board: {school.name}",
+        },
+    )
+
+
+def apda_board_debater_detail(request, debater_id):
+    if not is_apda_board_user(request.user):
+        return redirect("index")
+
+    debater = Debater.objects.filter(pk=int(debater_id)).first()
+    if not debater:
+        return redirect_and_flash_error(request, "Debater not found")
+
+    if request.method == "POST":
+        form = DebaterApdaIdForm(request.POST, instance=debater)
+        if form.is_valid():
+            form.save()
+            return redirect_and_flash_success(
+                request,
+                f"APDA ID updated for {debater.name}.",
+                path=reverse("apda_board_debater_detail", args=[debater.id]),
+            )
+    else:
+        form = DebaterApdaIdForm(instance=debater)
+
+    teams = Team.objects.filter(debaters=debater).select_related("school", "hybrid_school")
+    return render(
+        request,
+        "apda_board/debater_detail.html",
+        {
+            "form": form,
+            "debater_obj": debater,
+            "teams": teams,
+            "title": f"APDA Board: {debater.name}",
+        },
+    )
 
 
 def tab_logout(request, *args):
@@ -105,14 +327,29 @@ def render_500(request, *args, **kwargs):
 def add_scratch(request):
     if request.method == "POST":
         form = ScratchForm(request.POST)
+        can_view_scratches = user_has_staff_capability(
+            request.user,
+            CAP_VIEW_SCRATCHES,
+        )
         if form.is_valid():
             try:
-                form.save()
+                with transaction.atomic():
+                    form.save(actor=request.user)
             except IntegrityError:
+                if not can_view_scratches:
+                    return redirect_and_flash_success(
+                        request,
+                        "Scratch submitted.",
+                        path=reverse("add_scratch"),
+                    )
                 return redirect_and_flash_error(request,
                                                 "This scratch already exists.")
-        return redirect_and_flash_success(request,
-                                          "Scratch created successfully")
+        success_path = reverse("add_scratch") if not can_view_scratches else None
+        return redirect_and_flash_success(
+            request,
+            "Scratch created successfully",
+            path=success_path,
+        )
     else:
         form = ScratchForm(initial={"scratch_type": 0})
     return render(request, "common/data_entry.html", {
@@ -198,8 +435,10 @@ def enter_school(request):
     })
 
 
-@permission_required("tab.school.can_delete", login_url="/403/")
 def delete_school(request, school_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect("/403/")
+
     error_msg = None
     try:
         school_id = int(school_id)
@@ -253,7 +492,11 @@ def view_room(request, room_id):
     except Room.DoesNotExist:
         return redirect_and_flash_error(request, "Room not found")
     if request.method == "POST":
-        form = RoomForm(request.POST, instance=room)
+        form = RoomForm(
+            request.POST,
+            instance=room,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
         if form.is_valid():
             try:
                 form.save()
@@ -266,7 +509,10 @@ def view_room(request, room_id):
             return redirect_and_flash_success(
                 request, f"School {updated_name} updated successfully")
     else:
-        form = RoomForm(instance=room)
+        form = RoomForm(
+            instance=room,
+            allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
+        )
 
         # Get all rounds that happened in this room with related judges
         rounds = Round.objects.filter(room=room).select_related(
@@ -278,11 +524,28 @@ def view_room(request, room_id):
 
     return render(request, "tab/room_detail.html", {
         "form": form,
-        "links": [],
+        "links": [(f"/room/{room_id}/delete/", "Delete")],
         "room_rounds": rounds,
         "room_outrounds": outrounds,
         "title": f"Viewing Room: {room.name}"
     })
+
+
+def delete_room(request, room_id):
+    if not user_has_staff_capability(request.user, CAP_DATA_ENTRY):
+        return redirect("/403/")
+
+    try:
+        room_id = int(room_id)
+        room = Room.objects.get(pk=room_id)
+        room.delete()
+    except Room.DoesNotExist:
+        return redirect_and_flash_error(request, "That room does not exist")
+    except Exception as e:
+        return redirect_and_flash_error(request, str(e))
+    return redirect_and_flash_success(request,
+                                      "Room deleted successfully",
+                                      path="/")
 
 
 def enter_room(request):
@@ -332,6 +595,8 @@ def bulk_check_in(request):
 
     if entity_type == "judge":
         checkInObj, id_field = CheckIn, "judge_id"
+    elif entity_type == "judge_expected":
+        checkInObj, id_field = JudgeExpectedCheckIn, "judge_id"
     else:
         checkInObj, id_field = RoomCheckIn, "room_id"
 
@@ -409,6 +674,8 @@ def get_settings_from_yaml():
         for setting in all_settings:
             stored_value = stored_settings.get(setting["name"])
             if stored_value is None:
+                # Keep the YAML default for missing settings
+                # For choice fields with empty string default, this means it stays unset
                 continue
             if setting.get("type") == "boolean":
                 setting["value"] = stored_value == 1
@@ -457,38 +724,91 @@ def settings_form(request):
         })
 
 
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+def public_homepage(request):
+    # Local import to avoid a circular import between the tab and registration
+    # apps at module load.
+    from mittab.apps.registration.models import InfoLink
+
+    if request.method == "POST":
+        form = PublicHomepageForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            invalidate_all_public_caches()
+            return redirect_and_flash_success(
+                request,
+                "Public homepage updated!",
+                path=reverse("public_homepage"),
+            )
+    else:
+        form = PublicHomepageForm()
+
+    nav_pages = PublicHomeShortcut.nav_definition_map()
+    shortcut_rows = []
+    for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
+        field = form[f"slot_{slot}"]
+        slug = field.value()
+        meta = nav_pages.get(slug, {})
+        shortcut_rows.append({
+            "slot": slot,
+            "field": field,
+            "title": meta.get("title", slug),
+            "subtitle": meta.get("subtitle", ""),
+        })
+
+    return render(
+        request,
+        "tab/public_homepage.html",
+        {
+            "form": form,
+            "shortcut_rows": shortcut_rows,
+            "info_links": list(InfoLink.objects.all()),
+            "title": "Public Homepage",
+        },
+    )
+
+
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
     judge_info = {"errors": [], "uploaded": False}
     room_info = {"errors": [], "uploaded": False}
-    scratch_info = {"errors": [], "uploaded": False}
+    allow_scratch_import = (
+        user_has_staff_capability(request.user, CAP_ADD_SCRATCHES) or
+        user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES)
+    )
+    scratch_info = {"errors": [], "uploaded": False} if allow_scratch_import else None
 
     if request.method == "POST":
-        form = UploadDataForm(request.POST, request.FILES)
+        form = UploadDataForm(
+            request.POST,
+            request.FILES,
+            allow_scratches=allow_scratch_import,
+        )
         if form.is_valid():
             if "team_file" in request.FILES:
                 team_info["errors"] = import_teams.import_teams(
-                    request.FILES["team_file"])
+                    request.FILES["team_file"], created_by=request.user)
                 team_info["uploaded"] = True
             if "judge_file" in request.FILES:
                 judge_info["errors"] = import_judges.import_judges(
-                    request.FILES["judge_file"])
+                    request.FILES["judge_file"], created_by=request.user)
                 judge_info["uploaded"] = True
             if "room_file" in request.FILES:
                 room_info["errors"] = import_rooms.import_rooms(
                     request.FILES["room_file"])
                 room_info["uploaded"] = True
-            if "scratch_file" in request.FILES:
+            if allow_scratch_import and "scratch_file" in request.FILES:
                 scratch_info["errors"] = import_scratches.import_scratches(
-                    request.FILES["scratch_file"])
+                    request.FILES["scratch_file"], created_by=request.user)
                 scratch_info["uploaded"] = True
 
+        scratch_errors = scratch_info["errors"] if scratch_info else []
         if not team_info["errors"] + judge_info["errors"] + \
-                room_info["errors"] + scratch_info["errors"]:
+                room_info["errors"] + scratch_errors:
             return redirect_and_flash_success(request,
                                               "Data imported successfully")
     else:
-        form = UploadDataForm()
+        form = UploadDataForm(allow_scratches=allow_scratch_import)
     return render(
         request, "common/data_upload.html", {
             "form": form,
@@ -521,6 +841,25 @@ def generate_archive(request):
 
     response = HttpResponse(xml, content_type="text/xml; charset=utf-8")
     response["Content-Length"] = len(xml)
+    response["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
+
+
+def generate_black_rod_bundle(request):
+    # Allow access for users with tab_settings.can_change permission or APDA board users
+    if not (
+        request.user.has_perm("tab.tab_settings.can_change")
+        or is_apda_board_user(request.user)
+    ):
+        return redirect("/403/")
+
+    tournament_name = request.META["SERVER_NAME"].split(".")[0]
+    filename = tournament_name + "-black-rod-bundle.json"
+
+    bundle = BlackRodBundleExporter(tournament_name).export_tournament()
+
+    response = HttpResponse(bundle, content_type="application/json; charset=utf-8")
+    response["Content-Length"] = len(bundle.encode("utf-8"))
     response["Content-Disposition"] = f"attachment; filename={filename}"
     return response
 
@@ -580,27 +919,103 @@ def manage_room_tags(request):
                   {"room_tags": room_tags,
                    "form": form})
 
+
+def ranking_group(request, group_id=None):
+    group = None
+    if group_id is not None:
+        group = RankingGroup.objects.filter(pk=group_id).first()
+
+    if request.method == "POST":
+        if request.POST.get("_method") == "DELETE":
+            if group is not None:
+                group.delete()
+                return redirect_and_flash_success(
+                    request, "Ranking group deleted successfully"
+                )
+            return redirect_and_flash_error(request, "Ranking group does not exist")
+
+        form = RankingGroupForm(request.POST, instance=group)
+        if not form.is_valid():
+            return redirect_and_flash_error(request, "Error saving ranking group.")
+
+        ranking_group_instance = form.save()
+        path = reverse("manage_ranking_groups")
+        message = (
+            f"Ranking group {ranking_group_instance.name} "
+            f"{'updated' if group else 'created'} successfully"
+        )
+        return redirect_and_flash_success(request, message, path=path)
+
+    form = RankingGroupForm(instance=group)
+    return render(
+        request,
+        "common/data_entry.html",
+        {
+            "form": form,
+            "links": [],
+            "title": f"Viewing Ranking Group: {group.name}" if group else "Create Ranking Group",
+        },
+    )
+
+
+def manage_ranking_groups(request):
+    if request.method == "POST":
+        return ranking_group(request)
+    form = MiniRankingGroupForm(request.POST or None)
+    ranking_groups = RankingGroup.objects.all().order_by("name")
+    return render(
+        request,
+        "pairing/manage_ranking_groups.html",
+        {"ranking_groups": ranking_groups, "form": form},
+    )
+
 def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     all_round_numbers = [0] + round_numbers
 
     team_data = [
-        {"entity": t, "school": t.school, "debaters": t.debaters_display,
-         "checked_in": t.checked_in}
+        {
+            "entity": t,
+            "school": t.school,
+            "debaters": t.debaters_display,
+            "checked_in": t.checked_in,
+            "expected_checkins": [],
+        }
         for t in Team.objects.prefetch_related("school", "debaters").all()
     ]
 
-    judge_data = [
-        {"entity": j, "schools": j.schools.all(),
-         "checkins": [rn in {c.round_number for c in j.checkin_set.all()}
-                      for rn in all_round_numbers]}
-        for j in Judge.objects.prefetch_related("checkin_set", "schools")
-    ]
+    judges = Judge.objects.prefetch_related("checkin_set", "expected_checkins", "schools")
+    judge_data = []
+    expected_judge_data = []
+
+    for j in judges:
+        checkin_rounds = {c.round_number for c in j.checkin_set.all()}
+        expected_rounds = {c.round_number for c in j.expected_checkins.all()}
+        checkins = [rn in checkin_rounds for rn in all_round_numbers]
+        expected_flags = [rn in expected_rounds for rn in all_round_numbers]
+
+        judge_row = {
+            "entity": j,
+            "schools": j.schools.all(),
+            "checkins": checkins,
+            "expected_checkins": expected_flags,
+        }
+        judge_data.append(judge_row)
+
+        judge_expected_row = {
+            "entity": j,
+            "schools": j.schools.all(),
+            "checkins": expected_flags,
+            "expected_checkins": expected_flags,
+        }
+        expected_judge_data.append(judge_expected_row)
 
     room_data = [
         {"entity": r,
          "checkins": [rn in {c.round_number for c in r.roomcheckin_set.all()}
-                      for rn in all_round_numbers]}
+                      for rn in all_round_numbers],
+         "expected_checkins": [],
+         }
         for r in Room.objects.prefetch_related("roomcheckin_set")
     ]
 
@@ -613,6 +1028,7 @@ def batch_checkin(request):
         return counts
 
     judge_counts = column_counts(judge_data)
+    expected_judge_counts = column_counts(expected_judge_data)
     room_counts = column_counts(room_data)
 
     def round_count_data(counts):
@@ -623,12 +1039,14 @@ def batch_checkin(request):
         } for idx in range(len(round_numbers))]
 
     judge_round_counts = round_count_data(judge_counts)
+    expected_judge_round_counts = round_count_data(expected_judge_counts)
     room_round_counts = round_count_data(room_counts)
 
     return render(request, "batch_check_in/check_in.html", {
         "team_data": team_data,
         "team_headers": ["School", "Team", "Debater Names"],
         "judge_data": judge_data,
+        "judge_expectation_data": expected_judge_data,
         "judge_headers": ["School", "Judge"],
         "room_data": room_data,
         "room_headers": ["Room"],
@@ -638,8 +1056,12 @@ def batch_checkin(request):
         "judge_total_count": len(judge_data),
         "room_total_count": len(room_data),
         "judge_round_counts": judge_round_counts,
+        "judge_expectation_round_counts": expected_judge_round_counts,
         "room_round_counts": room_round_counts,
         "judge_outround_count": judge_counts[0] if judge_counts else 0,
+        "judge_expectation_outround_count": (
+            expected_judge_counts[0] if expected_judge_counts else 0
+        ),
         "room_outround_count": room_counts[0] if room_counts else 0,
     })
 
