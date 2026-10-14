@@ -7,6 +7,7 @@ from django.urls import reverse
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
 from mittab.apps.tab.public_rankings import set_ranking_settings
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 
 
 @pytest.mark.django_db(transaction=True)
@@ -203,6 +204,19 @@ class TestPublicCache(TestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200,
                 f"Should be able to regenerate content for {url}")
+
+    def test_invalidation_clears_historical_pairing_variants(self):
+        """Permission changes must invalidate cached round-specific pages."""
+        history_url = reverse("previous_pretty_pair", args=[1])
+        TabSettings.set("show_previous_inround_pairings", 1)
+
+        response = self.client.get(history_url)
+        self.assertEqual(response.status_code, 200)
+
+        TabSettings.set("show_previous_inround_pairings", 0)
+        invalidate_all_public_caches()
+
+        self.assertEqual(self.client.get(history_url).status_code, 404)
 
     def test_permission_and_visibility_changes(self):
         """Test that changing permissions and 

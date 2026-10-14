@@ -175,16 +175,13 @@ def public_home(request):
         status_secondary = pairing_text
 
     # Slot 1 is reserved (and locked in the settings UI): pre-tournament
-    # with registration open it points at Registration; once round 1 starts
-    # (or registration is closed) it switches to Released Pairings.
+    # with registration open, the separate registration callout replaces it.
+    # Once round 1 starts (or registration is closed), it shows pairings.
     if quick_links:
         if show_registration_lead:
-            quick_links[0] = {
-                "slug": "registration",
-                "title": "Registration",
-                "subtitle": "Sign up your teams and judges.",
-                "url": reverse("registration_portal"),
-            }
+            # Avoid showing Registration twice, especially in the stacked
+            # mobile layout where the callout and tile looked identical.
+            quick_links.pop(0)
         else:
             pages = PublicHomeShortcut.nav_definition_map(include_inactive=False)
             rp = pages.get("released_pairings", {})
@@ -196,6 +193,51 @@ def public_home(request):
                     "url": rp.get("url_path", "/public/pairings/"),
                 }
 
+    # As soon as outrounds exist, promote the active outround page to the
+    # first tile and move the inround pairings tile into its former position.
+    # This keeps an Ro8 status attached to a link that actually shows Ro8.
+    if in_outrounds:
+        released_index = next(
+            (index for index, link in enumerate(quick_links)
+             if link.get("slug") == "released_pairings"),
+            None,
+        )
+        active_outround_slugs = []
+        if varsity:
+            active_outround_slugs.append("varsity_outrounds")
+        if novice:
+            active_outround_slugs.append("novice_outrounds")
+        outround_index = next(
+            (index for index, link in enumerate(quick_links)
+             if link.get("slug") in active_outround_slugs),
+            None,
+        )
+        if released_index is not None and outround_index is not None:
+            quick_links[released_index], quick_links[outround_index] = (
+                quick_links[outround_index], quick_links[released_index]
+            )
+
+        outround_statuses = {
+            "varsity_outrounds": varsity,
+            "novice_outrounds": novice,
+        }
+        for shortcut in quick_links:
+            outround = outround_statuses.get(shortcut.get("slug"))
+            if outround:
+                prefix = "N" if outround.type_of_round == BreakingTeam.NOVICE else "V"
+                visibility_key = (
+                    "nov_teams_visible"
+                    if outround.type_of_round == BreakingTeam.NOVICE
+                    else "var_teams_visible"
+                )
+                is_visible = (
+                    TabSettings.get(visibility_key, 256) <= outround.num_teams
+                )
+                status = "paired" if is_visible else "pairing in progress"
+                shortcut["subtitle"] = (
+                    f"[{prefix}] Ro{outround.num_teams} {status}"
+                )
+
     status_parts = []
     if status_primary and status_primary.strip().lower() != "tournament":
         status_parts.append(status_primary)
@@ -206,7 +248,10 @@ def public_home(request):
     )
     for shortcut in quick_links:
         if shortcut.get("slug") == "released_pairings":
-            shortcut["subtitle"] = pairings_tile_subtitle
+            shortcut["subtitle"] = (
+                "Preliminary round pairings" if in_outrounds
+                else pairings_tile_subtitle
+            )
             break
 
     return render(
@@ -490,10 +535,27 @@ def serialize_debaters(team, stats_by_debater):
     } for debater in team.debaters.all()]
 
 @cache_public_view(timeout=60)
-def pretty_pair(request):
+def pretty_pair(request, round_number=None):
     errors, byes = [], []
 
-    round_number = TabSettings.get("cur_round") - 1
+    current_round = TabSettings.get("cur_round") - 1
+    show_previous_pairings = TabSettings.get(
+        "show_previous_inround_pairings", True
+    )
+    if round_number is None:
+        round_number = current_round
+    elif (round_number < 1 or not show_previous_pairings or
+          round_number > current_round - 1):
+        raise Http404("Previous pairings are not available")
+
+    pairing_round_numbers = []
+    if show_previous_pairings:
+        pairing_round_numbers = list(
+            Round.objects.filter(round_number__lte=current_round)
+            .order_by("round_number")
+            .values_list("round_number", flat=True)
+            .distinct()
+        )
     round_pairing = list(
         Round.objects.filter(round_number=round_number).prefetch_related(
             "gov_team",
@@ -528,7 +590,10 @@ def pretty_pair(request):
             if present_team not in byes:
                 errors.append(present_team)
 
-    pairing_exists = TabSettings.get("pairing_released", 0) == 1
+    pairing_exists = (
+        round_number < current_round or
+        TabSettings.get("pairing_released", 0) == 1
+    )
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     context = {
         "errors": errors,
@@ -539,6 +604,8 @@ def pretty_pair(request):
         "team_count": team_count,
         "pairing_exists": pairing_exists,
         "debater_team_memberships_public": debater_team_memberships_public,
+        "pairing_round_numbers": pairing_round_numbers,
+        "current_round_number": current_round,
     }
     return render(request, "public/pairing_display.html", context)
 
@@ -1106,7 +1173,7 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     sidelock = TabSettings.get("sidelock", 0)
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
-    show_outrounds_bracket = TabSettings.get("show_outs_bracket", False)
+    show_outrounds_bracket = TabSettings.get("show_outs_bracket", True)
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)
