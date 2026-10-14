@@ -3,6 +3,7 @@ from django.urls import include
 from django.urls import path, re_path
 from django.contrib import admin
 
+import mittab.apps.tab.scratch_views as scratch_views
 import mittab.settings as settings
 import mittab.apps.tab.views.views as views
 import mittab.apps.tab.views.public_views as public_views
@@ -21,6 +22,32 @@ import mittab.apps.registration.views as registration_views
 admin.autodiscover()
 
 urlpatterns = [
+    path(
+        "experimental/scratches/add/", scratch_views.add_scratch,
+        name="experimental_add_scratch",
+    ),
+    path(
+        "experimental/scratches/", scratch_views.view_scratches,
+        name="experimental_view_scratches",
+    ),
+    path(
+        "experimental/judge/<int:object_id>/scratches/",
+        scratch_views.view_scratches_for_object, {"object_type": "judge"},
+        name="experimental_view_scratches_judge",
+    ),
+    path(
+        "experimental/team/<int:object_id>/scratches/",
+        scratch_views.view_scratches_for_object, {"object_type": "team"},
+        name="experimental_view_scratches_team",
+    ),
+    path(
+        "experimental/scratch/<str:scratch_type>/<int:scratch_id>/",
+        scratch_views.scratch_detail, name="experimental_scratch_detail",
+    ),
+    path(
+        "experimental/scratch/<str:scratch_type>/<int:scratch_id>/delete/",
+        scratch_views.scratch_delete, name="experimental_scratch_delete",
+    ),
     path("favicon.ico", public_views.favicon, name="favicon"),
     path("tournament-logo/", public_views.tournament_logo, name="tournament_logo"),
     path("admin/logout/", views.tab_logout, name="admin_logout"),

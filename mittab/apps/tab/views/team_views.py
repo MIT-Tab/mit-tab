@@ -105,6 +105,12 @@ def view_team(request, team_id):
                 f"/team/{team_id}/scratches/view/",
                 f"Scratches for {team.display_backend}",
             ))
+        if (TabSettings.get("enable_team_team_scratches", 0) == 1
+                and user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES)):
+            links.append((
+                f"/experimental/team/{team_id}/scratches/",
+                "Experimental: team–team scratches",
+            ))
         return render(
             request, "tab/team_detail.html", {
                 "title": f"Viewing Team: {team.display_backend}",

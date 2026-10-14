@@ -90,10 +90,10 @@ function assignTeam(e) {
         $container.find(".outround-tabcard").attr("team-id", result.team.id);
         populateTabCards();
       } else {
-        window.alert(alertMsg);
+        window.alert(result.message || alertMsg);
       }
     },
-    failure() {
+    error() {
       window.alert(alertMsg);
     },
   });
@@ -125,6 +125,7 @@ function assignJudge(e) {
   const url = `/outround/${roundId}/assign_judge/${judgeId}/${
     curJudgeId || ""
   }`;
+  const alertMsg = "Unable to assign that judge. Refresh and try again.";
 
   let $buttonWrapper;
   if (curJudgeId) {
@@ -139,6 +140,10 @@ function assignJudge(e) {
     url,
     success(result) {
       $button.removeClass("disabled");
+      if (!result.success) {
+        window.alert(result.message || alertMsg);
+        return;
+      }
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("judge-id", result.judge_id);
 
@@ -147,6 +152,10 @@ function assignJudge(e) {
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
     .judge-toggle`).addClass("chair");
+    },
+    error() {
+      $button.removeClass("disabled");
+      window.alert(alertMsg);
     },
   });
 }

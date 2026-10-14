@@ -128,6 +128,41 @@ class MotionAdmin(admin.ModelAdmin):
     motion_text_truncated.short_description = "Motion Text"
 
 
+class ExperimentalAdmin(admin.ModelAdmin):
+    setting_key = None
+
+    def enabled(self):
+        return models.TabSettings.get(self.setting_key, 0) in self.enabled_values
+
+    enabled_values = (1,)
+
+    def get_model_perms(self, request):
+        return super().get_model_perms(request) if self.enabled() else {}
+
+    def has_module_permission(self, request):
+        return self.enabled() and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self.enabled() and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return self.enabled() and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.enabled() and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.enabled() and super().has_delete_permission(request, obj)
+
+
+class JudgeJudgeScratchAdmin(ExperimentalAdmin):
+    setting_key = "enable_judge_judge_scratches"
+
+
+class TeamTeamScratchAdmin(ExperimentalAdmin):
+    setting_key = "enable_team_team_scratches"
+
+
 admin.site.register(models.Debater)
 admin.site.register(models.Team, TeamAdmin)
 admin.site.register(models.School)
@@ -150,6 +185,8 @@ admin.site.register(models.Bye)
 admin.site.register(models.NoShow)
 admin.site.register(models.BreakingTeam)
 admin.site.register(models.Outround, OutroundAdmin)
+admin.site.register(models.JudgeJudgeScratch, JudgeJudgeScratchAdmin)
+admin.site.register(models.TeamTeamScratch, TeamTeamScratchAdmin)
 admin.site.register(models.Motion, MotionAdmin)
 admin.site.register(models.ManualJudgeAssignment, ManualJudgeAssignmentAdmin)
 admin.site.register(models.AuditEvent, AuditEventAdmin)

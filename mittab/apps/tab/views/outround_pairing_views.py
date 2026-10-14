@@ -1,4 +1,6 @@
-import random
+"""Outround pairing views."""
+# pylint: disable=too-many-lines
+
 import math
 from urllib.parse import urlencode
 
@@ -22,6 +24,14 @@ from mittab.libs.data_export.pairings_export import export_pairings_csv
 from mittab.libs.cacheing.public_cache import (
     invalidate_outround_public_pairings_cache,
 )
+
+
+def _scratched_team_ids(team):
+    return tab_logic.scratched_team_ids(team)
+
+
+def _team_pair_is_scratched(team_one, team_two):
+    return tab_logic.team_pair_is_scratched(team_one, team_two)
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
@@ -430,7 +440,10 @@ def outround_pairing_view(request,
             else TabSettings.get("nov_panel_size", 3)
         )
         judge_slots = [i for i in range(1, judges_per_panel + 1)]
-        section_label = f"[{'V' if selected_type == BreakingTeam.VARSITY else 'N'}] Ro{selected_num}"
+        section_label = (
+            f"[{'V' if selected_type == BreakingTeam.VARSITY else 'N'}] "
+            f"Ro{selected_num}"
+        )
         pairing_released = (
             TabSettings.get("var_teams_visible", 256) <= selected_num
             if selected_type == BreakingTeam.VARSITY
@@ -488,8 +501,21 @@ def outround_pairing_view(request,
     if len(outround_sections) == 1:
         page_label = outround_sections[0]["label"]
     control_section = outround_sections[0] if len(outround_sections) == 1 else None
-    control_round_type = control_section["type_of_round"] if control_section else None
-    control_num_teams = control_section["num_teams"] if control_section else None
+    control_round_type = None
+    control_num_teams = None
+    control_pairing_released = False
+    control_outrounds = []
+    control_judges_per_panel = 0
+    control_judge_slots = []
+    control_pairing_exists = False
+    if control_section is not None:
+        control_round_type = control_section["type_of_round"]
+        control_num_teams = control_section["num_teams"]
+        control_pairing_released = control_section["pairing_released"]
+        control_outrounds = control_section["outrounds"]
+        control_judges_per_panel = control_section["judges_per_panel"]
+        control_judge_slots = control_section["judge_slots"]
+        control_pairing_exists = control_section["pairing_exists"]
 
     warnings = []
     for section in outround_sections:
@@ -538,11 +564,13 @@ def outround_pairing_view(request,
         available_rooms = available_rooms.exclude(selected_room_scope)
     available_rooms = available_rooms.distinct()
 
-    size = max(1, max(list(
-        map(
+    size = max(
+        1,
+        *map(
             len,
-            [excluded_teams, excluded_judges, non_checkins, available_rooms]
-        ))))
+            [excluded_teams, excluded_judges, non_checkins, available_rooms],
+        ),
+    )
     # The minimum rank you want to warn on
     warning = 5
     excluded_people = list(
@@ -559,13 +587,13 @@ def outround_pairing_view(request,
         "choice": choice,
         "type_of_round": type_of_round,
         "num_teams": num_teams,
-        "pairing_released": control_section["pairing_released"] if control_section else False,
+        "pairing_released": control_pairing_released,
         "label": page_label,
         "outround_options": outround_options,
-        "outrounds": control_section["outrounds"] if control_section else [],
-        "judges_per_panel": control_section["judges_per_panel"] if control_section else 0,
-        "judge_slots": control_section["judge_slots"] if control_section else [],
-        "pairing_exists": control_section["pairing_exists"] if control_section else False,
+        "outrounds": control_outrounds,
+        "judges_per_panel": control_judges_per_panel,
+        "judge_slots": control_judge_slots,
+        "pairing_exists": control_pairing_exists,
         "outround_sections": outround_sections,
         "control_section": control_section,
         "control_round_type": control_round_type,
@@ -591,7 +619,9 @@ def outround_pairing_view(request,
             key=lambda x: x["num_teams"],
             reverse=True,
         ),
-        "stats_round_numbers": list(dict.fromkeys([spec[1] for spec in selected_specs])),
+        "stats_round_numbers": list(
+            dict.fromkeys([spec[1] for spec in selected_specs])
+        ),
         "return_path": request.get_full_path(),
         "manual_judge_audit_events": manual_judge_audit_events,
     }
@@ -606,15 +636,20 @@ def outround_pairing_view(request,
 def alternative_judges(request, round_id, judge_id=None):
     round_obj = Outround.objects.get(id=int(round_id))
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
+    current_judge_id = None
+    if judge_id is not None:
+        current_judge_id = int(judge_id)
+    panel_judge_ids = set(round_obj.judges.values_list("id", flat=True))
+    if current_judge_id is not None:
+        panel_judge_ids.discard(current_judge_id)
     # All of these variables are for the convenience of the template
     try:
-        current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related("scratches", "schools").get(
             id=current_judge_id
         )
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
-    except TypeError:
+    except (TypeError, ValueError, Judge.DoesNotExist):
         current_judge_id, current_judge_obj, current_judge_rank = "", "", ""
         current_judge_name = "No judge"
 
@@ -641,21 +676,30 @@ def alternative_judges(request, round_id, judge_id=None):
         )
     else:
         excluded_judges = checked_in_judges
-        included_judges = checked_in_judges.filter(judges_outrounds=round_obj).distinct()
+        included_judges = checked_in_judges.filter(
+            judges_outrounds=round_obj
+        ).distinct()
 
     excluded_judges = excluded_judges.exclude(judges_outrounds=round_obj).distinct()
+    excluded_judges = list(excluded_judges)
+    included_judges = list(included_judges)
+    judge_pair_blocks = assign_judges.build_judge_pair_blocks()
+    assign_judges.populate_panel_scratch_ids(excluded_judges, judge_pair_blocks)
+    assign_judges.populate_panel_scratch_ids(included_judges, judge_pair_blocks)
 
     eligible_excluded = assign_judges.can_judge_teams(
         excluded_judges,
         round_gov,
         round_opp,
         allow_rejudges=True,
+        panel_judge_ids=panel_judge_ids,
     )
     eligible_included = assign_judges.can_judge_teams(
         included_judges,
         round_gov,
         round_opp,
         allow_rejudges=True,
+        panel_judge_ids=panel_judge_ids,
     )
 
     excluded_judges = [
@@ -689,6 +733,8 @@ def alternative_judges(request, round_id, judge_id=None):
 def alternative_teams(request, round_id, current_team_id, position):
     round_obj = Outround.objects.get(pk=round_id)
     current_team = Team.objects.get(pk=current_team_id)
+    paired_team = round_obj.opp_team if position == "gov" else round_obj.gov_team
+    scratched_team_ids = _scratched_team_ids(paired_team)
 
     breaking_teams_by_type = [t.team.id
                               for t in BreakingTeam.objects.filter(
@@ -701,13 +747,13 @@ def alternative_teams(request, round_id, current_team_id, position):
         gov_team_outround__num_teams=round_obj.num_teams
     ).exclude(
         opp_team_outround__num_teams=round_obj.num_teams
-    ).exclude(pk=current_team_id)
+    ).exclude(pk=current_team_id).exclude(pk__in=scratched_team_ids)
 
     included_teams = Team.objects.filter(
         id__in=breaking_teams_by_type
     ).exclude(
         pk__in=excluded_teams
-    )
+    ).exclude(pk__in=scratched_team_ids)
 
     context = {
         "round_obj": round_obj,
@@ -729,6 +775,14 @@ def assign_team(request, round_id, position, team_id):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
         team_obj = Team.objects.get(id=int(team_id))
+        opposing_team = (
+            round_obj.opp_team if position.lower() == "gov" else round_obj.gov_team
+        )
+        if _team_pair_is_scratched(team_obj, opposing_team):
+            return JsonResponse({
+                "success": False,
+                "message": "Teams cannot be paired because of a scratch.",
+            })
 
         if position.lower() == "gov":
             round_obj.gov_team = team_obj
@@ -787,10 +841,26 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     try:
         round_obj = Outround.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
+        removed_judge_id = int(remove_id) if remove_id is not None else None
+        panel_judge_ids = set(
+            round_obj.judges.exclude(id=removed_judge_id).values_list("id", flat=True)
+        )
+        if (TabSettings.get("enable_judge_judge_scratches", 0) == 1
+                and not assign_judges.can_assign_judge(
+            judge_obj,
+            round_obj.gov_team,
+            round_obj.opp_team,
+            allow_rejudges=True,
+            panel_judge_ids=panel_judge_ids,
+        )):
+            return JsonResponse({
+                "success": False,
+                "message": "Judge conflicts with the current round or panel.",
+            })
         round_obj.judges.add(judge_obj)
 
         if remove_id is not None:
-            remove_obj = Judge.objects.get(id=int(remove_id))
+            remove_obj = Judge.objects.get(id=removed_judge_id)
             round_obj.judges.remove(remove_obj)
             AuditEvent.record(
                 round_obj,

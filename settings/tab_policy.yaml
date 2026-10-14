@@ -5,6 +5,16 @@ category:
   order: 3
 
 settings:
+  - enable_team_team_scratches:
+    name: enable_team_team_scratches
+    description: "Experimental: enforce team–team scratches in preliminary pairings and manual team changes. Off by default. Fixed outround brackets cannot be rearranged automatically to avoid these scratches."
+    value: false
+    type: boolean
+  - enable_judge_judge_scratches:
+    name: enable_judge_judge_scratches
+    description: "Experimental: enforce judge–judge scratches on panels and manual judge changes. Off by default."
+    value: false
+    type: boolean
   - tot_rounds:
     name: tot_rounds
     description: "The total number of preliminary rounds in the tournament"

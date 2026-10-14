@@ -818,6 +818,79 @@ class Scratch(AuditAttributionMixin):
         s_type = ("Team", "Tab")[self.scratch_type]
         return f"{self.team} <={s_type}=> {self.judge}"
 
+class JudgeJudgeScratch(models.Model):
+    judge_one = models.ForeignKey(
+        "Judge",
+        related_name="judge_scratch_primary",
+        on_delete=models.CASCADE,
+    )
+    judge_two = models.ForeignKey(
+        "Judge",
+        related_name="judge_scratch_secondary",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("judge_one", "judge_two")
+        constraints = [models.CheckConstraint(
+            check=models.Q(judge_one__lt=models.F("judge_two")),
+            name="ordered_distinct_judge_judge_scratch",
+        )]
+        verbose_name_plural = "judge scratches"
+
+    def __str__(self):
+        return f"{self.judge_one} <=> {self.judge_two}"
+
+    def clean(self):
+        if self.judge_one_id and self.judge_two_id:
+            if self.judge_one_id == self.judge_two_id:
+                raise ValidationError("Scratches must involve two distinct judges")
+            if self.judge_one_id > self.judge_two_id:
+                self.judge_one_id, self.judge_two_id = (
+                    self.judge_two_id, self.judge_one_id,
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+
+class TeamTeamScratch(models.Model):
+    team_one = models.ForeignKey(
+        "Team",
+        related_name="team_scratch_primary",
+        on_delete=models.CASCADE,
+    )
+    team_two = models.ForeignKey(
+        "Team",
+        related_name="team_scratch_secondary",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("team_one", "team_two")
+        constraints = [models.CheckConstraint(
+            check=models.Q(team_one__lt=models.F("team_two")),
+            name="ordered_distinct_team_team_scratch",
+        )]
+        verbose_name_plural = "team scratches"
+
+    def __str__(self):
+        return f"{self.team_one} <=> {self.team_two}"
+
+    def clean(self):
+        if self.team_one_id and self.team_two_id:
+            if self.team_one_id == self.team_two_id:
+                raise ValidationError("Scratches must involve two distinct teams")
+            if self.team_one_id > self.team_two_id:
+                self.team_one_id, self.team_two_id = (
+                    self.team_two_id, self.team_one_id,
+                )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
 
 class Room(models.Model):
     name = models.CharField(max_length=30, unique=True)

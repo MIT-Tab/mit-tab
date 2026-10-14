@@ -1,0 +1,5 @@
+{% extends "common/data_entry.html" %}
+{% block content %}{{ block.super }}
+<form method="post" action="{{ delete_link }}">{% csrf_token %}
+<button class="btn btn-danger" type="submit">Delete scratch</button>
+</form>{% endblock %}

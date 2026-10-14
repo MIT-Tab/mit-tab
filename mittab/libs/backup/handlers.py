@@ -84,6 +84,10 @@ class MysqlDumpRestorer:
         cmd.extend(_ssl_cmd_args())
 
         if not include_scratches:
-            cmd.append(f"--ignore-table={DB_NAME}.tab_scratch")
+            cmd.extend([
+                f"--ignore-table={DB_NAME}.tab_scratch",
+                f"--ignore-table={DB_NAME}.tab_judgejudgescratch",
+                f"--ignore-table={DB_NAME}.tab_teamteamscratch",
+            ])
 
         return cmd

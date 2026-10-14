@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import redirect
 
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -40,6 +40,14 @@ from mittab.libs.cacheing.public_cache import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _scratched_team_ids(team):
+    return tab_logic.scratched_team_ids(team)
+
+
+def _team_pair_is_scratched(team_one, team_two):
+    return tab_logic.team_pair_is_scratched(team_one, team_two)
 
 
 def invalidate_public_ballot_cache():
@@ -681,26 +689,44 @@ def alternative_judges(request, round_id, judge_id=None):
     round_obj = Round.objects.get(id=int(round_id))
     round_number = round_obj.round_number
     round_gov, round_opp = round_obj.gov_team, round_obj.opp_team
+    current_judge_id = None
+    if judge_id is not None:
+        current_judge_id = int(judge_id)
+    panel_judge_ids = set(round_obj.judges.values_list("id", flat=True))
+    if current_judge_id is not None:
+        panel_judge_ids.discard(current_judge_id)
     excluded_judges = Judge.objects.exclude(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
                                    .prefetch_related("judges", "scratches", "schools")
     included_judges = Judge.objects.filter(judges__round_number=round_number) \
                                    .filter(checkin__round_number=round_number) \
                                    .prefetch_related("judges", "scratches", "schools")
+    excluded_judges = list(excluded_judges)
+    included_judges = list(included_judges)
+    judge_pair_blocks = assign_judges.build_judge_pair_blocks()
+    assign_judges.populate_panel_scratch_ids(excluded_judges, judge_pair_blocks)
+    assign_judges.populate_panel_scratch_ids(included_judges, judge_pair_blocks)
 
     excluded_judges_list = assign_judges.can_judge_teams(
-        excluded_judges, round_gov, round_opp)
+        excluded_judges,
+        round_gov,
+        round_opp,
+        panel_judge_ids=panel_judge_ids,
+    )
     included_judges_list = assign_judges.can_judge_teams(
-        included_judges, round_gov, round_opp)
+        included_judges,
+        round_gov,
+        round_opp,
+        panel_judge_ids=panel_judge_ids,
+    )
 
     current_judge_obj = None
     try:
-        current_judge_id = int(judge_id)
         current_judge_obj = Judge.objects.prefetch_related(
             "judges", "scratches", "schools").get(id=current_judge_id)
         current_judge_name = current_judge_obj.name
         current_judge_rank = current_judge_obj.rank
-    except TypeError:
+    except (TypeError, ValueError, Judge.DoesNotExist):
         current_judge_id, current_judge_rank = "", ""
         current_judge_name = "No judge"
 
@@ -760,11 +786,15 @@ def alternative_teams(request, round_id, current_team_id, position):
     round_obj = Round.objects.get(pk=round_id)
     current_team = Team.objects.get(pk=current_team_id)
     round_number = round_obj.round_number
+    paired_team = round_obj.opp_team if position == "gov" else round_obj.gov_team
+    scratched_team_ids = _scratched_team_ids(paired_team)
     excluded_teams = Team.objects.exclude(gov_team__round_number=round_number) \
         .exclude(opp_team__round_number=round_number) \
-        .exclude(pk=current_team_id)
+        .exclude(pk=current_team_id) \
+        .exclude(pk__in=scratched_team_ids)
     included_teams = Team.objects.exclude(pk__in=excluded_teams) \
-        .exclude(pk=current_team_id)
+        .exclude(pk=current_team_id) \
+        .exclude(pk__in=scratched_team_ids)
     context = {
         "round_obj": round_obj,
         "current_team": current_team,
@@ -822,6 +852,14 @@ def assign_team(request, round_id, position, team_id):
     try:
         round_obj = Round.objects.get(id=int(round_id))
         team_obj = Team.objects.get(id=int(team_id))
+        opposing_team = (
+            round_obj.opp_team if position.lower() == "gov" else round_obj.gov_team
+        )
+        if _team_pair_is_scratched(team_obj, opposing_team):
+            return JsonResponse({
+                "success": False,
+                "message": "Teams cannot be paired because of a scratch.",
+            })
 
         if position.lower() == "gov":
             round_obj.gov_team = team_obj
@@ -880,6 +918,21 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
     try:
         round_obj = Round.objects.get(id=int(round_id))
         judge_obj = Judge.objects.get(id=int(judge_id))
+        removed_judge_id = int(remove_id) if remove_id is not None else None
+        panel_judge_ids = set(
+            round_obj.judges.exclude(id=removed_judge_id).values_list("id", flat=True)
+        )
+        if (TabSettings.get("enable_judge_judge_scratches", 0) == 1
+                and not assign_judges.can_assign_judge(
+            judge_obj,
+            round_obj.gov_team,
+            round_obj.opp_team,
+            panel_judge_ids=panel_judge_ids,
+        )):
+            return JsonResponse({
+                "success": False,
+                "message": "Judge conflicts with the current round or panel.",
+            })
         round_obj.judges.add(judge_obj)
         actor = request.user if getattr(request.user, "is_authenticated", False) else None
         ManualJudgeAssignment.objects.update_or_create(
@@ -889,7 +942,7 @@ def assign_judge(request, round_id, judge_id, remove_id=None):
         )
 
         if remove_id is not None:
-            remove_obj = Judge.objects.get(id=int(remove_id))
+            remove_obj = Judge.objects.get(id=removed_judge_id)
             round_obj.judges.remove(remove_obj)
             AuditEvent.record(
                 round_obj,

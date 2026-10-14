@@ -159,3 +159,28 @@ important as it usually is, you could change the value of `high_gov_penalty` to
 `-50` using the settings form. If you wanted to make it not considered at all, you could change it to `0`.
 
 To prevent seeded teams from getting the bye, check `fair_bye` in the settings form.
+
+
+## Experimental team–team and judge–judge scratches
+
+These scratch types are disabled by default. Enable either one independently in
+**Settings → Tab Policy** using `enable_team_team_scratches` or
+`enable_judge_judge_scratches`. Each setting and scratch-entry screen is marked
+**Experimental**. Enabled links appear on the relevant team or judge detail page.
+The experimental editor requires full tab staff access; existing scratch-only
+staff roles and the ordinary judge–team scratch editor retain their existing behavior.
+
+Team–team scratches prevent those teams from meeting in preliminary pairings,
+including random round-two pairings, and in manual team replacements. Pullups and
+byes may be reconsidered when needed to find a valid pairing. Fixed outround brackets
+are not rearranged automatically: pairing fails with an explanation if the bracket
+would violate a team–team scratch.
+
+Judge–judge scratches prevent the judges from sharing a panel in preliminary
+rounds, outrounds, and manual judge replacements. School conflicts, judge–team
+scratches, chair eligibility, and rejudge settings still apply. Failed experimental
+pairing or assignment attempts roll back their changes.
+
+When either feature is disabled, its stored scratches are ignored and its controls
+are unavailable. The standard pairing algorithms are used directly. Existing
+judge–team scratches remain enforced regardless of these settings.

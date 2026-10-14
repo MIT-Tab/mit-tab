@@ -372,6 +372,12 @@ def view_judge(request, judge_id):
         links.append((f"/judge/{judge_id}/delete/", "Delete"))
     if user_has_staff_capability(request.user, CAP_VIEW_SCRATCHES):
         links.append((scratch_url, f"Scratches for {judge.name}"))
+    if TabSettings.get("enable_judge_judge_scratches", 0) == 1:
+        links.append((
+            f"/experimental/judge/{judge_id}/scratches/",
+            "Experimental: judge–judge scratches",
+        ))
+
     return render(
         request, "tab/judge_detail.html", {
             "form": form,

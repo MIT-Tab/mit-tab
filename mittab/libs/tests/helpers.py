@@ -5,11 +5,13 @@ import random
 from mittab.apps.tab.models import (
     CheckIn,
     Judge,
+    JudgeJudgeScratch,
     Room,
     RoomCheckIn,
     Round,
     RoundStats,
     Scratch,
+    TeamTeamScratch,
 )
 
 # Speaks every quarter point
@@ -146,6 +148,8 @@ def generate_results(round_number,
 def clear_all_scratches():
     """Remove any pre-existing scratch records so tests start from a clean slate."""
     Scratch.objects.all().delete()
+    JudgeJudgeScratch.objects.all().delete()
+    TeamTeamScratch.objects.all().delete()
 
 
 def build_judge_pool(num_judges,
