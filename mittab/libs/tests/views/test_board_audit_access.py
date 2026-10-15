@@ -345,10 +345,11 @@ class TestBoardAuditAccess(TestCase):
 
     def test_dino_edit_can_only_change_is_dino(self):
         before = list(Judge.objects.order_by("pk").values())
-        self.client.post(reverse("board_judges"), {
+        response = self.client.post(reverse("board_judges"), {
             "judge": self.judge.pk, "is_dino": "on", "rank": "1.00",
             "wing_only": "on", "ballot_code": "stolen-code",
         })
+        self.assertRedirects(response, reverse("board_judges"))
         after = list(Judge.objects.order_by("pk").values())
         for old, new in zip(before, after):
             if old["id"] == self.judge.pk:

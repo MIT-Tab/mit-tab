@@ -171,7 +171,7 @@ def judges(request):
         except (ValueError, ValidationError):
             return redirect_and_flash_error(
                 request, "Invalid judge update.", path=request.path)
-        return redirect(request.path)
+        return redirect("board_judges")
     roster = list(Judge.objects.order_by("name", "id").values("id", "name", "is_dino"))
     histories = {}
     events = AuditEvent.objects.filter(
