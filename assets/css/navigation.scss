@@ -19,7 +19,7 @@
 }
 
 // Desktop navigation
-@media (min-width: 1200px) {
+@media (min-width: 992px) {
   .mittab-nav {
     margin-bottom: 1.1rem;
     box-shadow: 0 4px 10px -8px rgba(12, 34, 68, 0.65);
@@ -44,10 +44,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 1.2rem;
+      min-width: 0;
     }
 
     .navbar-nav {
       flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 0.5rem;
       padding: 0;
@@ -151,8 +153,41 @@
   }
 }
 
+// Keep the full desktop navigation at laptop widths without allowing labels
+// to wrap. Lower-priority result pages remain grouped under More.
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .mittab-nav {
+    .container {
+      gap: 0.35rem;
+      padding: 0 0.6rem;
+    }
+
+    .navbar-brand {
+      font-size: 1.1rem;
+    }
+
+    .navbar-collapse {
+      gap: 0.35rem;
+    }
+
+    .navbar-nav {
+      gap: 0.05rem;
+
+      + .navbar-nav {
+        margin-left: 0.35rem;
+        padding-left: 0.35rem;
+      }
+    }
+
+    .nav-link {
+      padding: 0.45rem 0.42rem;
+      font-size: 0.8rem;
+    }
+  }
+}
+
 // Mobile navigation
-@media (max-width: 1199.98px) {
+@media (max-width: 991.98px) {
   .mittab-nav {
     .container {
       display: flex;

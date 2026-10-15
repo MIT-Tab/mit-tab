@@ -68,7 +68,7 @@
 {% staff_can user "checkins" as can_checkins %}
 {% staff_can user "data_entry" as can_data_entry %}
 
-<nav class="navbar navbar-expand-xl navbar-dark bg-dark shadow-sm mittab-nav">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
     <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{% if is_apda_board_user %}{{ apda_board_home|with_return_to }}{% else %}{{ home|with_return_to }}{% endif %}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
 
@@ -270,16 +270,20 @@
           <a class="nav-link {% active request public_team_portal %}" href="{{ public_team_portal|with_return_to }}">Team Portal</a>
         </li>
         {% endif %}
-        {% if public_page_flags.judge_list or public_page_flags.team_list or public_page_flags.public_team_results or public_page_flags.public_speaker_results or public_page_flags.public_ballots or public_page_flags.public_motions or public_page_flags.varsity_outrounds or public_page_flags.novice_outrounds %}
+        {% if public_page_flags.judge_list %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
+        </li>
+        {% endif %}
+        {% if public_page_flags.team_list %}
+        <li class="nav-item">
+          <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
+        </li>
+        {% endif %}
+        {% if public_page_flags.public_team_results or public_page_flags.public_speaker_results or public_page_flags.public_ballots or public_page_flags.public_motions or public_page_flags.varsity_outrounds or public_page_flags.novice_outrounds %}
         <li class="nav-item dropdown">
           <a data-toggle="dropdown" class="nav-link dropdown-toggle">More</a>
           <div class="dropdown-menu">
-            {% if public_page_flags.judge_list %}
-            <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
-            {% endif %}
-            {% if public_page_flags.team_list %}
-            <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
-            {% endif %}
             {% if public_page_flags.public_team_results %}
             <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
             {% endif %}

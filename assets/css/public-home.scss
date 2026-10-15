@@ -97,9 +97,8 @@ body {
     gap: 1.5rem;
 
     @media (min-width: 992px) {
-      grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.6fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 1rem;
-      align-items: stretch;
     }
   }
 
@@ -149,8 +148,18 @@ body {
     display: flex;
     flex-direction: column;
 
+    @media (min-width: 992px) {
+      order: 2;
+    }
+
     @media (max-width: 991.98px) {
       display: none;
+    }
+  }
+
+  .links {
+    @media (min-width: 992px) {
+      order: 1;
     }
   }
 
@@ -472,11 +481,21 @@ body {
 
 .public-sidebar-card {
   @include card-shell;
-  padding: 1.5rem 1.75rem;
-  height: 100%;
+  padding: 1.1rem 1.4rem 1.25rem;
   display: flex;
   flex-direction: column;
   background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
+
+  .public-card-header {
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .info-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.55rem;
+  }
 }
 
 .status-block {
@@ -620,11 +639,7 @@ body {
     display: none;
   }
 
-  .public-links .tile:first-child {
-    grid-column: auto;
-  }
-
-  .public-links--odd > :first-child {
+  .public-links.public-links--odd > :first-child {
     grid-column: 1 / -1;
   }
 
