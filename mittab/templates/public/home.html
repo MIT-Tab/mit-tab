@@ -51,14 +51,10 @@
           <h2 class="public-card-header" id="public-home-resources">External Resources</h2>
           <div class="info-links" aria-label="Tournament resources">
             {% for link in info_links %}
-            <a class="info-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">
-              <span class="info-link__body">
-                <span class="info-link__title">{{ link.title }}</span>
-                {% if link.description %}
-                <span class="info-link__subtitle">{{ link.description }}</span>
-                {% endif %}
-              </span>
-              <span class="info-link__icon" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+            <a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+               {% if link.description %}title="{{ link.description }}"{% endif %}>
+              <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+              <span class="info-link-chip__title">{{ link.title }}</span>
             </a>
             {% endfor %}
           </div>
