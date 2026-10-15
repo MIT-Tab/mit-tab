@@ -3,7 +3,7 @@ from mittab.libs.outround_tab_logic.pairing import (
     perform_the_break,
     get_challenge_setup_context,
     save_challenge_pick,
-    save_current_challenger,
+    delete_challenge_pick,
     OutroundPairingMode,
     ChallengeSeedBasis,
 )

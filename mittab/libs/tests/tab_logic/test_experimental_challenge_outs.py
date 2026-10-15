@@ -3,7 +3,7 @@ from unittest.mock import patch
 # pylint: disable=protected-access
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -11,13 +11,30 @@ from mittab.apps.tab.models import (
     BreakingTeam, Outround, OutroundChallenge, Room, RoomCheckIn, TabSettings,
 )
 from mittab.libs import outround_tab_logic
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.outround_tab_logic import pairing
 
 
+@override_settings(CACHES={
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "challenge-outs-tests-default",
+    },
+    "filesystem": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "challenge-outs-tests-persistent",
+    },
+    "public": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "challenge-outs-tests-public",
+    },
+})
 class TestExperimentalChallengeOuts(TestCase):
     fixtures = ["testing_finished_db"]
 
     def setUp(self):
+        cache_logic.clear_cache()
+        TabSettings.set("cur_round", 6)
         RoomCheckIn.objects.bulk_create([
             RoomCheckIn(room=room, round_number=0) for room in Room.objects.all()
         ])
@@ -101,7 +118,51 @@ class TestExperimentalChallengeOuts(TestCase):
         })
         self.assertContains(response, url)
         response = self.client.get(url)
-        self.assertContains(response, "Experimental: Challenge Outs")
+        self.assertContains(response, "Challenge Outs")
+        self.assertContains(response, "Seed 1 starts")
+        self.assertNotContains(response, "Pre-pairing checks")
+
+        response = self.client.get(f"{url}?stage=pairing")
+        self.assertContains(response, "Pre-pairing checks")
+        self.assertNotContains(response, "Recorded matchups")
+
+    def test_setup_context_guides_staff_through_available_teams(self):
+        self.perform_break(1)
+        teams = self.teams()
+
+        context = pairing.get_challenge_setup_context(0, 8)
+        self.assertEqual(context["next_challenger"]["id"], teams[0].team_id)
+        self.assertNotIn(
+            teams[0].team_id,
+            {option["id"] for option in context["opponent_options"]},
+        )
+
+        pairing.save_challenge_pick(0, 8, teams[0].team_id, teams[2].team_id)
+        context = pairing.get_challenge_setup_context(0, 8)
+
+        self.assertEqual(context["next_challenger"]["id"], teams[1].team_id)
+        self.assertEqual(
+            context["saved_challenges"][0]["challenged"]["id"],
+            teams[2].team_id,
+        )
+        remaining_ids = {option["id"] for option in context["remaining_teams"]}
+        self.assertNotIn(teams[0].team_id, remaining_ids)
+        self.assertNotIn(teams[2].team_id, remaining_ids)
+
+    def test_staff_can_remove_a_saved_challenge(self):
+        self.perform_break(1)
+        teams = self.teams()
+        pairing.save_challenge_pick(0, 8, teams[0].team_id, teams[2].team_id)
+
+        response = self.client.post(reverse("next_outround", kwargs={
+            "num_teams": 16, "type_of_round": 0,
+        }), {
+            "action": "delete_challenge",
+            "challenger_id": teams[0].team_id,
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(OutroundChallenge.objects.exists())
 
     def test_once_upsets_keep_bracket_progression_complete(self):
         self.perform_break(2)

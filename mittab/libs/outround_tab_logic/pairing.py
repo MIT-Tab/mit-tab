@@ -55,11 +55,6 @@ def prepare_challenge_edits(type_of_round):
         TabSettings.set(generation_key, generation)
 
 
-def _setting_key_for_current_challenger(type_of_round, num_teams):
-    generation = _challenge_generation(type_of_round)
-    return f"challenge_current_{type_of_round}_{num_teams}_{generation}"
-
-
 def _setting_key_for_challenge_once(type_of_round):
     generation = _challenge_generation(type_of_round)
     return f"challenge_once_applied_{type_of_round}_{generation}"
@@ -102,14 +97,6 @@ def challenge_round_enabled(type_of_break, num_teams, actual_num_teams):
     return True
 
 
-def _resolve_current_challenger(remaining_teams, current_override_id):
-    remaining_ids = {entry.team.id for entry in remaining_teams}
-    if current_override_id in remaining_ids:
-        return next(entry for entry in remaining_teams if entry.team.id ==
-                    current_override_id)
-    return remaining_teams[0]
-
-
 def _get_challenge_pairs(type_of_break, num_teams, base_queryset, challenge_settings):
     seed_basis = challenge_settings["seed_basis"]
     if challenge_settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE:
@@ -129,18 +116,13 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, challenge_sett
     if any(team_id not in {entry.team.id for entry in ordered}
            for team_id in picked_ids):
         raise ValueError("A challenge pick refers to a team outside the active pool.")
-    current_override = int(TabSettings.get(
-        _setting_key_for_current_challenger(type_of_break, num_teams), 0
-    ) or 0)
-
     result = []
     seed_updates = []
     while remaining:
         # A team already selected as an opponent cannot become a challenger.
         eligible_challengers = [entry for entry in remaining
                                if entry.team.id not in set(picks.values())]
-        challenger = _resolve_current_challenger(eligible_challengers, current_override)
-        current_override = 0
+        challenger = eligible_challengers[0]
         remaining_ids = {
     entry.team.id for entry in remaining if entry.team.id != challenger.team.id}
         challenged_id = picks.get(challenger.team.id)
@@ -203,14 +185,52 @@ def get_challenge_setup_context(type_of_break, num_teams):
             type_of_break, num_teams, [entry.team_id for entry in ordered],
         )
     }
-    current_challenger_id = int(TabSettings.get(
-        _setting_key_for_current_challenger(type_of_break, num_teams), 0
-    ) or 0)
-    used_targets = set(challenge_map.values())
+    used_team_ids = set(challenge_map) | set(challenge_map.values())
     pending = [
         entry for entry in ordered
-        if entry.team.id not in challenge_map and entry.team.id not in used_targets
+        if entry.team.id not in used_team_ids
     ]
+
+    def team_option(entry):
+        seed = (
+            entry.seed
+            if seed_basis == ChallengeSeedBasis.ORIGINAL
+            else entry.effective_seed
+        )
+        return {
+            "id": entry.team.id,
+            "name": entry.team.name,
+            "seed": seed,
+            "label": f"[{seed}] {entry.team.name}",
+        }
+
+    team_options = [team_option(entry) for entry in ordered]
+    options_by_id = {option["id"]: option for option in team_options}
+    saved_challenges = [
+        {
+            "challenger": options_by_id[entry.team.id],
+            "challenged": options_by_id[challenge_map[entry.team.id]],
+        }
+        for entry in ordered
+        if entry.team.id in challenge_map
+    ]
+
+    next_challenger = None
+    if len(pending) > 2:
+        next_challenger = pending[0]
+    next_challenger_option = (
+        team_option(next_challenger) if next_challenger else None
+    )
+    opponent_options = [
+        team_option(entry)
+        for entry in pending
+        if not next_challenger or entry.team.id != next_challenger.team.id
+    ]
+    automatic_pair = (
+        [team_option(entry) for entry in pending]
+        if len(pending) == 2
+        else []
+    )
 
     return {
         "enabled": True,
@@ -227,13 +247,7 @@ def get_challenge_setup_context(type_of_break, num_teams):
             if seed_basis == ChallengeSeedBasis.ORIGINAL
             else "Previous Round Seeds"
         ),
-        "team_options": [
-            {
-                "id": b.team.id,
-                "label": f"[{i + 1}] {b.team.name}",
-            }
-            for i, b in enumerate(ordered)
-        ],
+        "team_options": team_options,
         "challenges": [
             {
                 "challenger_id": b.team.id,
@@ -242,8 +256,13 @@ def get_challenge_setup_context(type_of_break, num_teams):
             }
             for b in ordered
         ],
-        "current_challenger_id": current_challenger_id,
-        "pending_ids": [b.team.id for b in pending],
+        "remaining_teams": [team_option(entry) for entry in pending],
+        "saved_challenges": saved_challenges,
+        "next_challenger": next_challenger_option,
+        "opponent_options": opponent_options,
+        "automatic_pair": automatic_pair,
+        "choices_entered": len(saved_challenges),
+        "choices_total": max((num_teams // 2) - 1, 0),
     }
 
 
@@ -281,20 +300,22 @@ def save_challenge_pick(type_of_break, num_teams, challenger_id, challenged_id):
 
 
 @transaction.atomic
-def save_current_challenger(type_of_break, num_teams, challenger_id):
+def delete_challenge_pick(type_of_break, num_teams, challenger_id):
     list(BreakingTeam.objects.select_for_update().filter(type_of_team=type_of_break))
     challenge_context = get_challenge_setup_context(type_of_break, num_teams)
     if not challenge_context.get("enabled"):
         raise ValueError("Challenge entries are not available for this round.")
 
-    valid_team_ids = set(challenge_context["pending_ids"])
-    if challenger_id and challenger_id not in valid_team_ids:
-        raise ValueError("Selected current challenger is invalid.")
+    valid_team_ids = {option["id"] for option in challenge_context["team_options"]}
+    if challenger_id not in valid_team_ids:
+        raise ValueError("Selected team is not in this challenge pool.")
+
     prepare_challenge_edits(type_of_break)
-    TabSettings.set(
-        _setting_key_for_current_challenger(type_of_break, num_teams),
-        challenger_id or 0,
-    )
+    OutroundChallenge.objects.filter(
+        type_of_round=type_of_break,
+        num_teams=num_teams,
+        challenger_id=challenger_id,
+    ).delete()
 
 
 def perform_the_break():

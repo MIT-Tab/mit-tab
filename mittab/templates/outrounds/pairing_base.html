@@ -6,8 +6,25 @@
 
 {% block content %}
 {% for pending in pending_challenges %}
-<div class="alert alert-warning">Experimental: {{ pending.label }} challenge outs are awaiting picks.
-<a href="{% url 'next_outround' pending.type pending.previous_size %}">Set challenges and pair round of {{ pending.size }}</a></div>
+<div class="col-12">
+  <div class="card border-primary mb-4 challenge-entry-callout">
+    <div class="card-body d-md-flex align-items-center justify-content-between">
+      <div class="mr-md-4 mb-3 mb-md-0">
+        <div class="text-uppercase text-primary small font-weight-bold mb-1">
+          Experimental: Challenge Outs · Action required
+        </div>
+        <h4 class="card-title mb-1">Enter {{ pending.label }} Round of {{ pending.size }} challenges</h4>
+        <p class="card-text text-muted mb-0">
+          The break is complete, but this round has not been paired. Record challenge choices first,
+          then create the pairing from the same page.
+        </p>
+      </div>
+      <a class="btn btn-primary text-nowrap" href="{% url 'next_outround' pending.type pending.previous_size %}">
+        <i class="fas fa-list-ol mr-1"></i> Enter Challenge Outs
+      </a>
+    </div>
+  </div>
+</div>
 {% endfor %}
 
 <div id="round-number"
@@ -125,7 +142,11 @@
             <a class="btn btn-info"
                href="/outround_pairing/pair/{{ section.type_of_round }}/{{ section.num_teams }}"
                title="Pair the next round of debate for this bracket">
+              {% if section.challenge_entry_pending %}
+              <i class="fas fa-list-ol"></i> Enter Challenge Outs
+              {% else %}
               <i class="fas fa-arrow-right"></i> Prepare Next Round
+              {% endif %}
             </a>
             {% endif %}
             <a class="btn btn-secondary" href="{% url 'outround_pretty_pair' section.type_of_round %}" title="To display in GA">

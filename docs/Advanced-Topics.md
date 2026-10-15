@@ -169,10 +169,14 @@ under `outround_pairing_mode` to enable them. Standard Bracket uses the existing
 pairing and result-entry behavior and ignores stored challenge picks.
 
 After breaking teams, a full power-of-two break of at least four teams waits for
-staff to enter challenges. Follow **Set challenges and pair round** on the outround
-pairing page, save the picks, then pair the round. Teams without explicit picks
-receive the lowest available unreserved opponent. Each team can appear in only
-one pick. Staff can override the next challenger among the remaining teams.
+staff to enter challenges. Follow **Enter Challenge Outs** on the outround pairing
+page, save each announced matchup, then create the pairing. Challenge entry is a
+staff workflow; teams do not submit choices through the team portal. After a
+matchup is saved, both teams leave the available pool and the highest-seeded
+remaining team challenges next. The final two teams are paired automatically.
+If staff creates the pairing before entering every choice, the highest remaining
+seed receives the lowest available unreserved opponent.
+The top seed always challenges first.
 
 Challenge Each Round accepts new picks each round; challenge order can use the
 original break seeds or the previous round's effective seeds. Challenge Once
@@ -182,6 +186,6 @@ seeds remain unchanged. Partial breaks use standard pairings until a complete
 power-of-two pool is available. Finals use standard pairings. Pairings and judges
 still use the existing side, room, and judge-conflict rules.
 
-Challenge picks, challenger overrides, and the challenge-once marker belong to the
+Challenge picks and the challenge-once marker belong to the
 current break. Rebreaking while Standard Bracket is selected does not carry old
 challenge state into a later experimental break.

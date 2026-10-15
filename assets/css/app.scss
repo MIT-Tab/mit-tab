@@ -166,6 +166,10 @@ $font-size-base: 0.95rem !default;
   min-height: 38px;
 }
 
+.challenge-entry-callout {
+  border-left-width: 0.35rem !important;
+}
+
 .winner-row .submitted-field {
   font-weight: 600;
   font-size: 1rem;
