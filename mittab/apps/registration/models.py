@@ -54,6 +54,9 @@ class Registration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.school.name} — {self.email}"
+
     def save(self, *args, **kwargs):
         if not self.herokunator_code:
             self.herokunator_code = generate_readable_auth_code(

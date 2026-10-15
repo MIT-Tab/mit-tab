@@ -44,10 +44,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 1.2rem;
+      min-width: 0;
     }
 
     .navbar-nav {
       flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 0.5rem;
       padding: 0;
@@ -88,6 +90,7 @@
       border-radius: 0.5rem;
       font-weight: 500;
       font-size: 0.95rem;
+      white-space: nowrap;
       color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.84);
       transition: all 120ms ease;
 
@@ -146,6 +149,39 @@
 
     .dropdown-divider {
       border-top-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.22);
+    }
+  }
+}
+
+// Keep the full desktop navigation at laptop widths without allowing labels
+// to wrap. Lower-priority result pages remain grouped under More.
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .mittab-nav {
+    .container {
+      gap: 0.35rem;
+      padding: 0 0.6rem;
+    }
+
+    .navbar-brand {
+      font-size: 1.1rem;
+    }
+
+    .navbar-collapse {
+      gap: 0.35rem;
+    }
+
+    .navbar-nav {
+      gap: 0.05rem;
+
+      + .navbar-nav {
+        margin-left: 0.35rem;
+        padding-left: 0.35rem;
+      }
+    }
+
+    .nav-link {
+      padding: 0.45rem 0.42rem;
+      font-size: 0.8rem;
     }
   }
 }

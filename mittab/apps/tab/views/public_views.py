@@ -25,6 +25,10 @@ from mittab.apps.tab.models import (
     Round,
     RoundStats,
 )
+from mittab.apps.tab.public_pages import (
+    get_active_public_page_flags,
+    get_public_page_availability,
+)
 from mittab.apps.tab.public_rankings import (
     get_all_ballot_round_settings,
     get_ranking_settings,
@@ -45,10 +49,12 @@ from mittab.apps.tab.written_rfd import (
 
 def build_public_home_shortcuts():
     definition_map = PublicHomeShortcut.nav_definition_map(include_inactive=False)
+    active_page_flags = get_active_public_page_flags()
     slot_to_slug = PublicHomeShortcut.default_slot_mapping()
 
     for shortcut in PublicHomeShortcut.objects.all():
-        if shortcut.position in slot_to_slug:
+        # Slot 1 is intentionally fixed to pairings (or registration, below).
+        if shortcut.position in slot_to_slug and shortcut.position != 1:
             slot_to_slug[shortcut.position] = shortcut.nav_item
 
     shortcuts = []
@@ -59,6 +65,8 @@ def build_public_home_shortcuts():
             slug = default_slug
             definition = definition_map.get(default_slug)
         if definition is None:
+            continue
+        if not active_page_flags.get(slug, True):
             continue
         shortcuts.append({
             "slug": slug,
@@ -177,21 +185,12 @@ def public_home(request):
     # Slot 1 is reserved (and locked in the settings UI): pre-tournament
     # with registration open, the separate registration callout replaces it.
     # Once round 1 starts (or registration is closed), it shows pairings.
-    if quick_links:
-        if show_registration_lead:
-            # Avoid showing Registration twice, especially in the stacked
-            # mobile layout where the callout and tile looked identical.
-            quick_links.pop(0)
-        else:
-            pages = PublicHomeShortcut.nav_definition_map(include_inactive=False)
-            rp = pages.get("released_pairings", {})
-            if rp:
-                quick_links[0] = {
-                    "slug": "released_pairings",
-                    "title": rp.get("title", "Released Pairings"),
-                    "subtitle": rp.get("subtitle", ""),
-                    "url": rp.get("url_path", "/public/pairings/"),
-                }
+    if show_registration_lead:
+        # Registration occupies slot 1 before the first round is paired.
+        quick_links = [
+            link for link in quick_links
+            if link.get("slug") != "released_pairings"
+        ]
 
     # As soon as outrounds exist, promote the active outround page to the
     # first tile and move the inround pairings tile into its former position.
@@ -254,6 +253,8 @@ def public_home(request):
             )
             break
 
+    public_tile_count = len(quick_links) + int(show_registration_lead)
+
     return render(
         request,
         "public/home.html",
@@ -265,6 +266,7 @@ def public_home(request):
             "registration_url": reverse("registration_portal"),
             "info_links": info_links,
             "quick_links": quick_links,
+            "public_tiles_odd": public_tile_count % 2 == 1,
         },
     )
 
@@ -294,9 +296,8 @@ def public_view_judges(request):
 def public_view_teams(request):
     display_teams = TabSettings.get("teams_public", 0)
 
-    if not request.user.is_authenticated and not display_teams:
-        return redirect_and_flash_error(
-            request, "This view is not public", path=reverse("index"))
+    if not display_teams:
+        return redirect("public_access_error")
 
     return render(
         request, "public/teams.html", {
@@ -536,6 +537,12 @@ def serialize_debaters(team, stats_by_debater):
 
 @cache_public_view(timeout=60)
 def pretty_pair(request, round_number=None):
+    if (
+        round_number is None and
+        not get_public_page_availability()["released_pairings"]
+    ):
+        return redirect("public_access_error")
+
     errors, byes = [], []
 
     current_round = TabSettings.get("cur_round") - 1
@@ -612,6 +619,9 @@ def pretty_pair(request, round_number=None):
 
 @cache_public_view(timeout=30)
 def missing_ballots(request):
+    if not get_public_page_availability()["missing_ballots"]:
+        return redirect("public_access_error")
+
     round_number = TabSettings.get("cur_round") - 1
     rounds = Round.objects.prefetch_related("gov_team", "opp_team",
                                             "room", "chair") \
@@ -1104,6 +1114,14 @@ def enter_e_ballot(request, ballot_code):
 
 @cache_public_view(timeout=60)
 def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
+    page_slug = (
+        "novice_outrounds"
+        if type_of_round == BreakingTeam.NOVICE
+        else "varsity_outrounds"
+    )
+    if not get_public_page_availability()[page_slug]:
+        return redirect("public_access_error")
+
     gov_opp_display = TabSettings.get("gov_opp_display", 0)
 
     round_number = 256

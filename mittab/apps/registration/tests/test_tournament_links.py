@@ -46,6 +46,17 @@ def test_validate_safe_url_blocks_dangerous_schemes():
 
 
 @pytest.mark.django_db
+def test_registration_label_identifies_school_and_email():
+    school = School.objects.create(name="MIT")
+    registration = Registration.objects.create(
+        school=school,
+        email="tab@mit.edu",
+    )
+
+    assert str(registration) == "MIT — tab@mit.edu"
+
+
+@pytest.mark.django_db
 def test_admin_can_create_info_link(logged_in_admin_client):
     response = logged_in_admin_client.post(
         reverse("tournament_link_create", kwargs={"link_kind": "info"}),

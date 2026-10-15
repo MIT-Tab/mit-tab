@@ -51,14 +51,10 @@
           <h2 class="public-card-header" id="public-home-resources">External Resources</h2>
           <div class="info-links" aria-label="Tournament resources">
             {% for link in info_links %}
-            <a class="info-link" href="{{ link.url }}" target="_blank" rel="noopener noreferrer">
-              <span class="info-link__body">
-                <span class="info-link__title">{{ link.title }}</span>
-                {% if link.description %}
-                <span class="info-link__subtitle">{{ link.description }}</span>
-                {% endif %}
-              </span>
-              <span class="info-link__icon" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+            <a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+               {% if link.description %}title="{{ link.description }}"{% endif %}>
+              <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+              <span class="info-link-chip__title">{{ link.title }}</span>
             </a>
             {% endfor %}
           </div>
@@ -81,20 +77,19 @@
         </div>
         {% endif %}
 
-        {% if show_registration_lead %}
-        <aside class="register-cta">
-          <div class="register-cta__text">
-            <p class="register-cta__title">Registration is open</p>
-            <p class="register-cta__body">Sign up your teams and judges here.</p>
+        <nav class="public-links{% if public_tiles_odd %} public-links--odd{% endif %}" aria-label="Quick links">
+          {% if show_registration_lead %}
+          <div class="register-cta">
+            <div class="register-cta__text">
+              <p class="register-cta__title">Registration is open</p>
+              <p class="register-cta__body">Sign up your teams and judges here.</p>
+            </div>
+            <div class="register-cta__actions">
+              <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register new team</a>
+              <a class="btn btn-outline-primary btn-sm register-cta__btn" href="{% url 'registration_code_lookup' %}">Edit existing</a>
+            </div>
           </div>
-          <div class="register-cta__actions">
-            <a class="btn btn-primary btn-sm register-cta__btn" href="{{ registration_url }}">Register new team</a>
-            <a class="btn btn-outline-primary btn-sm register-cta__btn" href="{% url 'registration_code_lookup' %}">Edit existing</a>
-          </div>
-        </aside>
-        {% endif %}
-
-        <nav class="public-links" aria-label="Quick links">
+          {% endif %}
           {% for shortcut in quick_links %}
           <a class="tile shadow-sm" href="{{ shortcut.url }}">
             <span class="body">

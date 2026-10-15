@@ -86,9 +86,9 @@ body {
 }
 
 .public-home {
-  padding: 1rem 1rem 2rem;
+  padding: 1.25rem 1.5rem 2.5rem;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1240px;
   margin: 0 auto;
 
   .grid {
@@ -97,15 +97,15 @@ body {
     gap: 1.5rem;
 
     @media (min-width: 992px) {
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-      align-items: stretch;
+      grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.6fr);
+      gap: 1rem;
+      align-items: start;
     }
   }
 
   &--single .grid {
     @media (min-width: 992px) {
-      grid-template-columns: minmax(0, 720px);
+      grid-template-columns: minmax(0, 960px);
       justify-content: center;
     }
   }
@@ -137,11 +137,12 @@ body {
   }
   .links {
     @include card-shell;
-    padding: 1.5rem 1.75rem;
+    padding: 1.4rem;
     color: #1d2b44;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
   }
 
   .sidebar {
@@ -153,30 +154,6 @@ body {
     }
   }
 
-  // On desktop, the two cards are visually a single connected panel:
-  // collapse the gap, drop the inner rounded corners, and trim the box-shadow
-  // along the shared edge so the seam reads as one panel rather than two
-  // glowing rectangles bumping into each other.
-  @media (min-width: 992px) {
-    &:not(.public-home--single) .sidebar .public-sidebar-card {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-      border-right: 1px solid rgba(21, 33, 61, 0.08);
-      height: 100%;
-      // Clip box-shadow on the shared (right) side. Using a clip-path
-      // that extends past the visible card preserves the soft drop
-      // shadow on the outer 3 sides while cutting it cleanly at the seam.
-      clip-path: inset(-40px 0 -40px -40px);
-    }
-
-    &:not(.public-home--single) .links {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-      border-left: none;
-      height: 100%;
-      clip-path: inset(-40px -40px -40px 0);
-    }
-  }
 }
 
 .public-home-hero {
@@ -270,83 +247,48 @@ body {
       display: flex;
     }
 
-    .info-link-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      flex: 0 0 auto;
-      max-width: 100%;
-      padding: 0.4rem 0.8rem;
-      border-radius: 999px;
-      border: 1px solid rgba(28, 54, 94, 0.18);
-      background: #ffffff;
-      color: #1f2f4a;
-      font-size: 0.85rem;
-      font-weight: 600;
-      line-height: 1.2;
-      text-decoration: none;
-      box-shadow: 0 4px 10px -8px rgba(16, 34, 63, 0.25);
-
-      i {
-        color: var(--theme-color, #00438A);
-        font-size: 0.75rem;
-        flex-shrink: 0;
-      }
-
-      &__title {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      &:hover,
-      &:focus-visible {
-        text-decoration: none;
-        border-color: var(--theme-color, #00438A);
-        color: #1f2f4a;
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--theme-color, #00438A);
-        outline-offset: 2px;
-      }
-    }
   }
+}
 
-  .info-link {
-    @include public-card-link;
-    justify-content: space-between;
-  }
+.info-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 54, 94, 0.18);
+  background: #ffffff;
+  color: #1f2f4a;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  box-shadow: 0 4px 10px -8px rgba(16, 34, 63, 0.25);
 
-  .info-link__icon {
-    flex-shrink: 0;
-    color: rgba(24, 44, 72, 0.35);
-    font-size: 0.9rem;
-    transition: color 140ms ease, transform 140ms ease;
-  }
-
-  .info-link:hover .info-link__icon,
-  .info-link:focus-visible .info-link__icon {
+  i {
     color: var(--theme-color, #00438A);
-    transform: translateX(2px);
+    font-size: 0.75rem;
+    flex-shrink: 0;
   }
 
-  .info-link__body {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .info-link__title {
-    @include public-card-link-title;
+  &__title {
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .info-link__subtitle {
-    @include public-card-link-subtitle;
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+    border-color: var(--theme-color, #00438A);
+    color: #1f2f4a;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--theme-color, #00438A);
+    outline-offset: 2px;
   }
 }
 
@@ -355,14 +297,18 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.6rem 1rem;
-  margin-bottom: 0.55rem;
+  height: auto;
+  min-height: 5.5rem;
+  border: 2px solid var(--theme-color, #00438A);
+  border-radius: 0.6rem;
+  background: #ffffff;
   cursor: default;
 
   &:hover,
   &:focus-visible {
     transform: none;
     box-shadow: none;
-    border-color: rgba(28, 54, 94, 0.12);
+    border-color: var(--theme-color, #00438A);
   }
 
   &__text {
@@ -403,7 +349,7 @@ body {
     padding: 0.75rem 0.85rem;
     height: auto;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    min-width: 0;
 
     &__text {
       flex: 0 0 auto;
@@ -422,28 +368,43 @@ body {
     }
 
     &__actions {
-      flex-direction: row;
+      flex-direction: column;
       gap: 0.35rem;
     }
 
     &__btn {
       flex: 1 1 0;
       padding: 0.4rem 0.55rem;
-      font-size: 0.82rem;
+      font-size: 0.76rem;
       line-height: 1.3;
       border-radius: 0.25rem;
+      white-space: normal;
     }
   }
 }
 
 .public-links {
   position: relative;
-  @include flex-column(0.55rem);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
   margin: 0;
 
   .tile {
     @include public-card-link;
     justify-content: space-between;
+    height: auto;
+    min-height: 5.5rem;
+    border: 2px solid var(--theme-color, #00438A);
+    border-radius: 0.6rem;
+    box-shadow: 0 7px 18px -16px rgba(12, 31, 58, 0.65) !important;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--theme-color, #00438A);
+      background: rgba(var(--theme-color-rgb, 0, 67, 138), 0.045);
+      box-shadow: 0 12px 24px -18px rgba(12, 31, 58, 0.75) !important;
+    }
 
     .body {
       @include flex-column(0.1rem);
@@ -476,10 +437,21 @@ body {
 
 .public-sidebar-card {
   @include card-shell;
-  padding: 1.5rem 1.75rem;
-  height: 100%;
+  padding: 1.1rem 1.4rem 1.25rem;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(145deg, #ffffff 0%, #fbfcff 100%);
+
+  .public-card-header {
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .info-links {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
 }
 
 .status-block {
@@ -623,7 +595,7 @@ body {
     display: none;
   }
 
-  .public-links .tile:first-child {
+  .public-links.public-links--odd > :first-child {
     grid-column: 1 / -1;
   }
 

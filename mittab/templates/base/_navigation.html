@@ -60,7 +60,7 @@
 {% url "tab_login" as staff_login %}
 {% url "manage_motions" as manage_motions %}
 {% url "public_motions" as public_motions %}
-{% public_display_flags as public_display_flags %}
+{% public_page_flags as public_page_flags %}
 {% motions_enabled as motions_enabled_flag %}
 {% is_apda_board user as is_apda_board_user %}
 {% staff_can user "add_scratches" as can_add_scratches %}
@@ -198,26 +198,42 @@
             Public
           </a>
           <div class="dropdown-menu">
+            {% if public_page_flags.released_pairings %}
             <a class="dropdown-item {% active request public_pairings %}" href="{{ public_pairings|with_return_to }}">Released Pairings</a>
+            {% endif %}
+            {% if public_page_flags.missing_ballots %}
             <a class="dropdown-item {% active request public_missing_ballots %}" href="{{ public_missing_ballots|with_return_to }}">Missing Ballots</a>
+            {% endif %}
+            {% if public_page_flags.submit_e_ballot %}
             <a class="dropdown-item {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Judge Portal and Ballots</a>
+            {% endif %}
+            {% if public_page_flags.team_portal %}
             <a class="dropdown-item {% active request public_team_portal %}" href="{{ public_team_portal|with_return_to }}">Team Portal</a>
+            {% endif %}
+            {% if public_page_flags.judge_list %}
             <a class="dropdown-item {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
+            {% endif %}
+            {% if public_page_flags.team_list %}
             <a class="dropdown-item {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
-            {% if public_display_flags.team_results %}
+            {% endif %}
+            {% if public_page_flags.public_team_results %}
             <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
             {% endif %}
-            {% if public_display_flags.speaker_results %}
+            {% if public_page_flags.public_speaker_results %}
             <a class="dropdown-item {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
             {% endif %}
-            {% if public_display_flags.ballots %}
+            {% if public_page_flags.public_ballots %}
             <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
             {% endif %}
-            {% if motions_enabled_flag %}
+            {% if public_page_flags.public_motions %}
             <a class="dropdown-item {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
             {% endif %}
+            {% if public_page_flags.varsity_outrounds %}
             <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
+            {% endif %}
+            {% if public_page_flags.novice_outrounds %}
             <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
+            {% endif %}
           </div>
         </li>
         {% endif %}
@@ -234,50 +250,61 @@
 
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav mr-auto order-0">
+        {% if public_page_flags.released_pairings %}
         <li class="nav-item">
           <a class="nav-link {% active request public_pairings %}" href="{{ public_pairings|with_return_to }}">Released Pairings</a>
         </li>
+        {% endif %}
+        {% if public_page_flags.missing_ballots %}
         <li class="nav-item">
           <a class="nav-link {% active request public_missing_ballots %}" href="{{ public_missing_ballots|with_return_to }}">Missing Ballots</a>
         </li>
+        {% endif %}
+        {% if public_page_flags.submit_e_ballot %}
         <li class="nav-item">
           <a class="nav-link {% active request public_eballot %}" href="{{ public_eballot|with_return_to }}">Judge Portal and Ballots</a>
         </li>
+        {% endif %}
+        {% if public_page_flags.team_portal %}
         <li class="nav-item">
           <a class="nav-link {% active request public_team_portal %}" href="{{ public_team_portal|with_return_to }}">Team Portal</a>
         </li>
+        {% endif %}
+        {% if public_page_flags.judge_list %}
         <li class="nav-item">
           <a class="nav-link {% active request public_judges %}" href="{{ public_judges|with_return_to }}">Judge List</a>
         </li>
+        {% endif %}
+        {% if public_page_flags.team_list %}
         <li class="nav-item">
           <a class="nav-link {% active request public_teams %}" href="{{ public_teams|with_return_to }}">Team List</a>
         </li>
-        {% if public_display_flags.team_results %}
-        <li class="nav-item">
-          <a class="nav-link {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+        {% endif %}
+        {% if public_page_flags.public_team_results or public_page_flags.public_speaker_results or public_page_flags.public_ballots or public_page_flags.public_motions or public_page_flags.varsity_outrounds or public_page_flags.novice_outrounds %}
+        <li class="nav-item dropdown">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle">More</a>
+          <div class="dropdown-menu">
+            {% if public_page_flags.public_team_results %}
+            <a class="dropdown-item {% active request public_team_rankings %}" href="{{ public_team_rankings|with_return_to }}">Public Team Results</a>
+            {% endif %}
+            {% if public_page_flags.public_speaker_results %}
+            <a class="dropdown-item {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
+            {% endif %}
+            {% if public_page_flags.public_ballots %}
+            <a class="dropdown-item {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
+            {% endif %}
+            {% if public_page_flags.public_motions %}
+            <a class="dropdown-item {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
+            {% endif %}
+            {% if public_page_flags.varsity_outrounds %}
+            <a class="dropdown-item {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
+            {% endif %}
+            {% if public_page_flags.novice_outrounds %}
+            <a class="dropdown-item {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
+            {% endif %}
+          </div>
         </li>
         {% endif %}
-        {% if public_display_flags.speaker_results %}
-        <li class="nav-item">
-          <a class="nav-link {% active request public_speaker_rankings %}" href="{{ public_speaker_rankings|with_return_to }}">Public Speaker Results</a>
-        </li>
-        {% endif %}
-        {% if public_display_flags.ballots %}
-        <li class="nav-item">
-          <a class="nav-link {% active request public_ballots %}" href="{{ public_ballots|with_return_to }}">Public Ballots</a>
-        </li>
-        {% endif %}
-        {% if motions_enabled_flag %}
-        <li class="nav-item">
-          <a class="nav-link {% active request public_motions %}" href="{{ public_motions|with_return_to }}">Motions</a>
-        </li>
-        {% endif %}
-        <li class="nav-item">
-          <a class="nav-link {% active request public_outround_varsity %}" href="{{ public_outround_varsity|with_return_to }}">Varsity Outrounds</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% active request public_outround_novice %}" href="{{ public_outround_novice|with_return_to }}">Novice Outrounds</a>
-        </li>
       </ul>
       <ul class="navbar-nav ml-auto order-1">
         <li class="nav-item">
