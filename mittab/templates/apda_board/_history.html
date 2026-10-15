@@ -1,0 +1,11 @@
+{% if pairing.history %}
+<details class="mt-2 small">
+  <summary>Manual edits ({{ pairing.history|length }})</summary>
+  {% for event in pairing.history %}
+  <div class="border-top mt-2 pt-2">
+    <strong>{{ event.label }}</strong>{% if event.source %} ({{ event.source }}){% endif %} by {{ event.actor }} · {{ event.time|date:"Y-m-d H:i:s T" }}
+    <ul>{% for change in event.changes %}<li>{{ change.field }}: {{ change.before|default_if_none:"None" }} → {{ change.after|default_if_none:"None" }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}

@@ -3,9 +3,34 @@ from urllib.parse import urlsplit
 from django.contrib.auth.models import Group
 from django.urls import Resolver404, resolve, reverse
 
-from mittab.apps.tab.models import Round, TabSettings
+from mittab.apps.tab.models import Outround, Round, TabSettings
 
 APDA_BOARD_GROUP_NAME = "APDA Board"
+
+# Named routes and methods, never whole path prefixes: new endpoints fail closed.
+APDA_BOARD_ALLOWED_VIEWS = {
+    name: {"GET", "HEAD"} for name in (
+        "index", "403", "404", "500", "public_home", "pretty_pair",
+        "missing_ballots", "public_judges", "public_teams", "rank_teams_public",
+        "public_speaker_rankings", "public_ballots", "outround_pretty_pair",
+        "public_motions", "favicon", "tournament_logo", "js18", "forum_post",
+        "all_tab_cards", "tab_card", "pretty_tab_card", "download_black_rod_bundle",
+        "export_apda_board_schools_csv", "export_apda_board_debaters_csv",
+        "board_inrounds", "board_outrounds", "board_tab_cards", "board_tab_card",
+    )
+}
+APDA_BOARD_ALLOWED_VIEWS.update({
+    name: {"GET", "HEAD", "POST"} for name in (
+        "apda_board_home", "apda_board_school_detail", "apda_board_debater_detail",
+        "board_judges", "logout", "admin_logout",
+    )
+})
+APDA_BOARD_ALLOWED_VIEWS.update({
+    name: {"POST"} for name in (
+        "import_apda_board_schools_csv", "import_apda_board_debaters_csv",
+        "board_outround_edit", "board_pair_outround",
+    )
+})
 
 PRESET_FULL_TAB_STAFF = "full_tab_staff"
 PRESET_ADD_SCRATCHES = "add_scratches"
@@ -187,13 +212,14 @@ STAFF_PRESET_LANDING_VIEWS = {
 def is_apda_board_user(user):
     if not user or not user.is_authenticated:
         return False
-    if user.is_superuser:
-        return False
     return user.groups.filter(name=APDA_BOARD_GROUP_NAME).exists()
 
 
 def is_apda_board_access_open():
-    """APDA board access opens once the final inround has been paired."""
+    """Open at outrounds, or when at least 80% of final inround outcomes are in.
+
+    This is a chronological milestone, not ballot completeness validation.
+    """
     try:
         total_inrounds = int(TabSettings.get("tot_rounds"))
     except (TypeError, ValueError):
@@ -201,7 +227,16 @@ def is_apda_board_access_open():
 
     if total_inrounds < 1:
         return False
-    return Round.objects.filter(round_number=total_inrounds).exists()
+    if Outround.objects.exists():
+        return True
+    final_rounds = Round.objects.filter(round_number=total_inrounds)
+    total = final_rounds.count()
+    entered = final_rounds.exclude(victor=Round.UNKNOWN).count()
+    return total > 0 and entered * 5 >= total * 4
+
+
+def board_can_access_view(view_name, method):
+    return method in APDA_BOARD_ALLOWED_VIEWS.get(view_name, set())
 
 
 def staff_preset_for_user(user):

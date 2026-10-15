@@ -15,6 +15,7 @@ import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
 import mittab.apps.tab.views.staff_invite_views as staff_invite_views
 import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
+import mittab.apps.tab.views.board_views as board_views
 import mittab.apps.registration.views as registration_views
 
 
@@ -40,6 +41,18 @@ urlpatterns = [
         name="team_portal",
     ),
     path("apda-board/", views.apda_board_home, name="apda_board_home"),
+    path("apda-board/inrounds/", board_views.inrounds, name="board_inrounds"),
+    path("apda-board/inrounds/<int:round_number>/", board_views.inrounds,
+         name="board_inrounds"),
+    path("apda-board/outrounds/", board_views.outrounds, name="board_outrounds"),
+    path("apda-board/outrounds/pair/", board_views.pair_outround,
+         name="board_pair_outround"),
+    path("apda-board/outround/<int:round_id>/", board_views.edit_outround,
+         name="board_outround_edit"),
+    path("apda-board/judges/", board_views.judges, name="board_judges"),
+    path("apda-board/tab-cards/", board_views.tab_cards, name="board_tab_cards"),
+    path("apda-board/tab-card/<int:team_id>/", board_views.tab_cards,
+         name="board_tab_card"),
     path(
         "apda-board/schools/export/",
         views.export_apda_board_schools_csv,
