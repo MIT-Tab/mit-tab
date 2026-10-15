@@ -113,13 +113,13 @@
       This action will attempt to pair the next round. If you have ignored the checks above,
       it may fail. Always back up first if you are unsure.
     </p>
+    {% if challenge_context.enabled %}
     <button class="btn btn-primary btn-block btn-lg" type="submit">
-      {% if challenge_context.enabled %}
       Create Round of {{ challenge_context.num_teams }} Pairing
-      {% else %}
-      Pair This Round
-      {% endif %}
     </button>
+    {% else %}
+    <input class="btn btn-primary btn-block btn-lg" type="submit" value="Pair This Round">
+    {% endif %}
   </form>
   {% endif %}
 </div>
