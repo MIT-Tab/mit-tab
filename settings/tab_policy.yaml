@@ -35,6 +35,23 @@ settings:
     description: "Toggle to indicate whether you would like to display who has choice. When enabled, this will be indicated on the pairing card and bolded on the front-facing pairing display."
     value: false
     type: boolean
+  - outround_pairing_mode:
+    name: outround_pairing_mode
+    description: "Experimental challenge outs (off by default). Choose how outrounds are paired. Standard uses bracket seeding. Challenge each round means teams re-challenge each outround. Challenge once means one challenge round sets the initial full bracket, then bracket progression continues."
+    value: 0
+    type: choice
+    choices:
+      - [0, "Standard Bracket"]
+      - [1, "Experimental: Challenge Each Round"]
+      - [2, "Experimental: Challenge Once (Set Bracket)"]
+  - challenge_seed_basis:
+    name: challenge_seed_basis
+    description: "Experimental: for Challenge Each Round, choose if challenge order is based on original break seeds or the previous round's effective seeds."
+    value: 1
+    type: choice
+    choices:
+      - [0, "Original Break Seeds"]
+      - [1, "Previous Round Seeds"]
   - lenient_late:
     name: lenient_late
     description: "The latest round where people who do not show up are given average speaks instead of speaks of 0 by default. Note: This only applies before the round. If you change this after the round was paired, it will not take effect. You can manually allow a lenient_late in the admin interface."

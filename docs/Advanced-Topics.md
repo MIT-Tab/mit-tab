@@ -159,3 +159,33 @@ important as it usually is, you could change the value of `high_gov_penalty` to
 `-50` using the settings form. If you wanted to make it not considered at all, you could change it to `0`.
 
 To prevent seeded teams from getting the bye, check `fair_bye` in the settings form.
+
+
+## Experimental challenge outs
+
+Challenge outs are disabled by default. In **Settings → Tab Policy**, select
+**Experimental: Challenge Each Round** or **Experimental: Challenge Once (Set Bracket)**
+under `outround_pairing_mode` to enable them. Standard Bracket uses the existing
+pairing and result-entry behavior and ignores stored challenge picks.
+
+After breaking teams, a full power-of-two break of at least four teams waits for
+staff to enter challenges. Follow **Enter Challenge Outs** on the outround pairing
+page, save each announced matchup, then create the pairing. Challenge entry is a
+staff workflow; teams do not submit choices through the team portal. After a
+matchup is saved, both teams leave the available pool and the highest-seeded
+remaining team challenges next. The final two teams are paired automatically.
+If staff creates the pairing before entering every choice, the highest remaining
+seed receives the lowest available unreserved opponent.
+The top seed always challenges first.
+
+Challenge Each Round accepts new picks each round; challenge order can use the
+original break seeds or the previous round's effective seeds. Challenge Once
+sets bracket slots in the first eligible round, then follows the standard bracket.
+Upset winners inherit their opponent's bracket slot in both modes; original break
+seeds remain unchanged. Partial breaks use standard pairings until a complete
+power-of-two pool is available. Finals use standard pairings. Pairings and judges
+still use the existing side, room, and judge-conflict rules.
+
+Challenge picks and the challenge-once marker belong to the
+current break. Rebreaking while Standard Bracket is selected does not carry old
+challenge state into a later experimental break.

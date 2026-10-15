@@ -1,8 +1,10 @@
 from django.contrib import admin
+
 from django import forms
 from django.utils.html import format_html
 
 from mittab.apps.tab import models
+from mittab.libs.outround_tab_logic.pairing import prepare_challenge_edits
 
 
 class RoundAdminForm(forms.ModelForm):
@@ -128,6 +130,45 @@ class MotionAdmin(admin.ModelAdmin):
     motion_text_truncated.short_description = "Motion Text"
 
 
+class ExperimentalAdmin(admin.ModelAdmin):
+    setting_key = None
+
+    def enabled(self):
+        return models.TabSettings.get(self.setting_key, 0) in self.enabled_values
+
+    enabled_values = (1,)
+
+    def get_model_perms(self, request):
+        return super().get_model_perms(request) if self.enabled() else {}
+
+    def has_module_permission(self, request):
+        return self.enabled() and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self.enabled() and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return self.enabled() and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.enabled() and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.enabled() and super().has_delete_permission(request, obj)
+
+
+class OutroundChallengeAdmin(ExperimentalAdmin):
+    setting_key = "outround_pairing_mode"
+    enabled_values = (1, 2)
+
+    def save_model(self, request, obj, form, change):
+        list(models.BreakingTeam.objects.select_for_update().filter(
+            type_of_team=obj.type_of_round,
+        ))
+        prepare_challenge_edits(obj.type_of_round)
+        super().save_model(request, obj, form, change)
+
+
 admin.site.register(models.Debater)
 admin.site.register(models.Team, TeamAdmin)
 admin.site.register(models.School)
@@ -150,6 +191,7 @@ admin.site.register(models.Bye)
 admin.site.register(models.NoShow)
 admin.site.register(models.BreakingTeam)
 admin.site.register(models.Outround, OutroundAdmin)
+admin.site.register(models.OutroundChallenge, OutroundChallengeAdmin)
 admin.site.register(models.Motion, MotionAdmin)
 admin.site.register(models.ManualJudgeAssignment, ManualJudgeAssignmentAdmin)
 admin.site.register(models.AuditEvent, AuditEventAdmin)

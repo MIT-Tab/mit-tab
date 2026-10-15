@@ -5,30 +5,123 @@
 
 {% block content %}
 
-<div class="col-2"></div>
-<div id="pairing_form" class="col-8">
+<div id="pairing_form" class="col-lg-10 offset-lg-1">
   <h3 class="text-center mb-4">{{ title }}</h3>
-  <form action="." method="post"> {% csrf_token %}
-    {% return_to_input %}
-    <table class="check_status table">
-      <thead class="thead-dark">
-        <th>Sanity Check</th><th>Successful?</th>
+
+  {% if show_challenge_entry %}
+  <div class="d-flex justify-content-between align-items-baseline mb-2">
+    <h4 class="mb-0">Challenge Outs</h4>
+    <small class="text-muted">{{ challenge_context.mode_label }} · {{ challenge_context.seed_basis_label }}</small>
+  </div>
+  <p class="text-muted mb-4">
+    Seed 1 starts. After each matchup, the highest remaining seed challenges next.
+  </p>
+
+  <div class="d-flex justify-content-between align-items-baseline mb-2">
+    <h5 class="mb-0">Recorded matchups</h5>
+    <small class="text-muted">{{ challenge_context.choices_entered }}/{{ challenge_context.choices_total }}</small>
+  </div>
+  {% if challenge_context.saved_challenges %}
+  <div class="table-responsive">
+    <table class="table table-sm mb-3">
+      <thead>
+        <tr><th>Challenger</th><th>Challenged</th><th></th></tr>
       </thead>
-      {% for check,status,alt in check_status%}
-      <tr class="table-{% if status == "No" %}danger font-weight-bolder{% else %}light{% endif %}">
-        <td>{{check}}</td>
-        <td title="{{alt}}">{{status}}</td>
-      </tr>
-      {% endfor %}
+      <tbody>
+        {% for challenge in challenge_context.saved_challenges %}
+        <tr>
+          <td><span class="badge badge-secondary mr-1">{{ challenge.challenger.seed }}</span> {{ challenge.challenger.name }}</td>
+          <td><span class="badge badge-secondary mr-1">{{ challenge.challenged.seed }}</span> {{ challenge.challenged.name }}</td>
+          <td class="text-right">
+            <form action="." method="post">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-link text-danger p-0" type="submit" name="challenger_id" value="{{ challenge.challenger.id }}">
+                Remove
+              </button>
+              <input type="hidden" name="action" value="delete_challenge">
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
-    <div class="mt-5">
-      <p class="alert alert-warning">
-        This action will attempt to pair the next round. If you have ignored the warnings above it may fail. Be warned, and always backup if you are unsure.
-      </p>
-      <input class="btn btn-primary btn-block btn-lg" type="submit" value="Pair This Round">
+  </div>
+  {% else %}
+  <p class="text-muted mb-3">None yet.</p>
+  {% endif %}
+
+  {% if challenge_context.next_challenger %}
+  <form action="." method="post" class="bg-light rounded p-3">
+    {% csrf_token %}
+    <input type="hidden" name="challenger_id" value="{{ challenge_context.next_challenger.id }}">
+    <div class="form-row align-items-end">
+      <div class="col-md-5">
+        <label class="font-weight-bold">Challenger</label>
+        <div class="form-control bg-white">
+          [{{ challenge_context.next_challenger.seed }}] {{ challenge_context.next_challenger.name }}
+        </div>
+      </div>
+      <div class="col-md-5 mt-3 mt-md-0">
+        <label for="challenged-team" class="font-weight-bold">Opponent</label>
+        <select id="challenged-team" class="form-control" name="challenged_id">
+          {% for team in challenge_context.opponent_options %}
+          <option value="{{ team.id }}">{{ team.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 mt-3 mt-md-0">
+        <button class="btn btn-primary btn-block" type="submit" name="action" value="set_challenge">Save</button>
+      </div>
     </div>
   </form>
+  {% elif challenge_context.automatic_pair %}
+  <p class="text-success mb-0">
+    <strong>Final matchup:</strong>
+    {{ challenge_context.automatic_pair.0.label }} vs. {{ challenge_context.automatic_pair.1.label }}
+  </p>
+  {% endif %}
+
+  <div class="border-top mt-4 pt-3 d-flex justify-content-between align-items-center">
+    <small class="text-muted">
+      {% if challenge_context.next_challenger %}Unentered matchups will use default seeding.{% endif %}
+    </small>
+    <a class="btn btn-primary" href="?stage=pairing">Continue to Pairing Checks</a>
+  </div>
+  {% else %}
+  {% if challenge_context.enabled %}
+  <a class="btn btn-sm btn-link pl-0 mb-2" href="."><i class="fas fa-arrow-left mr-1"></i> Back to Challenge Outs</a>
+  {% endif %}
+  <h5>Pre-pairing checks</h5>
+  <table class="check_status table">
+    <thead class="thead-dark">
+      <tr><th>Sanity Check</th><th>Successful?</th></tr>
+    </thead>
+    <tbody>
+      {% for check,status,alt in check_status %}
+      <tr class="table-{% if status == "No" %}danger font-weight-bolder{% else %}light{% endif %}">
+        <td>{{ check }}</td>
+        <td title="{{ alt }}">{{ status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form action="." method="post" class="mt-4">
+    {% csrf_token %}
+    {% return_to_input %}
+    <p class="alert alert-warning">
+      This action will attempt to pair the next round. If you have ignored the checks above,
+      it may fail. Always back up first if you are unsure.
+    </p>
+    {% if challenge_context.enabled %}
+    <button class="btn btn-primary btn-block btn-lg" type="submit">
+      Create Round of {{ challenge_context.num_teams }} Pairing
+    </button>
+    {% else %}
+    <input class="btn btn-primary btn-block btn-lg" type="submit" value="Pair This Round">
+    {% endif %}
+  </form>
+  {% endif %}
 </div>
-<div class="col-2"></div>
 
 {% endblock %}

@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
 
@@ -26,16 +27,61 @@ from mittab.libs.cacheing.public_cache import (
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def pair_next_outround(request, num_teams, type_of_round):
+    challenge_num_teams = int(num_teams / 2)
     if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "set_challenge":
+            try:
+                challenger_id = int(request.POST.get("challenger_id", 0))
+                challenged_id = int(request.POST.get("challenged_id", 0))
+                outround_tab_logic.save_challenge_pick(
+                    type_of_round,
+                    challenge_num_teams,
+                    challenger_id,
+                    challenged_id,
+                )
+                return redirect_and_flash_success(
+                    request,
+                    "Challenge updated.",
+                    path=request.path,
+                )
+            except ValueError as exc:
+                return redirect_and_flash_error(request, str(exc), path=request.path)
+
+        if action == "delete_challenge":
+            try:
+                challenger_id = int(request.POST.get("challenger_id", 0))
+                outround_tab_logic.delete_challenge_pick(
+                    type_of_round,
+                    challenge_num_teams,
+                    challenger_id,
+                )
+                return redirect_and_flash_success(
+                    request,
+                    "Challenge removed.",
+                    path=request.path,
+                )
+            except ValueError as exc:
+                return redirect_and_flash_error(request, str(exc), path=request.path)
+
         type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
         round_str = f"Round-of-{num_teams}-{type_str}"
         backup.backup_round(round_number=round_str,
                             btype=backup.BEFORE_PAIRING)
 
-        Outround.objects.filter(num_teams__lt=num_teams,
-                                type_of_round=type_of_round).delete()
-
-        outround_tab_logic.pair(type_of_round)
+        if TabSettings.get("outround_pairing_mode", 0) in (1, 2):
+            try:
+                with transaction.atomic():
+                    Outround.objects.filter(num_teams__lt=num_teams,
+                                            type_of_round=type_of_round).delete()
+                    outround_tab_logic.pair(type_of_round)
+            except ValueError as exc:
+                return redirect_and_flash_error(request, str(exc), path=request.path)
+        else:
+            Outround.objects.filter(num_teams__lt=num_teams,
+                                    type_of_round=type_of_round).delete()
+            outround_tab_logic.pair(type_of_round)
         invalidate_outround_public_pairings_cache(type_of_round)
 
         return redirect_and_flash_success(
@@ -46,7 +92,8 @@ def pair_next_outround(request, num_teams, type_of_round):
                                               }))
 
     # See if we can pair the round
-    title = "Pairing Outrounds"
+    division_label = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
+    title = f"Prepare {division_label} Round of {challenge_num_teams}"
     current_round_number = 0
 
     previous_round_number = TabSettings.get("tot_rounds", 5)
@@ -93,6 +140,10 @@ def pair_next_outround(request, num_teams, type_of_round):
         check_status.append(
             (msg, "No", f"Not all rounds are entered. {e}"))
 
+    challenge_context = outround_tab_logic.get_challenge_setup_context(
+        type_of_round,
+        challenge_num_teams,
+    )
     context = {
         "title": title,
         "current_round_number": current_round_number,
@@ -105,6 +156,11 @@ def pair_next_outround(request, num_teams, type_of_round):
         "num_teams": num_teams,
         "type_of_round": type_of_round,
         "round_label": round_label,
+        "challenge_context": challenge_context,
+        "show_challenge_entry": (
+            challenge_context.get("enabled", False)
+            and request.GET.get("stage") != "pairing"
+        ),
     }
     return render(request, "pairing/pair_round.html", context)
 
@@ -445,6 +501,10 @@ def outround_pairing_view(request,
             "judge_slots": judge_slots,
             "pairing_exists": len(section_outrounds) > 0,
             "pairing_released": pairing_released,
+            "challenge_entry_pending": outround_tab_logic.get_challenge_setup_context(
+                selected_type,
+                selected_num // 2,
+            ).get("enabled", False),
         })
 
         section_excluded_teams = BreakingTeam.objects.filter(
@@ -596,6 +656,15 @@ def outround_pairing_view(request,
         "manual_judge_audit_events": manual_judge_audit_events,
     }
 
+    if TabSettings.get("outround_pairing_mode", 0) in (1, 2):
+        context["pending_challenges"] = [
+            {"type": kind, "size": size, "previous_size": size * 2,
+             "label": "Varsity" if kind == BreakingTeam.VARSITY else "Novice"}
+            for kind in (BreakingTeam.VARSITY, BreakingTeam.NOVICE)
+            for size in [BreakingTeam.objects.filter(type_of_team=kind).count()]
+            if not Outround.objects.filter(type_of_round=kind).exists()
+            and outround_tab_logic.get_challenge_setup_context(kind, size).get("enabled")
+        ]
     return render(
         request,
         "outrounds/pairing_base.html",

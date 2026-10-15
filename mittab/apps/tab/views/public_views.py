@@ -1192,6 +1192,8 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     choice = TabSettings.get("choice", 0)
     debater_team_memberships_public = TabSettings.get("debaters_public", 1)
     show_outrounds_bracket = TabSettings.get("show_outs_bracket", True)
+    if TabSettings.get("outround_pairing_mode", 0) == 1:
+        show_outrounds_bracket = False
     bracket_data_json = None
     if outround_pairings and show_outrounds_bracket:
         bracket_data_json = get_bracket_data_json(outround_pairings)

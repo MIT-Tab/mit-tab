@@ -916,6 +916,47 @@ class Outround(models.Model):
         return self.gov_team
 
 
+class OutroundChallenge(models.Model):
+    num_teams = models.IntegerField()
+    type_of_round = models.IntegerField(
+        default=Outround.VARSITY,
+        choices=Outround.TYPE_OF_ROUND_CHOICES,
+    )
+    challenger = models.ForeignKey(
+        Team,
+        related_name="outround_challenges_made",
+        on_delete=models.CASCADE,
+    )
+    challenged = models.ForeignKey(
+        Team,
+        related_name="outround_challenges_received",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["num_teams", "type_of_round", "challenger"],
+                name="unique_challenger_per_outround_size",
+            ),
+            models.UniqueConstraint(
+                fields=["num_teams", "type_of_round", "challenged"],
+                name="unique_target_per_outround_size",
+            ),
+            models.CheckConstraint(
+                check=~models.Q(challenger=models.F("challenged")),
+                name="challenge_distinct_teams",
+            ),
+        ]
+
+    def __str__(self):
+        round_type = "Varsity" if self.type_of_round == Outround.VARSITY else "Novice"
+        return (
+            f"{round_type} Ro{self.num_teams}: "
+            f"{self.challenger} challenged {self.challenged}"
+        )
+
+
 class Round(models.Model):
     round_number = models.IntegerField()
     gov_team = models.ForeignKey(Team, related_name="gov_team",
