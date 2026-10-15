@@ -623,7 +623,7 @@ class TestPublicViews(TestCase):
                 "denied": lambda: TabSettings.set("pairing_released", 0),
                 "expected": self.test_round.gov_team.display_backend,
                 "status_allowed": 200,
-                "status_denied": 200,
+                "status_denied": 302,
             },
             {
                 "url": reverse("outround_pretty_pair", args=[0]),
@@ -631,7 +631,7 @@ class TestPublicViews(TestCase):
                 "denied": lambda: TabSettings.set("var_teams_visible", 16),
                 "expected": v_out.gov_team.name,
                 "status_allowed": 200,
-                "status_denied": 200,
+                "status_denied": 302,
             },
             {
                 "url": reverse("outround_pretty_pair", args=[1]),
@@ -639,7 +639,7 @@ class TestPublicViews(TestCase):
                 "denied": lambda: TabSettings.set("nov_teams_visible", 16),
                 "expected": n_out.gov_team.name,
                 "status_allowed": 200,
-                "status_denied": 200,
+                "status_denied": 302,
             },
         ]
 
@@ -778,6 +778,70 @@ class TestPublicViews(TestCase):
 
         self.assertEqual(content.count("Registration is open"), 1)
         self.assertNotIn('<span class="title">Registration</span>', content)
+
+    def test_public_home_and_navigation_hide_unavailable_pages(self):
+        client = Client()
+        TabSettings.set("pairing_released", 0)
+        TabSettings.set("judges_public", 0)
+        TabSettings.set("teams_public", 0)
+        TabSettings.set("var_teams_visible", 256)
+        TabSettings.set("nov_teams_visible", 256)
+        set_ranking_settings("team", False, True, 1000)
+        set_ranking_settings("varsity", False, True, 10)
+        set_ranking_settings("novice", False, True, 10)
+        set_ballot_round_settings(1, False, False, False)
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+        content = response.content.decode()
+
+        for url in (
+            reverse("missing_ballots"),
+            reverse("public_judges"),
+            reverse("public_teams"),
+            reverse("rank_teams_public"),
+            reverse("public_speaker_rankings"),
+            reverse("public_ballots"),
+            reverse("outround_pretty_pair", args=[0]),
+            reverse("outround_pretty_pair", args=[1]),
+        ):
+            self.assertNotIn(f'href="{url}"', content)
+
+        # A previously paired preliminary round remains useful even while the
+        # current pairing is closed.
+        self.assertIn(f'href="{reverse("pretty_pair")}"', content)
+
+    def test_public_home_mobile_grid_marks_only_odd_tile_counts(self):
+        client = Client()
+        caches["public"].clear()
+
+        even_response = client.get(reverse("public_home"))
+        self.assertNotContains(
+            even_response,
+            'class="public-links public-links--odd"',
+        )
+
+        TabSettings.set("judges_public", 0)
+        caches["public"].clear()
+        odd_response = client.get(reverse("public_home"))
+        self.assertContains(
+            odd_response,
+            'class="public-links public-links--odd"',
+        )
+
+    def test_hidden_team_and_judge_lists_share_access_error(self):
+        client = Client()
+        TabSettings.set("judges_public", 0)
+        TabSettings.set("teams_public", 0)
+        caches["public"].clear()
+
+        for url in (reverse("public_judges"), reverse("public_teams")):
+            response = client.get(url)
+            self.assertRedirects(
+                response,
+                reverse("public_access_error"),
+                fetch_redirect_response=False,
+            )
 
     def test_outround_bracket_is_enabled_by_default(self):
         client = Client()
@@ -1112,3 +1176,53 @@ class TestPublicViews(TestCase):
                 else:
                     response = client.get(reverse(*view_name))
                 self.assertEqual(response.status_code, 200)
+
+
+@pytest.mark.django_db(transaction=True)
+class TestPreTournamentPublicNavigation(TestCase):
+    fixtures = ["testing_empty"]
+
+    def setUp(self):
+        super().setUp()
+        caches["public"].clear()
+        cache_logic.clear_cache()
+
+    def tearDown(self):
+        caches["public"].clear()
+        cache_logic.clear_cache()
+        super().tearDown()
+
+    def test_unstarted_pages_are_hidden_from_home_and_navigation(self):
+        client = Client()
+        response = client.get(reverse("public_home"))
+        content = response.content.decode()
+
+        self.assertNotIn(f'href="{reverse("pretty_pair")}"', content)
+        self.assertNotIn(f'href="{reverse("missing_ballots")}"', content)
+        self.assertNotIn(
+            f'href="{reverse("outround_pretty_pair", args=[0])}"',
+            content,
+        )
+        self.assertContains(response, "Registration is open")
+        self.assertRedirects(
+            client.get(reverse("pretty_pair")),
+            reverse("public_access_error"),
+            fetch_redirect_response=False,
+        )
+
+    def test_registration_participates_in_mobile_tile_parity(self):
+        client = Client()
+
+        odd_response = client.get(reverse("public_home"))
+        self.assertContains(
+            odd_response,
+            'class="public-links public-links--odd"',
+        )
+
+        TabSettings.set("teams_public", 1)
+        caches["public"].clear()
+        even_response = client.get(reverse("public_home"))
+        self.assertNotContains(
+            even_response,
+            'class="public-links public-links--odd"',
+        )
