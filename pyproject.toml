@@ -4,24 +4,24 @@ version = "2.0.0"
 description = "A web application to tabulate and run APDA tournaments"
 requires-python = ">=3.10.16,<3.11"
 dependencies = [
-  "boto3==1.40.42",
-  "charset-normalizer==3.4.3",
-  "django==4.2.26",
+  "boto3==1.43.93",
+  "charset-normalizer==3.5.1",
+  "django==4.2.30",
   "django-bootstrap4==3.0.0",
-  "django-silk==5.2.0",
-  "django-webpack-loader==3.2.1",
-  "exceptiongroup==1.3.0",
-  "gevent==24.10.3",
+  "django-silk==5.5.0",
+  "django-webpack-loader==3.2.4",
+  "exceptiongroup==1.3.1",
+  "gevent==24.11.1",
   "gunicorn==23.0.0",
   "mysqlclient==1.4.4",
-  "pillow==12.2.0",
+  "pillow==12.3.0",
   "pymemcache==4.0.0",
-  "python-dotenv==1.2.2",
+  "python-dotenv==1.2.3",
   "pyyaml==6.0.3",
-  "requests==2.33.0",
-  "sentry-sdk[django]==2.39.0",
+  "requests==2.34.2",
+  "sentry-sdk[django]==2.69.1",
   "six==1.17.0",
-  "urllib3==2.6.3",
+  "urllib3==2.7.0",
   "wrapt==1.17.3",
   "xlrd==0.9.4",
   "xlwt==1.3.0",
@@ -29,23 +29,23 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "coverage==7.10.7",
+  "coverage==7.16.1",
   "mock==1.0.1",
   "nplusone",
   "pylint==3.3.9",
-  "pylint-django==2.6.1",
+  "pylint-django==2.8.0",
   "pytest==9.0.3",
   "pytest-circleci-parallelized==0.0.4",
   "pytest-cov==4.1.0",
   "pytest-django==4.8.0",
-  "selenium==4.15.2",
+  "selenium==4.49.0",
   "splinter==0.21.0",
 ]
 docs = [
   "jinja2==3.1.6",
   "myst-parser==2.0.0",
   "shibuya==2024.8.30",
-  "sphinx==7.2.6",
+  "sphinx==7.4.7",
 ]
 
 [tool.uv]

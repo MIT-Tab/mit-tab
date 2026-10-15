@@ -1,0 +1,38 @@
+<form method="post" class="mb-4 email-management-panel" data-email-management-panel="team-codes" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="email_action" value="team_codes">
+  <h2 class="h5">Team Codes</h2>
+  <p class="small text-muted">Emails go to distinct debater addresses. Each team and each address has a six-hour cooldown after a successful send; an address can receive one email per batch. Failed sends can be retried once any applicable cooldown expires.</p>
+  <div class="mb-2">
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-select-target="team-code-table" data-select-mode="never-received">Select Never Sent</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-select-target="team-code-table" data-select-mode="needs-resend">Select Needs Resend</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-select-target="team-code-table" data-select-mode="all">Select All</button>
+    <button class="btn btn-sm btn-primary" type="submit" {% if not team_email.sendable_count %}disabled{% endif %}>Send Team Codes</button>
+  </div>
+  <div class="table-responsive bg-white rounded">
+    <table class="table table-sm email-management-table" id="team-code-table">
+      <thead class="thead-light"><tr>
+        <th>Send</th><th data-sort-key="name">Team <span class="sort-arrow"></span></th>
+        <th>Recipients / Preview</th><th>Team Code</th><th data-sort-key="status">Status <span class="sort-arrow"></span></th><th data-sort-key="sent">Last Attempt <span class="sort-arrow"></span></th>
+      </tr></thead>
+      <tbody>
+        {% for row in team_email.rows %}
+        <tr data-can-send="{{ row.can_send|yesno:'true,false' }}" data-never-received="{{ row.never_received|yesno:'true,false' }}" data-needs-resend="{{ row.needs_resend|yesno:'true,false' }}">
+          <td><input type="checkbox" name="team_ids" value="{{ row.team.id }}" {% if row.checked %}checked{% endif %} {% if not row.can_send %}disabled{% endif %}></td>
+          <td><a href="{% url 'view_team' row.team.id %}">{{ row.team.name }}</a></td>
+          <td>{{ row.recipients|default:"No debater emails on file" }}
+            {% include "tab/_email_preview.html" with email=row.preview recipients=row.recipients %}
+            {% if row.can_send %}<div class="small text-muted">{{ row.sendable_recipients }} recipient(s) eligible in this batch.</div>{% endif %}
+          </td>
+          <td>{{ row.team.team_code|default:"-" }}</td>
+          <td>{% if row.needs_resend %}<strong class="text-warning">{{ row.status }}</strong>{% else %}{{ row.status }}{% endif %}
+            {% if row.cooldown %}<div class="small text-muted">Cooldown or address already queued in this batch.</div>{% endif %}
+            {% if row.last_log and not row.last_log.successful %}<div class="small text-danger">{{ row.last_log.error_message|truncatechars:140 }}</div>{% endif %}
+          </td>
+          <td data-sort-value="{{ row.last_log.sent_at|date:'U'|default:0 }}">{{ row.last_log.sent_at|date:"M j, g:i a"|default:"-" }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="6">No teams found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>

@@ -1,3 +1,4 @@
+from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.urls import reverse
@@ -5,7 +6,8 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 from mittab.apps.tab.auth_roles import apply_staff_permission_preset
-from mittab.libs.email_service import EmailService
+from mittab.apps.tab.models import StaffInviteEmailLog
+from mittab.libs.email_service import EmailService, EmailServiceError
 from mittab.libs.email_views import build_staff_invite_email
 
 
@@ -23,7 +25,23 @@ def send_staff_invite_email(request, user):
         user.username,
         invite_url,
     )
-    return EmailService().send_bulk([email_request])
+    successful = False
+    error = ""
+    try:
+        sent = EmailService().send_bulk([email_request])
+        successful = bool(sent)
+        return sent
+    except (ImproperlyConfigured, EmailServiceError) as exc:
+        error = str(exc)
+        raise
+    finally:
+        StaffInviteEmailLog.objects.create(
+            username=user.username,
+            email=user.email,
+            email_payload=email_request.snapshot,
+            successful=successful,
+            error_message=error,
+        )
 
 
 def get_or_create_staff_invite_user(email, username, permission_preset):

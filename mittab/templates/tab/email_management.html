@@ -5,6 +5,7 @@
 
 {% block extra_head %}
   {{ block.super }}
+  {% render_bundle 'emailManagement' 'css' %}
   {% render_bundle 'emailManagement' 'js' %}
 {% endblock %}
 
@@ -14,6 +15,7 @@
     <div>
       <h1 class="h3 mb-1">Email Management</h1>
       <div class="text-muted small">
+        <strong>{{ team_email.sendable_count }}</strong> team(s) ready.
         <strong>{{ judge_email.sendable_count }}</strong> judge code{{ judge_email.sendable_count|pluralize }} ready.
         <span class="ml-2"><strong>{{ registration_email.sendable_count }}</strong> registration confirmation{{ registration_email.sendable_count|pluralize }} ready.</span>
         <span class="ml-2"><strong>{{ written_rfd_email.sendable_count }}</strong> written RFD round{{ written_rfd_email.sendable_count|pluralize }} ready.</span>
@@ -27,12 +29,15 @@
   <div class="form-group mb-3">
     <label class="font-weight-semibold" for="email-management-view">Email Type</label>
     <select class="form-control form-control-sm w-auto" id="email-management-view">
+      <option value="team-codes">Team Codes</option>
       <option value="judge-codes">Judge Codes</option>
       <option value="registration-confirmations">Registration Confirmations</option>
       <option value="written-rfds">Written RFDs</option>
       <option value="sent-history">Sent Email History</option>
     </select>
   </div>
+
+  {% include "tab/_team_code_emails.html" %}
 
   <form method="post" class="mb-4 email-management-panel" data-email-management-panel="judge-codes">
     {% csrf_token %}
@@ -102,7 +107,7 @@
               <td data-sort-value="{{ row.judge.name|lower }}">
                 <a href="/judge/{{ row.judge.id }}/" class="text-primary">{{ row.judge.name }}</a>
               </td>
-              <td data-sort-value="{{ row.email|default:''|lower }}">{{ row.email|default:"-" }}</td>
+              <td data-sort-value="{{ row.email|default:''|lower }}">{{ row.email|default:"-" }}{% include "tab/_email_preview.html" with email=row.preview %}</td>
               <td data-sort-value="{{ row.ballot_code|default:'' }}">{{ row.ballot_code|default:"-" }}</td>
               <td data-sort-value="{{ row.status|lower }}">
                 {% if row.can_send %}
@@ -194,7 +199,7 @@
               <td data-sort-value="{{ row.registration.school.name|lower }}">
                 <a href="{% url 'registration_portal_edit' row.registration.herokunator_code %}" class="text-primary">{{ row.registration.school.name }}</a>
               </td>
-              <td data-sort-value="{{ row.registration.email|default:''|lower }}">{{ row.registration.email|default:"-" }}</td>
+              <td data-sort-value="{{ row.registration.email|default:''|lower }}">{{ row.registration.email|default:"-" }}{% include "tab/_email_preview.html" with email=row.preview %}</td>
               <td data-sort-value="{{ row.registration.herokunator_code }}">{{ row.registration.herokunator_code }}</td>
               <td data-sort-value="{{ row.status|lower }}">
                 {% if row.status == "Sent" %}
@@ -275,7 +280,7 @@
               <td data-sort-value="{{ row.round.gov_team.display|lower }}">{{ row.round.gov_team.display }}</td>
               <td data-sort-value="{{ row.round.opp_team.display|lower }}">{{ row.round.opp_team.display }}</td>
               <td data-sort-value="{{ row.winner|lower }}">{{ row.winner }}</td>
-              <td data-sort-value="{{ row.recipient_count }}">{{ row.recipient_count }}</td>
+              <td data-sort-value="{{ row.recipient_count }}">{{ row.recipient_count }}{% include "tab/_email_preview.html" with email=row.preview recipients=row.recipients %}</td>
               <td data-sort-value="{{ row.status|lower }}">
                 {% if row.can_send %}
                   <span class="text-success font-weight-semibold">Ready</span>
@@ -328,7 +333,13 @@
               {% endif %}
             </td>
             <td data-sort-value="{{ row.recipient|lower }}">{{ row.recipient }}</td>
-            <td data-sort-value="{{ row.detail|lower }}">{{ row.detail }}</td>
+            <td data-sort-value="{{ row.detail|lower }}">{{ row.detail }}
+              {% if row.email_payload %}
+                {% include "tab/_email_preview.html" with email=row.email_payload preview_label="Preview recorded email" %}
+              {% else %}
+                <div class="small text-muted">Original content unavailable: this email predates content tracking.</div>
+              {% endif %}
+            </td>
             <td data-sort-value="{{ row.sent_at|date:'U' }}">{{ row.sent_at|date:"M j, g:i a" }}</td>
           </tr>
           {% empty %}
@@ -339,4 +350,18 @@
     </div>
   </section>
 </div>
+<dialog id="email-preview-dialog" class="email-preview-dialog" aria-labelledby="email-preview-title">
+  <div class="email-preview-header">
+    <h2 class="h5 mb-0" id="email-preview-title">Email preview</h2>
+    <button class="close" type="button" data-close-email-preview aria-label="Close email preview"><span aria-hidden="true">&times;</span></button>
+  </div>
+  <div class="email-preview-envelope">
+    <div><strong>To:</strong> <span id="email-preview-recipients"></span></div>
+    <div><strong>Subject:</strong> <span id="email-preview-subject"></span></div>
+  </div>
+  <iframe id="email-preview-frame" title="Email HTML preview" sandbox="" referrerpolicy="no-referrer"></iframe>
+  <div class="email-preview-footer">
+    <button class="btn btn-secondary" type="button" data-close-email-preview autofocus>Close</button>
+  </div>
+</dialog>
 {% endblock %}

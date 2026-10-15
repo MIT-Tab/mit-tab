@@ -1,0 +1,14 @@
+{% if email.html_body %}
+<button
+  type="button"
+  class="btn btn-sm btn-outline-secondary d-block my-1"
+  data-email-preview
+  aria-haspopup="dialog"
+  aria-controls="email-preview-dialog"
+  data-email-subject="{{ email.subject }}"
+  data-email-recipients="{{ recipients|default:email.to_address }}"
+  data-email-html="{{ email.html_body }}"
+>{{ preview_label|default:"Preview current email" }}</button>
+{% elif email %}
+<span class="small text-muted">HTML preview unavailable.</span>
+{% endif %}
