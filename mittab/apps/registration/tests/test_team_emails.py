@@ -19,7 +19,6 @@ from mittab.apps.registration.models import (
 from mittab.apps.registration.team_emails import (
     prepare_team_code_plan,
     send_team_code_entries,
-    team_email_snapshot,
 )
 from mittab.apps.tab.models import Debater, Judge, JudgeCodeEmailLog, School, Team
 from mittab.apps.tab.models import StaffInviteEmailLog, TabSettings, TeamCodeEmailLog
@@ -114,6 +113,12 @@ def test_manual_team_send_and_preview(staff_client, team):
     assert b"Team Codes" in response.content
     assert b"Preview current email" in response.content
     assert team.team_code.encode() in response.content
+    assert response.content.count(b"data-email-preview\n") == 1
+    recipients = b'data-email-recipients="alice@example.com, bob@example.com"'
+    assert recipients in response.content
+    assert b'<dialog id="email-preview-dialog"' in response.content
+    assert b"<details" not in response.content
+    assert b"<pre " not in response.content
     with mock.patch("mittab.apps.registration.team_emails.EmailService") as service:
         service.return_value.send_bulk.return_value = 2
         response = staff_client.post(reverse("email_management"), {
@@ -223,16 +228,14 @@ def test_configuration_failure_does_not_start_cooldown(team, email_request):
     assert len(prepare_team_code_plan([team], email_request)) == 2
 
 
-def test_legacy_team_is_not_selected_and_edits_are_detected(team, email_request):
-    team.code_email_history_unknown = True
-    team.code_email_baseline = team_email_snapshot(team, "Tournament")
-    team.save()
+def test_team_without_send_history_is_selected(team, email_request):
     row = row_for(team, email_request)
-    assert row["status"] == "Earlier delivery unknown"
-    assert not row["checked"]
-    team.name = "Edited legacy team"
+    assert row["status"] == "Never sent"
+    assert row["never_received"]
+    assert row["checked"]
+    team.name = "Edited team without history"
     team.save()
-    assert row_for(team, email_request)["needs_resend"]
+    assert row_for(team, email_request)["status"] == "Never sent"
     deliver(team, email_request)
     assert row_for(team, email_request)["status"] == "Sent"
 
@@ -283,11 +286,19 @@ def test_staff_invitation_is_in_history_with_original_preview(staff_client):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_upgrade_preserves_existing_roster_codes_and_history():
+@pytest.mark.parametrize(
+    "tracking_deployed, logged_team_email",
+    [(False, False), (True, False), (True, True)],
+)
+def test_upgrade_preserves_existing_roster_codes_and_history(
+        tracking_deployed, logged_team_email):
     executor = MigrationExecutor(connection)
     latest = executor.loader.graph.leaf_nodes()
     old_targets = [("tab", "0046_judgecodeemaillog_source"),
                    ("registration", "0004_registrationconfirmationemaillog")]
+    if tracking_deployed:
+        old_targets = [("tab", "0047_team_code_email_tracking"),
+                       ("registration", "0005_email_content_tracking")]
     executor.migrate(old_targets)
     old_apps = executor.loader.project_state(old_targets).apps
     try:
@@ -306,6 +317,20 @@ def test_upgrade_preserves_existing_roster_codes_and_history():
             novice_status=0,
         )
         team.debaters.add(debater)
+        if tracking_deployed:
+            team.code_email_history_unknown = True
+            team.code_email_baseline = {"name": "Old baseline"}
+            team.save()
+        recorded_payload = {"html_body": "<p>Recorded team email</p>"}
+        if logged_team_email:
+            old_apps.get_model("tab", "TeamCodeEmailLog").objects.create(
+                team=team, email=debater.email, email_payload=recorded_payload,
+                team_snapshot={
+                    "name": team.name, "team_code": team.team_code,
+                    "debaters": [debater.name], "recipients": [debater.email],
+                    "tournament_name": "Tournament",
+                },
+            )
         log_model = old_apps.get_model(
             "registration", "RegistrationConfirmationEmailLog",
         )
@@ -319,13 +344,16 @@ def test_upgrade_preserves_existing_roster_codes_and_history():
         assert upgraded.team_code == "existing-team-code"
         assert upgraded.registration.herokunator_code == "existing-registration"
         assert upgraded.debaters.get().pk == debater.pk
-        assert upgraded.code_email_history_unknown
-        assert upgraded.code_email_baseline == team_email_snapshot(
-            upgraded, "Tournament")
-        assert not TeamCodeEmailLog.objects.exists()
+        assert not hasattr(upgraded, "code_email_history_unknown")
+        assert not hasattr(upgraded, "code_email_baseline")
+        assert TeamCodeEmailLog.objects.count() == int(logged_team_email)
+        if logged_team_email:
+            assert TeamCodeEmailLog.objects.get().email_payload == recorded_payload
         assert RegistrationConfirmationEmailLog.objects.get().email_payload == {}
-        assert not Team.objects.create(
-            name="New U A", school_id=school.pk, seed=0,
-        ).code_email_history_unknown
+        row = row_for(upgraded, RequestFactory().get(reverse("email_management")))
+        assert row["status"] == ("Sent" if logged_team_email else "Never sent")
+        assert row["checked"] is not logged_team_email
+        created = Team.objects.create(name="New U A", school_id=school.pk, seed=0)
+        assert row_for(created, RequestFactory().get("/"))["status"] == "Missing email"
     finally:
         MigrationExecutor(connection).migrate(latest)

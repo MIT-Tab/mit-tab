@@ -1,3 +1,5 @@
+import "../css/emailManagement.scss";
+
 document.addEventListener("DOMContentLoaded", () => {
   const tables = Array.from(
     document.querySelectorAll(".email-management-table"),
@@ -18,6 +20,32 @@ document.addEventListener("DOMContentLoaded", () => {
     showPanel(viewSelect.value);
     viewSelect.addEventListener("change", () => {
       showPanel(viewSelect.value);
+    });
+  }
+
+  const previewDialog = document.getElementById("email-preview-dialog");
+  const previewFrame = document.getElementById("email-preview-frame");
+  const previewRecipients = document.getElementById("email-preview-recipients");
+  const previewSubject = document.getElementById("email-preview-subject");
+
+  if (previewDialog && previewFrame && previewRecipients && previewSubject) {
+    document.querySelectorAll("[data-email-preview]").forEach((button) => {
+      button.addEventListener("click", () => {
+        previewRecipients.textContent = button.dataset.emailRecipients;
+        previewSubject.textContent = button.dataset.emailSubject;
+        previewFrame.srcdoc = button.dataset.emailHtml;
+        previewDialog.showModal();
+        document.body.classList.add("email-preview-open");
+      });
+    });
+    previewDialog
+      .querySelectorAll("[data-close-email-preview]")
+      .forEach((button) => {
+        button.addEventListener("click", () => previewDialog.close());
+      });
+    previewDialog.addEventListener("close", () => {
+      previewFrame.removeAttribute("srcdoc");
+      document.body.classList.remove("email-preview-open");
     });
   }
 

@@ -928,9 +928,11 @@ def _written_rfd_email_management_context(request):
             if can_send else len(_recipient_emails_for_round(round_obj))
         )
         winner = round_obj.winner
+        previews = sendable_by_id.get(round_obj.id, {}).get("email_requests", [])
         round_rows.append({
             "round": round_obj,
-            "previews": sendable_by_id.get(round_obj.id, {}).get("email_requests", []),
+            "preview": previews[0] if previews else None,
+            "recipients": ", ".join(email.to_address for email in previews),
             "winner": winner.display if winner else round_obj.get_victor_display(),
             "recipient_count": recipient_count,
             "can_send": can_send,
