@@ -311,8 +311,7 @@ class TestPublicCache(TestCase):
             self.cache.clear()
             TabSettings.set(test['setting'], test['hidden_value'])
             response = self.client.get(test['url'])
-            self.assertEqual(response.status_code, 200)
-            # Just verify we get a response - visibility logic is in the template
+            self.assertEqual(response.status_code, 302)
 
     def test_authenticated_cache_separation(self):
         """Test that authenticated and unauthenticated
