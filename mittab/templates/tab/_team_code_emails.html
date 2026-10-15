@@ -2,7 +2,7 @@
   {% csrf_token %}
   <input type="hidden" name="email_action" value="team_codes">
   <h2 class="h5">Team Codes</h2>
-  <p class="small text-muted">Emails go to distinct debater addresses. Each team and each address has a six-hour cooldown after a successful send; an address can receive one email per batch. Failed sends can be retried once any applicable cooldown expires. Existing teams with no delivery history are not selected automatically; earlier emails were not tracked.</p>
+  <p class="small text-muted">Emails go to distinct debater addresses. Each team and each address has a six-hour cooldown after a successful send; an address can receive one email per batch. Failed sends can be retried once any applicable cooldown expires.</p>
   <div class="mb-2">
     <button class="btn btn-sm btn-outline-secondary" type="button" data-select-target="team-code-table" data-select-mode="never-received">Select Never Sent</button>
     <button class="btn btn-sm btn-outline-secondary" type="button" data-select-target="team-code-table" data-select-mode="needs-resend">Select Needs Resend</button>
@@ -21,7 +21,7 @@
           <td><input type="checkbox" name="team_ids" value="{{ row.team.id }}" {% if row.checked %}checked{% endif %} {% if not row.can_send %}disabled{% endif %}></td>
           <td><a href="{% url 'view_team' row.team.id %}">{{ row.team.name }}</a></td>
           <td>{{ row.recipients|default:"No debater emails on file" }}
-            {% for email in row.previews %}{% include "tab/_email_preview.html" %}{% endfor %}
+            {% include "tab/_email_preview.html" with email=row.preview recipients=row.recipients %}
             {% if row.can_send %}<div class="small text-muted">{{ row.sendable_recipients }} recipient(s) eligible in this batch.</div>{% endif %}
           </td>
           <td>{{ row.team.team_code|default:"-" }}</td>

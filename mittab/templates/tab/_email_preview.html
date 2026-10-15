@@ -1,16 +1,14 @@
-{% if email %}
-<details class="small my-1">
-  <summary>{{ preview_label|default:"Preview current email" }}</summary>
-  <div class="border rounded p-2 bg-light text-dark">
-    <div><strong>To:</strong> {{ email.to_address }}</div>
-    <div><strong>Subject:</strong> {{ email.subject }}</div>
-    <pre class="text-wrap mb-2" style="white-space:pre-wrap;">{{ email.text_body }}</pre>
-    {% if email.html_body %}
-    <details>
-      <summary>HTML version</summary>
-      <iframe loading="lazy" title="Email HTML preview" sandbox="" referrerpolicy="no-referrer" srcdoc="{{ email.html_body }}" style="width:100%;height:500px;border:0;"></iframe>
-    </details>
-    {% endif %}
-  </div>
-</details>
+{% if email.html_body %}
+<button
+  type="button"
+  class="btn btn-sm btn-outline-secondary d-block my-1"
+  data-email-preview
+  aria-haspopup="dialog"
+  aria-controls="email-preview-dialog"
+  data-email-subject="{{ email.subject }}"
+  data-email-recipients="{{ recipients|default:email.to_address }}"
+  data-email-html="{{ email.html_body }}"
+>{{ preview_label|default:"Preview current email" }}</button>
+{% elif email %}
+<span class="small text-muted">HTML preview unavailable.</span>
 {% endif %}

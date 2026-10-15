@@ -487,8 +487,6 @@ class Team(AuditAttributionMixin):
     )
     seed = models.IntegerField(choices=SEED_CHOICES)
     checked_in = models.BooleanField(default=True)
-    code_email_history_unknown = models.BooleanField(default=False)
-    code_email_baseline = models.JSONField(default=dict, blank=True)
     team_code = models.CharField(max_length=255,
                                  blank=True,
                                  null=True,
