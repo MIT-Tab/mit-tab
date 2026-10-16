@@ -30,6 +30,19 @@ class WingPairingMode:
     RANDOM = 2
 
 
+WING_PREFERENCE_WEIGHT = 100
+
+
+def chair_wing_preference_weight(chair):
+    """Return the room-level wing preference adjustment for an inround chair."""
+    weight = 0
+    if chair.request_wing:
+        weight += WING_PREFERENCE_WEIGHT
+    if chair.no_wings:
+        weight -= WING_PREFERENCE_WEIGHT
+    return weight
+
+
 def get_inround_settings():
     return SimpleNamespace(
         mode=TabSettings.get("judge_pairing_mode", JudgePairingMode.DEFAULT),
@@ -293,6 +306,8 @@ def add_judges():
                         relative_judge_rank=relative_rank,
                         judge_index=wing_judge_i,
                     )
+                    chair = chairs[chair_by_pairing[pairing_i]]
+                    weight += chair_wing_preference_weight(chair)
                     if rejudge_sum > 0 and pairing_settings.rejudge_penalty > 0:
                         penalty = (
                             pairing_settings.rejudge_penalty *
