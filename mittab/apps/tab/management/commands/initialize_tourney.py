@@ -13,6 +13,7 @@ from mittab.apps.tab.models import (
     TabSettings,
 )
 from mittab.libs.backup import backup_round, BEFORE_NEW_TOURNAMENT, INITIAL
+from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
 
 USER_MODEL = get_user_model()
 
@@ -91,6 +92,7 @@ class Command(BaseCommand):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
         TabSettings.set("theme_color", "#00438A")
+        TabSettings.set(START_TOURNAMENT_WIZARD_COMPLETED, 0)
         InfoText.ensure_defaults()
         self.stdout.write(
             "Done setting up tournament "
