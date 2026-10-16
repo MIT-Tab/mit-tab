@@ -111,6 +111,22 @@ class TestPostOperations(TestCase):
 
         mock_set.assert_called_once_with("lenient_late", 1)
 
+    def test_settings_form_supports_custom_labels(self):
+        form = SettingsForm(
+            settings=[{
+                "name": "fair_bye",
+                "label": "Unseeded always gets bye R1",
+                "value": True,
+                "description": "Round one bye policy",
+                "type": "boolean",
+            }],
+        )
+
+        self.assertEqual(
+            form.fields["setting_fair_bye"].label,
+            "Unseeded always gets bye R1",
+        )
+
     def test_settings_form_accepts_zero_breaks(self):
         form = SettingsForm(
             {

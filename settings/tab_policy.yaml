@@ -61,6 +61,12 @@ settings:
     description: "Pair round 2 randomly within win brackets while preventing teams from debating a team they have already debated. Later preliminary rounds continue to use speaks-based high-low pairing."
     value: false
     type: boolean
+  - fair_bye:
+    name: fair_bye
+    label: "Unseeded always gets bye R1"
+    description: "When enabled, a round 1 bye is randomly assigned to an unseeded or free-seed team. If none are available, the bye is randomly assigned from all checked-in teams."
+    value: true
+    type: boolean
   - enable_room_seeding:
     name: enable_room_seeding
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."

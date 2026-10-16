@@ -13,6 +13,7 @@ from mittab.apps.tab.models import (
     School,
     TabSettings,
     Team,
+    Bye,
 )
 from mittab.libs import assign_judges, assign_rooms, errors
 from mittab.libs import tab_logic
@@ -164,6 +165,69 @@ class TestPairingLogic(TestCase):
 
         self.re_pair_latest_round()
         self.assertEqual(self.pairings_for(second_round), baseline_pairings)
+
+
+@pytest.mark.django_db
+class TestFirstRoundByeSetting(TestCase):
+    pytestmark = pytest.mark.django_db
+
+    def setUp(self):
+        super().setUp()
+        self.school = School.objects.create(name="Round One Bye School")
+        TabSettings.set("cur_round", 1)
+        cache_logic.clear_cache()
+
+    def make_team(self, name, seed):
+        return Team.objects.create(
+            name=name,
+            school=self.school,
+            seed=seed,
+        )
+
+    def make_pairing_resources(self, team_count):
+        round_count = team_count // 2
+        judges = [
+            Judge.objects.create(name=f"Bye Judge {index}", rank=5)
+            for index in range(round_count)
+        ]
+        rooms = [
+            Room.objects.create(name=f"Bye Room {index}", rank=5)
+            for index in range(round_count)
+        ]
+        CheckIn.objects.bulk_create(
+            CheckIn(judge=judge, round_number=1) for judge in judges
+        )
+        RoomCheckIn.objects.bulk_create(
+            RoomCheckIn(room=room, round_number=1) for room in rooms
+        )
+
+    def test_enabled_setting_assigns_bye_to_unseeded_team(self):
+        unseeded_team = self.make_team("Unseeded Team", Team.UNSEEDED)
+        for index, seed in enumerate((
+                Team.HALF_SEED,
+                Team.HALF_SEED,
+                Team.FULL_SEED,
+                Team.FULL_SEED,
+        )):
+            self.make_team(f"Seeded Team {index}", seed)
+        self.make_pairing_resources(5)
+        TabSettings.set("fair_bye", 1)
+
+        tab_logic.pair_round()
+
+        self.assertEqual(Bye.objects.get(round_number=1).bye_team, unseeded_team)
+
+    def test_enabled_setting_falls_back_when_all_teams_are_seeded(self):
+        teams = [
+            self.make_team(f"Seeded Team {index}", Team.FULL_SEED)
+            for index in range(3)
+        ]
+        self.make_pairing_resources(3)
+        TabSettings.set("fair_bye", 1)
+
+        tab_logic.pair_round()
+
+        self.assertIn(Bye.objects.get(round_number=1).bye_team, teams)
 
 
 @pytest.mark.django_db

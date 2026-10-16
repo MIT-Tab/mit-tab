@@ -665,7 +665,10 @@ class SettingsForm(forms.Form):
 
         for setting in self.settings:
             field_name = f"setting_{setting['name']}"
-            label = setting["name"].replace("_", " ").title()
+            label = setting.get(
+                "label",
+                setting["name"].replace("_", " ").title(),
+            )
 
             if setting.get("type") == "boolean":
                 self.fields[field_name] = forms.BooleanField(
