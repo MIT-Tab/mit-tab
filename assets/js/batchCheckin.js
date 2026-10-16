@@ -157,6 +157,7 @@ $(() => {
   $(document)
     .on("click", ".checkin-toggle, .checkin-label", (e) => e.preventDefault())
     .on("click", ".bulk-toggle", (e) => {
+      e.preventDefault();
       const targets = getBulkTargets(e.currentTarget);
       const shouldCheckIn = $(e.currentTarget).data("action") === "check_in";
       if (targets.length) submitCheckIn(targets, shouldCheckIn);

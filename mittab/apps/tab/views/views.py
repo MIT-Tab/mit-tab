@@ -971,7 +971,7 @@ def manage_ranking_groups(request):
 
 def batch_checkin(request):
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
-    all_round_numbers = [0] + round_numbers
+    all_round_numbers = round_numbers + [0]
 
     team_data = [
         {
@@ -1033,10 +1033,10 @@ def batch_checkin(request):
 
     def round_count_data(counts):
         return [{
-            "index": idx + 1,
-            "round_number": round_numbers[idx],
-            "count": counts[idx + 1]
-        } for idx in range(len(round_numbers))]
+            "index": round_number,
+            "round_number": round_number,
+            "count": counts[idx]
+        } for idx, round_number in enumerate(round_numbers)]
 
     judge_round_counts = round_count_data(judge_counts)
     expected_judge_round_counts = round_count_data(expected_judge_counts)
@@ -1058,11 +1058,11 @@ def batch_checkin(request):
         "judge_round_counts": judge_round_counts,
         "judge_expectation_round_counts": expected_judge_round_counts,
         "room_round_counts": room_round_counts,
-        "judge_outround_count": judge_counts[0] if judge_counts else 0,
+        "judge_outround_count": judge_counts[-1] if judge_counts else 0,
         "judge_expectation_outround_count": (
-            expected_judge_counts[0] if expected_judge_counts else 0
+            expected_judge_counts[-1] if expected_judge_counts else 0
         ),
-        "room_outround_count": room_counts[0] if room_counts else 0,
+        "room_outround_count": room_counts[-1] if room_counts else 0,
     })
 
 

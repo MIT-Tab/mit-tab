@@ -106,6 +106,46 @@
     </tbody>
   </table>
 
+  <details class="checked-in-judges border rounded mb-4"{% if checked_in_judges|length <= 12 %} open{% endif %}>
+    <summary class="checked-in-judges-summary p-3">
+      <span class="font-weight-bold">Checked-in judges</span>
+      <span class="badge badge-primary ml-1">{{ checked_in_judges|length }}</span>
+      <span class="checked-in-judges-action text-muted small ml-auto">
+        <span class="when-closed">View names</span>
+        <span class="when-open">Hide names</span>
+      </span>
+    </summary>
+    <div class="checked-in-judges-body border-top p-3">
+      {% if checked_in_judges %}
+        {% if checked_in_judges|length > 12 %}
+        <label class="sr-only" for="checked-in-judge-filter">Find a checked-in judge</label>
+        <div class="input-group input-group-sm mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fas fa-search" aria-hidden="true"></i></span>
+          </div>
+          <input id="checked-in-judge-filter" class="form-control" type="search"
+                 placeholder="Find a judge or school" autocomplete="off">
+        </div>
+        {% endif %}
+        <ul class="checked-in-judge-list">
+          {% for judge in checked_in_judges %}
+          <li class="checked-in-judge-item" data-search="{{ judge.name }} {{ judge.affiliations_display }}">
+            <a class="font-weight-medium" href="{% url 'view_judge' judge.id %}">{{ judge.name }}</a>
+            {% if judge.affiliations_display %}
+            <small class="d-block text-muted">{{ judge.affiliations_display }}</small>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <p id="checked-in-judge-no-results" class="text-muted mb-0 d-none">
+          No checked-in judges match that search.
+        </p>
+      {% else %}
+        <p class="text-muted mb-0">No judges are checked in for this round.</p>
+      {% endif %}
+    </div>
+  </details>
+
   <form action="." method="post" class="mt-4">
     {% csrf_token %}
     {% return_to_input %}

@@ -329,8 +329,31 @@ function handleChairClick(event) {
   });
 }
 
+function initializeCheckedInJudgeFilter() {
+  const $filter = $("#checked-in-judge-filter");
+  if (!$filter.length) return;
+
+  const $items = $(".checked-in-judge-item");
+  const $noResults = $("#checked-in-judge-no-results");
+
+  $filter.on("input", () => {
+    const query = $filter.val().trim().toLowerCase();
+    let matches = 0;
+
+    $items.each((_, item) => {
+      const $item = $(item);
+      const isMatch = $item.data("search").toLowerCase().includes(query);
+      $item.toggleClass("d-none", !isMatch);
+      if (isMatch) matches += 1;
+    });
+
+    $noResults.toggleClass("d-none", matches !== 0);
+  });
+}
+
 $(document).ready(() => {
   populateTabCards();
+  initializeCheckedInJudgeFilter();
   $("#team_ranking").each((_, element) => {
     lazyLoad($(element).parent(), "/team/rank/");
   });
