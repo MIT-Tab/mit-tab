@@ -6,6 +6,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from mittab.apps.registration.models import InfoText
 from mittab.apps.tab.forms import SettingsForm
 from mittab.apps.tab.models import (
     PUBLIC_HOME_PAGE_DEFINITIONS,
@@ -241,11 +242,16 @@ class TestPostOperations(TestCase):
                 "is_active": True,
             },
         )
+        InfoText.objects.create(title="Day 1 GA", text="Old location")
 
         response = self.client.post(reverse("start_tourny"))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(PublicHomeShortcut.objects.count(), 0)
         self.assertEqual(PublicHomePage.objects.count(), 0)
+        self.assertEqual(
+            list(InfoText.objects.values_list("title", "text")),
+            [("GA", "TBD")],
+        )
 
     def test_public_home_page_ensure_defaults_is_idempotent(self):
         PublicHomePage.objects.all().delete()

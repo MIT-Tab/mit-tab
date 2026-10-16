@@ -19,6 +19,7 @@ from requests.exceptions import RequestException
 
 from mittab.apps.registration.forms import (
     InfoLinkForm,
+    InfoTextForm,
     JudgeForm,
     RegistrationForm,
     RegistrationLinkForm,
@@ -52,6 +53,7 @@ from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 from mittab.libs.email_service import EmailServiceError
 from .models import (
     InfoLink,
+    InfoText,
     Registration,
     RegistrationChangeLog,
     RegistrationConfig,
@@ -522,6 +524,62 @@ def tournament_link_delete(request, link_kind, link_id):
         request,
         f"{config['label'].capitalize()} link removed.",
         path=reverse(config["redirect_url_name"]),
+    )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def info_text_create(request):
+    form = InfoTextForm(request.POST)
+    if form.is_valid():
+        form.save()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            "Text information added.",
+            path=reverse("public_homepage"),
+        )
+    return redirect_and_flash_error(
+        request,
+        _summarize_form_errors(form, "Could not add text information."),
+        path=reverse("public_homepage"),
+    )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def info_text_update(request, info_text_id):
+    info_text = InfoText.objects.filter(pk=info_text_id).first()
+    if not info_text:
+        raise Http404()
+    form = InfoTextForm(request.POST, instance=info_text)
+    if form.is_valid():
+        form.save()
+        invalidate_all_public_caches()
+        return redirect_and_flash_success(
+            request,
+            "Text information updated.",
+            path=reverse("public_homepage"),
+        )
+    return redirect_and_flash_error(
+        request,
+        _summarize_form_errors(form, "Could not update text information."),
+        path=reverse("public_homepage"),
+    )
+
+
+@permission_required("tab.tab_settings.can_change", login_url="/403/")
+@require_http_methods(["POST"])
+def info_text_delete(request, info_text_id):
+    info_text = InfoText.objects.filter(pk=info_text_id).first()
+    if not info_text:
+        raise Http404()
+    info_text.delete()
+    invalidate_all_public_caches()
+    return redirect_and_flash_success(
+        request,
+        "Text information removed.",
+        path=reverse("public_homepage"),
     )
 
 

@@ -34,7 +34,7 @@ from mittab.apps.tab.public_rankings import (
     get_ranking_settings,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.registration.models import InfoLink, RegistrationConfig
+from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
@@ -121,6 +121,7 @@ def public_home(request):
     registration_open = bool(registration_config and registration_config.can_create())
     quick_links = build_public_home_shortcuts()
     info_links = list(InfoLink.objects.filter(is_active=True))
+    info_texts = list(InfoText.objects.filter(is_active=True))
 
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
     # Single source of truth for the pre-tournament state. RegistrationConfig
@@ -265,6 +266,7 @@ def public_home(request):
             "show_registration_lead": show_registration_lead,
             "registration_url": reverse("registration_portal"),
             "info_links": info_links,
+            "info_texts": info_texts,
             "quick_links": quick_links,
             "public_tiles_odd": public_tile_count % 2 == 1,
         },

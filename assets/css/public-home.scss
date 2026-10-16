@@ -292,6 +292,32 @@ body {
   }
 }
 
+.info-text-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 54, 94, 0.18);
+  background: rgba(0, 67, 138, 0.06);
+  color: #1f2f4a;
+  font-size: 0.85rem;
+  line-height: 1.2;
+
+  &__title {
+    color: var(--theme-color, #00438A);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  &__value {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+}
+
 .register-cta {
   @include public-card-link;
   flex-wrap: wrap;
@@ -559,6 +585,11 @@ body {
     padding-bottom: 0.4rem;
 
     .info-link-chip {
+      font-size: 0.82rem;
+      padding: 0.4rem 0.75rem;
+    }
+
+    .info-text-chip {
       font-size: 0.82rem;
       padding: 0.4rem 0.75rem;
     }

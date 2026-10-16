@@ -6,6 +6,7 @@ from django.urls import reverse
 from mittab.apps.registration.emails import build_registration_confirmation_email
 from mittab.apps.registration.models import (
     InfoLink,
+    InfoText,
     Registration,
     RegistrationLink,
     validate_safe_url,
@@ -74,6 +75,62 @@ def test_admin_can_create_info_link(logged_in_admin_client):
     assert link.title == "Tournament Discord"
     assert link.url == "https://discord.gg/abc"
     assert link.is_active is True
+
+
+@pytest.mark.django_db
+def test_admin_can_create_update_and_delete_info_text(logged_in_admin_client):
+    response = logged_in_admin_client.post(
+        reverse("info_text_create"),
+        {
+            "title": "Day 1 GA",
+            "text": "Student center, room 201",
+            "display_order": 2,
+            "is_active": "on",
+        },
+        follow=True,
+    )
+    assert response.status_code == 200
+    info_text = InfoText.objects.get(title="Day 1 GA")
+    assert info_text.text == "Student center, room 201"
+    assert info_text.is_active is True
+
+    response = logged_in_admin_client.post(
+        reverse("info_text_update", kwargs={"info_text_id": info_text.pk}),
+        {
+            "title": "Day 2 GA",
+            "text": "Building 26 lobby",
+            "display_order": 3,
+        },
+        follow=True,
+    )
+    assert response.status_code == 200
+    info_text.refresh_from_db()
+    assert info_text.title == "Day 2 GA"
+    assert info_text.text == "Building 26 lobby"
+    assert info_text.display_order == 3
+    assert info_text.is_active is False
+
+    response = logged_in_admin_client.post(
+        reverse("info_text_delete", kwargs={"info_text_id": info_text.pk}),
+        follow=True,
+    )
+    assert response.status_code == 200
+    assert not InfoText.objects.filter(pk=info_text.pk).exists()
+
+
+@pytest.mark.django_db
+def test_public_homepage_editor_renders_info_text_controls(logged_in_admin_client):
+    info_text = InfoText.objects.create(title="Day 1 GA", text="Lobby")
+
+    response = logged_in_admin_client.get(reverse("public_homepage"))
+
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "Text information" in body
+    assert reverse("info_text_update", kwargs={"info_text_id": info_text.pk}) in body
+    assert 'name="text"' in body
+    assert "Day 1 GA" in body
+    assert "Lobby" in body
 
 
 @pytest.mark.django_db
@@ -159,6 +216,48 @@ def test_public_home_renders_info_links(client):
     assert "Packet" in body
     assert "https://drive.google.com/abc" in body
     assert "Hidden" not in body
+
+
+@pytest.mark.django_db
+def test_public_home_renders_active_info_text_as_non_link(client):
+    InfoText.objects.create(title="GA", text="Lobby at 8:30 AM")
+    InfoText.objects.create(title="Hidden", text="Secret", is_active=False)
+
+    response = client.get(reverse("public_home"))
+
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "External Information" in body
+    assert '<div class="info-text-chip">' in body
+    assert "GA:" in body
+    assert "Lobby at 8:30 AM" in body
+    assert "Secret" not in body
+    assert '<a class="info-text-chip"' not in body
+
+
+@pytest.mark.django_db
+def test_public_home_escapes_info_text(client):
+    InfoText.objects.create(title="GA", text="<script>alert(1)</script>")
+
+    response = client.get(reverse("public_home"))
+    body = response.content.decode()
+
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
+
+
+@pytest.mark.django_db
+def test_info_text_defaults_are_idempotent():
+    InfoText.objects.all().delete()
+
+    first, first_created = InfoText.ensure_defaults()
+    second, second_created = InfoText.ensure_defaults()
+
+    assert first_created is True
+    assert second_created is False
+    assert first.pk == second.pk
+    assert first.title == "GA"
+    assert first.text == "TBD"
 
 
 @pytest.mark.django_db

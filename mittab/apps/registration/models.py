@@ -152,5 +152,33 @@ class InfoLink(TournamentLinkBase):
     """Tournament-wide link shown on the public homepage."""
 
 
+class InfoText(models.Model):
+    """Tournament-wide text shown with external information on the homepage."""
+
+    DEFAULT_TITLE = "GA"
+    DEFAULT_TEXT = "TBD"
+
+    title = models.CharField(max_length=80)
+    text = models.CharField(max_length=500)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_order", "created_at"]
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def ensure_defaults(cls):
+        """Create the information every newly initialized tournament starts with."""
+        return cls.objects.get_or_create(
+            title=cls.DEFAULT_TITLE,
+            defaults={"text": cls.DEFAULT_TEXT},
+        )
+
+
 class RegistrationLink(TournamentLinkBase):
     """Link surfaced after a successful registration and in the confirmation email."""

@@ -205,7 +205,7 @@
     margin: 0;
   }
 
-  /* ----- Info links ----- */
+  /* ----- External information ----- */
   .ph__links { display: flex; flex-direction: column; gap: 0.4rem; }
   .ph__link-row {
     display: grid;
@@ -218,6 +218,18 @@
     background: #fff;
   }
   .ph__link-row--add { background: var(--ph-tint); }
+  .ph__row-form { display: none; }
+  .ph__text-row {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 3.2fr) 4.5rem auto;
+  }
+  .ph__info-group-title {
+    margin: 0.35rem 0 0.1rem;
+    color: var(--ph-text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
   @media (max-width: 900px) {
     .ph__link-row { grid-template-columns: 1fr 1fr; }
     .ph__link-row .ph__link-actions { grid-column: 1 / -1; justify-content: flex-end; }
@@ -346,15 +358,77 @@
 
   <section class="ph__section">
     <div class="ph__section-head">
-      <h2 class="ph__section-title">Info links</h2>
-      <p class="ph__section-sub">Sidebar resources on the public homepage (Discord, packet, schedule&hellip;). Each row saves on its own.</p>
+      <h2 class="ph__section-title">External information</h2>
+      <p class="ph__section-sub">Text details and resource links shown on the public homepage. Each row saves on its own.</p>
     </div>
 
     <div class="ph__links">
+      <h3 class="ph__info-group-title">Text information</h3>
+      {% for item in info_texts %}
+        <div class="ph__link-row ph__text-row">
+          <form method="post"
+                action="{% url 'info_text_update' info_text_id=item.pk %}"
+                class="ph__row-form"
+                id="ph-text-{{ item.pk }}">
+            {% csrf_token %}
+          </form>
+          <input type="text" name="title" form="ph-text-{{ item.pk }}"
+                 class="form-control form-control-sm"
+                 value="{{ item.title }}" maxlength="80" placeholder="Label (e.g. GA)" required>
+          <input type="text" name="text" form="ph-text-{{ item.pk }}"
+                 class="form-control form-control-sm"
+                 value="{{ item.text }}" maxlength="500" placeholder="Information" required>
+          <input type="number" name="display_order" form="ph-text-{{ item.pk }}"
+                 class="form-control form-control-sm ph__link-order"
+                 value="{{ item.display_order }}" min="0" step="1"
+                 title="Display order (lowest first)">
+          <div class="ph__link-actions">
+            <label class="ph__link-toggle">
+              <input type="checkbox" name="is_active" form="ph-text-{{ item.pk }}"
+                     {% if item.is_active %}checked{% endif %}>
+              Active
+            </label>
+            <button type="submit" form="ph-text-{{ item.pk }}"
+                    class="btn btn-sm btn-outline-primary">Save</button>
+            <form method="post"
+                  action="{% url 'info_text_delete' info_text_id=item.pk %}"
+                  class="d-inline"
+                  onsubmit="return confirm('Delete this text information?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete text information">
+                <i class="fas fa-trash" aria-hidden="true"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      {% empty %}
+        <div class="ph__link-empty">No text information yet. Add the first item below.</div>
+      {% endfor %}
+
+      <form method="post"
+            action="{% url 'info_text_create' %}"
+            class="ph__link-row ph__link-row--add ph__text-row">
+        {% csrf_token %}
+        <input type="text" name="title" class="form-control form-control-sm"
+               placeholder="Label (e.g. Day 1 GA)" maxlength="80" required>
+        <input type="text" name="text" class="form-control form-control-sm"
+               placeholder="Information (e.g. Student center, room 201)" maxlength="500" required>
+        <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
+               value="0" min="0" step="1" title="Display order (lowest first)">
+        <div class="ph__link-actions">
+          <label class="ph__link-toggle">
+            <input type="checkbox" name="is_active" checked> Active
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm">Add text</button>
+        </div>
+      </form>
+
+      <h3 class="ph__info-group-title">Resource links</h3>
       {% for link in info_links %}
         <div class="ph__link-row">
           <form method="post"
                 action="{% url 'tournament_link_update' link_kind='info' link_id=link.pk %}"
+                class="ph__row-form"
                 id="ph-link-{{ link.pk }}">
             {% csrf_token %}
           </form>
@@ -392,7 +466,7 @@
           </div>
         </div>
       {% empty %}
-        <div class="ph__link-empty">No info links yet. Add the first one below.</div>
+        <div class="ph__link-empty">No resource links yet. Add the first one below.</div>
       {% endfor %}
 
       <form method="post"

@@ -4,6 +4,7 @@ from mittab.apps.tab.models import Judge, Team
 
 from .models import (
     InfoLink,
+    InfoText,
     Registration,
     RegistrationChangeLog,
     RegistrationConfirmationEmailLog,
@@ -137,6 +138,15 @@ class _TournamentLinkAdmin(admin.ModelAdmin):
 @admin.register(InfoLink)
 class InfoLinkAdmin(_TournamentLinkAdmin):
     pass
+
+
+@admin.register(InfoText)
+class InfoTextAdmin(admin.ModelAdmin):
+    list_display = ("title", "text", "is_active", "display_order", "updated_at")
+    list_editable = ("is_active", "display_order")
+    list_display_links = ("title",)
+    search_fields = ("title", "text")
+    ordering = ("display_order", "created_at")
 
 
 @admin.register(RegistrationLink)

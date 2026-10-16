@@ -20,7 +20,7 @@
 {% block content %}
 {% tournament_logo_url as tournament_logo %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
-  <div class="public-home{% if not info_links %} public-home--single{% endif %}">
+  <div class="public-home{% if not info_links and not info_texts %} public-home--single{% endif %}">
 
     <header class="public-home-hero desktop-only">
       {% if tournament_logo %}
@@ -45,18 +45,12 @@
     </header>
 
     <div class="grid">
-      {% if info_links %}
+      {% if info_links or info_texts %}
       <aside class="sidebar" aria-labelledby="public-home-resources">
         <div class="public-sidebar-card">
-          <h2 class="public-card-header" id="public-home-resources">External Resources</h2>
+          <h2 class="public-card-header" id="public-home-resources">External Information</h2>
           <div class="info-links" aria-label="Tournament resources">
-            {% for link in info_links %}
-            <a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
-               {% if link.description %}title="{{ link.description }}"{% endif %}>
-              <i class="fas fa-external-link-alt" aria-hidden="true"></i>
-              <span class="info-link-chip__title">{{ link.title }}</span>
-            </a>
-            {% endfor %}
+            {% include "public/_external_information.html" %}
           </div>
         </div>
       </aside>
@@ -65,15 +59,9 @@
       <aside class="links" aria-labelledby="public-home-quick-links">
         <h2 class="public-card-header desktop-only" id="public-home-quick-links">Tournament Pages</h2>
 
-        {% if info_links %}
+        {% if info_links or info_texts %}
         <div class="info-links info-links--mobile" aria-label="Tournament resources">
-          {% for link in info_links %}
-          <a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
-             {% if link.description %}title="{{ link.description }}"{% endif %}>
-            <i class="fas fa-external-link-alt" aria-hidden="true"></i>
-            <span class="info-link-chip__title">{{ link.title }}</span>
-          </a>
-          {% endfor %}
+          {% include "public/_external_information.html" %}
         </div>
         {% endif %}
 
