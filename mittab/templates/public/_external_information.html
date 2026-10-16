@@ -1,0 +1,13 @@
+{% for item in info_texts %}
+<div class="info-text-chip">
+  <span class="info-text-chip__title">{{ item.title }}:</span>
+  <span class="info-text-chip__value">{{ item.text }}</span>
+</div>
+{% endfor %}
+{% for link in info_links %}
+<a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+   {% if link.description %}title="{{ link.description }}"{% endif %}>
+  <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+  <span class="info-link-chip__title">{{ link.title }}</span>
+</a>
+{% endfor %}

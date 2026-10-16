@@ -20,6 +20,21 @@ urlpatterns = [
         views.tournament_link_delete,
         name="tournament_link_delete",
     ),
+    path(
+        "manage/info-text/",
+        views.info_text_create,
+        name="info_text_create",
+    ),
+    path(
+        "manage/info-text/<int:info_text_id>/",
+        views.info_text_update,
+        name="info_text_update",
+    ),
+    path(
+        "manage/info-text/<int:info_text_id>/delete/",
+        views.info_text_delete,
+        name="info_text_delete",
+    ),
     path("edit/", views.registration_code_lookup, name="registration_code_lookup"),
     path("<str:code>/", views.registration_portal, name="registration_portal_edit"),
     path("api/debaters/<int:school_id>/", views.proxy_debaters, name="api_debaters"),

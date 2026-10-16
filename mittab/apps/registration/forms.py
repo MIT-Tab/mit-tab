@@ -4,6 +4,7 @@ from django import forms
 
 from mittab.apps.registration.models import (
     InfoLink,
+    InfoText,
     RegistrationConfig,
     RegistrationLink,
 )
@@ -539,6 +540,40 @@ class _TournamentLinkForm(forms.ModelForm):
 class InfoLinkForm(_TournamentLinkForm):
     class Meta(_TournamentLinkForm.Meta):
         model = InfoLink
+
+
+class InfoTextForm(forms.ModelForm):
+    """Editor for non-link information on the public homepage."""
+
+    class Meta:
+        model = InfoText
+        fields = ("title", "text", "display_order", "is_active")
+        widgets = {
+            "title": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "placeholder": "e.g. GA",
+                    "maxlength": "80",
+                }
+            ),
+            "text": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "placeholder": "e.g. Student center, room 201",
+                    "maxlength": "500",
+                }
+            ),
+            "display_order": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "min": "0",
+                    "step": "1",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "custom-control-input"}
+            ),
+        }
 
 
 class RegistrationLinkForm(_TournamentLinkForm):

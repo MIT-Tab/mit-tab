@@ -728,7 +728,7 @@ def settings_form(request):
 def public_homepage(request):
     # Local import to avoid a circular import between the tab and registration
     # apps at module load.
-    from mittab.apps.registration.models import InfoLink
+    from mittab.apps.registration.models import InfoLink, InfoText
 
     if request.method == "POST":
         form = PublicHomepageForm(request.POST, request.FILES)
@@ -763,6 +763,7 @@ def public_homepage(request):
             "form": form,
             "shortcut_rows": shortcut_rows,
             "info_links": list(InfoLink.objects.all()),
+            "info_texts": list(InfoText.objects.all()),
             "title": "Public Homepage",
         },
     )

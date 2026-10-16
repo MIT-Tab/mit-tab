@@ -1139,6 +1139,8 @@ def start_new_tourny(request):
         TabSettings.set("tot_rounds", 5)
         TabSettings.set("lenient_late", 0)
         TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
+        from mittab.apps.registration.models import InfoText
+        InfoText.ensure_defaults()
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(
@@ -1147,9 +1149,12 @@ def start_new_tourny(request):
 
 
 def clear_db():
+    from mittab.apps.registration.models import InfoText
+
     obj_types = [
         CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
-        PublicHomePage, UserTournamentSetupPreference, TabSettings, Team, School, Debater
+        PublicHomePage, UserTournamentSetupPreference, InfoText, TabSettings,
+        Team, School, Debater
     ]
     list(map(delete_obj, obj_types))
 

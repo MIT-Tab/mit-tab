@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
+from mittab.apps.registration.models import InfoText
 from mittab.apps.tab.models import (
     DEFAULT_TOURNAMENT_NAME,
     TabSettings,
@@ -90,6 +91,7 @@ class Command(BaseCommand):
         TabSettings.set("cur_round", 1)
         TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
         TabSettings.set("theme_color", "#00438A")
+        InfoText.ensure_defaults()
         self.stdout.write(
             "Done setting up tournament "
             "New tournament information:")

@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.test import TransactionTestCase
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
+from mittab.apps.registration.models import InfoText
 
 
 @pytest.mark.django_db(transaction=True)
@@ -32,6 +33,10 @@ class TestInitializeTourneyCommand(TransactionTestCase):
         )
         self.assertTrue(Group.objects.filter(name=APDA_BOARD_GROUP_NAME).exists())
         self.assertFalse(user_model.objects.filter(username="apda_board").exists())
+        self.assertEqual(
+            list(InfoText.objects.values_list("title", "text")),
+            [("GA", "TBD")],
+        )
 
     def test_board_user_password_falls_back_to_random_when_env_missing(self):
         with patch.dict(
