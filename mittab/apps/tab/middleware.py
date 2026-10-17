@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from mittab.apps.tab.auth_roles import (
@@ -17,6 +17,7 @@ from mittab.apps.tab.auth_roles import (
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
 from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
+from mittab.apps.tab.tournament_start import is_start_tournament_wizard_complete
 from mittab.libs.backup import is_backup_active
 
 LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
@@ -95,6 +96,30 @@ class Login:
                     "APDA Board access is limited to APDA tools and public pages.",
                     path="/403/",
                 )
+
+        wizard_path = reverse("start_tournament")
+        wizard_exempt = (
+            path == wizard_path
+            or path.startswith((
+                "/public/",
+                "/static/",
+                "/dynamic-media/",
+                "/accounts/logout/",
+                "/admin/logout/",
+            ))
+            or path in {"/favicon.ico", "/tournament-logo/"}
+        )
+        if (
+            request.user.is_authenticated
+            and request.user.is_superuser
+            and not wizard_exempt
+            and not is_start_tournament_wizard_complete()
+        ):
+            return redirect_and_flash_info(
+                request,
+                "Complete the tournament basics before using staff tools.",
+                path=wizard_path,
+            )
 
         should_store_return_to = (
             request.method == "GET"

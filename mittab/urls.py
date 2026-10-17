@@ -15,6 +15,7 @@ import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
 import mittab.apps.tab.views.motion_views as motion_views
 import mittab.apps.tab.views.staff_invite_views as staff_invite_views
 import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
+import mittab.apps.tab.views.tournament_start_views as tournament_start_views
 import mittab.apps.registration.views as registration_views
 
 
@@ -168,6 +169,11 @@ urlpatterns = [
         "settings/public-homepage/",
         views.public_homepage,
         name="public_homepage",
+    ),
+    path(
+        "setup/start-tournament/",
+        tournament_start_views.start_tournament,
+        name="start_tournament",
     ),
     path(
         "setup/tournament-todo/",

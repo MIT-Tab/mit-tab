@@ -880,6 +880,74 @@ class PublicHomepageForm(forms.Form):
             )
 
 
+class StartTournamentWizardForm(forms.Form):
+    DISCLOSURE_CHOICES = (
+        ("", "Choose a policy…"),
+        (1, "Open — judges disclose this information"),
+        (2, "Closed — judges do not disclose this information"),
+    )
+
+    tournament_name = forms.CharField(
+        label="Tournament name",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g. MIT Spring Invitational",
+            "autocomplete": "organization",
+        }),
+    )
+    ga_room = forms.CharField(
+        label="GA location / room",
+        max_length=500,
+        help_text=(
+            "The room or online location attendees should use for general assembly."
+        ),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g. Building 26, Room 100",
+        }),
+    )
+    facebook_url = forms.URLField(
+        label="Facebook link",
+        max_length=500,
+        help_text="The tournament's Facebook event or announcement page.",
+        widget=forms.URLInput(attrs={
+            "class": "form-control",
+            "placeholder": "https://www.facebook.com/events/...",
+            "autocomplete": "url",
+        }),
+    )
+    open_speaks = forms.TypedChoiceField(
+        label="Speaker points",
+        choices=DISCLOSURE_CHOICES,
+        coerce=int,
+        empty_value=None,
+        help_text="Choose whether judges tell debaters their speaker points.",
+        widget=forms.Select(attrs={"class": "custom-select"}),
+    )
+    open_ranks = forms.TypedChoiceField(
+        label="Speaker ranks",
+        choices=DISCLOSURE_CHOICES,
+        coerce=int,
+        empty_value=None,
+        help_text=(
+            "Choose whether judges tell debaters their speaker ranks "
+            "(open ranks are shared only if debaters opt in)."
+        ),
+        widget=forms.Select(attrs={"class": "custom-select"}),
+    )
+
+
+    def full_clean(self):
+        super().full_clean()
+        for name in self.errors:
+            if name in self.fields:
+                widget = self.fields[name].widget
+                widget.attrs["class"] = (
+                    f'{widget.attrs.get("class", "")} is-invalid'.strip()
+                )
+
+
 def validate_panel(result):
     all_good = True
     all_results = list(itertools.chain(*list(result.values())))
