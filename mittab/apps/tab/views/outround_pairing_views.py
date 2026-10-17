@@ -412,8 +412,8 @@ def outround_pairing_view(request,
 
     choice = TabSettings.get("choice", 0)
 
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    var_teams_to_break, nov_teams_to_break = \
+        outround_tab_logic.get_break_sizes()
 
     if (nov_teams_to_break is None or var_teams_to_break is None or
             nov_teams_to_break < 0 or var_teams_to_break < 0):

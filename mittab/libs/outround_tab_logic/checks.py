@@ -75,9 +75,15 @@ def have_enough_rooms():
     )
 
 
+def get_break_sizes():
+    # Defaults mirror settings/tab_policy.yaml. Tournaments that never saved
+    # these settings have no TabSettings rows for them.
+    return (TabSettings.get("var_teams_to_break", 8),
+            TabSettings.get("nov_teams_to_break", 4))
+
+
 def have_enough_rooms_before_break():
-    var_breaking = TabSettings.get("var_teams_to_break", 8)
-    nov_breaking = TabSettings.get("nov_teams_to_break", 4)
+    var_breaking, nov_breaking = get_break_sizes()
 
     rooms_needed = var_breaking // 2
     rooms_needed += nov_breaking // 2

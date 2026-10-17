@@ -137,6 +137,26 @@ class TestPostOperations(TestCase):
         self.assertEqual(TabSettings.get("var_teams_to_break"), 0)
         self.assertEqual(TabSettings.get("nov_teams_to_break"), 0)
 
+    def test_settings_form_persists_unsaved_defaults(self):
+        for setting in TabSettings.objects.filter(key="var_teams_to_break"):
+            setting.delete()
+
+        form = SettingsForm(
+            {"setting_var_teams_to_break": "8"},
+            settings=[
+                {
+                    "name": "var_teams_to_break",
+                    "value": 8,
+                    "description": "Varsity break size",
+                    "persisted": False,
+                },
+            ],
+        )
+
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.assertEqual(TabSettings.get("var_teams_to_break"), 8)
+
     def test_settings_form_surfaces_errors_without_claiming_success(self):
         response = self.client.post(
             reverse("settings_form"),

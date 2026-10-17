@@ -6,7 +6,8 @@ from django.db.models import Q
 
 from mittab.apps.tab.models import *
 
-from mittab.libs.outround_tab_logic.checks import have_enough_rooms
+from mittab.libs.outround_tab_logic.checks import have_enough_rooms, \
+    get_break_sizes
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
@@ -333,8 +334,7 @@ def _perform_the_break_experimental():
         None
     )
 
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    var_teams_to_break, nov_teams_to_break = get_break_sizes()
 
     if (nov_teams_to_break is None or var_teams_to_break is None or
             nov_teams_to_break < 0 or var_teams_to_break < 0):
@@ -598,8 +598,7 @@ def _perform_the_break_standard():
         None
     )
 
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    var_teams_to_break, nov_teams_to_break = get_break_sizes()
 
     if (nov_teams_to_break is None or var_teams_to_break is None or
             nov_teams_to_break < 0 or var_teams_to_break < 0):

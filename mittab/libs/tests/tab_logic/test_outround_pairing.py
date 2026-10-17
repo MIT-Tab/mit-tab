@@ -31,6 +31,22 @@ class TestOutroundPairingLogic(TestCase):
         outround_tab_logic.pair(BreakingTeam.NOVICE)
         outround_tab_logic.pair(BreakingTeam.VARSITY)
 
+    def test_break_uses_defaults_when_break_settings_missing(self):
+        self.generate_checkins()
+        for setting in TabSettings.objects.filter(
+                key__in=["var_teams_to_break", "nov_teams_to_break"]):
+            setting.delete()
+
+        success, message = outround_tab_logic.perform_the_break()
+
+        self.assertTrue(success, message)
+        self.assertEqual(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.VARSITY
+        ).count(), 8)
+        self.assertTrue(BreakingTeam.objects.filter(
+            type_of_team=BreakingTeam.NOVICE
+        ).exists())
+
     def test_break_can_disable_novice_break(self):
         self.generate_checkins()
         TabSettings.set("nov_teams_to_break", 0)

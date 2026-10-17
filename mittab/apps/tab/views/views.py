@@ -40,6 +40,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.views.outround_pairing_views import create_forum_view_data
+from mittab.libs.outround_tab_logic import get_break_sizes
 from mittab.apps.tab.public_rankings import (
     get_all_ballot_round_settings,
     get_all_ranking_settings,
@@ -673,6 +674,9 @@ def get_settings_from_yaml():
         }
         for setting in all_settings:
             stored_value = stored_settings.get(setting["name"])
+            # The form shows YAML defaults for missing rows, so it needs to
+            # know which ones still have to be written on save.
+            setting["persisted"] = stored_value is not None
             if stored_value is None:
                 # Keep the YAML default for missing settings
                 # For choice fields with empty string default, this means it stays unset
@@ -1180,8 +1184,7 @@ def forum_post(request):
 
     # Get team rankings and calculate breaking teams
     varsity_teams, nov_teams = get_team_rankings(None)
-    nov_teams_to_break = TabSettings.get("nov_teams_to_break")
-    var_teams_to_break = TabSettings.get("var_teams_to_break")
+    var_teams_to_break, nov_teams_to_break = get_break_sizes()
 
     varsity_teams = varsity_teams[:var_teams_to_break]
 

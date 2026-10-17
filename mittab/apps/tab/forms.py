@@ -750,7 +750,8 @@ class SettingsForm(forms.Form):
     def save(self):
         for setting in self.settings:
             field = f"setting_{setting['name']}"
-            if field not in self.changed_data:
+            if (field not in self.changed_data and
+                    setting.get("persisted", True)):
                 continue
 
             key = setting["name"]
