@@ -63,10 +63,14 @@ settings:
     type: boolean
   - fair_bye:
     name: fair_bye
-    label: "Unseeded always gets bye R1"
-    description: "When enabled, a round 1 bye is randomly assigned to an unseeded or free-seed team. If none are available, the bye is randomly assigned from all checked-in teams."
-    value: true
-    type: boolean
+    label: "Round 1 bye goes to a random team of seed"
+    description: "Choose which seed group is eligible for the round 1 bye. If that group is empty, the next lowest available seed bucket is used."
+    value: 1
+    type: choice
+    choices:
+      - [0, "Any seed"]
+      - [1, "Free seed or unseeded"]
+      - [2, "Unseeded"]
   - enable_room_seeding:
     name: enable_room_seeding
     description: "Toggle to enable room seeding. When enabled, the best rooms go to the highest seeded rooms."

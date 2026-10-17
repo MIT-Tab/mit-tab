@@ -115,16 +115,21 @@ class TestPostOperations(TestCase):
         form = SettingsForm(
             settings=[{
                 "name": "fair_bye",
-                "label": "Unseeded always gets bye R1",
-                "value": True,
+                "label": "Round 1 bye goes to a random team of seed",
+                "value": 1,
                 "description": "Round one bye policy",
-                "type": "boolean",
+                "type": "choice",
+                "choices": [
+                    [0, "Any seed"],
+                    [1, "Free seed or unseeded"],
+                    [2, "Unseeded"],
+                ],
             }],
         )
 
         self.assertEqual(
             form.fields["setting_fair_bye"].label,
-            "Unseeded always gets bye R1",
+            "Round 1 bye goes to a random team of seed",
         )
 
     def test_settings_form_accepts_zero_breaks(self):

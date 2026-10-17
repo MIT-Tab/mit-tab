@@ -11,6 +11,27 @@ from mittab.libs.tab_logic.stats import *
 from mittab.libs.tab_logic.rankings import *
 
 
+def first_round_bye_candidates(teams):
+    bye_seed_policy = TabSettings.get("fair_bye", 1)
+    highest_eligible_seed = {
+        1: Team.FREE_SEED,
+        2: Team.UNSEEDED,
+    }.get(bye_seed_policy)
+
+    if highest_eligible_seed is None:
+        return teams
+
+    eligible_teams = [
+        team for team in teams
+        if team.seed <= highest_eligible_seed
+    ]
+    if eligible_teams:
+        return eligible_teams
+
+    lowest_available_seed = min(team.seed for team in teams)
+    return [team for team in teams if team.seed == lowest_available_seed]
+
+
 def pair_round():
     """
     Pair the next round of debate.
@@ -58,14 +79,7 @@ def pair_round():
 
         # If there are an odd number of teams, give a random team the bye
         if len(list_of_teams) % 2 == 1:
-            possible_teams = list_of_teams
-            if TabSettings.get("fair_bye", 1) == 1:
-                unseeded_teams = [
-                    team for team in list_of_teams
-                    if team.seed < Team.HALF_SEED
-                ]
-                if unseeded_teams:
-                    possible_teams = unseeded_teams
+            possible_teams = first_round_bye_candidates(list_of_teams)
             bye_team = random.choice(possible_teams)
             bye = Bye(bye_team=bye_team, round_number=current_round)
             bye.save()

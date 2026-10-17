@@ -57,9 +57,9 @@ round.
 ### Byes
 If a bye is needed to make the lowest bracket whole, a bye will be selected as
 follows:
-* In the first round the bye is selected randomly. By default, only unseeded
-  and free-seed teams are eligible when at least one is checked in. This can be
-  disabled with **Unseeded always gets bye R1** under **Tab Policy**.
+* In the first round the bye is selected randomly from the seed group selected
+  under **Round 1 bye goes to a random team of seed** in **Tab Policy**. If the
+  selected group is empty, the next lowest available seed bucket is used.
 * In all succeeding rounds the bye is selected as the lowest speaking team of
   the all down bracket.
 * No team will get the bye more than once.

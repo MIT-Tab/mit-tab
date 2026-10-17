@@ -201,33 +201,67 @@ class TestFirstRoundByeSetting(TestCase):
             RoomCheckIn(room=room, round_number=1) for room in rooms
         )
 
-    def test_enabled_setting_assigns_bye_to_unseeded_team(self):
+    def test_unseeded_policy_assigns_bye_to_unseeded_team(self):
         unseeded_team = self.make_team("Unseeded Team", Team.UNSEEDED)
         for index, seed in enumerate((
-                Team.HALF_SEED,
+                Team.FREE_SEED,
                 Team.HALF_SEED,
                 Team.FULL_SEED,
                 Team.FULL_SEED,
         )):
             self.make_team(f"Seeded Team {index}", seed)
         self.make_pairing_resources(5)
-        TabSettings.set("fair_bye", 1)
+        TabSettings.set("fair_bye", 2)
 
         tab_logic.pair_round()
 
         self.assertEqual(Bye.objects.get(round_number=1).bye_team, unseeded_team)
 
-    def test_enabled_setting_falls_back_when_all_teams_are_seeded(self):
-        teams = [
-            self.make_team(f"Seeded Team {index}", Team.FULL_SEED)
-            for index in range(3)
-        ]
+    def test_unseeded_policy_falls_back_to_free_seed(self):
+        free_seed_team = self.make_team("Free Seed Team", Team.FREE_SEED)
+        self.make_team("Half Seed Team", Team.HALF_SEED)
+        self.make_team("Full Seed Team", Team.FULL_SEED)
+        self.make_pairing_resources(3)
+        TabSettings.set("fair_bye", 2)
+
+        tab_logic.pair_round()
+
+        self.assertEqual(Bye.objects.get(round_number=1).bye_team, free_seed_team)
+
+    def test_free_or_unseeded_policy_falls_back_to_half_seed(self):
+        half_seed_team = self.make_team("Half Seed Team", Team.HALF_SEED)
+        self.make_team("Full Seed Team 1", Team.FULL_SEED)
+        self.make_team("Full Seed Team 2", Team.FULL_SEED)
         self.make_pairing_resources(3)
         TabSettings.set("fair_bye", 1)
 
         tab_logic.pair_round()
 
-        self.assertIn(Bye.objects.get(round_number=1).bye_team, teams)
+        self.assertEqual(Bye.objects.get(round_number=1).bye_team, half_seed_team)
+
+    def test_any_seed_policy_makes_every_team_eligible(self):
+        teams = [
+            self.make_team("Unseeded Team", Team.UNSEEDED),
+            self.make_team("Half Seed Team", Team.HALF_SEED),
+            self.make_team("Full Seed Team", Team.FULL_SEED),
+        ]
+        TabSettings.set("fair_bye", 0)
+
+        candidates = tab_logic.first_round_bye_candidates(teams)
+
+        self.assertCountEqual(candidates, teams)
+
+    def test_free_or_unseeded_policy_uses_both_seed_buckets(self):
+        unseeded_team = self.make_team("Unseeded Team", Team.UNSEEDED)
+        free_seed_team = self.make_team("Free Seed Team", Team.FREE_SEED)
+        self.make_team("Half Seed Team", Team.HALF_SEED)
+        TabSettings.set("fair_bye", 1)
+
+        candidates = tab_logic.first_round_bye_candidates(
+            list(Team.objects.all())
+        )
+
+        self.assertCountEqual(candidates, [unseeded_team, free_seed_team])
 
 
 @pytest.mark.django_db
