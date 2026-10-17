@@ -1,3 +1,4 @@
+from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.tab.models import TabSettings
 
 
@@ -15,3 +16,11 @@ def is_start_tournament_wizard_complete():
     if value is None:
         return True
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def apply_new_tournament_defaults():
+    """Require the start wizard and close registration for a new tournament."""
+    TabSettings.set(START_TOURNAMENT_WIZARD_COMPLETED, 0)
+    config = RegistrationConfig.get_or_create_active()
+    config.allow_new_registrations = False
+    config.save()

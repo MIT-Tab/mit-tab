@@ -1,19 +1,65 @@
+from django import forms
 from django.contrib.auth.decorators import permission_required
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.shortcuts import render, reverse
 
 from mittab.apps.registration.models import InfoLink, InfoText
+from mittab.apps.tab.auth_roles import STAFF_PRESET_DETAILS
 from mittab.apps.tab.forms import StartTournamentWizardForm
 from mittab.apps.tab.helpers import redirect_and_flash_success
 from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
+from mittab.apps.tab.staff_invites import (
+    get_or_create_staff_invite_user,
+    send_staff_invite_email,
+)
 from mittab.apps.tab.tournament_start import (
     START_TOURNAMENT_WIZARD_COMPLETED,
     is_start_tournament_wizard_complete,
 )
+from mittab.apps.tab.views.staff_invite_views import StaffInviteForm
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.email_service import EmailServiceError
 
 
 FACEBOOK_LINK_TITLE = "Facebook"
+INVITE_PREFIX = "invite"
+
+
+class WizardStaffInviteForm(StaffInviteForm):
+    """Staff invite that must go to someone other than the person signing up."""
+
+    def __init__(self, *args, inviter=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.inviter = inviter
+        for field in self.fields.values():
+            field.widget.attrs["class"] = (
+                "custom-select" if isinstance(field.widget, forms.Select)
+                else "form-control"
+            )
+        self.fields["email"].widget.attrs["placeholder"] = "colleague@example.com"
+        self.fields["username"].widget.attrs["placeholder"] = "e.g. jsmith"
+
+    def full_clean(self):
+        super().full_clean()
+        for name in self.errors:
+            if name in self.fields:
+                self.fields[name].widget.attrs["class"] += " is-invalid"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.inviter is None:
+            return cleaned_data
+        email = (cleaned_data.get("email") or "").lower()
+        username = cleaned_data.get("username") or ""
+        inviter_email = (self.inviter.email or "").lower()
+        if username == self.inviter.username or (
+                inviter_email and email == inviter_email):
+            raise forms.ValidationError(
+                "Invite a different person. Every tab staff member needs "
+                "their own login."
+            )
+        return cleaned_data
 
 
 def _initial_values():
@@ -33,21 +79,37 @@ def _initial_values():
         "tournament_name": tournament_name,
         "ga_room": ga_room,
         "facebook_url": facebook_link.url if facebook_link else "",
-        "total_rounds": TabSettings.get("tot_rounds", 5),
-        "varsity_break_size": TabSettings.get("var_teams_to_break", 8),
-        "novice_break_size": TabSettings.get("nov_teams_to_break", 4),
         "open_speaks": TabSettings.get("open_speaks", 0) or None,
         "open_ranks": TabSettings.get("open_ranks", 0) or None,
     }
+
+
+def _send_invite(request, invite_form):
+    """Create the invited account and email it; record failures on the form."""
+    user, _created = get_or_create_staff_invite_user(
+        invite_form.cleaned_data["email"],
+        invite_form.cleaned_data["username"],
+        invite_form.cleaned_data["permission_preset"],
+    )
+    if not user.is_staff:
+        invite_form.add_error(
+            "email",
+            "A non-staff account already uses this email. Update it in the "
+            "admin interface before sending an invite.",
+        )
+        return False
+    try:
+        send_staff_invite_email(request, user)
+    except (EmailServiceError, ImproperlyConfigured) as exc:
+        invite_form.add_error(None, f"Could not send the staff invite: {exc}")
+        return False
+    return True
 
 
 def _save_wizard(form):
     cleaned = form.cleaned_data
     with transaction.atomic():
         TabSettings.set("tournament_name", cleaned["tournament_name"].strip())
-        TabSettings.set("tot_rounds", cleaned["total_rounds"])
-        TabSettings.set("var_teams_to_break", cleaned["varsity_break_size"])
-        TabSettings.set("nov_teams_to_break", cleaned["novice_break_size"])
         TabSettings.set("open_speaks", cleaned["open_speaks"])
         TabSettings.set("open_ranks", cleaned["open_ranks"])
 
@@ -77,10 +139,22 @@ def _save_wizard(form):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def start_tournament(request):
     was_complete = is_start_tournament_wizard_complete()
+    # The staff invite is only mandatory during first-time setup; afterwards
+    # staff are managed from the dedicated Invite Staff page.
+    invite_form = None
 
     if request.method == "POST":
         form = StartTournamentWizardForm(request.POST)
-        if form.is_valid():
+        if not was_complete:
+            invite_form = WizardStaffInviteForm(
+                request.POST,
+                prefix=INVITE_PREFIX,
+                inviter=request.user,
+            )
+        basics_valid = form.is_valid()
+        invite_valid = invite_form is None or invite_form.is_valid()
+        if basics_valid and invite_valid and (
+                invite_form is None or _send_invite(request, invite_form)):
             _save_wizard(form)
             if was_complete:
                 return redirect_and_flash_success(
@@ -90,17 +164,26 @@ def start_tournament(request):
                 )
             return redirect_and_flash_success(
                 request,
-                "Tournament basics saved. Continue with the setup checklist.",
+                "Tournament basics saved and a staff invite was sent to "
+                f"{invite_form.cleaned_data['email']}. Continue with the "
+                "setup checklist.",
                 path=reverse("tournament_todo"),
             )
     else:
         form = StartTournamentWizardForm(initial=_initial_values())
+        if not was_complete:
+            invite_form = WizardStaffInviteForm(
+                prefix=INVITE_PREFIX,
+                inviter=request.user,
+            )
 
     return render(
         request,
         "tab/start_tournament.html",
         {
             "form": form,
+            "invite_form": invite_form,
+            "staff_preset_details": STAFF_PRESET_DETAILS,
             "is_initial_setup": not was_complete,
             "title": "Tournament Basics",
         },

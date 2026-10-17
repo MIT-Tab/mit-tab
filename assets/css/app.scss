@@ -156,6 +156,39 @@ $font-size-base: 0.95rem !default;
     font-size: 2rem;
   }
 
+  .wizard-login-note {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 1.1rem;
+    padding: 0.8rem 1rem;
+    border-left: 4px solid var(--theme-color, #00438A);
+    border-radius: 0.4rem;
+    background: #f1f5fa;
+    color: #1e293b;
+
+    > i {
+      margin-top: 0.2rem;
+      color: var(--theme-color, #00438A);
+    }
+  }
+
+  .wizard-preset-details {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+
+    summary {
+      cursor: pointer;
+      color: var(--theme-color, #00438A);
+    }
+
+    ul {
+      margin: 0.5rem 0 0;
+      padding-left: 1.2rem;
+      color: #475569;
+    }
+  }
+
   .wizard-required-note {
     display: flex;
     gap: 0.85rem;

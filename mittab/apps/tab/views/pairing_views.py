@@ -17,6 +17,7 @@ from django.shortcuts import redirect
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
+from mittab.apps.tab.tournament_start import apply_new_tournament_defaults
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -1141,6 +1142,7 @@ def start_new_tourny(request):
         TabSettings.set("tournament_name", DEFAULT_TOURNAMENT_NAME)
         from mittab.apps.registration.models import InfoText
         InfoText.ensure_defaults()
+        apply_new_tournament_defaults()
     except Exception:
         emit_current_exception()
         return redirect_and_flash_error(

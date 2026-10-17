@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
@@ -6,6 +8,11 @@ from django.urls import reverse
 from mittab.apps.registration.models import InfoLink, InfoText
 from mittab.apps.tab.models import TabSettings
 from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
+from mittab.libs.email_service import EmailServiceError
+
+SEND_INVITE = (
+    "mittab.apps.tab.views.tournament_start_views.send_staff_invite_email"
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -27,11 +34,11 @@ class TestStartTournamentWizard(TestCase):
             "tournament_name": "MIT Fall Invitational",
             "ga_room": "Building 26, Room 100",
             "facebook_url": "https://www.facebook.com/events/123456789",
-            "total_rounds": 6,
-            "varsity_break_size": 16,
-            "novice_break_size": 8,
             "open_speaks": 1,
             "open_ranks": 2,
+            "invite-email": "second@test.com",
+            "invite-username": "second_tab",
+            "invite-permission_preset": "full_tab_staff",
         }
 
     def test_first_admin_login_redirects_to_wizard_even_with_next(self):
@@ -65,7 +72,9 @@ class TestStartTournamentWizard(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Complete these basics to unlock staff tools")
         self.assertContains(response, "You can change every answer later")
-        self.assertContains(response, "Preliminary rounds")
+        self.assertContains(response, "Invite at least one more member of tab staff")
+        self.assertContains(response, "Do not share your password")
+        self.assertNotContains(response, "Preliminary rounds")
 
     def test_initialization_placeholders_are_not_prefilled(self):
         InfoText.ensure_defaults()
@@ -91,10 +100,11 @@ class TestStartTournamentWizard(TestCase):
     def test_valid_form_saves_all_basics_and_unlocks_staff_tools(self):
         self.client.force_login(self.user)
 
-        response = self.client.post(
-            reverse("start_tournament"),
-            self._valid_data(),
-        )
+        with mock.patch(SEND_INVITE) as send_invite:
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
 
         self.assertRedirects(
             response,
@@ -102,9 +112,7 @@ class TestStartTournamentWizard(TestCase):
             fetch_redirect_response=False,
         )
         self.assertEqual(TabSettings.get("tournament_name"), "MIT Fall Invitational")
-        self.assertEqual(TabSettings.get("tot_rounds"), 6)
-        self.assertEqual(TabSettings.get("var_teams_to_break"), 16)
-        self.assertEqual(TabSettings.get("nov_teams_to_break"), 8)
+        self.assertEqual(TabSettings.get("tot_rounds"), 5)
         self.assertEqual(TabSettings.get("open_speaks"), 1)
         self.assertEqual(TabSettings.get("open_ranks"), 2)
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 1)
@@ -120,8 +128,55 @@ class TestStartTournamentWizard(TestCase):
         )
         self.assertTrue(facebook_link.is_active)
 
+        invitee = get_user_model().objects.get(username="second_tab")
+        self.assertEqual(invitee.email, "second@test.com")
+        self.assertTrue(invitee.is_staff)
+        self.assertFalse(invitee.has_usable_password())
+        send_invite.assert_called_once()
+        self.assertEqual(send_invite.call_args.args[1], invitee)
+
         unlocked_response = self.client.get(reverse("index"))
         self.assertEqual(unlocked_response.status_code, 200)
+
+    def test_staff_invite_is_required_for_initial_setup(self):
+        self.client.force_login(self.user)
+        data = self._valid_data()
+        del data["invite-email"]
+        del data["invite-username"]
+
+        with mock.patch(SEND_INVITE) as send_invite:
+            response = self.client.post(reverse("start_tournament"), data)
+
+        self.assertEqual(response.status_code, 200)
+        send_invite.assert_not_called()
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
+        self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
+
+    def test_cannot_invite_yourself(self):
+        self.client.force_login(self.user)
+        data = self._valid_data()
+        data["invite-email"] = "wizard@test.com"
+        data["invite-username"] = "wizard_user"
+
+        with mock.patch(SEND_INVITE) as send_invite:
+            response = self.client.post(reverse("start_tournament"), data)
+
+        self.assertContains(response, "Invite a different person")
+        send_invite.assert_not_called()
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
+
+    def test_failed_invite_email_does_not_unlock_staff_tools(self):
+        self.client.force_login(self.user)
+
+        with mock.patch(SEND_INVITE, side_effect=EmailServiceError("SES down")):
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
+
+        self.assertContains(response, "Could not send the staff invite: SES down")
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
+        self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
 
     def test_completed_wizard_can_be_edited_from_setup(self):
         self.client.force_login(self.user)
@@ -132,11 +187,14 @@ class TestStartTournamentWizard(TestCase):
             url="https://www.facebook.com/events/old",
         )
 
-        response = self.client.post(
-            reverse("start_tournament"),
-            self._valid_data(),
-        )
+        data = self._valid_data()
+        for key in ("invite-email", "invite-username", "invite-permission_preset"):
+            del data[key]
 
+        with mock.patch(SEND_INVITE) as send_invite:
+            response = self.client.post(reverse("start_tournament"), data)
+
+        send_invite.assert_not_called()
         self.assertRedirects(
             response,
             reverse("start_tournament"),

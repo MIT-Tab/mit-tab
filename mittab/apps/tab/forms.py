@@ -917,27 +917,6 @@ class StartTournamentWizardForm(forms.Form):
             "autocomplete": "url",
         }),
     )
-    total_rounds = forms.IntegerField(
-        label="Preliminary rounds",
-        min_value=1,
-        max_value=20,
-        help_text="The number of in-rounds before the break.",
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
-    )
-    varsity_break_size = forms.IntegerField(
-        label="Varsity teams breaking",
-        min_value=0,
-        max_value=256,
-        help_text="Use 0 if there will be no varsity elimination bracket.",
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
-    )
-    novice_break_size = forms.IntegerField(
-        label="Novice teams breaking",
-        min_value=0,
-        max_value=256,
-        help_text="Use 0 if there will be no novice elimination bracket.",
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
-    )
     open_speaks = forms.TypedChoiceField(
         label="Speaker points",
         choices=DISCLOSURE_CHOICES,
