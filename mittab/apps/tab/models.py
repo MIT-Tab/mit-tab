@@ -655,6 +655,18 @@ class Judge(AuditAttributionMixin):
                                    ])
     is_dino = models.BooleanField(default=False)
     wing_only = models.BooleanField(default=False)
+    request_wing = models.BooleanField(
+        default=False,
+        help_text=(
+            "Prioritize giving this judge a wing when they chair an inround."
+        ),
+    )
+    no_wings = models.BooleanField(
+        default=False,
+        help_text=(
+            "Deprioritize giving this judge a wing when they chair an inround."
+        ),
+    )
     required_room_tags = models.ManyToManyField("RoomTag", blank=True)
 
     def set_unique_ballot_code(self):

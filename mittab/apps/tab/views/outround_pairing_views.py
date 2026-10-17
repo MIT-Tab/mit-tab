@@ -728,11 +728,25 @@ def alternative_judges(request, round_id, judge_id=None):
     )
 
     excluded_judges = [
-        (j.name, j.id, float(j.rank), j.wing_only)
+        (
+            j.name,
+            j.id,
+            float(j.rank),
+            j.wing_only,
+            j.request_wing,
+            j.no_wings,
+        )
         for j in eligible_excluded
     ]
     included_judges = [
-        (j.name, j.id, float(j.rank), j.wing_only)
+        (
+            j.name,
+            j.id,
+            float(j.rank),
+            j.wing_only,
+            j.request_wing,
+            j.no_wings,
+        )
         for j in eligible_included
     ]
 
