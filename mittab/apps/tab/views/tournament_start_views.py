@@ -62,7 +62,7 @@ class WizardStaffInviteForm(StaffInviteForm):
         return cleaned_data
 
 
-def _initial_values():
+def _initial_values(is_initial_setup=False):
     ga_info = InfoText.objects.filter(title=InfoText.DEFAULT_TITLE).first()
     facebook_link = InfoLink.objects.filter(
         title__iexact=FACEBOOK_LINK_TITLE,
@@ -78,28 +78,26 @@ def _initial_values():
     return {
         "tournament_name": tournament_name,
         "ga_room": ga_room,
-        "facebook_url": facebook_link.url if facebook_link else "",
+        "facebook_url": (
+            facebook_link.url
+            if facebook_link and not is_initial_setup
+            else ""
+        ),
         "open_speaks": TabSettings.get("open_speaks", 0) or None,
         "open_ranks": TabSettings.get("open_ranks", 0) or None,
     }
 
 
 def _send_invite(request, invite_form):
-    """Create the invited account and email it; record failures on the form."""
-    user, _created = get_or_create_staff_invite_user(
-        invite_form.cleaned_data["email"],
-        invite_form.cleaned_data["username"],
-        invite_form.cleaned_data["permission_preset"],
-    )
-    if not user.is_staff:
-        invite_form.add_error(
-            "email",
-            "A non-staff account already uses this email. Update it in the "
-            "admin interface before sending an invite.",
-        )
-        return False
+    """Create and email the invite without retaining a failed account change."""
     try:
-        send_staff_invite_email(request, user)
+        with transaction.atomic():
+            user, _created = get_or_create_staff_invite_user(
+                invite_form.cleaned_data["email"],
+                invite_form.cleaned_data["username"],
+                invite_form.cleaned_data["permission_preset"],
+            )
+            send_staff_invite_email(request, user)
     except (EmailServiceError, ImproperlyConfigured) as exc:
         invite_form.add_error(None, f"Could not send the staff invite: {exc}")
         return False
@@ -170,7 +168,9 @@ def start_tournament(request):
                 path=reverse("tournament_todo"),
             )
     else:
-        form = StartTournamentWizardForm(initial=_initial_values())
+        form = StartTournamentWizardForm(
+            initial=_initial_values(is_initial_setup=not was_complete),
+        )
         if not was_complete:
             invite_form = WizardStaffInviteForm(
                 prefix=INVITE_PREFIX,

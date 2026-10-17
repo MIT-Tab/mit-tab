@@ -6,8 +6,13 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from mittab.apps.registration.models import InfoLink, InfoText
+from mittab.apps.tab.auth_roles import (
+    PRESET_DATA_ENTRY_HELPER,
+    apply_staff_permission_preset,
+)
 from mittab.apps.tab.models import TabSettings
 from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
+from mittab.apps.tab.views.tournament_start_views import WizardStaffInviteForm
 from mittab.libs.email_service import EmailServiceError
 
 SEND_INVITE = (
@@ -78,6 +83,10 @@ class TestStartTournamentWizard(TestCase):
 
     def test_initialization_placeholders_are_not_prefilled(self):
         InfoText.ensure_defaults()
+        InfoLink.objects.create(
+            title="Facebook",
+            url="https://www.facebook.com/events/previous-tournament",
+        )
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("start_tournament"))
@@ -85,6 +94,16 @@ class TestStartTournamentWizard(TestCase):
         form = response.context["form"]
         self.assertEqual(form.initial["tournament_name"], "")
         self.assertEqual(form.initial["ga_room"], "")
+        self.assertEqual(form.initial["facebook_url"], "")
+
+    def test_invite_form_can_be_validated_without_an_inviter(self):
+        form = WizardStaffInviteForm({
+            "email": "second@test.com",
+            "username": "second_tab",
+            "permission_preset": "full_tab_staff",
+        })
+
+        self.assertTrue(form.is_valid())
 
     def test_invalid_form_does_not_unlock_staff_tools(self):
         self.client.force_login(self.user)
@@ -99,6 +118,7 @@ class TestStartTournamentWizard(TestCase):
 
     def test_valid_form_saves_all_basics_and_unlocks_staff_tools(self):
         self.client.force_login(self.user)
+        InfoText.objects.all().delete()
 
         with mock.patch(SEND_INVITE) as send_invite:
             response = self.client.post(
@@ -177,6 +197,33 @@ class TestStartTournamentWizard(TestCase):
         self.assertContains(response, "Could not send the staff invite: SES down")
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
         self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
+        self.assertFalse(
+            get_user_model().objects.filter(username="second_tab").exists()
+        )
+
+    def test_failed_reinvite_preserves_existing_staff_permissions(self):
+        existing_user = get_user_model().objects.create_user(
+            username="second_tab",
+            email="second@test.com",
+            is_staff=True,
+        )
+        apply_staff_permission_preset(existing_user, PRESET_DATA_ENTRY_HELPER)
+        self.client.force_login(self.user)
+
+        with mock.patch(SEND_INVITE, side_effect=EmailServiceError("SES down")):
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
+
+        self.assertContains(response, "Could not send the staff invite: SES down")
+        existing_user.refresh_from_db()
+        self.assertFalse(existing_user.is_superuser)
+        self.assertTrue(
+            existing_user.groups.filter(
+                name="MIT-TAB: Data entry helper",
+            ).exists()
+        )
 
     def test_completed_wizard_can_be_edited_from_setup(self):
         self.client.force_login(self.user)
