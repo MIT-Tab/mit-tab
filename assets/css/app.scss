@@ -363,6 +363,58 @@ details[open] > .audit-trail-summary::before {
   padding-left: 1.1rem;
 }
 
+// Pair-round check-in roster
+.checked-in-judges {
+  background: #fff;
+
+  &[open] .when-closed,
+  &:not([open]) .when-open {
+    display: none;
+  }
+}
+
+.checked-in-judges-summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+
+  &::-webkit-details-marker { display: none; }
+  &::marker { display: none; }
+
+  &::before {
+    content: "\25B8";
+    margin-right: 0.6rem;
+    color: #6c757d;
+    transition: transform 0.15s ease;
+  }
+}
+
+.checked-in-judges[open] > .checked-in-judges-summary::before {
+  transform: rotate(90deg);
+}
+
+.checked-in-judge-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.1rem;
+  list-style: none;
+}
+
+.checked-in-judge-item {
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #e3e8ee;
+  border-radius: 0.25rem;
+  background: #f8f9fa;
+  overflow-wrap: anywhere;
+}
+
 // Utility classes
 .badge-wing-only {
   font-size: 0.6rem;

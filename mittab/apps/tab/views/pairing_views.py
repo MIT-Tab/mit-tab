@@ -79,6 +79,13 @@ def pair_round(request):
 
         judges = tab_logic.have_enough_judges(current_round_number)
         rooms = tab_logic.have_enough_rooms(current_round_number)
+        checked_in_judges = (
+            Judge.objects
+            .filter(checkin__round_number=current_round_number)
+            .prefetch_related("schools")
+            .order_by("name")
+            .distinct()
+        )
 
         msg = (
             f"N/2 Judges checked in for Round {current_round_number}? "
@@ -124,6 +131,7 @@ def pair_round(request):
             "title": title,
             "check_status": check_status,
             "judges": judges,
+            "checked_in_judges": checked_in_judges,
             "rooms": rooms,
             "ready_to_pair": ready_to_pair,
             "ready_to_pair_alt": ready_to_pair_alt,
