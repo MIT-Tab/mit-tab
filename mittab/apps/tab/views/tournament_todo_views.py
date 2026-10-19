@@ -10,6 +10,7 @@ from mittab.apps.tab.auth_roles import (
 )
 from mittab.apps.tab.helpers import redirect_and_flash_success
 from mittab.apps.tab.models import UserTournamentSetupPreference
+from mittab.apps.tab.tournament_start import is_start_tournament_wizard_complete
 from mittab.libs.tournament_todo import (
     get_field_to_step_map,
     get_tournament_todo_sections,
@@ -34,6 +35,12 @@ class StaffLoginView(LoginView):
             not redirect_url or redirect_url == reverse("tournament_todo")
         ):
             return reverse("apda_board_home")
+
+        if (
+            self.request.user.is_superuser
+            and not is_start_tournament_wizard_complete()
+        ):
+            return reverse("start_tournament")
 
         if redirect_url:
             if is_restricted_staff_user(self.request.user):

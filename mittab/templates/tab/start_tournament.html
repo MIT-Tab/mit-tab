@@ -1,0 +1,187 @@
+{% extends "base/__normal.html" %}
+
+{% block title %}Tournament Basics{% endblock %}
+
+{% block content %}
+<div class="start-tournament-wizard col-12">
+  <header class="wizard-hero">
+    <div>
+      <span class="wizard-eyebrow">
+        {% if is_initial_setup %}Required first-time setup{% else %}Tournament setup{% endif %}
+      </span>
+      <h1>{% if is_initial_setup %}Let's get your tournament ready.{% else %}Tournament basics{% endif %}</h1>
+      <p>
+        Set the details staff, judges, and competitors need before the first round.
+        You can change every answer later from the Setup menu.
+      </p>
+    </div>
+    <div class="wizard-hero-icon" aria-hidden="true">
+      <i class="fas fa-flag-checkered"></i>
+    </div>
+  </header>
+
+  {% if is_initial_setup %}
+  <div class="wizard-required-note" role="status">
+    <i class="fas fa-lock" aria-hidden="true"></i>
+    <div>
+      <strong>Complete these basics to unlock staff tools.</strong>
+      This one-time setup applies to the whole tournament, so the next staff member
+      to sign in can get straight to work.
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" class="wizard-form" novalidate>
+    {% csrf_token %}
+
+    {% if form.errors %}
+    <div class="alert alert-danger" role="alert">
+      <strong>We couldn't save the tournament yet.</strong>
+      Check the highlighted fields below and try again.
+      {{ form.non_field_errors }}
+    </div>
+    {% endif %}
+
+    <section class="wizard-section">
+      <div class="wizard-step-number">1</div>
+      <div class="wizard-section-body">
+        <div class="wizard-section-heading">
+          <div>
+            <h2>Tournament identity</h2>
+            <p>These details appear on the public homepage and help everyone find GA.</p>
+          </div>
+          <span class="wizard-section-badge">Public information</span>
+        </div>
+
+        <div class="form-group">
+          <label for="{{ form.tournament_name.id_for_label }}">{{ form.tournament_name.label }}</label>
+          {{ form.tournament_name }}
+          {% for error in form.tournament_name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="{{ form.ga_room.id_for_label }}">{{ form.ga_room.label }}</label>
+            {{ form.ga_room }}
+            <small class="form-text text-muted">{{ form.ga_room.help_text }}</small>
+            {% for error in form.ga_room.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-group col-md-6">
+            <label for="{{ form.facebook_url.id_for_label }}">{{ form.facebook_url.label }}</label>
+            {{ form.facebook_url }}
+            <small class="form-text text-muted">{{ form.facebook_url.help_text }}</small>
+            {% for error in form.facebook_url.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wizard-section">
+      <div class="wizard-step-number">2</div>
+      <div class="wizard-section-body">
+        <div class="wizard-section-heading">
+          <div>
+            <h2>Disclosure policy</h2>
+            <p>Give judges a clear answer about what they may share after each debate.</p>
+          </div>
+          <span class="wizard-section-badge">Judge guidance</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="{{ form.open_speaks.id_for_label }}">{{ form.open_speaks.label }}</label>
+            {{ form.open_speaks }}
+            <small class="form-text text-muted">{{ form.open_speaks.help_text }}</small>
+            {% for error in form.open_speaks.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-group col-md-6">
+            <label for="{{ form.open_ranks.id_for_label }}">{{ form.open_ranks.label }}</label>
+            {{ form.open_ranks }}
+            <small class="form-text text-muted">{{ form.open_ranks.help_text }}</small>
+            {% for error in form.open_ranks.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wizard-section">
+      <div class="wizard-step-number">3</div>
+      <div class="wizard-section-body">
+        <div class="wizard-section-heading">
+          <div>
+            <h2>Tab staff</h2>
+            <p>
+              {% if is_initial_setup %}
+              Invite at least one more member of tab staff before you start.
+              They'll get an email with a link to set their own password.
+              {% else %}
+              Invite and manage additional tab staff from the Invite Staff page.
+              {% endif %}
+            </p>
+          </div>
+          <span class="wizard-section-badge">{% if is_initial_setup %}Required{% else %}Accounts{% endif %}</span>
+        </div>
+
+        <div class="wizard-login-note" role="note">
+          <i class="fas fa-user-shield" aria-hidden="true"></i>
+          <div>
+            <strong>Different tab staff members should always have different logins</strong>
+            so the tournament can track who did what. Do not share your password.
+          </div>
+        </div>
+
+        {% if invite_form %}
+        {% if invite_form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {% for error in invite_form.non_field_errors %}{{ error }}{% endfor %}
+        </div>
+        {% endif %}
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="{{ invite_form.email.id_for_label }}">Their email</label>
+            {{ invite_form.email }}
+            {% for error in invite_form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-group col-md-6">
+            <label for="{{ invite_form.username.id_for_label }}">Their username</label>
+            {{ invite_form.username }}
+            <small class="form-text text-muted">The username they will use to sign in.</small>
+            {% for error in invite_form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="{{ invite_form.permission_preset.id_for_label }}">{{ invite_form.permission_preset.label }}</label>
+          {{ invite_form.permission_preset }}
+          <small class="form-text text-muted">{{ invite_form.permission_preset.help_text }}</small>
+          {% for error in invite_form.permission_preset.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          <details class="wizard-preset-details">
+            <summary>What can each preset do?</summary>
+            <ul>
+              {% for preset in staff_preset_details %}
+              <li><strong>{{ preset.label }}:</strong> {{ preset.summary }}</li>
+              {% endfor %}
+            </ul>
+          </details>
+        </div>
+        {% else %}
+        <a class="btn btn-outline-primary" href="{% url 'invite_staff' %}">
+          <i class="fas fa-user-plus mr-1" aria-hidden="true"></i> Invite tab staff
+        </a>
+        {% endif %}
+      </div>
+    </section>
+
+    <footer class="wizard-actions">
+      <div>
+        <i class="fas fa-sync-alt" aria-hidden="true"></i>
+        Nothing here is locked. Return to <strong>Setup → Tournament Basics</strong>
+        whenever plans change.
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg">
+        {% if is_initial_setup %}Save, send invite, and start setup{% else %}Save changes{% endif %}
+        <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
+      </button>
+    </footer>
+  </form>
+</div>
+{% endblock %}
