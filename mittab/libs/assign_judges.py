@@ -54,6 +54,7 @@ def get_inround_settings():
         ),
         allow_rejudges=TabSettings.get("allow_rejudges", False),
         rejudge_penalty=TabSettings.get("rejudge_penalty", 100),
+        repeat_wing_penalty=TabSettings.get("repeat_wing_penalty", 10),
     )
 
 
@@ -169,6 +170,12 @@ def add_judges():
     rejudge_counts = {}
     if pairing_settings.allow_rejudges:
         rejudge_counts = judge_team_rejudge_counts(chairs, all_teams)
+    repeat_wing_counts = {}
+    if pairing_settings.repeat_wing_penalty > 0:
+        repeat_wing_counts = judge_chair_wing_counts(
+            all_judges,
+            before_round_number=round_number,
+        )
 
     graph_edges = []
     for chair_i, chair in enumerate(chairs):
@@ -314,6 +321,15 @@ def add_judges():
                             (1 + 0.1 * judge_score)
                         )
                         weight -= penalty * rejudge_sum
+
+                    repeat_wing_count = repeat_wing_counts.get(
+                        judge.id,
+                        {},
+                    ).get(chair.id, 0)
+                    weight -= (
+                        pairing_settings.repeat_wing_penalty
+                        * repeat_wing_count
+                    )
 
                     wing_edges.append((pairing_i, num_rounds + wing_judge_i, weight))
 
@@ -700,5 +716,33 @@ def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
             if round_obj.opp_team_id in team_ids:
                 result[judge.id][round_obj.opp_team_id] = result[judge.id].get(
                     round_obj.opp_team_id, 0) + 1
+
+    return result
+
+
+def judge_chair_wing_counts(judges, before_round_number=None):
+    """Count prior inrounds where each judge winged each chair.
+
+    Judges must have the ``judges`` relation prefetched before calling this
+    function to avoid an N+1 query.
+    """
+    result = {}
+
+    for judge in judges:
+        result[judge.id] = {}
+        for round_obj in judge.judges.all():
+            if (
+                    round_obj.chair_id is None
+                    or round_obj.chair_id == judge.id
+                    or (
+                        before_round_number is not None
+                        and round_obj.round_number >= before_round_number
+                    )):
+                continue
+
+            chair_counts = result[judge.id]
+            chair_counts[round_obj.chair_id] = (
+                chair_counts.get(round_obj.chair_id, 0) + 1
+            )
 
     return result
