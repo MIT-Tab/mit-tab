@@ -75,9 +75,14 @@ def _team_text_lines(team, request):
 def _judge_text_lines(judge, fallback_school):
     schools = ", ".join(s.name for s in judge.schools.all()) or fallback_school
     availability = _format_available_rounds(judge.expected_checkins.all())
+    experience = (
+        judge.reported_experience
+        if judge.reported_experience is not None
+        else judge.rank
+    )
     return [
         f"- {judge.name}",
-        f"  Experience: {judge.rank}",
+        f"  Self-reported experience: {experience}",
         f"  Schools: {schools}",
         f"  Availability: {availability}",
     ]
@@ -110,7 +115,11 @@ def _registration_team_context(team, request):
 def _registration_judge_context(judge, fallback_school):
     return {
         "name": judge.name,
-        "rank": judge.rank,
+        "rank": (
+            judge.reported_experience
+            if judge.reported_experience is not None
+            else judge.rank
+        ),
         "schools": ", ".join(s.name for s in judge.schools.all())
         or fallback_school,
         "availability": _format_available_rounds(judge.expected_checkins.all()),
@@ -146,6 +155,8 @@ def _registration_text_body(
         "School and contact",
         f"  School: {registration.school.name}",
         f"  Email:  {registration.email}",
+        f"  Dietary requests: {registration.dietary_requests or 'None'}",
+        f"  Other housing requests: {registration.housing_requests or 'None'}",
         "",
         "Teams",
     ])
@@ -189,6 +200,8 @@ def build_registration_confirmation_email(
     context = {
         "school_name": registration.school.name,
         "contact_email": registration.email,
+        "dietary_requests": registration.dietary_requests,
+        "housing_requests": registration.housing_requests,
         "tournament_name": tournament_name,
         "edit_url": edit_url,
         "registration_code": registration.herokunator_code,

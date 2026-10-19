@@ -1,6 +1,8 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.utils import timezone
 from django.urls import reverse
 
 from mittab.apps.registration.models import (
@@ -139,3 +141,48 @@ def test_registration_config_is_singleton():
     assert RegistrationConfig.objects.count() == 1
     config.refresh_from_db()
     assert config.allow_new_registrations is True
+
+
+@pytest.mark.django_db
+def test_registration_schedule_controls_new_and_edit_windows_independently():
+    now = timezone.now()
+    config = RegistrationConfig.objects.create(
+        allow_new_registrations=True,
+        allow_registration_edits=True,
+        new_registrations_open_at=now - timedelta(hours=1),
+        new_registrations_close_at=now + timedelta(hours=1),
+        registration_edits_open_at=now - timedelta(hours=2),
+        registration_edits_close_at=now - timedelta(minutes=1),
+    )
+
+    assert config.can_create(now) is True
+    assert config.can_modify(now) is False
+
+    config.new_registrations_open_at = now + timedelta(minutes=1)
+    config.registration_edits_close_at = now + timedelta(hours=1)
+
+    assert config.can_create(now) is False
+    assert config.can_modify(now) is True
+
+
+@pytest.mark.django_db
+def test_admin_saves_schedules_and_crash_housing(logged_in_admin_client):
+    url = reverse("registration_admin")
+    response = logged_in_admin_client.post(
+        url,
+        {
+            "allow_new_registrations": "on",
+            "allow_registration_edits": "on",
+            "new_registrations_open_at": "2026-11-01T09:00",
+            "new_registrations_close_at": "2026-11-02T18:00",
+            "registration_edits_close_at": "2026-11-03T12:00",
+            "crash_housing_enabled": "on",
+        },
+    )
+
+    assert response.status_code == 302
+    config = RegistrationConfig.get_or_create_active()
+    assert config.new_registrations_open_at is not None
+    assert config.new_registrations_close_at is not None
+    assert config.registration_edits_close_at is not None
+    assert config.crash_housing_enabled is True

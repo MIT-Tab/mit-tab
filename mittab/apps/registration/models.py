@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
+from django.utils import timezone
 
 from mittab.apps.tab.models import EmailContentLog, School
 from mittab.libs.codes import generate_readable_auth_code
@@ -16,6 +17,11 @@ class RegistrationConfig(models.Model):
 
     allow_new_registrations = models.BooleanField(default=True)
     allow_registration_edits = models.BooleanField(default=True)
+    new_registrations_open_at = models.DateTimeField(null=True, blank=True)
+    new_registrations_close_at = models.DateTimeField(null=True, blank=True)
+    registration_edits_open_at = models.DateTimeField(null=True, blank=True)
+    registration_edits_close_at = models.DateTimeField(null=True, blank=True)
+    crash_housing_enabled = models.BooleanField(default=False)
     team_name_changes_allowed = models.BooleanField(default=False)
     disc_scratches_open = models.BooleanField(default=False)
     disc_scratch_quantity = models.PositiveSmallIntegerField(default=0)
@@ -40,16 +46,39 @@ class RegistrationConfig(models.Model):
         self.pk = self.SINGLETON_PK
         super().save(False, force_update, using, update_fields)
 
-    def can_create(self):
-        return self.allow_new_registrations
+    @staticmethod
+    def _within_window(enabled, opens_at, closes_at, now=None):
+        if not enabled:
+            return False
+        now = now or timezone.now()
+        if opens_at and now < opens_at:
+            return False
+        if closes_at and now >= closes_at:
+            return False
+        return True
 
-    def can_modify(self):
-        return self.allow_registration_edits
+    def can_create(self, now=None):
+        return self._within_window(
+            self.allow_new_registrations,
+            self.new_registrations_open_at,
+            self.new_registrations_close_at,
+            now,
+        )
+
+    def can_modify(self, now=None):
+        return self._within_window(
+            self.allow_registration_edits,
+            self.registration_edits_open_at,
+            self.registration_edits_close_at,
+            now,
+        )
 
 
 class Registration(models.Model):
     school = models.ForeignKey(School, on_delete=models.CASCADE)
     email = models.EmailField()
+    dietary_requests = models.TextField(blank=True)
+    housing_requests = models.TextField(blank=True)
     herokunator_code = models.CharField(max_length=255, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

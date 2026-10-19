@@ -203,6 +203,14 @@ def registration_team_initial(team):
         "debater_one_novice_status": (
             defaults[0]["debater"].novice_status if defaults[0]["debater"] else 0
         ),
+        "debater_one_needs_crash_housing": (
+            defaults[0]["debater"].needs_crash_housing
+            if defaults[0]["debater"] else False
+        ),
+        "debater_one_requests_wgm_housing": (
+            defaults[0]["debater"].requests_wgm_housing
+            if defaults[0]["debater"] else False
+        ),
         "debater_one_qualified": (
             defaults[0]["debater"].qualified if defaults[0]["debater"] else False
         ),
@@ -220,6 +228,14 @@ def registration_team_initial(team):
         ),
         "debater_two_novice_status": (
             defaults[1]["debater"].novice_status if defaults[1]["debater"] else 0
+        ),
+        "debater_two_needs_crash_housing": (
+            defaults[1]["debater"].needs_crash_housing
+            if defaults[1]["debater"] else False
+        ),
+        "debater_two_requests_wgm_housing": (
+            defaults[1]["debater"].requests_wgm_housing
+            if defaults[1]["debater"] else False
         ),
         "debater_two_qualified": (
             defaults[1]["debater"].qualified if defaults[1]["debater"] else False
@@ -239,7 +255,13 @@ def registration_judge_initial(judge, round_config):
         "judge_id": judge.pk,
         "name": judge.name,
         "email": judge.email or "",
-        "experience": judge.rank,
+        "experience": (
+            judge.reported_experience
+            if judge.reported_experience is not None
+            else judge.rank
+        ),
+        "needs_crash_housing": judge.needs_crash_housing,
+        "requests_wgm_housing": judge.requests_wgm_housing,
         "schools": [school_value(school) for school in affiliated],
         "school_label_map": {
             school_value(school): school.name for school in affiliated
@@ -353,7 +375,7 @@ def _existing_registration_debater(registration, debater_id):
     )
 
 
-def get_or_create_debater(data, school, registration=None):
+def get_or_create_debater(data, school, registration=None, housing_enabled=False):
     name = (data["name"] or "").strip()
     if not name:
         raise forms.ValidationError("Debater name required")
@@ -361,6 +383,9 @@ def get_or_create_debater(data, school, registration=None):
     debater.name = uniquify_name(Debater, name, exclude_pk=debater.pk)
     debater.email = (data.get("email") or "").strip() or None
     debater.novice_status = data["novice_status"]
+    if housing_enabled:
+        debater.needs_crash_housing = data["needs_crash_housing"]
+        debater.requests_wgm_housing = data["requests_wgm_housing"]
     debater.qualified = data["qualified"]
     debater.apda_id = data.get("apda_id") or -1
     debater.school = school
@@ -389,6 +414,8 @@ def _debater_snapshot(debater):
         "email": debater.email,
         "apda_id": debater.apda_id,
         "novice_status": debater.novice_status,
+        "needs_crash_housing": debater.needs_crash_housing,
+        "requests_wgm_housing": debater.requests_wgm_housing,
         "qualified": debater.qualified,
         "school": _school_snapshot(debater.school),
     }
@@ -436,7 +463,10 @@ def registration_snapshot(registration):
             {
                 "id": judge.pk,
                 "name": judge.name,
-                "experience": str(judge.rank),
+                "reported_experience": judge.reported_experience,
+                "calibration": str(judge.rank),
+                "needs_crash_housing": judge.needs_crash_housing,
+                "requests_wgm_housing": judge.requests_wgm_housing,
                 "schools": [_school_snapshot(school) for school in judge.schools.all()],
                 "availability_rounds": sorted(
                     checkin.round_number for checkin in judge.expected_checkins.all()
@@ -448,6 +478,8 @@ def registration_snapshot(registration):
         "code": registration.herokunator_code,
         "school": _school_snapshot(registration.school),
         "email": registration.email,
+        "dietary_requests": registration.dietary_requests,
+        "housing_requests": registration.housing_requests,
         "teams": teams,
         "judges": judges,
     }
@@ -502,7 +534,7 @@ def diff_registration_snapshots(before, after):
         }, ["created registration"]
     changes = {}
     summary = []
-    for field in ("school", "email"):
+    for field in ("school", "email", "dietary_requests", "housing_requests"):
         if before.get(field) != after.get(field):
             changes[field] = {
                 "before": before.get(field),
@@ -545,7 +577,12 @@ def log_registration_change(registration, action, before=None, after=None):
     )
 
 
-def save_registration(reg_form, team_formset, judge_formset, registration):
+def save_registration(
+        reg_form,
+        team_formset,
+        judge_formset,
+        registration,
+        housing_enabled=False):
     before = (
         registration_snapshot(registration) if registration and registration.pk else {}
     )
@@ -553,6 +590,9 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
     registration = registration or Registration()
     registration.school = school
     registration.email = reg_form.cleaned_data["email"]
+    registration.dietary_requests = reg_form.cleaned_data["dietary_requests"]
+    if housing_enabled:
+        registration.housing_requests = reg_form.cleaned_data["housing_requests"]
     registration.save()
 
     team_payloads = []
@@ -611,7 +651,12 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
             team.name = uniquify_name(Team, payload["name"], exclude_pk=team.pk)
             team.save()
         debaters = [
-            get_or_create_debater(member, member_schools[index], registration)
+            get_or_create_debater(
+                member,
+                member_schools[index],
+                registration,
+                housing_enabled=housing_enabled,
+            )
             for index, member in enumerate(members)
         ]
         team.debaters.set(debaters)
@@ -628,9 +673,14 @@ def save_registration(reg_form, team_formset, judge_formset, registration):
         payload = form.get_payload()
         judge = Judge.objects.filter(
             pk=payload.get("judge_id"), registration=registration
-        ).first() or Judge(registration=registration)
+        ).first()
+        if judge is None:
+            judge = Judge(registration=registration, rank=0)
         judge.name = uniquify_name(Judge, payload["name"], exclude_pk=judge.pk)
-        judge.rank = payload["experience"]
+        judge.reported_experience = payload["experience"]
+        if housing_enabled:
+            judge.needs_crash_housing = payload["needs_crash_housing"]
+            judge.requests_wgm_housing = payload["requests_wgm_housing"]
         judge.email = payload["email"]
         try:
             judge.save()

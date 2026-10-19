@@ -33,6 +33,14 @@ def _build_debater_fields():
             required=False,
             initial=Debater.VARSITY,
         )
+        fields[f"{prefix}_needs_crash_housing"] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+        )
+        fields[f"{prefix}_requests_wgm_housing"] = forms.BooleanField(
+            required=False,
+            widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+        )
         fields[f"{prefix}_qualified"] = forms.BooleanField(
             required=False, widget=forms.HiddenInput
         )
@@ -83,6 +91,16 @@ class RegistrationForm(ValueMixin, forms.Form):
     school = forms.CharField()
     school_name = forms.CharField(required=False, max_length=50)
     email = forms.EmailField(max_length=254)
+    dietary_requests = forms.CharField(
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    housing_requests = forms.CharField(
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
 
     def __init__(self, *args, school_choices=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,6 +129,13 @@ class RegistrationForm(ValueMixin, forms.Form):
             "data-related-select", self.fields["school"].widget.attrs.get("id")
         )
         self.fields["email"].widget.attrs.update({"class": "form-control"})
+        for field_name in ("dietary_requests", "housing_requests"):
+            self.fields[field_name].widget.attrs.update(
+                {
+                    "class": "form-control",
+                    "placeholder": "Share any requests or details staff should know.",
+                }
+            )
 
     def get_school(self):
         value = self.cleaned_data["school"]
@@ -235,6 +260,9 @@ class TeamForm(ValueMixin, forms.Form):
             if not data.get(f"{prefix}_school"):
                 raise forms.ValidationError("Select a school for each debater")
         data["team_school_source"] = primary
+        for prefix in DEBATER_PREFIXES:
+            if data.get(f"{prefix}_requests_wgm_housing"):
+                data[f"{prefix}_needs_crash_housing"] = True
         return data
 
     def _member_payload(self, prefix):
@@ -252,7 +280,15 @@ class TeamForm(ValueMixin, forms.Form):
             ),
             "apda_id": self.cleaned_data.get(f"{prefix}_apda_id"),
             "novice_status": int(
-                self.cleaned_data[f"{prefix}_novice_status"] or Debater.VARSITY
+                self.cleaned_data[f"{prefix}_novice_status"]
+                if self.cleaned_data[f"{prefix}_novice_status"] is not None
+                else Debater.VARSITY
+            ),
+            "needs_crash_housing": bool(
+                self.cleaned_data.get(f"{prefix}_needs_crash_housing")
+            ),
+            "requests_wgm_housing": bool(
+                self.cleaned_data.get(f"{prefix}_requests_wgm_housing")
             ),
             "qualified": bool(self.cleaned_data.get(f"{prefix}_qualified")),
             "school": parse_school(school_value, school_label),
@@ -304,6 +340,12 @@ class TeamForm(ValueMixin, forms.Form):
         name_field = f"{prefix}_name"
         apda_field = f"{prefix}_apda_id"
         name_widget = self.fields[name_field].widget
+        current_name = self._current_value(name_field)
+        if current_name:
+            name_widget.choices = [
+                ("", "Select a debater"),
+                (current_name, current_name),
+            ]
         name_widget.attrs.update(
             {
                 "data-debater-input": prefix,
@@ -323,6 +365,14 @@ class JudgeForm(forms.Form):
         min_value=0,
         max_value=10,
         widget=forms.NumberInput(attrs={"min": "0", "max": "10", "step": "1"}),
+    )
+    needs_crash_housing = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+    )
+    requests_wgm_housing = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
     schools = SchoolMultipleChoiceField(required=False, choices=())
     DELETE = forms.BooleanField(required=False, widget=forms.HiddenInput)
@@ -403,6 +453,13 @@ class JudgeForm(forms.Form):
             "name": self.cleaned_data["name"],
             "email": self.cleaned_data["email"],
             "experience": self.cleaned_data["experience"],
+            "needs_crash_housing": bool(
+                self.cleaned_data.get("needs_crash_housing")
+                or self.cleaned_data.get("requests_wgm_housing")
+            ),
+            "requests_wgm_housing": bool(
+                self.cleaned_data.get("requests_wgm_housing")
+            ),
             "schools": self.get_school_payloads(),
             "availability_rounds": self.get_available_rounds(),
         }
@@ -439,6 +496,47 @@ class RegistrationSettingsForm(forms.Form):
         help_text="Controls whether existing registration links can modify their data.",
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
+    new_registrations_open_at = forms.DateTimeField(
+        label="New Registrations Open",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
+        ),
+    )
+    new_registrations_close_at = forms.DateTimeField(
+        label="New Registrations Close",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
+        ),
+    )
+    registration_edits_open_at = forms.DateTimeField(
+        label="Registration Edits Open",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
+        ),
+    )
+    registration_edits_close_at = forms.DateTimeField(
+        label="Registration Edits Close",
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(
+            format="%Y-%m-%dT%H:%M",
+            attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
+        ),
+    )
+    crash_housing_enabled = forms.BooleanField(
+        label="Ask About Crash Housing",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
+    )
     team_name_changes_allowed = forms.BooleanField(
         label="Allow Team Name Changes",
         required=False,
@@ -469,12 +567,33 @@ class RegistrationSettingsForm(forms.Form):
         initial = {
             "allow_new_registrations": self.config.allow_new_registrations,
             "allow_registration_edits": self.config.allow_registration_edits,
+            "new_registrations_open_at": self.config.new_registrations_open_at,
+            "new_registrations_close_at": self.config.new_registrations_close_at,
+            "registration_edits_open_at": self.config.registration_edits_open_at,
+            "registration_edits_close_at": self.config.registration_edits_close_at,
+            "crash_housing_enabled": self.config.crash_housing_enabled,
             "team_name_changes_allowed": self.config.team_name_changes_allowed,
             "disc_scratches_open": self.config.disc_scratches_open,
             "disc_scratch_quantity": self.config.disc_scratch_quantity,
         }
         kwargs.setdefault("initial", initial)
         super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        windows = (
+            ("new_registrations_open_at", "new_registrations_close_at"),
+            ("registration_edits_open_at", "registration_edits_close_at"),
+        )
+        for open_field, close_field in windows:
+            opens_at = cleaned_data.get(open_field)
+            closes_at = cleaned_data.get(close_field)
+            if opens_at and closes_at and opens_at >= closes_at:
+                self.add_error(
+                    close_field,
+                    "Closing time must be after the opening time.",
+                )
+        return cleaned_data
 
     def clean_disc_scratch_quantity(self):
         return self.cleaned_data.get("disc_scratch_quantity") or 0
@@ -485,6 +604,21 @@ class RegistrationSettingsForm(forms.Form):
         ]
         self.config.allow_registration_edits = self.cleaned_data[
             "allow_registration_edits"
+        ]
+        self.config.new_registrations_open_at = self.cleaned_data[
+            "new_registrations_open_at"
+        ]
+        self.config.new_registrations_close_at = self.cleaned_data[
+            "new_registrations_close_at"
+        ]
+        self.config.registration_edits_open_at = self.cleaned_data[
+            "registration_edits_open_at"
+        ]
+        self.config.registration_edits_close_at = self.cleaned_data[
+            "registration_edits_close_at"
+        ]
+        self.config.crash_housing_enabled = self.cleaned_data[
+            "crash_housing_enabled"
         ]
         self.config.team_name_changes_allowed = self.cleaned_data[
             "team_name_changes_allowed"

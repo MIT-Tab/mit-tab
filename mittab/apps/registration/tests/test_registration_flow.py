@@ -1,10 +1,12 @@
 import json
+from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
 
 import pytest
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from mittab.apps.registration.forms import DEBATER_PREFIXES
 from mittab.apps.registration.models import (
@@ -301,6 +303,57 @@ def test_debater_email_status_is_blocked_when_registration_is_closed(client):
 
 
 @pytest.mark.django_db
+@mock.patch(
+    "mittab.apps.registration.services.fetch_remote_schools",
+    return_value=[],
+)
+def test_scheduled_close_can_block_new_registration_but_leave_edits_open(
+    _remote_schools, client
+):
+    school = School.objects.create(name="Schedule U")
+    registration = Registration.objects.create(
+        school=school,
+        email="schedule@example.com",
+    )
+    config = RegistrationConfig.get_or_create_active()
+    config.allow_new_registrations = True
+    config.allow_registration_edits = True
+    config.new_registrations_close_at = timezone.now() - timedelta(minutes=1)
+    config.registration_edits_close_at = timezone.now() + timedelta(hours=1)
+    config.save()
+
+    new_response = client.get("/registration/")
+    edit_response = client.get(
+        reverse("registration_portal_edit", args=[registration.herokunator_code])
+    )
+
+    assert new_response.context["can_submit_registration"] is False
+    assert b"New registrations are currently closed" in new_response.content
+    assert edit_response.context["can_submit_registration"] is True
+
+
+@pytest.mark.django_db
+@mock.patch(
+    "mittab.apps.registration.services.fetch_remote_schools",
+    return_value=[],
+)
+def test_crash_housing_questions_follow_admin_setting(_remote_schools, client):
+    config = RegistrationConfig.get_or_create_active()
+    config.crash_housing_enabled = False
+    config.save()
+
+    response = client.get("/registration/")
+    assert b"Needs crash housing" not in response.content
+    assert b"Other housing requests" not in response.content
+
+    config.crash_housing_enabled = True
+    config.save()
+    response = client.get("/registration/")
+    assert b"Needs crash housing" in response.content
+    assert b"Other housing requests" in response.content
+
+
+@pytest.mark.django_db
 @mock.patch("mittab.apps.registration.emails.EmailService")
 def test_registration_flow_creates_objects(email_service, client):
     email_service.return_value.send_bulk.return_value = 1
@@ -374,7 +427,8 @@ def test_registration_flow_creates_objects(email_service, client):
     )
     judge = registration.judges.first()
     assert judge.name == "Reg Judge"
-    assert judge.rank == Decimal("7")
+    assert judge.reported_experience == 7
+    assert judge.rank == Decimal("0")
     assert judge.email == "judge@example.com"
     assert {school.name for school in judge.schools.all()} == {
         "Registration U",
@@ -451,6 +505,90 @@ def test_registration_flow_creates_objects(email_service, client):
     )
     assert "email" not in log.snapshot["judges"][0]
     assert f"(Code: {judge.ballot_code})".encode() not in response.content
+
+
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_saves_requests_without_trusting_reported_experience(
+    email_service, client
+):
+    email_service.return_value.send_bulk.return_value = 1
+    config = RegistrationConfig.get_or_create_active()
+    config.crash_housing_enabled = True
+    config.save()
+    School.objects.create(name="Housing U", apda_id=321)
+    first = speaker("Housing Speaker", "apda:321", "Housing U")
+    first["needs_crash_housing"] = "on"
+    first["requests_wgm_housing"] = "on"
+    teams = [
+        team_entry(
+            0,
+            "Housing U A",
+            [first, speaker("Commuting Speaker", "apda:321", "Housing U")],
+        )
+    ]
+    judge = judge_entry(
+        0,
+        "Housing Judge",
+        "housing.judge@example.com",
+        9,
+        schools=["apda:321"],
+    )
+    judge["judges-0-requests_wgm_housing"] = "on"
+    data = registration_payload(
+        "apda:321", "Housing U", "housing@example.com", teams, [judge]
+    )
+    data["dietary_requests"] = "Severe peanut allergy"
+    data["housing_requests"] = "Arriving after midnight"
+
+    response = client.post("/registration/", data=data)
+
+    assert response.status_code == 302
+    registration = Registration.objects.get()
+    assert registration.dietary_requests == "Severe peanut allergy"
+    assert registration.housing_requests == "Arriving after midnight"
+    housing_speaker = Debater.objects.get(name="Housing Speaker")
+    assert housing_speaker.needs_crash_housing is True
+    assert housing_speaker.requests_wgm_housing is True
+    housing_judge = Judge.objects.get(name="Housing Judge")
+    assert housing_judge.needs_crash_housing is True
+    assert housing_judge.requests_wgm_housing is True
+    assert housing_judge.reported_experience == 9
+    assert housing_judge.rank == Decimal("0")
+
+
+@pytest.mark.django_db
+def test_invalid_submission_preserves_debater_and_novice_values(client):
+    novice = speaker(
+        "Second Year Novice",
+        "apda:654",
+        "Validation U",
+        apda_id="7654",
+        email="",
+    )
+    novice["novice_status"] = "1"
+    data = registration_payload(
+        "apda:654",
+        "Validation U",
+        "contact@example.com",
+        [
+            team_entry(
+                0,
+                "Validation U A",
+                [novice, speaker("Partner", "apda:654", "Validation U")],
+            )
+        ],
+        [],
+    )
+
+    response = client.post("/registration/", data=data)
+
+    assert response.status_code == 200
+    form = response.context["team_formset"].forms[0]
+    assert form["debater_one_name"].value() == "Second Year Novice"
+    assert form["debater_one_novice_status"].value() == "1"
+    assert b'Second Year Novice</option>' in response.content
+    assert b"Each debater needs an email" in response.content
 
 
 @pytest.mark.django_db

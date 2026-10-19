@@ -20,18 +20,61 @@
 
     <form method="post" class="registration-admin__settings">
         {% csrf_token %}
-        <div class="registration-admin__settings-row">
-            <div class="custom-control custom-switch">
-                {{ form.allow_new_registrations }}
-                <label class="custom-control-label" for="{{ form.allow_new_registrations.id_for_label }}">
-                    Allow New Registrations
-                </label>
+        <div class="registration-admin__settings-head">
+            <div>
+                <h6 class="registration-admin__panel-title mb-1">Registration Availability</h6>
+                <p class="text-muted small mb-0">Manual switches are the master controls. Optional windows automatically open and close each type independently.</p>
             </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save Settings</button>
+        </div>
+        <div class="registration-admin__schedule-grid">
+            <section class="registration-admin__schedule-card">
+                <div class="registration-admin__schedule-title">
+                    <div class="custom-control custom-switch">
+                        {{ form.allow_new_registrations }}
+                        <label class="custom-control-label" for="{{ form.allow_new_registrations.id_for_label }}">New registrations</label>
+                    </div>
+                    <span class="badge badge-{% if config.can_create %}success{% else %}secondary{% endif %}">{% if config.can_create %}Open now{% else %}Closed now{% endif %}</span>
+                </div>
+                <div class="registration-admin__datetime-grid">
+                    <div class="form-group mb-0">
+                        <label for="{{ form.new_registrations_open_at.id_for_label }}">Open at (UTC)</label>
+                        {{ form.new_registrations_open_at }}
+                        <div class="registration-field__error">{{ form.new_registrations_open_at.errors }}</div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="{{ form.new_registrations_close_at.id_for_label }}">Close at (UTC)</label>
+                        {{ form.new_registrations_close_at }}
+                        <div class="registration-field__error">{{ form.new_registrations_close_at.errors }}</div>
+                    </div>
+                </div>
+            </section>
+            <section class="registration-admin__schedule-card">
+                <div class="registration-admin__schedule-title">
+                    <div class="custom-control custom-switch">
+                        {{ form.allow_registration_edits }}
+                        <label class="custom-control-label" for="{{ form.allow_registration_edits.id_for_label }}">Registration edits</label>
+                    </div>
+                    <span class="badge badge-{% if config.can_modify %}success{% else %}secondary{% endif %}">{% if config.can_modify %}Open now{% else %}Closed now{% endif %}</span>
+                </div>
+                <div class="registration-admin__datetime-grid">
+                    <div class="form-group mb-0">
+                        <label for="{{ form.registration_edits_open_at.id_for_label }}">Open at (UTC)</label>
+                        {{ form.registration_edits_open_at }}
+                        <div class="registration-field__error">{{ form.registration_edits_open_at.errors }}</div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label for="{{ form.registration_edits_close_at.id_for_label }}">Close at (UTC)</label>
+                        {{ form.registration_edits_close_at }}
+                        <div class="registration-field__error">{{ form.registration_edits_close_at.errors }}</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="registration-admin__settings-row registration-admin__settings-row--secondary">
             <div class="custom-control custom-switch">
-                {{ form.allow_registration_edits }}
-                <label class="custom-control-label" for="{{ form.allow_registration_edits.id_for_label }}">
-                    Allow Registration Updates
-                </label>
+                {{ form.crash_housing_enabled }}
+                <label class="custom-control-label" for="{{ form.crash_housing_enabled.id_for_label }}">Ask About Crash Housing</label>
             </div>
             <div class="custom-control custom-switch">
                 {{ form.team_name_changes_allowed }}
@@ -51,7 +94,6 @@
                 </label>
                 {{ form.disc_scratch_quantity }}
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <small class="registration-admin__hint">
                 Note: team name changes and disc scratches are auto-disabled for teams once round 1 has been paired, regardless of the toggles above.
             </small>
@@ -114,6 +156,7 @@
                 <thead>
                     <tr>
                         <th scope="col">School / Contact</th>
+                        <th scope="col">Requests</th>
                         <th scope="col">Teams</th>
                         <th scope="col">Judges</th>
                         <th scope="col">Recent Changes</th>
@@ -129,6 +172,14 @@
                             <div class="school-name">{{ registration.school.name }}</div>
                             <div class="school-email">{{ registration.email }}</div>
                         </td>
+                        <td class="registration-admin__requests">
+                            <strong>Dietary</strong>
+                            <div>{% if registration.dietary_requests %}{{ registration.dietary_requests|linebreaksbr }}{% else %}<span class="text-muted">None</span>{% endif %}</div>
+                            {% if config.crash_housing_enabled or registration.housing_requests %}
+                            <strong>Housing</strong>
+                            <div>{% if registration.housing_requests %}{{ registration.housing_requests|linebreaksbr }}{% else %}<span class="text-muted">None</span>{% endif %}</div>
+                            {% endif %}
+                        </td>
                         <td>
                             <span class="badge badge-light">{{ registration.team_count }} teams</span>
                             {% if registration.team_count %}
@@ -140,7 +191,7 @@
                                     <span class="text-muted">
                                         —
                                         {% for debater in team.debaters.all %}
-                                            {{ debater.name }}{% if not forloop.last %}, {% endif %}
+                                            {{ debater.name }}{% if debater.needs_crash_housing %} <span class="badge badge-info">Housing{% if debater.requests_wgm_housing %} · WGM{% endif %}</span>{% endif %}{% if not forloop.last %}, {% endif %}
                                         {% endfor %}
                                     </span>
                                     {% endif %}
@@ -156,6 +207,9 @@
                                 {% for judge in registration.judges.all %}
                                 <li>
                                     <strong>{{ judge.name }}</strong>
+                                    {% if judge.reported_experience is not None %}<span class="badge badge-primary">Reported {{ judge.reported_experience }}/10</span>{% endif %}
+                                    <span class="badge badge-light">Calibration {{ judge.rank }}</span>
+                                    {% if judge.needs_crash_housing %}<span class="badge badge-info">Housing{% if judge.requests_wgm_housing %} · WGM{% endif %}</span>{% endif %}
                                     {% if judge.schools.all %}
                                     <span class="text-muted">
                                         —

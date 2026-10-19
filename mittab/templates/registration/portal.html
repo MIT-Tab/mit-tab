@@ -45,6 +45,24 @@
         <section class="registration-section">
             <div class="registration-section-header">
                 <div class="registration-section-titles">
+                    <h2 class="registration-section-title">Food{% if config.crash_housing_enabled %} &amp; Housing{% endif %}</h2>
+                    <p class="registration-section-subtitle">These notes go directly to tournament staff.</p>
+                </div>
+            </div>
+            <div class="registration-field-row">
+                {% include "registration/_input_group.html" with field=registration_form.dietary_requests label="Dietary requests" errors=registration_form.dietary_requests.errors %}
+                {% if config.crash_housing_enabled %}
+                {% include "registration/_input_group.html" with field=registration_form.housing_requests label="Other housing requests" errors=registration_form.housing_requests.errors %}
+                {% endif %}
+            </div>
+            {% if config.crash_housing_enabled %}
+            <p class="registration-section-subtitle">Mark crash housing needs on each debater and judge below. WGM housing is crash housing limited to women and gender minorities.</p>
+            {% endif %}
+        </section>
+
+        <section class="registration-section">
+            <div class="registration-section-header">
+                <div class="registration-section-titles">
                     <h2 class="registration-section-title">Teams</h2>
                     <p class="registration-section-subtitle">Click any team header to expand or collapse.</p>
                     <p class="registration-section-subtitle">
