@@ -57,7 +57,7 @@ Below is a reference table of available settings. Most can be modified through t
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | `pairing_released`       | `0`           | Check this to make pairings publicly visible, uncheck when they are not                                                                                                                                                                                                                                                                                                |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| `fair_bye`               | `1`           | Check this if only unseeded teams should be eligible for a first round bye, uncheck if all teams should be eligible                                                                                                                                                                                                                                                    |
+| `fair_bye`               | `1`           | `0` allows any seed; `1` allows free-seed or unseeded teams; `2` allows only unseeded teams. Empty groups fall back to the next lowest seed bucket.                                                                                                                                                                                                                    |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | `use_team_codes`         | `0`           | Legacy setting. Team codes are authentication tokens and are not displayed on pairings.                                                                                                                                                                                                                                                                                |
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -158,7 +158,9 @@ So, if you wanted to change the penalties so that having 4 govs was half as
 important as it usually is, you could change the value of `high_gov_penalty` to
 `-50` using the settings form. If you wanted to make it not considered at all, you could change it to `0`.
 
-To prevent seeded teams from getting the bye, check `fair_bye` in the settings form.
+Use **Round 1 bye goes to a random team of seed** under **Tab Policy** to choose
+between any seed, free seed or unseeded, and unseeded. If no team belongs to the
+selected group, the next lowest available seed bucket is used.
 
 
 ## Experimental challenge outs

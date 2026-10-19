@@ -33,8 +33,3 @@ settings:
     name: hit_team_before
     description: "Penalty for teams that have already debated each other being paired again (advanced pairing algorithm setting)"
     value: -100000
-  - fair_bye:
-    name: fair_bye
-    description: "Toggle to ensure fair distribution of byes across teams. When enabled, teams that have already received a bye are less likely to receive another one."
-    value: true
-    type: boolean
