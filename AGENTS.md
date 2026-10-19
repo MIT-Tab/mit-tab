@@ -2,4 +2,5 @@
 - Before handing off changes, run `uv run python bin/check-dependency-age`, `uv run pylint mittab`, and `npm run lint`.
 - Dependency updates and additions must choose direct Python/NPM dependency versions released at least 30 days ago and no more than 913 days ago. The dependency age check runs as its own lint-step check, blocks new or changed direct dependency versions outside that window, and leaves pre-existing out-of-window versions as warnings.
 - Read failing CI with `gh pr list -R MIT-Tab/mit-tab --json number,title,statusCheckRollup` and CircleCI build logs from the failing `targetUrl`, e.g. `curl -fsSL https://circleci.com/api/v1.1/project/github/MIT-Tab/mit-tab/<build_num>`.
-- To wait for CI, run `bin/wait-for-ci all` or `bin/wait-for-ci '<check name>'` instead of manually polling and sleeping.
+- If the `mittab-task` skill is installed (`~/.codex/skills/mittab-task`), load and follow it for every implementation task: worktree setup, tests, dev server, screenshots, PRs, and CI.
+- Never poll CI. With the skill, run its `ci-watch --detach` and end your turn; the result arrives as a new message. Without it, run `bin/wait-for-ci all` (or `bin/wait-for-ci '<check name>'`) once rather than polling and sleeping manually.
