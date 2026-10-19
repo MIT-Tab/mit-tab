@@ -310,6 +310,8 @@ def view_judges(request):
             f"({judge.ballot_code})",
             judge.rank,
             judge.wing_only,
+            judge.request_wing,
+            judge.no_wings,
         )
         for judge in judges
     ]

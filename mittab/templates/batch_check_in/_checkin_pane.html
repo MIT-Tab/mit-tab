@@ -124,6 +124,12 @@
             {% if row.entity.wing_only %}
               <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
             {% endif %}
+            {% if row.entity.request_wing %}
+              <span class="badge badge-info ml-1">Requests Wing</span>
+            {% endif %}
+            {% if row.entity.no_wings %}
+              <span class="badge badge-secondary ml-1">No Wings</span>
+            {% endif %}
           </td>
         {% elif entity_type == 'room' %}
           <td><a href="/room/{{ row.entity.id }}">{{ row.entity.name }}</a></td>

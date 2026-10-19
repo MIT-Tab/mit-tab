@@ -78,6 +78,12 @@
             {% if judge.wing_only %}
               <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
             {% endif %}
+            {% if judge.request_wing %}
+              <span class="badge badge-info ml-1">Requests Wing</span>
+            {% endif %}
+            {% if judge.no_wings %}
+              <span class="badge badge-secondary ml-1">No Wings</span>
+            {% endif %}
           </a>
           <ul class="dropdown-menu"></ul>
         </span>

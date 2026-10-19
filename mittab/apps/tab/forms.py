@@ -149,6 +149,14 @@ class JudgeForm(forms.ModelForm):
             except Exception:
                 pass
 
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("request_wing") and cleaned_data.get("no_wings"):
+            raise forms.ValidationError(
+                "A judge cannot both request a wing and request no wings."
+            )
+        return cleaned_data
+
     def save(self, commit=True, actor=None):
         actor = actor if getattr(actor, "is_authenticated", False) else None
         judge = super(JudgeForm, self).save(commit=False)

@@ -30,22 +30,30 @@
   {% if current_judge_obj and current_judge_obj.wing_only %}
       <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
   {% endif %}
+  {% if current_judge_obj and current_judge_obj.request_wing %}
+      <span class="badge badge-info ml-1">Requests Wing</span>
+  {% endif %}
+  {% if current_judge_obj and current_judge_obj.no_wings %}
+      <span class="badge badge-secondary ml-1">No Wings</span>
+  {% endif %}
 </a>
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">Viable Judges Not Paired In</h6>
 {% if is_outround %}
-  {% for judge_name, judge_id, judge_rank, wing_only in excluded_judges%}
+  {% for judge_name, judge_id, judge_rank, wing_only, request_wing, no_wings in excluded_judges%}
   <a href="#" class="dropdown-item judge-assign searchable" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
     {{judge_name}} - {{judge_rank}}
     {% if wing_only %}
       <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
     {% endif %}
+    {% if request_wing %}<span class="badge badge-info ml-1">Requests Wing</span>{% endif %}
+    {% if no_wings %}<span class="badge badge-secondary ml-1">No Wings</span>{% endif %}
   </a>
   {% empty %}
   <a class="dropdown-item">No viable judges</a>
   {% endfor %}
 {% else %}
-  {% for judge_name, judge_id, judge_rank, rejudge_count, wing_only in excluded_judges%}
+  {% for judge_name, judge_id, judge_rank, rejudge_count, wing_only, request_wing, no_wings in excluded_judges%}
   <a href="#" class="dropdown-item judge-assign searchable" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
     {{judge_name}} - {{judge_rank}}
     {% if rejudge_count %}
@@ -54,6 +62,8 @@
     {% if wing_only %}
       <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
     {% endif %}
+    {% if request_wing %}<span class="badge badge-info ml-1">Requests Wing</span>{% endif %}
+    {% if no_wings %}<span class="badge badge-secondary ml-1">No Wings</span>{% endif %}
   </a>
   {% empty %}
   <a class="dropdown-item">No viable judges</a>
@@ -63,18 +73,20 @@
 <div class="dropdown-divider"></div>
 <h6 class="text-center dropdown-header">Viable Judges Within Pairing</h6>
 {% if is_outround %}
-  {% for judge_name, judge_id, judge_rank, wing_only in included_judges%}
+  {% for judge_name, judge_id, judge_rank, wing_only, request_wing, no_wings in included_judges%}
   <a href="#" class="dropdown-item judge-assign searchable" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
     {{judge_name}} - {{judge_rank}}
     {% if wing_only %}
       <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
     {% endif %}
+    {% if request_wing %}<span class="badge badge-info ml-1">Requests Wing</span>{% endif %}
+    {% if no_wings %}<span class="badge badge-secondary ml-1">No Wings</span>{% endif %}
   </a>
   {% empty %}
   <a class="dropdown-item">No viable judges</a>
   {% endfor %}
 {% else %}
-  {% for judge_name, judge_id, judge_rank, rejudge_count, wing_only in included_judges%}
+  {% for judge_name, judge_id, judge_rank, rejudge_count, wing_only, request_wing, no_wings in included_judges%}
   <a href="#" class="dropdown-item judge-assign searchable" judge-id="{{judge_id}}" round-id="{{round_obj.id}}" current-judge-id="{{current_judge_id}}">
     {{judge_name}} - {{judge_rank}}
     {% if rejudge_count %}
@@ -83,6 +95,8 @@
     {% if wing_only %}
       <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
     {% endif %}
+    {% if request_wing %}<span class="badge badge-info ml-1">Requests Wing</span>{% endif %}
+    {% if no_wings %}<span class="badge badge-secondary ml-1">No Wings</span>{% endif %}
   </a>
   {% empty %}
   <a class="dropdown-item">No viable judges</a>
