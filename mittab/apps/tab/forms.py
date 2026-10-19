@@ -929,6 +929,39 @@ class StartTournamentWizardForm(forms.Form):
             "autocomplete": "url",
         }),
     )
+    tournament_director = forms.CharField(
+        label="Tournament director",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
+    tab_director = forms.CharField(
+        label="Tab director",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
+    equity_officers = forms.CharField(
+        label="Equity officer(s)",
+        max_length=200,
+        help_text="Enter one name per line.",
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 2,
+        }),
+    )
+    tournament_observer = forms.CharField(
+        label="Tournament observer",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
     open_speaks = forms.TypedChoiceField(
         label="Speaker points",
         choices=DISCLOSURE_CHOICES,

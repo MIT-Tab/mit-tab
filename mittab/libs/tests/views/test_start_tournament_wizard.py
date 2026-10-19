@@ -39,6 +39,10 @@ class TestStartTournamentWizard(TestCase):
             "tournament_name": "MIT Fall Invitational",
             "ga_room": "Building 26, Room 100",
             "facebook_url": "https://www.facebook.com/events/123456789",
+            "tournament_director": "Alex Morgan",
+            "tab_director": "Jordan Lee",
+            "equity_officers": "Sam Rivera\nTaylor Chen",
+            "tournament_observer": "TBD",
             "open_speaks": 1,
             "open_ranks": 2,
             "invite-email": "second@test.com",
@@ -69,16 +73,16 @@ class TestStartTournamentWizard(TestCase):
             fetch_redirect_response=False,
         )
 
-    def test_wizard_page_explains_gate_and_future_edits(self):
+    def test_wizard_page_explains_required_setup_and_staff_placeholders(self):
         self.client.force_login(self.user)
 
         response = self.client.get(reverse("start_tournament"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Complete these basics to unlock staff tools")
-        self.assertContains(response, "You can change every answer later")
-        self.assertContains(response, "Invite at least one more member of tab staff")
-        self.assertContains(response, "Do not share your password")
+        self.assertContains(response, "Complete this form to unlock staff tools")
+        self.assertContains(response, "You can update these details later")
+        self.assertContains(response, "TBD")
+        self.assertContains(response, "Invite another tab staff member")
         self.assertNotContains(response, "Preliminary rounds")
 
     def test_initialization_placeholders_are_not_prefilled(self):
@@ -135,6 +139,13 @@ class TestStartTournamentWizard(TestCase):
         self.assertEqual(TabSettings.get("tot_rounds"), 5)
         self.assertEqual(TabSettings.get("open_speaks"), 1)
         self.assertEqual(TabSettings.get("open_ranks"), 2)
+        self.assertEqual(TabSettings.get("tournament_director"), "Alex Morgan")
+        self.assertEqual(TabSettings.get("tab_director"), "Jordan Lee")
+        self.assertEqual(
+            TabSettings.get("equity_officers"),
+            "Sam Rivera\nTaylor Chen",
+        )
+        self.assertEqual(TabSettings.get("tournament_observer"), "TBD")
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 1)
 
         ga_info = InfoText.objects.get(title=InfoText.DEFAULT_TITLE)
@@ -171,6 +182,29 @@ class TestStartTournamentWizard(TestCase):
         send_invite.assert_not_called()
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
         self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
+
+    def test_all_tournament_staff_roles_are_required(self):
+        self.client.force_login(self.user)
+
+        for field in (
+                "tournament_director",
+                "tab_director",
+                "equity_officers",
+                "tournament_observer"):
+            with self.subTest(field=field):
+                data = self._valid_data()
+                data[field] = ""
+
+                with mock.patch(SEND_INVITE) as send_invite:
+                    response = self.client.post(reverse("start_tournament"), data)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "This field is required")
+                send_invite.assert_not_called()
+                self.assertEqual(
+                    TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED),
+                    0,
+                )
 
     def test_cannot_invite_yourself(self):
         self.client.force_login(self.user)
@@ -251,6 +285,14 @@ class TestStartTournamentWizard(TestCase):
         self.assertEqual(
             InfoLink.objects.get().url,
             "https://www.facebook.com/events/123456789",
+        )
+
+        edit_response = self.client.get(reverse("start_tournament"))
+        edit_form = edit_response.context["form"]
+        self.assertEqual(edit_form.initial["tournament_director"], "Alex Morgan")
+        self.assertEqual(
+            edit_form.initial["equity_officers"],
+            "Sam Rivera\nTaylor Chen",
         )
 
     def test_legacy_tournament_without_completion_setting_is_not_gated(self):

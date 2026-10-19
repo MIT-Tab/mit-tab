@@ -24,6 +24,12 @@ from mittab.libs.email_service import EmailServiceError
 
 FACEBOOK_LINK_TITLE = "Facebook"
 INVITE_PREFIX = "invite"
+STAFF_SETTING_FIELDS = (
+    "tournament_director",
+    "tab_director",
+    "equity_officers",
+    "tournament_observer",
+)
 
 
 class WizardStaffInviteForm(StaffInviteForm):
@@ -83,6 +89,10 @@ def _initial_values(is_initial_setup=False):
             if facebook_link and not is_initial_setup
             else ""
         ),
+        **{
+            field: TabSettings.get(field, "")
+            for field in STAFF_SETTING_FIELDS
+        },
         "open_speaks": TabSettings.get("open_speaks", 0) or None,
         "open_ranks": TabSettings.get("open_ranks", 0) or None,
     }
@@ -110,6 +120,8 @@ def _save_wizard(form):
         TabSettings.set("tournament_name", cleaned["tournament_name"].strip())
         TabSettings.set("open_speaks", cleaned["open_speaks"])
         TabSettings.set("open_ranks", cleaned["open_ranks"])
+        for field in STAFF_SETTING_FIELDS:
+            TabSettings.set(field, cleaned[field].strip())
 
         ga_info = InfoText.objects.filter(title=InfoText.DEFAULT_TITLE).first()
         if ga_info is None:
