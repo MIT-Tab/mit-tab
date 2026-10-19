@@ -22,6 +22,10 @@ settings:
     name: rejudge_penalty
     description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
     value: 100
+  - repeat_wing_penalty:
+    name: repeat_wing_penalty
+    description: "Set the penalty applied in inrounds each time a wing judge has previously winged the assigned chair. A higher penalty makes repeat chair-wing pairings less likely. Set to 0 to disable."
+    value: 10
   - pair_wings:
     name: pair_wings
     description: "Toggle to enable wing pairing. When enabled, assign judges will continue assigning judges beyond just chairs to fill panels with wing judges."
