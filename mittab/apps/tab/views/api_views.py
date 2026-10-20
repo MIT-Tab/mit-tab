@@ -1,4 +1,6 @@
-from django.db.models import Count
+from datetime import date
+
+from django.db.models import Count, Min
 from django.http import JsonResponse
 from django.utils import timezone
 
@@ -7,7 +9,8 @@ from mittab.apps.tab.live_results import (
     speaker_results_available,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
-from mittab.apps.tab.models import Debater, Team, Outround, TabSettings
+from mittab.apps.tab.models import Debater, Team, Outround, Round, TabSettings
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic.stats import tot_wins
 
 
@@ -67,9 +70,9 @@ def _get_team_placements_and_ids(team_type):
     return formatted_data, placing_team_ids
 
 
-def _serialize_live_debater(debater, team=None):
-    team = team or debater.team()
-    school = team.school if team else None
+def _serialize_live_debater(debater, team):
+    # Hybrid teams carry each debater's own school; fall back to the team's.
+    school = debater.school or (team.school if team else None)
     return {
         "apda_id": debater.apda_id,
         "tournament_id": debater.pk,
@@ -86,6 +89,7 @@ def _serialize_live_team(team):
     return {
         "tournament_id": team.pk,
         "name": str(team),
+        "hybrid": team.hybrid_school_id is not None,
         "debaters": [
             _serialize_live_debater(debater, team) for debater in team.debaters.all()
         ],
@@ -97,9 +101,12 @@ def _live_team_results(team_type):
     outrounds = Outround.objects.filter(
         type_of_round=team_type,
         victor__gt=Outround.UNKNOWN,
-    ).select_related("gov_team", "opp_team").prefetch_related(
-        "gov_team__debaters",
-        "opp_team__debaters",
+    ).select_related(
+        "gov_team__school", "gov_team__hybrid_school",
+        "opp_team__school", "opp_team__hybrid_school",
+    ).prefetch_related(
+        "gov_team__debaters__school",
+        "opp_team__debaters__school",
     )
     for outround in outrounds:
         if not outround.winner:
@@ -139,15 +146,34 @@ def _live_speaker_results():
                 "place": place,
                 "division": division,
                 "tie": previous_tied_forward or tied_forward,
-                "debater": _serialize_live_debater(entry[0]),
+                "debater": _serialize_live_debater(entry[0], entry[3]),
             })
             previous_place = place
             previous_tied_forward = tied_forward
     return rows
 
 
+def _tournament_date():
+    """Date results were first entered, so it matches the reviewed import."""
+    first_result = Round.objects.aggregate(first=Min("result_entered_at"))["first"]
+    if first_result:
+        return timezone.localdate(first_result)
+    try:
+        return date.fromisoformat(str(TabSettings.get("tournament_date", "")))
+    except ValueError:
+        return timezone.localdate()
+
+
 def live_results_api(request):
     """Machine-readable live results; calculations remain on the consumer."""
+    return JsonResponse(
+        _live_results_payload(request.build_absolute_uri("/").rstrip("/"))
+    )
+
+
+# Public and unauthenticated, so bound the cost of speaker ranking per worker.
+@cache_logic.cache(seconds=60, stampede=30)
+def _live_results_payload(source_url):
     host_value = str(TabSettings.get("host_school", "") or "")
     host_id = None
     if host_value.startswith("apda:"):
@@ -156,19 +182,19 @@ def live_results_api(request):
         except ValueError:
             host_id = None
 
-    today = timezone.localdate()
-    season = today.year if today.month >= 7 else today.year - 1
+    held_on = _tournament_date()
+    season = held_on.year if held_on.month >= 7 else held_on.year - 1
     completed_at = final_inround_completed_at()
     speakers_available = speaker_results_available()
     team_ids = list(_get_teams_with_min_rounds())
     debaters = Debater.objects.filter(team__pk__in=team_ids).distinct()
 
-    return JsonResponse({
+    return {
         "schema_version": 1,
-        "source_url": request.build_absolute_uri("/").rstrip("/"),
+        "source_url": source_url,
         "tournament": {
             "name": TabSettings.get("tournament_name", "Tournament"),
-            "date": TabSettings.get("tournament_date", today.isoformat()),
+            "date": held_on.isoformat(),
             "season": str(season),
             "host_school": {
                 "apda_id": host_id,
@@ -192,7 +218,7 @@ def live_results_api(request):
         ),
         "speaker_results": _live_speaker_results(),
         "generated_at": timezone.now().isoformat(),
-    })
+    }
 
 def varsity_speaker_awards_api(request):
     """API endpoint for varsity speaker awards."""

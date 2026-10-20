@@ -1,6 +1,8 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
+from django.core.cache import caches
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -11,6 +13,7 @@ from mittab.apps.tab.models import (
     Room, TabSettings, Team, Outround, Round
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
+from mittab.apps.tab.views import api_views
 
 
 @pytest.mark.django_db(transaction=True)
@@ -19,6 +22,7 @@ class TestApiViews(TestCase):
 
     def setUp(self):
         super().setUp()
+        caches["default"].clear()
         self.client = Client()
         self.user = get_user_model().objects.create_superuser(
             username='testuser',
@@ -246,6 +250,29 @@ class TestApiViews(TestCase):
             {3, 5},
         )
 
+    def test_live_results_is_cached_between_requests(self):
+        self.client.get(reverse("live_results_api"))
+
+        with patch.object(api_views, "_live_team_results") as rebuild:
+            response = self.client.get(reverse("live_results_api"))
+
+        rebuild.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+
+    def test_live_results_dates_tournament_by_first_result(self):
+        TabSettings.set("tournament_date", "2026-08-01")
+        held_on = timezone.now() - timedelta(days=30)
+        Round.objects.update(result_entered_at=held_on)
+
+        tournament = self.client.get(reverse("live_results_api")).json()["tournament"]
+
+        expected = timezone.localdate(held_on)
+        self.assertEqual(tournament["date"], expected.isoformat())
+        self.assertEqual(
+            tournament["season"],
+            str(expected.year if expected.month >= 7 else expected.year - 1),
+        )
+
     def test_round_records_when_a_result_is_first_entered(self):
         round_obj = Round.objects.first()
         round_obj.victor = Round.UNKNOWN
@@ -269,6 +296,7 @@ class TestApiViews(TestCase):
             ("new_debater_data_api",),
             ("new_schools_api",),
             ("debater_counts_api",),
+            ("live_results_api",),
             ("team_stats", [round_obj.round_number]),
         ]
 
