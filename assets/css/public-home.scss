@@ -630,8 +630,16 @@ body {
   }
 
   .info-links--mobile {
-    margin: 0 0 0.5rem;
+    margin: 1rem 0 0.5rem;
+    padding-top: 1rem;
     padding-bottom: 0.4rem;
+    border-top: 1px solid rgba(0, 44, 92, 0.1);
+
+    .public-card-header {
+      margin-bottom: 0.75rem;
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
 
     .info-link-chip {
       font-size: 0.82rem;
