@@ -1026,7 +1026,7 @@ class StartTournamentWizardForm(forms.Form):
         # registration instead of maintaining a second school list.
         from mittab.apps.registration.services import build_school_choices
 
-        choices = list(build_school_choices())
+        choices = [("", "Choose a school…"), *build_school_choices()]
         selected = self.data.get("host_school") if self.is_bound else self.initial.get(
             "host_school"
         )

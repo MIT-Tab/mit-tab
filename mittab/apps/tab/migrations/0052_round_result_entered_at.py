@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("tab", "0050_judge_wing_preferences"),
+        ("tab", "0051_tournament_staff_roles"),
     ]
 
     operations = [
