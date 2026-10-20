@@ -43,6 +43,30 @@
 
       <div class="form-row">
         <div class="form-group col-md-6">
+          <label for="{{ form.host_school.id_for_label }}">{{ form.host_school.label }}</label>
+          {{ form.host_school }}
+          <small class="form-text text-muted">{{ form.host_school.help_text }}</small>
+          {% for error in form.host_school.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="form-group col-md-6">
+          <label for="{{ form.tournament_type.id_for_label }}">{{ form.tournament_type.label }}</label>
+          {{ form.tournament_type }}
+          <small class="form-text text-muted">{{ form.tournament_type.help_text }}</small>
+          {% for error in form.tournament_type.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <div class="custom-control custom-checkbox mb-4">
+        {{ form.sanctioned }}
+        <label class="custom-control-label" for="{{ form.sanctioned.id_for_label }}">
+          {{ form.sanctioned.label }}
+        </label>
+        <small class="form-text text-muted">{{ form.sanctioned.help_text }}</small>
+        {% for error in form.sanctioned.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-md-6">
           <label for="{{ form.ga_room.id_for_label }}">{{ form.ga_room.label }}</label>
           {{ form.ga_room }}
           <small class="form-text text-muted">{{ form.ga_room.help_text }}</small>

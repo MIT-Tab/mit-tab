@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 import pytest
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
@@ -168,29 +171,91 @@ class TestApiViews(TestCase):
             reverse("debater_counts_api"),
         ]
 
-        # Disable speaker publications, expect speaker APIs blocked
+        # Disable both publications while the three-hour embargo is active.
         set_standings_publication_setting("speaker_results", False)
+        set_standings_publication_setting("team_results", False)
         for url in speaker_urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 423)
         # Re-enable to unblock future checks
         set_standings_publication_setting("speaker_results", True)
 
-        # Disable team publications, expect team APIs blocked
-        set_standings_publication_setting("team_results", False)
+        # Outround/team placements are live as soon as entered.
         for url in team_urls:
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 423)
+            self.assertEqual(response.status_code, 200)
 
-        # Shared APIs require either set; disable both to confirm they block
+        # Identity/count APIs remain available so early live teams can resolve.
         set_standings_publication_setting("speaker_results", False)
         for url in shared_urls:
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 423)
+            self.assertEqual(response.status_code, 200)
 
         # Restore defaults for downstream tests
         set_standings_publication_setting("speaker_results", True)
         set_standings_publication_setting("team_results", True)
+
+    def test_speaker_api_unlocks_three_hours_after_final_inround(self):
+        set_standings_publication_setting("speaker_results", False)
+        set_standings_publication_setting("team_results", False)
+        final_round = Round.objects.order_by("-round_number").first().round_number
+        TabSettings.set("tot_rounds", final_round)
+        completed_at = timezone.now() - timedelta(hours=3, minutes=1)
+        Round.objects.filter(round_number=final_round).update(
+            victor=Round.GOV,
+            result_entered_at=completed_at,
+        )
+
+        response = self.client.get(reverse("varsity_speaker_awards_api"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_live_results_redacts_speakers_during_embargo(self):
+        set_standings_publication_setting("speaker_results", False)
+        set_standings_publication_setting("team_results", False)
+
+        response = self.client.get(reverse("live_results_api"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["availability"]["speakers"])
+        self.assertEqual(response.json()["speaker_results"], [])
+
+    def test_live_results_is_public(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("live_results_api"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["schema_version"], 1)
+
+    def test_live_results_reports_guaranteed_partial_bracket_places(self):
+        outround = Outround.objects.filter(type_of_round=Outround.VARSITY).first()
+        outround.num_teams = 8
+        outround.victor = Outround.GOV
+        outround.save()
+
+        response = self.client.get(reverse("live_results_api"))
+
+        self.assertEqual(response.status_code, 200)
+        varsity_results = [
+            result for result in response.json()["team_results"]
+            if result["division"] == "varsity"
+        ]
+        self.assertEqual(
+            {result["place"] for result in varsity_results},
+            {3, 5},
+        )
+
+    def test_round_records_when_a_result_is_first_entered(self):
+        round_obj = Round.objects.first()
+        round_obj.victor = Round.UNKNOWN
+        round_obj.save()
+        self.assertIsNone(round_obj.result_entered_at)
+
+        round_obj.victor = Round.GOV
+        round_obj.save()
+
+        self.assertIsNotNone(round_obj.result_entered_at)
 
     def test_n_plus_one(self):
         round_obj = Round.objects.filter(round_number=1).first()

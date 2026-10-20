@@ -898,6 +898,24 @@ class StartTournamentWizardForm(forms.Form):
         (1, "Open — judges disclose this information"),
         (2, "Closed — judges do not disclose this information"),
     )
+    TOURNAMENT_TYPE_CHOICES = (
+        (0, "Regular points tournament"),
+        (1, "Brandeis IV"),
+        (2, "Yale IV"),
+        (3, "NorthAms"),
+        (4, "Expansion"),
+        (5, "Worlds"),
+        (6, "NAUDC"),
+        (7, "ProAms"),
+        (8, "Nationals"),
+        (9, "Novice"),
+        (10, "Gender Minority"),
+        (11, "Online (no points)"),
+        (12, "Online points tournament"),
+        (13, "Online ProAms"),
+        (14, "Online Gender Minority"),
+        (15, "BIPOC"),
+    )
 
     tournament_name = forms.CharField(
         label="Tournament name",
@@ -907,6 +925,26 @@ class StartTournamentWizardForm(forms.Form):
             "placeholder": "e.g. MIT Spring Invitational",
             "autocomplete": "organization",
         }),
+    )
+    host_school = forms.ChoiceField(
+        label="Host school",
+        choices=(),
+        help_text="Schools are synced from the APDA results directory.",
+        widget=forms.Select(attrs={"class": "custom-select"}),
+    )
+    tournament_type = forms.TypedChoiceField(
+        label="Tournament type",
+        choices=TOURNAMENT_TYPE_CHOICES,
+        coerce=int,
+        help_text="This determines which season points the live results can award.",
+        widget=forms.Select(attrs={"class": "custom-select"}),
+    )
+    sanctioned = forms.BooleanField(
+        label="Sanctioned APDA tournament",
+        required=False,
+        initial=True,
+        help_text="Only sanctioned tournaments are included in the live APDA leaderboards.",
+        widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
     ga_room = forms.CharField(
         label="GA location / room",
@@ -981,6 +1019,21 @@ class StartTournamentWizardForm(forms.Form):
         ),
         widget=forms.Select(attrs={"class": "custom-select"}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Reuse the same Black Rod school directory and local-school fallback as
+        # registration instead of maintaining a second school list.
+        from mittab.apps.registration.services import build_school_choices
+
+        choices = list(build_school_choices())
+        selected = self.data.get("host_school") if self.is_bound else self.initial.get(
+            "host_school"
+        )
+        if selected and selected not in {value for value, _label in choices}:
+            selected_label = self.initial.get("host_school_name") or "Selected school"
+            choices.append((selected, selected_label))
+        self.fields["host_school"].choices = choices
 
 
     def full_clean(self):

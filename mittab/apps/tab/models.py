@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, RegexValidator
+from django.utils import timezone
 
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
@@ -1030,6 +1031,7 @@ class Round(models.Model):
     room = models.ForeignKey(
         Room, on_delete=models.SET_NULL, blank=True, null=True)
     victor = models.IntegerField(choices=VICTOR_CHOICES, default=0)
+    result_entered_at = models.DateTimeField(null=True, blank=True, editable=False)
     rfd = models.TextField(blank=True, default="")
 
     def clean(self):
@@ -1054,6 +1056,21 @@ class Round(models.Model):
              force_update=False,
              using=None,
              update_fields=None):
+        previous_victor = self.UNKNOWN
+        if self.pk:
+            previous_victor = type(self).objects.filter(pk=self.pk).values_list(
+                "victor", flat=True
+            ).first() or self.UNKNOWN
+
+        if self.victor != self.UNKNOWN and previous_victor == self.UNKNOWN:
+            self.result_entered_at = timezone.now()
+        elif self.victor == self.UNKNOWN:
+            self.result_entered_at = None
+
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            update_fields.add("result_entered_at")
+
         no_shows = NoShow.objects.filter(
             round_number=self.round_number,
             no_show_team__in=[self.gov_team, self.opp_team])

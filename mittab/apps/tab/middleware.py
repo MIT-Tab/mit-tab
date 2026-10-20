@@ -16,6 +16,7 @@ from mittab.apps.tab.auth_roles import (
 )
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.public_rankings import get_standings_publication_setting
+from mittab.apps.tab.live_results import speaker_results_available
 from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
 from mittab.apps.tab.tournament_start import is_start_tournament_wizard_complete
 from mittab.libs.backup import is_backup_active
@@ -33,18 +34,13 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools",
-                   "/api/debater-counts", "/favicon.ico", "/tournament-logo/")
+                   "/api/debater-counts", "/api/live-results",
+                   "/favicon.ico", "/tournament-logo/")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
 API_PATH_REQUIREMENTS = {
     "/api/varsity-speaker-awards": "speaker",
     "/api/novice-speaker-awards": "speaker",
-    "/api/varsity-team-placements": "team",
-    "/api/novice-team-placements": "team",
-    "/api/non-placing-teams": "team",
-    "/api/new-debater-data": "shared",
-    "/api/new-schools": "shared",
-    "/api/debater-counts": "shared",
 }
 API_ERROR_MESSAGES = {
     "speaker": "Speaker results not published",
@@ -208,14 +204,9 @@ class TournamentStatusCheck:
 
         speaker_published = bool(
             get_standings_publication_setting("speaker_results")["published"]
-        )
-        team_published = bool(
-            get_standings_publication_setting("team_results")["published"]
-        )
+        ) or speaker_results_available()
         published_state = {
             "speaker": speaker_published,
-            "team": team_published,
-            "shared": speaker_published or team_published,
         }
 
         if not published_state[requirement]:
