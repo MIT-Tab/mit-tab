@@ -10,7 +10,10 @@ from django.test import TransactionTestCase
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
 from mittab.apps.registration.models import InfoText, RegistrationConfig
 from mittab.apps.tab.models import TabSettings
-from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
+from mittab.apps.tab.tournament_start import (
+    START_TOURNAMENT_STAFF_INVITES_SENT,
+    START_TOURNAMENT_WIZARD_COMPLETED,
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -43,6 +46,7 @@ class TestInitializeTourneyCommand(TransactionTestCase):
             TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED),
             0,
         )
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT), 0)
         self.assertFalse(
             RegistrationConfig.get_or_create_active().allow_new_registrations
         )

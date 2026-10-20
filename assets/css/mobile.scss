@@ -289,3 +289,49 @@
   .footer { padding: 0.95rem 0.35rem; }
   .footer small { font-size: 0.74rem; }
 }
+
+// Setup forms are content-entry screens, not dense operational tables. Keep
+// their type at ordinary reading and touch-target sizes on phones.
+@include respond-max(767.98px) {
+  #container-main:has(.start-tournament-wizard) {
+    > .row > .col > h3 { font-size: 1.4rem; }
+
+    .content { font-size: 0.95rem; }
+  }
+
+  .start-tournament-wizard {
+    font-size: 0.95rem;
+
+    legend { font-size: 1.1rem; }
+    label { font-size: 0.9rem; }
+
+    .form-control,
+    .custom-select,
+    input,
+    select,
+    textarea {
+      min-height: 2.4rem;
+      padding: 0.45rem 0.65rem;
+      font-size: 1rem;
+    }
+
+    small,
+    .small,
+    .form-text { font-size: 0.8rem; }
+
+    .alert,
+    .btn { font-size: 0.9rem; }
+
+    .custom-staff-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .custom-staff-remove { padding-top: 0; }
+
+    .wizard-next-action {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+}

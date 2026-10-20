@@ -929,6 +929,39 @@ class StartTournamentWizardForm(forms.Form):
             "autocomplete": "url",
         }),
     )
+    tournament_director = forms.CharField(
+        label="Tournament director",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
+    tab_director = forms.CharField(
+        label="Tab director",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
+    equity_officers = forms.CharField(
+        label="Equity officer(s)",
+        max_length=200,
+        help_text="Enter one name per line.",
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 2,
+        }),
+    )
+    tournament_observer = forms.CharField(
+        label="Tournament observer",
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "autocomplete": "name",
+        }),
+    )
     open_speaks = forms.TypedChoiceField(
         label="Speaker points",
         choices=DISCLOSURE_CHOICES,
@@ -958,6 +991,52 @@ class StartTournamentWizardForm(forms.Form):
                 widget.attrs["class"] = (
                     f'{widget.attrs.get("class", "")} is-invalid'.strip()
                 )
+
+
+class CustomTournamentStaffForm(forms.Form):
+    title = forms.CharField(
+        label="Title",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "e.g. Food Director",
+        }),
+    )
+    names = forms.CharField(
+        label="Name(s)",
+        max_length=500,
+        required=False,
+        help_text="Enter one name per line.",
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 2,
+        }),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        title = (cleaned_data.get("title") or "").strip()
+        names = (cleaned_data.get("names") or "").strip()
+        if title and not names:
+            self.add_error("names", "Enter at least one name for this role.")
+        elif names and not title:
+            self.add_error("title", "Enter a title for this role.")
+        cleaned_data["title"] = title
+        cleaned_data["names"] = names
+        return cleaned_data
+
+
+class CustomTournamentStaffFormSet(forms.BaseFormSet):
+    deletion_widget = forms.HiddenInput
+
+
+CustomTournamentStaffFormSetFactory = forms.formset_factory(
+    CustomTournamentStaffForm,
+    formset=CustomTournamentStaffFormSet,
+    extra=0,
+    can_delete=True,
+)
 
 
 def validate_panel(result):

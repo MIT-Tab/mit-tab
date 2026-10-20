@@ -26,6 +26,7 @@ from mittab.apps.tab.models import (
     SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING,
     TabSettings,
     Team,
+    TournamentStaffRole,
 )
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
@@ -748,6 +749,28 @@ class TestPublicViews(TestCase):
             f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
             content,
         )
+
+    def test_public_home_displays_core_and_custom_tournament_staff(self):
+        client = Client()
+        TabSettings.set("tournament_director", "Alex Morgan")
+        TabSettings.set("tab_director", "Jordan Lee")
+        TabSettings.set("equity_officers", "Sam Rivera\nTaylor Chen")
+        TabSettings.set("tournament_observer", "TBD")
+        TournamentStaffRole.objects.create(
+            title="Food Director",
+            names="Morgan Patel",
+        )
+        caches["public"].clear()
+
+        response = client.get(reverse("public_home"))
+
+        self.assertContains(response, "Tournament Staff", count=2)
+        self.assertContains(response, "Tournament Director", count=2)
+        self.assertContains(response, "Alex Morgan", count=2)
+        self.assertContains(response, "Sam Rivera", count=2)
+        self.assertContains(response, "Taylor Chen", count=2)
+        self.assertContains(response, "Food Director", count=2)
+        self.assertContains(response, "Morgan Patel", count=2)
 
     def test_public_home_promotes_outrounds_when_they_begin(self):
         client = Client()

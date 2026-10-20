@@ -1179,8 +1179,8 @@ def clear_db():
 
     obj_types = [
         CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
-        PublicHomePage, UserTournamentSetupPreference, InfoText, TabSettings,
-        Team, School, Debater
+        PublicHomePage, TournamentStaffRole, UserTournamentSetupPreference,
+        InfoText, TabSettings, Team, School, Debater
     ]
     list(map(delete_obj, obj_types))
 

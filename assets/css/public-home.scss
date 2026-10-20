@@ -227,6 +227,10 @@ body {
   color: #1f2f4a;
 }
 
+.public-card-header--mobile-pages {
+  display: none;
+}
+
 .info-links {
   display: flex;
   flex-direction: column;
@@ -315,6 +319,55 @@ body {
   &__value {
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+}
+
+.tournament-staff-list {
+  flex: 1 0 100%;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(31, 47, 74, 0.12);
+
+  &__heading {
+    margin: 0 0 0.55rem;
+    color: #1f2f4a;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__roles {
+    margin: 0;
+  }
+
+  &__role {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.9fr) minmax(0, 1.1fr);
+    gap: 0.25rem 0.7rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(31, 47, 74, 0.07);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    dt {
+      color: rgba(28, 45, 70, 0.72);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    dd {
+      margin: 0;
+      color: #1f2f4a;
+      font-size: 0.82rem;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+
+      span {
+        display: block;
+      }
+    }
   }
 }
 
@@ -581,8 +634,48 @@ body {
   }
 
   .info-links--mobile {
-    margin: 0 0 0.5rem;
-    padding-bottom: 0.4rem;
+    margin: 0 0 0.85rem;
+    padding-bottom: 0.35rem;
+
+    .public-card-header {
+      margin-bottom: 0.75rem;
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .tournament-staff-list--compact {
+      margin-top: 0.6rem;
+      padding: 0.65rem 0 0;
+
+      .tournament-staff-list__heading {
+        margin-bottom: 0.35rem;
+        font-size: 0.8rem;
+      }
+
+      .tournament-staff-list__roles {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 0.8rem;
+      }
+
+      .tournament-staff-list__role {
+        display: block;
+        min-width: 0;
+        padding: 0.25rem 0;
+        border-bottom: 0;
+
+        dt {
+          font-size: 0.65rem;
+          line-height: 1.2;
+        }
+
+        dd {
+          margin-top: 0.05rem;
+          font-size: 0.72rem;
+          line-height: 1.25;
+        }
+      }
+    }
 
     .info-link-chip {
       font-size: 0.82rem;
@@ -598,6 +691,11 @@ body {
   .public-home .links {
     padding: 1.1rem 1rem;
     margin: 0;
+  }
+
+  .public-card-header--mobile-pages {
+    display: block;
+    margin-bottom: 0.75rem;
   }
 
   .public-links {
