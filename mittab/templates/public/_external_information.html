@@ -12,16 +12,8 @@
 </a>
 {% endfor %}
 {% if tournament_staff %}
-{% if compact_staff %}
-<details class="tournament-staff-list tournament-staff-list--compact">
-  <summary class="tournament-staff-list__summary">
-    <span>Tournament Staff</span>
-    <span class="tournament-staff-list__summary-hint">View {{ tournament_staff|length }} role{{ tournament_staff|length|pluralize }}</span>
-  </summary>
-{% else %}
-<section class="tournament-staff-list" aria-label="Tournament staff">
+<section class="tournament-staff-list{% if compact_staff %} tournament-staff-list--compact{% endif %}" aria-label="Tournament staff">
   <h3 class="tournament-staff-list__heading">Tournament Staff</h3>
-{% endif %}
   <dl class="tournament-staff-list__roles">
     {% for role in tournament_staff %}
     <div class="tournament-staff-list__role">
@@ -34,9 +26,5 @@
     </div>
     {% endfor %}
   </dl>
-{% if compact_staff %}
-</details>
-{% else %}
 </section>
-{% endif %}
 {% endif %}

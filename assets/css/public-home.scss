@@ -340,23 +340,6 @@ body {
     margin: 0;
   }
 
-  &__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    color: #1f2f4a;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-
-  &__summary-hint {
-    color: rgba(28, 45, 70, 0.65);
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
   &__role {
     display: grid;
     grid-template-columns: minmax(7rem, 0.9fr) minmax(0, 1.1fr);
@@ -665,8 +648,32 @@ body {
       margin-top: 0.6rem;
       padding: 0.65rem 0 0;
 
-      &[open] .tournament-staff-list__roles {
-        margin-top: 0.5rem;
+      .tournament-staff-list__heading {
+        margin-bottom: 0.35rem;
+        font-size: 0.8rem;
+      }
+
+      .tournament-staff-list__roles {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 0.8rem;
+      }
+
+      .tournament-staff-list__role {
+        display: block;
+        min-width: 0;
+        padding: 0.25rem 0;
+
+        dt {
+          font-size: 0.65rem;
+          line-height: 1.2;
+        }
+
+        dd {
+          margin-top: 0.05rem;
+          font-size: 0.72rem;
+          line-height: 1.25;
+        }
       }
     }
 
