@@ -635,8 +635,7 @@ body {
 
   .info-links--mobile {
     margin: 0 0 0.85rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid rgba(0, 44, 92, 0.1);
+    padding-bottom: 0.35rem;
 
     .public-card-header {
       margin-bottom: 0.75rem;
@@ -663,6 +662,7 @@ body {
         display: block;
         min-width: 0;
         padding: 0.25rem 0;
+        border-bottom: 0;
 
         dt {
           font-size: 0.65rem;
