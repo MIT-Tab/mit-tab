@@ -1,0 +1,21 @@
+<div class="custom-staff-row{% if role_form.DELETE.value %} d-none{% endif %}">
+  {{ role_form.DELETE }}
+  <div class="form-row align-items-start">
+    <div class="form-group col-md-5">
+      <label for="{{ role_form.title.id_for_label }}">{{ role_form.title.label }}</label>
+      {{ role_form.title }}
+      {% for error in role_form.title.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="form-group col-md-5">
+      <label for="{{ role_form.names.id_for_label }}">{{ role_form.names.label }}</label>
+      {{ role_form.names }}
+      <small class="form-text text-muted">{{ role_form.names.help_text }}</small>
+      {% for error in role_form.names.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="form-group col-md-2 custom-staff-remove">
+      <button type="button" class="btn btn-outline-danger btn-sm js-remove-custom-staff">
+        Remove
+      </button>
+    </div>
+  </div>
+</div>

@@ -2,21 +2,31 @@ from django import forms
 from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import render, reverse
 
 from mittab.apps.registration.models import InfoLink, InfoText
 from mittab.apps.tab.auth_roles import STAFF_PRESET_DETAILS
-from mittab.apps.tab.forms import StartTournamentWizardForm
+from mittab.apps.tab.forms import (
+    CustomTournamentStaffFormSetFactory,
+    StartTournamentWizardForm,
+)
 from mittab.apps.tab.helpers import redirect_and_flash_success
-from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
+from mittab.apps.tab.models import (
+    DEFAULT_TOURNAMENT_NAME,
+    TabSettings,
+    TournamentStaffRole,
+)
 from mittab.apps.tab.staff_invites import (
     get_or_create_staff_invite_user,
     send_staff_invite_email,
 )
 from mittab.apps.tab.tournament_start import (
+    START_TOURNAMENT_STAFF_INVITES_SENT,
     START_TOURNAMENT_WIZARD_COMPLETED,
     is_start_tournament_wizard_complete,
 )
+from mittab.apps.tab.tournament_staff import CORE_TOURNAMENT_STAFF_FIELDS
 from mittab.apps.tab.views.staff_invite_views import StaffInviteForm
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 from mittab.libs.email_service import EmailServiceError
@@ -24,11 +34,10 @@ from mittab.libs.email_service import EmailServiceError
 
 FACEBOOK_LINK_TITLE = "Facebook"
 INVITE_PREFIX = "invite"
-STAFF_SETTING_FIELDS = (
-    "tournament_director",
-    "tab_director",
-    "equity_officers",
-    "tournament_observer",
+CUSTOM_STAFF_PREFIX = "custom_staff"
+SEND_INVITE_ACTION = "send_invite"
+STAFF_SETTING_FIELDS = tuple(
+    setting for setting, _label in CORE_TOURNAMENT_STAFF_FIELDS
 )
 
 
@@ -108,13 +117,24 @@ def _send_invite(request, invite_form):
                 invite_form.cleaned_data["permission_preset"],
             )
             send_staff_invite_email(request, user)
+            invite_count = int(
+                TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT, 0) or 0
+            ) + 1
+            TabSettings.set(START_TOURNAMENT_STAFF_INVITES_SENT, invite_count)
     except (EmailServiceError, ImproperlyConfigured) as exc:
         invite_form.add_error(None, f"Could not send the staff invite: {exc}")
-        return False
-    return True
+        return None
+    return invite_count
 
 
-def _save_wizard(form):
+def _custom_staff_initial():
+    return [
+        {"title": role.title, "names": role.names}
+        for role in TournamentStaffRole.objects.all()
+    ]
+
+
+def _save_wizard(form, custom_staff_formset):
     cleaned = form.cleaned_data
     with transaction.atomic():
         TabSettings.set("tournament_name", cleaned["tournament_name"].strip())
@@ -122,6 +142,18 @@ def _save_wizard(form):
         TabSettings.set("open_ranks", cleaned["open_ranks"])
         for field in STAFF_SETTING_FIELDS:
             TabSettings.set(field, cleaned[field].strip())
+
+        TournamentStaffRole.objects.all().delete()
+        custom_roles = []
+        for sort_order, role in enumerate(custom_staff_formset.cleaned_data):
+            if role.get("DELETE") or not role.get("title"):
+                continue
+            custom_roles.append(TournamentStaffRole(
+                title=role["title"],
+                names=role["names"],
+                sort_order=sort_order,
+            ))
+        TournamentStaffRole.objects.bulk_create(custom_roles)
 
         ga_info = InfoText.objects.filter(title=InfoText.DEFAULT_TITLE).first()
         if ga_info is None:
@@ -149,23 +181,71 @@ def _save_wizard(form):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def start_tournament(request):
     was_complete = is_start_tournament_wizard_complete()
+    invite_count = int(
+        TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT, 0) or 0
+    )
     # The staff invite is only mandatory during first-time setup; afterwards
     # staff are managed from the dedicated Invite Staff page.
     invite_form = None
+    action = request.POST.get("action") if request.method == "POST" else None
 
-    if request.method == "POST":
-        form = StartTournamentWizardForm(request.POST)
-        if not was_complete:
-            invite_form = WizardStaffInviteForm(
-                request.POST,
-                prefix=INVITE_PREFIX,
-                inviter=request.user,
+    if request.method == "POST" and action == SEND_INVITE_ACTION:
+        if was_complete:
+            return JsonResponse(
+                {"ok": False, "message": "Tournament setup is already complete."},
+                status=400,
             )
+        invite_form = WizardStaffInviteForm(
+            request.POST,
+            prefix=INVITE_PREFIX,
+            inviter=request.user,
+        )
+        if invite_form.is_valid():
+            invite_count = _send_invite(request, invite_form)
+            if invite_count is not None:
+                message = (
+                    f"Invite sent to {invite_form.cleaned_data['email']}. "
+                    "You can send another invite or continue setup."
+                )
+                if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                    return JsonResponse({
+                        "ok": True,
+                        "message": message,
+                        "invite_count": invite_count,
+                    })
+                return redirect_and_flash_success(
+                    request,
+                    message,
+                    path=reverse("start_tournament"),
+                )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {"ok": False, "errors": invite_form.errors.get_json_data()},
+                status=400,
+            )
+        form = StartTournamentWizardForm(
+            initial=_initial_values(is_initial_setup=True),
+        )
+        custom_staff_formset = CustomTournamentStaffFormSetFactory(
+            initial=_custom_staff_initial(),
+            prefix=CUSTOM_STAFF_PREFIX,
+        )
+    elif request.method == "POST":
+        form = StartTournamentWizardForm(request.POST)
+        custom_staff_formset = CustomTournamentStaffFormSetFactory(
+            request.POST,
+            prefix=CUSTOM_STAFF_PREFIX,
+        )
         basics_valid = form.is_valid()
-        invite_valid = invite_form is None or invite_form.is_valid()
-        if basics_valid and invite_valid and (
-                invite_form is None or _send_invite(request, invite_form)):
-            _save_wizard(form)
+        custom_staff_valid = custom_staff_formset.is_valid()
+        invite_requirement_met = was_complete or invite_count > 0
+        if not invite_requirement_met:
+            form.add_error(
+                None,
+                "Send at least one tab staff invite before continuing.",
+            )
+        if basics_valid and custom_staff_valid and invite_requirement_met:
+            _save_wizard(form, custom_staff_formset)
             if was_complete:
                 return redirect_and_flash_success(
                     request,
@@ -174,14 +254,21 @@ def start_tournament(request):
                 )
             return redirect_and_flash_success(
                 request,
-                "Tournament basics saved and a staff invite was sent to "
-                f"{invite_form.cleaned_data['email']}. Continue with the "
-                "setup checklist.",
+                "Tournament basics saved. Continue with the setup checklist.",
                 path=reverse("tournament_todo"),
+            )
+        if not was_complete:
+            invite_form = WizardStaffInviteForm(
+                prefix=INVITE_PREFIX,
+                inviter=request.user,
             )
     else:
         form = StartTournamentWizardForm(
             initial=_initial_values(is_initial_setup=not was_complete),
+        )
+        custom_staff_formset = CustomTournamentStaffFormSetFactory(
+            initial=_custom_staff_initial(),
+            prefix=CUSTOM_STAFF_PREFIX,
         )
         if not was_complete:
             invite_form = WizardStaffInviteForm(
@@ -194,7 +281,9 @@ def start_tournament(request):
         "tab/start_tournament.html",
         {
             "form": form,
+            "custom_staff_formset": custom_staff_formset,
             "invite_form": invite_form,
+            "invite_count": invite_count,
             "staff_preset_details": STAFF_PRESET_DETAILS,
             "is_initial_setup": not was_complete,
             "title": "Tournament Basics",

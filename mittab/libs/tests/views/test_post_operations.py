@@ -8,7 +8,10 @@ from django.contrib.auth import get_user_model
 
 from mittab.apps.registration.models import InfoText, RegistrationConfig
 from mittab.apps.tab.forms import SettingsForm
-from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
+from mittab.apps.tab.tournament_start import (
+    START_TOURNAMENT_STAFF_INVITES_SENT,
+    START_TOURNAMENT_WIZARD_COMPLETED,
+)
 from mittab.apps.tab.models import (
     PUBLIC_HOME_PAGE_DEFINITIONS,
     Room,
@@ -295,6 +298,7 @@ class TestPostOperations(TestCase):
             [("GA", "TBD")],
         )
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT), 0)
         self.assertFalse(
             RegistrationConfig.get_or_create_active().allow_new_registrations
         )

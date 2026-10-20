@@ -16,6 +16,7 @@ module.exports = {
     bracket : "./assets/js/bracket",
     batchCheckin: "./assets/js/batchCheckin",
     tournamentTodo: "./assets/js/tournamentTodo",
+    tournamentStart: "./assets/js/tournamentStart",
     emailManagement: "./assets/js/emailManagement",
   },
   optimization: {

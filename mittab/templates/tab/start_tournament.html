@@ -1,7 +1,12 @@
 {% extends "base/__normal.html" %}
+{% load render_bundle from webpack_loader %}
 
 {% block title %}Tournament Basics{% endblock %}
 {% block banner %}Tournament Basics{% endblock %}
+
+{% block extra_head %}
+  {% render_bundle 'tournamentStart' %}
+{% endblock %}
 
 {% block content %}
 <div class="start-tournament-wizard col-12 col-lg-9">
@@ -12,17 +17,19 @@
 
   {% if is_initial_setup %}
   <div class="alert alert-warning py-2" role="status">
-    Complete this form to unlock staff tools.
+    Complete this form and invite at least one tab staff member to unlock staff tools.
   </div>
   {% endif %}
 
-  <form method="post" novalidate>
+  <form method="post" id="tournament-details-form" novalidate>
     {% csrf_token %}
+    <input type="hidden" name="action" value="save">
 
-    {% if form.errors %}
+    {% if form.errors or custom_staff_formset.errors %}
     <div class="alert alert-danger" role="alert">
       Check the highlighted fields and try again.
       {{ form.non_field_errors }}
+      {{ custom_staff_formset.non_form_errors }}
     </div>
     {% endif %}
 
@@ -53,7 +60,8 @@
     <fieldset class="wizard-section">
       <legend>Tournament staff</legend>
       <p class="text-muted small">
-        All roles are required. Use <strong>TBD</strong> if a role has not been filled yet.
+        All roles are required and appear on the public homepage. Use <strong>TBD</strong>
+        if a role has not been filled yet.
       </p>
       <div class="form-row">
         <div class="form-group col-md-6">
@@ -80,6 +88,25 @@
           {% for error in form.tournament_observer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
         </div>
       </div>
+
+      <div class="custom-staff-header">
+        <div>
+          <h4>Other tournament staff</h4>
+          <p class="text-muted small mb-0">Add roles such as Food Director or Housing Director.</p>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="add-custom-staff">
+          Add staff role
+        </button>
+      </div>
+      {{ custom_staff_formset.management_form }}
+      <div id="custom-staff-rows">
+        {% for role_form in custom_staff_formset %}
+          {% include "tab/_custom_staff_role_form.html" with role_form=role_form %}
+        {% endfor %}
+      </div>
+      <template id="custom-staff-empty-form">
+        {% include "tab/_custom_staff_role_form.html" with role_form=custom_staff_formset.empty_form %}
+      </template>
     </fieldset>
 
     <fieldset class="wizard-section">
@@ -99,34 +126,52 @@
         </div>
       </div>
     </fieldset>
+  </form>
 
-    <fieldset class="wizard-section">
-      <legend>Tab staff login</legend>
-      {% if invite_form %}
-      <p class="text-muted small">
-        Invite another tab staff member. Each person should use a separate login.
-      </p>
-      {% if invite_form.non_field_errors %}
-      <div class="alert alert-danger" role="alert">
+  <fieldset class="wizard-section">
+    <legend>Tab staff login</legend>
+    {% if invite_form %}
+    <p class="text-muted small">
+      Send one or more invitations now. Each person should use a separate login.
+    </p>
+    <div
+      id="staff-invite-status"
+      class="alert alert-success py-2{% if not invite_count %} d-none{% endif %}"
+      role="status"
+      aria-live="polite"
+    >
+      {% if invite_count %}
+        {{ invite_count }} tab staff invitation{{ invite_count|pluralize }} sent. You can continue or send another.
+      {% endif %}
+    </div>
+    <form method="post" id="staff-invite-form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="send_invite">
+      <div class="invalid-feedback d-block" data-invite-errors-for="__all__">
         {% for error in invite_form.non_field_errors %}{{ error }}{% endfor %}
       </div>
-      {% endif %}
       <div class="form-row">
         <div class="form-group col-md-6">
           <label for="{{ invite_form.email.id_for_label }}">Email</label>
           {{ invite_form.email }}
-          {% for error in invite_form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          <div class="invalid-feedback d-block" data-invite-errors-for="email">
+            {% for error in invite_form.email.errors %}{{ error }}{% endfor %}
+          </div>
         </div>
         <div class="form-group col-md-6">
           <label for="{{ invite_form.username.id_for_label }}">Username</label>
           {{ invite_form.username }}
-          {% for error in invite_form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          <div class="invalid-feedback d-block" data-invite-errors-for="username">
+            {% for error in invite_form.username.errors %}{{ error }}{% endfor %}
+          </div>
         </div>
       </div>
       <div class="form-group">
         <label for="{{ invite_form.permission_preset.id_for_label }}">{{ invite_form.permission_preset.label }}</label>
         {{ invite_form.permission_preset }}
-        {% for error in invite_form.permission_preset.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        <div class="invalid-feedback d-block" data-invite-errors-for="permission_preset">
+          {% for error in invite_form.permission_preset.errors %}{{ error }}{% endfor %}
+        </div>
         <details class="small mt-2">
           <summary>Permission preset details</summary>
           <ul class="mb-0 mt-2">
@@ -136,15 +181,27 @@
           </ul>
         </details>
       </div>
-      {% else %}
-      <p class="text-muted small">Manage additional accounts from the Invite Staff page.</p>
-      <a class="btn btn-outline-primary" href="{% url 'invite_staff' %}">Invite tab staff</a>
-      {% endif %}
-    </fieldset>
+      <button type="submit" class="btn btn-outline-primary">Send invitation</button>
+    </form>
+    {% else %}
+    <p class="text-muted small">Manage additional accounts from the Invite Staff page.</p>
+    <a class="btn btn-outline-primary" href="{% url 'invite_staff' %}">Invite tab staff</a>
+    {% endif %}
+  </fieldset>
 
-    <button type="submit" class="btn btn-primary">
+  <div class="wizard-next-action">
+    <button
+      type="submit"
+      class="btn btn-primary"
+      id="wizard-next-button"
+      form="tournament-details-form"
+      {% if is_initial_setup and not invite_count %}disabled aria-disabled="true"{% endif %}
+    >
       {% if is_initial_setup %}Save and continue{% else %}Save changes{% endif %}
     </button>
-  </form>
+    {% if is_initial_setup and not invite_count %}
+    <small class="text-muted">Send at least one invitation to continue.</small>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

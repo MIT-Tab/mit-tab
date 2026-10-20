@@ -11,3 +11,20 @@
   <span class="info-link-chip__title">{{ link.title }}</span>
 </a>
 {% endfor %}
+{% if tournament_staff %}
+<section class="tournament-staff-list" aria-label="Tournament staff">
+  <h3 class="tournament-staff-list__heading">Tournament Staff</h3>
+  <dl class="tournament-staff-list__roles">
+    {% for role in tournament_staff %}
+    <div class="tournament-staff-list__role">
+      <dt>{{ role.title }}</dt>
+      <dd>
+        {% for name in role.names %}
+        <span>{{ name }}</span>
+        {% endfor %}
+      </dd>
+    </div>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}

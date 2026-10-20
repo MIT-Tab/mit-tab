@@ -3,6 +3,7 @@ from mittab.apps.tab.models import TabSettings
 
 
 START_TOURNAMENT_WIZARD_COMPLETED = "start_tournament_wizard_completed"
+START_TOURNAMENT_STAFF_INVITES_SENT = "start_tournament_staff_invites_sent"
 
 
 def is_start_tournament_wizard_complete():
@@ -21,6 +22,7 @@ def is_start_tournament_wizard_complete():
 def apply_new_tournament_defaults():
     """Require the start wizard and close registration for a new tournament."""
     TabSettings.set(START_TOURNAMENT_WIZARD_COMPLETED, 0)
+    TabSettings.set(START_TOURNAMENT_STAFF_INVITES_SENT, 0)
     config = RegistrationConfig.get_or_create_active()
     config.allow_new_registrations = False
     config.save()

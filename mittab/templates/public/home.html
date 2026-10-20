@@ -20,7 +20,7 @@
 {% block content %}
 {% tournament_logo_url as tournament_logo %}
 <div class="col-12 d-flex justify-content-center public-home-wrapper">
-  <div class="public-home{% if not info_links and not info_texts %} public-home--single{% endif %}">
+  <div class="public-home{% if not info_links and not info_texts and not tournament_staff %} public-home--single{% endif %}">
 
     <header class="public-home-hero desktop-only">
       {% if tournament_logo %}
@@ -45,7 +45,7 @@
     </header>
 
     <div class="grid">
-      {% if info_links or info_texts %}
+      {% if info_links or info_texts or tournament_staff %}
       <aside class="sidebar" aria-labelledby="public-home-resources">
         <div class="public-sidebar-card">
           <h2 class="public-card-header" id="public-home-resources">External Information</h2>
@@ -59,7 +59,7 @@
       <aside class="links" aria-labelledby="public-home-quick-links">
         <h2 class="public-card-header desktop-only" id="public-home-quick-links">Tournament Pages</h2>
 
-        {% if info_links or info_texts %}
+        {% if info_links or info_texts or tournament_staff %}
         <div class="info-links info-links--mobile" aria-label="Tournament resources">
           {% include "public/_external_information.html" %}
         </div>

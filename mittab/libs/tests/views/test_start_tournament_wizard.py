@@ -10,8 +10,11 @@ from mittab.apps.tab.auth_roles import (
     PRESET_DATA_ENTRY_HELPER,
     apply_staff_permission_preset,
 )
-from mittab.apps.tab.models import TabSettings
-from mittab.apps.tab.tournament_start import START_TOURNAMENT_WIZARD_COMPLETED
+from mittab.apps.tab.models import TabSettings, TournamentStaffRole
+from mittab.apps.tab.tournament_start import (
+    START_TOURNAMENT_STAFF_INVITES_SENT,
+    START_TOURNAMENT_WIZARD_COMPLETED,
+)
 from mittab.apps.tab.views.tournament_start_views import WizardStaffInviteForm
 from mittab.libs.email_service import EmailServiceError
 
@@ -33,6 +36,7 @@ class TestStartTournamentWizard(TestCase):
         TabSettings.set("tournament_name", "New Tournament")
         TabSettings.set("tot_rounds", 5)
         TabSettings.set(START_TOURNAMENT_WIZARD_COMPLETED, 0)
+        TabSettings.set(START_TOURNAMENT_STAFF_INVITES_SENT, 0)
 
     def _valid_data(self):
         return {
@@ -45,10 +49,27 @@ class TestStartTournamentWizard(TestCase):
             "tournament_observer": "TBD",
             "open_speaks": 1,
             "open_ranks": 2,
-            "invite-email": "second@test.com",
-            "invite-username": "second_tab",
+            "custom_staff-TOTAL_FORMS": 2,
+            "custom_staff-INITIAL_FORMS": 0,
+            "custom_staff-MIN_NUM_FORMS": 0,
+            "custom_staff-MAX_NUM_FORMS": 1000,
+            "custom_staff-0-title": "Food Director",
+            "custom_staff-0-names": "Morgan Patel",
+            "custom_staff-1-title": "Housing Director",
+            "custom_staff-1-names": "Casey Jones\nRobin Smith",
+        }
+
+    @staticmethod
+    def _invite_data(email="second@test.com", username="second_tab"):
+        return {
+            "action": "send_invite",
+            "invite-email": email,
+            "invite-username": username,
             "invite-permission_preset": "full_tab_staff",
         }
+
+    def _allow_continue(self, count=1):
+        TabSettings.set(START_TOURNAMENT_STAFF_INVITES_SENT, count)
 
     def test_first_admin_login_redirects_to_wizard_even_with_next(self):
         response = self.client.post(
@@ -79,10 +100,16 @@ class TestStartTournamentWizard(TestCase):
         response = self.client.get(reverse("start_tournament"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Complete this form to unlock staff tools")
+        self.assertContains(
+            response,
+            "Complete this form and invite at least one tab staff member",
+        )
         self.assertContains(response, "You can update these details later")
         self.assertContains(response, "TBD")
-        self.assertContains(response, "Invite another tab staff member")
+        self.assertContains(response, "Add staff role")
+        self.assertContains(response, "Send one or more invitations now")
+        self.assertContains(response, 'id="wizard-next-button"')
+        self.assertContains(response, "disabled")
         self.assertNotContains(response, "Preliminary rounds")
 
     def test_initialization_placeholders_are_not_prefilled(self):
@@ -111,6 +138,7 @@ class TestStartTournamentWizard(TestCase):
 
     def test_invalid_form_does_not_unlock_staff_tools(self):
         self.client.force_login(self.user)
+        self._allow_continue()
         data = self._valid_data()
         data["facebook_url"] = "not a url"
 
@@ -122,13 +150,13 @@ class TestStartTournamentWizard(TestCase):
 
     def test_valid_form_saves_all_basics_and_unlocks_staff_tools(self):
         self.client.force_login(self.user)
+        self._allow_continue()
         InfoText.objects.all().delete()
 
-        with mock.patch(SEND_INVITE) as send_invite:
-            response = self.client.post(
-                reverse("start_tournament"),
-                self._valid_data(),
-            )
+        response = self.client.post(
+            reverse("start_tournament"),
+            self._valid_data(),
+        )
 
         self.assertRedirects(
             response,
@@ -147,6 +175,13 @@ class TestStartTournamentWizard(TestCase):
         )
         self.assertEqual(TabSettings.get("tournament_observer"), "TBD")
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 1)
+        self.assertEqual(
+            list(TournamentStaffRole.objects.values_list("title", "names")),
+            [
+                ("Food Director", "Morgan Patel"),
+                ("Housing Director", "Casey Jones\nRobin Smith"),
+            ],
+        )
 
         ga_info = InfoText.objects.get(title=InfoText.DEFAULT_TITLE)
         self.assertEqual(ga_info.text, "Building 26, Room 100")
@@ -159,32 +194,62 @@ class TestStartTournamentWizard(TestCase):
         )
         self.assertTrue(facebook_link.is_active)
 
-        invitee = get_user_model().objects.get(username="second_tab")
-        self.assertEqual(invitee.email, "second@test.com")
-        self.assertTrue(invitee.is_staff)
-        self.assertFalse(invitee.has_usable_password())
-        send_invite.assert_called_once()
-        self.assertEqual(send_invite.call_args.args[1], invitee)
-
         unlocked_response = self.client.get(reverse("index"))
         self.assertEqual(unlocked_response.status_code, 200)
 
     def test_staff_invite_is_required_for_initial_setup(self):
         self.client.force_login(self.user)
-        data = self._valid_data()
-        del data["invite-email"]
-        del data["invite-username"]
 
-        with mock.patch(SEND_INVITE) as send_invite:
-            response = self.client.post(reverse("start_tournament"), data)
+        response = self.client.post(
+            reverse("start_tournament"),
+            self._valid_data(),
+        )
 
         self.assertEqual(response.status_code, 200)
-        send_invite.assert_not_called()
+        self.assertContains(
+            response,
+            "Send at least one tab staff invite before continuing",
+        )
         self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
         self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
 
+    def test_multiple_staff_invites_can_be_sent_before_continuing(self):
+        self.client.force_login(self.user)
+
+        with mock.patch(SEND_INVITE) as send_invite:
+            first_response = self.client.post(
+                reverse("start_tournament"),
+                self._invite_data(),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+            second_response = self.client.post(
+                reverse("start_tournament"),
+                self._invite_data("third@test.com", "third_tab"),
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(first_response.json()["invite_count"], 1)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(second_response.json()["invite_count"], 2)
+        self.assertEqual(
+            TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT),
+            2,
+        )
+        self.assertEqual(send_invite.call_count, 2)
+        self.assertTrue(
+            get_user_model().objects.filter(username="second_tab").exists()
+        )
+        self.assertTrue(
+            get_user_model().objects.filter(username="third_tab").exists()
+        )
+
+        page_response = self.client.get(reverse("start_tournament"))
+        self.assertContains(page_response, "2 tab staff invitations sent")
+
     def test_all_tournament_staff_roles_are_required(self):
         self.client.force_login(self.user)
+        self._allow_continue()
 
         for field in (
                 "tournament_director",
@@ -195,12 +260,10 @@ class TestStartTournamentWizard(TestCase):
                 data = self._valid_data()
                 data[field] = ""
 
-                with mock.patch(SEND_INVITE) as send_invite:
-                    response = self.client.post(reverse("start_tournament"), data)
+                response = self.client.post(reverse("start_tournament"), data)
 
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, "This field is required")
-                send_invite.assert_not_called()
                 self.assertEqual(
                     TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED),
                     0,
@@ -208,12 +271,12 @@ class TestStartTournamentWizard(TestCase):
 
     def test_cannot_invite_yourself(self):
         self.client.force_login(self.user)
-        data = self._valid_data()
-        data["invite-email"] = "wizard@test.com"
-        data["invite-username"] = "wizard_user"
 
         with mock.patch(SEND_INVITE) as send_invite:
-            response = self.client.post(reverse("start_tournament"), data)
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._invite_data("wizard@test.com", "wizard_user"),
+            )
 
         self.assertContains(response, "Invite a different person")
         send_invite.assert_not_called()
@@ -225,7 +288,7 @@ class TestStartTournamentWizard(TestCase):
         with mock.patch(SEND_INVITE, side_effect=EmailServiceError("SES down")):
             response = self.client.post(
                 reverse("start_tournament"),
-                self._valid_data(),
+                self._invite_data(),
             )
 
         self.assertContains(response, "Could not send the staff invite: SES down")
@@ -247,7 +310,7 @@ class TestStartTournamentWizard(TestCase):
         with mock.patch(SEND_INVITE, side_effect=EmailServiceError("SES down")):
             response = self.client.post(
                 reverse("start_tournament"),
-                self._valid_data(),
+                self._invite_data(),
             )
 
         self.assertContains(response, "Could not send the staff invite: SES down")
@@ -268,12 +331,11 @@ class TestStartTournamentWizard(TestCase):
             url="https://www.facebook.com/events/old",
         )
 
-        data = self._valid_data()
-        for key in ("invite-email", "invite-username", "invite-permission_preset"):
-            del data[key]
-
         with mock.patch(SEND_INVITE) as send_invite:
-            response = self.client.post(reverse("start_tournament"), data)
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
 
         send_invite.assert_not_called()
         self.assertRedirects(

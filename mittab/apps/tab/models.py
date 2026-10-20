@@ -382,6 +382,29 @@ class PublicHomeShortcut(models.Model):
             for index, slug in enumerate(PUBLIC_HOME_SHORTCUT_DEFAULTS)
         }
 
+
+class TournamentStaffRole(models.Model):
+    title = models.CharField(max_length=100)
+    names = models.TextField(max_length=500)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return f"{self.title}: {self.names}"
+
+    def save(self, *args, **kwargs):
+        super(TournamentStaffRole, self).save(*args, **kwargs)
+        invalidate_all_public_caches()
+
+    def delete(self, using=None, keep_parents=False):
+        super(TournamentStaffRole, self).delete(
+            using=using,
+            keep_parents=keep_parents,
+        )
+        invalidate_all_public_caches()
+
 class School(models.Model):
     name = models.CharField(max_length=50, unique=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)

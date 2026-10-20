@@ -116,6 +116,34 @@ $font-size-base: 0.95rem !default;
       font-size: 1.1rem;
     }
   }
+
+  .custom-staff-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0.25rem 0 0.75rem;
+
+    h4 {
+      margin: 0 0 0.15rem;
+      font-size: 1rem;
+    }
+  }
+
+  .custom-staff-row {
+    padding-top: 0.75rem;
+    border-top: 1px dashed #dee2e6;
+  }
+
+  .custom-staff-remove {
+    padding-top: 1.8rem;
+  }
+
+  .wizard-next-action {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
 }
 
 .ballot-form {
