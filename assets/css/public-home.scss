@@ -227,6 +227,10 @@ body {
   color: #1f2f4a;
 }
 
+.public-card-header--mobile-pages {
+  display: none;
+}
+
 .info-links {
   display: flex;
   flex-direction: column;
@@ -334,6 +338,23 @@ body {
 
   &__roles {
     margin: 0;
+  }
+
+  &__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: #1f2f4a;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__summary-hint {
+    color: rgba(28, 45, 70, 0.65);
+    font-size: 0.75rem;
+    font-weight: 500;
   }
 
   &__role {
@@ -630,15 +651,23 @@ body {
   }
 
   .info-links--mobile {
-    margin: 1rem 0 0.5rem;
-    padding-top: 1rem;
-    padding-bottom: 0.4rem;
-    border-top: 1px solid rgba(0, 44, 92, 0.1);
+    margin: 0 0 0.85rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(0, 44, 92, 0.1);
 
     .public-card-header {
       margin-bottom: 0.75rem;
       padding-bottom: 0;
       border-bottom: 0;
+    }
+
+    .tournament-staff-list--compact {
+      margin-top: 0.6rem;
+      padding: 0.65rem 0 0;
+
+      &[open] .tournament-staff-list__roles {
+        margin-top: 0.5rem;
+      }
     }
 
     .info-link-chip {
@@ -655,6 +684,11 @@ body {
   .public-home .links {
     padding: 1.1rem 1rem;
     margin: 0;
+  }
+
+  .public-card-header--mobile-pages {
+    display: block;
+    margin-bottom: 0.75rem;
   }
 
   .public-links {
