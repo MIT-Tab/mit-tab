@@ -1,11 +1,26 @@
 from decimal import Decimal
+from html.parser import HTMLParser
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from mittab.apps.tab.models import CheckIn, Judge, School, TabSettings
+from mittab.apps.tab.models import (
+    CheckIn, Judge, JudgeExpectedCheckIn, Room, RoomCheckIn, School, TabSettings,
+)
+
+
+class CheckinToggleParser(HTMLParser):
+    def __init__(self, content):
+        super().__init__()
+        self.toggles = []
+        self.feed(content)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "input" and "checkin-toggle" in attrs.get("class", "").split():
+            self.toggles.append(attrs)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -72,3 +87,56 @@ class TestCheckinUx(TestCase):
         self.assertLess(content.index("Round 1"), content.index("Outrounds"))
         self.assertContains(response, '<button type="button" class="bulk-toggle')
         self.assertNotContains(response, '<a href="#" class="bulk-toggle')
+
+    def test_displayed_rounds_save_and_reload_in_the_same_columns(self):
+        judge = Judge.objects.create(name="Batch Round Judge", rank=Decimal("2"))
+        room = Room.objects.create(name="Batch Round Room", rank=1)
+        round_numbers = list(range(1, TabSettings.get("tot_rounds") + 1)) + [0]
+
+        for entity_type, entity, model, field in (
+            ("judge", judge, CheckIn, "judge"),
+            ("judge_expected", judge, JudgeExpectedCheckIn, "judge"),
+            ("room", room, RoomCheckIn, "room"),
+        ):
+            for column, expected_round in enumerate(round_numbers):
+                with self.subTest(entity_type=entity_type, round_number=expected_round):
+                    response = self.client.get(reverse("batch_checkin"))
+                    toggles = [
+                        toggle for toggle in CheckinToggleParser(
+                            response.content.decode()
+                        ).toggles
+                        if toggle["id"].startswith(f"toggle-{entity_type}-{entity.id}-")
+                    ]
+                    self.assertEqual(
+                        [int(toggle["data-round"]) for toggle in toggles], round_numbers
+                    )
+                    payload = {
+                        "entity_type": entity_type,
+                        "action": "check_in",
+                        "entity_ids[]": [entity.id],
+                        "rounds[]": [toggles[column]["data-round"]],
+                    }
+                    response = self.client.post(reverse("bulk_check_in"), payload)
+                    self.assertEqual(response.json(), {"success": True})
+                    self.assertEqual(
+                        list(model.objects.filter(**{field: entity}).values_list(
+                            "round_number", flat=True
+                        )), [expected_round]
+                    )
+
+                    response = self.client.get(reverse("batch_checkin"))
+                    saved_toggles = [
+                        toggle for toggle in CheckinToggleParser(
+                            response.content.decode()
+                        ).toggles
+                        if toggle["id"].startswith(f"toggle-{entity_type}-{entity.id}-")
+                    ]
+                    self.assertEqual(
+                        ["checked" in toggle for toggle in saved_toggles],
+                        [rn == expected_round for rn in round_numbers],
+                    )
+
+                    payload["action"] = "check_out"
+                    response = self.client.post(reverse("bulk_check_in"), payload)
+                    self.assertEqual(response.json(), {"success": True})
+                    self.assertFalse(model.objects.filter(**{field: entity}).exists())

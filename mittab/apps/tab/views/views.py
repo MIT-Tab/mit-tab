@@ -1056,6 +1056,7 @@ def batch_checkin(request):
         "room_data": room_data,
         "room_headers": ["Room"],
         "round_numbers": round_numbers,
+        "checkin_round_numbers": all_round_numbers,
         "team_total_count": len(team_data),
         "team_checked_in_count": sum(1 for t in team_data if t["checked_in"]),
         "judge_total_count": len(judge_data),
