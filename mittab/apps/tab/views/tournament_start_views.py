@@ -4,6 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, reverse
+from django.utils import timezone
 
 from mittab.apps.registration.models import InfoLink, InfoText
 from mittab.apps.tab.auth_roles import STAFF_PRESET_DETAILS
@@ -92,6 +93,10 @@ def _initial_values(is_initial_setup=False):
         ga_room = ""
     return {
         "tournament_name": tournament_name,
+        "host_school": TabSettings.get("host_school", ""),
+        "host_school_name": TabSettings.get("host_school_name", ""),
+        "tournament_type": TabSettings.get("tournament_type", 0),
+        "sanctioned": bool(TabSettings.get("sanctioned_apda_tournament", 1)),
         "ga_room": ga_room,
         "facebook_url": (
             facebook_link.url
@@ -138,6 +143,19 @@ def _save_wizard(form, custom_staff_formset):
     cleaned = form.cleaned_data
     with transaction.atomic():
         TabSettings.set("tournament_name", cleaned["tournament_name"].strip())
+        TabSettings.set("host_school", cleaned["host_school"])
+        TabSettings.set(
+            "host_school_name",
+            dict(form.fields["host_school"].choices).get(
+                cleaned["host_school"], cleaned["host_school"]
+            ),
+        )
+        TabSettings.set("tournament_type", cleaned["tournament_type"])
+        TabSettings.set(
+            "sanctioned_apda_tournament", int(cleaned["sanctioned"])
+        )
+        if not TabSettings.get("tournament_date", None):
+            TabSettings.set("tournament_date", timezone.localdate().isoformat())
         TabSettings.set("open_speaks", cleaned["open_speaks"])
         TabSettings.set("open_ranks", cleaned["open_ranks"])
         for field in STAFF_SETTING_FIELDS:

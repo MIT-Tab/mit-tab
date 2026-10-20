@@ -41,6 +41,9 @@ class TestStartTournamentWizard(TestCase):
     def _valid_data(self):
         return {
             "tournament_name": "MIT Fall Invitational",
+            "host_school": "apda:1",
+            "tournament_type": 0,
+            "sanctioned": "on",
             "ga_room": "Building 26, Room 100",
             "facebook_url": "https://www.facebook.com/events/123456789",
             "tournament_director": "Alex Morgan",
@@ -107,6 +110,9 @@ class TestStartTournamentWizard(TestCase):
         self.assertContains(response, "You can update these details later")
         self.assertContains(response, "TBD")
         self.assertContains(response, "Add staff role")
+        self.assertContains(response, "Host school")
+        self.assertContains(response, "Tournament type")
+        self.assertContains(response, "Sanctioned APDA tournament")
         self.assertContains(response, "Send one or more invitations now")
         self.assertContains(response, 'id="wizard-next-button"')
         self.assertContains(response, "disabled")
@@ -153,10 +159,14 @@ class TestStartTournamentWizard(TestCase):
         self._allow_continue()
         InfoText.objects.all().delete()
 
-        response = self.client.post(
-            reverse("start_tournament"),
-            self._valid_data(),
-        )
+        with mock.patch(
+            "mittab.apps.registration.services.build_school_choices",
+            return_value=[("apda:1", "MIT")],
+        ):
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
 
         self.assertRedirects(
             response,
@@ -167,6 +177,10 @@ class TestStartTournamentWizard(TestCase):
         self.assertEqual(TabSettings.get("tot_rounds"), 5)
         self.assertEqual(TabSettings.get("open_speaks"), 1)
         self.assertEqual(TabSettings.get("open_ranks"), 2)
+        self.assertEqual(TabSettings.get("host_school"), "apda:1")
+        self.assertEqual(TabSettings.get("host_school_name"), "MIT")
+        self.assertEqual(TabSettings.get("tournament_type"), 0)
+        self.assertEqual(TabSettings.get("sanctioned_apda_tournament"), 1)
         self.assertEqual(TabSettings.get("tournament_director"), "Alex Morgan")
         self.assertEqual(TabSettings.get("tab_director"), "Jordan Lee")
         self.assertEqual(
