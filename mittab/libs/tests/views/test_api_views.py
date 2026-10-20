@@ -13,7 +13,7 @@ from mittab.apps.tab.models import (
     Room, TabSettings, Team, Outround, Round
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
-from mittab.apps.tab.views import api_views
+from mittab.apps.tab.views import api_views as api_views_module
 
 
 @pytest.mark.django_db(transaction=True)
@@ -253,7 +253,7 @@ class TestApiViews(TestCase):
     def test_live_results_is_cached_between_requests(self):
         self.client.get(reverse("live_results_api"))
 
-        with patch.object(api_views, "_live_team_results") as rebuild:
+        with patch.object(api_views_module, "_live_team_results") as rebuild:
             response = self.client.get(reverse("live_results_api"))
 
         rebuild.assert_not_called()
