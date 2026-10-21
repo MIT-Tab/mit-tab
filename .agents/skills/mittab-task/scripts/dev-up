@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Usage: dev-up [--fresh] [--empty]
+# Starts webpack --watch + runserver for this worktree in the background and returns once the
+# site answers. First run creates the worktree's DB, migrates, and loads a populated tournament
+# (mittab/apps/tab/fixtures/testing_db.json). Login: tab / password.
+#   --fresh  drop and rebuild this worktree's dev DB
+#   --empty  start from initialize_tourney (no teams/judges) instead of the fixture
+. "$(dirname "$0")/_env.sh"
+cd "$MT_ROOT"
+set -uo pipefail
+
+fresh=0
+empty=0
+for arg in "$@"; do
+  case "$arg" in
+    --fresh) fresh=1 ;;
+    --empty) empty=1 ;;
+    *) echo "unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
+
+fail() {
+  tail -n 40 "$1" | cut -c1-300
+  echo "dev-up failed; full log: $1" >&2
+  exit 1
+}
+
+"$MT_SCRIPTS/dev-down" >/dev/null 2>&1
+setup_log="$MT_STATE/dev-setup.log"
+: >"$setup_log"
+
+[ "$fresh" = 1 ] && mt_mysql "DROP DATABASE IF EXISTS \`$MYSQL_DATABASE\`"
+existing="$(mt_mysql "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$MYSQL_DATABASE'")"
+mt_mysql "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DATABASE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" ||
+  { echo "cannot reach MySQL with $MT_ROOT/.env credentials" >&2; exit 1; }
+
+uv run python manage.py migrate --noinput >>"$setup_log" 2>&1 || fail "$setup_log"
+if [ "$existing" = 0 ]; then
+  if [ "$empty" = 1 ]; then
+    uv run python manage.py initialize_tourney --first-init --skip-backups \
+      --tab-password password --entry-password password >>"$setup_log" 2>&1 || fail "$setup_log"
+  else
+    uv run python manage.py loaddata mittab/apps/tab/fixtures/testing_db.json \
+      >>"$setup_log" 2>&1 || fail "$setup_log"
+  fi
+  uv run python manage.py shell -c \
+    "from mittab.apps.tab.models import TabSettings; TabSettings.set('start_tournament_wizard_completed', 1)" \
+    >>"$setup_log" 2>&1 || fail "$setup_log"
+fi
+
+port="$MT_PORT"
+while ! uv run python -c 'import socket, sys; s = socket.socket(); s.bind(("127.0.0.1", int(sys.argv[1]))); s.close()' "$port" 2>/dev/null; do
+  port=$((port + 1))
+done
+echo "$port" >"$MT_STATE/port"
+
+started="$(date +%s)"
+# Python's process/session API works on Linux and macOS without GNU setsid/nohup.
+uv run python - "$MT_STATE" "$port" <<'PYTHON'
+import os
+import subprocess
+import sys
+from pathlib import Path
+state = Path(sys.argv[1])
+commands = {
+    "webpack": ["./node_modules/.bin/webpack", "--config", "webpack.config.js", "--watch"],
+    "server": ["uv", "run", "python", "manage.py", "runserver", f"127.0.0.1:{sys.argv[2]}"],
+}
+for name, command in commands.items():
+    with (state / f"{name}.log").open("w") as log:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                   start_new_session=True,
+                                   env={**os.environ, "NODE_ENV": "development", "DEBUG": "1",
+                                        "SILK_ENABLED": "0"})
+    (state / f"{name}.pid").write_text(str(process.pid))
+PYTHON
+
+for _ in $(seq 1 120); do
+  stats_ready=0
+  if [ -f webpack-stats.json ] && [ "$(uv run python -c 'import os; print(int(os.path.getmtime("webpack-stats.json")))')" -ge "$started" ] &&
+    grep -q '"status": *"done"' webpack-stats.json; then
+    stats_ready=1
+  fi
+  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/" || true)"
+  if [ "$stats_ready" = 1 ] && [[ $code =~ ^(200|302)$ ]]; then
+    echo "dev server: http://127.0.0.1:$port  (login tab / password)"
+    echo "DB: $MYSQL_DATABASE   logs: $MT_STATE/server.log, $MT_STATE/webpack.log   stop: dev-down"
+    exit 0
+  fi
+  grep -q 'ERROR in' "$MT_STATE/webpack.log" 2>/dev/null && fail "$MT_STATE/webpack.log"
+  kill -0 "$(cat "$MT_STATE/server.pid")" 2>/dev/null || fail "$MT_STATE/server.log"
+  sleep 1
+done
+echo "timed out waiting for server/webpack (http $code)" >&2
+fail "$MT_STATE/server.log"

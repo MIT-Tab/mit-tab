@@ -213,6 +213,9 @@ jobs:
           command: |
             uv run --frozen python bin/check-dependency-age
       - run:
+          name: Test shared agent helpers
+          command: uv run --frozen python bin/test-agent-workflow
+      - run:
           name: Lint -- Python
           command: |
             uv run --frozen pylint mittab

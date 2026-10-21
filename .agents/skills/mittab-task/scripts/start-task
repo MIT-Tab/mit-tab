@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Usage: start-task <slug>
+# Creates a sibling worktree on a new branch codex/<slug> from fresh origin/master,
+# links the shared .env, and installs Python + JS dependencies.
+set -euo pipefail
+
+slug="${1:?usage: start-task <kebab-case-slug>}"
+[[ $slug =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "slug must be lowercase kebab-case" >&2; exit 2; }
+
+main="${MT_MAIN:-$(git rev-parse --show-toplevel)}"
+wt="$(dirname "$main")/$(basename "$main")-$slug"
+branch="codex/$slug"
+log_dir="${TMPDIR:-/tmp}/mittab-agent/setup-$(printf %s "$wt" | cksum | cut -d' ' -f1)"
+mkdir -p "$log_dir"
+
+if [ -e "$wt" ]; then
+  echo "worktree already exists: $wt (cd into it to continue, or choose another slug)" >&2
+  exit 1
+fi
+if git -C "$main" show-ref --quiet "refs/heads/$branch"; then
+  echo "branch already exists: $branch (choose another slug)" >&2
+  exit 1
+fi
+
+git -C "$main" fetch -q origin master
+git -C "$main" worktree add -q --no-track -b "$branch" "$wt" origin/master
+if [ -f "$main/.env" ]; then
+  ln -s "$main/.env" "$wt/.env"
+else
+  echo "No .env found; configure $wt/.env per CONTRIBUTING.md before DB commands." >&2
+fi
+
+cd "$wt"
+if ! { uv sync --all-groups -q && npm ci --no-audit --no-fund --loglevel=error; } \
+  >"$log_dir/setup.log" 2>&1; then
+  tail -n 30 "$log_dir/setup.log"
+  echo "dependency install failed; full log: $log_dir/setup.log" >&2
+  exit 1
+fi
+
+echo "worktree: $wt"
+echo "branch:   $branch (from origin/master @ $(git rev-parse --short HEAD), no upstream yet)"
+echo "next:     cd $wt; first push with: git push -u origin HEAD"

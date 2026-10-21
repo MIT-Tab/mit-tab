@@ -23,6 +23,27 @@ MIT-Tab is a web application built with Django and used to manage APDA debate to
 2. Set up your development environment following the [Development Setup](#development-setup) guide below
 3. Check the [issues page](https://github.com/MIT-Tab/mit-tab/issues) for tasks that need help
 
+## Codex and Claude Code workflows
+
+The shared [`mittab-task` skill](.agents/skills/mittab-task/SKILL.md) and its helpers
+are committed to the repo. Codex discovers `.agents/skills/mittab-task`; Claude Code
+discovers the relative symlink at `.claude/skills/mittab-task`. `AGENTS.md` requires
+the workflow, and `CLAUDE.md` imports those same instructions. No copying to a home
+directory or machine-specific skill installation is needed. Start a new agent
+session after pulling these files. Clones/worktrees need Git symlink support
+(Windows: use WSL).
+
+If you have an old user-level `mittab-task` skill, remove or rename it so it cannot
+shadow the repo version. Keep shared changes in `.agents/skills/mittab-task`.
+The scripts derive paths from the checkout; development dependencies, MySQL and
+`.env` still need the platform setup below. See the skill for worktree, screenshot,
+and CI commands, including the different background notification modes for Codex
+and Claude. Never manually poll CI from the agent.
+
+Discovery references: [Codex skills](https://developers.openai.com/codex/skills/),
+[Claude Code skills](https://code.claude.com/docs/en/skills), and
+[Claude instruction imports](https://code.claude.com/docs/en/memory#import-additional-files).
+
 ## Development Setup
 
 This guide will help you set up a local development environment for MIT-Tab. The setup process varies by operating system - expand the section for your platform below.

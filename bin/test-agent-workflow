@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Offline regression checks for the repo-shared agent helpers (no DB/browser required)."""
+import contextlib
+import importlib.machinery
+import importlib.util
+import io
+import os
+import shutil
+from pathlib import Path
+import subprocess
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / '.agents/skills/mittab-task/scripts'
+loader = importlib.machinery.SourceFileLoader('ci_watch', str(SCRIPTS / 'ci-watch'))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+ci = importlib.util.module_from_spec(spec)
+loader.exec_module(ci)
+
+
+def run(*args, **kwargs):
+    return subprocess.run(args, check=True, capture_output=True, text=True, **kwargs).stdout
+
+
+class WorkflowTests(unittest.TestCase):
+    def test_discovery_survives_copy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run('git', 'clone', '--quiet', '--no-hardlinks', str(ROOT), directory)
+            # Copy the pending files too, so this test also works before committing.
+            for name in ('.agents', '.claude'):
+                if (Path(directory) / name).exists():
+                    shutil.rmtree(Path(directory) / name)
+                shutil.copytree(ROOT / name, Path(directory) / name,
+                                symlinks=True, dirs_exist_ok=True)
+            claude = Path(directory) / '.claude/skills/mittab-task'
+            self.assertEqual(claude.resolve(), Path(directory) / '.agents/skills/mittab-task')
+            self.assertTrue((claude / 'SKILL.md').is_file())
+            self.assertTrue(os.access(claude / 'scripts/start-task', os.X_OK))
+
+    def test_worktree_in_arbitrarily_named_clone_with_spaces(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            repo = base / 'different checkout'
+            run('git', 'init', '-q', str(repo))
+            run('git', '-C', str(repo), 'symbolic-ref', 'HEAD', 'refs/heads/master')
+            run('git', '-C', str(repo), 'config', 'user.name', 'Test')
+            run('git', '-C', str(repo), 'config', 'user.email', 'test@example.com')
+            (repo / 'tracked').write_text('original')
+            run('git', '-C', str(repo), 'add', 'tracked')
+            run('git', '-C', str(repo), 'commit', '-qm', 'Initial')
+            remote = base / 'remote.git'
+            run('git', 'clone', '-q', '--bare', str(repo), str(remote))
+            run('git', '-C', str(repo), 'remote', 'add', 'origin', str(remote))
+            (repo / '.env').write_text('MYSQL_USER=test\n')
+            (repo / 'tracked').write_text('user changes')
+            tools = base / 'tools'
+            tools.mkdir()
+            for name in ('uv', 'npm'):
+                tool = tools / name
+                tool.write_text('#!/bin/sh\nexit 0\n')
+                tool.chmod(0o755)
+            env = {**os.environ, 'PATH': f'{tools}:{os.environ["PATH"]}'}
+            env.pop('MT_MAIN', None)
+            output = run('bash', str(SCRIPTS / 'start-task'), 'example', cwd=repo, env=env)
+            worktree = base / 'different checkout-example'
+            self.assertIn(str(worktree), output)
+            self.assertEqual((repo / 'tracked').read_text(), 'user changes')
+            self.assertEqual((worktree / '.env').resolve(), repo / '.env')
+            self.assertEqual(run('git', 'branch', '--show-current', cwd=worktree).strip(),
+                             'codex/example')
+            def environment(path):
+                return run('bash', '-c', 'source "$1"; printf "%s\\n%s" "$MYSQL_DATABASE" "$MT_STATE"',
+                           'test', str(SCRIPTS / '_env.sh'), cwd=path).splitlines()
+            original = environment(repo)
+            private = environment(worktree)
+            self.assertNotEqual(original[0], private[0])
+            self.assertNotEqual(original[1], private[1])
+
+    def test_watcher_tracks_new_head_before_finishing(self):
+        check = {'__typename': 'CheckRun', 'name': 'lint', 'status': 'COMPLETED',
+                 'conclusion': 'SUCCESS'}
+        states = [{'headRefOid': sha, 'statusCheckRollup': [check]} for sha in ('old', 'new', 'new')]
+        with patch.object(ci, 'gh_json', side_effect=states), patch.object(ci.time, 'sleep'):
+            self.assertEqual(ci.wait_for_checks(1, 60, 100)[0], 'new')
+
+    def test_failure_report_includes_log_tail(self):
+        check = {'name': 'build', 'state': 'FAILURE', 'targetUrl': 'https://circleci.com/gh/x/1'}
+        with patch.object(ci, 'circleci_log_tail', return_value='actual error'):
+            passed, summary = ci.report(1, 'abcdef123', [check])
+        self.assertFalse(passed)
+        self.assertIn('actual error', summary)
+
+    def test_no_thread_detach_persists_result_without_codex(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(ci, 'STATE', Path(directory)):
+            args = SimpleNamespace(pr=1, thread=None, interval=60, timeout=100, only_pass=False)
+            with patch.object(ci, 'wait_for_checks', return_value=('abc', [])), \
+                    patch.object(ci, 'wake') as wake:
+                ci.background(args)
+            wake.assert_not_called()
+            self.assertIn('CI PASSED', (Path(directory) / 'ci-watch-1.result').read_text())
+
+    def test_foreground_returns_failure_without_notifications(self):
+        with patch('sys.argv', ['ci-watch']), patch.object(ci, 'ensure_gh_auth'), \
+                patch.object(ci, 'resolve_pr', return_value=1), \
+                patch.object(ci, 'wait_for_checks', return_value=('abc', [])), \
+                patch.object(ci, 'report', return_value=(False, 'CI FAILED')), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(ci.main(), 1)
+        self.assertIn('CI FAILED', output.getvalue())
+
+
+if __name__ == '__main__':
+    unittest.main()
