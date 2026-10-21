@@ -288,6 +288,8 @@ class PublicDisplaySetting(models.Model):
 
 
 class PublicHomePage(models.Model):
+    """Legacy link configuration retained for backup compatibility; unused by the UI."""
+
     slug = models.CharField(max_length=50, unique=True)
     title = models.CharField(max_length=100)
     subtitle = models.CharField(max_length=255, blank=True, default="")
@@ -328,6 +330,8 @@ class PublicHomePage(models.Model):
 
 
 class PublicHomeShortcut(models.Model):
+    """Legacy slot choices retained for backup compatibility; unused by the UI."""
+
     position = models.PositiveSmallIntegerField(
         choices=[(i, f"Slot {i}") for i in range(1, PUBLIC_HOME_SHORTCUT_SLOTS + 1)],
         unique=True,

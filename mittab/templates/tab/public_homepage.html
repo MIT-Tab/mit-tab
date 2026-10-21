@@ -54,7 +54,7 @@
     flex: 1 1 auto;
   }
 
-  /* ----- Top row: branding + tiles ----- */
+  /* ----- Top row: branding + link information ----- */
   .ph__top {
     display: grid;
     grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
@@ -125,75 +125,7 @@
   }
   .ph__logo input[type="file"] { font-size: 0.8rem; }
 
-  /* ----- Tiles ----- */
-  .ph__tiles {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.55rem;
-  }
-  @media (max-width: 1100px) { .ph__tiles { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 575px) { .ph__tiles { grid-template-columns: 1fr; } }
-
-  .ph__tile {
-    display: grid;
-    grid-template-columns: 1.5rem minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    column-gap: 0.5rem;
-    row-gap: 0.2rem;
-    padding: 0.5rem 0.6rem 0.55rem;
-    border: 1px solid var(--ph-border);
-    border-radius: 0.45rem;
-    background: #fff;
-  }
-  .ph__tile--locked {
-    background: var(--ph-tint);
-    border-style: dashed;
-  }
-  .ph__tile-num {
-    grid-row: 1 / span 2;
-    align-self: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 999px;
-    background: rgba(42, 102, 196, 0.12);
-    color: var(--ph-accent);
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .ph__tile--locked .ph__tile-num {
-    background: rgba(28, 45, 70, 0.08);
-    color: rgba(28, 45, 70, 0.55);
-  }
-  .ph__tile-title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--ph-text);
-    line-height: 1.2;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ph__tile-title .fa-lock {
-    color: rgba(28, 45, 70, 0.45);
-    font-size: 0.72rem;
-    margin-left: 0.25rem;
-  }
-  .ph__tile select.form-control {
-    height: calc(1.4em + 0.4rem + 2px);
-    padding: 0.15rem 1.5rem 0.15rem 0.4rem;
-    font-size: 0.8rem;
-  }
-  .ph__tile-locked-msg {
-    font-size: 0.74rem;
-    color: var(--ph-text-soft);
-    line-height: 1.35;
-    margin: 0;
-  }
-
-  /* ----- Save bar (top-right of tiles header) ----- */
+  /* ----- Save bar ----- */
   .ph__save {
     display: inline-flex;
     align-items: center;
@@ -278,9 +210,9 @@
 
     <div class="ph__section-head">
       <h2 class="ph__section-title">Homepage</h2>
-      <p class="ph__section-sub">Branding and the seven quick-link tiles. Tile 1 is auto-managed.</p>
+      <p class="ph__section-sub">Tournament branding. Page links follow tournament status automatically.</p>
       <div class="ph__save">
-        <span class="ph__save-hint">Saves branding &amp; tiles</span>
+        <span class="ph__save-hint">Saves branding</span>
         <button type="submit" class="btn btn-primary btn-sm">Save</button>
       </div>
     </div>
@@ -330,28 +262,12 @@
       </div>
 
       <div class="ph__col">
-        <div class="ph__tiles">
-          <div class="ph__tile ph__tile--locked">
-            <span class="ph__tile-num">1</span>
-            <span class="ph__tile-title">
-              Auto-managed <i class="fas fa-lock" aria-hidden="true"></i>
-            </span>
-            <p class="ph__tile-locked-msg" style="grid-column: 2;">
-              Registration before round 1, then Released Pairings once the tournament starts.
-            </p>
-          </div>
-
-          {% for row in shortcut_rows %}
-            <div class="ph__tile">
-              <span class="ph__tile-num">{{ row.slot }}</span>
-              <span class="ph__tile-title" title="{{ row.title }}{% if row.subtitle %} — {{ row.subtitle }}{% endif %}">{{ row.title }}</span>
-              {{ row.field }}
-              {% if row.field.errors %}
-                <div class="text-danger small" style="grid-column: 2;">{{ row.field.errors|striptags }}</div>
-              {% endif %}
-            </div>
-          {% endfor %}
-        </div>
+        <h3>Automatic tournament links</h3>
+        <p>Homepage links follow the tournament: registration before round one,
+          preliminary pairings and public results during inrounds, and elimination
+          pairings during outrounds.</p>
+        <p>The navigation bar keeps all available public pages accessible throughout
+          the tournament.</p>
       </div>
     </div>
   </form>

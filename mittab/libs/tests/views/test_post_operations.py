@@ -239,6 +239,9 @@ class TestPostOperations(TestCase):
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
     def test_public_homepage_update(self):
+        shortcuts_before = list(PublicHomeShortcut.objects.values_list(
+            "position", "nav_item"
+        ))
         response = self.client.post(
             reverse("public_homepage"),
             {
@@ -260,14 +263,10 @@ class TestPostOperations(TestCase):
             PublicHomeShortcut.objects.get(position=1).nav_item,
             "released_pairings",
         )
-        self.assertEqual(
-            PublicHomeShortcut.objects.get(position=2).nav_item,
-            "public_motions",
-        )
-        self.assertEqual(
-            PublicHomeShortcut.objects.get(position=3).nav_item,
-            "public_ballots",
-        )
+        self.assertNotContains(response, 'name="slot_')
+        self.assertEqual(shortcuts_before, list(
+            PublicHomeShortcut.objects.values_list("position", "nav_item")
+        ))
         self.assertEqual(TabSettings.get("tournament_name"), "MIT Invitational")
         self.assertEqual(TabSettings.get("theme_color"), "#A14BC0")
 

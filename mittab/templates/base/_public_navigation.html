@@ -1,0 +1,10 @@
+{% load tags %}
+<li class="nav-item dropdown">
+  <a href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" class="nav-link dropdown-toggle {% active request public_home %}{% for page in public_pages %}{% active request page.url %}{% endfor %}">Public</a>
+  <div class="dropdown-menu dropdown-menu-right">
+    <a class="dropdown-item {% active request public_home %}" href="{{ public_home|with_return_to }}">Public Homepage</a>
+    {% for page in public_pages %}
+    <a class="dropdown-item {% active request page.url %}" href="{{ page.url|with_return_to }}">{{ page.title }}</a>
+    {% endfor %}
+  </div>
+</li>

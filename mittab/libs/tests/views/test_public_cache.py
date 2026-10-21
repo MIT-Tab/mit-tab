@@ -7,7 +7,11 @@ from django.urls import reverse
 from mittab.apps.tab.models import (Room, TabSettings, Team, Round, Outround)
 from mittab.apps.tab.public_rankings import set_ranking_settings
 from mittab.libs.cacheing import cache_logic
-from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
+from mittab.libs.cacheing.public_cache import (
+    invalidate_all_public_caches,
+    invalidate_outround_public_pairings_cache,
+    invalidate_public_rankings_cache,
+)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -71,6 +75,33 @@ class TestPublicCache(TestCase):
         self.cache.clear()
         cache_logic.clear_cache()
         super().tearDown()
+
+    def test_starting_outrounds_updates_cached_homepage_links(self):
+        outround = Outround.objects.filter(type_of_round=Outround.VARSITY).first()
+        Outround.objects.all().delete()
+        response = self.client.get(reverse("public_home"))
+        self.assertContains(response, '<span class="title">Released Pairings</span>')
+
+        outround.pk = None
+        outround.save()
+        invalidate_outround_public_pairings_cache(Outround.VARSITY)
+        response = self.client.get(reverse("public_home"))
+        self.assertNotContains(response, '<span class="title">Released Pairings</span>')
+        self.assertContains(response, '<span class="title">Varsity Outrounds</span>')
+        self.assertContains(response, f'href="{reverse("pretty_pair")}"')
+
+    def test_publication_changes_update_cached_homepage_links(self):
+        Outround.objects.all().delete()
+        response = self.client.get(reverse("public_home"))
+        self.assertContains(response, '<span class="title">Public Team Results</span>')
+
+        set_ranking_settings("team", False, include_speaks=True, max_visible=1000)
+        invalidate_public_rankings_cache()
+        response = self.client.get(reverse("public_home"))
+        self.assertNotContains(
+            response, '<span class="title">Public Team Results</span>'
+        )
+        self.assertNotContains(response, f'href="{reverse("rank_teams_public")}"')
 
     def _get_cache_key_count(self):
         """Count number of keys in the public cache."""

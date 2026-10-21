@@ -3,7 +3,7 @@
 from mittab.apps.tab.models import (
     BreakingTeam,
     Outround,
-    PublicHomePage,
+    PUBLIC_HOME_PAGE_DEFINITIONS,
     Round,
     TabSettings,
 )
@@ -36,23 +36,27 @@ def get_public_page_availability():
 
 
 def get_active_public_page_flags():
-    """Combine homepage configuration with live publication state."""
-    configured_pages = list(
-        PublicHomePage.objects.values_list("slug", "is_active")
-    )
-    if not configured_pages:
-        PublicHomePage.ensure_defaults()
-        configured_pages = list(
-            PublicHomePage.objects.values_list("slug", "is_active")
-        )
-    configured_slugs = {
-        slug for slug, is_active in configured_pages if is_active
-    }
-    availability = get_public_page_availability()
-    return {
-        slug: slug in configured_slugs and is_available
-        for slug, is_available in availability.items()
-    }
+    """Show available pages relevant to the current tournament phase at home."""
+    flags = get_public_page_availability()
+    in_outrounds = Outround.objects.exists()
+    inrounds_started = TabSettings.get("cur_round", 1) > 1
+    for slug in (
+        "released_pairings", "missing_ballots", "public_team_results",
+        "public_speaker_results", "public_ballots",
+    ):
+        flags[slug] = flags[slug] and inrounds_started and not in_outrounds
+    flags["public_motions"] = flags["public_motions"] and inrounds_started
+    return flags
+
+
+def get_public_navigation_pages():
+    """List every available public destination, independent of homepage activity."""
+    flags = get_public_page_availability()
+    return [
+        dict(definition, url=definition["url_path"])
+        for definition in PUBLIC_HOME_PAGE_DEFINITIONS
+        if flags.get(definition["slug"], False)
+    ]
 
 
 def _outrounds_are_public(round_type):

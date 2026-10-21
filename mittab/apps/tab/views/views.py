@@ -747,25 +747,11 @@ def public_homepage(request):
     else:
         form = PublicHomepageForm()
 
-    nav_pages = PublicHomeShortcut.nav_definition_map()
-    shortcut_rows = []
-    for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
-        field = form[f"slot_{slot}"]
-        slug = field.value()
-        meta = nav_pages.get(slug, {})
-        shortcut_rows.append({
-            "slot": slot,
-            "field": field,
-            "title": meta.get("title", slug),
-            "subtitle": meta.get("subtitle", ""),
-        })
-
     return render(
         request,
         "tab/public_homepage.html",
         {
             "form": form,
-            "shortcut_rows": shortcut_rows,
             "info_links": list(InfoLink.objects.all()),
             "info_texts": list(InfoText.objects.all()),
             "title": "Public Homepage",

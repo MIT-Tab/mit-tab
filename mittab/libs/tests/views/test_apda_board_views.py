@@ -59,6 +59,7 @@ class TestApdaBoardViews(TestCase):
 
         self.assertContains(response, f'href="{reverse("all_tab_cards")}"')
         self.assertContains(response, f'href="{reverse("forum_post")}"')
+        self.assertContains(response, 'href="/public/">Public Homepage</a>')
 
     def test_apda_board_blocked_pages_redirect_to_403(self):
         school = School.objects.first()

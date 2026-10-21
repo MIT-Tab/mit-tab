@@ -25,23 +25,10 @@ class TestThemeSettings(TestCase):
         )
         self.client.login(username="testuser", password="testpass123")
 
-    def _shortcut_payload(self):
-        return {
-            "slot_1": "released_pairings",
-            "slot_2": "missing_ballots",
-            "slot_3": "submit_e_ballot",
-            "slot_4": "judge_list",
-            "slot_5": "team_list",
-            "slot_6": "varsity_outrounds",
-            "slot_7": "novice_outrounds",
-            "slot_8": "team_portal",
-        }
-
     def test_public_homepage_form_saves_theme_color(self):
         payload = {
             "tournament_name": "MIT Invitational",
             "theme_color": "#A14BC0",
-            **self._shortcut_payload(),
         }
 
         form = PublicHomepageForm(payload)
@@ -54,7 +41,6 @@ class TestThemeSettings(TestCase):
         payload = {
             "tournament_name": "MIT Invitational",
             "theme_color": "#12ZZZZ",
-            **self._shortcut_payload(),
         }
 
         form = PublicHomepageForm(payload)

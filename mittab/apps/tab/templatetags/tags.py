@@ -12,7 +12,7 @@ from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab import logo_utils
 from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
 from mittab.apps.tab.theme import DEFAULT_THEME_COLOR, get_theme_css_variables
-from mittab.apps.tab.public_pages import get_active_public_page_flags
+from mittab.apps.tab.public_pages import get_public_navigation_pages
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
@@ -147,8 +147,8 @@ def public_display_flags():
 
 
 @register.simple_tag
-def public_page_flags():
-    return get_active_public_page_flags()
+def public_navigation_pages():
+    return get_public_navigation_pages()
 
 
 @register.simple_tag
