@@ -64,6 +64,8 @@ class WorkflowTests(unittest.TestCase):
                 tool.chmod(0o755)
             env = {**os.environ, 'PATH': f'{tools}:{os.environ["PATH"]}'}
             env.pop('MT_MAIN', None)
+            # CircleCI's BASH_ENV prepends the real uv, bypassing these test doubles.
+            env.pop('BASH_ENV', None)
             output = run('bash', str(SCRIPTS / 'start-task'), 'example', cwd=repo, env=env)
             worktree = base / 'different checkout-example'
             self.assertIn(str(worktree), output)
