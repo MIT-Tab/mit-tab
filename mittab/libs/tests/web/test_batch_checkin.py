@@ -3,6 +3,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import override_settings
 from django.urls import reverse
@@ -31,16 +32,18 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         self.addCleanup(self.driver.quit)
         self.wait = WebDriverWait(self.driver, 10)
         self.judge = Judge.objects.create(name="Batch Browser Judge", rank=Decimal("2"))
-        user = get_user_model().objects.create_superuser(
+        get_user_model().objects.create_superuser(
             username="batch-browser", password="password", email="batch@example.com"
         )
-        self.client.force_login(user)
-        self.driver.get(self.live_server_url + "/public/login/")
-        self.driver.add_cookie({
-            "name": settings.SESSION_COOKIE_NAME,
-            "value": self.client.cookies[settings.SESSION_COOKIE_NAME].value,
-        })
-        self.driver.get(self.live_server_url + reverse("batch_checkin"))
+        # Log in through the browser so its session stays in sync with in-flight
+        # page/favicon responses, which can overwrite a manually injected cookie.
+        self.driver.get(self.live_server_url + reverse("tab_login")
+                        + "?next=" + reverse("batch_checkin"))
+        self.driver.find_element(By.NAME, "username").send_keys("batch-browser")
+        self.driver.find_element(By.NAME, "password").send_keys("password")
+        self.driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
+        self.wait.until(lambda _: self.driver.current_url
+                        == self.live_server_url + reverse("batch_checkin"))
         self.driver.find_element(By.ID, "judge-tab").click()
         self.wait.until(lambda _: self.driver.find_element(
             By.CSS_SELECTOR, "#judge.show"
@@ -152,7 +155,9 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         ).values_list("round_number", flat=True)), [1, 2])
 
     def test_expired_session_html_does_not_show_success(self):
-        self.client.logout()
+        # Expire the actual browser session on the server, retaining its stale cookie.
+        session_key = self.driver.get_cookie(settings.SESSION_COOKIE_NAME)["value"]
+        Session.objects.filter(session_key=session_key).delete()
         self._click_toggle(1)
         self.wait.until(lambda _: "could not be confirmed" in self._status())
         self.assertFalse(self._toggle(1).is_selected())

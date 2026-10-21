@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Wait for a PR's CI without spending agent tokens.
+
+Usage:
+  uv run python ci-watch [PR]             # Claude/other agents: background this via the tool
+  uv run python ci-watch [PR] --detach    # Codex: queue to CODEX_THREAD_ID / --thread
+
+Without a thread, --detach only writes the result to the printed local file.
+
+PR defaults to the current branch's PR. A new --detach for the same PR replaces the old watcher.
+"""
+
+import argparse
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+REPO = "MIT-Tab/mit-tab"
+STATE = Path(os.environ.get("TMPDIR", "/tmp")) / "mittab-agent"
+DONE_RUN = {"COMPLETED"}
+DONE_STATE = {"SUCCESS", "FAILURE", "ERROR"}
+OK_CONCLUSIONS = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def ensure_gh_auth():
+    if os.environ.get("GH_TOKEN"):
+        return
+    if subprocess.run(["gh", "auth", "status"], capture_output=True).returncode == 0:
+        return
+    fill = subprocess.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n\n",
+                          capture_output=True, text=True)
+    for line in fill.stdout.splitlines():
+        if line.startswith("password="):
+            os.environ["GH_TOKEN"] = line.split("=", 1)[1]
+
+
+def gh_json(*args):
+    out = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if out.returncode:
+        raise RuntimeError(out.stderr.strip() or f"gh {' '.join(args)} failed")
+    return json.loads(out.stdout)
+
+
+def resolve_pr(target):
+    if target:
+        return gh_json("pr", "view", target, "-R", REPO, "--json", "number")["number"]
+    branch = subprocess.run(["git", "branch", "--show-current"], capture_output=True,
+                            text=True).stdout.strip()
+    prs = gh_json("pr", "list", "-R", REPO, "--head", branch, "--state", "open", "--json", "number")
+    if not prs:
+        sys.exit(f"no open PR for branch {branch!r}; pass a PR number")
+    return prs[0]["number"]
+
+
+def name(check):
+    return check.get("name") or check.get("context") or "<unnamed>"
+
+
+def done(check):
+    if check.get("__typename") == "CheckRun":
+        return check.get("status") in DONE_RUN
+    return check.get("state") in DONE_STATE
+
+
+def ok(check):
+    if check.get("__typename") == "CheckRun":
+        return check.get("conclusion") in OK_CONCLUSIONS
+    return check.get("state") == "SUCCESS"
+
+
+def wait_for_checks(pr, interval, timeout):
+    """Poll quietly; return (head_sha, checks) once every check is done on two consecutive polls."""
+    started = time.monotonic()
+    stable = None
+    while True:
+        try:
+            data = gh_json("pr", "view", str(pr), "-R", REPO, "--json",
+                           "headRefOid,statusCheckRollup")
+        except RuntimeError:
+            data = None  # transient API/network error; try again next interval
+        if data:
+            checks = data.get("statusCheckRollup") or []
+            if checks and all(done(c) for c in checks):
+                signature = (data["headRefOid"], tuple(sorted(name(c) for c in checks)))
+                if signature == stable:
+                    return data["headRefOid"], checks
+                stable = signature
+            else:
+                stable = None
+        if timeout and time.monotonic() - started > timeout:
+            raise TimeoutError(f"CI for PR #{pr} not finished after {timeout // 60} min")
+        time.sleep(interval)
+
+
+def fetch(url):
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return json.load(response)
+
+
+def circleci_log_tail(target_url, lines=60):
+    match = re.search(r"/(\d+)(?:[/?#]|$)", target_url or "")
+    if "circleci" not in (target_url or "") or not match:
+        return None
+    build = fetch(f"https://circleci.com/api/v1.1/project/github/{REPO}/{match.group(1)}")
+    parts = []
+    for step in build.get("steps", []):
+        for action in step.get("actions", []):
+            if not (action.get("failed") or action.get("status") in ("failed", "timedout")):
+                continue
+            text = ""
+            if action.get("output_url"):
+                text = "".join(m.get("message", "") for m in fetch(action["output_url"]))
+            # check-dependency-age prints dozens of pre-existing WARNING lines; they bury the error.
+            kept = [line for line in ANSI.sub("", text).splitlines()
+                    if not line.startswith("WARNING: ")]
+            tail = "\n".join(kept[-lines:])
+            parts.append(f"--- step: {step.get('name')} ---\n{tail}")
+    return "\n".join(parts) or None
+
+
+def report(pr, sha, checks):
+    failed = [c for c in checks if not ok(c)]
+    head = f"PR #{pr} @ {sha[:7]}: "
+    if not failed:
+        return True, head + f"CI PASSED ({len(checks)} checks green)."
+    lines = [head + f"CI FAILED ({len(failed)} of {len(checks)} checks)."]
+    for check in failed:
+        state = check.get("conclusion") or check.get("state")
+        url = check.get("targetUrl") or check.get("detailsUrl") or ""
+        lines.append(f"* {name(check)}: {state} {url}")
+    for check in failed:
+        try:
+            tail = circleci_log_tail(check.get("targetUrl"))
+        except Exception as exc:  # pylint: disable=broad-except
+            tail = f"(could not fetch CircleCI log: {exc})"
+        if tail:
+            lines.append(f"\n## {name(check)} (last lines of failing step)\n{tail[-6000:]}")
+    return False, "\n".join(lines)
+
+
+def wake(thread, message, log):
+    codex = shutil.which("codex")
+    if not codex or not thread:
+        log(f"cannot wake agent (codex={codex}, thread={thread}); message follows\n{message}")
+        return
+    result = subprocess.run([codex, "queue", "--thread", thread, "--message", message],
+                            capture_output=True, text=True)
+    log(f"codex queue -> thread {thread}: exit {result.returncode} "
+        f"{(result.stdout + result.stderr).strip()[:500]}")
+
+
+def background(args):
+    log_path = STATE / f"ci-watch-{args.pr}.log"
+
+    def log(text):
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write(f"[{time.strftime('%H:%M:%S')}] {text}\n")
+
+    log(f"watching PR #{args.pr} for thread {args.thread}")
+    try:
+        sha, checks = wait_for_checks(args.pr, args.interval, args.timeout)
+        passed, summary = report(args.pr, sha, checks)
+    except Exception as exc:  # pylint: disable=broad-except
+        passed, summary = False, f"ci-watch for PR #{args.pr} stopped: {exc}"
+    log(summary)
+    (STATE / f"ci-watch-{args.pr}.result").write_text(summary + "\n", encoding="utf-8")
+    if passed:
+        message = (f"[ci-watch] {summary}\nCI is done; do not check it again. Finish the task: "
+                   "give the user the final summary with the PR link.")
+    else:
+        message = (f"[ci-watch] {summary}\n\nFix the failure (reproduce locally with mt-test or "
+                   "lint first), push, then run `ci-watch --detach` again and end your turn.")
+    if args.thread and (passed or not args.only_pass):
+        wake(args.thread, message, log)
+    (STATE / f"ci-watch-{args.pr}.pid").unlink(missing_ok=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("pr", nargs="?", help="PR number/URL (default: current branch's PR)")
+    parser.add_argument("--detach", action="store_true", help="watch in background; notify if thread set")
+    parser.add_argument("--thread", default=os.environ.get("CODEX_THREAD_ID"),
+                        help="Codex thread to wake (default: $CODEX_THREAD_ID)")
+    parser.add_argument("--only-pass", action="store_true",
+                        help="with --detach, wake the agent only if CI passes")
+    parser.add_argument("--interval", type=int, default=60)
+    parser.add_argument("--timeout", type=int, default=3 * 3600, help="seconds; 0 = forever")
+    parser.add_argument("--background", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+
+    STATE.mkdir(parents=True, exist_ok=True)
+    ensure_gh_auth()
+    if args.background:
+        background(args)
+        return 0
+
+    args.pr = resolve_pr(args.pr)
+    if not args.detach:
+        sha, checks = wait_for_checks(args.pr, args.interval, args.timeout)
+        passed, summary = report(args.pr, sha, checks)
+        print(summary)
+        return 0 if passed else 1
+
+    thread = args.thread
+    if thread:
+        codex = shutil.which("codex")
+        if not codex or subprocess.run([codex, "queue", "--help"],
+                                       capture_output=True).returncode:
+            sys.exit("Codex queue is unavailable; use foreground background-task mode instead")
+    pid_file = STATE / f"ci-watch-{args.pr}.pid"
+    if pid_file.exists():
+        try:
+            os.killpg(int(pid_file.read_text()), signal.SIGTERM)
+        except (ProcessLookupError, ValueError, PermissionError):
+            pass
+    (STATE / f"ci-watch-{args.pr}.result").unlink(missing_ok=True)
+    command = [sys.executable, os.path.abspath(__file__), str(args.pr), "--background",
+               "--interval", str(args.interval),
+               "--timeout", str(args.timeout)] + (["--only-pass"] if args.only_pass else [])
+    if thread:
+        command.extend(["--thread", thread])
+    proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=open(STATE / f"ci-watch-{args.pr}.err", "w"),
+                            start_new_session=True, env=os.environ.copy())
+    pid_file.write_text(str(proc.pid))
+    print(f"Watching CI for PR #{args.pr} in the background (log {STATE}/ci-watch-{args.pr}.log). "
+          + ("End your turn now; the result will be queued to the specified Codex thread."
+             if thread else f"No notification configured. Result: {STATE}/ci-watch-{args.pr}.result"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

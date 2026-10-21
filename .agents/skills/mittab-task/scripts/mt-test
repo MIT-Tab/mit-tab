@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Usage: mt-test [pytest args...]
+# Runs pytest against this worktree's private test DB and prints only a short summary.
+# No args = the non-browser suite CI runs. Pass paths/-k to narrow it.
+# Browser tests (mittab/libs/tests/web) get real webpack bundles and the Chrome libs.
+. "$(dirname "$0")/_env.sh"
+cd "$MT_ROOT"
+
+args=()
+for arg in "$@"; do
+  # -q is already passed; a second one (-qq) would drop the summary line this script prints.
+  [[ $arg == -q || $arg == --quiet ]] || args+=("$arg")
+done
+set -- "${args[@]}"
+[ $# -eq 0 ] && set -- --ignore=mittab/libs/tests/web mittab/
+
+if [[ " $* " == *"tests/web"* ]]; then
+  export MITTAB_FAKE_WEBPACK_LOADER=0
+  export LD_LIBRARY_PATH="$MT_CHROME_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  [ -f webpack-stats.json ] || ./node_modules/.bin/webpack --config webpack.config.js \
+    >"$MT_STATE/webpack-build.log" 2>&1
+else
+  export MITTAB_FAKE_WEBPACK_LOADER="${MITTAB_FAKE_WEBPACK_LOADER:-1}"
+fi
+
+log="$MT_STATE/pytest-$(date +%H%M%S).log"
+if uv run pytest -q --reuse-db "$@" >"$log" 2>&1; then
+  grep -E '[0-9]+ (passed|failed|errors?|skipped|deselected)|no tests ran' "$log" | tail -n 1
+  echo "full log: $log"
+else
+  rc=$?
+  grep -E '^(FAILED|ERROR) ' "$log" | head -n 30
+  echo "---"
+  tail -n 60 "$log" | cut -c1-300
+  echo "pytest exit $rc; full log: $log (if migrations changed in place, rerun with --create-db)"
+  exit "$rc"
+fi

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Usage: dev-down   Stops this worktree's background webpack + runserver.
+. "$(dirname "$0")/_env.sh"
+for name in server webpack; do
+  pid_file="$MT_STATE/$name.pid"
+  [ -f "$pid_file" ] || continue
+  pid="$(cat "$pid_file")"
+  kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null
+  rm -f "$pid_file"
+  echo "stopped $name"
+done

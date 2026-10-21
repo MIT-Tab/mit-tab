@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Usage: pr-images IMAGE.png [IMAGE.png ...]
+# Copies screenshots into docs/img/<slug>/ (the repo's existing convention), commits only those
+# files, pushes the branch, and prints Markdown image lines to paste into the PR body.
+# URLs are pinned to the commit SHA so later pushes don't break them.
+. "$(dirname "$0")/_env.sh"
+cd "$MT_ROOT"
+set -euo pipefail
+[ $# -gt 0 ] || { echo "usage: pr-images IMAGE.png [...]" >&2; exit 2; }
+
+dest="docs/img/$MT_SLUG"
+mkdir -p "$dest"
+paths=()
+for image in "$@"; do
+  target="$dest/$(basename "$image")"
+  [ "$image" -ef "$target" ] || cp "$image" "$target"
+  paths+=("$target")
+done
+
+git add -- "${paths[@]}"
+git diff --cached --quiet -- "${paths[@]}" || git commit -q -m "Add PR screenshots" -- "${paths[@]}"
+mt_gh_auth
+git push -q -u origin HEAD
+sha="$(git rev-parse HEAD)"
+
+for path in "${paths[@]}"; do
+  name="$(basename "$path" .png)"
+  echo "![${name//-/ }](https://raw.githubusercontent.com/MIT-Tab/mit-tab/$sha/$path)"
+done

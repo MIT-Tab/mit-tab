@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Usage: shot [options] PATH OUT.png [PATH OUT.png ...]
+# Screenshots pages from this worktree's dev server (run dev-up first). See shot.py --help.
+. "$(dirname "$0")/_env.sh"
+cd "$MT_ROOT"
+
+# Use system Chrome libraries by default. A custom library directory is optional.
+if [ -d "$MT_CHROME_LIBS" ]; then
+  export LD_LIBRARY_PATH="$MT_CHROME_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+port="$(cat "$MT_STATE/port" 2>/dev/null || echo "$MT_PORT")"
+exec uv run python "$MT_SCRIPTS/shot.py" --base "http://127.0.0.1:$port" --preview-dir "$MT_STATE" "$@"

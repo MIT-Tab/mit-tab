@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Usage: mt <command...>
+# Runs a command in this worktree with its dev env loaded (.env, per-worktree MYSQL_DATABASE).
+# Example: mt uv run python manage.py shell -c "..."
+. "$(dirname "$0")/_env.sh"
+cd "$MT_ROOT"
+exec "$@"
