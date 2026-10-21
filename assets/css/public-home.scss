@@ -469,6 +469,10 @@ body {
   gap: 0.55rem;
   margin: 0;
 
+  &.public-links--odd > :first-child {
+    grid-column: 1 / -1;
+  }
+
   .tile {
     @include public-card-link;
     justify-content: space-between;
@@ -722,10 +726,6 @@ body {
 
   .public-links .tile .chevron {
     display: none;
-  }
-
-  .public-links.public-links--odd > :first-child {
-    grid-column: 1 / -1;
   }
 
   .public-links .body {
