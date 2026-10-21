@@ -115,6 +115,8 @@ jobs:
 
       - browser-tools/install-chrome
       - browser-tools/install-chromedriver
+      - restore_cache:
+          key: npm-v1-{{ checksum "package-lock.json" }}
       - run:
           name: install dependencies
           command: |
@@ -132,6 +134,17 @@ jobs:
           paths:
             - ~/.cache/uv
           key: uv-v1-3.10.16-{{ checksum "uv.lock" }}
+
+      - run:
+          name: Build browser test assets
+          command: |
+            npm ci --prefer-offline --no-audit
+            ./node_modules/.bin/webpack --config webpack.config.js --mode development
+
+      - save_cache:
+          paths:
+            - ~/.npm
+          key: npm-v1-{{ checksum "package-lock.json" }}
 
       - run:
           # Our primary container isn't MYSQL so run a sleep command until it's ready.

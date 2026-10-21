@@ -46,6 +46,9 @@ const submitCheckIn = (checkboxes, checked) => {
   const $boxes = $(checkboxes);
   if (!$boxes.length) return;
 
+  const $pane = $boxes.first().closest(".tab-pane");
+  if ($pane.data("saving")) return;
+
   const entityType = $boxes
     .first()
     .closest("[data-entity-type]")
@@ -63,14 +66,35 @@ const submitCheckIn = (checkboxes, checked) => {
       (roundDeltas[roundIndex] || 0) + (checked ? 1 : -1);
   });
 
-  $.post("/bulk_check_in/", {
-    csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
-    entity_type: entityType,
-    action: checked ? "check_in" : "check_out",
-    entity_ids: ids,
-    rounds: [...new Set(rounds)].filter((r) => r != null),
+  const $status = $pane.find(".checkin-status");
+  const showFailure = () => {
+    $status
+      .addClass("text-danger")
+      .text(
+        "Check-in changes could not be confirmed. Check your connection and reload before retrying.",
+      );
+  };
+  $pane.data("saving", true).attr("aria-busy", "true");
+  $pane.find(".checkin-toggle, .bulk-toggle").prop("disabled", true);
+  $status.removeClass("text-danger").text("Saving check-in changes…");
+
+  $.ajax({
+    url: "/bulk_check_in/",
+    method: "POST",
+    dataType: "json",
+    data: {
+      csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
+      entity_type: entityType,
+      action: checked ? "check_in" : "check_out",
+      entity_ids: ids,
+      rounds: [...new Set(rounds)].filter((r) => r != null),
+    },
   })
-    .done(() => {
+    .done((response) => {
+      if (response?.success !== true) {
+        showFailure();
+        return;
+      }
       $boxes.each((_, cb) => {
         const $cb = $(cb);
         $cb.prop("checked", checked);
@@ -82,8 +106,13 @@ const submitCheckIn = (checkboxes, checked) => {
       if (Object.keys(roundDeltas).length) {
         updateCheckinCounts(entityType, roundDeltas);
       }
+      $status.text("Check-in changes saved.");
     })
-    .fail(() => alert("Check-in failed. Please try again."));
+    .fail(showFailure)
+    .always(() => {
+      $pane.data("saving", false).removeAttr("aria-busy");
+      $pane.find(".checkin-toggle, .bulk-toggle").prop("disabled", false);
+    });
 };
 
 const getBulkTargets = (btn) => {
@@ -114,6 +143,7 @@ $(() => {
     .on("mousedown", "td, th", (e) => {
       const $cell = $(e.currentTarget);
       if (!$cell.find(toggleSelector).length) return;
+      if ($cell.closest(".tab-pane").data("saving")) return;
       if (!$cell.closest("tr").is(":visible")) return;
 
       drag = {
