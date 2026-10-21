@@ -100,6 +100,12 @@ PUBLIC_HOME_PAGE_DEFINITIONS = (
         "subtitle": "View debate motions and info slides.",
         "url_path": "/public/motions/",
     },
+    {
+        "slug": "public_tab_cards",
+        "title": "Tab Cards",
+        "subtitle": "Team results, speaker scores, and round records.",
+        "url_path": "/public/tab-cards/",
+    },
 )
 
 PUBLIC_HOME_SHORTCUT_DEFAULTS = (
@@ -229,6 +235,7 @@ class TabSettings(models.Model):
         if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
             cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).delete(using, keep_parents)
+        self._invalidate_publication_caches()
 
     def save(self,
              force_insert=False,
@@ -240,6 +247,15 @@ class TabSettings(models.Model):
         if self.key == SPEAKER_SINGLE_ADJUSTED_RANKINGS_SETTING:
             cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
+        self._invalidate_publication_caches()
+
+    def _invalidate_publication_caches(self):
+        if self.key in {
+            "publish_tab_cards_with_first_outround",
+            "var_teams_visible",
+            "nov_teams_visible",
+        }:
+            invalidate_all_public_caches()
 
 
 class UserTournamentSetupPreference(models.Model):
@@ -542,17 +558,22 @@ class Team(AuditAttributionMixin):
     @classmethod
     def with_preloaded_relations_for_tab_card(cls):
         return cls.objects.prefetch_related(
-            "gov_team",
-            "opp_team",
-            "gov_team__judges",
-            "opp_team__judges",
-            "gov_team__opp_team",
-            "opp_team__gov_team",
+            "byes",
+            models.Prefetch(
+                "gov_team",
+                queryset=Round.objects.select_related("opp_team").prefetch_related("judges"),
+            ),
+            models.Prefetch(
+                "opp_team",
+                queryset=Round.objects.select_related("gov_team").prefetch_related("judges"),
+            ),
             "debaters",
-            "debaters__roundstats_set",
-            "debaters__roundstats_set__round",
-            "debaters__team_set",
+            models.Prefetch(
+                "debaters__roundstats_set",
+                queryset=RoundStats.objects.select_related("round__gov_team", "round__opp_team"),
+            ),
             "debaters__team_set__no_shows",
+            "debaters__team_set__byes",
             "ranking_groups",
         )
 

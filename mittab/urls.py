@@ -9,6 +9,7 @@ import mittab.apps.tab.views.public_views as public_views
 import mittab.apps.tab.views.api_views as api_views
 import mittab.apps.tab.views.judge_views as judge_views
 import mittab.apps.tab.views.team_views as team_views
+import mittab.apps.tab.views.tab_card_views as tab_card_views
 import mittab.apps.tab.views.debater_views as debater_views
 import mittab.apps.tab.views.pairing_views as pairing_views
 import mittab.apps.tab.views.outround_pairing_views as outround_pairing_views
@@ -151,6 +152,7 @@ urlpatterns = [
             name="view_scratches_team"),
     path("view_teams/", team_views.view_teams, name="view_teams"),
     path("enter_team/", team_views.enter_team, name="enter_team"),
+    path("public/tab-cards/", tab_card_views.public_tab_cards, name="public_tab_cards"),
     path("all_tab_cards/", team_views.all_tab_cards, name="all_tab_cards"),
     re_path(r"^team/card/(\d+)/$", team_views.tab_card, name="tab_card"),
     re_path(r"^team/card/(\d+)/pretty/$",

@@ -1,0 +1,41 @@
+.tab-cards {
+  &__intro {
+    margin-bottom: 2rem;
+  }
+
+  &__card {
+    margin-bottom: 2rem;
+    break-inside: avoid;
+
+    h2 {
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+  }
+
+  .tab-card {
+    min-width: 52rem;
+    font-size: 0.875rem;
+
+    th, td {
+      vertical-align: middle;
+    }
+  }
+}
+
+@media print {
+  .tab-cards {
+    .table-responsive {
+      overflow: visible;
+    }
+
+    .tab-card {
+      min-width: 0;
+      font-size: 0.7rem;
+    }
+
+    &__card:nth-of-type(2n) {
+      break-after: page;
+    }
+  }
+}

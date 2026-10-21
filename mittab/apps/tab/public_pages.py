@@ -19,7 +19,7 @@ def get_public_page_availability():
         TabSettings.get("pairing_released", 0) == 1
     )
 
-    return {
+    availability = {
         "released_pairings": has_inround_pairing,
         "missing_ballots": current_pairing_released,
         "submit_e_ballot": True,
@@ -33,6 +33,10 @@ def get_public_page_availability():
         "public_ballots": display_flags["ballots"],
         "public_motions": bool(TabSettings.get("motions_enabled", 0)),
     }
+    availability["public_tab_cards"] = tab_cards_are_public(
+        availability["varsity_outrounds"] or availability["novice_outrounds"]
+    )
+    return availability
 
 
 def get_active_public_page_flags():
@@ -70,3 +74,15 @@ def _outrounds_are_public(round_type):
         type_of_round=round_type,
         num_teams__gte=visible_at_or_below,
     ).exists()
+
+
+def tab_cards_are_public(outrounds_public=None):
+    """Release cards when either division has a publicly visible outround."""
+    if not TabSettings.get("publish_tab_cards_with_first_outround", 1):
+        return False
+    if outrounds_public is not None:
+        return outrounds_public
+    return (
+        _outrounds_are_public(BreakingTeam.VARSITY)
+        or _outrounds_are_public(BreakingTeam.NOVICE)
+    )

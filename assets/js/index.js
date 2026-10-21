@@ -1,6 +1,7 @@
 import "../css/app.scss";
 import "../css/mobile.scss";
 import "../css/navigation.scss";
+import "../css/tab-cards.scss";
 
 import "./pairing";
 import "./outround";
@@ -29,17 +30,6 @@ function initializeRevealButtons() {
     e.preventDefault();
     $(e.target).slideUp(250);
     $(`#${$(e.target).data("to-reveal")}`).slideDown(250);
-  });
-}
-
-function loadTabCards() {
-  $(".tab_card_item").each((index, value) => {
-    $.ajax({
-      url: `/team/card/${$(value).data("team-id")}`,
-      success(result) {
-        $(value).html(result);
-      },
-    });
   });
 }
 
@@ -106,5 +96,4 @@ $(document).ready(() => {
 
   initializeConfirms();
   initializeRevealButtons();
-  loadTabCards();
 });

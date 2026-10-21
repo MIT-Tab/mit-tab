@@ -15,6 +15,12 @@ settings:
     description: "Check this box to make the judges list publicly visible"
     value: false
     type: boolean
+  - publish_tab_cards_with_first_outround:
+    name: publish_tab_cards_with_first_outround
+    label: "Publish tab cards with first outround"
+    description: "Make all tab cards public when the first varsity or novice outround pairing is released. Tab cards include speaker scores and ranks."
+    value: true
+    type: boolean
   - motions_enabled:
     name: motions_enabled
     description: "Check this box to enable the motions feature, which allows tournament directors to publish debate motions/resolutions"

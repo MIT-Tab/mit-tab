@@ -1,46 +1,26 @@
-<head>
-  {% load render_bundle from webpack_loader %}
-  {% render_bundle 'main' 'js' %}
+{% extends "base/__wide.html" %}
 
-  <style>
-div.printable {
-    width: 7in;
-    margin-bottom: 2em;
-}
+{% block title %}Tab Cards{% endblock %}
+{% block banner %}Tab Cards{% endblock %}
 
-table#pairing_list {
-    text-align: left;
-    border-collapse: collapse;
-    border: 1px solid #666666;
-}
+{% block messages %}{% if not public_view %}{{ block.super }}{% endif %}{% endblock %}
 
-table#pairing_list th{
-    border: 1px solid #666666;
-    padding: .5em;
-    font-size: 18px;
-    font-style: bold;
-}
-table#pairing_list td{
-    border: 1px solid #666666;
-    padding: .5em;
-    font-size: 14px;
-}
-
-.page_break_after {
-    page-break-after: always;
-}
-
-.center {
-    text-align: center;
-}
-  </style>
-</head>
-
-{% for team in all_teams %}
-<h3>Team: {{ team.display_backend }}</h3>
-<div class="printable tab_card_item {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}" data-team-id={{team.id}}>
-  <small>Loading...</small>
+{% block content %}
+<div class="col tab-cards">
+  <div class="tab-cards__intro d-print-none">
+    <p>Round results and speaker scores for every team. Scores are shown as (speaks, ranks).</p>
+    {% if not public_view %}<p class="text-muted">Staff view · Live data</p>{% endif %}
+    <button type="button" class="btn btn-secondary" onclick="window.print()">Print tab cards</button>
+  </div>
+  {% for card in cards %}
+  <section class="tab-cards__card" aria-labelledby="team-{{ card.team.pk }}">
+    <h2 id="team-{{ card.team.pk }}">{{ card.team_name }}</h2>
+    <div class="table-responsive">
+      {% include "tab/tab_card.html" %}
+    </div>
+  </section>
+  {% empty %}
+  <p>No tab cards are available yet.</p>
+  {% endfor %}
 </div>
-
-{% endfor %}
-
+{% endblock %}

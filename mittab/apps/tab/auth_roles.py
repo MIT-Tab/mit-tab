@@ -199,6 +199,7 @@ PUBLIC_TOURNAMENT_VIEWS = {
 }
 
 COMMON_RESTRICTED_STAFF_VIEWS = {
+    "public_tab_cards",
     "403",
     "404",
     "500",
