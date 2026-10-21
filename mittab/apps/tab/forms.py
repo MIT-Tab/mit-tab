@@ -827,39 +827,6 @@ class PublicHomepageForm(forms.Form):
             default=DEFAULT_THEME_COLOR,
         )
 
-        definitions = PublicHomeShortcut.nav_definition_map()
-
-        page_options = list(PublicHomePage.objects.filter(is_active=True))
-        if not page_options:
-            page_options = list(PublicHomePage.objects.all())
-        choices = [
-            (page.slug, page.title)
-            for page in page_options
-        ]
-        default_slots = PublicHomeShortcut.default_slot_mapping()
-        configured_slots = dict(default_slots)
-        configured_slots.update({
-            shortcut.position: shortcut.nav_item
-            for shortcut in PublicHomeShortcut.objects.all()
-        })
-
-        # Slot 1 is reserved: the public homepage auto-switches it between
-        # Registration (while open) and Released Pairings (otherwise), so it
-        # is intentionally not rendered as an editable choice.
-        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
-            nav_item = configured_slots.get(slot)
-            default_nav_item = default_slots.get(slot)
-            if nav_item not in definitions:
-                nav_item = default_nav_item
-            title = definitions.get(nav_item, {}).get("title", nav_item)
-            self.fields[f"slot_{slot}"] = forms.ChoiceField(
-                label=f"Shortcut {slot}",
-                choices=choices,
-                initial=nav_item,
-                help_text=f"Currently: {title}",
-                widget=forms.Select(attrs={"class": "form-control"}),
-            )
-
     def clean_tournament_logo(self):
         uploaded_logo = self.cleaned_data.get("tournament_logo")
         if uploaded_logo:
@@ -884,12 +851,6 @@ class PublicHomepageForm(forms.Form):
         uploaded_logo = self.cleaned_data.get("tournament_logo")
         if uploaded_logo:
             logo_utils.save_tournament_logo(uploaded_logo)
-
-        for slot in range(2, PUBLIC_HOME_SHORTCUT_SLOTS + 1):
-            PublicHomeShortcut.objects.update_or_create(
-                position=slot,
-                defaults={"nav_item": self.cleaned_data[f"slot_{slot}"]},
-            )
 
 
 class StartTournamentWizardForm(forms.Form):

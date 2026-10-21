@@ -13,6 +13,10 @@ from django.utils.html import escape
 from nplusone.core import profiler
 
 from mittab.apps.registration.models import RegistrationConfig
+from mittab.apps.tab.auth_roles import (
+    PRESET_CHECKIN_HELPER,
+    apply_staff_permission_preset,
+)
 from mittab.apps.tab.models import (
     Judge,
     JudgeExpectedCheckIn,
@@ -36,11 +40,16 @@ from mittab.apps.tab.public_rankings import (
     set_ballot_round_settings,
     set_ranking_settings,
 )
+from mittab.apps.tab.public_pages import (
+    get_active_public_page_flags,
+    get_public_page_availability,
+)
 from mittab.apps.tab.views.public_views import (
     _build_disclosure_message,
     _submitted_ballot_context,
 )
 from mittab.libs.cacheing import cache_logic
+from mittab.libs.cacheing.public_cache import invalidate_inround_public_pairings_cache
 
 
 @pytest.mark.django_db(transaction=True)
@@ -724,31 +733,45 @@ class TestPublicViews(TestCase):
             content.index("Unadjusted"),
         )
 
-    def test_public_home_uses_shortcut_configuration(self):
+    def test_public_menu_links_to_public_homepage_when_logged_in(self):
+        user = get_user_model().objects.create_superuser(
+            username="homepage-admin", email="admin@example.com", password=None,
+        )
         client = Client()
-
-        PublicHomeShortcut.objects.filter(position=2).update(
-            nav_item="public_team_results"
-        )
-        caches["public"].clear()
-
+        client.force_login(user)
         response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
+        self.assertContains(response, 'href="/public/">Public Homepage</a>')
 
-        self.assertIn("Public Team Results", content)
-        self.assertIn(
-            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
-            content,
+    def test_restricted_staff_can_use_public_menu(self):
+        user = get_user_model().objects.create_user(username="checkin-helper")
+        apply_staff_permission_preset(user, PRESET_CHECKIN_HELPER)
+        client = Client()
+        client.force_login(user)
+        for view_name in ("public_home", "e_ballot_search", "team_portal_search"):
+            response = client.get(reverse(view_name))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'href="/public/">Public Homepage</a>')
+        response = client.get(reverse("public_rankings_control"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/403/")
+
+    def test_public_home_ignores_legacy_shortcut_configuration(self):
+        Outround.objects.all().delete()
+        PublicHomePage.ensure_defaults()
+        PublicHomePage.objects.filter(slug="public_team_results").update(
+            is_active=False, title="Custom results", url_path="/unused/"
         )
-        self.assertIn(
-            f'class="tile shadow-sm" href="{reverse("pretty_pair")}"',
-            content,
+        PublicHomeShortcut.objects.update_or_create(
+            position=2, defaults={"nav_item": "public_team_results"}
         )
-        self.assertNotIn(
-            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
-            content,
+        response = Client().get(reverse("public_home"))
+        links = {link["slug"]: link for link in response.context["quick_links"]}
+        self.assertIn("missing_ballots", links)
+        self.assertEqual(links["public_team_results"]["title"], "Public Team Results")
+        self.assertEqual(
+            links["public_team_results"]["url"], reverse("rank_teams_public")
         )
+        self.assertNotContains(response, "Custom results")
 
     def test_public_home_displays_core_and_custom_tournament_staff(self):
         client = Client()
@@ -772,20 +795,47 @@ class TestPublicViews(TestCase):
         self.assertContains(response, "Food Director", count=2)
         self.assertContains(response, "Morgan Patel", count=2)
 
-    def test_public_home_promotes_outrounds_when_they_begin(self):
+    def test_public_home_only_shows_active_pages_during_outrounds(self):
+        response = Client().get(reverse("public_home"))
+        links = [link["slug"] for link in response.context["quick_links"]]
+        self.assertIn("varsity_outrounds", links)
+        self.assertIn("novice_outrounds", links)
+        self.assertContains(response, "[V] Ro2 paired")
+        for slug, url in (
+            ("released_pairings", reverse("pretty_pair")),
+            ("missing_ballots", reverse("missing_ballots")),
+            ("public_team_results", reverse("rank_teams_public")),
+            ("public_speaker_results", reverse("public_speaker_rankings")),
+            ("public_ballots", reverse("public_ballots")),
+        ):
+            self.assertNotIn(slug, links)
+            # Inactive pages remain accessible from the navbar.
+            self.assertContains(response, f'href="{url}"')
+
+    def test_public_home_automatically_shows_inround_results(self):
+        Outround.objects.all().delete()
+        response = Client().get(reverse("public_home"))
+        links = [link["slug"] for link in response.context["quick_links"]]
+        for slug in (
+            "released_pairings", "missing_ballots", "public_team_results",
+            "public_speaker_results", "public_ballots",
+        ):
+            self.assertIn(slug, links)
+        self.assertNotIn("varsity_outrounds", links)
+
+    def test_public_home_labels_unreleased_pairings_in_progress(self):
+        Outround.objects.all().delete()
         client = Client()
-
+        self.assertContains(client.get(reverse("public_home")),
+                            '<span class="title">Released Pairings</span>')
+        TabSettings.set("pairing_released", 0)
+        # Use the same invalidation path as starting or hiding a pairing.
+        invalidate_inround_public_pairings_cache()
         response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-
-        varsity_url = reverse("outround_pretty_pair", args=[0])
-        inround_url = reverse("pretty_pair")
-        varsity_tile = f'class="tile shadow-sm" href="{varsity_url}"'
-        inround_tile = f'class="tile shadow-sm" href="{inround_url}"'
-        self.assertLess(content.index(varsity_tile), content.index(inround_tile))
-        self.assertIn("[V] Ro2 paired", content)
-        self.assertIn(f'href="{varsity_url}"', content)
+        self.assertContains(response, '<span class="title">Pairings in Progress</span>')
+        self.assertNotContains(response, '<span class="title">Released Pairings</span>')
+        self.assertNotIn("missing_ballots", [link["slug"]
+                                           for link in response.context["quick_links"]])
 
     def test_public_home_does_not_duplicate_open_registration(self):
         client = Client()
@@ -835,20 +885,21 @@ class TestPublicViews(TestCase):
         self.assertIn(f'href="{reverse("pretty_pair")}"', content)
 
     def test_public_home_mobile_grid_marks_only_odd_tile_counts(self):
+        Outround.objects.all().delete()
         client = Client()
         caches["public"].clear()
 
-        even_response = client.get(reverse("public_home"))
-        self.assertNotContains(
-            even_response,
+        odd_response = client.get(reverse("public_home"))
+        self.assertContains(
+            odd_response,
             'class="public-links public-links--odd"',
         )
 
         TabSettings.set("judges_public", 0)
         caches["public"].clear()
-        odd_response = client.get(reverse("public_home"))
-        self.assertContains(
-            odd_response,
+        even_response = client.get(reverse("public_home"))
+        self.assertNotContains(
+            even_response,
             'class="public-links public-links--odd"',
         )
 
@@ -910,83 +961,32 @@ class TestPublicViews(TestCase):
         self.assertNotContains(current_response, history_url)
         self.assertEqual(client.get(history_url).status_code, 404)
 
-    def test_public_home_falls_back_to_defaults_when_shortcuts_missing(self):
-        client = Client()
-
+    def test_public_home_needs_no_shortcut_records(self):
+        Outround.objects.all().delete()
         PublicHomeShortcut.objects.all().delete()
-        caches["public"].clear()
+        PublicHomePage.objects.all().delete()
+        response = Client().get(reverse("public_home"))
+        self.assertContains(response, reverse("pretty_pair"))
+        self.assertContains(response, reverse("missing_ballots"))
+        self.assertFalse(PublicHomeShortcut.objects.exists())
+        self.assertFalse(PublicHomePage.objects.exists())
 
-        response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        self.assertIn(reverse("pretty_pair"), content)
-        self.assertIn(reverse("missing_ballots"), content)
-
-    def test_public_home_hides_inactive_configured_shortcuts(self):
-        client = Client()
-
-        PublicHomePage.ensure_defaults()
-        PublicHomePage.objects.filter(slug="public_team_results").update(
-            is_active=False
-        )
-        PublicHomeShortcut.objects.update_or_create(
-            position=2,
-            defaults={"nav_item": "public_team_results"},
-        )
-        caches["public"].clear()
-
-        response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-
-        self.assertNotIn(
-            f'class="tile shadow-sm" href="{reverse("rank_teams_public")}"',
-            content,
-        )
-        self.assertIn(
-            f'class="tile shadow-sm" href="{reverse("missing_ballots")}"',
-            content,
-        )
-
-    def test_public_home_shows_only_eight_shortcuts_when_motions_enabled(self):
-        client = Client()
+    def test_public_home_automatically_includes_motions_without_slot_limit(self):
+        Outround.objects.all().delete()
         TabSettings.set("motions_enabled", 1)
+        response = Client().get(reverse("public_home"))
+        links = [link["slug"] for link in response.context["quick_links"]]
+        self.assertIn("public_motions", links)
+        self.assertIn("public_team_results", links)
+        self.assertIn("public_speaker_results", links)
+        self.assertIn("public_ballots", links)
+        self.assertGreater(len(links), 8)
 
-        defaults = PublicHomeShortcut.default_slot_mapping()
-        for position, nav_item in defaults.items():
-            PublicHomeShortcut.objects.update_or_create(
-                position=position,
-                defaults={"nav_item": nav_item},
-            )
-
-        caches["public"].clear()
-        response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-
-        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
-        self.assertNotIn('<span class="title">Motions</span>', content)
-
-    def test_public_home_can_show_motions_when_selected_as_shortcut(self):
-        client = Client()
-        TabSettings.set("motions_enabled", 1)
-
-        defaults = PublicHomeShortcut.default_slot_mapping()
-        defaults[2] = "public_motions"
-        for position, nav_item in defaults.items():
-            PublicHomeShortcut.objects.update_or_create(
-                position=position,
-                defaults={"nav_item": nav_item},
-            )
-
-        caches["public"].clear()
-        response = client.get(reverse("public_home"))
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-
-        self.assertEqual(content.count('class="tile shadow-sm"'), 8)
-        self.assertIn('<span class="title">Motions</span>', content)
-        self.assertIn(reverse("public_motions"), content)
+    def test_public_link_rules_use_bounded_queries(self):
+        # Warm settings/display caches, then ensure round rows are queried in bulk.
+        get_public_page_availability()
+        with self.assertNumQueries(4), profiler.Profiler():
+            get_active_public_page_flags()
 
     def test_public_rankings_control_updates_display_settings(self):
         client = Client()

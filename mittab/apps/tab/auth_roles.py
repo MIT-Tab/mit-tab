@@ -164,6 +164,15 @@ CAPABILITY_ALLOWED_VIEWS = {
     },
 }
 
+PUBLIC_TOURNAMENT_VIEWS = {
+    "public_home", "public_access_error", "pretty_pair", "previous_pretty_pair",
+    "missing_ballots", "e_ballot_search", "judge_portal", "enter_e_ballot",
+    "view_submitted_ballot", "view_submitted_ballot_round", "previous_ballots",
+    "public_judges", "public_teams", "rank_teams_public", "public_speaker_rankings",
+    "public_ballots", "outround_pretty_pair", "public_motions",
+    "team_portal_search", "team_portal",
+}
+
 COMMON_RESTRICTED_STAFF_VIEWS = {
     "403",
     "404",
@@ -252,7 +261,7 @@ def restricted_staff_landing_url(user):
 def restricted_staff_can_access_view(user, view_name, method):
     if not is_restricted_staff_user(user):
         return True
-    if view_name in COMMON_RESTRICTED_STAFF_VIEWS:
+    if view_name in COMMON_RESTRICTED_STAFF_VIEWS or view_name in PUBLIC_TOURNAMENT_VIEWS:
         return True
 
     allowed_methods = set()

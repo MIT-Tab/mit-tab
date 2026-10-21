@@ -15,7 +15,7 @@ before_tournament_steps:
   - slug: set_tournament_name
     title: Configure Tournament Appearance
     description: >-
-      Go to the navigation bar and, under the Admin tab, select Public Homepage. Update the tournament name, theme color, logo, quick links, and external information so the public homepage matches the event and routes people to the right resources.
+      Go to the navigation bar and, under the Admin tab, select Public Homepage. Update the tournament name, theme color, logo, and external information so the public homepage matches the event and routes people to the right resources.
     url_name: public_homepage
     completion_rule: tournament_name_set
 

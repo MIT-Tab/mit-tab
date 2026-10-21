@@ -151,6 +151,7 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     """
     kwargs = {"type_of_round": type_of_round}
     _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
+    _delete_key_for_all_auth_states("public_home")
 
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
@@ -180,6 +181,7 @@ def invalidate_public_rankings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("rank_teams_public")
     _delete_key_for_all_auth_states("public_speaker_rankings")
     _delete_key_for_all_auth_states("public_ballots")
+    _delete_key_for_all_auth_states("public_home")
 
 
 def invalidate_public_motions_cache(*_args, **_kwargs):

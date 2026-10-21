@@ -17,7 +17,7 @@ from mittab.apps.tab.models import (
     Bye,
     Debater,
     Outround,
-    PublicHomeShortcut,
+    PUBLIC_HOME_PAGE_DEFINITIONS,
     TabSettings,
     Judge,
     JudgeExpectedCheckIn,
@@ -49,32 +49,20 @@ from mittab.apps.tab.written_rfd import (
 
 
 def build_public_home_shortcuts():
-    definition_map = PublicHomeShortcut.nav_definition_map(include_inactive=False)
-    active_page_flags = get_active_public_page_flags()
-    slot_to_slug = PublicHomeShortcut.default_slot_mapping()
-
-    for shortcut in PublicHomeShortcut.objects.all():
-        # Slot 1 is intentionally fixed to pairings (or registration, below).
-        if shortcut.position in slot_to_slug and shortcut.position != 1:
-            slot_to_slug[shortcut.position] = shortcut.nav_item
-
-    shortcuts = []
-    for slot, default_slug in PublicHomeShortcut.default_slot_mapping().items():
-        slug = slot_to_slug.get(slot, default_slug)
-        definition = definition_map.get(slug)
-        if definition is None and slug != default_slug:
-            slug = default_slug
-            definition = definition_map.get(default_slug)
-        if definition is None:
-            continue
-        if not active_page_flags.get(slug, True):
-            continue
-        shortcuts.append({
-            "slug": slug,
-            "title": definition["title"],
-            "subtitle": definition["subtitle"],
-            "url": definition["url_path"],
-        })
+    """Build all active tournament links automatically, without slot limits."""
+    flags = get_active_public_page_flags()
+    shortcuts = [
+        dict(definition, url=definition["url_path"])
+        for definition in PUBLIC_HOME_PAGE_DEFINITIONS
+        if flags.get(definition["slug"], False)
+    ]
+    shortcuts.sort(key=lambda link: link["slug"] not in (
+        "varsity_outrounds", "novice_outrounds",
+    ))
+    if TabSettings.get("pairing_released", 0) != 1:
+        for shortcut in shortcuts:
+            if shortcut["slug"] == "released_pairings":
+                shortcut["title"] = "Pairings in Progress"
     return shortcuts
 
 
@@ -126,11 +114,8 @@ def public_home(request):
     tournament_staff = get_public_tournament_staff()
 
     cur_round_setting = TabSettings.get("cur_round", 1) - 1
-    # Single source of truth for the pre-tournament state. RegistrationConfig
-    # tracks only the manual open/closed toggle and has no round awareness,
-    # so by itself it stays True forever once a round starts. Slot 1's swap
-    # and the Register/Edit CTA both key off this flag so they can never
-    # disagree (e.g. CTA hidden while slot 1 still says Registration).
+    # Registration remains configurable after pairing starts, but its homepage
+    # callout is only relevant before round one.
     tournament_in_progress = cur_round_setting >= 1
     show_registration_lead = (not tournament_in_progress) and registration_open
     tot_rounds = TabSettings.get("tot_rounds", 5)
@@ -185,40 +170,7 @@ def public_home(request):
             status_primary = "Tournament"
         status_secondary = pairing_text
 
-    # Slot 1 is reserved (and locked in the settings UI): pre-tournament
-    # with registration open, the separate registration callout replaces it.
-    # Once round 1 starts (or registration is closed), it shows pairings.
-    if show_registration_lead:
-        # Registration occupies slot 1 before the first round is paired.
-        quick_links = [
-            link for link in quick_links
-            if link.get("slug") != "released_pairings"
-        ]
-
-    # As soon as outrounds exist, promote the active outround page to the
-    # first tile and move the inround pairings tile into its former position.
-    # This keeps an Ro8 status attached to a link that actually shows Ro8.
     if in_outrounds:
-        released_index = next(
-            (index for index, link in enumerate(quick_links)
-             if link.get("slug") == "released_pairings"),
-            None,
-        )
-        active_outround_slugs = []
-        if varsity:
-            active_outround_slugs.append("varsity_outrounds")
-        if novice:
-            active_outround_slugs.append("novice_outrounds")
-        outround_index = next(
-            (index for index, link in enumerate(quick_links)
-             if link.get("slug") in active_outround_slugs),
-            None,
-        )
-        if released_index is not None and outround_index is not None:
-            quick_links[released_index], quick_links[outround_index] = (
-                quick_links[outround_index], quick_links[released_index]
-            )
-
         outround_statuses = {
             "varsity_outrounds": varsity,
             "novice_outrounds": novice,
@@ -250,10 +202,7 @@ def public_home(request):
     )
     for shortcut in quick_links:
         if shortcut.get("slug") == "released_pairings":
-            shortcut["subtitle"] = (
-                "Preliminary round pairings" if in_outrounds
-                else pairings_tile_subtitle
-            )
+            shortcut["subtitle"] = pairings_tile_subtitle
             break
 
     public_tile_count = len(quick_links) + int(show_registration_lead)
