@@ -1,5 +1,5 @@
 <table class="tab-card table-bordered table">
-<caption class="sr-only">Tab card for {{ card.team_name }}</caption>
+{% if not print_view %}<caption class="sr-only">Tab card for {{ card.team_name }}</caption>{% endif %}
 <thead>
 <tr>
     <th>R</th>

@@ -25,7 +25,7 @@ def public_tab_cards(request):
 
 
 def _render_public_tab_cards(request):
-    return render(request, "tab/all_tab_cards.html", {
+    return render(request, "public/tab_cards.html", {
         "cards": get_tab_cards(), "public_view": True,
     })
 

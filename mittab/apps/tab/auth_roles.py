@@ -195,11 +195,10 @@ PUBLIC_TOURNAMENT_VIEWS = {
     "view_submitted_ballot", "view_submitted_ballot_round", "previous_ballots",
     "public_judges", "public_teams", "rank_teams_public", "public_speaker_rankings",
     "public_ballots", "outround_pretty_pair", "public_motions",
-    "team_portal_search", "team_portal",
+    "team_portal_search", "team_portal", "public_tab_cards",
 }
 
 COMMON_RESTRICTED_STAFF_VIEWS = {
-    "public_tab_cards",
     "403",
     "404",
     "500",

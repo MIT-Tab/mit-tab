@@ -137,10 +137,19 @@ class TestTabCards(TestCase):
                     self.assertContains(response, "Tournament Totals:")
                     self.assertIn("no-store", response["Cache-Control"])
                     self.assertNotIn("public", response["Cache-Control"])
+                    if url == reverse("all_tab_cards"):
+                        self.assertTemplateNotUsed(response, "base/__wide.html")
+                        self.assertNotContains(response, "<nav")
+                        self.assertNotContains(response, "<script")
+                        self.assertNotContains(response, "webpack_bundles/")
+                        self.assertContains(response, "<h3>Team:")
+                        self.assertContains(response, "css/tab-cards-print.css")
             self.assertEqual(builder.call_count, 6)
         public_response = Client().get(self.public_url)
         self.assertNotContains(public_response, "Staff view")
         self.assertNotContains(public_response, "Logout")
+        self.assertTemplateUsed(public_response, "public/tab_cards.html")
+        self.assertContains(public_response, "<nav")
 
     def test_private_routes_require_login_before_publication(self):
         for url in [reverse("all_tab_cards"),

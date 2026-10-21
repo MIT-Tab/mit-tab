@@ -1,26 +1,11 @@
-{% extends "base/__wide.html" %}
+{% load static %}
+<head>
+  <link rel="stylesheet" href="{% static 'css/tab-cards-print.css' %}">
+</head>
 
-{% block title %}Tab Cards{% endblock %}
-{% block banner %}Tab Cards{% endblock %}
-
-{% block messages %}{% if not public_view %}{{ block.super }}{% endif %}{% endblock %}
-
-{% block content %}
-<div class="col tab-cards">
-  <div class="tab-cards__intro d-print-none">
-    <p>Round results and speaker scores for every team. Scores are shown as (speaks, ranks).</p>
-    {% if not public_view %}<p class="text-muted">Staff view · Live data</p>{% endif %}
-    <button type="button" class="btn btn-secondary" onclick="window.print()">Print tab cards</button>
-  </div>
-  {% for card in cards %}
-  <section class="tab-cards__card" aria-labelledby="team-{{ card.team.pk }}">
-    <h2 id="team-{{ card.team.pk }}">{{ card.team_name }}</h2>
-    <div class="table-responsive">
-      {% include "tab/tab_card.html" %}
-    </div>
-  </section>
-  {% empty %}
-  <p>No tab cards are available yet.</p>
-  {% endfor %}
+{% for card in cards %}
+<h3>Team: {{ card.team_name }}</h3>
+<div class="printable {% if forloop.counter|divisibleby:2 %}page_break_after{% endif %}">
+  {% include "tab/tab_card.html" with print_view=True %}
 </div>
-{% endblock %}
+{% endfor %}
