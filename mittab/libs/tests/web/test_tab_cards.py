@@ -1,10 +1,6 @@
 """Original tab card tables fit mobile screens and support browser zoom."""
-from pathlib import Path
-
-from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import caches
-from django.test import override_settings
 from django.urls import reverse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,10 +10,6 @@ from mittab.apps.tab.models import Outround, TabSettings, Team
 from mittab.libs.cacheing import cache_logic
 
 
-@override_settings(WEBPACK_LOADER={"DEFAULT": {
-    "STATS_FILE": str(Path(settings.BASE_DIR) / "webpack-stats.json"),
-    "BUNDLE_DIR_NAME": "webpack_bundles/",
-}})
 class TabCardsWebTestCase(StaticLiveServerTestCase):
     fixtures = ["testing_finished_db"]
 
