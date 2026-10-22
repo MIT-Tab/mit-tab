@@ -36,6 +36,7 @@ class TestImportingJudges(TestCase):
 
         assert Room.objects.count() == 0
         assert len(errors) == 2
-        assert "Row 3: Room 1 - Room with this Name already exists." in errors
-        assert "Row 2: Room 2 - Ensure that there are no more than" \
-            " 4 digits in total." in errors
+        assert ('Row 3: Value "Room 1" in column "Room name": '
+                'Room with this Name already exists.') in errors
+        assert ('Row 2: Value "200000" in column "Rank": '
+                'Ensure that there are no more than 4 digits in total.') in errors

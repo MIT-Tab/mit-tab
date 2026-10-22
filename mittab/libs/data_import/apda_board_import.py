@@ -1,48 +1,40 @@
-import csv
-from io import TextIOWrapper
+"""APDA ID imports only update the explicit name/ID fields."""
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from mittab.apps.tab.models import Debater, School
+from mittab.libs.spreadsheets import SpreadsheetError, column_mapping, read_rows
 
 
 def import_apda_ids_from_csv(uploaded_file, model, name_field, id_field):
-    text_file = TextIOWrapper(uploaded_file.file, encoding="utf-8-sig", newline="")
-    reader = csv.reader(text_file)
-
+    kind = "schools" if model is School else "debaters"
+    rows, mapping, _extras = column_mapping(kind, read_rows(uploaded_file))
     updated_count = 0
     ignored_count = 0
-
-    try:
-        next(reader, None)
-        with transaction.atomic():
-            for row in reader:
-                if len(row) < 2:
-                    ignored_count += 1
-                    continue
-
-                object_name = row[0].strip()
-                object_id = row[1].strip()
-                if not object_name:
-                    ignored_count += 1
-                    continue
-
-                try:
-                    apda_id = int(object_id)
-                except (TypeError, ValueError):
-                    ignored_count += 1
-                    continue
-
-                updated = model.objects.filter(**{name_field: object_name}).update(
-                    **{id_field: apda_id}
+    with transaction.atomic():
+        for number, row in rows:
+            name_col, id_col = mapping[0], mapping[1]
+            object_name = row[name_col] if name_col < len(row) else ""
+            object_id = row[id_col] if id_col < len(row) else ""
+            if not object_name:
+                raise SpreadsheetError(
+                    f"Row {number}: the name column cannot be blank."
                 )
-                if updated:
-                    updated_count += updated
-                else:
-                    ignored_count += 1
-    finally:
-        text_file.detach()
-
+            try:
+                apda_id = model._meta.get_field(id_field).clean(object_id, None)
+            except ValidationError as exc:
+                raise SpreadsheetError(
+                    f'Row {number}: Value "{object_id}" in column "APDA ID": '
+                    + "; ".join(exc.messages)
+                ) from exc
+            updated = model.objects.filter(**{name_field: object_name}).update(
+                **{id_field: apda_id}
+            )
+            if updated:
+                updated_count += updated
+            else:
+                ignored_count += 1
     return updated_count, ignored_count
 
 

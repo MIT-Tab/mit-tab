@@ -17,29 +17,58 @@ Then, you should see a page where you can add a file for judges, rooms and teams
 
 ![](img/data_import.png)
 
-You can upload xlsx files through this page to import data in bulk. When there is an
-error in the format of the xlsx files, all changes generated from the file are aborted,
-even if some were valid, so that you can simply re-upload a corrected version of the
-file
+Upload **CSV, XLS, or XLSX** files for teams, judges, rooms, and scratches. Excel
+imports read the first worksheet. Save CSV files with UTF-8 encoding. Blank rows
+are skipped. If any row fails validation, all records and audit events created by
+that file are rolled back; correct the reported values and upload the file again.
+Errors identify the spreadsheet row, column, offending value, and validation rule.
 
-You can use [these templates](https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5?usp=sharing)
-for the teams, judges, and rooms files
+Download an export from the same page to get the current column headers and order.
+Exports are available in all three formats and can be imported into another
+tournament. Roster imports create records; they do not replace existing names.
+Scratch exports require permission to view scratches. APDA Board accounts use the
+separate school/debater APDA ID import/export controls, also available in all three
+formats; these update IDs on existing records only.
+
+### Column detection
+
+The importer tries the default column order first, then named headers (ignoring
+case, spaces, and punctuation), then recognizable data such as email addresses,
+numeric calibrations, and scratch types. Headers are optional for data in the
+default order. A recognized header row is skipped; the first data row is retained
+in a file without headers. When rearranging columns, keep the exported headers.
+Ambiguous text columns need names: the importer cannot reliably distinguish a
+team name, school name, and debater name from their values alone.
+
+Default columns, from left to right:
+
+| Spreadsheet | Columns |
+| --- | --- |
+| Teams | Team name, School, Hybrid school, Seed, Debater 1 name, Debater 1 status, Debater 1 email, Debater 1 APDA ID, Debater 2 name, Debater 2 status, Debater 2 email, Debater 2 APDA ID |
+| Judges | Judge name, Judge email, Calibration, then affiliated schools and expected rounds |
+| Rooms | Room name, Rank |
+| Scratches | Team name, Judge name, Scratch type |
+
+Seed accepts full, half, free, or unseeded (blank also means unseeded). Debater
+status accepts novice or varsity, including `N`/`V`; blank means varsity.
+Scratch type accepts team or tab. Optional omitted columns in a named layout
+are treated as blank.
 
 ### Judge spreadsheet columns
 
-- Column A: Judge Name
-- Column B: Judge Email (optional)
-- Column C: Judge Rank
-- Columns D onward: Affiliated schools (one per column). Blank cells are ignored, so you can leave extra cells empty without creating phantom schools.
-- The final *N* columns (where *N* is the value of the **Total Rounds** setting) represent the rounds you expect the judge to attend (`R1` through `RN`). Use `Y`, `Yes`, `True`, `1`, `X`, or `In` to mark a judge as expected for that round; leave the cell empty (or anything else) if they are not expected.
+- Column A: Judge name.
+- Column B: Judge email (optional).
+- Column C: Calibration (also recognized as Judge Rank).
+- Columns D onward: Affiliated schools, one per column, with headers `School 1`,
+  `School 2`, etc. Blank cells are ignored.
+- The final *N* columns (*N* is the **Total Rounds** setting) represent the rounds
+  the judge is expected to attend. Use headers `Round 1 expected` through
+  `Round N expected` (or `R1` through `RN`). Use `Y`, `Yes`, `True`, `1`, `X`,
+  or `In` for expected rounds; use a blank, `No`, `False`, `0`, or `Out` otherwise.
+  Named expected-round columns can be reordered or omitted.
 
-When the spreadsheet is imported, the expected-round columns populate the “Expected Judges” tab in batch check-in and the public judge list.
-
-**NOTE:** The files _must_ be `.xlsx` files. Not `.xls`, `.csv`, or anything
-similar
-
-**NOTE:** All data in the first row will be ignored. That row is assumed to be
-a header row.
+Expected rounds populate the “Expected Judges” tab in batch check-in and the
+public judge list. Judge exports retain affiliated schools and expected rounds.
 
 (manual-data-entry)=
 ## Manual Data Entry

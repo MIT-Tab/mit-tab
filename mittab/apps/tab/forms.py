@@ -47,10 +47,22 @@ class UploadDataForm(forms.Form):
         super(UploadDataForm, self).__init__(*args, **kwargs)
         if not allow_scratches:
             self.fields.pop("scratch_file")
+        for field in self.fields.values():
+            field.widget.attrs["accept"] = ".csv,.xls,.xlsx"
+            field.help_text = "CSV (UTF-8), Excel XLS, or Excel XLSX."
+
+    def clean(self):
+        cleaned = super().clean()
+        if not any(cleaned.values()):
+            raise forms.ValidationError("Choose at least one spreadsheet to import.")
+        return cleaned
 
 
 class UploadApdaCsvForm(forms.Form):
-    file = forms.FileField(label="CSV File")
+    file = forms.FileField(
+        label="Spreadsheet",
+        widget=forms.ClearableFileInput(attrs={"accept": ".csv,.xls,.xlsx"}),
+    )
 
 
 class SchoolForm(forms.ModelForm):

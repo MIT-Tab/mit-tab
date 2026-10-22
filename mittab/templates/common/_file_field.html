@@ -1,9 +1,13 @@
 <div class="custom-file form-group">
   <input type="file" name="{{field.name}}"
-                     class="custom-file-input" id="custom-file-{{field.name}}"/>
+                     class="custom-file-input{% if field.errors %} is-invalid{% endif %}" id="custom-file-{{field.name}}"
+                     {% if field.field.widget.attrs.accept %}accept="{{ field.field.widget.attrs.accept }}"{% endif %}/>
   <label class="custom-file-label" for="custom-file-{{field.name}}">
     {{field.label}}
   </label>
 </div>
+{% for error in field.errors %}
+<div class="invalid-feedback d-block" role="alert">{{ error }}</div>
+{% endfor %}
 <br/>
 <br/>

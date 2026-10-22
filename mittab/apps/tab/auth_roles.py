@@ -176,6 +176,7 @@ CAPABILITY_ALLOWED_VIEWS = {
         "enter_team": {"GET", "POST"},
         "index": {"GET"},
         "upload_data": {"GET", "POST"},
+        "export_roster": {"GET"},
         "view_debater": {"GET", "POST"},
         "view_debaters": {"GET"},
         "view_judge": {"GET", "POST"},

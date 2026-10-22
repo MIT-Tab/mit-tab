@@ -7,7 +7,16 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
-from mittab.apps.tab.models import Debater, Round, School, TabSettings, Team
+from mittab.apps.tab.models import (
+    Debater,
+    Judge,
+    Round,
+    School,
+    Scratch,
+    TabSettings,
+    Team,
+)
+from mittab.libs.spreadsheets import read_rows, spreadsheet_response
 from mittab.apps.tab.public_rankings import (
     get_standings_publication_setting,
     set_standings_publication_setting,
@@ -87,8 +96,9 @@ class TestApdaBoardViews(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("apda_board_home"))
-        self.assertTrue(get_standings_publication_setting(
-            "speaker_results")["published"])
+        self.assertTrue(
+            get_standings_publication_setting("speaker_results")["published"]
+        )
         self.assertFalse(get_standings_publication_setting("team_results")["published"])
 
     def test_apda_board_school_detail_updates_only_apda_id(self):
@@ -177,9 +187,7 @@ class TestApdaBoardViews(TestCase):
         upload = SimpleUploadedFile(
             "schools.csv",
             (
-                "school,id\n"
-                f"{school.name},4242\n"
-                f"{missing_school_name},9999\n"
+                "school,id\n" f"{school.name},4242\n" f"{missing_school_name},9999\n"
             ).encode("utf-8"),
             content_type="text/csv",
         )
@@ -201,9 +209,7 @@ class TestApdaBoardViews(TestCase):
         upload = SimpleUploadedFile(
             "debaters.csv",
             (
-                "debater,id\n"
-                f"{debater.name},3131\n"
-                f"{missing_debater_name},9999\n"
+                "debater,id\n" f"{debater.name},3131\n" f"{missing_debater_name},9999\n"
             ).encode("utf-8"),
             content_type="text/csv",
         )
@@ -218,3 +224,93 @@ class TestApdaBoardViews(TestCase):
         debater.refresh_from_db()
         self.assertEqual(debater.apda_id, 3131)
         self.assertFalse(Debater.objects.filter(name=missing_debater_name).exists())
+
+    def test_apda_spreadsheets_all_formats_schema_and_protected_state(self):
+        for extension in ("csv", "xls", "xlsx"):
+            for kind, model, label in (
+                ("schools", School, "school"),
+                ("debaters", Debater, "debater"),
+            ):
+                with self.subTest(extension=extension, kind=kind):
+                    response = self.client.get(
+                        reverse(f"export_apda_board_{kind}_csv"), {"format": extension}
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    parsed = read_rows(
+                        SimpleUploadedFile(f"ids.{extension}", response.content)
+                    )
+                    self.assertEqual(parsed[0][1], [label, "id"])
+                    self.assertTrue(all(len(row) == 2 for _, row in parsed))
+                    before = list(
+                        model.objects.order_by("name").values_list("name", "apda_id")
+                    )
+                    self.assertEqual(
+                        [row for _, row in parsed[1:]],
+                        [[name, str(apda_id or "")] for name, apda_id in before],
+                    )
+                    protected = {
+                        item: list(item.objects.order_by("pk").values())
+                        for item in (Judge, Scratch, Team, Round)
+                    }
+                    obj = model.objects.first()
+                    export = spreadsheet_response(
+                        kind,
+                        extension,
+                        ["id", label, "rank"],
+                        [[4321, obj.name, "forbidden"]],
+                    )
+                    upload = SimpleUploadedFile(f"ids.{extension}", export.content)
+                    result = self.client.post(
+                        reverse(f"import_apda_board_{kind}_csv"), {"file": upload}
+                    )
+                    self.assertEqual(result.status_code, 302)
+                    obj.refresh_from_db()
+                    self.assertEqual(obj.apda_id, 4321)
+                    for item, values in protected.items():
+                        self.assertEqual(
+                            list(item.objects.order_by("pk").values()), values
+                        )
+
+    def test_apda_exports_do_not_change_when_protected_data_changes(self):
+        for extension in ("csv", "xls", "xlsx"):
+            for kind in ("schools", "debaters"):
+                url = reverse(f"export_apda_board_{kind}_csv")
+                first = self.client.get(url, {"format": extension})
+                judge = Judge.objects.first()
+                Judge.objects.update(rank=1 if judge.rank != 1 else 9,
+                                     wing_only=not judge.wing_only)
+                Scratch.objects.update(scratch_type=Scratch.TAB_SCRATCH)
+                second = self.client.get(url, {"format": extension})
+                first_rows = read_rows(
+                    SimpleUploadedFile(f"ids.{extension}", first.content)
+                )
+                second_rows = read_rows(
+                    SimpleUploadedFile(f"ids.{extension}", second.content)
+                )
+                self.assertEqual(first_rows, second_rows)
+
+    def test_apda_invalid_spreadsheet_shows_specific_error_and_rolls_back(self):
+        school = School.objects.first()
+        original_id = school.apda_id
+        upload = SimpleUploadedFile(
+            "schools.csv",
+            (f"school,id\n{school.name},4321\n{school.name},not-an-integer\n").encode(),
+        )
+        response = self.client.post(
+            reverse("import_apda_board_schools_csv"), {"file": upload}, follow=True
+        )
+        self.assertContains(
+            response, "Value &quot;not-an-integer&quot; in column &quot;APDA ID&quot;"
+        )
+        school.refresh_from_db()
+        self.assertEqual(school.apda_id, original_id)
+        response = self.client.post(
+            reverse("import_apda_board_debaters_csv"),
+            {"file": SimpleUploadedFile("bad.xlsx", b"damaged")},
+            follow=True,
+        )
+        self.assertContains(response, "Could not read .xlsx file")
+        response = self.client.get(
+            reverse("export_apda_board_debaters_csv"), {"format": "json"}
+        )
+        self.assertEqual(response.status_code, 400)

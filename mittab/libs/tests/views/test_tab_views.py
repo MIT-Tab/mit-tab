@@ -120,7 +120,7 @@ class TestTabViews(TestCase):
             (reverse("public_homepage"), "Public Homepage"),
             (reverse("tournament_todo"), "Tournament Checklist"),
             (reverse("view_backups"), "Backups"),
-            (reverse("upload_data"), "Upload Data"),
+            (reverse("upload_data"), "Import and Export Spreadsheets"),
             (reverse("confirm_start_tourny"), "Are you sure?"),
             (reverse("break"), "This action will attempt to pair"),
             (reverse("pair_round"), "Pairing Round"),

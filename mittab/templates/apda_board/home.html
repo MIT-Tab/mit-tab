@@ -61,12 +61,14 @@
             <a href="{% url 'export_apda_board_schools_csv' %}" class="btn btn-sm btn-outline-secondary mb-2">
               <i class="fa fa-download"></i> Export CSV
             </a>
+            <a href="{% url 'export_apda_board_schools_csv' %}?format=xls" class="btn btn-sm btn-outline-secondary mb-2">XLS</a>
+            <a href="{% url 'export_apda_board_schools_csv' %}?format=xlsx" class="btn btn-sm btn-outline-secondary mb-2">XLSX</a>
             <form method="post" action="{% url 'import_apda_board_schools_csv' %}" enctype="multipart/form-data">
               {% csrf_token %}
               <div class="form-group mb-2">
-                <input type="file" class="form-control-file form-control-sm" id="apda-school-csv" name="file" accept=".csv,text/csv" required>
+                <input type="file" class="form-control-file form-control-sm" id="apda-school-csv" name="file" accept=".csv,.xls,.xlsx" required>
               </div>
-              <button type="submit" class="btn btn-sm btn-primary">Import CSV</button>
+              <button type="submit" class="btn btn-sm btn-primary">Import spreadsheet</button>
             </form>
           </div>
           <ol id="apda-school-list">
@@ -103,12 +105,14 @@
             <a href="{% url 'export_apda_board_debaters_csv' %}" class="btn btn-sm btn-outline-secondary mb-2">
               <i class="fa fa-download"></i> Export CSV
             </a>
+            <a href="{% url 'export_apda_board_debaters_csv' %}?format=xls" class="btn btn-sm btn-outline-secondary mb-2">XLS</a>
+            <a href="{% url 'export_apda_board_debaters_csv' %}?format=xlsx" class="btn btn-sm btn-outline-secondary mb-2">XLSX</a>
             <form method="post" action="{% url 'import_apda_board_debaters_csv' %}" enctype="multipart/form-data">
               {% csrf_token %}
               <div class="form-group mb-2">
-                <input type="file" class="form-control-file form-control-sm" id="apda-debater-csv" name="file" accept=".csv,text/csv" required>
+                <input type="file" class="form-control-file form-control-sm" id="apda-debater-csv" name="file" accept=".csv,.xls,.xlsx" required>
               </div>
-              <button type="submit" class="btn btn-sm btn-primary">Import CSV</button>
+              <button type="submit" class="btn btn-sm btn-primary">Import spreadsheet</button>
             </form>
           </div>
           <ol id="apda-debater-list">
