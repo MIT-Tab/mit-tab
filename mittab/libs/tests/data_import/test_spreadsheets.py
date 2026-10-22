@@ -1,6 +1,7 @@
 """Exercise real file readers, layouts, rollback and import/export compatibility."""
 
 from io import BytesIO
+from unittest.mock import patch
 
 import openpyxl
 import pytest
@@ -32,7 +33,12 @@ from mittab.libs.data_import.import_judges import import_judges
 from mittab.libs.data_import.import_rooms import import_rooms
 from mittab.libs.data_import.import_scratches import import_scratches
 from mittab.libs.data_import.import_teams import import_teams
-from mittab.libs.spreadsheets import LAYOUTS, ROSTER_KINDS, spreadsheet_response
+from mittab.libs.spreadsheets import (
+    LAYOUTS,
+    ROSTER_KINDS,
+    SpreadsheetError,
+    spreadsheet_response,
+)
 
 
 def spreadsheet(kind, rows, extension="csv", headers=None):
@@ -439,4 +445,28 @@ class TestSpreadsheets(TestCase):
                         reverse("export_roster", args=[kind, "csv"])
                     ).status_code,
                     [302, 403],
+                )
+
+    def test_roster_export_errors_do_not_disclose_exception_details(self):
+        user = get_user_model().objects.create_superuser(
+            "spreadsheet-tester", "tab@example.com", "password"
+        )
+        self.client.force_login(user)
+        for error in (SpreadsheetError, ValueError):
+            with patch(
+                "mittab.apps.tab.views.views.spreadsheet_response",
+                side_effect=error(
+                    "Traceback: /srv/private/file.py; protected judge calibration"
+                ),
+            ):
+                response = self.client.get(
+                    reverse("export_roster", args=["judges", "xlsx"])
+                )
+                self.assertContains(
+                    response, "Could not export spreadsheet.", status_code=400
+                )
+                self.assertNotContains(response, "Traceback", status_code=400)
+                self.assertNotContains(response, "/srv/private", status_code=400)
+                self.assertNotContains(
+                    response, "protected judge calibration", status_code=400
                 )

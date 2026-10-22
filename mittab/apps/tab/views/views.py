@@ -180,20 +180,38 @@ def export_apda_board_schools_csv(request):
     if not is_apda_board_user(request.user):
         return redirect("index")
 
+    extension = request.GET.get("format", "csv")
+    if extension not in {"csv", "xls", "xlsx"}:
+        return HttpResponseBadRequest(
+            "Unsupported export format. Choose csv, xls, or xlsx."
+        )
     try:
-        return export_apda_board_schools_csv_file(request.GET.get("format", "csv"))
-    except SpreadsheetError as exc:
-        return HttpResponseBadRequest(str(exc))
+        return export_apda_board_schools_csv_file(extension)
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export APDA IDs. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
 
 
 def export_apda_board_debaters_csv(request):
     if not is_apda_board_user(request.user):
         return redirect("index")
 
+    extension = request.GET.get("format", "csv")
+    if extension not in {"csv", "xls", "xlsx"}:
+        return HttpResponseBadRequest(
+            "Unsupported export format. Choose csv, xls, or xlsx."
+        )
     try:
-        return export_apda_board_debaters_csv_file(request.GET.get("format", "csv"))
-    except SpreadsheetError as exc:
-        return HttpResponseBadRequest(str(exc))
+        return export_apda_board_debaters_csv_file(extension)
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export APDA IDs. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
 
 
 def import_apda_board_schools_csv(request):
@@ -803,8 +821,12 @@ def export_roster(request, kind, extension):
     headers, rows = roster_rows(kind)
     try:
         return spreadsheet_response(kind, extension, headers, rows)
-    except (SpreadsheetError, ValueError) as exc:
-        return HttpResponseBadRequest(f"Could not export spreadsheet: {exc}")
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export spreadsheet. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
 
 
 def upload_data(request):

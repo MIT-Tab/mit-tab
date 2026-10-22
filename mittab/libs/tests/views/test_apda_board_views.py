@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from django.contrib.auth import get_user_model
@@ -16,7 +18,7 @@ from mittab.apps.tab.models import (
     TabSettings,
     Team,
 )
-from mittab.libs.spreadsheets import read_rows, spreadsheet_response
+from mittab.libs.spreadsheets import SpreadsheetError, read_rows, spreadsheet_response
 from mittab.apps.tab.public_rankings import (
     get_standings_publication_setting,
     set_standings_publication_setting,
@@ -314,3 +316,31 @@ class TestApdaBoardViews(TestCase):
             reverse("export_apda_board_debaters_csv"), {"format": "json"}
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_apda_export_errors_do_not_disclose_exception_details(self):
+        for kind in ("schools", "debaters"):
+            target = f"mittab.apps.tab.views.views.export_apda_board_{kind}_csv_file"
+            for error in (SpreadsheetError, ValueError):
+                with patch(
+                    target,
+                    side_effect=error(
+                        "Traceback: /srv/private/file.py; protected judge calibration"
+                    ),
+                ) as exporter:
+                    response = self.client.get(reverse(f"export_apda_board_{kind}_csv"),
+                                               {"format": "xlsx"})
+                    self.assertContains(
+                        response, "Could not export APDA IDs.", status_code=400)
+                    self.assertNotContains(response, "Traceback", status_code=400)
+                    self.assertNotContains(response, "/srv/private", status_code=400)
+                    self.assertNotContains(
+                        response, "protected judge calibration", status_code=400
+                    )
+                    exporter.reset_mock()
+                    response = self.client.get(
+                        reverse(f"export_apda_board_{kind}_csv"), {"format": "json"}
+                    )
+                    self.assertContains(
+                        response, "Choose csv, xls, or xlsx.", status_code=400
+                    )
+                    exporter.assert_not_called()
