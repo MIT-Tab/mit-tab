@@ -1167,12 +1167,14 @@ class AuditEvent(models.Model):
     MANUAL_JUDGE_ASSIGN = "manual_judge_assign"
     MANUAL_JUDGE_REMOVE = "manual_judge_remove"
     MANUAL_CHAIR_CHANGE = "manual_chair_change"
+    JUDGES_PAIRED = "judges_paired"
     EVENT_CHOICES = (
         (CREATE, "Created"),
         (EDIT, "Edited"),
         (MANUAL_JUDGE_ASSIGN, "Manual judge assignment"),
         (MANUAL_JUDGE_REMOVE, "Manual judge removal"),
         (MANUAL_CHAIR_CHANGE, "Manual chair change"),
+        (JUDGES_PAIRED, "Automatic judge assignment"),
     )
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

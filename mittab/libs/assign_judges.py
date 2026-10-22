@@ -1,8 +1,10 @@
 import random
 from types import SimpleNamespace
+from django.db import transaction
 from django.db.models import Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
+from mittab.apps.tab.judge_history import record_judge_pairing
 
 class JudgePairingMode:
     DEFAULT = 0
@@ -110,6 +112,7 @@ def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
     return judge_scores
 
 
+@transaction.atomic
 def add_judges():
     round_number = TabSettings.get("cur_round") - 1
     pairing_settings = get_inround_settings()
@@ -353,6 +356,7 @@ def add_judges():
                 assigned_judge_objects.add(judge.id)
 
     Round.judges.through.objects.bulk_create(judge_round_joins)
+    record_judge_pairing(pairings, Round)
 
 
 def _normalize_round_specs(round_specs=None, round_type=None):
@@ -522,6 +526,7 @@ def _collect_outround_pairing_data(round_specs, round_priority):
     return pairings_by_spec, panel_size_by_spec
 
 
+@transaction.atomic
 def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     normalized_specs = _normalize_round_specs(round_specs, round_type=round_type)
     if not normalized_specs:
@@ -609,6 +614,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
         Outround.objects.bulk_update(rounds_to_update, ["chair"])
     if judge_round_joins:
         Outround.judges.through.objects.bulk_create(judge_round_joins)
+    record_judge_pairing(rounds_to_update, Outround)
 
 def calc_weight(
         judge_i,
