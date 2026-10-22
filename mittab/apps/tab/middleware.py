@@ -1,13 +1,13 @@
 import re
 from urllib.parse import urlsplit
 
-from django.contrib.auth import logout
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, JsonResponse
 from django.urls import Resolver404, resolve, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from mittab.apps.tab.auth_roles import (
+    board_can_access_view,
     is_apda_board_access_open,
     is_apda_board_user,
     is_restricted_staff_user,
@@ -47,28 +47,6 @@ API_ERROR_MESSAGES = {
     "team": "Team results not published",
     "shared": "Standings data not published",
 }
-APDA_BOARD_ALLOWED_PREFIXES = (
-    "/apda-board/",
-    "/public/",
-    "/team/card/",
-    "/team_portal/",
-    "/accounts/logout/",
-    "/admin/logout/",
-    "/403/",
-    "/404/",
-    "/500/",
-    "/favicon.ico",
-    "/static/",
-    "/dynamic-media/",
-)
-APDA_BOARD_ALLOWED_EXACT_PATHS = (
-    "/",
-    "/all_tab_cards/",
-    "/archive/black_rod_bundle/",
-    "/forum_post",
-)
-
-
 class Login:
     """This middleware requires a login for every view"""
 
@@ -78,20 +56,30 @@ class Login:
     def __call__(self, request):
         path = request.path
         if request.user.is_authenticated and is_apda_board_user(request.user):
+            try:
+                view_name = resolve(path).view_name
+            except Resolver404:
+                view_name = None
             if not is_apda_board_access_open():
-                logout(request)
-                return redirect_and_flash_info(
-                    request,
-                    "APDA Board login activates after the final inround is paired.",
-                    path="/public/",
+                if view_name in {"logout", "admin_logout"}:
+                    return self.get_response(request)
+                return HttpResponse(
+                    "Board access opens near the end of inrounds.", status=403,
+                    headers={"Cache-Control": "private, no-store"},
                 )
-            if path not in APDA_BOARD_ALLOWED_EXACT_PATHS and \
-                    not path.startswith(APDA_BOARD_ALLOWED_PREFIXES):
+            if not board_can_access_view(view_name, request.method):
                 return redirect_and_flash_info(
                     request,
                     "APDA Board access is limited to APDA tools and public pages.",
                     path="/403/",
                 )
+            # Board membership takes precedence over any staff preset.
+            response = self.get_response(request)
+            if response.status_code >= 500:
+                # Debug/profiler exception details must never reach board accounts.
+                response = HttpResponse("Unable to complete this request.", status=500)
+            response["Cache-Control"] = "private, no-store"
+            return response
 
         wizard_path = reverse("start_tournament")
         wizard_exempt = (

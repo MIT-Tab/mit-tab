@@ -40,8 +40,8 @@ MIDDLEWARE = (
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "mittab.apps.tab.middleware.TournamentStatusCheck",
     "mittab.apps.tab.middleware.Login",
+    "mittab.apps.tab.middleware.TournamentStatusCheck",
 )
 
 if os.environ.get("SILK_ENABLED"):

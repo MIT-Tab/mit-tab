@@ -12,6 +12,7 @@ from mittab.apps.tab.auth_roles import (
     user_has_staff_capability,
 )
 from mittab.apps.tab.forms import TeamForm, TeamEntryForm, ScratchForm
+from mittab.apps.tab.views.board_views import tab_cards as board_tab_cards
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.errors import *
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
@@ -293,17 +294,17 @@ def view_scratches(request, team_id):
 
 
 def all_tab_cards(request):
-    if not (
-        request.user.has_perm("tab.tab_settings.can_change")
-        or is_apda_board_user(request.user)
-    ):
+    if is_apda_board_user(request.user):
+        return board_tab_cards(request)
+    if not request.user.has_perm("tab.tab_settings.can_change"):
         return HttpResponseRedirect("/403/")
-
     all_teams = Team.objects.all()
     return render(request, "tab/all_tab_cards.html", {"all_teams": all_teams})
 
 
 def pretty_tab_card(request, team_id):
+    if is_apda_board_user(request.user):
+        return board_tab_cards(request, team_id=team_id)
     try:
         team_id = int(team_id)
     except Exception:
@@ -313,6 +314,8 @@ def pretty_tab_card(request, team_id):
 
 
 def tab_card(request, team_id):
+    if is_apda_board_user(request.user):
+        return board_tab_cards(request, team_id=team_id)
     try:
         team_id = int(team_id)
     except ValueError:

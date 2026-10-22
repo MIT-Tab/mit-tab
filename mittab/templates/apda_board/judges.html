@@ -1,0 +1,8 @@
+{% extends "base/__wide.html" %}
+{% block title %}Dino Judges{% endblock %}
+{% block banner %}Dino Judges{% endblock %}
+{% block content %}
+<div class="col-12"><table class="table"><thead><tr><th>Judge</th><th>Dino status</th></tr></thead><tbody>
+{% for judge in judges %}<tr><td>{{ judge.name }}</td><td><form method="post">{% csrf_token %}<input type="hidden" name="judge" value="{{ judge.id }}"><label><input type="checkbox" name="is_dino" {% if judge.is_dino %}checked{% endif %}> Dino</label> <button class="btn btn-sm btn-primary">Save</button></form>{% if judge.history %}<details><summary>Dino edits</summary>{% for event in judge.history %}<p>{{ event.time|date:"Y-m-d H:i:s T" }} · {{ event.actor }}: {{ event.before|yesno:"Dino,Not dino" }} → {{ event.after|yesno:"Dino,Not dino" }}</p>{% endfor %}</details>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}
