@@ -40,8 +40,8 @@ class TabCardsWebTestCase(StaticLiveServerTestCase):
             type_of_round=Outround.VARSITY, num_teams=2,
         )
         opponent = Team.objects.first().gov_team.first().opp_team
-        opponent.name = "UniversityWithAnUnusuallyLongUnbrokenName"
-        opponent.save()
+        opponent.name = "W" * Team._meta.get_field("name").max_length
+        opponent.save(update_fields=["name"])
 
     def test_phone_tablet_desktop_and_print_layouts(self):
         self.driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {
