@@ -41,7 +41,6 @@ function inviteErrorMessage(error) {
 function initializeStaffInvites() {
   const form = document.querySelector("#staff-invite-form");
   const status = document.querySelector("#staff-invite-status");
-  const nextButton = document.querySelector("#wizard-next-button");
   if (!form || !status) {
     return;
   }
@@ -89,10 +88,6 @@ function initializeStaffInvites() {
       status.className = "alert alert-success py-2";
       status.textContent = data.message;
       form.reset();
-      if (nextButton) {
-        nextButton.disabled = false;
-        nextButton.removeAttribute("aria-disabled");
-      }
     } catch (error) {
       if (!form.querySelector("[data-invite-errors-for]:not(:empty)")) {
         status.className = "alert alert-danger py-2";
