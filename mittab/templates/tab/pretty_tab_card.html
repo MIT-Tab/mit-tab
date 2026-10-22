@@ -10,7 +10,7 @@
   <a class="btn btn-secondary" href="/team/{{team.id}}/">View {{team.display_backend}}</a>
 
   <div style="padding:1em 0 0"></div>
-  <div class="tab_card_item" data-team-id={{team.id}}></div>
+  {% if card %}{% include "tab/tab_card.html" %}{% else %}<p>No debaters registered for this team.</p>{% endif %}
 </div>
 {% endblock %}
 

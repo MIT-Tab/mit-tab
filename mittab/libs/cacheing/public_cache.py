@@ -95,6 +95,7 @@ def cache_public_view(timeout=60):
                     if cache.add(lock_key, True, lock_timeout):
                         try:
                             fresh_response = view_func(request, *args, **kwargs)
+                            fresh_response["Cache-Control"] = cache_control_header
                             cache.set(
                                 cache_key,
                                 {"response": fresh_response,
@@ -158,6 +159,7 @@ def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
     kwargs = {"type_of_round": type_of_round}
     _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
     _delete_key_for_all_auth_states("public_home")
+    _delete_key_for_all_auth_states("cached_public_tab_cards")
 
 
 def invalidate_public_judges_cache(*_args, **_kwargs):
@@ -217,6 +219,7 @@ def invalidate_all_public_caches(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_ballots")
     _delete_key_for_all_auth_states("e_ballot_search_page")
     _delete_key_for_all_auth_states("public_motions")
+    _delete_key_for_all_auth_states("cached_public_tab_cards")
 
     # Invalidate outrounds for both divisions
     for type_of_round in [0, 1]:  # VARSITY=0, NOVICE=1

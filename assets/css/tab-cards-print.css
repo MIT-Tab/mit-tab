@@ -1,0 +1,27 @@
+/* Preserve the original standalone staff tab card layout. */
+div.printable {
+    width: 7in;
+    margin-bottom: 2em;
+}
+
+table.tab-card {
+    text-align: left;
+    border-collapse: collapse;
+    border: 1px solid #666666;
+}
+
+table.tab-card th {
+    border: 1px solid #666666;
+    padding: .5em;
+    font-size: 18px;
+}
+
+table.tab-card td {
+    border: 1px solid #666666;
+    padding: .5em;
+    font-size: 14px;
+}
+
+.page_break_after {
+    page-break-after: always;
+}

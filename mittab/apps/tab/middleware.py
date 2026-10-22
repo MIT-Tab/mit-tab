@@ -107,6 +107,7 @@ class Login:
 
         should_store_return_to = (
             request.method == "GET"
+            and request.path != reverse("public_tab_cards")
             and not request.path.startswith("/api/")
             and request.headers.get("X-Requested-With") != "XMLHttpRequest"
         )

@@ -1,0 +1,87 @@
+.tab-cards {
+  min-width: 0;
+  &__intro {
+    margin-bottom: 2rem;
+  }
+
+  &__card {
+    margin-bottom: 2rem;
+    break-inside: avoid;
+
+    h2 {
+      font-size: 1.35rem;
+      margin-bottom: 0.75rem;
+    }
+  }
+
+  .tab-card {
+    min-width: 52rem;
+    font-size: 0.875rem;
+
+    th, td {
+      vertical-align: middle;
+    }
+  }
+}
+
+@media screen and (max-width: 991.98px) {
+  #container-main:has(.tab-cards) > .row > .col > h3 {
+    font-size: 1.5rem;
+  }
+
+  .tab-cards {
+    &__intro {
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+
+      .btn {
+        min-height: 44px;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.95rem;
+      }
+    }
+
+    &__card h2 {
+      overflow-wrap: anywhere;
+    }
+
+    .tab-card {
+      width: 100%;
+      min-width: 0;
+      table-layout: fixed;
+      font-size: clamp(0.25rem, 1.3vw, 0.625rem);
+
+      th, td {
+        padding: 0.3em 0.2em;
+        overflow-wrap: anywhere;
+      }
+
+      th:nth-child(1) { width: 4%; }
+      th:nth-child(2),
+      th:nth-child(3) { width: 5%; }
+      th:nth-child(4) { width: 23%; }
+      th:nth-child(5) { width: 18%; }
+      th:nth-child(6),
+      th:nth-child(7) { width: 17%; }
+      th:nth-child(8) { width: 11%; }
+    }
+  }
+}
+
+@media print {
+  .tab-cards {
+    .table-responsive {
+      overflow: visible;
+    }
+
+    .tab-card {
+      min-width: 0;
+      font-size: 0.7rem;
+    }
+
+    &__card:nth-of-type(2n) {
+      break-after: page;
+    }
+  }
+}

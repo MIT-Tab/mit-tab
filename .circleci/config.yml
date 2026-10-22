@@ -90,7 +90,8 @@ jobs:
           TEST_BROWSER: chrome
           MYSQL_PASSWORD: secret
           MITTAB_DB_HOST: 127.0.0.1
-          MITTAB_FAKE_WEBPACK_LOADER: "1"
+          # Browser layout tests need the bundles built below.
+          MITTAB_FAKE_WEBPACK_LOADER: "0"
           MITTAB_INITIALIZE_ARGS: --skip-backups
           MITTAB_SKIP_WEBPACK_BUILD: "1"
       - image: cimg/mysql:8.0
