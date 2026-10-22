@@ -5,7 +5,6 @@ from urllib.parse import urlencode
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import permission_required
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Min
 from django.shortcuts import redirect, reverse
@@ -14,6 +13,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
+from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.libs import assign_judges, assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -534,16 +534,7 @@ def outround_pairing_view(request,
     excluded_teams = list(excluded_teams_map.values())
     manual_judge_audit_events = {}
     if outround_ids:
-        outround_content_type = ContentType.objects.get_for_model(Outround)
-        audit_entries = AuditEvent.objects.filter(
-            content_type=outround_content_type,
-            object_id__in=outround_ids,
-            event_type__in=[
-                AuditEvent.MANUAL_JUDGE_ASSIGN,
-                AuditEvent.MANUAL_JUDGE_REMOVE,
-                AuditEvent.MANUAL_CHAIR_CHANGE,
-            ],
-        ).select_related("user")
+        audit_entries = current_manual_judge_events(Outround, outround_ids)
         for entry in audit_entries:
             manual_judge_audit_events.setdefault(entry.object_id, []).append(entry)
 

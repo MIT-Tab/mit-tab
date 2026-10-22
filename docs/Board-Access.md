@@ -84,6 +84,13 @@ database access or a full database restore can rewrite history. Board accounts
 have no route to modify history or perform restores. Independent custody of audit
 events would be a separate infrastructure project.
 
+Staff pairing cards show manual judge edits since the latest successful automatic
+judge assignment for that debate. Re-pairing clears those card annotations even
+when the panel stays the same. Earlier edits remain in the full audit history,
+including the board's safe projection. Failed judge assignment leaves the existing
+panel and card annotations intact; scoped outround assignment resets only the
+selected undecided debates.
+
 ## Verification
 
 `mittab/libs/tests/views/test_board_audit_access.py` tests access timing, active

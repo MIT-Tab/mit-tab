@@ -9,7 +9,6 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
@@ -19,6 +18,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from mittab.apps.tab.models import *
 from mittab.apps.tab.tournament_start import apply_new_tournament_defaults
 from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
+from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
     written_rfd_editing_open,
@@ -571,16 +571,7 @@ def view_round(request, round_number):
             manual_judge_assignment_labels[(round_id, judge_id)] = (
                 f"Manually assigned by {entry.created_by_display}"
             )
-        round_content_type = ContentType.objects.get_for_model(Round)
-        audit_entries = AuditEvent.objects.filter(
-            content_type=round_content_type,
-            object_id__in=round_ids,
-            event_type__in=[
-                AuditEvent.MANUAL_JUDGE_ASSIGN,
-                AuditEvent.MANUAL_JUDGE_REMOVE,
-                AuditEvent.MANUAL_CHAIR_CHANGE,
-            ],
-        ).select_related("user")
+        audit_entries = current_manual_judge_events(Round, round_ids)
         for entry in audit_entries:
             manual_judge_audit_events.setdefault(entry.object_id, []).append(entry)
 
