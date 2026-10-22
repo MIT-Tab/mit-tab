@@ -1,87 +1,110 @@
 from abc import ABC, abstractmethod
 
+from django.core.exceptions import ValidationError
+from django.db import DataError, IntegrityError, transaction
 from django.forms import ModelForm
-import xlrd
-from xlrd.biffh import XLRDError
 
+from mittab.apps.tab.models import AuditAttributionMixin, TabSettings
+from mittab.libs.spreadsheets import (
+    LAYOUTS,
+    SpreadsheetError,
+    column_mapping,
+    read_rows,
+)
 
-class InvalidWorkbookException(Exception):
-    pass
+InvalidWorkbookException = SpreadsheetError
 
 
 class Workbook:
-    """
-    A wrapper for an xlsx file, so that we can mock it in tests
-    """
+    """Read the first worksheet (or CSV), preserving physical row numbers."""
 
-    def __init__(self, file_to_import, min_rows):
-        self.min_rows = min_rows
-        try:
-            self.sheet = xlrd.open_workbook(
-                filename=None,
-                file_contents=file_to_import.read()).sheet_by_index(0)
-        except (XLRDError, TypeError, IndexError) as exc:
-            raise InvalidWorkbookException("Could not open workbook") from exc
+    def __init__(self, file_to_import):
+        self.data = read_rows(file_to_import)
+        self.row_numbers = []
+        self.named_headers = False
 
-    def get(self, row, col):
-        try:
-            return str(self.sheet.cell(row, col).value)
-        except IndexError:
-            return None
+    def configure(self, kind):
+        round_count = TabSettings.get("tot_rounds", 5) if kind == "judges" else 0
+        rows, mapping, extras = column_mapping(kind, self.data, round_count)
+        self.named_headers = rows[0][0] != self.data[0][0]
+        self.row_numbers = [number for number, _ in rows]
+        width = len(LAYOUTS[kind])
+        self.data = [
+            [
+                row[mapping[i]] if i in mapping and mapping[i] < len(row) else ""
+                for i in range(width)
+            ]
+            + [row[i] if i is not None and i < len(row) else "" for i in extras]
+            for _, row in rows
+        ]
 
     def rows(self):
-        """
-        A simple iterator to return all of the rows as a list of strings
-        """
-        row = 1
-        while self.get(row, 0) is not None:
-            col = 0
-            row_data = []
-            while self.get(row, col) is not None or col < self.min_rows:
-                row_data.append(self.get(row, col) or "")
-                col += 1
-            yield row_data
-            row += 1
+        return iter(self.data)
 
 
 class WorkbookImporter(ABC):
-    min_row_size = 1
+    kind = None
 
     def __init__(self, workbook, created_by=None):
         self.workbook = workbook
         self.created_by = created_by
         self.errors = []
-        self.created_objs = []
 
     @abstractmethod
     def import_row(self, row, row_number):
         pass
 
     def import_data(self):
-        for row_number, row in enumerate(self.workbook.rows()):
-            self.import_row(row, row_number)
-        if self.errors:
-            self.rollback()
+        try:
+            if isinstance(self.workbook, Workbook):
+                self.workbook.configure(self.kind)
+        except SpreadsheetError as exc:
+            return [str(exc)]
+        with transaction.atomic():
+            for row_number, row in enumerate(self.workbook.rows()):
+                try:
+                    with transaction.atomic():
+                        self.import_row(row, row_number)
+                except (ValidationError, DataError, IntegrityError) as exc:
+                    detail = (
+                        "; ".join(exc.messages)
+                        if isinstance(exc, ValidationError)
+                        else (
+                            "A value conflicts with an existing record "
+                            "or exceeds a database limit. "
+                            "Check the names and column values."
+                        )
+                    )
+                    self.error(detail, row_number)
+            if self.errors:
+                transaction.set_rollback(True)
         return self.errors
 
     def create(self, obj):
         if isinstance(obj, ModelForm):
-            self.created_objs.append(obj.instance)
-            try:
+            if isinstance(obj.instance, AuditAttributionMixin):
                 obj.save(actor=self.created_by)
-            except TypeError:
+            else:
                 obj.save()
         else:
-            self.created_objs.append(obj)
+            obj.full_clean()
             obj.save()
         return obj
 
-    def rollback(self):
-        for obj in reversed(self.created_objs):
-            obj.delete()
+    def form_errors(self, form, columns, row, row_number):
+        for field, messages in form.errors.items():
+            column = columns.get(field)
+            label = LAYOUTS[self.kind][column] if column is not None else field
+            value = row[column] if column is not None else ""
+            for message in messages:
+                self.error(
+                    f'Value "{value}" in column "{label}": {message}', row_number
+                )
 
     def error(self, msg, row_number=None):
         if row_number is not None:
-            self.errors.append(f"Row {row_number + 1}: {msg}")
+            numbers = getattr(self.workbook, "row_numbers", [])
+            number = numbers[row_number] if numbers else row_number + 1
+            self.errors.append(f"Row {number}: {msg}")
         else:
             self.errors.append(msg)

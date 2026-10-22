@@ -104,7 +104,8 @@ class TestImportingTeams(TestCase):
         assert Debater.objects.count() == 0
         assert len(errors) == 1
         assert errors[
-            0] == "Row 2: John - Debater with this Name already exists."
+            0] == ('Row 2: Value "John" in column "Debater 2 name": '
+                   'Debater with this Name already exists.')
 
     def test_rollback_from_invalid_team(self):
         assert Team.objects.count() == 0
@@ -131,7 +132,8 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 0
         assert Debater.objects.count() == 0
         assert len(errors) == 1
-        assert errors[0] == "Row 2: Invalid seed value for team Team 2"
+        assert errors[0] == ('Row 2: Value "invalid" in column "Seed": '
+                             'expected full, half, free, or unseeded.')
 
     def test_schools_not_rolledback_if_existed_before(self):
         school = School(name="NU")
@@ -156,7 +158,8 @@ class TestImportingTeams(TestCase):
         assert School.objects.count() == 1
         assert School.objects.first().name == "NU"
         assert len(errors) == 1
-        assert errors[0] == "Row 1: Invalid seed value for team Team 1"
+        assert errors[0] == ('Row 1: Value "invalid" in column "Seed": '
+                             'expected full, half, free, or unseeded.')
 
     def test_empty_debater_emails_are_normalized_to_none(self):
         data = [

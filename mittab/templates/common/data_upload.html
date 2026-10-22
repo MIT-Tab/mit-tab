@@ -5,7 +5,7 @@
 {% block content %}
 <div class="col-md-2"></div>
 <div class="col-md-8">
-  <h3 class="text-center">Upload Data Files</h3>
+  <h3 class="text-center">Import and Export Spreadsheets</h3>
   {% with obj_type="team" info_obj=team_info %}
     {% include "common/_upload_error.html" %}
   {% endwith %}
@@ -24,14 +24,32 @@
     {% endwith %}
   {% endif %}
 
-  <p class="text-center">
-    Check out
-    <a href="https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5">
-      these templates
-    </a>
-    to get started and make sure to keep the header rows!
+  <p class="text-muted small">
+    CSV, XLS, or XLSX.
+    <a href="https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5">Example templates</a>
   </p>
-  {% include "common/_form.html" %}
+  <h4>Import</h4>
+  {% include "common/_form.html" with submit_label="Import spreadsheets" %}
+  <h4 class="mt-4">Export</h4>
+  <table class="table table-sm">
+    <thead><tr><th>Data</th><th>Download spreadsheet</th></tr></thead>
+    <tbody>
+      {% for kind in export_kinds %}
+      <tr><td>{{ kind|capfirst }}</td><td>
+        {% for extension in export_formats %}
+        <a class="btn btn-sm btn-outline-primary mr-2" href="{% url 'export_roster' kind extension %}">{{ extension|upper }}</a>
+        {% endfor %}
+      </td></tr>
+      {% endfor %}
+      {% if can_export_scratches %}
+      <tr><td>Scratches</td><td>
+        {% for extension in export_formats %}
+        <a class="btn btn-sm btn-outline-primary mr-2" href="{% url 'export_roster' 'scratches' extension %}">{{ extension|upper }}</a>
+        {% endfor %}
+      </td></tr>
+      {% endif %}
+    </tbody>
+  </table>
 </div>
 <div class="col-md-2"></div>
 {% endblock %}

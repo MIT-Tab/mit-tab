@@ -419,6 +419,8 @@ urlpatterns = [
 
     # Data Upload
     path("import_data/", views.upload_data, name="upload_data"),
+    path("export_data/<str:kind>.<str:extension>", views.export_roster,
+         name="export_roster"),
 
     # Tournament Archive
     path("archive/download/", views.generate_archive, name="download_archive"),

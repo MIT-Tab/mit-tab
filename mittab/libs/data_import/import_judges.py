@@ -1,3 +1,6 @@
+from django.core.exceptions import ValidationError
+
+from mittab.libs.spreadsheets import is_number
 from mittab.apps.tab.models import School, JudgeExpectedCheckIn, TabSettings
 from mittab.apps.tab.forms import JudgeForm
 from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookException
@@ -9,13 +12,15 @@ def normalize_email(value):
 
 def import_judges(file_to_import, created_by=None):
     try:
-        workbook = Workbook(file_to_import, 3)
-    except InvalidWorkbookException:
-        return ["Judges file is not a valid .xlsx file"]
+        workbook = Workbook(file_to_import)
+    except InvalidWorkbookException as exc:
+        return [str(exc)]
     return JudgeImporter(workbook, created_by=created_by).import_data()
 
 
 class JudgeImporter(WorkbookImporter):
+    kind = "judges"
+
     truthy_expectation_values = {
         "1",
         "true",
@@ -28,9 +33,22 @@ class JudgeImporter(WorkbookImporter):
         "checked",
     }
 
+    false_expectation_values = {"", "0", "false", "no", "n", "out"}
+
     def _split_row(self, row):
         num_rounds = TabSettings.get("tot_rounds", 5)
-        if num_rounds and len(row) >= 3 + num_rounds:
+        if (
+            num_rounds
+            and len(row) >= 3 + num_rounds
+            and (
+                getattr(self.workbook, "named_headers", False)
+                or all(
+                    cell.strip().lower()
+                    in self.truthy_expectation_values | self.false_expectation_values
+                    for cell in row[-num_rounds:]
+                )
+            )
+        ):
             expectation_cells = row[-num_rounds:]
             school_cells = row[3:-num_rounds]
         else:
@@ -38,12 +56,19 @@ class JudgeImporter(WorkbookImporter):
             school_cells = row[3:]
         return school_cells, expectation_cells
 
-    def _expected_rounds(self, expectation_cells):
+    def _expected_rounds(self, expectation_cells, row_number):
         expected_rounds = []
         for index, cell in enumerate(expectation_cells, start=1):
             normalized = str(cell or "").strip().lower()
-            if normalized and normalized in self.truthy_expectation_values:
+            if normalized in self.truthy_expectation_values:
                 expected_rounds.append(index)
+            elif normalized not in self.false_expectation_values:
+                self.error(
+                    f'Value "{cell}" in column "Round {index} expected": '
+                    "use yes, no, or a blank cell.",
+                    row_number,
+                )
+                return None
         return expected_rounds
 
     def _apply_expected_rounds(self, judge, expected_rounds):
@@ -60,12 +85,19 @@ class JudgeImporter(WorkbookImporter):
         judge_email = normalize_email(row[1])
         judge_rank = row[2]
 
-        try:
-            judge_rank = round(float(judge_rank), 2)
-        except ValueError:
-            self.error("Judge rank is not a number", row_number)
+        if not is_number(judge_rank):
+            self.error(
+                f'Value "{judge_rank}" in column "Calibration": '
+                "expected a finite number.",
+                row_number,
+            )
+            return
+        judge_rank = round(float(judge_rank), 2)
 
         school_cells, expectation_cells = self._split_row(row)
+        expected_rounds = self._expected_rounds(expectation_cells, row_number)
+        if expected_rounds is None:
+            return
 
         schools = []
         for school_name in school_cells:
@@ -79,8 +111,13 @@ class JudgeImporter(WorkbookImporter):
                 school = School(name=school_name)
                 try:
                     self.create(school)
-                except Exception:
-                    self.error(f"Invalid school '{school_name}'", row_number)
+                except ValidationError as exc:
+                    self.error(
+                        f'Value "{school_name}" in column "School": '
+                        + "; ".join(exc.messages),
+                        row_number,
+                    )
+                    return
             schools.append(school.id)
 
         data = {
@@ -93,10 +130,7 @@ class JudgeImporter(WorkbookImporter):
         if form.is_valid():
             self.create(form)
             judge = form.instance
-            expected_rounds = self._expected_rounds(expectation_cells)
             if expected_rounds:
                 self._apply_expected_rounds(judge, expected_rounds)
         else:
-            for _field, error_msgs in form.errors.items():
-                for error_msg in error_msgs:
-                    self.error(f"{judge_name} - {error_msg}", row_number)
+            self.form_errors(form, {"name": 0, "email": 1, "rank": 2}, row, row_number)

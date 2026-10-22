@@ -5,13 +5,15 @@ from mittab.libs.data_import import Workbook, WorkbookImporter, InvalidWorkbookE
 
 def import_scratches(file_to_import, created_by=None):
     try:
-        workbook = Workbook(file_to_import, 3)
-    except InvalidWorkbookException:
-        return ["Scratches file is not a valid .xlsx file"]
+        workbook = Workbook(file_to_import)
+    except InvalidWorkbookException as exc:
+        return [str(exc)]
     return ScratchImporter(workbook, created_by=created_by).import_data()
 
 
 class ScratchImporter(WorkbookImporter):
+    kind = "scratches"
+
     team_scratch_values = ["team scratch", "team"]
     tab_scratch_values = ["tab scratch", "tab"]
 
@@ -34,8 +36,7 @@ class ScratchImporter(WorkbookImporter):
             scratch_type = Scratch.TAB_SCRATCH
         else:
             got_error = True
-            self.error(f"'{scratch_type}' is not a valid scratch type",
-                       row_number)
+            self.error(f"'{scratch_type}' is not a valid scratch type", row_number)
         if got_error:
             return
 
@@ -43,13 +44,12 @@ class ScratchImporter(WorkbookImporter):
             data={
                 "scratch_type": scratch_type,
                 "team": Team.objects.get(name=team_name).id,
-                "judge": Judge.objects.get(name=judge_name).id
-            })
+                "judge": Judge.objects.get(name=judge_name).id,
+            }
+        )
         if form.is_valid():
             self.create(form)
         else:
-            for _field, error_msgs in form.errors.items():
-                for error_msg in error_msgs:
-                    self.error(
-                        f"{team_name} x {judge_name} - {error_msg}",
-                        row_number)
+            self.form_errors(
+                form, {"team": 0, "judge": 1, "scratch_type": 2}, row, row_number
+            )

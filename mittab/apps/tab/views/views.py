@@ -5,7 +5,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
-from django.http import HttpResponse, JsonResponse
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
+from django.views.decorators.http import require_GET
 from django.shortcuts import render, redirect, reverse
 from django.core.management import call_command
 import yaml
@@ -66,6 +72,8 @@ from mittab.libs.data_export.apda_board_export import (
     export_apda_board_debaters_csv as export_apda_board_debaters_csv_file,
     export_apda_board_schools_csv as export_apda_board_schools_csv_file,
 )
+from mittab.libs.data_export.roster_export import roster_rows
+from mittab.libs.spreadsheets import ROSTER_KINDS, SpreadsheetError, spreadsheet_response
 from mittab.libs.tab_logic.rankings import get_team_rankings
 
 
@@ -172,14 +180,38 @@ def export_apda_board_schools_csv(request):
     if not is_apda_board_user(request.user):
         return redirect("index")
 
-    return export_apda_board_schools_csv_file()
+    extension = request.GET.get("format", "csv")
+    if extension not in {"csv", "xls", "xlsx"}:
+        return HttpResponseBadRequest(
+            "Unsupported export format. Choose csv, xls, or xlsx."
+        )
+    try:
+        return export_apda_board_schools_csv_file(extension)
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export APDA IDs. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
 
 
 def export_apda_board_debaters_csv(request):
     if not is_apda_board_user(request.user):
         return redirect("index")
 
-    return export_apda_board_debaters_csv_file()
+    extension = request.GET.get("format", "csv")
+    if extension not in {"csv", "xls", "xlsx"}:
+        return HttpResponseBadRequest(
+            "Unsupported export format. Choose csv, xls, or xlsx."
+        )
+    try:
+        return export_apda_board_debaters_csv_file(extension)
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export APDA IDs. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
 
 
 def import_apda_board_schools_csv(request):
@@ -192,13 +224,18 @@ def import_apda_board_schools_csv(request):
     if not form.is_valid():
         return redirect_and_flash_error(
             request,
-            "Please upload a CSV file for school APDA IDs.",
+            "Please upload a CSV, XLS, or XLSX spreadsheet for school APDA IDs.",
             path=reverse("apda_board_home"),
         )
 
-    updated_count, ignored_count = import_apda_board_schools_csv_file(
-        form.cleaned_data["file"]
-    )
+    try:
+        updated_count, ignored_count = import_apda_board_schools_csv_file(
+            form.cleaned_data["file"]
+        )
+    except SpreadsheetError as exc:
+        return redirect_and_flash_error(
+            request, str(exc), path=reverse("apda_board_home")
+        )
     return redirect_and_flash_success(
         request,
         f"Imported school APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
@@ -216,13 +253,18 @@ def import_apda_board_debaters_csv(request):
     if not form.is_valid():
         return redirect_and_flash_error(
             request,
-            "Please upload a CSV file for debater APDA IDs.",
+            "Please upload a CSV, XLS, or XLSX spreadsheet for debater APDA IDs.",
             path=reverse("apda_board_home"),
         )
 
-    updated_count, ignored_count = import_apda_board_debaters_csv_file(
-        form.cleaned_data["file"]
-    )
+    try:
+        updated_count, ignored_count = import_apda_board_debaters_csv_file(
+            form.cleaned_data["file"]
+        )
+    except SpreadsheetError as exc:
+        return redirect_and_flash_error(
+            request, str(exc), path=reverse("apda_board_home")
+        )
     return redirect_and_flash_success(
         request,
         f"Imported debater APDA IDs. Updated {updated_count}; ignored {ignored_count}.",
@@ -759,6 +801,34 @@ def public_homepage(request):
     )
 
 
+@require_GET
+def export_roster(request, kind, extension):
+    # Check board membership before broader staff/superuser privileges.
+    if is_apda_board_user(request.user) or not user_has_staff_capability(
+        request.user, CAP_DATA_ENTRY
+    ):
+        return HttpResponseForbidden("Roster exports require data entry access.")
+    if kind == "scratches" and not user_has_staff_capability(
+        request.user, CAP_VIEW_SCRATCHES
+    ):
+        return HttpResponseForbidden(
+            "Scratch exports require permission to view scratches."
+        )
+    if kind not in ROSTER_KINDS or extension not in {"csv", "xls", "xlsx"}:
+        return HttpResponseBadRequest(
+            "Choose teams, judges, rooms, or scratches and csv, xls, or xlsx."
+        )
+    headers, rows = roster_rows(kind)
+    try:
+        return spreadsheet_response(kind, extension, headers, rows)
+    except (SpreadsheetError, ValueError):
+        return HttpResponseBadRequest(
+            "Could not export spreadsheet. Check cell text "
+            "and spreadsheet format limits, "
+            "or try another download format."
+        )
+
+
 def upload_data(request):
     team_info = {"errors": [], "uploaded": False}
     judge_info = {"errors": [], "uploaded": False}
@@ -794,21 +864,29 @@ def upload_data(request):
                 scratch_info["uploaded"] = True
 
         scratch_errors = scratch_info["errors"] if scratch_info else []
-        if not team_info["errors"] + judge_info["errors"] + \
+        if form.is_valid() and not team_info["errors"] + judge_info["errors"] + \
                 room_info["errors"] + scratch_errors:
             return redirect_and_flash_success(request,
                                               "Data imported successfully")
     else:
         form = UploadDataForm(allow_scratches=allow_scratch_import)
     return render(
-        request, "common/data_upload.html", {
+        request,
+        "common/data_upload.html",
+        {
             "form": form,
             "title": "Upload Input Files",
             "team_info": team_info,
             "judge_info": judge_info,
             "room_info": room_info,
-            "scratch_info": scratch_info
-        })
+            "scratch_info": scratch_info,
+            "can_export_scratches": user_has_staff_capability(
+                request.user, CAP_VIEW_SCRATCHES
+            ),
+            "export_kinds": ["teams", "judges", "rooms"],
+            "export_formats": ["xlsx", "xls", "csv"],
+        },
+    )
 
 
 def force_cache_refresh(request):
