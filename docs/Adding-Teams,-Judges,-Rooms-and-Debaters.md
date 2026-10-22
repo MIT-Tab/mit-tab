@@ -15,7 +15,7 @@ the "Admin" section of the navigation menu:
 
 Then, you should see a page where you can add a file for judges, rooms and teams:
 
-![](img/data_import.png)
+![](img/spreadsheet-import-export/desktop.png)
 
 Upload **CSV, XLS, or XLSX** files for teams, judges, rooms, and scratches. Excel
 imports read the first worksheet. Save CSV files with UTF-8 encoding. Blank rows
