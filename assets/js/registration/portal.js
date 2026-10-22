@@ -77,6 +77,13 @@ const getDebaterSchoolValue = (selectEl) =>
     `select[name$="${getDebaterPrefix(selectEl)}_school"]`,
   )?.value || "";
 
+const isNovice = (debaterData) => {
+  if (!debaterData) return false;
+  if (debaterData.is_novice === true) return true;
+  if (Number(debaterData.novice_status) === 1) return true;
+  return String(debaterData.status || "").toLocaleLowerCase() === "novice";
+};
+
 const fillDebaterData = (selectEl, debaterData = null) => {
   const { apdaTarget } = selectEl.dataset;
   const debaterCard = getDebaterCard(selectEl);
@@ -92,7 +99,7 @@ const fillDebaterData = (selectEl, debaterData = null) => {
       (debaterData && (debaterData.apda_id || debaterData.id)) || "";
   }
   if (noviceField) {
-    noviceField.value = debaterData?.status === "Novice" ? "1" : "0";
+    noviceField.value = isNovice(debaterData) ? "1" : "0";
   }
   if (qualifiedField) {
     qualifiedField.value = debaterData?.apda_id ? "on" : "";
@@ -187,6 +194,16 @@ const syncDebater = (selectEl) => {
 
 const renderDebaterList = ($select, entries = [], schoolValue = "") => {
   const currentValue = $select.val() || $select.data("currentValue") || "";
+  const selectEl = $select[0];
+  const debaterCard = getDebaterCard(selectEl);
+  const prefix = getDebaterPrefix(selectEl);
+  const noviceValue = debaterCard?.querySelector(
+    `[name$="${prefix}_novice_status"]`,
+  )?.value;
+  const { apdaTarget } = selectEl.dataset;
+  const apdaValue = apdaTarget
+    ? document.getElementById(apdaTarget)?.value || ""
+    : "";
   $select.empty().append('<option value="">Select a debater</option>');
   entries.forEach((entry) => {
     const name = entry.name || entry.full_name || "";
@@ -198,6 +215,8 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
       apda_id: entry.apda_id || entry.id,
       name,
       status: entry.status,
+      novice_status: entry.novice_status,
+      is_novice: entry.is_novice,
     });
     $select.append(option);
   });
@@ -209,6 +228,22 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
       option.dataset.debater = JSON.stringify(debater);
       insertAtTop($select, option);
     });
+  }
+  if (
+    currentValue &&
+    !$select.find("option").filter((_, option) => option.value === currentValue)
+      .length
+  ) {
+    const option = document.createElement("option");
+    option.value = currentValue;
+    option.textContent = currentValue;
+    option.dataset.debater = JSON.stringify({
+      id: apdaValue,
+      apda_id: apdaValue,
+      name: currentValue,
+      novice_status: noviceValue,
+    });
+    insertAtTop($select, option);
   }
   const restoredValue = $select.find(`option[value="${currentValue}"]`).length
     ? currentValue
@@ -262,20 +297,22 @@ const loadDebaters = ($schoolSelect) => {
     return;
   }
   if (!value.startsWith("apda:")) {
-    $schoolSelect.removeData("loadedDebaterSchool");
-    setPlaceholder($debaterSelect, "Select a school first");
+    $schoolSelect.data("loadedDebaterSchool", value);
+    renderDebaterList($debaterSelect, [], value);
     return;
   }
   $schoolSelect.data("loadedDebaterSchool", value);
   setPlaceholder($debaterSelect, "Loading debaters...");
   $.getJSON(DEB_URL(value.split(":")[1]))
     .done((data) => {
+      if ($schoolSelect.val() !== value) return;
       const entries = Array.isArray(data) ? data : data.debaters || [];
       renderDebaterList($debaterSelect, entries, value);
     })
     .fail(() => {
+      if ($schoolSelect.val() !== value) return;
       $schoolSelect.removeData("loadedDebaterSchool");
-      setPlaceholder($debaterSelect, "Unable to load debaters");
+      renderDebaterList($debaterSelect, [], value);
     });
 };
 
@@ -698,6 +735,20 @@ export default function initRegistrationPortal() {
   $root.on("change", "[data-debater-input]", function onDebChange() {
     syncDebater(this);
   });
+
+  $root.on(
+    "change",
+    'input[name$="requests_wgm_housing"]',
+    function onWgmHousingChange() {
+      if (!this.checked) return;
+      const needsHousingName = this.name.replace(
+        "requests_wgm_housing",
+        "needs_crash_housing",
+      );
+      const needsHousing = this.form?.elements.namedItem(needsHousingName);
+      if (needsHousing) needsHousing.checked = true;
+    },
+  );
 
   // When the field is showing the masked value, focusing it selects the whole
   // value so the user's first keystroke replaces it (autofill-style).

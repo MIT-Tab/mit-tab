@@ -23,7 +23,7 @@
 {% endif %}
 
 <h2 style="margin:24px 0 8px;font-size:16px;color:#111827;">School and contact</h2>
-<p style="margin:0 0 8px;"><strong>School:</strong> {{ school_name }}<br /><strong>Email:</strong> {{ contact_email }}</p>
+<p style="margin:0 0 8px;"><strong>School:</strong> {{ school_name }}<br /><strong>Email:</strong> {{ contact_email }}<br /><strong>Dietary requests:</strong> {{ dietary_requests|default:"None" }}{% if housing_requests %}<br /><strong>Other housing requests:</strong> {{ housing_requests }}{% endif %}</p>
 
 <h2 style="margin:24px 0 8px;font-size:16px;color:#111827;">Teams</h2>
 {% if teams %}
@@ -56,7 +56,7 @@
   <li style="margin-bottom:10px;">
     <strong>{{ judge.name }}</strong>
     <ul style="margin:4px 0 0;padding-left:20px;">
-      <li>Experience: {{ judge.rank }}</li>
+      <li>Self-reported experience: {{ judge.rank }}</li>
       <li>Schools: {{ judge.schools }}</li>
       <li>Availability: {{ judge.availability }}</li>
     </ul>

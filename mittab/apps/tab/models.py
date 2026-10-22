@@ -5,7 +5,11 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxLengthValidator, RegexValidator
+from django.core.validators import (
+    MaxLengthValidator,
+    MaxValueValidator,
+    RegexValidator,
+)
 from django.utils import timezone
 
 from mittab.libs.cacheing import cache_logic
@@ -445,6 +449,8 @@ class Debater(models.Model):
         (NOVICE, "Novice"),
     )
     novice_status = models.IntegerField(choices=NOVICE_CHOICES)
+    needs_crash_housing = models.BooleanField(default=False)
+    requests_wgm_housing = models.BooleanField(default=False)
     qualified = models.BooleanField(default=False)
     tiebreaker = models.IntegerField(unique=True, null=True, blank=True)
     apda_id = models.IntegerField(blank=True, null=True, default=-1)
@@ -664,6 +670,13 @@ ballot_code_validator = RegexValidator(
 class Judge(AuditAttributionMixin):
     name = models.CharField(max_length=30, unique=True)
     rank = models.DecimalField(max_digits=4, decimal_places=2)
+    reported_experience = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MaxValueValidator(10)],
+    )
+    needs_crash_housing = models.BooleanField(default=False)
+    requests_wgm_housing = models.BooleanField(default=False)
     schools = models.ManyToManyField(School)
     email = models.EmailField(max_length=254, blank=True, null=True)
     registration = models.ForeignKey(

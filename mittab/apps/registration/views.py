@@ -182,6 +182,8 @@ def get_registration_forms(request, registration, school_choices, round_config):
                 "school": school_value(registration.school),
                 "school_name": registration.school.name,
                 "email": registration.email,
+                "dietary_requests": registration.dietary_requests,
+                "housing_requests": registration.housing_requests,
             },
             school_choices=school_choices,
         )
@@ -269,12 +271,12 @@ def registration_portal(request, code=None):
         )
         if not registration:
             raise Http404()
+    config = RegistrationConfig.get_or_create_active()
     school_choices = build_school_choices()
     round_config = get_round_config()
     reg_form, team_formset, judge_formset = get_registration_forms(
         request, registration, school_choices, round_config
     )
-    config = RegistrationConfig.get_or_create_active()
     is_edit_mode = registration is not None
     can_create = config.can_create()
     can_modify = config.can_modify()
@@ -309,7 +311,11 @@ def registration_portal(request, code=None):
                 try:
                     with transaction.atomic():
                         saved = save_registration(
-                            reg_form, team_formset, judge_formset, registration
+                            reg_form,
+                            team_formset,
+                            judge_formset,
+                            registration,
+                            housing_enabled=config.crash_housing_enabled,
                         )
                 except forms.ValidationError as error:
                     team_formset._non_form_errors = (  # pylint: disable=protected-access
@@ -451,7 +457,10 @@ def registration_admin(request):
             ),
             "change_logs",
         )
-        .annotate(team_count=Count("teams"), judge_count=Count("judges"))
+        .annotate(
+            team_count=Count("teams", distinct=True),
+            judge_count=Count("judges", distinct=True),
+        )
         .order_by("-created_at")
     )
     recent_changes = RegistrationChangeLog.objects.all()[:25]

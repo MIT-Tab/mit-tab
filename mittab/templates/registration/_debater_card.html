@@ -1,6 +1,6 @@
 {% load tags %}
-{% with name_key=prefix|add:"_name" email_key=prefix|add:"_email" school_key=prefix|add:"_school" novice_key=prefix|add:"_novice_status" %}
-{% with name_field=form|get_field:name_key email_field=form|get_field:email_key school_field=form|get_field:school_key novice_field=form|get_field:novice_key %}
+{% with name_key=prefix|add:"_name" email_key=prefix|add:"_email" school_key=prefix|add:"_school" novice_key=prefix|add:"_novice_status" housing_key=prefix|add:"_needs_crash_housing" wgm_key=prefix|add:"_requests_wgm_housing" %}
+{% with name_field=form|get_field:name_key email_field=form|get_field:email_key school_field=form|get_field:school_key novice_field=form|get_field:novice_key housing_field=form|get_field:housing_key wgm_field=form|get_field:wgm_key %}
 <div class="registration-team-panel" data-debater="{{ slot }}">
     <h6 class="registration-team-panel__title">{{ title }}</h6>
     {% include "registration/_input_group.html" with field=name_field label="Name" errors=name_field.errors %}
@@ -8,6 +8,18 @@
     <div class="registration-team-panel__secondary">
         {% include "registration/_input_group.html" with field=novice_field label="Status" errors=novice_field.errors compact=True %}
         {% include "registration/_input_group.html" with field=school_field label="School" errors=school_field.errors compact=True %}
+        {% if config.crash_housing_enabled %}
+        <div class="registration-housing-options" aria-label="Housing requests for {{ title }}">
+            <div class="custom-control custom-checkbox">
+                {{ housing_field }}
+                <label class="custom-control-label" for="{{ housing_field.id_for_label }}">Needs crash housing</label>
+            </div>
+            <div class="custom-control custom-checkbox">
+                {{ wgm_field }}
+                <label class="custom-control-label" for="{{ wgm_field.id_for_label }}">Requests WGM housing</label>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endwith %}

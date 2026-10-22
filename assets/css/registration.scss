@@ -360,6 +360,25 @@
     border-top: 1px dashed var(--rg-border);
   }
 
+  .registration-housing-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding-top: 0.15rem;
+
+    &--row {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.45rem 1.5rem;
+    }
+
+    .custom-control-label {
+      color: var(--rg-text);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+  }
+
   // ---------- Judge form layout ----------
 
   .registration-judge-grid {
@@ -910,12 +929,85 @@
     gap: 1.5rem 2rem;
   }
 
+  .registration-admin__settings-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .registration-admin__schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+
+    @media (max-width: 767.98px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .registration-admin__schedule-card {
+    padding: 0.85rem;
+    border: 1px solid rgba(28, 54, 94, 0.12);
+    border-radius: 0.55rem;
+    background: rgba(244, 249, 255, 0.55);
+  }
+
+  .registration-admin__schedule-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .registration-admin__datetime-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+
+    @media (max-width: 575.98px) {
+      grid-template-columns: 1fr;
+    }
+
+    label {
+      margin-bottom: 0.25rem;
+      color: rgba(28, 45, 70, 0.7);
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+  }
+
+  .registration-admin__settings-row--secondary {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(28, 54, 94, 0.1);
+  }
+
   .registration-admin__settings-row .custom-switch {
     margin-bottom: 0;
   }
 
   .registration-admin__settings-row .btn {
     margin-left: auto;
+  }
+
+  .registration-admin__requests {
+    min-width: 190px;
+    max-width: 280px;
+    font-size: 0.82rem;
+
+    strong {
+      display: block;
+      margin-top: 0.4rem;
+      color: #1f2f4a;
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
   }
 
   .registration-admin__hint {

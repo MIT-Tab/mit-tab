@@ -24,7 +24,7 @@ class RegistrationJudgeInline(admin.TabularInline):
     model = Judge
     fk_name = "registration"
     extra = 0
-    fields = ("name", "rank", "email")
+    fields = ("name", "reported_experience", "rank", "email")
 
 
 class RegistrationChangeLogInline(admin.TabularInline):
@@ -77,7 +77,16 @@ class RegistrationAdmin(admin.ModelAdmin):
 
 @admin.register(RegistrationConfig)
 class RegistrationConfigAdmin(admin.ModelAdmin):
-    list_display = ("allow_new_registrations", "allow_registration_edits", "updated_at")
+    list_display = (
+        "allow_new_registrations",
+        "new_registrations_open_at",
+        "new_registrations_close_at",
+        "allow_registration_edits",
+        "registration_edits_open_at",
+        "registration_edits_close_at",
+        "crash_housing_enabled",
+        "updated_at",
+    )
 
     def has_add_permission(self, request):
         return not RegistrationConfig.objects.exists()

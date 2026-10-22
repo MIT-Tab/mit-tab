@@ -20,8 +20,23 @@
             {% include "registration/_input_group.html" with field=form.name label="Name" errors=form.name.errors %}
             {% include "registration/_input_group.html" with field=form.email label="Email" errors=form.email.errors %}
             <div class="registration-judge-grid__item--exp">
-                {% include "registration/_input_group.html" with field=form.experience label="Experience" errors=form.experience.errors %}
+                {% include "registration/_input_group.html" with field=form.experience label="Self-reported experience (0–10)" errors=form.experience.errors %}
             </div>
+            {% if config.crash_housing_enabled %}
+            <div class="registration-field registration-judge-grid__item--wide">
+                <label class="registration-field__label">Crash housing</label>
+                <div class="registration-housing-options registration-housing-options--row">
+                    <div class="custom-control custom-checkbox">
+                        {{ form.needs_crash_housing }}
+                        <label class="custom-control-label" for="{{ form.needs_crash_housing.id_for_label }}">Needs crash housing</label>
+                    </div>
+                    <div class="custom-control custom-checkbox">
+                        {{ form.requests_wgm_housing }}
+                        <label class="custom-control-label" for="{{ form.requests_wgm_housing.id_for_label }}">Requests WGM housing</label>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             <div class="registration-field registration-judge-grid__item--wide">
                 <label class="registration-field__label" for="{{ form.schools.id_for_label }}">Schools</label>
                 {{ form.schools }}
