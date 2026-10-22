@@ -105,7 +105,7 @@ class TestStartTournamentWizard(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Complete this form and invite at least one tab staff member",
+            "Complete this form to unlock staff tools",
         )
         self.assertContains(response, "You can update these details later")
         self.assertContains(response, "TBD")
@@ -113,9 +113,9 @@ class TestStartTournamentWizard(TestCase):
         self.assertContains(response, "Host school")
         self.assertContains(response, "Tournament type")
         self.assertContains(response, "Sanctioned APDA tournament")
-        self.assertContains(response, "Send one or more invitations now")
+        self.assertContains(response, "Optionally send one or more invitations now")
         self.assertContains(response, 'id="wizard-next-button"')
-        self.assertContains(response, "disabled")
+        self.assertNotContains(response, "Send at least one invitation")
         self.assertNotContains(response, "Preliminary rounds")
 
     def test_initialization_placeholders_are_not_prefilled(self):
@@ -211,21 +211,25 @@ class TestStartTournamentWizard(TestCase):
         unlocked_response = self.client.get(reverse("index"))
         self.assertEqual(unlocked_response.status_code, 200)
 
-    def test_staff_invite_is_required_for_initial_setup(self):
+    def test_initial_setup_does_not_require_staff_invite(self):
         self.client.force_login(self.user)
 
-        response = self.client.post(
-            reverse("start_tournament"),
-            self._valid_data(),
-        )
+        with mock.patch(
+            "mittab.apps.registration.services.build_school_choices",
+            return_value=[("apda:1", "MIT")],
+        ):
+            response = self.client.post(
+                reverse("start_tournament"),
+                self._valid_data(),
+            )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
+        self.assertRedirects(
             response,
-            "Send at least one tab staff invite before continuing",
+            reverse("tournament_todo"),
+            fetch_redirect_response=False,
         )
-        self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 0)
-        self.assertEqual(TabSettings.get("tournament_name"), "New Tournament")
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT), 0)
+        self.assertEqual(TabSettings.get(START_TOURNAMENT_WIZARD_COMPLETED), 1)
 
     def test_multiple_staff_invites_can_be_sent_before_continuing(self):
         self.client.force_login(self.user)

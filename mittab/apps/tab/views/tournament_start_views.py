@@ -202,7 +202,7 @@ def start_tournament(request):
     invite_count = int(
         TabSettings.get(START_TOURNAMENT_STAFF_INVITES_SENT, 0) or 0
     )
-    # The staff invite is only mandatory during first-time setup; afterwards
+    # Staff invites are offered inline during first-time setup; afterwards
     # staff are managed from the dedicated Invite Staff page.
     invite_form = None
     action = request.POST.get("action") if request.method == "POST" else None
@@ -256,13 +256,7 @@ def start_tournament(request):
         )
         basics_valid = form.is_valid()
         custom_staff_valid = custom_staff_formset.is_valid()
-        invite_requirement_met = was_complete or invite_count > 0
-        if not invite_requirement_met:
-            form.add_error(
-                None,
-                "Send at least one tab staff invite before continuing.",
-            )
-        if basics_valid and custom_staff_valid and invite_requirement_met:
+        if basics_valid and custom_staff_valid:
             _save_wizard(form, custom_staff_formset)
             if was_complete:
                 return redirect_and_flash_success(
