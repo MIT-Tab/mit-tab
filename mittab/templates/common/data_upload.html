@@ -24,17 +24,13 @@
     {% endwith %}
   {% endif %}
 
-  <p>Import teams, judges, rooms, and scratches from <strong>CSV, XLS, or XLSX</strong>.</p>
-  <p>Columns are read in the default order first, then by header name, then by recognizable
-    values such as email addresses and calibration numbers. Add headers when names or
-    values could match more than one column. Files with errors are rolled back in full.</p>
-  <p>Download an export below for the default column order and headers. Keep those headers
-    when rearranging columns. Excel imports use the first worksheet; CSV must use UTF-8.</p>
+  <p class="text-muted small">
+    CSV, XLS, or XLSX.
+    <a href="https://drive.google.com/drive/folders/1ElIk0bM9uMpuewmOxb2e3-cWiLhCYv_5">Example templates</a>
+  </p>
   <h4>Import</h4>
   {% include "common/_form.html" with submit_label="Import spreadsheets" %}
   <h4 class="mt-4">Export</h4>
-  <p>Exports use the same columns as imports, so you can import them into another tournament.
-    Imports create new records; existing names will produce a duplicate error.</p>
   <table class="table table-sm">
     <thead><tr><th>Data</th><th>Download spreadsheet</th></tr></thead>
     <tbody>
