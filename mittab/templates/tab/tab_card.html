@@ -1,43 +1,43 @@
-<table class="tab-card table-bordered table" role="table">
+<table class="tab-card table-bordered table">
 {% if not print_view %}<caption class="sr-only">Tab card for {{ card.team_name }}</caption>{% endif %}
-<thead role="rowgroup">
-<tr role="row">
-    <th scope="col" role="columnheader">R</th>
-    <th scope="col" role="columnheader">G/O</th>
-    <th scope="col" role="columnheader">W/L</th>
-    <th scope="col" role="columnheader">Opponent</th>
-    <th scope="col" role="columnheader">Judge</th>
-    <th scope="col" role="columnheader">
+<thead>
+<tr>
+    <th>R</th>
+    <th>G/O</th>
+    <th>W/L</th>
+    <th>Opponent</th>
+    <th>Judge</th>
+    <th>
       {{card.debater_1}} ({{card.debater_1_status|slice:":1" }})
     </th>
-    <th scope="col" role="columnheader">
+    <th>
       {{card.debater_2}} ({{card.debater_2_status|slice:":1" }})
     </th>
-    <th scope="col" role="columnheader">Total</th>
+    <th>Total</th>
 </tr>
 </thead>
-<tbody role="rowgroup">
+<tbody>
 {% for round_stat in card.round_stats %}
-<tr role="row">
-    <td role="cell" data-label="Round">{{forloop.counter}}</td>
+<tr>
+    <td>{{forloop.counter}}</td>
     {% if forloop.counter == card.bye_round %}
-    <td role="cell" data-label="Side">BYE</td>
+    <td>BYE</td>
     {% else %}
-    <td role="cell" data-label="Side">{{round_stat.0}}</td>
+    <td>{{round_stat.0}}</td>
     {% endif %}
-    <td role="cell" data-label="Result">{{round_stat.1}}</td>
-    <td role="cell" data-label="Opponent">{{round_stat.2}}</td>
-    <td role="cell" data-label="Judge">{{round_stat.3}}</td>
-    <td role="cell" data-label="{{ card.debater_1 }} ({{ card.debater_1_status|slice:":1" }})">{{round_stat.4}}</td>
-    <td role="cell" data-label="{{ card.debater_2 }} ({{ card.debater_2_status|slice:":1" }})">{{round_stat.5}}</td>
-    <td role="cell" data-label="Cumulative total">{{round_stat.6}}</td>
+    <td>{{round_stat.1}}</td>
+    <td>{{round_stat.2}}</td>
+    <td>{{round_stat.3}}</td>
+    <td>{{round_stat.4}}</td>
+    <td>{{round_stat.5}}</td>
+    <td>{{round_stat.6}}</td>
 </tr>
 {% endfor %}
-<tr role="row" class="tab-card__totals">
-    <td role="cell" colspan=5>Tournament Totals:</td>
-    <td role="cell" data-label="{{ card.debater_1 }} ({{ card.debater_1_status|slice:":1" }})">({{ card.d1st|floatformat:2 }},{{ card.d1rt|floatformat:2 }})</td>
-    <td role="cell" data-label="{{ card.debater_2 }} ({{ card.debater_2_status|slice:":1" }})">({{ card.d2st|floatformat:2 }},{{ card.d2rt|floatformat:2 }})</td>
-    <td role="cell" data-label="Team total">({{ card.ts|floatformat:2 }},{{ card.tr|floatformat:2 }})</td>
+<tr>
+    <td colspan=5>Tournament Totals:</td>
+    <td>({{ card.d1st|floatformat:2 }},{{ card.d1rt|floatformat:2 }})</td>
+    <td>({{ card.d2st|floatformat:2 }},{{ card.d2rt|floatformat:2 }})</td>
+    <td>({{ card.ts|floatformat:2 }},{{ card.tr|floatformat:2 }})</td>
 </tr>
 </tbody>
 </table>

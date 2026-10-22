@@ -1,4 +1,4 @@
-"""Public tab cards keep every result visible at phone and tablet widths."""
+"""Original tab card tables fit mobile screens and support browser zoom."""
 from pathlib import Path
 
 from django.conf import settings
@@ -65,8 +65,9 @@ class TabCardsWebTestCase(StaticLiveServerTestCase):
                         cells: cells.map(cell => {
                             const rect = cell.getBoundingClientRect();
                             return {left: rect.left, right: rect.right,
-                                    font: parseFloat(getComputedStyle(cell).fontSize)};
+                                    display: getComputedStyle(cell.parentElement).display};
                         }),
+                        header: getComputedStyle(table.querySelector('thead')).display,
                         printButton: document.querySelector('.tab-cards__intro .btn')
                             .getBoundingClientRect().height,
                     };
@@ -77,12 +78,17 @@ class TabCardsWebTestCase(StaticLiveServerTestCase):
                 for cell in metrics["cells"]:
                     self.assertGreaterEqual(cell["left"], 0)
                     self.assertLessEqual(cell["right"], metrics["viewport"])
-                    self.assertGreaterEqual(cell["font"], 14)
-                self.assertIn("Cumulative total", [
-                    cell.get_attribute("data-label") for cell in self.driver.find_elements(
-                        By.CSS_SELECTOR, ".tab-card tbody tr:first-child td"
-                    )
-                ])
+                    self.assertEqual(cell["display"], "table-row")
+                self.assertEqual(metrics["header"], "table-header-group")
+                self.driver.execute_cdp_cmd("Emulation.setPageScaleFactor", {
+                    "pageScaleFactor": 2,
+                })
+                self.assertEqual(self.driver.execute_script(
+                    "return visualViewport.scale"
+                ), 2)
+                self.driver.execute_cdp_cmd("Emulation.setPageScaleFactor", {
+                    "pageScaleFactor": 1,
+                })
 
         self.driver.execute_cdp_cmd("Emulation.clearDeviceMetricsOverride", {})
         self.driver.set_window_size(1440, 1000)
