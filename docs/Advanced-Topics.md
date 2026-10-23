@@ -99,6 +99,11 @@ Below is a reference table of available settings. Most can be modified through t
 +--------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
+Use **Min byes** to reduce the judges and rooms needed for a preliminary round.
+For example, with 8 checked-in teams and 3 judges, setting Min byes to 1 gives
+2 teams byes and creates 3 debates, so pairing and judge assignment can proceed
+with those 3 judges.
+
 ## Running a Tournament with a Non-Standard number of rounds
 
 To run a tournament that has more/less than 5 rounds, change the value of the

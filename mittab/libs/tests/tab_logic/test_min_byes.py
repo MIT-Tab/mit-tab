@@ -1,6 +1,7 @@
 """Parity, allocation, tournament and pre-feature compatibility coverage."""
 import json
 from pathlib import Path
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -9,7 +10,7 @@ from django.urls import reverse
 
 from mittab.apps.tab.forms import SettingsForm
 from mittab.apps.tab.models import (
-    Bye, CheckIn, NoShow, RoomCheckIn, Round, RoundStats, TabSettings, Team,
+    Bye, CheckIn, Judge, NoShow, RoomCheckIn, Round, RoundStats, TabSettings, Team,
 )
 from mittab.libs import errors, tab_logic
 from mittab.libs.cacheing import cache_logic
@@ -160,6 +161,58 @@ class TestMinByes(TestCase):
         self.assertEqual(tab_logic.have_enough_judges(1), (True, (1, 1)))
         self.assertEqual(tab_logic.have_enough_rooms(1), (True, (1, 1)))
         self.pair(1)
+
+    def test_minimum_resolves_judge_shortage_through_pairing_and_assignment(self):
+        user = get_user_model().objects.create_superuser(
+            username="judge-shortage-admin", email="judges@example.com", password="test"
+        )
+        self.client.force_login(user)
+        cases = ((8, 1, 3), (9, 2, 3), (8, 6, 1), (9, 7, 1))
+        for size, minimum, available in cases:
+            with self.subTest(size=size, minimum=minimum), transaction.atomic():
+                self.prepare(size, 0)
+                cache_logic.clear_cache()
+                CheckIn.objects.filter(round_number=1).delete()
+                judges = [
+                    Judge.objects.create(name=f"Available chair {index}", rank=5)
+                    for index in range(available)
+                ]
+                CheckIn.objects.bulk_create([
+                    CheckIn(judge=judge, round_number=1) for judge in judges
+                ])
+                self.assertEqual(
+                    tab_logic.have_enough_judges(1), (False, (available, size // 2))
+                )
+                with self.assertRaises(errors.NotEnoughJudgesError):
+                    tab_logic.pair_round()
+                self.assertFalse(Round.objects.exists())
+                self.assertFalse(Bye.objects.exists())
+
+                TabSettings.set("min_byes", minimum)
+                response = self.client.get(reverse("pair_round"))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.context["judges"], (True, (available, available))
+                )
+                with mock.patch(
+                    "mittab.apps.tab.views.pairing_views.backup.backup_round"
+                ):
+                    response = self.client.post(reverse("pair_round"))
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(TabSettings.get("cur_round"), 2)
+                    response = self.client.post(reverse("assign_judges"))
+                    self.assertEqual(response.status_code, 302)
+
+                debates = Round.objects.filter(round_number=1)
+                self.assertEqual(debates.count(), available)
+                self.assertCountEqual(
+                    debates.values_list("chair_id", flat=True),
+                    [judge.pk for judge in judges],
+                )
+                self.assertEqual(
+                    Bye.objects.filter(round_number=1).count(), size - 2 * available
+                )
+                transaction.set_rollback(True)
 
     def test_invalid_minimum_rejected_before_pairing_writes(self):
         for minimum in (-1, 9):
