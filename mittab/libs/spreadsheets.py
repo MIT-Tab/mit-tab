@@ -77,7 +77,9 @@ def read_rows(upload):
 
 
 def normalize_header(value):
-    return re.sub(r"[^a-z0-9]", "", value.lower())
+    # Older templates append instructions in parentheses to the column label.
+    label = value.split("(", 1)[0]
+    return re.sub(r"[^a-z0-9]", "", label.lower())
 
 
 # Canonical order is also the exported order. Only required identity/rank columns
@@ -116,7 +118,7 @@ REQUIRED = {
 ALIASES = {
     "APDA ID": ["id"],
     "Debater name": ["debater", "name"],
-    "Team name": ["team"],
+    "Team name": ["team", "name"],
     "School": ["school name", "primary school"],
     "Hybrid school": ["hybrid", "hybrid school name"],
     "Seed": ["team seed", "seeding"],
@@ -131,6 +133,8 @@ for _number in (1, 2):
     for _field, _alternates in {
         "name": [f"debater {_number}", f"speaker {_number}", f"speaker {_number} name"],
         "status": [
+            f"debater {_number} N?",
+            f"D{_number} Varsity/Novice Status",
             f"debater {_number} novice status",
             f"novice {_number}",
             f"debater {_number} novice",
@@ -230,7 +234,9 @@ def judge_extra_columns(headers, data, mapping, round_count):
         if i not in rounds.values()
         and (
             (default_order and i >= len(LAYOUTS["judges"]))
-            or normalize_header(headers[i]).startswith("school")
+            or normalize_header(headers[i]).startswith(
+                ("school", "affiliation", "affiliatedschool")
+            )
         )
     ]
     return schools + [rounds.get(i) for i in range(1, round_count + 1)]
@@ -240,6 +246,13 @@ def column_mapping(kind, rows, round_count=0):
     """Prefer default order, then named columns, then unambiguous value types."""
     labels = LAYOUTS[kind]
     first = rows[0][1]
+    if kind == "scratches" and any(
+        re.fullmatch(r"disc\d+", normalize_header(value)) for value in first
+    ) and any(normalize_header(value) == "teamname" for value in first):
+        raise SpreadsheetError(
+            "This looks like a scratch form response sheet. Use one row per scratch "
+            'with columns "Team name", "Judge name", and "Scratch type" (team or tab).'
+        )
     aliases = {
         normalize_header(alias): index
         for index, label in enumerate(labels)
@@ -338,9 +351,16 @@ def column_mapping(kind, rows, round_count=0):
             return data, {i: i for i in range(width)}, list(range(width, len(first)))
     if missing:
         names = ", ".join(f'"{labels[i]}"' for i in sorted(missing))
+        hint = (
+            " For scratches, use one row per scratch with columns "
+            '"Team name", "Judge name", and "Scratch type" (team or tab).'
+            if kind == "scratches"
+            else ""
+        )
         raise SpreadsheetError(
             f"Couldn't find an unambiguous column for {names}. "
             "Use the default column order or add the named headers from an export."
+            + hint
         )
     return data, mapping, extras
 

@@ -81,9 +81,13 @@ class JudgeImporter(WorkbookImporter):
             )
 
     def import_row(self, row, row_number):
-        judge_name = row[0]
+        judge_name = row[0].strip()
         judge_email = normalize_email(row[1])
         judge_rank = row[2]
+
+        if not judge_name:
+            self.error('Column "Judge name": enter a non-empty judge name.', row_number)
+            return
 
         if not is_number(judge_rank):
             self.error(
@@ -95,6 +99,13 @@ class JudgeImporter(WorkbookImporter):
         judge_rank = round(float(judge_rank), 2)
 
         school_cells, expectation_cells = self._split_row(row)
+        if not any(cell.strip() for cell in school_cells):
+            self.error(
+                'Column "School": each judge must have at least one school. '
+                'Add a "School 1" column and fill in the judge\'s school.',
+                row_number,
+            )
+            return
         expected_rounds = self._expected_rounds(expectation_cells, row_number)
         if expected_rounds is None:
             return
