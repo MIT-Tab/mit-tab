@@ -164,6 +164,9 @@ class PairingARoundTestCase(BaseWebTestCase):
 
         assert self._wait_for_text("GOV win")
 
+        # The stats request must finish before teardown flushes tournament data.
+        assert self.browser.is_text_not_present("Loading results...", wait_time=30)
+
     def test_speaks_warnings(self):
         """Test that high and low speaks trigger warnings via JavaScript"""
         self._login()
@@ -236,6 +239,9 @@ class PairingARoundTestCase(BaseWebTestCase):
         self._accept_confirm()
         
         assert self._wait_for_text("OPP win")
+
+        # The stats request must finish before teardown flushes tournament data.
+        assert self.browser.is_text_not_present("Loading results...", wait_time=30)
 
     def _enter_results(self, **results):
         """

@@ -6,6 +6,42 @@
   border-bottom: 1px solid rgba(9, 32, 61, 0.55);
   color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.84);
 
+  .navbar-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .tournament-home {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.4);
+    border-radius: 2rem;
+    color: var(--theme-on-color, #fff);
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--theme-on-color, #fff);
+      background-color: rgba(var(--theme-on-color-rgb, 255, 255, 255), 0.12);
+      border-color: currentColor;
+      text-decoration: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 3px;
+    }
+  }
+
   .navbar-brand {
     color: var(--theme-on-color, #fff);
     font-weight: 600;
@@ -198,8 +234,12 @@
       padding: 0 0.5rem;
     }
 
-    .navbar-brand {
+    .navbar-identity {
       margin: 0 auto;
+    }
+
+    .navbar-brand {
+      margin: 0;
       font-size: 1.15rem;
       letter-spacing: -0.01em;
     }
