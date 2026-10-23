@@ -148,7 +148,7 @@ class TestSpreadsheets(TestCase):
         upload = spreadsheet(
             "judges",
             [["9.25", "j@example.com", "Jane", "yes", "NU"]],
-            headers=["Judge rank", "EMAIL ADDRESS", "Name", "R1", "School 1"],
+            headers=["Judge rank", "EMAIL ADDRESS", "Name", "R1", "Affiliated School 1"],
         )
         self.assertEqual(import_judges(upload), [])
         judge = Judge.objects.get()
@@ -156,6 +156,78 @@ class TestSpreadsheets(TestCase):
         self.assertEqual(judge.email, "j@example.com")
         self.assertEqual(judge.schools.get().name, "NU")
         self.assertEqual(judge.expected_checkins.get().round_number, 1)
+
+    def test_legacy_template_headers(self):
+        team = ["Team One", "NU", "", "", "Alice", "N", "123", "Bob", "V", "456"]
+        for extension in ("csv", "xls", "xlsx"):
+            with self.subTest(extension=extension):
+                self.assertEqual(import_teams(spreadsheet(
+                    "teams", [team], extension,
+                    headers=[
+                        "Team Name", "School (Protection this team is taking)",
+                        "Hybrid School (leave column empty for non-hybrids)",
+                        "Seed (half, full, free, or leave blank)",
+                        "Debater 1 Name", "D1 Varsity/Novice Status (use V or N)",
+                        "Debater 1 ID", "Debater 2 Name",
+                        "D2 Varsity/Novice Status (use V or N)", "Debater 2 ID",
+                    ],
+                )), [])
+                self.assertEqual(Debater.objects.get(name="Alice").apda_id, 123)
+                self.assertEqual(
+                    Debater.objects.get(name="Alice").novice_status, Debater.NOVICE
+                )
+                self.assertEqual(import_judges(spreadsheet(
+                    "judges", [["Jane", "j@example.com", "9", "NU"]], extension,
+                    headers=["Name ", "Email", "Rank (0=worst, 100=best)",
+                             "Affiliation 1"],
+                )), [])
+                self.assertEqual(Judge.objects.get().schools.get().name, "NU")
+                self.assertEqual(import_rooms(spreadsheet(
+                    "rooms", [["Hall", "9"]], extension,
+                    headers=["Name", "Rank (Decimal, 0-100)"],
+                )), [])
+                Judge.objects.all().delete()
+                Team.objects.all().delete()
+                Debater.objects.all().delete()
+                Room.objects.all().delete()
+
+    def test_raw_scratch_form_responses_have_actionable_error(self):
+        errors = import_scratches(spreadsheet(
+            "scratches", [["2026-10-22", "Team One", "Jane", "Bob"]], "xlsx",
+            headers=["Timestamp", "team name", "disc 1", "disc 2"],
+        ))
+        self.assertEqual(len(errors), 1)
+        self.assertIn('"Judge name"', errors[0])
+        self.assertIn('"Scratch type" (team or tab)', errors[0])
+        self.assertIn("one row per scratch", errors[0])
+        self.assertEqual(Scratch.objects.count(), 0)
+
+    def test_missing_judge_schools_render_without_partial_import(self):
+        user = get_user_model().objects.create_superuser(
+            "school-tester", "tab@example.com", "password"
+        )
+        self.client.force_login(user)
+        for headers, rows in [
+            (LAYOUTS["judges"], [["Jane", "", "9"]]),
+            (LAYOUTS["judges"] + ["School 1"],
+             [["Valid Judge", "", "9", "NU"], ["Jane", "", "8", ""]]),
+            (LAYOUTS["judges"] + ["School 1"], [["   ", "", "9", "NU"]]),
+        ]:
+            with self.subTest(headers=headers, rows=rows):
+                original_audits = AuditEvent.objects.count()
+                response = self.client.post(reverse("upload_data"), {
+                    "judge_file": spreadsheet("judges", rows, "xlsx", headers=headers),
+                })
+                self.assertContains(response, "Row ")
+                self.assertContains(response, "all judge uploads aborted")
+                self.assertContains(
+                    response,
+                    "at least one school" if rows[0][0].strip()
+                    else "non-empty judge name",
+                )
+                self.assertEqual(Judge.objects.count(), 0)
+                self.assertEqual(School.objects.count(), 0)
+                self.assertEqual(AuditEvent.objects.count(), original_audits)
 
     def test_default_judge_order_retains_legacy_school_headers(self):
         TabSettings.set("tot_rounds", 1)
@@ -172,8 +244,8 @@ class TestSpreadsheets(TestCase):
     def test_inference_fills_unrecognized_headers_after_named_columns(self):
         upload = spreadsheet(
             "judges",
-            [["j@example.com", "9", "Jane"]],
-            headers=["Contact", "Calibration", "Judge name"],
+            [["j@example.com", "9", "Jane", "NU"]],
+            headers=["Contact", "Calibration", "Judge name", "School 1"],
         )
         self.assertEqual(import_judges(upload), [])
         self.assertEqual(Judge.objects.get().email, "j@example.com")
@@ -189,7 +261,7 @@ class TestSpreadsheets(TestCase):
         self.assertEqual(Room.objects.count(), 2)
         self.assertEqual(
             import_judges(
-                SimpleUploadedFile("judges.csv", b"j@example.com,9.5,Jane\n")
+                SimpleUploadedFile("judges.csv", b"Jane,j@example.com,9.5,NU\n")
             ),
             [],
         )
@@ -261,9 +333,13 @@ class TestSpreadsheets(TestCase):
             spreadsheet(
                 "judges",
                 [
-                    ["Valid Judge", "valid@example.com", "9"],
-                    ["Name that is much longer than thirty characters", "bad", "8"],
+                    ["Valid Judge", "valid@example.com", "9", "NU"],
+                    [
+                        "Name that is much longer than thirty characters",
+                        "bad", "8", "NU",
+                    ],
                 ],
+                headers=LAYOUTS["judges"] + ["School 1"],
             ),
             created_by=user,
         )
@@ -322,8 +398,8 @@ class TestSpreadsheets(TestCase):
         errors = import_judges(
             spreadsheet(
                 "judges",
-                [["Jane", "", "9", "maybe"]],
-                headers=LAYOUTS["judges"] + ["Round 1 expected"],
+                [["Jane", "", "9", "NU", "maybe"]],
+                headers=LAYOUTS["judges"] + ["School 1", "Round 1 expected"],
             )
         )
         self.assertIn('Value "maybe" in column "Round 1 expected"', errors[0])
