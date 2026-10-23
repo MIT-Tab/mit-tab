@@ -80,8 +80,13 @@ def pair_round(request):
         title = f"Pairing Round {current_round_number}"
         check_status = []
 
-        judges = tab_logic.have_enough_judges(current_round_number)
-        rooms = tab_logic.have_enough_rooms(current_round_number)
+        try:
+            judges = tab_logic.have_enough_judges(current_round_number)
+            rooms = tab_logic.have_enough_rooms(current_round_number)
+        except ByeAssignmentError as error:
+            return redirect_and_flash_error(
+                request, str(error), path=reverse("settings_form")
+            )
         checked_in_judges = (
             Judge.objects
             .filter(checkin__round_number=current_round_number)
@@ -91,7 +96,7 @@ def pair_round(request):
         )
 
         msg = (
-            f"N/2 Judges checked in for Round {current_round_number}? "
+            f"Enough judges checked in for Round {current_round_number}? "
             f"Need {judges[1][1]}, have {judges[1][0]}"
         )
         if judges[0]:
@@ -100,7 +105,7 @@ def pair_round(request):
             check_status.append((msg, "No", "Not enough judges"))
 
         msg = (
-            f"N/2 Rooms available Round {current_round_number}? "
+            f"Enough rooms available Round {current_round_number}? "
             f"Need {rooms[1][1]}, have {rooms[1][0]}"
         )
         if rooms[0]:

@@ -32,6 +32,42 @@ def first_round_bye_candidates(teams):
     return [team for team in teams if team.seed == lowest_available_seed]
 
 
+def required_bye_count(team_count):
+    """Return the minimum plus the parity bye needed for even pairings."""
+    minimum = TabSettings.get("min_byes", 0)
+    if minimum < 0:
+        raise errors.ByeAssignmentError("Min byes must be nonnegative.")
+    if minimum > team_count:
+        raise errors.ByeAssignmentError(
+            "Min byes cannot exceed the number of checked-in teams."
+        )
+    return minimum + (team_count - minimum) % 2
+
+
+def assign_minimum_byes(teams, current_round):
+    """Select distinct recipients by prior bye count, then seed or standings."""
+    remaining = list(teams)
+    count = required_bye_count(len(remaining))
+    if current_round > 1:
+        remaining = sorted(
+            rank_teams_except_record(remaining), key=tot_wins, reverse=True
+        )
+    selected = []
+    for _ in range(count):
+        fewest = min(num_byes(team) for team in remaining)
+        candidates = [team for team in remaining if num_byes(team) == fewest]
+        if current_round == 1:
+            team = random.choice(first_round_bye_candidates(candidates))
+        else:
+            team = candidates[-1]
+        selected.append(team)
+        remaining.remove(team)
+    Bye.objects.bulk_create(
+        Bye(bye_team=team, round_number=current_round) for team in selected
+    )
+    return teams.exclude(pk__in=[team.pk for team in selected])
+
+
 def pair_round():
     """
     Pair the next round of debate.
@@ -73,6 +109,13 @@ def pair_round():
     # If it is the first round, pair by *seed*
     all_checked_in_teams = Team.with_preloaded_relations_for_tabbing() \
             .filter(checked_in=True)
+
+    # Zero deliberately retains the legacy selection and random-call sequence.
+    minimum_byes = TabSettings.get("min_byes", 0)
+    if minimum_byes > 0:
+        all_checked_in_teams = assign_minimum_byes(
+            all_checked_in_teams, current_round
+        )
 
     if current_round == 1:
         list_of_teams = list(all_checked_in_teams)
@@ -120,7 +163,7 @@ def pair_round():
         for bracket in reversed(list(range(current_round))):
             if len(list_of_teams[bracket]) % 2 != 0:
                 # If there are no teams all down, give the bye to a one down team.
-                if bracket == 0:
+                if minimum_byes == 0 and bracket == 0:
                     byeint = len(list_of_teams[bracket]) - 1
                     bye = Bye(
                         bye_team=list_of_teams[bracket][byeint],
@@ -128,7 +171,7 @@ def pair_round():
                     )
                     bye.save()
                     list_of_teams[bracket].remove(list_of_teams[bracket][byeint])
-                elif bracket == 1 and not list_of_teams[0]:
+                elif minimum_byes == 0 and bracket == 1 and not list_of_teams[0]:
                     # in 1 up and no all down teams
                     found_bye = False
                     for byeint in range(len(list_of_teams[1]) - 1, -1, -1):
@@ -145,6 +188,13 @@ def pair_round():
                     if not found_bye:
                         raise errors.NotEnoughTeamsError()
                 else:
+                    # Explicit byes can leave empty brackets between opponents.
+                    donor_bracket = bracket - 1
+                    if minimum_byes > 0:
+                        donor_bracket = next(
+                            lower for lower in range(bracket - 1, -1, -1)
+                            if list_of_teams[lower]
+                        )
                     pull_up = None
                     pullup_rounds = Round.objects.exclude(pullup=Round.NONE)
                     teams_been_pulled_up = [
@@ -159,17 +209,17 @@ def pair_round():
                     # been pulled-up
                     not_pulled_up_teams = [
                         t
-                        for t in list_of_teams[bracket - 1]
+                        for t in list_of_teams[donor_bracket]
                         if t not in teams_been_pulled_up
                     ]
                     if not_pulled_up_teams:
                         pull_up = not_pulled_up_teams[-1]
                     else:
-                        pull_up = list_of_teams[bracket - 1][-1]
+                        pull_up = list_of_teams[donor_bracket][-1]
 
                     all_pull_ups.append(pull_up)
                     list_of_teams[bracket].append(pull_up)
-                    list_of_teams[bracket - 1].remove(pull_up)
+                    list_of_teams[donor_bracket].remove(pull_up)
 
                     # after adding pull-up to new bracket and deleting from old,
                     # sort again by speaks making sure to leave any first
@@ -239,7 +289,8 @@ def pair_round():
 
 
 def have_enough_judges(round_to_check):
-    future_rounds = Team.objects.filter(checked_in=True).count() // 2
+    team_count = Team.objects.filter(checked_in=True).count()
+    future_rounds = (team_count - required_bye_count(team_count)) // 2
     num_judges = CheckIn.objects.filter(round_number=round_to_check).count()
     if num_judges < future_rounds:
         return False, (num_judges, future_rounds)
@@ -247,7 +298,8 @@ def have_enough_judges(round_to_check):
 
 
 def have_enough_rooms(_round_to_check):
-    future_rounds = Team.objects.filter(checked_in=True).count() // 2
+    team_count = Team.objects.filter(checked_in=True).count()
+    future_rounds = (team_count - required_bye_count(team_count)) // 2
     num_rooms = RoomCheckIn.objects.filter(round_number=_round_to_check).count()
     if num_rooms < future_rounds:
         return False, (num_rooms, future_rounds)

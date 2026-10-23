@@ -61,6 +61,11 @@ settings:
     description: "Pair round 2 randomly within win brackets while preventing teams from debating a team they have already debated. Later preliminary rounds continue to use speaks-based high-low pairing."
     value: false
     type: boolean
+  - min_byes:
+    name: min_byes
+    label: "Min byes"
+    description: "Minimum byes per preliminary round. One extra bye is added when needed to pair the remaining teams evenly. Positive values prioritize teams with the fewest previous byes, then the lowest standings (or the round 1 seed policy). Cannot exceed checked-in teams. Zero preserves the existing pairing behavior."
+    value: 0
   - fair_bye:
     name: fair_bye
     label: "Round 1 bye goes to a random team of seed"
