@@ -60,10 +60,12 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
     <div class="navbar-identity">
+      {% if not user.is_authenticated %}
       <a class="tournament-home" href="https://nu-tab.com/" aria-label="All tournaments on nu-tab.com" title="All tournaments on nu-tab.com">
         <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span class="d-none d-xl-inline">Tournaments</span>
       </a>
+      {% endif %}
       <a class="navbar-brand text-extra-bold{% if not user.is_authenticated %} no-nav{% endif %}" href="{% if user.is_authenticated %}{% if is_apda_board_user %}{{ apda_board_home|with_return_to }}{% else %}{{ home|with_return_to }}{% endif %}{% else %}{{ public_home|with_return_to }}{% endif %}">MIT-TAB</a>
     </div>
 
