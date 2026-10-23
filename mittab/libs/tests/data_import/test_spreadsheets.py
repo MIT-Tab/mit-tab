@@ -148,7 +148,9 @@ class TestSpreadsheets(TestCase):
         upload = spreadsheet(
             "judges",
             [["9.25", "j@example.com", "Jane", "yes", "NU"]],
-            headers=["Judge rank", "EMAIL ADDRESS", "Name", "R1", "Affiliated School 1"],
+            headers=[
+                "Judge rank", "EMAIL ADDRESS", "Name", "R1", "Affiliated School 1"
+            ],
         )
         self.assertEqual(import_judges(upload), [])
         judge = Judge.objects.get()
