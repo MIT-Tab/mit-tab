@@ -15,6 +15,7 @@ Adding-Teams,-Judges,-Rooms-and-Debaters
 Before-Round-1
 Running-a-Tournament
 Outrounds
+Live-Results
 Board-Access
 Email-Management
 Advanced-Topics
