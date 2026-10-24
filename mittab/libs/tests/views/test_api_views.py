@@ -14,6 +14,7 @@ from mittab.apps.tab.models import (
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
 from mittab.apps.tab.views import api_views as api_views_module
+from mittab.apps.tab.views.outround_pairing_views import toggle_pairing_released
 
 
 @pytest.mark.django_db(transaction=True)
@@ -23,6 +24,7 @@ class TestApiViews(TestCase):
     def setUp(self):
         super().setUp()
         caches["default"].clear()
+        caches["filesystem"].clear()
         self.client = Client()
         self.user = get_user_model().objects.create_superuser(
             username='testuser',
@@ -371,10 +373,9 @@ class TestApiViews(TestCase):
                 for team in teams[:3]:
                     BreakingTeam.objects.create(team=team, type_of_team=division)
                 TabSettings.set(f"{key}_teams_visible", 16)
-                rows = self._live_payload()["team_results"]
-                self.assertTrue(all(row["division"] == (
-                    "varsity" if division == Outround.VARSITY else "novice"
-                ) for row in rows))
+                division_name = "varsity" if division == Outround.VARSITY else "novice"
+                rows = [row for row in self._live_payload()["team_results"]
+                        if row["division"] == division_name]
                 self.assertEqual({
                     row["team"]["tournament_id"]: row["place"] for row in rows
                 }, {teams[0].pk: 9, teams[1].pk: 9, teams[2].pk: 5})
@@ -394,6 +395,57 @@ class TestApiViews(TestCase):
             self.assertEqual(payload["availability"]["speakers"], available)
             self.assertEqual(bool(payload["speaker_results"]), available)
             self.assertEqual(payload["team_results"], [])
+
+    def test_live_results_survive_hidden_rounds_and_challenge_preparation(self):
+        teams, outround = self._prepare_live_release()
+        TabSettings.set("var_teams_visible", 8)
+        published = self._live_payload()
+        self.assertEqual(len(published["team_results"]), 2)
+        for mode in (0, 1, 2):
+            with self.subTest(mode=mode):
+                TabSettings.set("outround_pairing_mode", mode)
+                TabSettings.set("var_teams_visible", 256)
+                outround.delete()
+                outround = Outround.objects.create(
+                    gov_team=teams[2], opp_team=teams[3], num_teams=4,
+                    type_of_round=Outround.VARSITY, room=Room.objects.first(),
+                )
+                caches["default"].clear()
+                caches["filesystem"].clear()
+                hidden = self._live_payload()
+                self.assertTrue(hidden["availability"]["speakers"])
+                self.assertEqual(hidden["team_results"], published["team_results"])
+                self.assertEqual(
+                    hidden["speaker_results"], published["speaker_results"],
+                )
+        # Only releasing the new stage adds its new participants.
+        TabSettings.set("var_teams_visible", 4)
+        rows = self._live_payload()["team_results"]
+        self.assertEqual({row["team"]["tournament_id"]: row["place"] for row in rows}, {
+            teams[0].pk: 5, teams[1].pk: 5, teams[2].pk: 3, teams[3].pk: 3,
+        })
+
+    def test_release_control_remembers_results_without_an_api_visit(self):
+        _teams, outround = self._prepare_live_release()
+        toggle_pairing_released(None, Outround.VARSITY, 8)
+        toggle_pairing_released(None, Outround.VARSITY, 8)
+        outround.delete()
+        payload = self._live_payload()
+        self.assertTrue(payload["availability"]["speakers"])
+        self.assertEqual(len(payload["team_results"]), 2)
+
+    def test_republishing_stage_applies_corrected_results(self):
+        teams, outround = self._prepare_live_release()
+        TabSettings.set("var_teams_visible", 8)
+        outround.victor = Outround.GOV
+        outround.save()
+        self._live_payload()
+        outround.victor = Outround.OPP
+        outround.save()
+        rows = self._live_payload()["team_results"]
+        self.assertEqual({row["team"]["tournament_id"]: row["place"] for row in rows}, {
+            teams[0].pk: 5, teams[1].pk: 3,
+        })
 
     def test_live_results_is_cached_between_requests(self):
         self.client.get(reverse("live_results_api"))

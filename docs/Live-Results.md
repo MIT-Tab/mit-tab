@@ -20,6 +20,17 @@ receives the next round's placement even before that round is paired. Unreleased
 later pairings/results do not affect the response. Varsity and novice releases
 are independent for team results.
 
+Once a stage is released, its team IDs and placements are persisted in
+`TabSettings` (`live_results_published_stages_0` / `_1`). Preparing challenge
+picks, pairing another round, hiding pairings, or clearing caches does not erase
+these already-public results or re-embargo speakers. Releasing the same stage
+again replaces its published placements, so corrected outcomes can be reflected.
+Snapshots contain no judge data or unpublished opponents. Team identities and
+APDA IDs are serialized from current records so later identity corrections apply.
+There is no database migration. Existing tournaments begin recording snapshots
+when a public stage is next read or a release/pairing control is used; data hidden
+before this version was deployed cannot be reconstructed from a snapshot.
+
 The placement is a current points floor, not a prediction or a confirmed final
 finish. Black Rod already converts each placement into the corresponding points
 and recomputes its overlay on refresh, so advancing replaces a team's previous
