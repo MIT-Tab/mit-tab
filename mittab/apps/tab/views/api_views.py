@@ -6,11 +6,11 @@ from django.utils import timezone
 
 from mittab.apps.tab.live_results import (
     final_inround_completed_at,
+    published_team_placements,
     speaker_results_available,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.models import Debater, Team, Outround, Round, TabSettings
-from mittab.apps.tab.public_pages import released_outrounds
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic.stats import tot_wins
 
@@ -98,48 +98,18 @@ def _serialize_live_team(team):
 
 
 def _live_team_results(team_type):
-    """Export the best guaranteed placement, including unfinished rounds and byes."""
-    placements = {}
-    outrounds = list(released_outrounds(team_type).select_related(
-        "gov_team__school", "gov_team__hybrid_school",
-        "opp_team__school", "opp_team__hybrid_school",
-    ).prefetch_related(
-        "gov_team__debaters__school",
-        "opp_team__debaters__school",
-    ))
-    if not outrounds:
-        return []
-    first_round_size = max(outround.num_teams for outround in outrounds)
-    first_round_team_ids = set()
-    for outround in outrounds:
-        floor_place = outround.num_teams // 2 + 1
-        winner_place = 1 if outround.num_teams <= 2 else outround.num_teams // 4 + 1
-        if outround.num_teams == first_round_size:
-            first_round_team_ids.update((outround.gov_team_id, outround.opp_team_id))
-        for team in (outround.gov_team, outround.opp_team):
-            place = winner_place if team == outround.winner else floor_place
-            current = placements.get(team.pk)
-            if current is None or place < current[0]:
-                placements[team.pk] = (place, team)
-    # A breaking team absent from the opening partial round has a bye into
-    # the next round, even if that next round has not been paired/released.
-    bye_teams = Team.objects.filter(
-        breaking_team__type_of_team=team_type,
-    ).exclude(pk__in=first_round_team_ids).select_related(
+    """Export the best published placement, including unfinished rounds and byes."""
+    placements = published_team_placements(team_type)
+    teams = Team.objects.filter(pk__in=placements).select_related(
         "school", "hybrid_school",
     ).prefetch_related("debaters__school")
-    bye_place = 1 if first_round_size <= 2 else first_round_size // 4 + 1
-    for team in bye_teams:
-        current = placements.get(team.pk)
-        if current is None or bye_place < current[0]:
-            placements[team.pk] = (bye_place, team)
     return [
         {
-            "place": place,
+            "place": placements[team.pk],
             "division": "varsity" if team_type == Team.VARSITY else "novice",
             "team": _serialize_live_team(team),
         }
-        for place, team in sorted(placements.values(), key=lambda item: (item[0], item[1].pk))
+        for team in sorted(teams, key=lambda team: (placements[team.pk], team.pk))
     ]
 
 

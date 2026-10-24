@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from mittab.apps.tab.models import *
+from mittab.apps.tab.live_results import published_team_placements
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms, \
     get_break_sizes
@@ -320,6 +321,8 @@ def delete_challenge_pick(type_of_break, num_teams, challenger_id):
 
 
 def perform_the_break():
+    for division in (BreakingTeam.VARSITY, BreakingTeam.NOVICE):
+        published_team_placements(division)
     if _get_challenge_settings()["mode"] == OutroundPairingMode.STANDARD:
         return _perform_the_break_standard()
     with transaction.atomic():
@@ -442,6 +445,7 @@ def gov_team(team_one, team_two):
 
 
 def pair(type_of_break=BreakingTeam.VARSITY):
+    published_team_placements(type_of_break)
     if _get_challenge_settings()["mode"] == OutroundPairingMode.STANDARD:
         return _pair_standard(type_of_break)
     with transaction.atomic():

@@ -14,6 +14,7 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
 from mittab.apps.tab.models import *
 from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
 from mittab.apps.tab.judge_history import current_manual_judge_events
+from mittab.apps.tab.live_results import published_team_placements
 from mittab.libs import assign_judges, assign_rooms
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -67,6 +68,7 @@ def pair_next_outround(request, num_teams, type_of_round):
             except ValueError as exc:
                 return redirect_and_flash_error(request, str(exc), path=request.path)
 
+        published_team_placements(type_of_round)
         type_str = "Varsity" if type_of_round == Outround.VARSITY else "Novice"
         round_str = f"Round-of-{num_teams}-{type_str}"
         backup.backup_round(round_number=round_str,
@@ -961,6 +963,7 @@ def export_outround_pairings_csv_view(request, type_of_round=BreakingTeam.VARSIT
 
 
 def toggle_pairing_released(request, type_of_round, num_teams):
+    published_team_placements(type_of_round)
     old = 256
 
     if type_of_round == BreakingTeam.VARSITY:
@@ -978,6 +981,7 @@ def toggle_pairing_released(request, type_of_round, num_teams):
         else:
             TabSettings.set("nov_teams_visible", num_teams)
 
+    published_team_placements(type_of_round)
     invalidate_outround_public_pairings_cache(type_of_round)
 
     data = {"success": True, "pairing_released": not old == num_teams}
