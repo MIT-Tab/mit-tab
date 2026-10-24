@@ -63,7 +63,8 @@ def get_public_navigation_pages():
     ]
 
 
-def _outrounds_are_public(round_type):
+def released_outrounds(round_type):
+    """Return the same rounds visible on the public outround pairing page."""
     visibility_key = (
         "nov_teams_visible"
         if round_type == BreakingTeam.NOVICE
@@ -73,7 +74,11 @@ def _outrounds_are_public(round_type):
     return Outround.objects.filter(
         type_of_round=round_type,
         num_teams__gte=visible_at_or_below,
-    ).exists()
+    )
+
+
+def _outrounds_are_public(round_type):
+    return released_outrounds(round_type).exists()
 
 
 def tab_cards_are_public(outrounds_public=None):

@@ -3,8 +3,8 @@ from datetime import timedelta
 from django.db.models import Max
 from django.utils import timezone
 
-from mittab.apps.tab.models import Round, TabSettings
-from mittab.apps.tab.public_rankings import get_standings_publication_setting
+from mittab.apps.tab.models import Outround, Round, TabSettings
+from mittab.apps.tab.public_pages import released_outrounds
 
 
 def final_inround_completed_at():
@@ -26,7 +26,8 @@ def final_inround_completed_at():
 
 def speaker_results_available(now=None):
     """Expose speakers after outround publication or a three-hour embargo."""
-    if get_standings_publication_setting("team_results")["published"]:
+    if any(released_outrounds(division).exists()
+           for division in (Outround.VARSITY, Outround.NOVICE)):
         return True
     completed_at = final_inround_completed_at()
     if completed_at is None:

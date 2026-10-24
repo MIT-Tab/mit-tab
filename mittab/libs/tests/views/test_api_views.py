@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
-    Room, TabSettings, Team, Outround, Round
+    BreakingTeam, Room, TabSettings, Team, Outround, Round
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
 from mittab.apps.tab.views import api_views as api_views_module
@@ -233,6 +233,7 @@ class TestApiViews(TestCase):
         self.assertEqual(response.json()["schema_version"], 1)
 
     def test_live_results_reports_guaranteed_partial_bracket_places(self):
+        TabSettings.set("var_teams_visible", 8)
         outround = Outround.objects.filter(type_of_round=Outround.VARSITY).first()
         outround.num_teams = 8
         outround.victor = Outround.GOV
@@ -249,6 +250,150 @@ class TestApiViews(TestCase):
             {result["place"] for result in varsity_results},
             {3, 5},
         )
+
+    def _prepare_live_release(self):
+        self.client.logout()
+        Outround.objects.all().delete()
+        BreakingTeam.objects.all().delete()
+        for division in ("var", "nov"):
+            TabSettings.set(f"{division}_teams_visible", 256)
+        for slug in ("team_results", "speaker_results"):
+            set_standings_publication_setting(slug, False)
+        final_round = Round.objects.order_by("-round_number").first().round_number
+        TabSettings.set("tot_rounds", final_round)
+        Round.objects.filter(round_number=final_round).update(
+            victor=Round.GOV, result_entered_at=timezone.now(),
+        )
+        teams = list(Team.objects.order_by("pk")[:4])
+        outround = Outround.objects.create(
+            gov_team=teams[0], opp_team=teams[1], num_teams=8,
+            type_of_round=Outround.VARSITY, room=Room.objects.first(),
+        )
+        return teams, outround
+
+    def _live_payload(self):
+        caches["default"].clear()
+        response = self.client.get(reverse("live_results_api"))
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_unreleased_pairings_and_results_do_not_unlock_live_results(self):
+        _teams, outround = self._prepare_live_release()
+        outround.victor = Outround.GOV
+        outround.save()
+        payload = self._live_payload()
+        self.assertFalse(payload["availability"]["speakers"])
+        self.assertEqual(payload["speaker_results"], [])
+        self.assertEqual(payload["team_results"], [])
+        self.assertEqual(
+            self.client.get(reverse("varsity_speaker_awards_api")).status_code, 423,
+        )
+        # Publishing final team standings is not the pairing release control.
+        set_standings_publication_setting("team_results", True)
+        self.assertFalse(self._live_payload()["availability"]["speakers"])
+
+    def test_first_released_outround_unlocks_top_ten_speakers_without_results(self):
+        self._prepare_live_release()
+        for division, key in ((Outround.VARSITY, "var"), (Outround.NOVICE, "nov")):
+            with self.subTest(division=division):
+                Outround.objects.update(type_of_round=division)
+                TabSettings.set("var_teams_visible", 256)
+                TabSettings.set("nov_teams_visible", 256)
+                TabSettings.set(f"{key}_teams_visible", 8)
+                payload = self._live_payload()
+                self.assertTrue(payload["availability"]["speakers"])
+                self.assertTrue(payload["speaker_results"])
+                for row in payload["speaker_results"]:
+                    self.assertEqual(set(row), {"place", "division", "tie", "debater"})
+                    self.assertEqual(set(row["debater"]), {
+                        "apda_id", "tournament_id", "name", "novice", "school",
+                    })
+                for name in ("varsity", "novice"):
+                    self.assertLessEqual(sum(
+                        row["division"] == name for row in payload["speaker_results"]
+                    ), 10)
+                    self.assertEqual(self.client.get(reverse(
+                        f"{name}_speaker_awards_api"
+                    )).status_code, 200)
+
+    def test_quarterfinal_points_increase_as_team_advances(self):
+        teams, outround = self._prepare_live_release()
+        TabSettings.set("var_teams_visible", 8)
+
+        def places():
+            rows = self._live_payload()["team_results"]
+            self.assertEqual(len(rows), 2)
+            for row in rows:
+                self.assertEqual(set(row), {"place", "division", "team"})
+                self.assertEqual(set(row["team"]), {
+                    "tournament_id", "name", "hybrid", "debaters",
+                })
+            return {row["team"]["tournament_id"]: row["place"] for row in rows}
+
+        self.assertEqual(places(), {teams[0].pk: 5, teams[1].pk: 5})
+        outround.victor = Outround.GOV
+        outround.save()
+        self.assertEqual(places(), {teams[0].pk: 3, teams[1].pk: 5})
+        semifinal = Outround.objects.create(
+            gov_team=teams[0], opp_team=teams[2], num_teams=4,
+            type_of_round=Outround.VARSITY, room=Room.objects.first(),
+        )
+        # Pairing a private later round does not add its other participant.
+        self.assertEqual(places(), {teams[0].pk: 3, teams[1].pk: 5})
+        semifinal.victor = Outround.GOV
+        semifinal.save()
+        self.assertEqual(places(), {teams[0].pk: 3, teams[1].pk: 5})
+        TabSettings.set("var_teams_visible", 4)
+        rows = self._live_payload()["team_results"]
+        self.assertEqual({row["team"]["tournament_id"]: row["place"] for row in rows}, {
+            teams[0].pk: 2, teams[1].pk: 5, teams[2].pk: 3,
+        })
+        final = Outround.objects.create(
+            gov_team=teams[0], opp_team=teams[3], num_teams=2,
+            type_of_round=Outround.VARSITY, room=Room.objects.first(),
+        )
+        TabSettings.set("var_teams_visible", 2)
+        final.victor = Outround.GOV
+        final.save()
+        rows = self._live_payload()["team_results"]
+        self.assertEqual({row["team"]["tournament_id"]: row["place"] for row in rows}, {
+            teams[0].pk: 1, teams[1].pk: 5, teams[2].pk: 3, teams[3].pk: 2,
+        })
+
+    def test_partial_opening_round_byes_receive_next_round_points(self):
+        teams, outround = self._prepare_live_release()
+        outround.num_teams = 16
+        outround.save()
+        for division, key in ((Outround.VARSITY, "var"), (Outround.NOVICE, "nov")):
+            with self.subTest(division=division):
+                Outround.objects.update(type_of_round=division)
+                BreakingTeam.objects.all().delete()
+                for team in teams[:3]:
+                    BreakingTeam.objects.create(team=team, type_of_team=division)
+                TabSettings.set(f"{key}_teams_visible", 16)
+                rows = self._live_payload()["team_results"]
+                self.assertTrue(all(row["division"] == (
+                    "varsity" if division == Outround.VARSITY else "novice"
+                ) for row in rows))
+                self.assertEqual({
+                    row["team"]["tournament_id"]: row["place"] for row in rows
+                }, {teams[0].pk: 9, teams[1].pk: 9, teams[2].pk: 5})
+
+    def test_speaker_fallback_without_outrounds_respects_three_hour_boundary(self):
+        self._prepare_live_release()
+        Outround.objects.all().delete()
+        final_round = int(TabSettings.get("tot_rounds"))
+        now = timezone.now()
+        for elapsed, available in ((timedelta(hours=2, minutes=59), False),
+                                   (timedelta(hours=3), True)):
+            Round.objects.filter(round_number=final_round).update(
+                result_entered_at=now - elapsed,
+            )
+            with patch("mittab.apps.tab.live_results.timezone.now", return_value=now):
+                payload = self._live_payload()
+            self.assertEqual(payload["availability"]["speakers"], available)
+            self.assertEqual(bool(payload["speaker_results"]), available)
+            self.assertEqual(payload["team_results"], [])
 
     def test_live_results_is_cached_between_requests(self):
         self.client.get(reverse("live_results_api"))
