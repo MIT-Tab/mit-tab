@@ -19,4 +19,5 @@ Live-Results
 Board-Access
 Email-Management
 Advanced-Topics
+CI-performance
 ```
