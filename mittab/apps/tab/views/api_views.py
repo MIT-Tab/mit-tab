@@ -1,9 +1,11 @@
+import json
 from datetime import date
 
 from django.db.models import Count, Min
 from django.http import JsonResponse
 from django.utils import timezone
 
+from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.live_results import (
     final_inround_completed_at,
     published_team_placements,
@@ -48,7 +50,7 @@ def _get_team_placements_and_ids(team_type):
     # Add non-breaking teams with 4 wins
     all_teams = Team.objects.filter(
         break_preference=team_type
-    ).prefetch_related("debaters")
+    ).prefetch_related("debaters", "gov_team", "opp_team", "byes")
 
     for team in all_teams:
         if tot_wins(team) == 4 and team.pk not in placing_team_ids:
@@ -311,3 +313,30 @@ def debater_counts_api(request):
             "teams": team_count,
         },
     })
+
+
+def import_results_api(request):
+    """Complete import snapshot. Keep bundles out of the lightweight live API."""
+    source_url = request.build_absolute_uri("/").rstrip("/")
+    payload = dict(_live_results_payload(source_url))
+    ready = speaker_results_available()
+    payload["import_ready"] = ready
+    varsity, varsity_ids = _get_team_placements_and_ids(Team.VARSITY)
+    novice, novice_ids = _get_team_placements_and_ids(Team.NOVICE)
+    payload.update(varsity_team_placements=varsity, novice_team_placements=novice)
+    payload["non_placing_teams"] = [
+        [{"apda_id": debater.apda_id, "tournament_id": debater.pk}
+         for debater in team.debaters.all()]
+        for team in Team.objects.exclude(pk__in=varsity_ids | novice_ids).prefetch_related("debaters")
+    ]
+    for endpoint in (new_debater_data_api, new_schools_api, debater_counts_api):
+        payload.update(json.loads(endpoint(request).content))
+    if ready:
+        for endpoint in (varsity_speaker_awards_api, novice_speaker_awards_api):
+            payload.update(json.loads(endpoint(request).content))
+    else:
+        payload.update(varsity_speaker_awards=[], novice_speaker_awards=[])
+    payload["bundle"] = json.loads(BlackRodBundleExporter(
+        TabSettings.get("tournament_name", "Tournament")
+    ).export_tournament()) if ready else None
+    return JsonResponse(payload)

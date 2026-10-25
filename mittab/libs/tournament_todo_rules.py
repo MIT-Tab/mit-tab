@@ -20,7 +20,9 @@ from mittab.apps.tab.models import (
     Team,
     WrittenRFDEmailLog,
 )
-from mittab.apps.tab.public_rankings import get_standings_publication_setting
+from mittab.apps.tab.live_results import (
+    published_team_placements, speaker_results_available,
+)
 
 
 SETTINGS_FORM_VISITED_CATEGORIES_KEY = "settings_tabs_seen"
@@ -134,11 +136,12 @@ def rule_final_inround_completed():
 
 
 def rule_speaker_results_published():
-    return bool(get_standings_publication_setting("speaker_results")["published"])
+    return speaker_results_available()
 
 
 def rule_team_results_published():
-    return bool(get_standings_publication_setting("team_results")["published"])
+    return any(published_team_placements(division)
+               for division in (Outround.VARSITY, Outround.NOVICE))
 
 
 def rule_outrounds_paired():

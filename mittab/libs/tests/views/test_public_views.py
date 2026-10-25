@@ -1030,8 +1030,10 @@ class TestPublicViews(TestCase):
 
         speaker_published = get_standings_publication_setting("speaker_results")
         team_published = get_standings_publication_setting("team_results")
-        self.assertTrue(speaker_published["published"])
-        self.assertTrue(team_published["published"])
+        self.assertFalse(speaker_published["published"])
+        self.assertFalse(team_published["published"])
+        page = client.get(reverse("public_rankings_control"))
+        self.assertNotContains(page, 'name="standings_')
 
         round1_settings = get_ballot_round_settings(1)
         self.assertTrue(round1_settings["visible"])

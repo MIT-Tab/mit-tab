@@ -13,35 +13,7 @@
       </button>
     </div>
     <div class="card-body">
-      <section class="mb-4">
-        <div class="d-flex align-items-center">
-          <h5 class="mb-0">Standings Published</h5>
-          <span class="badge badge-info help-badge ml-2"
-                data-toggle="tooltip"
-                data-html="true"
-                title="Publishing standings makes data available for the APDA standings importer at results.apda.online. This does not change what the public sees on this tab site.">?</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-striped table-bordered table-sm">
-            <thead class="thead-light">
-              <tr>
-                <th scope="col">Type</th>
-                <th scope="col">Published</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for standing in standings_settings %}
-              <tr>
-                <td>{{ standing.label }}</td>
-                <td class="align-middle">
-                  {% include "rankings/_toggle_switch.html" with name="standings_"|add:standing.slug switch_id="standings_"|add:standing.slug checked=standing.published label=standing.published|yesno:"Enabled,Disabled" %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <p class="text-muted">APDA results publish automatically after outrounds are posted or three hours after the final inround.</p>
 
       <section class="mb-4">
         <h5>Rankings</h5>

@@ -53,7 +53,34 @@ class TestApiViews(TestCase):
             room=Room.objects.last(),
         ).save()
 
+    def _unlock_results(self):
+        final_round = Round.objects.order_by("-round_number").first().round_number
+        TabSettings.set("tot_rounds", final_round)
+        Round.objects.filter(round_number=final_round).update(
+            victor=Round.GOV, result_entered_at=timezone.now() - timedelta(hours=4),
+        )
+
+    def test_import_payload_embargo_and_bundle_separation(self):
+        client = Client()
+        hidden = client.get(reverse("import_results_api"))
+        self.assertEqual(hidden.status_code, 200)
+        self.assertFalse(hidden.json()["import_ready"])
+        self.assertIsNone(hidden.json()["bundle"])
+        self.assertEqual(hidden.json()["varsity_speaker_awards"], [])
+        self._unlock_results()
+        payload = client.get(reverse("import_results_api")).json()
+        self.assertTrue(payload["import_ready"])
+        self.assertEqual(payload["bundle"]["source"], "mit_tab_black_rod_bundle")
+        self.assertTrue(payload["bundle"]["rounds"])
+        self.assertIn("new_debater_data", payload)
+        self.assertIn("debater_counts", payload)
+        self.assertNotIn("bundle", client.get(reverse("live_results_api")).json())
+        serialized = str(payload["bundle"]).lower()
+        for protected in ("scratch", "rank_min", "wing_only", "judge_rank"):
+            self.assertNotIn(protected, serialized)
+
     def test_render(self):
+        self._unlock_results()
         round_obj = Round.objects.filter(round_number=1).first()
         outround = Outround.objects.first()
 
@@ -177,14 +204,15 @@ class TestApiViews(TestCase):
             reverse("debater_counts_api"),
         ]
 
-        # Disable both publications while the three-hour embargo is active.
+        # Legacy publication flags cannot override the automatic embargo.
         set_standings_publication_setting("speaker_results", False)
         set_standings_publication_setting("team_results", False)
         for url in speaker_urls:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 423)
-        # Re-enable to unblock future checks
         set_standings_publication_setting("speaker_results", True)
+        for url in speaker_urls:
+            self.assertEqual(self.client.get(url).status_code, 423)
 
         # Outround/team placements are live as soon as entered.
         for url in team_urls:
@@ -482,6 +510,7 @@ class TestApiViews(TestCase):
         self.assertIsNotNone(round_obj.result_entered_at)
 
     def test_n_plus_one(self):
+        self._unlock_results()
         round_obj = Round.objects.filter(round_number=1).first()
 
         api_views = [
