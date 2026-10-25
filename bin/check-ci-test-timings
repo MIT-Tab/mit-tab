@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+"""Fail if CircleCI's splitter cannot match pytest's JUnit timing identifiers."""
+import contextlib
+import io
+from pathlib import Path
+import sys
+
+import pytest
+from _pytest.junitxml import mangle_test_address
+from pytest_circleci_parallelized import get_class_name
+
+
+class TimingKeys:
+    """Compare the installed splitter with the installed JUnit implementation."""
+
+    def __init__(self):
+        self.count = 0
+        self.mismatches = []
+
+    def pytest_collection_modifyitems(self, items):
+        self.count = len(items)
+        for item in items:
+            split_key = get_class_name(item)
+            # This is how pytest's JUnit reporter computes the classname. Both
+            # packages are locked; check their actual behavior on upgrades too.
+            junit_key = ".".join(mangle_test_address(item.nodeid)[:-1])
+            if split_key != junit_key:
+                self.mismatches.append((item.nodeid, split_key, junit_key))
+
+
+def main():
+    root = Path(__file__).resolve().parent.parent
+    # Match `pytest`'s import path when invoked from the checkout root.
+    sys.path.insert(0, str(root))
+    check = TimingKeys()
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+        result = pytest.main(
+            ["--collect-only", "-q", str(root / "mittab"), *sys.argv[1:]],
+            plugins=[check],
+        )
+    if result or not check.count:
+        print(output.getvalue())
+        return int(result) or 1
+    if check.mismatches:
+        for nodeid, split_key, junit_key in check.mismatches:
+            print(f"{nodeid}: splitter={split_key!r}, JUnit={junit_key!r}")
+        print(f"{len(check.mismatches)}/{check.count} tests have unusable CI timings")
+        return 1
+    print(f"All {check.count} test timing identifiers match JUnit")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

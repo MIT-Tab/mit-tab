@@ -1,5 +1,7 @@
-import time
 import pytest
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from mittab.libs.tests.test_case import BaseWebTestCase
 
 
@@ -19,8 +21,9 @@ class PairingARoundTestCase(BaseWebTestCase):
         self.browser.find_by_xpath("//a[contains(normalize-space(), 'Prepare Next Round')]").first.click()
         self.browser.find_by_xpath("//*[@value='Pair This Round']").first.click()
 
-        time.sleep(10)
-        self.browser.find_by_xpath("//*[@id='assign-judges']").first.click()
+        WebDriverWait(self.browser.driver, 30).until(
+            EC.element_to_be_clickable((By.ID, "assign-judges"))
+        ).click()
         self._accept_confirm()
 
         assert self._wait_for_text("Round Status for Round 1")
@@ -175,8 +178,9 @@ class PairingARoundTestCase(BaseWebTestCase):
         self.browser.find_by_xpath("//a[contains(normalize-space(), 'Prepare Next Round')]").first.click()
         self.browser.find_by_xpath("//*[@value='Pair This Round']").first.click()
 
-        time.sleep(10)
-        self.browser.find_by_xpath("//*[@id='assign-judges']").first.click()
+        WebDriverWait(self.browser.driver, 30).until(
+            EC.element_to_be_clickable((By.ID, "assign-judges"))
+        ).click()
         self._accept_confirm()
 
         assert self._wait_for_text("Round Status for Round 1")
