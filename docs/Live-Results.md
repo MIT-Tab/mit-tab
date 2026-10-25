@@ -7,8 +7,8 @@ The payload is cached for up to 60 seconds; consumers may cache it further.
 Top-ten varsity and novice speaker results become available when the first
 outround in either division is released using the pairing release control
 (`var_teams_visible` / `nov_teams_visible`). Pairing an unreleased round or entering
-its result does not release speakers. The separate Team Results publication
-switch is not the outround release control. If no outrounds are released, speakers
+its result does not release speakers. APDA publication is automatic; there are
+no separate manual publication switches. If no outrounds are released, speakers
 become available three hours after all final-inround outcomes have timestamps.
 No speaker scores or ballots are included.
 
