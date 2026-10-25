@@ -237,14 +237,13 @@ class TestPublicCache(TestCase):
                 f"Should be able to regenerate content for {url}")
 
     def test_invalidation_clears_historical_pairing_variants(self):
-        """Permission changes must invalidate cached round-specific pages."""
+        """Pairing changes must invalidate cached round-specific pages."""
         history_url = reverse("previous_pretty_pair", args=[1])
-        TabSettings.set("show_previous_inround_pairings", 1)
 
         response = self.client.get(history_url)
         self.assertEqual(response.status_code, 200)
 
-        TabSettings.set("show_previous_inround_pairings", 0)
+        TabSettings.set("cur_round", 2)
         invalidate_all_public_caches()
 
         self.assertEqual(self.client.get(history_url).status_code, 404)

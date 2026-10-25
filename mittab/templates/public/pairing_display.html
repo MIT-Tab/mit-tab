@@ -18,20 +18,7 @@
       {{ team_count }} teams
     </span>
   </div>
-{% if pairing_round_numbers %}
-  <nav class="mb-3" aria-label="Previous inround pairings">
-    <span class="mr-2">Pairings:</span>
-    {% for pairing_round in pairing_round_numbers %}
-      {% if pairing_round == current_round_number %}
-      <a class="btn btn-outline-primary btn-sm"
-         href="{% url 'pretty_pair' %}">Round {{ pairing_round }}</a>
-      {% else %}
-      <a class="btn btn-outline-primary btn-sm"
-         href="{% url 'previous_pretty_pair' pairing_round %}">Round {{ pairing_round }}</a>
-      {% endif %}
-    {% endfor %}
-  </nav>
-{% endif %}
+{% include "public/_pairing_navigation.html" %}
 {% if pairing_exists %}
     <div id="scrollPage" class="hidden"></div>
 

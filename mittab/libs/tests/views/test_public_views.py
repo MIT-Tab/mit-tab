@@ -951,15 +951,46 @@ class TestPublicViews(TestCase):
         )
         self.assertNotContains(history_response, "Current round")
 
-    def test_previous_inround_pairings_can_be_disabled(self):
+    def test_legacy_setting_cannot_disable_previous_inround_pairings(self):
         client = Client()
         TabSettings.set("show_previous_inround_pairings", 0)
         caches["public"].clear()
         history_url = reverse("previous_pretty_pair", args=[1])
 
         current_response = client.get(reverse("pretty_pair"))
-        self.assertNotContains(current_response, history_url)
-        self.assertEqual(client.get(history_url).status_code, 404)
+        self.assertContains(current_response, history_url)
+        self.assertEqual(client.get(history_url).status_code, 200)
+
+    def test_pairing_pages_share_round_navigation(self):
+        urls = [
+            reverse("pretty_pair"),
+            reverse("previous_pretty_pair", args=[1]),
+            reverse("outround_pretty_pair", args=[0]),
+            reverse("outround_pretty_pair", args=[1]),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, 'aria-label="Round pairings"')
+                for destination in urls:
+                    self.assertContains(response, f'href="{destination}"')
+                self.assertNotContains(response, 'class="tournament-home"')
+
+    def test_pairing_navigation_hides_unpublished_outrounds(self):
+        TabSettings.set("nov_teams_visible", 256)
+        response = self.client.get(reverse("pretty_pair"))
+        self.assertContains(response, "Varsity Outrounds</a>")
+        self.assertNotContains(response, "Novice Outrounds</a>")
+
+    def test_tournament_back_link_only_appears_on_public_home(self):
+        self.assertContains(
+            self.client.get(reverse("public_home")),
+            'class="tournament-home"',
+        )
+        for name in ("pretty_pair", "public_teams", "e_ballot_search"):
+            self.assertNotContains(
+                self.client.get(reverse(name)), 'class="tournament-home"',
+            )
 
     def test_public_home_needs_no_shortcut_records(self):
         Outround.objects.all().delete()

@@ -60,7 +60,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mittab-nav">
   <div class="container w-95">
     <div class="navbar-identity">
-      {% if not user.is_authenticated %}
+      {% if not user.is_authenticated and request.path == public_home %}
       <a class="tournament-home" href="https://nu-tab.com/" aria-label="All tournaments on nu-tab.com" title="All tournaments on nu-tab.com">
         <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span class="d-none d-xl-inline">Tournaments</span>
