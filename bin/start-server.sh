@@ -42,11 +42,11 @@ if [[ -n "$ENTRY_PASSWORD" ]]; then
   ensure_args+=(--entry-password "$ENTRY_PASSWORD")
 fi
 
-python manage.py ensure_tournament_initialized "${ensure_args[@]}"
-
 if [[ $TOURNAMENT_NAME == *-test ]]; then
-  python manage.py loaddata testing_db;
+  ensure_args+=(--load-test-fixture)
 fi
+
+python manage.py ensure_tournament_initialized "${ensure_args[@]}"
 
 GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
 GUNICORN_CONNECTIONS=${GUNICORN_CONNECTIONS:-16}
