@@ -36,8 +36,3 @@ settings:
     description: "Display the bracket view for outrounds. Disable this to show only the list view."
     value: true
     type: boolean
-  - show_previous_inround_pairings:
-    name: show_previous_inround_pairings
-    description: "Allow teams to see their pairings from completed preliminary rounds in the team portal."
-    value: true
-    type: boolean

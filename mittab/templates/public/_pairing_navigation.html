@@ -1,0 +1,20 @@
+{% if pairing_round_numbers or varsity_outrounds_available or novice_outrounds_available %}
+  <nav class="mb-3" aria-label="Round pairings">
+    <span class="mr-2">Pairings:</span>
+    {% for pairing_round in pairing_round_numbers %}
+      {% if pairing_round == current_round_number %}
+      <a class="btn btn-outline-primary btn-sm"
+         href="{% url 'pretty_pair' %}">Round {{ pairing_round }}</a>
+      {% else %}
+      <a class="btn btn-outline-primary btn-sm"
+         href="{% url 'previous_pretty_pair' pairing_round %}">Round {{ pairing_round }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if varsity_outrounds_available %}
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'outround_pretty_pair' 0 %}">Varsity Outrounds</a>
+    {% endif %}
+    {% if novice_outrounds_available %}
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'outround_pretty_pair' 1 %}">Novice Outrounds</a>
+    {% endif %}
+  </nav>
+{% endif %}

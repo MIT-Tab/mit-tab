@@ -489,6 +489,22 @@ def serialize_debaters(team, stats_by_debater):
         "ranks": getattr(stats_by_debater.get(debater.id), "ranks", None),
     } for debater in team.debaters.all()]
 
+def _pairing_navigation_context():
+    current_round = TabSettings.get("cur_round") - 1
+    availability = get_public_page_availability()
+    return {
+        "pairing_round_numbers": list(
+            Round.objects.filter(round_number__lte=current_round)
+            .order_by("round_number")
+            .values_list("round_number", flat=True)
+            .distinct()
+        ),
+        "current_round_number": current_round,
+        "varsity_outrounds_available": availability["varsity_outrounds"],
+        "novice_outrounds_available": availability["novice_outrounds"],
+    }
+
+
 @cache_public_view(timeout=60)
 def pretty_pair(request, round_number=None):
     if (
@@ -500,23 +516,11 @@ def pretty_pair(request, round_number=None):
     errors, byes = [], []
 
     current_round = TabSettings.get("cur_round") - 1
-    show_previous_pairings = TabSettings.get(
-        "show_previous_inround_pairings", True
-    )
     if round_number is None:
         round_number = current_round
-    elif (round_number < 1 or not show_previous_pairings or
-          round_number > current_round - 1):
+    elif round_number < 1 or round_number > current_round - 1:
         raise Http404("Previous pairings are not available")
 
-    pairing_round_numbers = []
-    if show_previous_pairings:
-        pairing_round_numbers = list(
-            Round.objects.filter(round_number__lte=current_round)
-            .order_by("round_number")
-            .values_list("round_number", flat=True)
-            .distinct()
-        )
     round_pairing = list(
         Round.objects.filter(round_number=round_number).prefetch_related(
             "gov_team",
@@ -565,8 +569,7 @@ def pretty_pair(request, round_number=None):
         "team_count": team_count,
         "pairing_exists": pairing_exists,
         "debater_team_memberships_public": debater_team_memberships_public,
-        "pairing_round_numbers": pairing_round_numbers,
-        "current_round_number": current_round,
+        **_pairing_navigation_context(),
     }
     return render(request, "public/pairing_display.html", context)
 
@@ -1167,6 +1170,7 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
         "debater_team_memberships_public": debater_team_memberships_public,
         "show_outrounds_bracket": show_outrounds_bracket,
         "bracket_data_json": bracket_data_json,
+        **_pairing_navigation_context(),
     }
 
     return render(request, "public/outround_pairing.html", context)
