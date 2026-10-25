@@ -73,9 +73,13 @@ not cacheable, and debug exception details are replaced with a neutral error.
 
 Existing structured manual judge assignment/removal/chair records are visible
 through a safe field projection. New pairing/result changes add before/after
-snapshots with actor, timestamp and operation source. Coverage includes board
-corrections, staff team/room/side/choice corrections, ballot/panel entry, automatic
-pairing and bulk judge/room assignment, and Round/Outround/RoundStats admin edits.
+snapshots with actor, timestamp and operation source. The board audit displays
+only manual corrections: board corrections, staff
+team/room/side/choice/result corrections, structured judge/chair edits, and
+Round/Outround/RoundStats admin edits. Automatic pairing, re-pairing, bulk
+judge/room assignment, initial breaks, and routine ballot/panel entry are excluded
+by an explicit operation allowlist, including previously recorded events. Removed
+pairings appear only for manual deletion, never automatic re-pairing.
 Protected fields and arbitrary notes are never part of the board projection.
 
 Historical actions that were not recorded cannot be reconstructed. The application
@@ -83,6 +87,15 @@ audit table is not an independently held tamper-proof record: an operator with
 database access or a full database restore can rewrite history. Board accounts
 have no route to modify history or perform restores. Independent custody of audit
 events would be a separate infrastructure project.
+
+Board inround cards share the staff pairing card layout and round navigation,
+with read-only teams, alphabetical public judges/chairs, outcomes and rooms.
+Manual history uses the same compact disclosure and list as staff pairing cards.
+The audit filter switches between all rounds and only rounds/debates with manual
+edits, retaining manual deletion evidence. Round links preserve the selected filter. Manual team/side
+changes and current manual judge/chair changes use the same yellow styling as
+staff cards. Staff inround and outround team highlights persist on reload; judge
+re-pairing does not clear team highlights.
 
 Staff pairing cards show manual judge edits since the latest successful automatic
 judge assignment for that debate. Re-pairing clears those card annotations even

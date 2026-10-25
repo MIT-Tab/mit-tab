@@ -112,6 +112,26 @@ class TestJudgeHistory(TestCase):
         new_event = AuditEvent.record(self.outround, AuditEvent.MANUAL_JUDGE_ASSIGN)
         self.assertEqual(self._current_events(self.outround), [new_event])
 
+    def test_team_swap_and_side_highlights_persist_in_both_staff_views(self):
+        for pairing, assign_route, side_route, page in (
+                (self.inround, "assign_team", "switch_sides",
+                 reverse("view_round", args=[self.inround.round_number])),
+                (self.outround, "outround_assign_team", "outround_switch_sides",
+                 reverse("outround_pairing_view", args=[Outround.VARSITY, 4]))):
+            with self.subTest(model=type(pairing).__name__):
+                replacement = self.other_inround.gov_team
+                response = self.client.get(reverse(
+                    assign_route, args=[pairing.pk, "gov", replacement.pk]))
+                self.assertTrue(response.json()["success"])
+                self.assertContains(self.client.get(page), 'gov-team manual-team')
+                AuditEvent.record(pairing, AuditEvent.JUDGES_PAIRED)
+                self.assertContains(self.client.get(page), 'gov-team manual-team')
+                response = self.client.get(reverse(side_route, args=[pairing.pk]))
+                self.assertTrue(response.json()["success"])
+                after = self.client.get(page)
+                self.assertContains(after, 'gov-team manual-team')
+                self.assertContains(after, 'opp-team manual-team')
+
     def test_failed_repair_preserves_assignments_and_manual_history(self):
         for pairing, repair in (
                 (self.inround, assign_judges.add_judges),

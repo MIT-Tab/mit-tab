@@ -1,10 +1,17 @@
-<div class="card mb-3">
-  <div class="card-body">
-    <div class="row">
-      <div class="col-md-4"><strong>GOV</strong> {{ pairing.gov_team.name }}<br><strong>OPP</strong> {{ pairing.opp_team.name }}</div>
-      <div class="col-md-4">{% for judge in pairing.judges %}{{ judge.name }}{% if judge.id == pairing.chair %} (chair){% endif %}{% if not forloop.last %}<br>{% endif %}{% empty %}No judges assigned{% endfor %}</div>
-      <div class="col-md-4">Room: {{ pairing.room.name|default:"Unassigned" }}<br>Outcome: {{ pairing.outcome }}</div>
-    </div>
-    {% include "apda_board/_history.html" %}
-  </div>
-</div>
+{% extends "pairing/_pairing_card.html" %}
+{% block pairing_teams %}
+<table class="table table-borderless table-sm mb-0 team-table">
+  <tr><td><h6 class="gov-team{% if "gov" in pairing.manual_team_positions %} manual-team{% endif %}"><span class="team-link text-dark">{{ pairing.gov_team.name }}</span> <small><abbr title="Gov Team" class="attribute">GOV</abbr></small></h6></td></tr>
+  <tr><td><h6 class="opp-team{% if "opp" in pairing.manual_team_positions %} manual-team{% endif %}"><span class="team-link text-dark">{{ pairing.opp_team.name }}</span> <small><abbr title="Opp Team" class="attribute">OPP</abbr></small></h6></td></tr>
+</table>
+{% endblock %}
+{% block pairing_judges %}
+{% for judge in pairing.judges %}
+  <span class="btn-sm btn-light{% if judge.name in pairing.manual_judge_names %} manual-pairing-edit{% endif %}">{{ judge.name }}{% if judge.id == pairing.chair %} <small><span aria-hidden="true">🪑</span><span class="sr-only"> (chair)</span></small>{% endif %}</span><br>
+{% empty %}<span class="btn-sm btn-light">N/A</span>{% endfor %}
+{% include "pairing/_manual_history.html" with manual_events=pairing.history board_history=True %}
+{% endblock %}
+{% block pairing_result %}
+<span class="btn-sm btn-block {% if pairing.victor %}btn-success{% else %}btn-warning{% endif %}">{% if pairing.victor == 1 %}GOV win{% elif pairing.victor == 2 %}OPP win{% elif pairing.victor == 3 %}GOV via Forfeit{% elif pairing.victor == 4 %}OPP via Forfeit{% elif pairing.victor == 5 %}All Drop{% elif pairing.victor == 6 %}All Win{% else %}No outcome{% endif %}</span>
+<span class="btn-sm btn-block btn-light text-wrap"><i class="far fa-building"></i> {{ pairing.room.name|default:"Unassigned" }}</span>
+{% endblock %}
