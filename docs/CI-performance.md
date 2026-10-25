@@ -61,7 +61,7 @@ CircleCI's stored JUnit timings, not that file. Both test jobs print their twent
 slowest tests to help identify the next bottleneck.
 
 No tests, coverage collection or PR gates are removed or moved after merge.
-The change raises peak workflow containers from nine to thirteen, assuming all
+The change raises peak concurrent job instances from nine to thirteen, assuming all
 jobs start together; account concurrency limits can introduce queueing. Total
 test work is unchanged, but additional shards repeat setup and fixture loading.
 CircleCI remains the provider because test execution and imbalance dominate
