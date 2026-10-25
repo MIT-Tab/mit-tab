@@ -7,6 +7,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--load-test-fixture",
+            action="store_true",
+            help="Load testing_db only when initializing a new tournament.",
+        )
+        parser.add_argument(
             "--tab-password",
             dest="tab_password",
             help="Password for the tab user; required when initializing.",
@@ -39,6 +44,9 @@ class Command(BaseCommand):
             initialize_kwargs["entry_password"] = entry_password
 
         call_command("initialize_tourney", **initialize_kwargs)
+
+        if options["load_test_fixture"]:
+            call_command("loaddata", "testing_db")
 
         self.stdout.write("Creating tournament_initialized flag table")
         with connection.cursor() as cursor:
