@@ -4,9 +4,12 @@
 {% block content %}
 <div class="col-12">
   {% include "pairing/_round_tabs.html" with board_round_tabs=True %}
-  <p>Pairings and outcomes are read-only. Manual edits show the recorded changes; older actions may have no recorded history.</p>
+  <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Audit filter">
+    <a class="btn {% if not manual_only %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% if round_number %}{% url 'board_inrounds' round_number %}{% else %}{% url 'board_inrounds' %}{% endif %}" aria-pressed="{% if not manual_only %}true{% else %}false{% endif %}">All rounds</a>
+    <a class="btn {% if manual_only %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% if round_number %}{% url 'board_inrounds' round_number %}{% else %}{% url 'board_inrounds' %}{% endif %}?manual=1" aria-pressed="{% if manual_only %}true{% else %}false{% endif %}">Manual edits only</a>
+  </div>
   <div class="row">
-    {% for pairing in pairings %}<div class="col-xl-6">{% include "apda_board/_pairing.html" %}</div>{% empty %}<div class="col">No pairings available.</div>{% endfor %}
+    {% for pairing in pairings %}<div class="col-xl-6">{% include "apda_board/_pairing.html" %}</div>{% empty %}<div class="col">{% if manual_only %}No manual edits.{% else %}No pairings available.{% endif %}</div>{% endfor %}
   </div>
   {% if deleted %}<h4>Removed pairings</h4>{% for pairing in deleted %}{% include "apda_board/_pairing.html" %}{% endfor %}{% endif %}
 </div>

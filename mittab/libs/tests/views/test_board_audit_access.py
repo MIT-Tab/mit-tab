@@ -268,7 +268,7 @@ class TestBoardAuditAccess(TestCase):
             })
         self.assertEqual(pairing_history(Outround, self.pairing.pk), [])
         response = self.client.get(reverse("board_outrounds"))
-        self.assertNotContains(response, "manual-edit-history")
+        self.assertNotContains(response, "manual-judge-history")
         for source in ("staff re-pairing", "staff judge assignment",
                        "staff room assignment"):
             self.assertNotContains(response, source)
@@ -309,8 +309,11 @@ class TestBoardAuditAccess(TestCase):
         self.assertContains(board_page, 'gov-team manual-team')
         self.assertContains(board_page, 'manual-pairing-edit')
         self.assertContains(board_page, staff.username)
-        self.assertContains(board_page, 'manual-edit-history')
-        self.assertNotContains(board_page, '<details')
+        self.assertTemplateUsed(board_page, 'pairing/_manual_history.html')
+        self.assertContains(board_page, 'manual edits (2)')
+        self.assertContains(board_page, '🪑')
+        self.assertNotContains(board_page, 'fa-crown')
+        self.assertNotContains(board_page, 'Pairings and outcomes are read-only')
         for marker in ('judge-toggle', 'team-toggle', 'room-toggle'):
             self.assertNotContains(board_page, marker)
         row = next(row for row in board_page.context["pairings"]
@@ -325,6 +328,62 @@ class TestBoardAuditAccess(TestCase):
         self.assertEqual(row["manual_judge_names"], [])
         self.assertEqual(row["manual_team_positions"], ["gov"])
         self.assertEqual(len(row["history"]), 2)
+
+    def test_manual_filter_hides_unedited_pairings_and_rounds(self):
+        pairing = Round.objects.first()
+        AuditEvent.record(pairing, AuditEvent.MANUAL_JUDGE_ASSIGN, self.user,
+                          changes={"assigned_judge": pairing.chair.name})
+        other = Round.objects.exclude(round_number=pairing.round_number).first()
+        snapshot = pairing_snapshot(other)
+        for source in ("staff pairing", "staff judge assignment", "admin correction"):
+            # A no-op manual snapshot also must not make a round appear edited.
+            before = snapshot if source == "admin correction" else None
+            AuditEvent.record(other, AuditEvent.EDIT, self.user, changes={
+                "public": {"before": before, "after": snapshot, "source": source},
+            })
+        AuditEvent.record(other, AuditEvent.EDIT, self.user,
+                          changes={"rank": "CALIBRATION_SECRET"})
+        url = reverse("board_inrounds", args=[other.round_number])
+        response = self.client.get(url, {"manual": "1"})
+        self.assertEqual(response.context["round_numbers"], [pairing.round_number])
+        self.assertEqual(response.context["round_number"], pairing.round_number)
+        self.assertEqual([row["id"] for row in response.context["pairings"]],
+                         [pairing.pk])
+        self.assertContains(response, 'Manual edits only')
+        self.assertContains(response, '?manual=1')
+        self.assertContains(response, 'manual edits (1)')
+        self.assertNotContains(response, 'CALIBRATION_SECRET')
+        self.assertNotContains(response, 'Pairings and outcomes are read-only')
+        all_rows = self.client.get(reverse(
+            "board_inrounds", args=[pairing.round_number]))
+        self.assertGreater(len(all_rows.context["pairings"]), 1)
+        # Protected fields and audit notes cannot affect filtered tabs or pairings.
+        Scratch.objects.all().delete()
+        Judge.objects.all().update(rank="9.99", wing_only=True)
+        AuditEvent.record(other, AuditEvent.EDIT, self.user,
+                          changes={"scratch": "SCRATCH_SECRET"}, note="SCRATCH_SECRET")
+        after = self.client.get(url, {"manual": "1"})
+        for key in ("round_numbers", "round_number", "pairings", "deleted"):
+            self.assertEqual(response.context[key], after.context[key])
+        self.assertEqual(response.content, after.content)
+
+    def test_manual_filter_empty_state_and_manual_deletions(self):
+        response = self.client.get(reverse("board_inrounds"), {"manual": "1"})
+        self.assertContains(response, 'No manual edits.')
+        self.assertEqual(response.context["pairings"], [])
+        self.assertEqual(response.context["round_numbers"], [])
+        pairing = Round.objects.create(
+            round_number=99, gov_team=self.teams[0], opp_team=self.teams[1])
+        object_id = pairing.pk
+        AuditEvent.record(pairing, AuditEvent.EDIT, self.user, changes={
+            "public": {"before": pairing_snapshot(pairing), "after": None,
+                       "source": "admin deletion"},
+        })
+        pairing.delete()
+        response = self.client.get(reverse("board_inrounds"), {"manual": "1"})
+        self.assertEqual(response.context["round_numbers"], [99])
+        self.assertContains(response, 'Removed pairings')
+        self.assertIn(object_id, [row["id"] for row in response.context["deleted"]])
 
     def test_board_inrounds_are_read_only_with_no_dropdowns_or_result_edits(self):
         response = self.client.get(reverse("board_inrounds"))

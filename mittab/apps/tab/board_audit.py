@@ -175,6 +175,10 @@ def pairing_history(model, object_id):
     events = AuditEvent.objects.filter(
         content_type=ContentType.objects.get_for_model(model), object_id=object_id,
     ).select_related("user").order_by("created_at", "id")
+    return _project_history(events)
+
+
+def _project_history(events):
     history = []
     manual_fields = {
         AuditEvent.MANUAL_JUDGE_ASSIGN: ("assigned_judge", "removed_judge"),
@@ -263,3 +267,23 @@ def manual_team_edits(model, pairing_ids):
             if before.get(field) != after.get(field):
                 positions.setdefault(object_id, set()).add(position)
     return positions
+
+
+def manual_inround_numbers():
+    """Find manual edits, including deleted debates, using the safe projection."""
+    events = AuditEvent.objects.filter(
+        content_type=ContentType.objects.get_for_model(Round),
+    ).select_related("user")
+    pairing_ids, numbers = set(), set()
+    for event in events:
+        if not _project_history([event]):
+            continue
+        pairing_ids.add(event.object_id)
+        public = event.changes.get("public")
+        if isinstance(public, dict) and public.get("after") is None:
+            number = safe_snapshot(public.get("before")).get("round_number")
+            if number is not None:
+                numbers.add(number)
+    numbers.update(Round.objects.filter(pk__in=pairing_ids).values_list(
+        "round_number", flat=True))
+    return sorted(numbers)

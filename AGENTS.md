@@ -15,3 +15,14 @@
 - Use explicit server-side route/method and field allowlists. Broader staff permissions must not override board restrictions. Do not pass unrestricted Judge, Scratch, or AuditEvent objects to board templates or serializers.
 - Access expansions must include negative authorization tests, response-schema tests, tests that changing protected data cannot change board responses for otherwise identical allowed state, and tests that board mutations leave protected state unchanged.
 - The implemented behavior and security boundary are documented in [docs/Board-Access.md](docs/Board-Access.md).
+
+## User-facing copy
+
+- Implementation instructions describe how to build a feature; they are not copy
+  that must appear on the feature's page. Display text only when it helps the user
+  understand or use the product, not as evidence that a request was implemented.
+- For example, the board audit request called for read-only pairings and recorded
+  manual edits. Do not turn those implementation requirements into a banner such
+  as "Pairings and outcomes are read-only. Manual edits show the recorded changes;
+  older actions may have no recorded history." Show the pairings, manual edits,
+  and useful controls directly instead.

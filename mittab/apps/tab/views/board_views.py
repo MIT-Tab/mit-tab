@@ -14,7 +14,8 @@ from django.views.decorators.http import (
 
 from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.board_audit import (
-    deleted_pairings, manual_team_positions, pairing_history, pairing_revision, pairing_snapshot,
+    deleted_pairings, manual_inround_numbers, manual_team_positions, pairing_history,
+    pairing_revision, pairing_snapshot,
 )
 from mittab.apps.tab.board_operations import (
     bracket_problems, edit_board_outround, lock_board_tournament, pair_board_outround,
@@ -63,11 +64,17 @@ def pairing_rows(queryset):
 def inrounds(request, round_number=None):
     numbers = list(Round.objects.order_by("round_number").values_list(
         "round_number", flat=True).distinct())
-    if round_number is None:
+    manual_only = request.GET.get("manual") == "1"
+    if manual_only:
+        numbers = manual_inround_numbers()
+    if round_number is None or (manual_only and round_number not in numbers):
         round_number = numbers[-1] if numbers else None
     rows = pairing_rows(Round.objects.filter(round_number=round_number).order_by("id"))
+    if manual_only:
+        rows = [row for row in rows if row["history"]]
     return render(request, "apda_board/inrounds.html", {
         "pairings": rows, "round_number": round_number, "round_numbers": numbers,
+        "manual_only": manual_only,
         "deleted": deleted_pairings(Round, "round_number", round_number),
     })
 

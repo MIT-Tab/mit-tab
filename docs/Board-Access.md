@@ -90,7 +90,9 @@ events would be a separate infrastructure project.
 
 Board inround cards share the staff pairing card layout and round navigation,
 with read-only teams, alphabetical public judges/chairs, outcomes and rooms.
-Manual history is visible inline; no accordion is required. Manual team/side
+Manual history uses the same compact disclosure and list as staff pairing cards.
+The audit filter switches between all rounds and only rounds/debates with manual
+edits, retaining manual deletion evidence. Round links preserve the selected filter. Manual team/side
 changes and current manual judge/chair changes use the same yellow styling as
 staff cards. Staff inround and outround team highlights persist on reload; judge
 re-pairing does not clear team highlights.

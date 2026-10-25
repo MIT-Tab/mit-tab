@@ -1,0 +1,12 @@
+{% if manual_events %}
+<details class="manual-judge-history small text-muted">
+  <summary class="audit-trail-summary">
+    <i class="fas fa-history"></i> manual edits ({{ manual_events|length }})
+  </summary>
+  <ul class="manual-judge-history-list">
+    {% for event in manual_events %}
+    <li{% if board_history %} title="{{ event.time|date:'Y-m-d H:i:s T' }}"{% endif %}>{{ event.label }} by {% if board_history %}{{ event.actor }}: {% for change in event.changes %}{{ change.field }}: {% if change.before %}{{ change.before }} → {% endif %}{{ change.after }}{% if not forloop.last %}; {% endif %}{% endfor %}{% else %}{{ event.user_display }}{% if event.note %}: {{ event.note }}{% endif %}{% endif %}</li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}

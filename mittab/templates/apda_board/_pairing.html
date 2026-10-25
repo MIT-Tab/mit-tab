@@ -7,11 +7,11 @@
 {% endblock %}
 {% block pairing_judges %}
 {% for judge in pairing.judges %}
-  <span class="btn-sm btn-light{% if judge.name in pairing.manual_judge_names %} manual-pairing-edit{% endif %}">{{ judge.name }}{% if judge.id == pairing.chair %} <small><i class="fas fa-crown" aria-hidden="true"></i><span class="sr-only"> (chair)</span></small>{% endif %}</span><br>
+  <span class="btn-sm btn-light{% if judge.name in pairing.manual_judge_names %} manual-pairing-edit{% endif %}">{{ judge.name }}{% if judge.id == pairing.chair %} <small><span aria-hidden="true">🪑</span><span class="sr-only"> (chair)</span></small>{% endif %}</span><br>
 {% empty %}<span class="btn-sm btn-light">N/A</span>{% endfor %}
+{% include "pairing/_manual_history.html" with manual_events=pairing.history board_history=True %}
 {% endblock %}
 {% block pairing_result %}
 <span class="btn-sm btn-block {% if pairing.victor %}btn-success{% else %}btn-warning{% endif %}">{% if pairing.victor == 1 %}GOV win{% elif pairing.victor == 2 %}OPP win{% elif pairing.victor == 3 %}GOV via Forfeit{% elif pairing.victor == 4 %}OPP via Forfeit{% elif pairing.victor == 5 %}All Drop{% elif pairing.victor == 6 %}All Win{% else %}No outcome{% endif %}</span>
 <span class="btn-sm btn-block btn-light text-wrap"><i class="far fa-building"></i> {{ pairing.room.name|default:"Unassigned" }}</span>
 {% endblock %}
-{% block pairing_history %}{% include "apda_board/_history.html" %}{% endblock %}
