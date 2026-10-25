@@ -115,26 +115,11 @@ PUBLIC_SNAPSHOT_KEYS = {
     "gov_team", "opp_team", "room", "judges", "chair", "victor", "num_teams",
     "division", "choice", "sidelock", "round_number", "scores",
 }
+# Explicit manual-operation allowlist also filters previously recorded bulk events.
 PUBLIC_SOURCES = {
-    "board pairing",
-    "board correction",
-    "board team swap",
-    "staff pairing",
-    "staff re-pairing",
-    "staff judge assignment",
-    "staff room assignment",
-    "staff room correction",
-    "staff team correction",
-    "staff side correction",
-    "ballot entry",
-    "panel ballot entry",
-    "staff outround pairing",
-    "staff break",
-    "staff outround result",
-    "staff choice correction",
-    "admin correction",
-    "admin scores",
-    "admin deletion",
+    "board correction", "board team swap", "staff room correction",
+    "staff team correction", "staff side correction", "staff outround result",
+    "staff choice correction", "admin correction", "admin scores", "admin deletion",
 }
 
 
@@ -202,6 +187,9 @@ def pairing_history(model, object_id):
         public = event.changes.get("public")
         changes = []
         if isinstance(public, dict):
+            if (not isinstance(public.get("source"), str)
+                    or public["source"] not in PUBLIC_SOURCES):
+                continue
             before = safe_snapshot(public.get("before"))
             after = safe_snapshot(public.get("after"))
             changes = [{"field": key.replace("_", " "),
@@ -237,7 +225,9 @@ def deleted_pairings(model, field, value):
         if not isinstance(event.changes, dict):
             continue
         public = event.changes.get("public")
-        if not isinstance(public, dict) or public.get("after") is not None:
+        if (not isinstance(public, dict) or public.get("after") is not None
+                or not isinstance(public.get("source"), str)
+                or public["source"] not in PUBLIC_SOURCES):
             continue
         before = safe_snapshot(public.get("before"))
         if before.get(field) != value:
@@ -248,3 +238,28 @@ def deleted_pairings(model, field, value):
                          outcome=dict(model.VICTOR_CHOICES).get(before.get("victor")),
                          history=pairing_history(model, event.object_id)))
     return rows
+
+
+def manual_team_positions(history):
+    """Annotate only team slots with recorded manual identity/side changes."""
+    return [position for position in ("gov", "opp")
+            if any(change["field"] == f"{position} team"
+                   for event in history for change in event["changes"])]
+
+
+def manual_team_edits(model, pairing_ids):
+    """Batch staff card annotations without loading full histories or user objects."""
+    positions = {}
+    events = AuditEvent.objects.filter(
+        content_type=ContentType.objects.get_for_model(model), object_id__in=pairing_ids,
+        changes__public__source__in=PUBLIC_SOURCES,
+    ).values_list("object_id", "changes")
+    for object_id, changes in events:
+        public = changes["public"]
+        before = safe_snapshot(public.get("before"))
+        after = safe_snapshot(public.get("after"))
+        for position in ("gov", "opp"):
+            field = f"{position}_team"
+            if before.get(field) != after.get(field):
+                positions.setdefault(object_id, set()).add(position)
+    return positions

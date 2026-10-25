@@ -1,0 +1,5 @@
+<nav class="mb-3" aria-label="Rounds">
+  {% for number in round_numbers %}
+  <a class="btn btn-sm {% if number == round_number %}btn-primary{% else %}btn-outline-primary{% endif %}" {% if number == round_number %}aria-current="page"{% endif %} href="{% if board_round_tabs %}{% url 'board_inrounds' number %}{% else %}{% url 'view_round' number %}{% endif %}">Round {{ number }}</a>
+  {% endfor %}
+</nav>

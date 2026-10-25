@@ -14,12 +14,13 @@ from django.views.decorators.http import (
 
 from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.board_audit import (
-    deleted_pairings, pairing_history, pairing_revision, pairing_snapshot,
+    deleted_pairings, manual_team_positions, pairing_history, pairing_revision, pairing_snapshot,
 )
 from mittab.apps.tab.board_operations import (
     bracket_problems, edit_board_outround, lock_board_tournament, pair_board_outround,
 )
 from mittab.apps.tab.helpers import redirect_and_flash_error, redirect_and_flash_success
+from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, Judge, NoShow, Outround, Room, Round, Team,
 )
@@ -43,9 +44,17 @@ def pairing_rows(queryset):
     rows = []
     for pairing in queryset:
         snapshot = pairing_snapshot(pairing)
+        history = pairing_history(type(pairing), pairing.pk)
+        judge_names = []
+        for event in current_manual_judge_events(type(pairing), [pairing.pk]):
+            if isinstance(event.changes, dict):
+                judge_names.extend(event.changes[field] for field in
+                                   ("assigned_judge", "chair", "new_chair")
+                                   if isinstance(event.changes.get(field), str))
         rows.append(dict(snapshot, id=pairing.pk, revision=pairing_revision(snapshot),
-                         outcome=pairing.get_victor_display(),
-                         history=pairing_history(type(pairing), pairing.pk)))
+                         outcome=pairing.get_victor_display(), history=history,
+                         manual_team_positions=manual_team_positions(history),
+                         manual_judge_names=judge_names))
     return rows
 
 

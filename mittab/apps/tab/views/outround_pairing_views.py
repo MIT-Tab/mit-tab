@@ -12,7 +12,9 @@ from django.shortcuts import redirect, reverse
 from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
-from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
+from mittab.apps.tab.board_audit import (
+    audit_pairing_change, audit_pairing_generation, manual_team_edits,
+)
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.live_results import published_team_placements
 from mittab.libs import assign_judges, assign_rooms
@@ -484,6 +486,9 @@ def outround_pairing_view(request,
                 "judges__required_room_tags",
             )
         )
+        team_edits = manual_team_edits(Outround, [pair.pk for pair in section_outrounds])
+        for pairing in section_outrounds:
+            pairing.manual_team_positions = team_edits.get(pairing.pk, set())
         outround_ids.extend(outround.id for outround in section_outrounds)
         judges_per_panel = (
             TabSettings.get("var_panel_size", 3)

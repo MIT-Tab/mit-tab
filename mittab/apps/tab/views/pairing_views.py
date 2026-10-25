@@ -17,7 +17,9 @@ from mittab.apps.tab.helpers import redirect_and_flash_error, \
     redirect_and_flash_success
 from mittab.apps.tab.models import *
 from mittab.apps.tab.tournament_start import apply_new_tournament_defaults
-from mittab.apps.tab.board_audit import audit_pairing_change, audit_pairing_generation
+from mittab.apps.tab.board_audit import (
+    audit_pairing_change, audit_pairing_generation, manual_team_edits,
+)
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.written_rfd import (
     round_allows_written_rfd,
@@ -535,6 +537,7 @@ def quick_judge_checkin(request):
 
 
 def view_round(request, round_number):
+    round_number = int(round_number)
     errors, excluded_teams = [], []
 
     tot_rounds = TabSettings.get("tot_rounds", 5)
@@ -562,6 +565,9 @@ def view_round(request, round_number):
 
     # For the template since we can't pass in something nicer like a hash
     round_info = [pair for pair in round_pairing]
+    team_edits = manual_team_edits(Round, [pair.pk for pair in round_info])
+    for pairing in round_info:
+        pairing.manual_team_positions = team_edits.get(pairing.pk, set())
     round_ids = [pair.id for pair in round_info]
     manual_judge_assignments = {}
     manual_judge_assignment_labels = {}
@@ -664,6 +670,8 @@ def view_round(request, round_number):
         "all_judges_in_round": all_judges_in_round,
         "judge_rejudge_counts": judge_rejudge_counts,
         "round_number": round_number,
+        "round_numbers": list(Round.objects.order_by("round_number").values_list(
+            "round_number", flat=True).distinct()),
         "excluded_teams_no_bye": excluded_teams_no_bye,
         "num_excluded": num_excluded,
         "simulate_round_button": simulate_round_button,

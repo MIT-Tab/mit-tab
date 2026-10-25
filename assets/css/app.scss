@@ -263,11 +263,18 @@ $font-size-base: 0.95rem !default;
     box-shadow 0.2s ease;
 }
 
-.manual-lay .judge-toggle {
+.manual-lay .judge-toggle,
+.manual-team .team-link,
+.manual-pairing-edit {
   background-color: #fff3cd !important;
   border-color: #f0ad4e !important;
   box-shadow: 0 0 0 1px rgba(240, 173, 78, 0.35);
   color: #6b3d00;
+}
+
+.manual-team .team-link {
+  border-radius: 0.2rem;
+  padding: 0.125rem 0.25rem;
 }
 
 .manual-lay .judge-toggle small {

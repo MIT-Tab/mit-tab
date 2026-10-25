@@ -84,6 +84,12 @@ function assignTeam(e) {
     success(result) {
       if (result.success) {
         const $container = $(`.row[round-id=${roundId}] .${position}-team`);
+        if (
+          Number($container.find(".team-assign-button").attr("team-id")) !==
+          Number(result.team.id)
+        ) {
+          $container.addClass("manual-team");
+        }
         $container.find(".team-assign-button").attr("team-id", result.team.id);
         $container.find(".team-link").text(result.team.name);
         $container.find(".team-link").attr("href", `/team/${result.team.id}`);

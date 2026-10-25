@@ -223,7 +223,7 @@ class TestBoardAuditAccess(TestCase):
         snapshot["rank"] = "CALIBRATION_SECRET"
         snapshot["judges"][0]["rank"] = "CALIBRATION_SECRET"
         AuditEvent.record(self.pairing, AuditEvent.EDIT, self.user, changes={
-            "public": {"before": None, "after": snapshot},
+            "public": {"before": None, "after": snapshot, "source": "admin correction"},
             "scratch": "SCRATCH_SECRET",
         }, note="SCRATCH_SECRET CALIBRATION_SECRET")
         AuditEvent.record(self.pairing, AuditEvent.EDIT, self.user,
@@ -239,7 +239,7 @@ class TestBoardAuditAccess(TestCase):
         snapshot = pairing_snapshot(self.pairing)
         snapshot["judges"][0]["name"] = {"scratch": "SCRATCH_SECRET"}
         AuditEvent.record(self.pairing, AuditEvent.EDIT, self.user, changes={
-            "public": {"before": None, "after": snapshot},
+            "public": {"before": None, "after": snapshot, "source": "admin correction"},
         })
         response = self.client.get(reverse("board_outrounds"))
         self.assertNotContains(response, "CALIBRATION_SECRET")
@@ -251,11 +251,80 @@ class TestBoardAuditAccess(TestCase):
         self.assertEqual(set(row), {
             "id", "revision", "gov_team", "opp_team", "room", "judges", "chair",
             "victor", "outcome", "num_teams", "division", "choice", "sidelock",
-            "history",
+            "history", "manual_team_positions", "manual_judge_names",
         })
         for judge in row["judges"]:
             self.assertEqual(set(judge), {"id", "name"})
         self.assertEqual(set(row["gov_team"]), {"id", "name"})
+
+    def test_automatic_and_routine_actions_never_appear_in_manual_history(self):
+        snapshot = pairing_snapshot(self.pairing)
+        for source in ("staff pairing", "staff re-pairing", "staff judge assignment",
+                       "staff room assignment", "staff outround pairing", "staff break",
+                       "board pairing", "ballot entry", "panel ballot entry",
+                       "unknown"):
+            AuditEvent.record(self.pairing, AuditEvent.EDIT, self.user, changes={
+                "public": {"before": None, "after": snapshot, "source": source},
+            })
+        self.assertEqual(pairing_history(Outround, self.pairing.pk), [])
+        response = self.client.get(reverse("board_outrounds"))
+        self.assertNotContains(response, "manual-edit-history")
+        for source in ("staff re-pairing", "staff judge assignment",
+                       "staff room assignment"):
+            self.assertNotContains(response, source)
+
+    def test_automatic_removed_pairings_are_hidden(self):
+        pairing = Round.objects.first()
+        number, object_id = pairing.round_number, pairing.pk
+        AuditEvent.record(pairing, AuditEvent.EDIT, self.user, changes={
+            "public": {"before": pairing_snapshot(pairing), "after": None,
+                       "source": "staff re-pairing"},
+        })
+        pairing.delete()
+        response = self.client.get(reverse("board_inrounds", args=[number]))
+        self.assertNotIn(object_id, [row["id"] for row in response.context["deleted"]])
+
+    def test_manual_team_and_chair_edits_use_shared_cards_and_yellow_highlights(self):
+        pairing = Round.objects.first()
+        staff = get_user_model().objects.create_superuser(
+            "manual_editor", "editor@example.com", "password")
+        self.client.force_login(staff)
+        team = Team.objects.exclude(
+            pk__in=[pairing.gov_team_id, pairing.opp_team_id]).first()
+        response = self.client.get(reverse(
+            "assign_team", args=[pairing.pk, "gov", team.pk]))
+        self.assertTrue(response.json()["success"])
+        AuditEvent.record(pairing, AuditEvent.MANUAL_CHAIR_CHANGE, staff,
+                          changes={"chair": pairing.chair.name})
+        staff_page = self.client.get(reverse("view_round", args=[pairing.round_number]))
+        self.assertContains(staff_page, 'gov-team manual-team')
+        self.assertContains(staff_page, 'aria-label="Rounds"')
+        self.assertContains(staff_page, reverse(
+            "view_round", args=[pairing.round_number]))
+        self.assertContains(staff_page, 'aria-current="page"')
+        self.client.force_login(self.user)
+        board_page = self.client.get(reverse(
+            "board_inrounds", args=[pairing.round_number]))
+        self.assertTemplateUsed(board_page, "pairing/_pairing_card.html")
+        self.assertContains(board_page, 'gov-team manual-team')
+        self.assertContains(board_page, 'manual-pairing-edit')
+        self.assertContains(board_page, staff.username)
+        self.assertContains(board_page, 'manual-edit-history')
+        self.assertNotContains(board_page, '<details')
+        for marker in ('judge-toggle', 'team-toggle', 'room-toggle'):
+            self.assertNotContains(board_page, marker)
+        row = next(row for row in board_page.context["pairings"]
+                   if row["id"] == pairing.pk)
+        self.assertEqual(row["manual_team_positions"], ["gov"])
+        self.assertIn(pairing.chair.name, row["manual_judge_names"])
+        # Automatic judge assignment resets judge highlights, preserving team edits
+        # and manual history without exposing calibration or scratch data.
+        AuditEvent.record(pairing, AuditEvent.JUDGES_PAIRED)
+        after = self.client.get(reverse("board_inrounds", args=[pairing.round_number]))
+        row = next(row for row in after.context["pairings"] if row["id"] == pairing.pk)
+        self.assertEqual(row["manual_judge_names"], [])
+        self.assertEqual(row["manual_team_positions"], ["gov"])
+        self.assertEqual(len(row["history"]), 2)
 
     def test_board_inrounds_are_read_only_with_no_dropdowns_or_result_edits(self):
         response = self.client.get(reverse("board_inrounds"))
@@ -455,7 +524,7 @@ class TestBoardAuditAccess(TestCase):
             self.assertIsNotNone(pairing.room_id)
             self.assertIsNone(pairing.chair_id)
             self.assertFalse(pairing.judges.exists())
-            self.assertEqual(len(pairing_history(Outround, pairing.pk)), 1)
+            self.assertEqual(pairing_history(Outround, pairing.pk), [])
 
     def test_insufficient_rooms_cannot_create_partial_initial_break(self):
         Outround.objects.all().delete()
@@ -484,7 +553,7 @@ class TestBoardAuditAccess(TestCase):
         object_id, number = pairing.pk, pairing.round_number
         AuditEvent.record(pairing, AuditEvent.EDIT, self.user, changes={
             "public": {"before": pairing_snapshot(pairing), "after": None,
-                       "source": "staff re-pairing"},
+                       "source": "admin deletion"},
         }, note="SCRATCH_SECRET")
         pairing.delete()
         response = self.client.get(reverse("board_inrounds", args=[number]))

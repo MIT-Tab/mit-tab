@@ -3,10 +3,11 @@
     <div class="row" round-id="{{pairing.id}}">
 
       <div class="col-5">
+        {% block pairing_teams %}
         <table class="table table-borderless table-sm mb-0 team-table">
           <tr>
             <td>
-              <h6 class="gov-team">
+              <h6 class="gov-team{% if "gov" in pairing.manual_team_positions %} manual-team{% endif %}">
                 <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
                   {{pairing.gov_team.display_backend}}
                 </a>
@@ -35,7 +36,7 @@
           </tr>
           <tr>
             <td>
-              <h6 class="opp-team">
+              <h6 class="opp-team{% if "opp" in pairing.manual_team_positions %} manual-team{% endif %}">
                 <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark">
                   {{pairing.opp_team.display_backend}}
                 </a>
@@ -66,9 +67,11 @@
             </td>
           </tr>
         </table>
+        {% endblock %}
       </div>
 
       <div class="col-4 judges">
+        {% block pairing_judges %}
         {% load tags %}
         {% for judge in pairing.judges.all %}
         {% is_manual_judge_assignment pairing.id judge.id as is_manual_assignment %}
@@ -122,9 +125,11 @@
             </ul>
           </details>
         {% endif %}
+        {% endblock %}
       </div>
 
       <div class="col-3 text-center">
+        {% block pairing_result %}
         {% if pairing.victor == 1 %}
         <a class="btn-sm btn-block btn-success" href="/round/{{pairing.id}}/result/">GOV win</a>
         {% elif pairing.victor == 2 %}
@@ -166,7 +171,9 @@
         <a class="btn-sm btn-block btn-light" href="/admin/tab/round/{{pairing.id}}/change/">
           <i class="fas fa-unlock-alt"></i> Edit in Admin
         </a>
+        {% endblock %}
       </div>
     </div>
+    {% block pairing_history %}{% endblock %}
     </div>
   </div>

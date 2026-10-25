@@ -6,7 +6,7 @@
         <table class="table table-borderless table-sm mb-0 team-table">
           <tr>
             <td>
-              <h6 class="gov-team">
+              <h6 class="gov-team{% if "gov" in pairing.manual_team_positions %} manual-team{% endif %}">
                 <a href="/team/{{pairing.gov_team.id}}" class="text-dark team-link">
                   {{pairing.gov_team.display_backend}}
                 </a>
@@ -35,7 +35,7 @@
           </tr>
           <tr>
             <td>
-              <h6 class="opp-team">
+              <h6 class="opp-team{% if "opp" in pairing.manual_team_positions %} manual-team{% endif %}">
                 <a href="/team/{{pairing.opp_team.id}}" class="team-link text-dark">
                   {{pairing.opp_team.display_backend}}
                 </a>
