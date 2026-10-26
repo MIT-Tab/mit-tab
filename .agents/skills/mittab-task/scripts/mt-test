@@ -5,6 +5,9 @@
 # Browser tests (mittab/libs/tests/web) get real webpack bundles and the Chrome libs.
 . "$(dirname "$0")/_env.sh"
 cd "$MT_ROOT"
+# Match CI: local .env profiling must not add EXPLAIN queries or interfere
+# with transaction tests through Silk's request/response writes.
+export SILK_ENABLED=""
 
 args=()
 for arg in "$@"; do

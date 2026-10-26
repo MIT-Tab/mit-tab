@@ -239,6 +239,10 @@ class TestPostOperations(TestCase):
         self.assertEqual([], failures, "Failed operations:\n" + "\n".join(failures))
 
     def test_public_homepage_update(self):
+        # Legacy shortcuts must survive edits; the fixture has no saved slots.
+        PublicHomeShortcut.objects.update_or_create(
+            position=1, defaults={"nav_item": "released_pairings"},
+        )
         shortcuts_before = list(PublicHomeShortcut.objects.values_list(
             "position", "nav_item"
         ))

@@ -456,6 +456,7 @@ urlpatterns = [
     path("api/debater-counts",
          api_views.debater_counts_api,
          name="debater_counts_api"),
+    path("api/import-results", api_views.import_results_api, name="import_results_api"),
     path("api/live-results",
          api_views.live_results_api,
          name="live_results_api"),

@@ -50,11 +50,9 @@ from mittab.libs.outround_tab_logic import get_break_sizes
 from mittab.apps.tab.public_rankings import (
     get_all_ballot_round_settings,
     get_all_ranking_settings,
-    get_all_standings_publication_settings,
     get_paired_round_numbers,
     set_ballot_round_settings,
     set_ranking_settings,
-    set_standings_publication_setting,
 )
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import (
@@ -137,22 +135,6 @@ def apda_board_home(request):
     if not is_apda_board_user(request.user):
         return redirect("index")
 
-    allowed_standing_slugs = ("speaker_results", "team_results")
-    if request.method == "POST":
-        for slug in allowed_standing_slugs:
-            published = bool(request.POST.get(f"standings_{slug}"))
-            set_standings_publication_setting(slug, published)
-        invalidate_public_rankings_cache()
-        return redirect_and_flash_success(
-            request,
-            "APDA standings publication settings saved.",
-            path=reverse("apda_board_home"),
-        )
-
-    standings_settings = [
-        setting for setting in get_all_standings_publication_settings()
-        if setting["slug"] in allowed_standing_slugs
-    ]
     schools_missing_apda_qs = School.objects.filter(
         Q(apda_id__isnull=True) | Q(apda_id=-1)
     )
@@ -165,7 +147,6 @@ def apda_board_home(request):
         "debater_list": [
             (debater.pk, debater.display) for debater in Debater.objects.all()
         ],
-        "standings_settings": standings_settings,
         "schools_missing_apda_ids": [school.pk for school in schools_missing_apda_qs],
         "debaters_missing_apda_ids": [
             debater.pk for debater in debaters_missing_apda_qs
@@ -1142,12 +1123,6 @@ def public_rankings_control(request):
 
     if request.method == "POST":
         validation_errors = []
-        standings_settings = get_all_standings_publication_settings()
-        for standing in standings_settings:
-            slug = standing["slug"]
-            published = bool(request.POST.get(f"standings_{slug}"))
-            set_standings_publication_setting(slug, published)
-
         ranking_settings = get_all_ranking_settings()
         for ranking in ranking_settings:
             slug = ranking["slug"]
@@ -1204,7 +1179,6 @@ def public_rankings_control(request):
         messages.success(request, "Public rankings settings saved.")
         return redirect("public_rankings_control")
 
-    standings_settings = get_all_standings_publication_settings()
     ranking_settings = get_all_ranking_settings()
     ballot_settings = get_all_ballot_round_settings(tot_rounds)
     paired_rounds = get_paired_round_numbers()
@@ -1213,7 +1187,6 @@ def public_rankings_control(request):
         request,
         "rankings/public_rankings_control.html",
         {
-            "standings_settings": standings_settings,
             "ranking_settings": ranking_settings,
             "ballot_settings": ballot_settings,
             "tot_rounds": tot_rounds,

@@ -15,7 +15,6 @@ from mittab.apps.tab.auth_roles import (
     restricted_staff_landing_url,
 )
 from mittab.apps.tab.helpers import redirect_and_flash_info
-from mittab.apps.tab.public_rankings import get_standings_publication_setting
 from mittab.apps.tab.live_results import speaker_results_available
 from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
 from mittab.apps.tab.tournament_start import is_start_tournament_wizard_complete
@@ -34,7 +33,7 @@ LOGIN_WHITELIST = ("/", "/public/", "/public/login/", "/public/pairings/",
                    "/api/novice-speaker-awards", "/api/varsity-team-placements",
                    "/api/novice-team-placements", "/api/non-placing-teams",
                    "/api/new-debater-data", "/api/new-schools",
-                   "/api/debater-counts", "/api/live-results",
+                   "/api/debater-counts", "/api/live-results", "/api/import-results",
                    "/favicon.ico", "/tournament-logo/")
 
 EBALLOT_REGEX = re.compile(r"/public/e-ballots/\S+")
@@ -191,9 +190,7 @@ class TournamentStatusCheck:
         if not requirement:
             return self.get_response(request)
 
-        speaker_published = bool(
-            get_standings_publication_setting("speaker_results")["published"]
-        ) or speaker_results_available()
+        speaker_published = speaker_results_available()
         published_state = {
             "speaker": speaker_published,
         }

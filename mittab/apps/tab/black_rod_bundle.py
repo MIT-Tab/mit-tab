@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from mittab.apps.tab.models import Debater, Judge, Outround, Round, RoundStats, School, Team
+from mittab.apps.tab.models import Debater, Judge, Outround, Round, School, Team
 
 
 class BlackRodBundleExporter:
@@ -64,7 +64,7 @@ class BlackRodBundleExporter:
         qs = (
             Round.objects.order_by("round_number", "id")
             .select_related("gov_team", "opp_team", "chair")
-            .prefetch_related("judges")
+            .prefetch_related("judges", "gov_team__debaters", "opp_team__debaters", "roundstats_set")
         )
         return [
             {
@@ -87,7 +87,7 @@ class BlackRodBundleExporter:
         qs = (
             Outround.objects.order_by("num_teams", "type_of_round", "id")
             .select_related("gov_team", "opp_team", "chair")
-            .prefetch_related("judges")
+            .prefetch_related("judges", "gov_team__debaters", "opp_team__debaters")
         )
         return [
             {
@@ -109,7 +109,7 @@ class BlackRodBundleExporter:
         ]
 
     def _serialize_team(self, team):
-        debaters = list(team.debaters.order_by("id"))
+        debaters = sorted(team.debaters.all(), key=lambda debater: debater.id)
         return {
             "debater_ids": [debater.id for debater in debaters],
             "source_names": [debater.name for debater in debaters],
@@ -135,10 +135,10 @@ class BlackRodBundleExporter:
     @staticmethod
     def _serialize_round_stats(round_obj):
         """Serialize speaks and ranks for all debaters in a round."""
-        stats = RoundStats.objects.filter(round=round_obj).select_related("debater")
+        stats = round_obj.roundstats_set.all()
         result = {}
         for stat in stats:
-            result[stat.debater.id] = {
+            result[stat.debater_id] = {
                 "speaks": float(stat.speaks),
                 "ranks": float(stat.ranks),
             }
@@ -151,7 +151,7 @@ class BlackRodBundleExporter:
         school_by_debater_id = {}
         teams = Team.objects.select_related("school", "hybrid_school").prefetch_related("debaters")
         for team in teams.order_by("id"):
-            debaters = list(team.debaters.order_by("id"))
+            debaters = sorted(team.debaters.all(), key=lambda debater: debater.id)
             if not debaters:
                 continue
 

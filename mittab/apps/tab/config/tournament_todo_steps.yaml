@@ -91,9 +91,9 @@ day_of_steps:
     url_name: forum_post
 
   - slug: publish_speaker_rankings_to_standings
-    title: Publish Speaker Results
+    title: Speaker Results Auto-Published
     description: >-
-      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Speaker Results for publishing to standings, then choose the public speaker results settings, save, and confirm the public speaker page is visible if you are publishing it publicly.
+      Speaker results publish to APDA automatically after outrounds are posted or three hours after the final inround. Public Rankings Control separately controls the public speaker page.
     url_name: public_rankings_control
     completion_rule: speaker_results_published
 
@@ -120,8 +120,8 @@ day_of_steps:
     completion_rule: written_rfds_sent
 
   - slug: publish_debater_rankings_to_standings
-    title: Publish Team Results
+    title: Team Results Auto-Published
     description: >-
-      Go to the navigation bar and, under the Setup tab, select Public Rankings Control. In the Standings Published section, turn on Team Results for publishing to standings, then choose the public team results settings, save, and verify the public team results page is active if you are publishing it publicly.
+      Team results publish to APDA automatically as outrounds are posted. Public Rankings Control separately controls the public team page.
     url_name: public_rankings_control
     completion_rule: team_results_published

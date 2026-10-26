@@ -16,6 +16,7 @@ Before-Round-1
 Running-a-Tournament
 Outrounds
 Live-Results
+results-import-api
 Board-Access
 Email-Management
 Advanced-Topics

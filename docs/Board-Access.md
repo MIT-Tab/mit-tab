@@ -23,7 +23,7 @@ neutral denial rather than a redirect exposing tournament details.
 - Correct outround outcomes, including clearing an incomplete result; switch
   sides while preserving the winning team's identity; replace or swap teams;
   assign rooms; and correct choice.
-- Continue APDA ID import/export and standings-publication workflows. APDA ID
+- Continue APDA ID import/export; APDA results publish automatically. APDA ID
   spreadsheets accept and export CSV, XLS, and XLSX using only school/debater
   names and APDA IDs. Extra input columns cannot update other fields; invalid ID
   values abort all updates in that file. Roster exports (including judges and

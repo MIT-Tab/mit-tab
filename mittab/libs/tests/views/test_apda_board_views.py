@@ -85,7 +85,7 @@ class TestApdaBoardViews(TestCase):
             self.assertEqual(response.status_code, 302)
             self.assertEqual(response.url, "/403/")
 
-    def test_apda_board_home_updates_only_standings_published_settings(self):
+    def test_apda_board_home_ignores_legacy_publication_fields(self):
         set_standings_publication_setting("speaker_results", False)
         set_standings_publication_setting("team_results", True)
 
@@ -96,12 +96,12 @@ class TestApdaBoardViews(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("apda_board_home"))
-        self.assertTrue(
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="standings_')
+        self.assertFalse(
             get_standings_publication_setting("speaker_results")["published"]
         )
-        self.assertFalse(get_standings_publication_setting("team_results")["published"])
+        self.assertTrue(get_standings_publication_setting("team_results")["published"])
 
     def test_apda_board_school_detail_updates_only_apda_id(self):
         school = School.objects.first()
