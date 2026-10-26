@@ -5,6 +5,7 @@ from mittab.apps.tab.models import Debater, TabSettings, Team
 from mittab.libs.tests.assertion import assert_nearly_equal
 from mittab.libs.tests.data.load_data import load_debater_rankings
 from mittab.libs.tests.data.load_data import load_team_rankings
+from mittab.libs.cacheing import cache_logic
 from mittab.libs.tab_logic.rankings import (
     COIN_FLIP,
     DOUBLE_ADJUSTED_RANKS,
@@ -18,6 +19,7 @@ from mittab.libs.tab_logic.rankings import (
     DebaterScore,
     TeamScore,
     speaker_stat_priority,
+    rank_teams,
 )
 
 
@@ -28,6 +30,27 @@ class TestRankingLogic(TestCase):
 
     fixtures = ["testing_finished_db"]
     pytestmark = pytest.mark.django_db(transaction=True)
+
+    def test_subset_rankings_preserve_scores_with_absent_past_opponents(self):
+        TabSettings.set("cur_round", 6)
+        selected = list(Team.objects.order_by("pk").values_list("pk", flat=True)[:4])
+        Team.objects.exclude(pk__in=selected).update(checked_in=False)
+        for exclude_round, up_to_round in ((None, None), (5, None), (None, 3)):
+            cache_logic.clear_cache()
+            expected = [
+                (score.team.pk, score.scoring_tuple())
+                for score in rank_teams(exclude_round, up_to_round)
+                if score.team.pk in selected
+            ]
+            cache_logic.clear_cache()
+            actual = [
+                (score.team.pk, score.scoring_tuple())
+                for score in rank_teams(
+                    exclude_round, up_to_round, teams=Team.objects.filter(pk__in=selected)
+                )
+            ]
+            self.assertEqual(actual, expected)
+        self.assertEqual(rank_teams(teams=Team.objects.none()), [])
 
     def debater_score_with_stats(self, speaks, ranks, adjusted_speaks,
                                  adjusted_ranks, stat_priority=None):

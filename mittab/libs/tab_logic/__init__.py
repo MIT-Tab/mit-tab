@@ -99,12 +99,12 @@ def pair_round():
     all_pull_ups = []
 
     # Record no-shows
-    forfeit_teams = list(Team.objects.filter(checked_in=False))
-    for team in forfeit_teams:
-        no_show = NoShow(
-            no_show_team=team, round_number=current_round
+    NoShow.objects.bulk_create(
+        NoShow(no_show_team_id=team_id, round_number=current_round)
+        for team_id in Team.objects.filter(checked_in=False).values_list(
+            "pk", flat=True
         )
-        no_show.save()
+    )
 
     # If it is the first round, pair by *seed*
     all_checked_in_teams = Team.with_preloaded_relations_for_tabbing() \
@@ -266,7 +266,12 @@ def pair_round():
         )
     # sort with pairing with highest ranked team first
     else:
-        sorted_teams = [s.team for s in rank_teams()]
+        # Only relative standings among paired teams affect debate ordering.
+        # Keep opponent prefetches intact so absent past opponents still count.
+        paired_ids = [team.pk for pairing in pairings for team in pairing]
+        sorted_teams = [s.team for s in rank_teams(
+            teams=Team.objects.filter(pk__in=paired_ids)
+        )]
         pairings = sorted(
             pairings,
             key=lambda team: min(

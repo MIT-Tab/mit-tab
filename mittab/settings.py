@@ -180,7 +180,9 @@ CACHES = {
     },
     "filesystem": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
-        "LOCATION": "/var/tmp/django_cache",
+        "LOCATION": os.environ.get(
+            "MITTAB_FILE_CACHE_LOCATION", "/var/tmp/django_cache"
+        ),
     }
 }
 
