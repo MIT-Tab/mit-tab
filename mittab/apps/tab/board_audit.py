@@ -5,18 +5,35 @@ import json
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Prefetch
 
-from mittab.apps.tab.models import AuditEvent, Outround, Round
+from mittab.apps.tab.models import AuditEvent, Judge, Outround, Round, RoundStats
+
+
+def with_pairing_snapshot_relations(queryset):
+    """Load public snapshot fields in bulk, including only public judge fields."""
+    queryset = queryset.select_related("gov_team", "opp_team", "room").prefetch_related(
+        Prefetch("judges", queryset=Judge.objects.only("id", "name").order_by("name", "id"),
+                 to_attr="snapshot_judges"),
+    )
+    if queryset.model is Round:
+        queryset = queryset.prefetch_related(Prefetch(
+            "roundstats_set", queryset=RoundStats.objects.select_related("debater").order_by(
+                "debater_role", "id"), to_attr="snapshot_scores"))
+    return queryset
 
 
 def pairing_snapshot(pairing):
     """Do not include judge rank, eligibility, scratch data, codes or free text."""
+    judges = ([{"id": judge.pk, "name": judge.name} for judge in pairing.snapshot_judges]
+              if hasattr(pairing, "snapshot_judges") else
+              list(pairing.judges.order_by("name", "id").values("id", "name")))
     data = {
         "gov_team": {"id": pairing.gov_team_id, "name": pairing.gov_team.display},
         "opp_team": {"id": pairing.opp_team_id, "name": pairing.opp_team.display},
         "room": ({"id": pairing.room_id, "name": pairing.room.name}
                  if pairing.room_id else None),
-        "judges": list(pairing.judges.order_by("name", "id").values("id", "name")),
+        "judges": judges,
         "chair": pairing.chair_id,
         "victor": pairing.victor,
     }
@@ -25,12 +42,17 @@ def pairing_snapshot(pairing):
                     choice=pairing.choice, sidelock=pairing.sidelock)
     else:
         data["round_number"] = pairing.round_number
+        scores = ([{"debater_id": score.debater_id, "debater__name": score.debater.name,
+                    "debater_role": score.debater_role, "speaks": score.speaks,
+                    "ranks": score.ranks} for score in pairing.snapshot_scores]
+                  if hasattr(pairing, "snapshot_scores") else
+                  pairing.roundstats_set.order_by("debater_role", "id").values(
+                      "debater_id", "debater__name", "debater_role", "speaks", "ranks"))
         data["scores"] = [
             {"debater": row["debater_id"], "role": row["debater_role"],
              "name": row["debater__name"],
              "speaks": str(row["speaks"]), "ranks": str(row["ranks"])}
-            for row in pairing.roundstats_set.order_by("debater_role", "id").values(
-                "debater_id", "debater__name", "debater_role", "speaks", "ranks")
+            for row in scores
         ]
     return data
 
@@ -94,10 +116,10 @@ def audit_pairing_generation(model, source):
             if request.method != "POST":
                 return view(request, *args, **kwargs)
             before = {pairing.pk: (pairing, pairing_snapshot(pairing))
-                      for pairing in model.objects.all()}
+                      for pairing in with_pairing_snapshot_relations(model.objects.all())}
             response = view(request, *args, **kwargs)
             remaining = set()
-            for pairing in model.objects.all():
+            for pairing in with_pairing_snapshot_relations(model.objects.all()):
                 remaining.add(pairing.pk)
                 record_pairing_change(pairing, before.get(pairing.pk, (None, None))[1],
                                       request.user, source)
@@ -171,10 +193,11 @@ def _history_value(field, value):
     return str(value)
 
 
-def pairing_history(model, object_id):
-    events = AuditEvent.objects.filter(
-        content_type=ContentType.objects.get_for_model(model), object_id=object_id,
-    ).select_related("user").order_by("created_at", "id")
+def pairing_history(model, object_id, events=None):
+    if events is None:
+        events = AuditEvent.objects.filter(
+            content_type=ContentType.objects.get_for_model(model), object_id=object_id,
+        ).select_related("user").order_by("created_at", "id")
     return _project_history(events)
 
 

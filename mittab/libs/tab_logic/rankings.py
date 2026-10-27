@@ -11,8 +11,8 @@ from mittab.libs.tab_logic.stats import *
 
 
 def rank_speakers():
-    debaters = Debater.objects.prefetch_related(
-        "team_set",
+    debaters = Debater.objects.select_related("school").prefetch_related(
+        "team_set__school",
         "team_set__byes",
         "team_set__no_shows",
         "roundstats_set",

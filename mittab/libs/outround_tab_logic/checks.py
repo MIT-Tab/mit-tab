@@ -2,16 +2,20 @@ from mittab.apps.tab.models import *
 from mittab.libs.errors import PrevRoundNotEnteredError
 
 
-def lost_teams():
-    return [outround.loser.id
-            for outround in Outround.objects.all()
-            if outround.loser]
+def lost_teams(type_of_round=None):
+    """Get eliminated IDs without fetching either team's model instance."""
+    outrounds = Outround.objects.all()
+    if type_of_round is not None:
+        outrounds = outrounds.filter(type_of_round=type_of_round)
+    return [opp_id if victor in (Outround.GOV, Outround.GOV_VIA_FORFEIT) else gov_id
+            for victor, gov_id, opp_id in outrounds.values_list(
+                "victor", "gov_team_id", "opp_team_id")
+            if victor in (Outround.GOV, Outround.GOV_VIA_FORFEIT,
+                          Outround.OPP, Outround.OPP_VIA_FORFEIT)]
 
 
 def have_enough_judges_type(type_of_round):
-    loser_ids = [outround.loser.id
-                 for outround in Outround.objects.all()
-                 if outround.loser]
+    loser_ids = lost_teams()
 
     panel_size = 3
 
@@ -46,9 +50,7 @@ def have_enough_judges():
 
 
 def have_enough_rooms_type(type_of_round):
-    loser_ids = [outround.loser.id
-                 for outround in Outround.objects.all()
-                 if outround.loser]
+    loser_ids = lost_teams()
 
     num_teams = BreakingTeam.objects.filter(
         type_of_team=type_of_round

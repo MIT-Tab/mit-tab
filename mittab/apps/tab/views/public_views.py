@@ -1,5 +1,6 @@
 import random
 import os
+from collections import defaultdict
 
 from django.contrib.messages import get_messages
 from django.db.models import Prefetch
@@ -37,6 +38,7 @@ from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.apps.tab.tournament_staff import get_public_tournament_staff
+from mittab.libs.outround_tab_logic.checks import lost_teams
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
 from mittab.libs.tab_logic import rankings
@@ -1088,50 +1090,31 @@ def outround_pretty_pair(request, type_of_round=BreakingTeam.VARSITY):
     else:
         round_number = TabSettings.get("nov_teams_visible", 256)
 
-    round_pairing = Outround.objects.filter(
+    round_pairing = list(Outround.objects.filter(
         num_teams__gte=round_number,
-        type_of_round=type_of_round
-    )
+        type_of_round=type_of_round,
+    ).select_related("gov_team", "opp_team", "room", "chair").prefetch_related(
+        "gov_team__debaters", "opp_team__debaters", "judges",
+    ))
+    rounds_by_size = defaultdict(list)
+    for pairing in round_pairing:
+        rounds_by_size[pairing.num_teams].append(pairing)
 
-    unique_values = round_pairing.values_list("num_teams")
-    unique_values = list(set([value[0] for value in unique_values]))
-    unique_values.sort(key=lambda v: v, reverse=True)
-
+    advancing_teams = [entry.team for entry in BreakingTeam.objects.filter(
+        type_of_team=type_of_round,
+    ).exclude(team_id__in=lost_teams()).select_related("team")]
     outround_pairings = []
-
-    for value in unique_values:
-        lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
-
-        excluded_teams = BreakingTeam.objects.filter(
-            type_of_team=type_of_round
-        ).exclude(
-            team__id__in=lost_outrounds
-        )
-
-        excluded_teams = [t.team for t in excluded_teams]
-
-        excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
-            type_of_round=type_of_round,
-            num_teams=value,
-            gov_team=t
-        ).exists()]
-
-        excluded_teams = [t for t in excluded_teams if not Outround.objects.filter(
-            type_of_round=type_of_round,
-            num_teams=value,
-            opp_team=t
-        ).exists()]
-
+    for value in sorted(rounds_by_size, reverse=True):
+        rounds = rounds_by_size[value]
+        paired_ids = {team_id for pairing in rounds
+                      for team_id in (pairing.gov_team_id, pairing.opp_team_id)}
         outround_pairings.append({
             "label": f"[{'N' if type_of_round else 'V'}] Ro{value}",
-            "rounds": Outround.objects.filter(num_teams=value,
-                                              type_of_round=type_of_round),
-            "excluded": excluded_teams
+            "rounds": rounds,
+            "excluded": [team for team in advancing_teams if team.pk not in paired_ids],
         })
 
     label = f"{'Novice' if type_of_round else 'Varsity'} Outrounds Pairings"
-
-    round_pairing = list(round_pairing)
 
     # We want a random looking, but constant ordering of the rounds
     random.seed(0xBEEF)
