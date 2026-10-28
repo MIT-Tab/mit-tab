@@ -249,7 +249,8 @@ def _get_seed_to_team_mapping(bracket_size, type_of_round):
     if type_of_round is not None:
         breaking = breaking.filter(type_of_team=type_of_round)
     return {entry.seed: entry.team for entry in
-            breaking.select_related("team") if entry.team}
+            breaking.select_related("team").prefetch_related("team__debaters")
+            if entry.team}
 
 def generate_bracket_data(outround_pairings):
     bracket_size, type_of_round = _calculate_bracket_size(outround_pairings)

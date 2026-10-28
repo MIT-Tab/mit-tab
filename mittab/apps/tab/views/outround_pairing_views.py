@@ -18,6 +18,7 @@ from mittab.apps.tab.board_audit import (
 from mittab.apps.tab.judge_history import current_manual_judge_events
 from mittab.apps.tab.live_results import published_team_placements
 from mittab.libs import assign_judges, assign_rooms
+from mittab.libs.outround_tab_logic.checks import lost_teams
 from mittab.libs.errors import *
 from mittab.apps.tab.forms import OutroundResultEntryForm
 import mittab.libs.tab_logic as tab_logic
@@ -469,7 +470,7 @@ def outround_pairing_view(request,
             else option["path"]
         )
 
-    lost_outrounds = [t.loser.id for t in Outround.objects.all() if t.loser]
+    lost_outrounds = lost_teams()
 
     outround_sections = []
     excluded_teams_map = {}
@@ -479,7 +480,7 @@ def outround_pairing_view(request,
             Outround.objects.filter(
                 type_of_round=selected_type,
                 num_teams=selected_num
-            ).prefetch_related(
+            ).select_related("gov_team", "opp_team", "room", "chair").prefetch_related(
                 "room__tags",
                 "gov_team__required_room_tags",
                 "opp_team__required_room_tags",
@@ -517,25 +518,11 @@ def outround_pairing_view(request,
             ).get("enabled", False),
         })
 
-        section_excluded_teams = BreakingTeam.objects.filter(
-            type_of_team=selected_type
-        ).exclude(
-            team__id__in=lost_outrounds
-        )
-        section_excluded_teams = [t.team for t in section_excluded_teams]
-        section_excluded_teams = [
-            t for t in section_excluded_teams
-            if not Outround.objects.filter(
-                type_of_round=selected_type,
-                num_teams=selected_num,
-                gov_team=t
-            ).exists()
-            and not Outround.objects.filter(
-                type_of_round=selected_type,
-                num_teams=selected_num,
-                opp_team=t
-            ).exists()
-        ]
+        paired_ids = {team_id for pairing in section_outrounds
+                      for team_id in (pairing.gov_team_id, pairing.opp_team_id)}
+        section_excluded_teams = [entry.team for entry in BreakingTeam.objects.filter(
+            type_of_team=selected_type,
+        ).exclude(team_id__in=set(lost_outrounds) | paired_ids).select_related("team")]
         for team in section_excluded_teams:
             excluded_teams_map[team.id] = team
     excluded_teams = list(excluded_teams_map.values())

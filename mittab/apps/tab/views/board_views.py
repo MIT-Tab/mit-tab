@@ -15,7 +15,7 @@ from django.views.decorators.http import (
 from mittab.apps.tab.auth_roles import is_apda_board_access_open, is_apda_board_user
 from mittab.apps.tab.board_audit import (
     deleted_pairings, manual_inround_numbers, manual_team_positions, pairing_history,
-    pairing_revision, pairing_snapshot,
+    pairing_revision, pairing_snapshot, with_pairing_snapshot_relations,
 )
 from mittab.apps.tab.board_operations import (
     bracket_problems, edit_board_outround, lock_board_tournament, pair_board_outround,
@@ -42,20 +42,30 @@ def board_required(view):
 
 
 def pairing_rows(queryset):
-    rows = []
-    for pairing in queryset:
-        snapshot = pairing_snapshot(pairing)
-        history = pairing_history(type(pairing), pairing.pk)
-        judge_names = []
-        for event in current_manual_judge_events(type(pairing), [pairing.pk]):
+    pairings = list(with_pairing_snapshot_relations(queryset))
+    events_by_pairing = {}
+    judge_names_by_pairing = {}
+    if pairings:
+        pairing_ids = [pairing.pk for pairing in pairings]
+        for event in AuditEvent.objects.filter(
+                content_type=ContentType.objects.get_for_model(queryset.model),
+                object_id__in=pairing_ids,
+        ).select_related("user").order_by("created_at", "id"):
+            events_by_pairing.setdefault(event.object_id, []).append(event)
+        for event in current_manual_judge_events(queryset.model, pairing_ids):
             if isinstance(event.changes, dict):
-                judge_names.extend(event.changes[field] for field in
-                                   ("assigned_judge", "chair", "new_chair")
-                                   if isinstance(event.changes.get(field), str))
+                judge_names_by_pairing.setdefault(event.object_id, []).extend(
+                    event.changes[field] for field in ("assigned_judge", "chair", "new_chair")
+                    if isinstance(event.changes.get(field), str))
+    rows = []
+    for pairing in pairings:
+        snapshot = pairing_snapshot(pairing)
+        history = pairing_history(type(pairing), pairing.pk,
+                                  events_by_pairing.get(pairing.pk, []))
         rows.append(dict(snapshot, id=pairing.pk, revision=pairing_revision(snapshot),
                          outcome=pairing.get_victor_display(), history=history,
                          manual_team_positions=manual_team_positions(history),
-                         manual_judge_names=judge_names))
+                         manual_judge_names=judge_names_by_pairing.get(pairing.pk, [])))
     return rows
 
 

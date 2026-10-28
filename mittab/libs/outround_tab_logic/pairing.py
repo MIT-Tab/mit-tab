@@ -8,7 +8,7 @@ from mittab.apps.tab.models import *
 from mittab.apps.tab.live_results import published_team_placements
 
 from mittab.libs.outround_tab_logic.checks import have_enough_rooms, \
-    get_break_sizes
+    get_break_sizes, lost_teams
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.tab_logic import (
     have_properly_entered_data,
@@ -104,7 +104,8 @@ def _get_challenge_pairs(type_of_break, num_teams, base_queryset, challenge_sett
     if challenge_settings["mode"] == OutroundPairingMode.CHALLENGE_ONCE:
         seed_basis = ChallengeSeedBasis.PREVIOUS_ROUND
 
-    ordered = _ordered_breaking_teams(base_queryset, seed_basis)
+    ordered = _ordered_breaking_teams(base_queryset.prefetch_related(
+        "team__gov_team", "team__gov_team_outround"), seed_basis)
     remaining = ordered[:]
     picks = {
         entry.challenger_id: entry.challenged_id
@@ -166,8 +167,7 @@ def get_challenge_setup_context(type_of_break, num_teams):
     if not enabled:
         return {"enabled": False}
 
-    lost_outround = [t.loser.id for t in Outround.objects.filter(
-        type_of_round=type_of_break) if t.loser]
+    lost_outround = lost_teams(type_of_break)
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
     ).exclude(
@@ -421,11 +421,11 @@ def gov_team(team_one, team_two):
 
     # 1. Check for sidelock
     if sidelock:
-        if Round.objects.filter(gov_team=team_one.team,
-                                opp_team=team_two.team).exists():
+        if any(round_obj.opp_team_id == team_two.team_id
+               for round_obj in team_one.team.gov_team.all()):
             return True, team_two
-        elif Round.objects.filter(gov_team=team_two.team,
-                                  opp_team=team_one.team).exists():
+        elif any(round_obj.opp_team_id == team_one.team_id
+                 for round_obj in team_two.team.gov_team.all()):
             return True, team_one
 
     # 2. Check for least govs
@@ -454,8 +454,7 @@ def pair(type_of_break=BreakingTeam.VARSITY):
 
 def _pair_experimental(type_of_break=BreakingTeam.VARSITY):
     list(BreakingTeam.objects.select_for_update().filter(type_of_team=type_of_break))
-    lost_outround = [t.loser.id for t in Outround.objects.filter(
-        type_of_round=type_of_break) if t.loser]
+    lost_outround = lost_teams(type_of_break)
 
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
@@ -504,16 +503,11 @@ def _pair_experimental(type_of_break=BreakingTeam.VARSITY):
         pairings = challenge_pairs
     else:
         bracket = gen_bracket(num_teams)
+        teams_by_seed = _breaking_teams_by_effective_seed(base_queryset)
         pairings = []
         for pairing in bracket:
-            team_one = base_queryset.filter(
-                effective_seed=pairing[0]).prefetch_related(
-                    "team__gov_team",
-                    "team__gov_team_outround").first()
-            team_two = base_queryset.filter(
-                effective_seed=pairing[1]).prefetch_related(
-                    "team__gov_team",
-                    "team__gov_team_outround").first()
+            team_one = teams_by_seed.get(pairing[0])
+            team_two = teams_by_seed.get(pairing[1])
             pairings.append((team_one, team_two))
 
     for team_one, team_two in pairings:
@@ -536,8 +530,18 @@ def _pair_experimental(type_of_break=BreakingTeam.VARSITY):
         TabSettings.set(_setting_key_for_challenge_once(type_of_break), 1)
 
 
+def _breaking_teams_by_effective_seed(queryset):
+    teams = queryset.select_related("team").prefetch_related(
+        "team__gov_team", "team__gov_team_outround").order_by("pk")
+    teams_by_seed = {}
+    for entry in teams:
+        # Match the old .filter(effective_seed=...).first() for duplicate seeds.
+        teams_by_seed.setdefault(entry.effective_seed, entry)
+    return teams_by_seed
+
+
 def _pair_standard(type_of_break=BreakingTeam.VARSITY):
-    lost_outround = [t.loser.id for t in Outround.objects.all() if t.loser]
+    lost_outround = lost_teams()
 
     base_queryset = BreakingTeam.objects.filter(
         type_of_team=type_of_break
@@ -568,16 +572,11 @@ def _pair_standard(type_of_break=BreakingTeam.VARSITY):
         TabSettings.set("nov_outrounds_public", 0)
 
     bracket = gen_bracket(num_teams)
+    teams_by_seed = _breaking_teams_by_effective_seed(base_queryset)
 
     for pairing in bracket:
-        team_one = base_queryset.filter(
-            effective_seed=pairing[0]).prefetch_related(
-                "team__gov_team",
-                "team__gov_team_outround").first()
-        team_two = base_queryset.filter(
-            effective_seed=pairing[1]).prefetch_related(
-                "team__gov_team",
-                "team__gov_team_outround").first()
+        team_one = teams_by_seed.get(pairing[0])
+        team_two = teams_by_seed.get(pairing[1])
 
         if not team_one or not team_two:
             continue
