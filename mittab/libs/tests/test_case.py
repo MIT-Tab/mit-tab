@@ -1,5 +1,4 @@
 import os
-import time
 import tempfile
 
 from django.test import LiveServerTestCase
@@ -22,7 +21,6 @@ class BaseWebTestCase(LiveServerTestCase):
 
     username = "tab"
     password = "password"
-    wait_seconds = 1
 
     def setUp(self):
         if os.environ.get("TEST_BROWSER", "chrome") == "chrome":
@@ -51,7 +49,12 @@ class BaseWebTestCase(LiveServerTestCase):
         cache.clear()
 
     def _wait(self):
-        time.sleep(self.wait_seconds)
+        WebDriverWait(self.browser.driver, 30, poll_frequency=0.05).until(
+            lambda driver: driver.execute_script(
+                "return document.readyState === 'complete' && "
+                "(!window.jQuery || window.jQuery.active === 0)"
+            )
+        )
 
     def _login(self):
         self._visit(reverse("tab_login"))
@@ -79,12 +82,16 @@ class BaseWebTestCase(LiveServerTestCase):
     def _wait_for_text(self, text, timeout=5, retries=2):
         for attempt in range(retries):
             try:
-                return WebDriverWait(self.browser.driver, timeout).until(
+                return WebDriverWait(
+                    self.browser.driver, timeout, poll_frequency=0.05
+                ).until(
                     EC.text_to_be_present_in_element((By.TAG_NAME, "body"), text)
                 )
             except Exception as e:
                 if attempt < retries - 1:
                     continue
                 print(e)
+                print(f"Timed out waiting for {text!r} at {self.browser.url}")
+                print(self.browser.find_by_tag("body").first.text[:2000])
                 return False
         return False

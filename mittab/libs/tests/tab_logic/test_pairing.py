@@ -6,6 +6,7 @@ from mittab.apps.tab.models import (
     CheckIn,
     Debater,
     Judge,
+    NoShow,
     Room,
     RoomCheckIn,
     Round,
@@ -20,9 +21,8 @@ from mittab.libs import tab_logic
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.tests.helpers import generate_results
 
-
 @pytest.mark.django_db
-class TestPairingLogic(TestCase):
+class PairingLogicTestCase(TestCase):
     """
     Tests that the the generated pairings are correct starting from round 1
     """
@@ -84,22 +84,6 @@ class TestPairingLogic(TestCase):
         if round_number + 2 != last:
             tab_logic.validate_round_data(round_number + 2)
 
-    def test_pairing_tournament(self):
-        """
-        Tests that we can pair round 1 through round 5, checking for various
-        things along the way. This is all one big method because the goal is to
-        test the entire pipeline in one go, and make sure a full tournament
-        works. Also, test fixture loading is painfully slow and we really only
-        need it to set the initial stte of the tournament with real world
-        data.
-        """
-        last_round = 6
-        TabSettings.set("cur_round", 1)
-        self.generate_checkins(last_round)
-        for _ in range(1, last_round):
-            round_number = self.round_number()
-            self.check_pairing(round_number, last_round)
-
     # --- Re-pair workflow helpers/tests ---
 
     def re_pair_latest_round(self):
@@ -141,6 +125,8 @@ class TestPairingLogic(TestCase):
             school_team.school = new_school
             school_team.save()
 
+
+class TestPairingLogic(PairingLogicTestCase):
     def test_repair_is_deterministic(self):
         paired_round = self.pair_round()
         baseline_pairings = self.pairings_for(paired_round)
@@ -165,6 +151,24 @@ class TestPairingLogic(TestCase):
 
         self.re_pair_latest_round()
         self.assertEqual(self.pairings_for(second_round), baseline_pairings)
+
+
+class TestPairingTournament(PairingLogicTestCase):
+    def test_pairing_tournament(self):
+        """
+        Tests that we can pair round 1 through round 5, checking for various
+        things along the way. This is all one big method because the goal is to
+        test the entire pipeline in one go, and make sure a full tournament
+        works. Also, test fixture loading is painfully slow and we really only
+        need it to set the initial stte of the tournament with real world
+        data.
+        """
+        last_round = 6
+        TabSettings.set("cur_round", 1)
+        self.generate_checkins(last_round)
+        for _ in range(1, last_round):
+            round_number = self.round_number()
+            self.check_pairing(round_number, last_round)
 
 
 @pytest.mark.django_db
@@ -200,6 +204,24 @@ class TestFirstRoundByeSetting(TestCase):
         RoomCheckIn.objects.bulk_create(
             RoomCheckIn(room=room, round_number=1) for room in rooms
         )
+
+    def test_pairing_records_all_absent_teams_without_changing_prior_noshows(self):
+        present = [self.make_team(f"Present {i}", Team.UNSEEDED) for i in range(2)]
+        absent = [self.make_team(f"Absent {i}", Team.UNSEEDED) for i in range(20)]
+        Team.objects.filter(pk__in=[team.pk for team in absent]).update(checked_in=False)
+        NoShow.objects.create(no_show_team=present[0], round_number=9)
+        self.make_pairing_resources(2)
+
+        tab_logic.pair_round()
+
+        self.assertCountEqual(
+            NoShow.objects.filter(round_number=1).values_list("no_show_team_id", flat=True),
+            [team.pk for team in absent],
+        )
+        self.assertEqual(NoShow.objects.filter(round_number=9).count(), 1)
+        debate = Round.objects.get(round_number=1)
+        self.assertCountEqual([debate.gov_team_id, debate.opp_team_id],
+                              [team.pk for team in present])
 
     def test_unseeded_policy_assigns_bye_to_unseeded_team(self):
         unseeded_team = self.make_team("Unseeded Team", Team.UNSEEDED)
@@ -262,7 +284,6 @@ class TestFirstRoundByeSetting(TestCase):
         )
 
         self.assertCountEqual(candidates, [unseeded_team, free_seed_team])
-
 
 @pytest.mark.django_db
 class TestRoundTwoRandomWithinBrackets(TestCase):
