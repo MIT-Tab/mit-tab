@@ -17,7 +17,7 @@
     {% endif %}
 
     {% if not registration_saved %}
-    <form method="post" novalidate data-registration-form>
+    <form method="post" novalidate data-registration-form{% if registration_form.is_bound %} data-registration-bound{% endif %}>
         {% csrf_token %}
 
         <section class="registration-section">
@@ -36,9 +36,9 @@
             </div>
             <div class="registration-section-helper">
                 <span class="registration-section-helper__label">Don't see what you need?</span>
-                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-school-modal">+ Add new school</button>
+                <button type="button" class="registration-section-helper__link" data-open-modal="#new-school-modal">+ Add new school</button>
                 <span class="registration-section-helper__sep" aria-hidden="true">·</span>
-                <button type="button" class="registration-section-helper__link" data-toggle="modal" data-target="#new-debater-modal">+ Add new debater</button>
+                <button type="button" class="registration-section-helper__link" data-open-modal="#new-debater-modal">+ Add new debater</button>
             </div>
         </section>
 
