@@ -74,12 +74,16 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(run('git', 'branch', '--show-current', cwd=worktree).strip(),
                              'codex/example')
             def environment(path):
-                return run('bash', '-c', 'source "$1"; printf "%s\\n%s" "$MYSQL_DATABASE" "$MT_STATE"',
+                return run('bash', '-c',
+                           'source "$1"; printf "%s\\n%s\\n%s" '
+                           '"$MYSQL_DATABASE" "$MT_STATE" "$MITTAB_FILE_CACHE_LOCATION"',
                            'test', str(SCRIPTS / '_env.sh'), cwd=path).splitlines()
             original = environment(repo)
             private = environment(worktree)
             self.assertNotEqual(original[0], private[0])
             self.assertNotEqual(original[1], private[1])
+            self.assertNotEqual(original[2], private[2])
+            self.assertEqual(private[2], str(Path(private[1]) / 'cache'))
 
     def test_watcher_tracks_new_head_before_finishing(self):
         check = {'__typename': 'CheckRun', 'name': 'lint', 'status': 'COMPLETED',
