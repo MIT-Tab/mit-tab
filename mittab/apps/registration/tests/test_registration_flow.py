@@ -589,6 +589,9 @@ def test_invalid_submission_preserves_debater_and_novice_values(client):
     assert form["debater_one_novice_status"].value() == "1"
     assert b'Second Year Novice</option>' in response.content
     assert b"Each debater needs an email" in response.content
+    # The re-rendered submission is newer than any autosaved browser draft.
+    assert b"data-registration-bound" in response.content
+    assert b"data-registration-bound" not in client.get("/registration/").content
 
 
 @pytest.mark.django_db

@@ -5,6 +5,19 @@ const DEB_URL = (id) => `/registration/api/debaters/${id}/`;
 const DEB_EMAIL_STATUS_URL = "/registration/api/debater-email-status/";
 
 const customDebaters = {};
+const customSchools = [];
+
+const DRAFT_KEY_PREFIX = "mittab:registration-draft:";
+const DRAFT_SAVE_DELAY_MS = 300;
+const MANAGEMENT_FIELD_RE = /-(TOTAL|INITIAL|MIN_NUM|MAX_NUM)_FORMS$/;
+const SUBFORM_INDEX_RE = /^(teams|judges)-(\d+)-/;
+
+let saveDraftTimer = null;
+let saveDraftNow = () => {};
+const scheduleDraftSave = () => {
+  clearTimeout(saveDraftTimer);
+  saveDraftTimer = setTimeout(() => saveDraftNow(), DRAFT_SAVE_DELAY_MS);
+};
 
 const getRegistrationSelect = () =>
   $("[data-school-select='registration']").first();
@@ -470,6 +483,7 @@ const initSubforms = ($scope) => {
 };
 
 const appendSchoolOption = (value, name) => {
+  customSchools.push({ value, name });
   $("[data-school-select]").each((_, el) => {
     const option = document.createElement("option");
     option.value = value;
@@ -619,6 +633,11 @@ const hideModal = (selector) => {
     document.activeElement.blur();
   }
   const $modal = $(selector);
+  // Bootstrap ignores hide() while the show transition is still running.
+  if ($modal.data("modalState") === "showing") {
+    $modal.one("shown.bs.modal", () => hideModal(selector));
+    return;
+  }
   $modal.one("hidden.bs.modal", () => {
     if (!$(".modal.show").length) {
       $(".modal-backdrop").remove();
@@ -626,6 +645,34 @@ const hideModal = (selector) => {
     }
   });
   $modal.modal("hide");
+};
+
+// Bootstrap 4.3 allows show() during the backdrop fade-out of a previous
+// hide, which leaves an invisible modal behind an orphaned backdrop that
+// blocks the whole page. Wait for the hide to finish before reopening.
+const showModal = (selector) => {
+  const $modal = $(selector);
+  if ($modal.data("modalState") === "hiding") {
+    $modal.one("hidden.bs.modal", () => $modal.modal("show"));
+    return;
+  }
+  $modal.modal("show");
+};
+
+const trackModalState = ($modals) => {
+  $modals
+    .on("show.bs.modal", function onShow() {
+      $(this).data("modalState", "showing");
+    })
+    .on("shown.bs.modal", function onShown() {
+      $(this).data("modalState", "shown");
+    })
+    .on("hide.bs.modal", function onHide() {
+      $(this).data("modalState", "hiding");
+    })
+    .on("hidden.bs.modal", function onHidden() {
+      $(this).data("modalState", "hidden");
+    });
 };
 
 const registerQuickActions = () => {
@@ -645,6 +692,7 @@ const registerQuickActions = () => {
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
     hideModal("#new-school-modal");
+    scheduleDraftSave();
   });
 
   $("#create-debater-btn").on("click", () => {
@@ -676,6 +724,7 @@ const registerQuickActions = () => {
     $("#new-debater-name").val("");
     $("#new-debater-status").val("0");
     hideModal("#new-debater-modal");
+    scheduleDraftSave();
   });
 };
 
@@ -698,6 +747,197 @@ const initNewDebaterSelect = () => {
   sync();
   const observer = new MutationObserver(sync);
   observer.observe($mainSchool[0], { childList: true });
+};
+
+// Unsaved progress is kept in localStorage per page so a reload, crash, or
+// closed tab doesn't lose the custom schools, debaters, and rows entered.
+const draftKey = () => `${DRAFT_KEY_PREFIX}${window.location.pathname}`;
+
+const readDraft = () => {
+  try {
+    return JSON.parse(window.localStorage.getItem(draftKey()) || "null");
+  } catch (error) {
+    return null;
+  }
+};
+
+const writeDraft = (draft) => {
+  try {
+    window.localStorage.setItem(draftKey(), JSON.stringify(draft));
+  } catch (error) {
+    // storage may be full or blocked; autosave is best-effort
+  }
+};
+
+const clearAllDrafts = () => {
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(DRAFT_KEY_PREFIX))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch (error) {
+    // ignore blocked storage
+  }
+};
+
+const getSubformIndex = (subformEl) => {
+  const named = subformEl.querySelector("[name]");
+  const match = named && named.name.match(SUBFORM_INDEX_RE);
+  return match ? { prefix: match[1], index: Number(match[2]) } : null;
+};
+
+const serializeField = (el) => {
+  if (el.type === "checkbox" || el.type === "radio") {
+    return [el.name, el.value, el.checked];
+  }
+  if (el.multiple) {
+    return [el.name, Array.from(el.selectedOptions, (option) => option.value)];
+  }
+  if (el.dataset.usingPrivateEmail === "true") {
+    // Masked email on file; it is re-fetched when the debater is restored.
+    return [el.name, ""];
+  }
+  if (el.dataset.debaterInput && el.disabled) {
+    // Debater list still loading; keep the pending selection.
+    return [el.name, $(el).data("currentValue") || ""];
+  }
+  return [el.name, el.value];
+};
+
+const serializeDraft = (formEl) => {
+  const forms = { teams: [], judges: [] };
+  formEl.querySelectorAll("[data-form]").forEach((subformEl) => {
+    const position = getSubformIndex(subformEl);
+    if (position) forms[position.prefix].push(position.index);
+  });
+  const fields = Array.from(formEl.elements)
+    .filter(
+      (el) =>
+        el.name &&
+        el.name !== "csrfmiddlewaretoken" &&
+        !MANAGEMENT_FIELD_RE.test(el.name) &&
+        el.type !== "submit" &&
+        el.type !== "button",
+    )
+    .map(serializeField);
+  return {
+    savedAt: Date.now(),
+    customSchools,
+    customDebaters,
+    forms,
+    totals: {
+      teams: parseInt($('[name="teams-TOTAL_FORMS"]').val(), 10) || 0,
+      judges: parseInt($('[name="judges-TOTAL_FORMS"]').val(), 10) || 0,
+    },
+    fields,
+  };
+};
+
+const restoreDraftForms = (draft, maxTeams) => {
+  [
+    ["teams", "team"],
+    ["judges", "judge"],
+  ].forEach(([prefix, type]) => {
+    const $total = $(`[name="${prefix}-TOTAL_FORMS"]`);
+    const initialTotal = parseInt($total.val(), 10) || 0;
+    const savedTotal = draft.totals?.[prefix] || 0;
+    const savedIndexes = draft.forms?.[prefix] || [];
+    for (let index = initialTotal; index < savedTotal; index += 1) {
+      addForm(type, maxTeams);
+      if (!savedIndexes.includes(index)) {
+        // The row was removed before the draft was saved.
+        $(`[data-formset-container="${type}"] [data-form]`).last().remove();
+      }
+    }
+  });
+};
+
+const restoreDraftField = (formEl, [name, value, checked]) => {
+  const elements = formEl.querySelectorAll(`[name="${CSS.escape(name)}"]`);
+  elements.forEach((el) => {
+    /* eslint-disable no-param-reassign */
+    if (el.type === "checkbox" || el.type === "radio") {
+      if (el.value === value) el.checked = checked;
+    } else if (el.multiple) {
+      $(el).val(value);
+    } else if (el.dataset.debaterInput) {
+      $(el).data("currentValue", value);
+      if (
+        $(el)
+          .find("option")
+          .filter((_, option) => option.value === value).length
+      ) {
+        el.value = value;
+      }
+    } else {
+      el.value = value;
+    }
+    /* eslint-enable no-param-reassign */
+  });
+};
+
+const restoreDraft = (formEl, draft, maxTeams) => {
+  (draft.customSchools || []).forEach(({ value, name }) => {
+    if (!getRegistrationSelect().find(`option[value="${value}"]`).length) {
+      appendSchoolOption(value, name);
+    }
+  });
+  Object.entries(draft.customDebaters || {}).forEach(([school, debaters]) => {
+    customDebaters[school] = debaters;
+  });
+
+  const fields = draft.fields || [];
+  const $registration = getRegistrationSelect();
+  const registrationField = fields.find(
+    ([name]) => name === $registration.attr("name"),
+  );
+  if (registrationField && registrationField[1]) {
+    $registration.val(registrationField[1]).trigger("change");
+  }
+
+  restoreDraftForms(draft, maxTeams);
+  fields.forEach((field) => restoreDraftField(formEl, field));
+
+  // Let dependent widgets (debater lists, select2, summaries) catch up with
+  // the restored values without treating them as manual school overrides.
+  const regValue = getRegistrationSchoolValue();
+  $(formEl)
+    .find("[data-school-select='team'], [data-judge-school-select]")
+    .each((_, el) => {
+      const $select = $(el);
+      $select.trigger("change");
+      const values = getSelectValues($select);
+      $select.data(
+        "prefillManual",
+        values.length > 0 && !(values.length === 1 && values[0] === regValue),
+      );
+    });
+  $(formEl)
+    .find("[data-debater-input]")
+    .each((_, el) => {
+      if (el.value) $(el).trigger("change");
+    });
+  $(formEl)
+    .find("[data-form]")
+    .each((_, el) => updateSubformSummary($(el)));
+};
+
+const initDraftAutosave = ($root, maxTeams) => {
+  const formEl = $root.find("[data-registration-form]")[0];
+  if (!formEl) {
+    // The registration was just saved; drafts are no longer needed.
+    clearAllDrafts();
+    return;
+  }
+  // A re-rendered submission already carries the user's latest values.
+  const draft = formEl.hasAttribute("data-registration-bound")
+    ? null
+    : readDraft();
+  if (draft) {
+    restoreDraft(formEl, draft, maxTeams);
+  }
+  saveDraftNow = () => writeDraft(serializeDraft(formEl));
+  $root.on("input change", "[data-registration-form]", scheduleDraftSave);
+  window.addEventListener("pagehide", () => saveDraftNow());
 };
 
 export default function initRegistrationPortal() {
@@ -802,15 +1042,23 @@ export default function initRegistrationPortal() {
     },
   );
 
+  trackModalState($root.find(".registration-modal"));
+  $root.on("click", "[data-open-modal]", function onOpenModal(event) {
+    event.preventDefault();
+    showModal($(this).data("openModal"));
+  });
+
   $root.on("click", "[data-add-form]", function onAddClick(event) {
     event.preventDefault();
     addForm($(this).data("addForm"), maxTeams);
+    scheduleDraftSave();
   });
 
   $root.on("click", "[data-remove-form]", function onRemoveClick(event) {
     event.preventDefault();
     event.stopPropagation();
     removeForm(this);
+    scheduleDraftSave();
   });
 
   const toggleSubform = (target) => {
@@ -860,6 +1108,8 @@ export default function initRegistrationPortal() {
         .trigger("change");
     },
   );
+
+  initDraftAutosave($root, maxTeams);
 
   // Warn the user before leaving the registration page (reload, close, back,
   // or follow a link). Only skip the prompt when the form is actually being
