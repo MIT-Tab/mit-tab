@@ -97,7 +97,11 @@ const isNovice = (debaterData) => {
   return String(debaterData.status || "").toLocaleLowerCase() === "novice";
 };
 
-const fillDebaterData = (selectEl, debaterData = null) => {
+const fillDebaterData = (
+  selectEl,
+  debaterData = null,
+  { preserveNoviceStatus = false } = {},
+) => {
   const { apdaTarget } = selectEl.dataset;
   const debaterCard = getDebaterCard(selectEl);
   const noviceField = debaterCard?.querySelector(
@@ -111,7 +115,7 @@ const fillDebaterData = (selectEl, debaterData = null) => {
     apdaField.value =
       (debaterData && (debaterData.apda_id || debaterData.id)) || "";
   }
-  if (noviceField) {
+  if (noviceField && !preserveNoviceStatus) {
     noviceField.value = isNovice(debaterData) ? "1" : "0";
   }
   if (qualifiedField) {
@@ -189,19 +193,19 @@ const loadDebaterEmailStatus = (selectEl, debaterData = null) => {
     });
 };
 
-const syncDebater = (selectEl) => {
+const syncDebater = (selectEl, options = {}) => {
   const option = selectEl.selectedOptions && selectEl.selectedOptions[0];
   if (option && option.dataset.debater) {
     try {
       const debaterData = JSON.parse(option.dataset.debater);
-      fillDebaterData(selectEl, debaterData);
+      fillDebaterData(selectEl, debaterData, options);
       loadDebaterEmailStatus(selectEl, debaterData);
       return;
     } catch (error) {
       // ignore JSON parse errors
     }
   }
-  fillDebaterData(selectEl);
+  fillDebaterData(selectEl, null, options);
   loadDebaterEmailStatus(selectEl);
 };
 
@@ -263,10 +267,13 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
     : "";
   $select.val(restoredValue);
   $select.prop("disabled", false);
-  syncDebater($select[0]);
+  // Restoring a selection must keep the saved/manual status, even when the
+  // APDA roster still lists last season's novice designation.
+  const options = { preserveNoviceStatus: Boolean(restoredValue) };
+  syncDebater($select[0], options);
   // Notify listeners (summary header, etc.) that the value has changed
   // — needed because programmatic .val() does not fire a change event.
-  $select.trigger("change");
+  $select.trigger("change", [options]);
 };
 
 const broadcastCustomDebater = (schoolValue, debater) => {
@@ -914,7 +921,7 @@ const restoreDraft = (formEl, draft, maxTeams) => {
   $(formEl)
     .find("[data-debater-input]")
     .each((_, el) => {
-      if (el.value) $(el).trigger("change");
+      if (el.value) $(el).trigger("change", [{ preserveNoviceStatus: true }]);
     });
   $(formEl)
     .find("[data-form]")
@@ -972,9 +979,13 @@ export default function initRegistrationPortal() {
     }
   });
 
-  $root.on("change", "[data-debater-input]", function onDebChange() {
-    syncDebater(this);
-  });
+  $root.on(
+    "change",
+    "[data-debater-input]",
+    function onDebChange(event, options) {
+      syncDebater(this, options);
+    },
+  );
 
   $root.on(
     "change",
