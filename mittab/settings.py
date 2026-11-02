@@ -61,6 +61,9 @@ MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
 DB_CONN_MAX_AGE = int(os.environ.get("DB_CONN_MAX_AGE", "0"))
+MYSQL_SHARED_CLUSTER = os.environ.get("MYSQL_SHARED_CLUSTER", "").lower() in (
+    "1", "true", "yes",
+)
 
 
 DB_OPTIONS = {"charset": "utf8mb4"}

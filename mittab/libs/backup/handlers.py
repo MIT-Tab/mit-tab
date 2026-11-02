@@ -1,6 +1,8 @@
 import subprocess
+import os
+from functools import lru_cache
 
-from mittab import settings
+from django.conf import settings
 
 DB_SETTINGS = settings.DATABASES["default"]
 DB_HOST = DB_SETTINGS["HOST"]
@@ -9,6 +11,14 @@ DB_USER = DB_SETTINGS["USER"]
 DB_PASS = DB_SETTINGS["PASSWORD"]
 DB_PORT = DB_SETTINGS["PORT"]
 SSL_CONFIG = DB_SETTINGS.get("OPTIONS", {}).get("ssl", {})
+
+
+@lru_cache(maxsize=1)
+def _dump_supports_gtid_option():
+    # Production's default-mysql-client can be MariaDB, whose dump command
+    # does not accept MySQL's set-gtid-purged flag. Both support snapshots.
+    help_text = subprocess.check_output(["mysqldump", "--help"])
+    return b"set-gtid-purged" in help_text
 
 
 def _ssl_cmd_args():
@@ -25,10 +35,16 @@ def _ssl_cmd_args():
 
 
 class MysqlDumpRestorer:
+    @staticmethod
+    def _execute(command, **kwargs):
+        if settings.MYSQL_SHARED_CLUSTER:
+            # Failed commands are reported by subprocess/Sentry. Do not put
+            # new tenant passwords in command arguments or exception text.
+            kwargs["env"] = {**os.environ, "MYSQL_PWD": DB_PASS}
+        return subprocess.check_output(command, **kwargs)
 
     def dump(self, include_scratches=True):
-        return subprocess.check_output(self._dump_cmd(
-            include_scratches=include_scratches))
+        return self._execute(self._dump_cmd(include_scratches=include_scratches))
 
     def restore(self, content):
         """
@@ -45,9 +61,9 @@ class MysqlDumpRestorer:
         """
         before = self.dump()
         try:
-            subprocess.check_output(self._restore_cmd(), input=content)
+            self._execute(self._restore_cmd(), input=content)
         except Exception as e:
-            subprocess.check_output(self._restore_cmd(), input=before)
+            self._execute(self._restore_cmd(), input=before)
             raise e
 
     def _restore_cmd(self):  # Note: refactor to just use a python mysql client
@@ -59,7 +75,7 @@ class MysqlDumpRestorer:
             f"--user={DB_USER}",
         ]
 
-        if DB_PASS:
+        if DB_PASS and not settings.MYSQL_SHARED_CLUSTER:
             cmd.append(f"--password={DB_PASS}")
 
         cmd.extend(_ssl_cmd_args())
@@ -71,14 +87,29 @@ class MysqlDumpRestorer:
             "mysqldump",
             DB_NAME,
             "--quick",
-            "--lock-all-tables",
             "--complete-insert",
             f"--port={DB_PORT}",
             f"--host={DB_HOST}",
             f"--user={DB_USER}",
         ]
 
-        if DB_PASS:
+        if settings.MYSQL_SHARED_CLUSTER:
+            # InnoDB snapshots need no server-wide lock, PROCESS or global GTID
+            # changes. A tenant's backup/restore must stay inside its schema.
+            cmd.extend(
+                [
+                    "--single-transaction",
+                    "--skip-lock-tables",
+                    "--skip-add-locks",
+                    "--no-tablespaces",
+                ]
+            )
+            if _dump_supports_gtid_option():
+                cmd.append("--set-gtid-purged=OFF")
+        else:
+            cmd.append("--lock-all-tables")
+
+        if DB_PASS and not settings.MYSQL_SHARED_CLUSTER:
             cmd.append(f"--password={DB_PASS}")
 
         cmd.extend(_ssl_cmd_args())

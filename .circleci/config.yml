@@ -12,6 +12,7 @@ jobs:
           MITTAB_FAKE_WEBPACK_LOADER: "1"
           MITTAB_SKIP_ASSET_BUILD: "1"
           MITTAB_INITIALIZE_ARGS: --skip-backups
+          MITTAB_TEST_SHARED_MYSQL: "1"
       - image: cimg/mysql:8.0
         environment:
           MYSQL_ROOT_PASSWORD: secret
@@ -26,6 +27,13 @@ jobs:
 
     steps:
       - checkout
+      - run:
+          name: Install MySQL command-line clients for backup integration tests
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y default-mysql-client
+            mysql --version
+            mysqldump --version
       - restore_cache:
           key: uv-v1-3.10.16-{{ checksum "uv.lock" }}
 

@@ -10,6 +10,7 @@ If you have any other questions, contact Ben Muschol at muschol.b@husky.neu.edu
 :maxdepth: 2
 
 Setting-up-your-server
+Shared-MySQL
 Tab-Policy
 Adding-Teams,-Judges,-Rooms-and-Debaters
 Before-Round-1
