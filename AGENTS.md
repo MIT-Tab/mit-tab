@@ -4,6 +4,7 @@
 - Read failing CI with `gh pr list -R MIT-Tab/mit-tab --json number,title,statusCheckRollup` and CircleCI build logs from the failing `targetUrl`, e.g. `curl -fsSL https://circleci.com/api/v1.1/project/github/MIT-Tab/mit-tab/<build_num>`.
 - For every implementation task, read and follow `.agents/skills/mittab-task/SKILL.md` before changing files. Use this repo copy even if an older user-level `mittab-task` skill is installed.
 - Never manually poll CI. Use the skill's CI watcher once, with the agent's background completion mechanism, then end the turn. See the skill for Codex and Claude instructions.
+- `docs/` is public-facing guidance for using the platform during a tournament. Add documentation there only when tournament directors need to understand a feature or take action. Keep internal architecture, storage design, and migration details in PR descriptions. Automatic fixes that require no action from tournament directors do not need public documentation.
 
 ## Board access invariants
 
