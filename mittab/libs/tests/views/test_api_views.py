@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +11,8 @@ from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
 from mittab.apps.tab.models import (
-    BreakingTeam, Room, TabSettings, Team, Outround, Round
+    BreakingTeam, PublishedOutroundStage, PublishedTeamPlacement, Room, RoomCheckIn,
+    TabSettings, Team, Outround, Round,
 )
 from mittab.apps.tab.public_rankings import set_standings_publication_setting
 from mittab.apps.tab.views import api_views as api_views_module
@@ -483,6 +485,79 @@ class TestApiViews(TestCase):
 
         rebuild.assert_not_called()
         self.assertEqual(response.status_code, 200)
+
+    def test_large_break_can_publish_and_pair_through_finals(self):
+        teams, _outround = self._prepare_live_release()
+        Outround.objects.all().delete()
+        school = teams[0].school
+        teams = [Team.objects.create(
+            name=f"Large break {index}", school=school, seed=Team.FULL_SEED,
+        ) for index in range(64)]
+        for seed, team in enumerate(teams, 1):
+            BreakingTeam.objects.create(
+                team=team, seed=seed, effective_seed=seed,
+                type_of_team=Outround.VARSITY,
+            )
+        for index in range(32):
+            room = Room.objects.create(name=f"Large break room {index}", rank=0)
+            RoomCheckIn.objects.create(room=room, round_number=0)
+        for index in range(32):
+            Outround.objects.create(
+                gov_team=teams[index], opp_team=teams[63 - index], num_teams=64,
+                type_of_round=Outround.VARSITY,
+            )
+        self.client.force_login(self.user)
+        # A malformed/truncated legacy value cannot break the new code paths.
+        TabSettings.set("live_results_published_stages_0", '{"64":')
+        seed_by_team = {team.pk: seed for seed, team in enumerate(teams, 1)}
+        for size in (64, 32, 16, 8, 4, 2):
+            with self.subTest(size=size):
+                # Advance the higher seed, preserving the standard bracket's
+                # effective seeds even when pairing randomly chooses sides.
+                for debate in Outround.objects.filter(num_teams=size).values(
+                    "pk", "gov_team_id", "opp_team_id",
+                ):
+                    victor = (Outround.GOV if seed_by_team[debate["gov_team_id"]]
+                              < seed_by_team[debate["opp_team_id"]] else Outround.OPP)
+                    Outround.objects.filter(pk=debate["pk"]).update(victor=victor)
+                response = self.client.get(reverse(
+                    "toggle_outround_pairing_released", args=[size, Outround.VARSITY],
+                ))
+                self.assertEqual(response.status_code, 200)
+                payload = self._live_payload()
+                self.assertEqual(len(payload["team_results"]), 64)
+                with patch(
+                    "mittab.apps.tab.live_results.TabSettings.set",
+                    wraps=TabSettings.set,
+                ) as save_setting:
+                    self.assertEqual(self.client.get(
+                        reverse("tournament_todo")
+                    ).status_code, 200)
+                self.assertFalse(any(
+                    call.args[0].startswith("live_results_")
+                    for call in save_setting.call_args_list
+                ))
+                if size > 2:
+                    with patch(
+                        "mittab.apps.tab.views.outround_pairing_views."
+                        "backup.backup_round"
+                    ):
+                        response = self.client.post(reverse(
+                            "next_outround", args=[Outround.VARSITY, size],
+                        ))
+                    self.assertEqual(response.status_code, 302)
+                    self.assertEqual(
+                        Outround.objects.filter(num_teams=size // 2).count(), size // 4,
+                    )
+        self.assertEqual(PublishedOutroundStage.objects.count(), 6)
+        self.assertEqual(PublishedTeamPlacement.objects.count(), 126)
+        self.assertEqual(min(row["place"] for row in payload["team_results"]), 1)
+        self.assertEqual(TabSettings.get("live_results_published_stages_0"), '{"64":')
+        # The first snapshot alone is much larger than the former 200-char column.
+        stage = PublishedOutroundStage.objects.get(num_teams=64)
+        self.assertGreater(len(json.dumps(dict(stage.placements.values_list(
+            "team_id", "place",
+        )))), 200)
 
     def test_live_results_dates_tournament_by_first_result(self):
         TabSettings.set("tournament_date", "2026-08-01")

@@ -990,6 +990,36 @@ class Outround(models.Model):
         return self.gov_team
 
 
+class PublishedOutroundStage(models.Model):
+    """A public placement snapshot that survives hiding or rebuilding pairings."""
+
+    type_of_round = models.IntegerField(choices=Outround.TYPE_OF_ROUND_CHOICES)
+    num_teams = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["type_of_round", "num_teams"],
+                name="unique_published_outround_stage",
+            ),
+        ]
+
+
+class PublishedTeamPlacement(models.Model):
+    stage = models.ForeignKey(
+        PublishedOutroundStage, on_delete=models.CASCADE, related_name="placements",
+    )
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    place = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stage", "team"], name="unique_published_stage_team",
+            ),
+        ]
+
+
 class OutroundChallenge(models.Model):
     num_teams = models.IntegerField()
     type_of_round = models.IntegerField(
