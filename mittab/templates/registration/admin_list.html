@@ -23,7 +23,7 @@
         <div class="registration-admin__settings-head">
             <div>
                 <h6 class="registration-admin__panel-title mb-1">Registration Availability</h6>
-                <p class="text-muted small mb-0">Manual switches are the master controls. Optional windows automatically open and close each type independently.</p>
+                <p class="text-muted small mb-0">Manual switches are the master controls. Optional windows automatically open and close each type independently. All schedule times use Eastern time (EST/EDT).</p>
             </div>
             <button type="submit" class="btn btn-primary btn-sm">Save Settings</button>
         </div>
@@ -38,12 +38,12 @@
                 </div>
                 <div class="registration-admin__datetime-grid">
                     <div class="form-group mb-0">
-                        <label for="{{ form.new_registrations_open_at.id_for_label }}">Open at (UTC)</label>
+                        <label for="{{ form.new_registrations_open_at.id_for_label }}">Open at (Eastern)</label>
                         {{ form.new_registrations_open_at }}
                         <div class="registration-field__error">{{ form.new_registrations_open_at.errors }}</div>
                     </div>
                     <div class="form-group mb-0">
-                        <label for="{{ form.new_registrations_close_at.id_for_label }}">Close at (UTC)</label>
+                        <label for="{{ form.new_registrations_close_at.id_for_label }}">Close at (Eastern)</label>
                         {{ form.new_registrations_close_at }}
                         <div class="registration-field__error">{{ form.new_registrations_close_at.errors }}</div>
                     </div>
@@ -59,12 +59,12 @@
                 </div>
                 <div class="registration-admin__datetime-grid">
                     <div class="form-group mb-0">
-                        <label for="{{ form.registration_edits_open_at.id_for_label }}">Open at (UTC)</label>
+                        <label for="{{ form.registration_edits_open_at.id_for_label }}">Open at (Eastern)</label>
                         {{ form.registration_edits_open_at }}
                         <div class="registration-field__error">{{ form.registration_edits_open_at.errors }}</div>
                     </div>
                     <div class="form-group mb-0">
-                        <label for="{{ form.registration_edits_close_at.id_for_label }}">Close at (UTC)</label>
+                        <label for="{{ form.registration_edits_close_at.id_for_label }}">Close at (Eastern)</label>
                         {{ form.registration_edits_close_at }}
                         <div class="registration-field__error">{{ form.registration_edits_close_at.errors }}</div>
                     </div>

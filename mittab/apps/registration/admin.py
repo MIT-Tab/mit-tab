@@ -1,5 +1,11 @@
+from django import forms
 from django.contrib import admin
+from django.utils import timezone
 
+from mittab.apps.registration.fields import (
+    REGISTRATION_TIME_ZONE,
+    RegistrationDateTimeField,
+)
 from mittab.apps.tab.models import Judge, Team
 
 from .models import (
@@ -79,14 +85,52 @@ class RegistrationAdmin(admin.ModelAdmin):
 class RegistrationConfigAdmin(admin.ModelAdmin):
     list_display = (
         "allow_new_registrations",
-        "new_registrations_open_at",
-        "new_registrations_close_at",
+        "new_registrations_open_eastern",
+        "new_registrations_close_eastern",
         "allow_registration_edits",
-        "registration_edits_open_at",
-        "registration_edits_close_at",
+        "registration_edits_open_eastern",
+        "registration_edits_close_eastern",
         "crash_housing_enabled",
         "updated_at",
     )
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in (
+            "new_registrations_open_at", "new_registrations_close_at",
+            "registration_edits_open_at", "registration_edits_close_at",
+        ):
+            kwargs.update(
+                form_class=RegistrationDateTimeField,
+                widget=forms.DateTimeInput(
+                    format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"},
+                ),
+                help_text="Eastern time (EST/EDT).",
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    @staticmethod
+    def _eastern_time(value):
+        if value is None:
+            return None
+        return timezone.localtime(value, REGISTRATION_TIME_ZONE).strftime(
+            "%Y-%m-%d %H:%M %Z",
+        )
+
+    @admin.display(description="New registrations open (Eastern)")
+    def new_registrations_open_eastern(self, obj):
+        return self._eastern_time(obj.new_registrations_open_at)
+
+    @admin.display(description="New registrations close (Eastern)")
+    def new_registrations_close_eastern(self, obj):
+        return self._eastern_time(obj.new_registrations_close_at)
+
+    @admin.display(description="Registration edits open (Eastern)")
+    def registration_edits_open_eastern(self, obj):
+        return self._eastern_time(obj.registration_edits_open_at)
+
+    @admin.display(description="Registration edits close (Eastern)")
+    def registration_edits_close_eastern(self, obj):
+        return self._eastern_time(obj.registration_edits_close_at)
 
     def has_add_permission(self, request):
         return not RegistrationConfig.objects.exists()
