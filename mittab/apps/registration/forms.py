@@ -2,6 +2,7 @@ from urllib.parse import unquote
 
 from django import forms
 
+from mittab.apps.registration.fields import RegistrationDateTimeField
 from mittab.apps.registration.models import (
     InfoLink,
     InfoText,
@@ -496,7 +497,7 @@ class RegistrationSettingsForm(forms.Form):
         help_text="Controls whether existing registration links can modify their data.",
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
-    new_registrations_open_at = forms.DateTimeField(
+    new_registrations_open_at = RegistrationDateTimeField(
         label="New Registrations Open",
         required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
@@ -505,7 +506,7 @@ class RegistrationSettingsForm(forms.Form):
             attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
         ),
     )
-    new_registrations_close_at = forms.DateTimeField(
+    new_registrations_close_at = RegistrationDateTimeField(
         label="New Registrations Close",
         required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
@@ -514,7 +515,7 @@ class RegistrationSettingsForm(forms.Form):
             attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
         ),
     )
-    registration_edits_open_at = forms.DateTimeField(
+    registration_edits_open_at = RegistrationDateTimeField(
         label="Registration Edits Open",
         required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
@@ -523,7 +524,7 @@ class RegistrationSettingsForm(forms.Form):
             attrs={"class": "form-control form-control-sm", "type": "datetime-local"},
         ),
     )
-    registration_edits_close_at = forms.DateTimeField(
+    registration_edits_close_at = RegistrationDateTimeField(
         label="Registration Edits Close",
         required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
