@@ -33,7 +33,7 @@ dev = [
   "coverage==7.16.1",
   "mock==1.0.1",
   "nplusone",
-  "pylint==3.3.9",
+  "pylint==4.0.9",
   "pylint-django==2.8.0",
   "pytest==9.0.3",
   "pytest-circleci-parallelized==0.0.4",
