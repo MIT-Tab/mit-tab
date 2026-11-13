@@ -7,7 +7,9 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 from mittab.apps.tab.live_results import published_team_placements
-from mittab.apps.tab.models import PublishedOutroundStage, PublishedTeamPlacement
+from mittab.apps.tab.models import (
+    PublishedOutroundStage, PublishedTeamPlacement, School,
+)
 
 
 class TestPublishedPlacementsMigration(TransactionTestCase):
@@ -17,6 +19,8 @@ class TestPublishedPlacementsMigration(TransactionTestCase):
     def setUp(self):
         super().setUp()
         executor = MigrationExecutor(connection)
+        self.latest_targets = executor.loader.graph.leaf_nodes()
+        self.addCleanup(self.restore_schema)
         executor.migrate(self.old_target)
         self.apps = executor.loader.project_state(self.old_target).apps
         self.settings = self.apps.get_model("tab", "TabSettings")
@@ -28,10 +32,9 @@ class TestPublishedPlacementsMigration(TransactionTestCase):
         self.teams = [team_model.objects.create(
             name=f"Migration team {index}", school=school, seed=0,
         ) for index in range(16)]
-        self.addCleanup(self.restore_schema)
 
     def restore_schema(self):
-        MigrationExecutor(connection).migrate(self.new_target)
+        MigrationExecutor(connection).migrate(self.latest_targets)
         for alias in ("default", "filesystem"):
             caches[alias].clear()
 
@@ -40,6 +43,11 @@ class TestPublishedPlacementsMigration(TransactionTestCase):
             num_teams=size, type_of_round=division,
             gov_team=self.teams[gov], opp_team=self.teams[opp], victor=victor,
         )
+
+    def test_live_roster_writes_work_after_restoring_schema(self):
+        self.restore_schema()
+        school = School.objects.create(name="After migration cleanup")
+        self.assertTrue(School.objects.filter(pk=school.pk).exists())
 
     def test_recovers_manual_rounds_and_preserves_every_pairing_field(self):
         # Same failure shape as the supplied SQL: only R16 was saved, while
