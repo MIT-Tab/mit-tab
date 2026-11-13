@@ -1,5 +1,8 @@
 """Record only explicitly public roster changes, never private audit payloads."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from django.db.models.signals import m2m_changed, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -10,6 +13,7 @@ from mittab.apps.tab.models import (
     Judge,
     JudgeExpectedCheckIn,
     PublicRosterChange,
+    PublicRosterLogState,
     School,
     TabSettings,
     Team,
@@ -20,18 +24,69 @@ from mittab.libs.cacheing.public_cache import (
 )
 
 
-def logging_enabled():
+IMPORT_IN_PROGRESS = ContextVar("public_roster_import_in_progress", default=False)
+
+
+@contextmanager
+def suppress_public_roster_logging():
+    """Exclude an entire import, including nested model and relationship saves."""
+    token = IMPORT_IN_PROGRESS.set(True)
+    try:
+        yield
+    finally:
+        IMPORT_IN_PROGRESS.reset(token)
+
+
+def registration_closed():
     config = RegistrationConfig.get_active()
-    return bool(
-        config
-        and (
-            not config.allow_new_registrations
-            or (
-                config.new_registrations_close_at
-                and timezone.now() >= config.new_registrations_close_at
-            )
+    return not config or bool(
+        not config.allow_new_registrations
+        or (
+            config.new_registrations_close_at
+            and timezone.now() >= config.new_registrations_close_at
         )
     )
+
+
+def log_state():
+    """Latch first publication; hiding a published list does not reset history."""
+    state = PublicRosterLogState.objects.filter(pk=1).first()
+    if state is None:
+        if not TabSettings.get("teams_public", 0):
+            return None
+        state, _ = PublicRosterLogState.objects.get_or_create(
+            pk=1,
+            defaults={"first_published_at": timezone.now()},
+        )
+    if state.started_at is None and registration_closed():
+        PublicRosterLogState.objects.filter(pk=1, started_at__isnull=True).update(
+            started_at=timezone.now(),
+        )
+        state.refresh_from_db()
+    return state
+
+
+def logging_enabled():
+    if IMPORT_IN_PROGRESS.get():
+        return False
+    state = log_state()
+    return bool(state and state.started_at and registration_closed())
+
+
+@receiver(post_save, sender=TabSettings)
+@receiver(post_save, sender=RegistrationConfig)
+def track_log_start(sender, instance, raw=False, **kwargs):
+    if raw:
+        return
+    if sender == RegistrationConfig or instance.key == "teams_public":
+        log_state()
+
+
+@receiver(post_save, sender=PublicRosterChange)
+@receiver(pre_delete, sender=PublicRosterChange)
+def invalidate_roster_history(**kwargs):
+    invalidate_public_teams_cache()
+    invalidate_public_judges_cache()
 
 
 def record(kind, message, involves_debaters=False):

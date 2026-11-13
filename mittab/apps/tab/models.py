@@ -1338,6 +1338,13 @@ class CheckIn(models.Model):
         ]
 
 
+class PublicRosterLogState(models.Model):
+    """The first publication starts the history clock, even without registration."""
+
+    first_published_at = models.DateTimeField()
+    started_at = models.DateTimeField(null=True, blank=True)
+
+
 class PublicRosterChange(models.Model):
     """A durable public message, independent of deleted roster objects."""
 

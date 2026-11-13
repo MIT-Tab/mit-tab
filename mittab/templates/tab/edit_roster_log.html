@@ -1,0 +1,22 @@
+{% extends "base/__wide.html" %}
+{% load bootstrap4 %}
+{% block title %}Edit Public Change Log Entry{% endblock %}
+{% block content %}
+<div class="col-12 col-lg-8">
+    <h1>Edit Public Change Log Entry</h1>
+    <p>This changes the public change log only. The audit log remains unchanged.</p>
+    <form method="post">
+        {% csrf_token %}
+        {% bootstrap_form form %}
+        <button class="btn btn-primary" type="submit" name="action" value="save">Save changes</button>
+        <a class="btn btn-outline-secondary" href="{% url 'manage_roster_log' %}">Cancel</a>
+    </form>
+    {% if perms.tab.delete_publicrosterchange %}
+    <hr>
+    <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-outline-danger" type="submit" name="action" value="delete">Delete this entry</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

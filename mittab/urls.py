@@ -18,12 +18,17 @@ import mittab.apps.tab.views.staff_invite_views as staff_invite_views
 import mittab.apps.tab.views.tournament_todo_views as tournament_todo_views
 import mittab.apps.tab.views.tournament_start_views as tournament_start_views
 import mittab.apps.tab.views.board_views as board_views
+import mittab.apps.tab.views.roster_log_views as roster_log_views
 import mittab.apps.registration.views as registration_views
 
 
 admin.autodiscover()
 
 urlpatterns = [
+    path("setup/public-change-log/", roster_log_views.manage_roster_log,
+         name="manage_roster_log"),
+    path("setup/public-change-log/<int:entry_id>/", roster_log_views.edit_roster_log,
+         name="edit_roster_log"),
     path("favicon.ico", public_views.favicon, name="favicon"),
     path("tournament-logo/", public_views.tournament_logo, name="tournament_logo"),
     path("admin/logout/", views.tab_logout, name="admin_logout"),

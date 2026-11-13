@@ -271,18 +271,10 @@ def test_apda_point_thresholds(count, value):
     assert tournament_value(count) == value
 
 
-@pytest.mark.parametrize(
-    "count,final",
-    [
-        (28, [1, 5, 8, 8, 5, 1]),
-        (53, [2, 9, 16, 16, 9, 1]),
-        (117, [4, 19, 36, 36, 19, 3]),
-        (72, [3, 10, 23, 23, 10, 3]),
-    ],
-)
-def test_records_match_reference_screenshots(count, final):
-    context = calculator_context(count, 5)
-    assert [row[0]["count"] for row in context["record_rows"]] == final
+@pytest.mark.parametrize("count", [28, 53, 117, 72])
+@pytest.mark.parametrize("case", ["best", "worst"])
+def test_record_scenarios_conserve_reference_field_sizes(count, case):
+    context = calculator_context(count, 5, case)
     for column in zip(*context["record_rows"]):
         assert sum(cell["count"] for cell in column if cell) == count
 

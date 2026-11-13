@@ -5,6 +5,7 @@ from django.db import DataError, IntegrityError, transaction
 from django.forms import ModelForm
 
 from mittab.apps.tab.models import AuditAttributionMixin, TabSettings
+from mittab.apps.tab.public_roster_log import suppress_public_roster_logging
 from mittab.libs.spreadsheets import (
     LAYOUTS,
     SpreadsheetError,
@@ -60,7 +61,7 @@ class WorkbookImporter(ABC):
                 self.workbook.configure(self.kind)
         except SpreadsheetError as exc:
             return [str(exc)]
-        with transaction.atomic():
+        with suppress_public_roster_logging(), transaction.atomic():
             for row_number, row in enumerate(self.workbook.rows()):
                 try:
                     with transaction.atomic():

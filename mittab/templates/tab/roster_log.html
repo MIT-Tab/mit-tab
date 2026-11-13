@@ -1,0 +1,40 @@
+{% extends "base/__wide.html" %}
+{% block title %}Public Change Log{% endblock %}
+{% block content %}
+<div class="col-12">
+    <h1>Public Change Log</h1>
+    <p>Edit or delete entries shown on the public team and judge lists. These changes do not modify the audit log.</p>
+    {% if logging_enabled %}
+    <p class="alert alert-success">Recording roster changes. Spreadsheet imports are excluded.</p>
+    {% elif state %}
+    <p class="alert alert-info">Recording will begin or resume when registration closes. Spreadsheet imports are excluded.</p>
+    {% else %}
+    <p class="alert alert-info">Recording begins when the teams list is first made public and registration is closed, if used.</p>
+    {% endif %}
+    <div class="btn-group mb-3" aria-label="Filter change log">
+        <a class="btn {% if not kind %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?">All entries</a>
+        <a class="btn {% if kind == 'teams' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?kind=teams">Teams</a>
+        <a class="btn {% if kind == 'judges' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?kind=judges">Judges</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead><tr><th>Date and time (EST)</th><th>List</th><th>Change</th><th></th></tr></thead>
+            <tbody>{% for entry in page %}
+            <tr>
+                <td class="text-nowrap">{{ entry.timestamp_est }}</td>
+                <td>{{ entry.get_list_kind_display }}</td>
+                <td>{{ entry.message }}{% if entry.involves_debaters %}<br><small class="text-muted">Hidden when debater names are private</small>{% endif %}</td>
+                <td><a class="btn btn-sm btn-outline-primary" href="{% url 'edit_roster_log' entry.pk %}">Edit or delete</a></td>
+            </tr>
+            {% empty %}<tr><td colspan="4">No entries.</td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    {% if page.has_other_pages %}
+    <nav aria-label="Change log pages">
+        {% if page.has_previous %}<a class="btn btn-outline-primary" href="?kind={{ kind }}&amp;page={{ page.previous_page_number }}">Previous</a>{% endif %}
+        <span class="mx-2">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a class="btn btn-outline-primary" href="?kind={{ kind }}&amp;page={{ page.next_page_number }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

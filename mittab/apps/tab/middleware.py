@@ -137,7 +137,8 @@ class Login:
         if not whitelisted and request.user.is_anonymous:
             if request.POST:
                 view = StaffLoginView.as_view()
-                return view(request)
+                response = view(request)
+                return response.render() if hasattr(response, "render") else response
             return redirect_and_flash_info(
                 request,
                 "You must be logged in to view that page",

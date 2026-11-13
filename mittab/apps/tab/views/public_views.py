@@ -284,9 +284,11 @@ def public_expected_records(request):
         checked_in = request.GET.get("teams") == "checked-in"
         teams = Team.objects.filter(checked_in=True) if checked_in else Team.objects.all()
         num_rounds = TabSettings.get("tot_rounds", 5)
+        case = "worst" if request.GET.get("case") == "worst" else "best"
         response = render(request, "public/expected_records.html", {
-            **calculator_context(teams.count(), num_rounds),
+            **calculator_context(teams.count(), num_rounds, case),
             "checked_in": checked_in, "num_rounds": num_rounds,
+            "case": case, "team_source": "checked-in" if checked_in else "total",
         })
     response["Cache-Control"] = "private, no-store"
     return response
