@@ -193,7 +193,9 @@ myst_enable_extensions = [
     "colon_fence",
 ]
 
-# Ignore bad random CI warning
+# External reference sites can reject automated CI requests.
 linkcheck_ignore = [
     r"https://www\.wikiwand\.com/en/articles/Blossom_algorithm",
+    # APDA Calc works for readers but returns HTTP 403 to CircleCI's link checker.
+    r"^https://apda\.online/calc/$",
 ]
