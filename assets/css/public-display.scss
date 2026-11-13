@@ -99,6 +99,16 @@
     }
   }
 
+  .public-roster-log {
+    min-width: 0;
+
+    thead { display: none; }
+    tbody, tr, td { display: block; width: 100%; }
+    tr { padding: 0.4rem; }
+    td { border: 0; }
+    td:first-child { font-weight: 600; }
+  }
+
   .public-table-root {
     flex: 0 0 calc(100% - 0.5rem);
     max-width: min(99vw, 1520px);
