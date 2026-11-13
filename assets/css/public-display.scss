@@ -67,6 +67,21 @@
   box-shadow: 0 14px 28px -26px rgba(var(--theme-color-rgb, 0, 67, 138), 0.28);
 }
 
+.public-roster-teams {
+  table-layout: auto;
+  min-width: 1000px;
+}
+
+.public-roster-log {
+  min-width: 680px;
+
+  th:first-child { width: 19rem; }
+}
+
+.public-records-table {
+  th, td { text-align: center; }
+}
+
 @media (max-width: 767.98px) {
   #container-main,
   .container-fluid {

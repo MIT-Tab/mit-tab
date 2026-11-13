@@ -8,6 +8,7 @@ from django.http import FileResponse
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_safe
 
 from mittab import settings
 from mittab.apps.tab import logo_utils
@@ -38,6 +39,8 @@ from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 from mittab.apps.tab.views.pairing_views import enter_result
 from mittab.apps.tab.tournament_staff import get_public_tournament_staff
+from mittab.apps.tab.public_roster_log import public_changes
+from mittab.apps.tab.tournament_calculator import calculator_context, tournament_value
 from mittab.libs.outround_tab_logic.checks import lost_teams
 from mittab.libs.bracket_display_logic import get_bracket_data_json
 from mittab.libs.cacheing.public_cache import cache_public_view
@@ -240,10 +243,14 @@ def public_view_judges(request):
         request,
         "public/judges.html",
         {
-            "judges": Judge.objects.order_by("name")
-            .prefetch_related("schools", "checkin_set", "expected_checkins")
-            .all(),
+            "judges": [
+                {"name": judge.name, "affiliations": judge.affiliations_display(),
+                 "availability": [judge.is_expected_for_round(number) for number in rounds]}
+                for judge in Judge.objects.only("id", "name").order_by("name")
+                .prefetch_related("schools", "expected_checkins")
+            ],
             "rounds": rounds,
+            "changes": public_changes("judges"),
         },
     )
 
@@ -261,8 +268,28 @@ def public_view_teams(request):
                      .order_by("-checked_in", "school__name")
                      .prefetch_related("debaters", "school", "hybrid_school")
                      .all(),
-            "num_checked_in": Team.objects.filter(checked_in=True).count()
+            "num_checked_in": Team.objects.filter(checked_in=True).count(),
+            "checked_in_points": tournament_value(Team.objects.filter(checked_in=True).count()),
+            "total_points": tournament_value(Team.objects.count()),
+            "changes": public_changes("teams"),
         })
+
+
+@require_safe
+def public_expected_records(request):
+    # Check visibility on every request, including after publication is revoked.
+    if not TabSettings.get("teams_public", 0):
+        response = redirect("public_access_error")
+    else:
+        checked_in = request.GET.get("teams") == "checked-in"
+        teams = Team.objects.filter(checked_in=True) if checked_in else Team.objects.all()
+        num_rounds = TabSettings.get("tot_rounds", 5)
+        response = render(request, "public/expected_records.html", {
+            **calculator_context(teams.count(), num_rounds),
+            "checked_in": checked_in, "num_rounds": num_rounds,
+        })
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @cache_public_view(timeout=60)
@@ -654,7 +681,10 @@ def _sync_judge_expected_checkins(judge, desired_rounds):
         for round_number in desired - existing
     ]
     if additions:
-        JudgeExpectedCheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+        for addition in additions:
+            JudgeExpectedCheckIn.objects.get_or_create(
+                judge=judge, round_number=addition.round_number,
+            )
     removals = existing - desired
     if removals:
         JudgeExpectedCheckIn.objects.filter(

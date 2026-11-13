@@ -507,6 +507,8 @@ urlpatterns = [
     path("public/teams/",
          public_views.public_view_teams,
          name="public_teams"),
+    path("public/teams/expected-records/", public_views.public_expected_records,
+         name="public_expected_records"),
     path("public/team-rankings/",
          public_views.rank_teams_public,
          name="rank_teams_public"),

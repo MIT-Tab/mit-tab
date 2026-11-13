@@ -120,3 +120,21 @@ The security suite has been exercised on isolated SQLite and MySQL 8.0.43,
 including direct-access attempts with additional staff and superuser privileges.
 External backup subprocesses were stubbed during these local runs to avoid
 contacting another tournament database. No dependency versions were changed.
+## Public roster history and expected records
+
+Public team and judge lists show a dedicated public roster change log, without
+reading private audit events. It records only additions/removals, team membership,
+debater/judge names and affiliations, team affiliations, and registered judge
+availability. Logging begins when new registrations are disabled or their closing
+deadline passes; a future opening date does not count as closure. Reopening pauses
+logging while preserving existing entries. No previous changes are backfilled.
+Team-name-only, seeding, novice status, check-in, calibration, scratch, and other
+private changes are excluded. Debater-related entries are hidden when debater
+names are private. Timestamps always use fixed EST (UTC-5), including in summer.
+
+Expected records are linked only from the public teams list, inherit its
+publication setting, and permit board GET/HEAD requests only. They use team counts
+and configured inround count; judge calibration, eligibility, and scratches cannot
+affect them. The judge list receives only public name, affiliation, and registered
+availability dictionaries. The calculator is an estimate based on APDA Calc; zero
+teams explicitly means zero points.

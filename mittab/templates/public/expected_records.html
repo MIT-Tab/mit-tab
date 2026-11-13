@@ -1,0 +1,44 @@
+{% extends "base/__wide.html" %}
+{% load render_bundle from webpack_loader %}
+{% block title %}Expected Records{% endblock %}
+{% block extra_head %}{% render_bundle 'publicDisplay' %}{% endblock %}
+{% block content %}
+<div class="col-12 public-table-root">
+    <h1>Expected Records</h1>
+    <div class="btn-group mb-3" role="group" aria-label="Teams to include">
+        <a class="btn {% if checked_in %}btn-primary{% else %}btn-outline-primary{% endif %}"
+           href="?teams=checked-in" {% if checked_in %}aria-current="true"{% endif %}>Checked in teams</a>
+        <a class="btn {% if not checked_in %}btn-primary{% else %}btn-outline-primary{% endif %}"
+           href="?teams=total" {% if not checked_in %}aria-current="true"{% endif %}>Total teams</a>
+    </div>
+    <p class="lead">{{ team_count }} {% if checked_in %}checked in{% else %}total{% endif %} teams · {{ num_rounds }} inrounds</p>
+    <h2>Tournament value: {{ value }} points</h2>
+    <p class="text-muted">Estimates based on <a href="https://apda.online/calc/">APDA Calc</a>, assuming evenly split brackets.</p>
+    <div class="row my-4">
+        <section class="col-6 mb-3" aria-labelledby="toty-heading">
+            <h2 id="toty-heading">TOTY Points</h2>
+            <table class="table table-sm"><thead><tr><th>Finish</th><th>Points</th></tr></thead><tbody>
+            {% for label, points in toty %}<tr><td>{{ label }}</td><td>{{ points|floatformat:"-2" }}</td></tr>
+            {% empty %}<tr><td colspan="2">No points for 0 teams.</td></tr>{% endfor %}
+            </tbody></table>
+        </section>
+        <section class="col-6 mb-3" aria-labelledby="soty-heading">
+            <h2 id="soty-heading">SOTY Points</h2>
+            <table class="table table-sm"><thead><tr><th>Place</th><th>Points</th></tr></thead><tbody>
+            {% for place, points in soty %}<tr><td>{{ place }}</td><td>{{ points|floatformat:"-2" }}</td></tr>
+            {% empty %}<tr><td colspan="2">No points for 0 teams.</td></tr>{% endfor %}
+            </tbody></table>
+        </section>
+    </div>
+    <h2>Expected records by round</h2>
+    <div class="public-table-wrap">
+        <table class="public_table public-records-table" style="min-width: {% widthratio num_rounds 1 72 %}px;">
+            <caption class="sr-only">Expected record followed by number of teams for each round.</caption>
+            <thead><tr>{% for number in round_numbers %}<th colspan="2" scope="colgroup">Round {{ number }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for row in record_rows %}<tr>{% for cell in row %}
+                <td>{{ cell.record }}</td><td>{{ cell.count }}</td>
+            {% endfor %}</tr>{% endfor %}</tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

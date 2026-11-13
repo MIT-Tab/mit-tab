@@ -624,7 +624,13 @@ def bulk_check_in(request):
     else:
         checkInObj, id_field = RoomCheckIn, "room_id"
 
-    if action == "check_in":
+    if action == "check_in" and entity_type == "judge_expected":
+        for entity_id in entity_ids:
+            for round_number in round_numbers:
+                JudgeExpectedCheckIn.objects.get_or_create(
+                    judge_id=entity_id, round_number=round_number,
+                )
+    elif action == "check_in":
         checkInObj.objects.bulk_create(
             [checkInObj(**{id_field: eid, "round_number": rn})
              for eid in entity_ids for rn in round_numbers],
