@@ -149,8 +149,5 @@ Change Log, including their fixed-EST timestamps. This changes no AuditEvent
 records. Board accounts cannot access either management route, including with
 additional staff or superuser privileges.
 
-The calculator's best/worst cases minimize/maximize the final number of teams
-with zero or one loss over all modeled pullup results, using one consistent
-sequence of round distributions for each table. This calculation uses no judge
-or scratch data. See [Public Rosters](Public-Rosters.md) for the start rules,
-editing workflow, and the mathematical distinction from fixed pullup winners.
+See [Public Rosters](Public-Rosters.md) for the start rules, editing workflow,
+and calculator behavior.

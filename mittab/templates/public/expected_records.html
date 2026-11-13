@@ -7,9 +7,9 @@
     <h1>Expected Records</h1>
     <div class="btn-group mb-3" role="group" aria-label="Teams to include">
         <a class="btn {% if checked_in %}btn-primary{% else %}btn-outline-primary{% endif %}"
-           href="?teams=checked-in&amp;case={{ case }}" {% if checked_in %}aria-current="true"{% endif %}>Checked in teams</a>
+           href="?teams=checked-in" {% if checked_in %}aria-current="true"{% endif %}>Checked in teams</a>
         <a class="btn {% if not checked_in %}btn-primary{% else %}btn-outline-primary{% endif %}"
-           href="?teams=total&amp;case={{ case }}" {% if not checked_in %}aria-current="true"{% endif %}>Total teams</a>
+           href="?teams=total" {% if not checked_in %}aria-current="true"{% endif %}>Total teams</a>
     </div>
     <p class="lead">{{ team_count }} {% if checked_in %}checked in{% else %}total{% endif %} teams · {{ num_rounds }} inrounds</p>
     <h2>Tournament value: {{ value }} points</h2>
@@ -31,15 +31,6 @@
         </section>
     </div>
     <h2>Expected records by round</h2>
-    <div class="btn-group mb-3" role="group" aria-label="Record scenario">
-        <a class="btn {% if case == 'best' %}btn-primary{% else %}btn-outline-primary{% endif %}"
-           href="?teams={{ team_source }}&amp;case=best" {% if case == 'best' %}aria-current="true"{% endif %}>Best case</a>
-        <a class="btn {% if case == 'worst' %}btn-primary{% else %}btn-outline-primary{% endif %}"
-           href="?teams={{ team_source }}&amp;case=worst" {% if case == 'worst' %}aria-current="true"{% endif %}>Worst case</a>
-    </div>
-    <p>{{ top_bracket_count }} teams finish with zero or one loss after {{ num_rounds }} rounds.
-        {% if case == 'best' %}This is the minimum{% else %}This is the maximum{% endif %} possible total over all pullup outcomes.</p>
-    <p class="text-muted">Each table shows one complete scenario. Teams pair within their record brackets with pullups as needed; an odd field receives one bye per round. Draws, forfeits, extra byes, and pairing restrictions are not modeled.</p>
     <div class="public-table-wrap">
         <table class="public_table public-records-table" style="min-width: {% widthratio num_rounds 1 72 %}px;">
             <caption class="sr-only">Expected record followed by number of teams for each round.</caption>

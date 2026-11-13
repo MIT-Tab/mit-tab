@@ -271,12 +271,29 @@ def test_apda_point_thresholds(count, value):
     assert tournament_value(count) == value
 
 
-@pytest.mark.parametrize("count", [28, 53, 117, 72])
-@pytest.mark.parametrize("case", ["best", "worst"])
-def test_record_scenarios_conserve_reference_field_sizes(count, case):
-    context = calculator_context(count, 5, case)
+@pytest.mark.parametrize(
+    "count,final",
+    [
+        (28, [1, 5, 8, 8, 5, 1]),
+        (53, [2, 9, 16, 16, 9, 1]),
+        (117, [4, 19, 36, 36, 19, 3]),
+        (72, [3, 10, 23, 23, 10, 3]),
+    ],
+)
+def test_records_match_reference_screenshots(count, final):
+    context = calculator_context(count, 5)
+    assert [row[0]["count"] for row in context["record_rows"]] == final
     for column in zip(*context["record_rows"]):
         assert sum(cell["count"] for cell in column if cell) == count
+
+
+def test_calculator_ignores_removed_scenario_parameters(client, roster):
+    response = client.get(reverse("public_expected_records"))
+    for case in ("best", "worst"):
+        previous_url = client.get(reverse("public_expected_records"), {"case": case})
+        assert previous_url.content == response.content
+    assert b"Best case" not in response.content
+    assert b"Worst case" not in response.content
 
 
 def test_awards_match_reference():
