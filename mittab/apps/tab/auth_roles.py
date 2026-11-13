@@ -11,7 +11,7 @@ APDA_BOARD_GROUP_NAME = "APDA Board"
 APDA_BOARD_ALLOWED_VIEWS = {
     name: {"GET", "HEAD"} for name in (
         "index", "403", "404", "500", "public_home", "pretty_pair",
-        "missing_ballots", "public_judges", "public_teams", "rank_teams_public",
+        "missing_ballots", "public_judges", "public_teams", "public_expected_records", "rank_teams_public",
         "public_speaker_rankings", "public_ballots", "outround_pretty_pair",
         "public_motions", "favicon", "tournament_logo", "js18", "forum_post",
         "all_tab_cards", "tab_card", "pretty_tab_card", "download_black_rod_bundle",
@@ -194,7 +194,7 @@ PUBLIC_TOURNAMENT_VIEWS = {
     "public_home", "public_access_error", "pretty_pair", "previous_pretty_pair",
     "missing_ballots", "e_ballot_search", "judge_portal", "enter_e_ballot",
     "view_submitted_ballot", "view_submitted_ballot_round", "previous_ballots",
-    "public_judges", "public_teams", "rank_teams_public", "public_speaker_rankings",
+    "public_judges", "public_teams", "public_expected_records", "rank_teams_public", "public_speaker_rankings",
     "public_ballots", "outround_pretty_pair", "public_motions",
     "team_portal_search", "team_portal", "public_tab_cards",
 }

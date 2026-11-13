@@ -120,3 +120,34 @@ The security suite has been exercised on isolated SQLite and MySQL 8.0.43,
 including direct-access attempts with additional staff and superuser privileges.
 External backup subprocesses were stubbed during these local runs to avoid
 contacting another tournament database. No dependency versions were changed.
+
+## Public roster history and expected records
+
+Public team and judge lists show a dedicated public roster change log, without
+reading private audit events. It records only additions/removals, team membership,
+debater/judge names and affiliations, team affiliations, and registered judge
+availability. Logging requires the first publication of the teams list and the
+closure of registration, if used. Without registration, first publication starts
+logging. A future opening date does not count as closure. Reopening registration
+pauses logging while preserving existing entries; hiding and republishing the
+list does not reset its first publication. No previous changes are backfilled.
+Spreadsheet/bulk imports are excluded from public history, including their nested
+model and relationship changes, without changing private audit behavior.
+Team-name-only, seeding, novice status, check-in, calibration, scratch, and other
+private changes are excluded. Debater-related entries are hidden when debater
+names are private. Timestamps always use fixed EST (UTC-5), including in summer.
+
+Expected records are linked only from the public teams list, inherit its
+publication setting, and permit board GET/HEAD requests only. They use team counts
+and configured inround count; judge calibration, eligibility, and scratches cannot
+affect them. The judge list receives only public name, affiliation, and registered
+availability dictionaries. The calculator is an estimate based on APDA Calc; zero
+teams explicitly means zero points.
+
+Full tournament admins can edit or delete public entries via Setup → Public
+Change Log, including their fixed-EST timestamps. This changes no AuditEvent
+records. Board accounts cannot access either management route, including with
+additional staff or superuser privileges.
+
+See [Public Rosters](Public-Rosters.md) for the start rules, editing workflow,
+and calculator behavior.

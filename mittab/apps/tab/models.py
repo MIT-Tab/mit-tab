@@ -1,4 +1,5 @@
 import random
+from datetime import timedelta, timezone as datetime_timezone
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -254,6 +255,10 @@ class TabSettings(models.Model):
             "publish_tab_cards_with_first_outround",
             "var_teams_visible",
             "nov_teams_visible",
+            "teams_public",
+            "judges_public",
+            "debaters_public",
+            "tot_rounds",
         }:
             invalidate_all_public_caches()
 
@@ -651,6 +656,12 @@ class Team(AuditAttributionMixin):
         if debaters_public:
             return ", ".join([debater.name for debater in self.debaters.all()])
         return ""
+
+    def novice_status_display(self):
+        statuses = {debater.novice_status for debater in self.debaters.all()}
+        return " / ".join(
+            label for value, label in Debater.NOVICE_CHOICES if value in statuses
+        ) or "—"
 
     class Meta:
         ordering = ["pk"]
@@ -1325,6 +1336,32 @@ class CheckIn(models.Model):
                 name="unique_judge_checkin_per_round",
             )
         ]
+
+
+class PublicRosterLogState(models.Model):
+    """The first publication starts the history clock, even without registration."""
+
+    first_published_at = models.DateTimeField()
+    started_at = models.DateTimeField(null=True, blank=True)
+
+
+class PublicRosterChange(models.Model):
+    """A durable public message, independent of deleted roster objects."""
+
+    list_kind = models.CharField(max_length=6, choices=(("teams", "Teams"), ("judges", "Judges")))
+    message = models.TextField()
+    involves_debaters = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+
+    @property
+    def timestamp_est(self):
+        # Explicit fixed UTC-5, including during daylight saving time.
+        return self.created_at.astimezone(datetime_timezone(timedelta(hours=-5))).strftime(
+            "%B %-d, %Y, %-I:%M %p EST"
+        )
 
 
 class JudgeExpectedCheckIn(models.Model):

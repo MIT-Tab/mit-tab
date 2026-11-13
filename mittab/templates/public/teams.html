@@ -11,16 +11,22 @@
         <div id="scrollPage" class="hidden"></div>
 
             <h1>Team List</h1>
-            <h3>({{ num_checked_in }} of {{ teams|length }} teams checked in)</h3>
+            <p class="lead">{{ num_checked_in }} of {{ teams|length }} teams checked in.
+                {{ num_checked_in }} teams =&gt; {{ checked_in_points }} points,
+                {{ teams|length }} teams =&gt; {{ total_points }} points.
+                <a href="{% url 'public_expected_records' %}">See expected records</a>
+            </p>
             <div class="public-table-wrap">
-            <table class="public_table">
+            <table class="public_table public-roster-teams">
                 <thead>
                 <tr>
-                    <th style="width: 20%;">Team Name</th>
-                    <th style="width: 20%;">School</th>
-                    <th style="width: 15%;">Hybrid School</th>
-                    <th style="width: 25%;">Debaters</th>
-                    <th style="width: 15%;">Checked In</th>
+                    <th>Team Name</th>
+                    <th>School</th>
+                    <th>Hybrid School</th>
+                    <th>Debaters</th>
+                    <th>Checked In</th>
+                    <th>Novice / Varsity</th>
+                    <th>Seeding</th>
                 </tr>
             </thead>
             <tbody>
@@ -31,11 +37,14 @@
 				<td>{{ team.hybrid_school.name }}</td>
 				<td>{{ team.debaters_display }}</td>
 				<td>{{ team.checked_in|yesno:"Yes,No" }}</td>
+                <td>{{ team.novice_status_display }}</td>
+                <td>{{ team.get_seed_display }}</td>
 			</tr>
 			{% endfor %}
             </tbody>
 		</table>
             </div>
+            {% include "public/_roster_changes.html" %}
 
         <div class="public_footer_spacer"></div>
 

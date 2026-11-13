@@ -19,6 +19,7 @@ Outrounds
 Live-Results
 results-import-api
 Board-Access
+Public-Rosters
 Email-Management
 Advanced-Topics
 CI-performance

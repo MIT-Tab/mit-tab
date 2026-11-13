@@ -8,3 +8,4 @@ class TabConfig(AppConfig):
 
     def ready(self):
         import mittab.apps.tab.signals  # noqa: F401
+        import mittab.apps.tab.public_roster_log  # noqa: F401

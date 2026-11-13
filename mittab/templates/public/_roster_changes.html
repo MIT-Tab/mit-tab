@@ -1,0 +1,16 @@
+<section class="mt-4" aria-labelledby="change-log-heading">
+    <h2 id="change-log-heading">Change log</h2>
+    <p class="text-muted">Roster changes after the teams list is first published and registration closes, if used. All times are EST (UTC−5).</p>
+    <div class="public-table-wrap">
+        <table class="public_table public-roster-log">
+            <thead><tr><th scope="col">Date and time (EST)</th><th scope="col">Change</th></tr></thead>
+            <tbody>
+                {% for change in changes %}
+                <tr><td class="text-nowrap">{{ change.timestamp_est }}</td><td>{{ change.message }}</td></tr>
+                {% empty %}
+                <tr><td colspan="2">No changes logged.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>

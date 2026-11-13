@@ -153,7 +153,10 @@ def sync_judge_expected_checkins(judge, desired_rounds):
     ]
     removals = existing - desired
     if additions:
-        JudgeExpectedCheckIn.objects.bulk_create(additions, ignore_conflicts=True)
+        for addition in additions:
+            JudgeExpectedCheckIn.objects.get_or_create(
+                judge=judge, round_number=addition.round_number,
+            )
     if removals:
         JudgeExpectedCheckIn.objects.filter(
             judge=judge,
