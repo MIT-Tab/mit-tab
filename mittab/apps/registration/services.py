@@ -671,7 +671,7 @@ def save_registration(
     saved_judge_ids = []
     registration_judge_emails = []
     for form in judge_formset:
-        if form.cleaned_data.get("DELETE"):
+        if not form.cleaned_data or form.cleaned_data.get("DELETE"):
             continue
         payload = form.get_payload()
         judge = Judge.objects.filter(

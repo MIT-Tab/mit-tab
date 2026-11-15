@@ -214,6 +214,20 @@ def registration_payload(school, school_name, email, teams, judges):
     return data
 
 
+@pytest.mark.django_db
+@mock.patch("mittab.apps.registration.emails.EmailService")
+def test_registration_skips_empty_extra_judge_row(email_service, client):
+    email_service.return_value.send_bulk.return_value = 1
+    judges = [judge_entry(0, "Test Judge", "judge@example.com", 0), {}]
+    data = registration_payload("apda:50", "Test School", "tab@example.com", [], judges)
+
+    response = client.post("/registration/", data=data)
+
+    assert response.status_code == 302
+    registration = Registration.objects.get()
+    assert list(registration.judges.values_list("name", flat=True)) == ["Test Judge"]
+
+
 @override_settings(
     BLACK_ROD_API_BASE_URL="https://black-rod.test",
     BLACK_ROD_PRIVATE_API_TOKEN="private-token",
