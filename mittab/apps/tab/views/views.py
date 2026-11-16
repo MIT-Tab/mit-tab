@@ -723,23 +723,36 @@ def get_settings_from_yaml():
 ### SETTINGS VIEWS ###
 
 
+def _tab_settings_form(data, registration_config):
+    yaml_settings, setting_dict, categories = get_settings_from_yaml()
+    form = SettingsForm(
+        data, settings=yaml_settings,
+        disc_scratches_open=bool(registration_config and registration_config.disc_scratches_open),
+    )
+    return form, setting_dict, categories
+
+
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def settings_form(request):
-    yaml_settings, setting_dict, categories = get_settings_from_yaml()
+    from mittab.apps.registration.models import RegistrationConfig
 
     if request.method == "POST":
-        form = SettingsForm(request.POST, settings=yaml_settings)
-
-        if form.is_valid():
-            form.save()
-            invalidate_all_public_caches()
-            return redirect_and_flash_success(
-                request,
-                "Tab settings updated!",
-                path=reverse("settings_form")
-            )
+        config = RegistrationConfig.get_or_create_active()
+        with transaction.atomic():
+            config = RegistrationConfig.objects.select_for_update().get(pk=config.pk)
+            form, setting_dict, categories = _tab_settings_form(request.POST, config)
+            if form.is_valid():
+                form.save()
+                transaction.on_commit(invalidate_all_public_caches)
+                return redirect_and_flash_success(
+                    request,
+                    "Tab settings updated!",
+                    path=reverse("settings_form")
+                )
     else:
-        form = SettingsForm(settings=yaml_settings)
+        form, setting_dict, categories = _tab_settings_form(
+            None, RegistrationConfig.get_active(),
+        )
 
     categories_with_fields = [
         {

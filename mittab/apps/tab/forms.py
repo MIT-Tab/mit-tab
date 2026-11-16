@@ -687,6 +687,7 @@ class EBallotForm(ResultEntryForm):
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):
         settings_to_import = kwargs.pop("settings")
+        disc_scratches_open = kwargs.pop("disc_scratches_open", False)
         self.settings = settings_to_import
 
         super(SettingsForm, self).__init__(*args, **kwargs)
@@ -778,11 +779,17 @@ class SettingsForm(forms.Form):
                     })
                 )
 
+        judge_list = self.fields.get("setting_judges_public")
+        if judge_list and disc_scratches_open:
+            judge_list.disabled = True
+            judge_list.help_text = "Close disc scratches before hiding the judge list."
+
     def save(self):
         for setting in self.settings:
             field = f"setting_{setting['name']}"
-            if (field not in self.changed_data and
-                    setting.get("persisted", True)):
+            if self.fields[field].disabled or (
+                field not in self.changed_data and setting.get("persisted", True)
+            ):
                 continue
 
             key = setting["name"]

@@ -9,7 +9,7 @@ from mittab.apps.registration.models import (
     RegistrationConfig,
     RegistrationLink,
 )
-from mittab.apps.tab.models import Debater, Judge, Scratch, Team
+from mittab.apps.tab.models import Debater, Judge, Scratch, TabSettings, Team
 
 DEBATER_PREFIXES = ("debater_one", "debater_two")
 
@@ -552,6 +552,9 @@ class RegistrationSettingsForm(forms.Form):
         help_text="Controls whether teams can submit or edit discretionary scratches.",
         widget=forms.CheckboxInput(attrs={"class": "custom-control-input"}),
     )
+    confirm_judge_list_publication = forms.BooleanField(
+        required=False, widget=forms.HiddenInput,
+    )
     disc_scratch_quantity = forms.IntegerField(
         label="Disc Scratch Quantity",
         min_value=0,
@@ -565,6 +568,9 @@ class RegistrationSettingsForm(forms.Form):
 
     def __init__(self, *args, config=None, **kwargs):
         self.config = config or RegistrationConfig.get_or_create_active()
+        self.judge_list_is_public = bool(
+            TabSettings.get("judges_public", 0, use_cache=False)
+        )
         initial = {
             "allow_new_registrations": self.config.allow_new_registrations,
             "allow_registration_edits": self.config.allow_registration_edits,
@@ -582,6 +588,15 @@ class RegistrationSettingsForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        if (
+            cleaned_data.get("disc_scratches_open")
+            and not self.judge_list_is_public
+            and not cleaned_data.get("confirm_judge_list_publication")
+        ):
+            self.add_error(
+                "disc_scratches_open",
+                "Confirm publication of the judge list to open disc scratches.",
+            )
         windows = (
             ("new_registrations_open_at", "new_registrations_close_at"),
             ("registration_edits_open_at", "registration_edits_close_at"),
@@ -628,6 +643,8 @@ class RegistrationSettingsForm(forms.Form):
         self.config.disc_scratch_quantity = self.cleaned_data[
             "disc_scratch_quantity"
         ]
+        if self.config.disc_scratches_open and not self.judge_list_is_public:
+            TabSettings.set("judges_public", 1)
         self.config.save()
         return self.config
 

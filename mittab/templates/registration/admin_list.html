@@ -18,7 +18,9 @@
         <a class="btn btn-primary" href="{% url 'registration_portal' %}">Open Portal</a>
     </div>
 
-    <form method="post" class="registration-admin__settings">
+    <form method="post" id="registration-settings" class="registration-admin__settings"
+          data-judge-list-public="{{ form.judge_list_is_public|yesno:'true,false' }}">
+        {{ form.confirm_judge_list_publication }}
         {% csrf_token %}
         <div class="registration-admin__settings-head">
             <div>
@@ -87,6 +89,7 @@
                 <label class="custom-control-label" for="{{ form.disc_scratches_open.id_for_label }}">
                     Disc Scratches Open
                 </label>
+                <div class="registration-field__error">{{ form.disc_scratches_open.errors }}</div>
             </div>
             <div class="form-inline">
                 <label class="mr-2 mb-0" for="{{ form.disc_scratch_quantity.id_for_label }}">
@@ -265,4 +268,20 @@
         {% endif %}
     </div>
 </div>
+<script>
+    const registrationSettings = document.getElementById("registration-settings");
+    registrationSettings.addEventListener("submit", function (event) {
+        const confirmation = registrationSettings.elements.confirm_judge_list_publication;
+        confirmation.value = "";
+        if (registrationSettings.dataset.judgeListPublic === "true" ||
+            !registrationSettings.elements.disc_scratches_open.checked) {
+            return;
+        }
+        if (window.confirm("The judge list must be public to open disc scratches. Publish the judge list now?")) {
+            confirmation.value = "true";
+        } else {
+            event.preventDefault();
+        }
+    });
+</script>
 {% endblock %}

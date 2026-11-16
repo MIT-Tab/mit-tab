@@ -4,7 +4,7 @@ from datetime import timedelta, timezone as datetime_timezone
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.core.validators import (
     MaxLengthValidator,
@@ -185,7 +185,7 @@ class TabSettings(models.Model):
         return f"{self.key} => {display_value}"
 
     @classmethod
-    def get(cls, key, default=_TABSETTING_MISSING):
+    def get(cls, key, default=_TABSETTING_MISSING, *, use_cache=True):
         def safe_get():
             setting = cls.objects.filter(key=key).first()
             if setting is not None:
@@ -193,10 +193,9 @@ class TabSettings(models.Model):
                         is not None else setting.value)
             return None
 
-        result = cache_logic.cache_fxn_key(
-            safe_get,
-            f"tab_settings_{key}",
-            cache_logic.PERSISTENT,
+        result = (
+            cache_logic.cache_fxn_key(safe_get, f"tab_settings_{key}", cache_logic.PERSISTENT)
+            if use_cache else safe_get()
         )
         if result is None and default is _TABSETTING_MISSING:
             raise ValueError(f"No TabSetting with key '{key}'")
@@ -249,6 +248,12 @@ class TabSettings(models.Model):
             cache_logic.invalidate_cache("speaker_rankings")
         super(TabSettings, self).save(force_insert, force_update, using, update_fields)
         self._invalidate_publication_caches()
+        if self.key == "judges_public":
+            # A request during the transaction may have cached the old value.
+            transaction.on_commit(
+                lambda: cache_logic.invalidate_cache("tab_settings_judges_public", cache_logic.PERSISTENT),
+                using=self._state.db,
+            )
 
     def _invalidate_publication_caches(self):
         if self.key in {

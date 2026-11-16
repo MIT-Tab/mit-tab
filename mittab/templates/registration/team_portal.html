@@ -71,16 +71,16 @@
     <div class="registration-admin__panel-head">
       <div>
         <h6 class="registration-admin__panel-title mb-2">Disc Scratches</h6>
-        {% if scratches %}
+        {% if judge_list_is_public and scratches %}
         <p class="mb-0">
           Scratched judges:
           {% for scratch in scratches %}<strong>{{ scratch.judge.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}
         </p>
-        {% else %}
+        {% elif judge_list_is_public %}
         <p class="text-muted small mb-0">No disc scratches submitted.</p>
         {% endif %}
       </div>
-      {% if config.disc_scratches_open and config.disc_scratch_quantity and not edits_locked_by_pairings %}
+      {% if scratch_form is not None %}
       <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#disc-scratch-modal">
         {% if scratches %}Edit Disc Scratches{% else %}Add Disc Scratches{% endif %}
       </button>
@@ -90,7 +90,7 @@
     <p class="text-muted small mb-0 mt-2">
       Disc scratch edits are auto-disabled once round 1 has been paired. Please contact the tab room if you need to make a change.
     </p>
-    {% elif not config.disc_scratches_open %}
+    {% elif not disc_scratches_open %}
     <p class="text-muted small mb-0 mt-2">Disc scratches are currently closed.</p>
     {% elif not config.disc_scratch_quantity %}
     <p class="text-muted small mb-0 mt-2">No disc scratches are available for this tournament.</p>
@@ -144,7 +144,7 @@
   {% endif %}
 </div>
 
-{% if config.disc_scratches_open and config.disc_scratch_quantity and not edits_locked_by_pairings %}
+{% if scratch_form is not None %}
 <div class="modal fade registration-modal" id="disc-scratch-modal" tabindex="-1" role="dialog" aria-labelledby="disc-scratch-modal-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
     <div class="modal-content">
