@@ -61,7 +61,8 @@
                                                data-toggle-label="true"
                                                data-label-on="Enabled"
                                                data-label-off="Disabled"
-                                               {% if field.value %}checked{% endif %}>
+                                               {% if field.value %}checked{% endif %}
+                                               {% if field.field.disabled %}disabled aria-describedby="{{ field.id_for_label }}_note"{% endif %}>
                                         <label class="custom-control-label" for="{{ field.id_for_label }}">
                                             {% if field.value %}Enabled{% else %}Disabled{% endif %}
                                         </label>
@@ -70,6 +71,9 @@
                                     {{ field }}
                                 {% endif %}
                                 
+                                {% if field.field.disabled %}
+                                    <small id="{{ field.id_for_label }}_note" class="form-text text-muted">{{ field.help_text }}</small>
+                                {% endif %}
                                 {% if field.errors %}
                                     <div class="invalid-feedback d-block">{{ field.errors }}</div>
                                 {% endif %}

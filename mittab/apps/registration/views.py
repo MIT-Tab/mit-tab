@@ -429,18 +429,21 @@ def registration_admin(request):
             path=reverse("registration_admin"),
         )
 
-    form = RegistrationSettingsForm(
-        request.POST or None,
-        config=config,
-    )
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        invalidate_all_public_caches()
-        return redirect_and_flash_success(
-            request,
-            "Registration settings updated!",
-            path=reverse("registration_admin"),
-        )
+    if request.method == "POST":
+        # Serialize this change with edits to the judge list visibility.
+        with transaction.atomic():
+            config = RegistrationConfig.objects.select_for_update().get(pk=config.pk)
+            form = RegistrationSettingsForm(request.POST, config=config)
+            if form.is_valid():
+                form.save()
+                transaction.on_commit(invalidate_all_public_caches)
+                return redirect_and_flash_success(
+                    request,
+                    "Registration settings updated!",
+                    path=reverse("registration_admin"),
+                )
+    else:
+        form = RegistrationSettingsForm(config=config)
 
     registrations = (
         Registration.objects.select_related("school")
@@ -687,10 +690,19 @@ def team_portal(request, team_code):
     config = RegistrationConfig.get_or_create_active()
     edits_locked_by_pairings = _edits_locked_by_pairings()
     name_form = TeamNameChangeForm(team=team)
-    scratch_form = TeamPortalScratchForm(
-        team=team,
-        quantity=config.disc_scratch_quantity,
+    judge_list_is_public = bool(TabSettings.get("judges_public", 0, use_cache=False))
+    disc_scratches_open = config.disc_scratches_open and judge_list_is_public
+    can_edit_scratches = (
+        disc_scratches_open and config.disc_scratch_quantity
+        and not edits_locked_by_pairings
     )
+    scratch_form = None
+    if can_edit_scratches:
+        scratch_form = TeamPortalScratchForm(
+            request.POST if request.POST.get("action") == "update_scratches" else None,
+            team=team,
+            quantity=config.disc_scratch_quantity,
+        )
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -709,16 +721,7 @@ def team_portal(request, team_code):
                     path=reverse("team_portal", args=[team.team_code]),
                 )
         elif action == "update_scratches":
-            scratch_form = TeamPortalScratchForm(
-                request.POST,
-                team=team,
-                quantity=config.disc_scratch_quantity,
-            )
-            if edits_locked_by_pairings:
-                scratch_form.add_error(None, EDITS_LOCKED_MESSAGE)
-            elif not config.disc_scratches_open:
-                scratch_form.add_error(None, "Disc scratches are currently closed.")
-            elif scratch_form.is_valid():
+            if scratch_form is not None and scratch_form.is_valid():
                 with transaction.atomic():
                     scratch_form.save()
                 invalidate_all_public_caches()
@@ -734,6 +737,7 @@ def team_portal(request, team_code):
         Scratch.objects.filter(team=team, scratch_type=Scratch.TEAM_SCRATCH)
         .select_related("judge")
         .order_by("judge__name")
+        if judge_list_is_public else ()
     )
     return render(
         request,
@@ -743,6 +747,8 @@ def team_portal(request, team_code):
             "config": config,
             "name_form": name_form,
             "scratch_form": scratch_form,
+            "disc_scratches_open": disc_scratches_open,
+            "judge_list_is_public": judge_list_is_public,
             "scratches": scratches,
             "edits_locked_by_pairings": edits_locked_by_pairings,
             "team_round_history": _team_round_history(team),

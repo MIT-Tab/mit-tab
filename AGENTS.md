@@ -3,6 +3,7 @@
 - Dependency updates and additions must choose direct Python/NPM dependency versions released at least 30 days ago and no more than 913 days ago. The dependency age check runs as its own lint-step check, blocks new or changed direct dependency versions outside that window, and leaves pre-existing out-of-window versions as warnings.
 - Read failing CI with `gh pr list -R MIT-Tab/mit-tab --json number,title,statusCheckRollup` and CircleCI build logs from the failing `targetUrl`, e.g. `curl -fsSL https://circleci.com/api/v1.1/project/github/MIT-Tab/mit-tab/<build_num>`.
 - For every implementation task, read and follow `.agents/skills/mittab-task/SKILL.md` before changing files. Use this repo copy even if an older user-level `mittab-task` skill is installed.
+- When the user starts a chat by asking you to implement a feature or fix a bug, treat that request as authorization to push a branch and open a pull request. Open the PR as part of the task unless the user asks to keep the work local or says otherwise.
 - Never manually poll CI. Use the skill's CI watcher once, with the agent's background completion mechanism, then end the turn. See the skill for Codex and Claude instructions.
 - `docs/` is public-facing guidance for using the platform during a tournament. Add documentation there only when tournament directors need to understand a feature or take action. Keep internal architecture, storage design, and migration details in PR descriptions. Automatic fixes that require no action from tournament directors do not need public documentation.
 

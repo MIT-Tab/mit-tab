@@ -24,6 +24,7 @@ from mittab.apps.tab.models import (
     JudgeExpectedCheckIn,
     School,
     Scratch,
+    TabSettings,
     Team,
 )
 
@@ -872,6 +873,7 @@ def test_registration_does_not_update_unrelated_debater_id(email_service, client
 
 @pytest.mark.django_db
 def test_team_portal_updates_team_name_and_disc_scratches(client):
+    TabSettings.set("judges_public", 1)
     config = RegistrationConfig.get_or_create_active()
     config.team_name_changes_allowed = True
     config.disc_scratches_open = True

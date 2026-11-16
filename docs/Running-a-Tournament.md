@@ -271,6 +271,8 @@ The judges list can be made publicly visible by checking the `judges_public` set
 - School affiliations
 - Check-in status for each round
 
+When you open disc scratches in Registration Admin, MIT-Tab asks you to publish the judge list if it is still hidden. Close disc scratches before hiding the judge list in Tab Settings.
+
 ## Batch Check-in
 
 MIT-Tab provides a batch check-in interface (navigate to Admin > Batch Check In) that allows you to check in or out teams, judges, and rooms for multiple rounds at once. This is significantly faster than checking in entities individually and is useful for managing availability across the entire tournament.
