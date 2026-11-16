@@ -111,7 +111,8 @@ class RegistrationForm(ValueMixin, forms.Form):
         if current and current not in choice_values:
             label = self._current_value("school_name") or "Selected School"
             choices = [(current, label)] + choices
-        final = [("", "Select school")] + choices
+        final = [("", "Select school"),
+                 *sorted(choices, key=lambda choice: choice[1].casefold())]
         self.fields["school"].widget = forms.Select(choices=final)
         self.choice_map = dict(choices)
         self.fields["school"].widget.attrs.update(
@@ -316,7 +317,10 @@ class TeamForm(ValueMixin, forms.Form):
                 or self.choice_map.get(current)
                 or "Selected School"
             )
-            choices_list.insert(1, (current, label))
+            choices_list.append((current, label))
+            choices_list[1:] = sorted(
+                choices_list[1:], key=lambda choice: choice[1].casefold()
+            )
         # Don't add "Add New School" option - we have a dedicated form for that
         field.widget = forms.Select(choices=choices_list)
         field.widget.attrs.update(
@@ -420,7 +424,9 @@ class JudgeForm(forms.Form):
                 seen.add(value)
         self.choice_map = dict(choices)
         self.label_map = {**label_map, **self.choice_map}
-        self.fields["schools"].choices = choices
+        self.fields["schools"].choices = sorted(
+            choices, key=lambda choice: choice[1].casefold()
+        )
 
     def _build_availability_fields(self):
         outround = self.round_config.get("outround")

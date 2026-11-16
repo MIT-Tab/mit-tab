@@ -738,8 +738,8 @@ def alternative_judges(request, round_id, judge_id=None):
         for j in eligible_included
     ]
 
-    included_judges = sorted(included_judges, key=lambda x: -x[2])
-    excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+    included_judges = sorted(included_judges, key=lambda x: (x[0].casefold(), x[1]))
+    excluded_judges = sorted(excluded_judges, key=lambda x: (x[0].casefold(), x[1]))
     is_outround = True
 
     context = {
@@ -786,8 +786,8 @@ def alternative_teams(request, round_id, current_team_id, position):
         "current_team_id": current_team_id,
         "round_id": round_id,
         "breaking_teams_by_type": breaking_teams_by_type,
-        "excluded_teams": excluded_teams,
-        "included_teams": included_teams,
+        "excluded_teams": excluded_teams.order_by("name", "id"),
+        "included_teams": included_teams.order_by("name", "id"),
         "position": position,
         "is_outround": True,
     }
@@ -1089,7 +1089,7 @@ def alternative_rooms(request, round_id, current_room_id=None):
             .exclude(id=round_obj.id)
             .filter(room_id=OuterRef("id"))
         )
-    ).order_by("-rank").prefetch_related("tags")
+    ).order_by("name", "id").prefetch_related("tags")
 
     viable_rooms = [
         room for room in rooms
