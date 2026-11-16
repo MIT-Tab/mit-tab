@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
+from django.utils.crypto import get_random_string
 
 from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
 from mittab.apps.registration.models import InfoText
@@ -26,13 +27,13 @@ class Command(BaseCommand):
             dest="tab_password",
             help="Password for the tab user",
             nargs="?",
-            default=USER_MODEL.objects.make_random_password(length=8))
+            default=get_random_string(length=8))
         parser.add_argument(
             "--entry-password",
             dest="entry_password",
             help="Password for the entry user",
             nargs="?",
-            default=USER_MODEL.objects.make_random_password(length=8))
+            default=get_random_string(length=8))
         parser.add_argument(
             "--apda-board-password",
             dest="apda_board_password",
@@ -57,7 +58,7 @@ class Command(BaseCommand):
         apda_board_password = (
             options.get("apda_board_password")
             or os.environ.get("BOARD_PASSWORD")
-            or USER_MODEL.objects.make_random_password(length=16)
+            or get_random_string(length=16)
         )
 
         if options["skip_backups"]:
