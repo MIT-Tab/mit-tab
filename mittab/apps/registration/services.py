@@ -124,7 +124,7 @@ def build_school_choices():
             value = f"pk:{school.pk}"
         add_choice(value, school.name)
 
-    return results
+    return sorted(results, key=lambda choice: choice[1].casefold())
 
 
 def get_round_config():

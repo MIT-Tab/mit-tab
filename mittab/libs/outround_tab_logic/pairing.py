@@ -228,6 +228,7 @@ def get_challenge_setup_context(type_of_break, num_teams):
         for entry in pending
         if not next_challenger or entry.team.id != next_challenger.team.id
     ]
+    opponent_options.sort(key=lambda option: (option["name"].casefold(), option["id"]))
     automatic_pair = (
         [team_option(entry) for entry in pending]
         if len(pending) == 2

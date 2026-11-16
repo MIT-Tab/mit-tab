@@ -57,13 +57,14 @@ const setPlaceholder = ($select, message, disabled = true) => {
   $select.prop("disabled", disabled);
 };
 
-const insertAtTop = ($select, option) => {
-  const $first = $select.children("option").first();
-  if ($first.length && !$first.val()) {
-    $first.after(option);
-  } else {
-    $select.prepend(option);
-  }
+const compareNames = (first, second) =>
+  first.localeCompare(second, undefined, { sensitivity: "base" });
+
+const insertAlphabetically = ($select, option) => {
+  const next = Array.from($select[0].options).find(
+    (other) => other.value && compareNames(option.text, other.text) < 0,
+  );
+  $select[0].insertBefore(option, next || null);
 };
 
 const getCsrfToken = () =>
@@ -222,8 +223,12 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
     ? document.getElementById(apdaTarget)?.value || ""
     : "";
   $select.empty().append('<option value="">Select a debater</option>');
-  entries.forEach((entry) => {
-    const name = entry.name || entry.full_name || "";
+  const entryName = (entry) => entry.name || entry.full_name || "";
+  const sortedEntries = [...entries].sort((a, b) =>
+    compareNames(entryName(a), entryName(b)),
+  );
+  sortedEntries.forEach((entry) => {
+    const name = entryName(entry);
     const option = document.createElement("option");
     option.value = name.startsWith("custom:") ? name : name;
     option.textContent = name;
@@ -243,7 +248,7 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
       option.value = debater.name;
       option.textContent = debater.name;
       option.dataset.debater = JSON.stringify(debater);
-      insertAtTop($select, option);
+      insertAlphabetically($select, option);
     });
   }
   if (
@@ -260,7 +265,7 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
       name: currentValue,
       novice_status: noviceValue,
     });
-    insertAtTop($select, option);
+    insertAlphabetically($select, option);
   }
   const restoredValue = $select.find(`option[value="${currentValue}"]`).length
     ? currentValue
@@ -290,7 +295,7 @@ const broadcastCustomDebater = (schoolValue, debater) => {
     option.value = debater.name;
     option.textContent = debater.name;
     option.dataset.debater = JSON.stringify(debater);
-    insertAtTop($debaterSelect, option);
+    insertAlphabetically($debaterSelect, option);
   });
 };
 
@@ -495,13 +500,13 @@ const appendSchoolOption = (value, name) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = name;
-    insertAtTop($(el), option);
+    insertAlphabetically($(el), option);
   });
   $("[data-judge-school-select]").each((_, el) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = name;
-    insertAtTop($(el), option);
+    insertAlphabetically($(el), option);
   });
   refreshJudgeSchoolSelects();
 };
@@ -509,10 +514,9 @@ const appendSchoolOption = (value, name) => {
 const ensureOptionExists = ($select, value, label) => {
   if (!value) return;
   if (!$select.find(`option[value="${value}"]`).length) {
-    $select.append(
-      $("<option>")
-        .val(value)
-        .text(label || "Selected School"),
+    insertAlphabetically(
+      $select,
+      new Option(label || "Selected School", value),
     );
   }
 };

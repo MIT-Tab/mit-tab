@@ -63,7 +63,8 @@
       </div>
       <div class="col-md-5 mt-3 mt-md-0">
         <label for="challenged-team" class="font-weight-bold">Opponent</label>
-        <select id="challenged-team" class="form-control" name="challenged_id">
+        <select id="challenged-team" class="form-control" name="challenged_id" required>
+          <option value="">Select an opponent</option>
           {% for team in challenge_context.opponent_options %}
           <option value="{{ team.id }}">{{ team.label }}</option>
           {% endfor %}

@@ -313,10 +313,12 @@ class ScratchForm(forms.ModelForm):
         super(ScratchForm, self).__init__(*args, **kwargs)
 
         self.fields["team"].choices = [
-            (str(team.id), team.name) for team in team_queryset
+            (str(team.id), team.name)
+            for team in sorted(team_queryset, key=lambda item: (item.name.casefold(), item.id))
         ]
         self.fields["judge"].choices = [
-            (str(judge.id), judge.name) for judge in judge_queryset
+            (str(judge.id), judge.name)
+            for judge in sorted(judge_queryset, key=lambda item: (item.name.casefold(), item.id))
         ]
 
         # If we're editing an existing scratch, set initial values
@@ -1014,14 +1016,16 @@ class StartTournamentWizardForm(forms.Form):
         # registration instead of maintaining a second school list.
         from mittab.apps.registration.services import build_school_choices
 
-        choices = [("", "Choose a school…"), *build_school_choices()]
+        choices = build_school_choices()
         selected = self.data.get("host_school") if self.is_bound else self.initial.get(
             "host_school"
         )
         if selected and selected not in {value for value, _label in choices}:
             selected_label = self.initial.get("host_school_name") or "Selected school"
             choices.append((selected, selected_label))
-        self.fields["host_school"].choices = choices
+        self.fields["host_school"].choices = [("", "Choose a school…"), *sorted(
+            choices, key=lambda choice: choice[1].casefold()
+        )]
 
 
     def full_clean(self):
@@ -1233,7 +1237,7 @@ class OutroundResultEntryForm(forms.Form):
 
 class RoomTagForm(forms.ModelForm):
     teams = forms.ModelMultipleChoiceField(
-        queryset=Team.objects.all(),
+        queryset=Team.objects.order_by("name", "id"),
         required=False,
     )
     judges = forms.ModelMultipleChoiceField(
@@ -1276,7 +1280,7 @@ class MiniRoomTagForm(RoomTagForm):
 
 class RankingGroupForm(forms.ModelForm):
     teams = forms.ModelMultipleChoiceField(
-        queryset=Team.objects.all(),
+        queryset=Team.objects.order_by("name", "id"),
         required=False,
     )
     debaters = forms.ModelMultipleChoiceField(

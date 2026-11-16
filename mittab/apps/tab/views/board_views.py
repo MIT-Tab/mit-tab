@@ -100,7 +100,8 @@ def outrounds(request):
                 "-num_teams").values_list("num_teams", flat=True).distinct():
             stages.append({"size": size, "pairings": pairing_rows(
                 queryset.filter(num_teams=size).order_by("id"))})
-        teams = list(BreakingTeam.objects.filter(type_of_team=division).order_by("seed")
+        teams = list(BreakingTeam.objects.filter(type_of_team=division)
+                     .order_by("team__name", "team_id")
                      .values("team_id", "team__name", "seed", "effective_seed"))
         divisions.append({"id": division, "label": label, "stages": stages,
                           "teams": teams, "problems": bracket_problems(division),

@@ -267,17 +267,17 @@ def alternative_rooms(request, round_id, current_room_id=None):
         except Room.DoesNotExist:
             pass
 
-    # Fetch all rooms checked in for the given round, ordered by rank
+    # Fetch all rooms checked in for the given round, ordered by name
     rooms = Room.objects.filter(
         roomcheckin__round_number=round_number
     ).annotate(
         has_round=Exists(Round.objects.filter(room_id=OuterRef("id")))
-    ).order_by("-rank").prefetch_related("tags")
+    ).order_by("name", "id").prefetch_related("tags")
 
     required_tags = assign_rooms.get_required_tags(round_obj)
 
-    viable_rooms = set(room for room in rooms if
-                       set(room.tags.all()).issuperset(required_tags))
+    viable_rooms = [room for room in rooms
+                    if set(room.tags.all()).issuperset(required_tags)]
 
     viable_unpaired_rooms = list(filter(lambda room: not room.has_round, viable_rooms))
     viable_paired_rooms = list(filter(lambda room: room.has_round, viable_rooms))
@@ -428,7 +428,7 @@ def view_backups(request):
     filters = [
         {"id": "type", "label": "Type", "options": types},
         {"id": "round", "label": "Round", "options": rounds},
-        {"id": "scratches", "label": "Scratches", "options": ["Yes", "No", "Unknown"]},
+        {"id": "scratches", "label": "Scratches", "options": ["No", "Unknown", "Yes"]},
     ]
 
     return render(request, "tab/backup_list.html", {
@@ -769,8 +769,8 @@ def alternative_judges(request, round_id, judge_id=None):
         )
         for j in included_judges_list
     ]
-    included_judges = sorted(included_judges, key=lambda x: -x[2])
-    excluded_judges = sorted(excluded_judges, key=lambda x: -x[2])
+    included_judges = sorted(included_judges, key=lambda x: (x[0].casefold(), x[1]))
+    excluded_judges = sorted(excluded_judges, key=lambda x: (x[0].casefold(), x[1]))
 
     context = {
         "round_obj": round_obj,
@@ -806,8 +806,8 @@ def alternative_teams(request, round_id, current_team_id, position):
         "current_team_id": current_team_id,
         "round_number": round_number,
         "round_id": round_id,
-        "excluded_teams": excluded_teams,
-        "included_teams": included_teams,
+        "excluded_teams": excluded_teams.order_by("name", "id"),
+        "included_teams": included_teams.order_by("name", "id"),
         "position": position,
         "is_outround": False,
     }
