@@ -276,7 +276,11 @@ class TestCheckinUx(TestCase):
             "entity_type": "judge_expected", "action": "restore",
             "change_id": first, "head": preview["head"],
         }
-        self.assertEqual(self.client.post(endpoint, restore).status_code, 302)
+        response = self.client.post(endpoint, restore)
+        self.assertRedirects(
+            response, reverse("batch_checkin") + "#judge-expected",
+            fetch_redirect_response=False,
+        )
         self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
         self.assertFalse(JudgeExpectedCheckIn.objects.filter(judge=judge).exists())
         self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=5).exists())

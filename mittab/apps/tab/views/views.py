@@ -602,6 +602,14 @@ def enter_room(request):
     })
 
 
+CHECKIN_TAB_FRAGMENTS = {
+    "team": "team",
+    "judge": "judge",
+    "judge_expected": "judge-expected",
+    "room": "room",
+}
+
+
 CHECKIN_TAB_NAMES = {
     "team": "Teams",
     "judge": "Judges",
@@ -635,7 +643,7 @@ def checkin_history_page(request, entity_type, *, conflict=False):
     return render(request, "batch_check_in/history.html", {
         "entity_type": entity_type,
         "tab_name": CHECKIN_TAB_NAMES[entity_type],
-        "tab_id": entity_type.replace("_", "-"),
+        "tab_id": CHECKIN_TAB_FRAGMENTS[entity_type],
         "page": page,
         "entries": entries,
         "target": target,
@@ -668,7 +676,7 @@ def bulk_check_in(request):
         except (ValueError, RestoreConflict):
             return checkin_history_page(request, entity_type, conflict=True)
         messages.success(request, f"Reversed {stats['edits']} check-in edits.")
-        return redirect(f"{reverse('batch_checkin')}#{entity_type.replace('_', '-')}")
+        return redirect(f"{reverse('batch_checkin')}#{CHECKIN_TAB_FRAGMENTS[entity_type]}")
 
     if action == "undo":
         if entity_type in ENTITY_MODELS and undo_change(
