@@ -1,4 +1,5 @@
 import random
+import uuid
 from datetime import timedelta, timezone as datetime_timezone
 
 from django.conf import settings
@@ -1325,6 +1326,19 @@ class RoundStats(models.Model):
 
     def __str__(self):
         return f"Results for {self.debater} in round {self.round.round_number}"
+
+
+class BulkCheckInChange(models.Model):
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    entity_type = models.CharField(max_length=14)
+    checked = models.BooleanField()
+    cells = models.JSONField()
+    undone = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-pk"]
+        indexes = [models.Index(fields=["entity_type", "undone", "-id"])]
 
 
 class CheckIn(models.Model):

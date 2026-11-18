@@ -444,6 +444,8 @@ def view_backups(request):
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
 def restore_backup(request, filename):
     backup.restore_from_backup(filename)
+    # Older dumps do not replace the history table, and can reuse entity IDs.
+    BulkCheckInChange.objects.all().delete()
     logout(request)
     return redirect_and_flash_success(
         request,
@@ -1192,7 +1194,7 @@ def clear_db():
     from mittab.apps.registration.models import InfoText
 
     obj_types = [
-        CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
+        BulkCheckInChange, CheckIn, RoundStats, Round, Judge, Room, Scratch, PublicHomeShortcut,
         PublicHomePage, TournamentStaffRole, UserTournamentSetupPreference,
         InfoText, TabSettings, Team, School, Debater
     ]

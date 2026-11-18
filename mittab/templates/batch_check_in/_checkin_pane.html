@@ -4,6 +4,10 @@
 
 {% with label_prefix=action_label|default:"Checked" label_on=action_on_label|default:"In" label_off=action_off_label|default:"Out" team_column_header=team_column_label|default:"Checked In?" %}
 <div class="col" data-entity-type="{{ entity_type }}">
+  <button type="button" class="undo-checkin btn btn-sm btn-outline-secondary mb-2"
+          data-change-id="{{ undo.token|default_if_none:'' }}"
+          {% if not undo %}hidden{% endif %}>Undo last change ({{ undo.cells|length }} changed)</button>
+  <a class="btn btn-sm btn-outline-secondary mb-2" href="{% url 'batch_checkin' %}?history={{ entity_type }}">History</a>
   <div class="checkin-status mb-2" role="status" aria-live="polite"></div>
   <table class="table table-striped table-bordered table-sm">
     <thead>

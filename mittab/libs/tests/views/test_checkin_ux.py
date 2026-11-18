@@ -3,11 +3,13 @@ from html.parser import HTMLParser
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from mittab.apps.tab.auth_roles import APDA_BOARD_GROUP_NAME
 from mittab.apps.tab.models import (
-    CheckIn, Judge, JudgeExpectedCheckIn, Room, RoomCheckIn, School, TabSettings,
+    CheckIn, Judge, JudgeExpectedCheckIn, Room, RoomCheckIn, School, TabSettings, Team,
 )
 
 
@@ -140,3 +142,177 @@ class TestCheckinUx(TestCase):
                     response = self.client.post(reverse("bulk_check_in"), payload)
                     self.assertEqual(response.json(), {"success": True})
                     self.assertFalse(model.objects.filter(**{field: entity}).exists())
+
+    def test_bulk_undo_restores_only_changed_cells_from_another_session(self):
+        original = Judge.objects.create(name="Originally available", rank=Decimal("2"))
+        other = Judge.objects.create(name="Originally unavailable", rank=Decimal("2"))
+        endpoint = reverse("bulk_check_in")
+        second_device = Client()
+        second_device.force_login(self.user)
+
+        for entity_type, model in (
+            ("judge", CheckIn), ("judge_expected", JudgeExpectedCheckIn),
+        ):
+            with self.subTest(entity_type=entity_type):
+                model.objects.create(judge=original, round_number=5)
+                model.objects.create(judge=other, round_number=4)
+                payload = {
+                    "entity_type": entity_type,
+                    "entity_ids[]": [original.pk, other.pk],
+                    "rounds[]": [5],
+                    "action": "check_in",
+                    "include_undo": True,
+                }
+                change = self.client.post(endpoint, payload).json()["undo"]
+                self.assertEqual(change["count"], 1)
+                retry = self.client.post(endpoint, payload).json()["undo"]
+                self.assertEqual(retry, change)
+                page = second_device.get(reverse("batch_checkin"))
+                self.assertContains(page, change["id"])
+
+                undo = {
+                    "entity_type": entity_type,
+                    "action": "undo",
+                    "change_id": change["id"],
+                }
+                self.assertEqual(second_device.post(endpoint, undo).status_code, 200)
+                self.assertEqual(second_device.post(endpoint, undo).status_code, 409)
+                self.assertSetEqual(
+                    set(model.objects.filter(judge__in=[original, other]).values_list(
+                        "judge_id", "round_number",
+                    )),
+                    {(original.pk, 5), (other.pk, 4)},
+                )
+
+                payload["action"] = "check_out"
+                cleared = self.client.post(endpoint, payload).json()["undo"]
+                undo["change_id"] = cleared["id"]
+                self.assertEqual(second_device.post(endpoint, undo).status_code, 200)
+                round_five = model.objects.filter(
+                    judge__in=[original, other], round_number=5,
+                )
+                self.assertEqual(
+                    list(round_five.values_list("judge_id", flat=True)), [original.pk],
+                )
+
+    def test_bulk_undo_rejects_stale_requests_and_conflicting_edits(self):
+        room = Room.objects.create(name="Undo Room", rank=1)
+        endpoint = reverse("bulk_check_in")
+        payload = {
+            "entity_type": "room",
+            "entity_ids[]": [room.pk],
+            "rounds[]": [5],
+            "action": "check_in",
+            "include_undo": True,
+        }
+        first = self.client.post(endpoint, payload).json()["undo"]["id"]
+        payload["rounds[]"] = [4]
+        second = self.client.post(endpoint, payload).json()["undo"]["id"]
+
+        undo = {"entity_type": "room", "action": "undo", "change_id": first}
+        self.assertEqual(self.client.post(endpoint, undo).status_code, 409)
+        undo["change_id"] = second
+        self.assertEqual(self.client.post(endpoint, undo).status_code, 200)
+        RoomCheckIn.objects.filter(room=room, round_number=5).delete()
+        undo["change_id"] = first
+        self.assertEqual(self.client.post(endpoint, undo).status_code, 409)
+        self.assertFalse(RoomCheckIn.objects.filter(room=room).exists())
+
+
+    def test_team_bulk_undo_is_unavailable_to_board(self):
+        teams = list(Team.objects.order_by("pk")[:2])
+        Team.objects.filter(pk=teams[0].pk).update(checked_in=True)
+        Team.objects.filter(pk=teams[1].pk).update(checked_in=False)
+        endpoint = reverse("bulk_check_in")
+        change = self.client.post(endpoint, {
+            "entity_type": "team",
+            "entity_ids[]": [team.pk for team in teams],
+            "action": "check_out",
+            "include_undo": True,
+        }).json()["undo"]
+
+        board = get_user_model().objects.create_user(username="checkin-board")
+        group, _ = Group.objects.get_or_create(name=APDA_BOARD_GROUP_NAME)
+        board.groups.add(group)
+        board_client = Client()
+        board_client.force_login(board)
+        undo = {"entity_type": "team", "action": "undo", "change_id": change["id"]}
+        self.assertIn(board_client.post(endpoint, undo).status_code, {302, 403})
+        teams[0].refresh_from_db()
+        self.assertFalse(teams[0].checked_in)
+
+        self.assertEqual(self.client.post(endpoint, undo).status_code, 200)
+        for team in teams:
+            team.refresh_from_db()
+        self.assertEqual([team.checked_in for team in teams], [True, False])
+
+    def test_history_restores_multiple_edits_and_preserves_other_tabs(self):
+        judge = Judge.objects.create(name="History Judge", rank=Decimal("2"))
+        endpoint = reverse("bulk_check_in")
+        payload = {
+            "entity_type": "judge_expected",
+            "entity_ids[]": [judge.pk],
+            "rounds[]": [5],
+            "action": "check_in",
+            "include_undo": True,
+        }
+        first = self.client.post(endpoint, payload).json()["undo"]["id"]
+        self.client.post(endpoint, {**payload, "action": "check_out"})
+        self.client.post(endpoint, {**payload, "rounds[]": [0]})
+        self.client.post(endpoint, {**payload, "entity_type": "judge"})
+
+        history = reverse("batch_checkin")
+        params = {"history": "judge_expected", "before": first}
+        response = self.client.get(history, params)
+        self.assertContains(response, "Restore preview")
+        self.assertContains(response, "Outrounds")
+        preview = response.context["preview"]
+        self.assertEqual(preview["edits"], 3)
+        self.assertEqual(preview["check_in"], 0)
+        self.assertEqual(preview["check_out"], 1)
+        self.assertTrue(JudgeExpectedCheckIn.objects.filter(judge=judge).exists())
+
+        restore = {
+            "entity_type": "judge_expected", "action": "restore",
+            "change_id": first, "head": preview["head"],
+        }
+        response = self.client.post(endpoint, restore)
+        self.assertRedirects(
+            response, reverse("batch_checkin") + "#judge-expected",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertFalse(JudgeExpectedCheckIn.objects.filter(judge=judge).exists())
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=5).exists())
+        self.assertContains(
+            self.client.get(history, {"history": "judge_expected"}),
+            "Reversed",
+            count=3,
+        )
+
+    def test_history_restore_rejects_changed_preview_and_conflicting_status(self):
+        room = Room.objects.create(name="History Room", rank=1)
+        endpoint = reverse("bulk_check_in")
+        payload = {
+            "entity_type": "room",
+            "entity_ids[]": [room.pk],
+            "rounds[]": [5],
+            "action": "check_in",
+            "include_undo": True,
+        }
+        first = self.client.post(endpoint, payload).json()["undo"]["id"]
+        restore = {
+            "entity_type": "room",
+            "action": "restore",
+            "change_id": first,
+            "head": first,
+        }
+        response = self.client.post(endpoint, {**payload, "rounds[]": [4]})
+        second = response.json()["undo"]["id"]
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertEqual(RoomCheckIn.objects.filter(room=room).count(), 2)
+
+        restore["head"] = second
+        RoomCheckIn.objects.filter(room=room, round_number=5).delete()
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertTrue(RoomCheckIn.objects.filter(room=room, round_number=4).exists())

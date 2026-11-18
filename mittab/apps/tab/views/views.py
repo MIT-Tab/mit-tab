@@ -1,10 +1,12 @@
 import os
+from uuid import UUID
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
+from django.core.paginator import Paginator
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -26,6 +28,9 @@ from mittab.apps.tab.auth_roles import (
     user_has_staff_capability,
 )
 from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
+from mittab.apps.tab.checkin_history import (
+    ENTITY_MODELS, RestoreConflict, apply_change, latest_change, restore_changes, undo_change,
+)
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
@@ -597,51 +602,105 @@ def enter_room(request):
     })
 
 
+CHECKIN_TAB_FRAGMENTS = {
+    "team": "team",
+    "judge": "judge",
+    "judge_expected": "judge-expected",
+    "room": "room",
+}
+
+
+CHECKIN_TAB_NAMES = {
+    "team": "Teams",
+    "judge": "Judges",
+    "judge_expected": "Expected Judges",
+    "room": "Rooms",
+}
+
+
+def checkin_history_page(request, entity_type, *, conflict=False):
+    if entity_type not in ENTITY_MODELS:
+        return HttpResponseBadRequest()
+    if is_apda_board_user(request.user) or not user_has_staff_capability(
+        request.user, CAP_CHECKINS,
+    ):
+        return HttpResponseForbidden()
+
+    history = BulkCheckInChange.objects.filter(entity_type=entity_type)
+    page = Paginator(history, 25).get_page(request.GET.get("page"))
+    entries = [
+        (change, sorted({rnd for _, rnd in change.cells if rnd is not None}))
+        for change in page
+    ]
+    target = request.GET.get("before")
+    preview = None
+    if target:
+        try:
+            preview = restore_changes(entity_type, UUID(target))
+        except (ValueError, RestoreConflict):
+            conflict = True
+
+    return render(request, "batch_check_in/history.html", {
+        "entity_type": entity_type,
+        "tab_name": CHECKIN_TAB_NAMES[entity_type],
+        "tab_id": CHECKIN_TAB_FRAGMENTS[entity_type],
+        "page": page,
+        "entries": entries,
+        "target": target,
+        "preview": preview,
+        "conflict": conflict,
+    }, status=409 if conflict else 200)
+
+
 def bulk_check_in(request):
+    if request.method != "POST":
+        return JsonResponse({"success": True})
+    if is_apda_board_user(request.user) or not user_has_staff_capability(
+        request.user, CAP_CHECKINS,
+    ):
+        return HttpResponseForbidden()
+
     entity_type = request.POST.get("entity_type")
     action = request.POST.get("action")
+    entity_ids = {int(value) for value in request.POST.getlist("entity_ids[]")
+                  if value.isdecimal()}
 
-    entity_ids = request.POST.getlist("entity_ids[]")
-    entity_ids = [int(eid) for eid in entity_ids if eid.isdigit()]
+    if action == "restore":
+        if entity_type not in ENTITY_MODELS:
+            return HttpResponseBadRequest()
+        try:
+            change_id = UUID(request.POST.get("change_id", ""))
+            stats = restore_changes(
+                entity_type, change_id, confirmed_head=request.POST.get("head", ""),
+            )
+        except (ValueError, RestoreConflict):
+            return checkin_history_page(request, entity_type, conflict=True)
+        messages.success(request, f"Reversed {stats['edits']} check-in edits.")
+        return redirect(f"{reverse('batch_checkin')}#{CHECKIN_TAB_FRAGMENTS[entity_type]}")
+
+    if action == "undo":
+        if entity_type in ENTITY_MODELS and undo_change(
+            entity_type, request.POST.get("change_id"),
+        ):
+            return JsonResponse({"success": True})
+        return JsonResponse({"success": False}, status=409)
 
     if not entity_ids:
         return JsonResponse({"success": True})
+    if entity_type not in ENTITY_MODELS or action not in {"check_in", "check_out"}:
+        return JsonResponse({"success": False}, status=400)
 
-    # Teams have a simple boolean field
-    if entity_type == "team":
-        Team.objects.filter(pk__in=entity_ids).update(checked_in=action == "check_in")
-        return JsonResponse({"success": True})
-
-    # Judges and rooms use check-in records per round
-    round_numbers = [int(rn) for rn in request.POST.getlist("rounds[]") if rn.isdigit()]
-
-    if not round_numbers:
-        return JsonResponse({"success": True})
-
-    if entity_type == "judge":
-        checkInObj, id_field = CheckIn, "judge_id"
-    elif entity_type == "judge_expected":
-        checkInObj, id_field = JudgeExpectedCheckIn, "judge_id"
-    else:
-        checkInObj, id_field = RoomCheckIn, "room_id"
-
-    if action == "check_in" and entity_type == "judge_expected":
-        for entity_id in entity_ids:
-            for round_number in round_numbers:
-                JudgeExpectedCheckIn.objects.get_or_create(
-                    judge_id=entity_id, round_number=round_number,
-                )
-    elif action == "check_in":
-        checkInObj.objects.bulk_create(
-            [checkInObj(**{id_field: eid, "round_number": rn})
-             for eid in entity_ids for rn in round_numbers],
-            ignore_conflicts=True
-        )
-    else:
-        checkInObj.objects.filter(**{f"{id_field}__in": entity_ids},
-                                  round_number__in=round_numbers).delete()
-
-    return JsonResponse({"success": True})
+    rounds = {None} if entity_type == "team" else {
+        int(value) for value in request.POST.getlist("rounds[]") if value.isdecimal()
+    }
+    change = apply_change(entity_type, entity_ids, rounds, action == "check_in") if rounds else None
+    response = {"success": True}
+    if request.POST.get("include_undo"):
+        response["undo"] = ({
+            "id": str(change.token),
+            "count": len(change.cells),
+        } if change else None)
+    return JsonResponse(response)
 
 
 @permission_required("tab.scratch.can_delete", login_url="/403/")
@@ -1041,6 +1100,9 @@ def manage_ranking_groups(request):
     )
 
 def batch_checkin(request):
+    if "history" in request.GET:
+        return checkin_history_page(request, request.GET["history"])
+
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     all_round_numbers = round_numbers + [0]
 
@@ -1114,6 +1176,7 @@ def batch_checkin(request):
     room_round_counts = round_count_data(room_counts)
 
     return render(request, "batch_check_in/check_in.html", {
+        "checkin_undo": {kind: latest_change(kind) for kind in ENTITY_MODELS},
         "team_data": team_data,
         "team_headers": ["School", "Team", "Debater Names"],
         "judge_data": judge_data,
