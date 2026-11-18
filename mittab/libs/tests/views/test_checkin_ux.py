@@ -245,3 +245,70 @@ class TestCheckinUx(TestCase):
         for team in teams:
             team.refresh_from_db()
         self.assertEqual([team.checked_in for team in teams], [True, False])
+
+    def test_history_restores_multiple_edits_and_preserves_other_tabs(self):
+        judge = Judge.objects.create(name="History Judge", rank=Decimal("2"))
+        endpoint = reverse("bulk_check_in")
+        payload = {
+            "entity_type": "judge_expected",
+            "entity_ids[]": [judge.pk],
+            "rounds[]": [5],
+            "action": "check_in",
+            "include_undo": True,
+        }
+        first = self.client.post(endpoint, payload).json()["undo"]["id"]
+        self.client.post(endpoint, {**payload, "action": "check_out"})
+        self.client.post(endpoint, {**payload, "rounds[]": [0]})
+        self.client.post(endpoint, {**payload, "entity_type": "judge"})
+
+        history = reverse("batch_checkin")
+        params = {"history": "judge_expected", "before": first}
+        response = self.client.get(history, params)
+        self.assertContains(response, "Restore preview")
+        self.assertContains(response, "Outrounds")
+        preview = response.context["preview"]
+        self.assertEqual(preview["edits"], 3)
+        self.assertEqual(preview["check_in"], 0)
+        self.assertEqual(preview["check_out"], 1)
+        self.assertTrue(JudgeExpectedCheckIn.objects.filter(judge=judge).exists())
+
+        restore = {
+            "entity_type": "judge_expected", "action": "restore",
+            "change_id": first, "head": preview["head"],
+        }
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 302)
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertFalse(JudgeExpectedCheckIn.objects.filter(judge=judge).exists())
+        self.assertTrue(CheckIn.objects.filter(judge=judge, round_number=5).exists())
+        self.assertContains(
+            self.client.get(history, {"history": "judge_expected"}),
+            "Reversed",
+            count=3,
+        )
+
+    def test_history_restore_rejects_changed_preview_and_conflicting_status(self):
+        room = Room.objects.create(name="History Room", rank=1)
+        endpoint = reverse("bulk_check_in")
+        payload = {
+            "entity_type": "room",
+            "entity_ids[]": [room.pk],
+            "rounds[]": [5],
+            "action": "check_in",
+            "include_undo": True,
+        }
+        first = self.client.post(endpoint, payload).json()["undo"]["id"]
+        restore = {
+            "entity_type": "room",
+            "action": "restore",
+            "change_id": first,
+            "head": first,
+        }
+        response = self.client.post(endpoint, {**payload, "rounds[]": [4]})
+        second = response.json()["undo"]["id"]
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertEqual(RoomCheckIn.objects.filter(room=room).count(), 2)
+
+        restore["head"] = second
+        RoomCheckIn.objects.filter(room=room, round_number=5).delete()
+        self.assertEqual(self.client.post(endpoint, restore).status_code, 409)
+        self.assertTrue(RoomCheckIn.objects.filter(room=room, round_number=4).exists())

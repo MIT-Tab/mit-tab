@@ -48,7 +48,9 @@ The batch check-in interface allows you to:
 
 Use **Undo last change** on the affected Batch Check-In tab to reverse an accidental
 change. You can return to the page or sign in on another device to undo it. Each
-tab has its own history, with the most recent change available first.
+tab has its own history. Open **History**, then select **Restore to before this
+edit** to preview reversing that edit and all newer edits on the same tab.
+Confirm the preview to apply the restore.
 
 Alternatively, you can check a judge in individually on the page for that
 specific judge:

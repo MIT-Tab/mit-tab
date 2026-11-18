@@ -1,0 +1,74 @@
+{% extends "base/__normal.html" %}
+
+{% block title %}Check-In History{% endblock %}
+{% block banner %}{{ tab_name }} Check-In History{% endblock %}
+
+{% block content %}
+<div class="col-12">
+<a href="{% url 'batch_checkin' %}#{{ tab_id }}">Back to Batch Check-In</a>
+
+{% if conflict %}
+<div class="alert alert-warning mt-3" role="alert">
+  This restore conflicts with newer edits or removed entries. Review the history before trying again.
+</div>
+{% endif %}
+
+{% if preview %}
+<section class="card mt-3 mb-3" aria-labelledby="restore-preview-heading">
+  <div class="card-body">
+    <h4 id="restore-preview-heading" class="h5">Restore preview</h4>
+    <p>Reverse {{ preview.edits }} edit{{ preview.edits|pluralize }} to restore check-ins to before {{ preview.before|date:"M j, Y, g:i:s a T" }}.</p>
+    {% if preview.check_in or preview.check_out %}
+    <ul>
+      {% if preview.check_in %}<li>Set {{ preview.check_in }} status{{ preview.check_in|pluralize:"es" }} to {% if entity_type == "judge_expected" %}Expected{% else %}Checked In{% endif %}.</li>{% endif %}
+      {% if preview.check_out %}<li>Set {{ preview.check_out }} status{{ preview.check_out|pluralize:"es" }} to {% if entity_type == "judge_expected" %}Not Expected{% else %}Checked Out{% endif %}.</li>{% endif %}
+    </ul>
+    {% else %}<p>The current statuses already match the restored state.</p>{% endif %}
+    <form method="post" action="{% url 'bulk_check_in' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="restore">
+      <input type="hidden" name="entity_type" value="{{ entity_type }}">
+      <input type="hidden" name="change_id" value="{{ target }}">
+      <input type="hidden" name="head" value="{{ preview.head }}">
+      <button type="submit" class="btn btn-primary">Restore check-ins</button>
+      <a class="btn btn-link" href="{% url 'batch_checkin' %}?history={{ entity_type }}&amp;page={{ page.number }}">Cancel</a>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+{% if entries %}
+<div class="table-responsive mt-3">
+  <table class="table table-sm">
+    <thead><tr><th scope="col">Saved</th><th scope="col">Change</th>{% if entity_type != "team" %}<th scope="col">Rounds</th>{% endif %}<th scope="col">Statuses</th><th scope="col">Restore</th></tr></thead>
+    <tbody>
+      {% for change, rounds in entries %}
+      <tr>
+        <td><time datetime="{{ change.created_at|date:'c' }}">{{ change.created_at|date:"M j, Y, g:i:s a T" }}</time></td>
+        <td>{% if entity_type == "judge_expected" %}{{ change.checked|yesno:"Expected,Not Expected" }}{% else %}{{ change.checked|yesno:"Checked In,Checked Out" }}{% endif %}</td>
+        {% if entity_type != "team" %}
+        <td>{% for round in rounds %}{% if round == 0 %}Outrounds{% else %}{{ round }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        {% endif %}
+        <td>{{ change.cells|length }}</td>
+        <td>
+          {% if change.undone %}Reversed{% else %}
+          <a href="{% url 'batch_checkin' %}?history={{ entity_type }}&amp;page={{ page.number }}&amp;before={{ change.token }}">Restore to before this edit</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page.paginator.num_pages > 1 %}
+<nav aria-label="Check-in history pages">
+  {% if page.has_previous %}<a class="btn btn-outline-secondary btn-sm" href="?history={{ entity_type }}&amp;page={{ page.previous_page_number }}">Newer</a>{% endif %}
+  <span class="mx-2">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="btn btn-outline-secondary btn-sm" href="?history={{ entity_type }}&amp;page={{ page.next_page_number }}">Older</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="mt-3">No saved changes for this tab.</p>
+{% endif %}
+</div>
+{% endblock %}

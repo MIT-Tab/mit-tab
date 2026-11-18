@@ -1,10 +1,12 @@
 import os
+from uuid import UUID
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth import logout
 from django.conf import settings
+from django.core.paginator import Paginator
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -26,7 +28,9 @@ from mittab.apps.tab.auth_roles import (
     user_has_staff_capability,
 )
 from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
-from mittab.apps.tab.checkin_history import ENTITY_MODELS, apply_change, latest_change, undo_change
+from mittab.apps.tab.checkin_history import (
+    ENTITY_MODELS, RestoreConflict, apply_change, latest_change, restore_changes, undo_change,
+)
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.forms import (
     MiniRankingGroupForm,
@@ -598,6 +602,48 @@ def enter_room(request):
     })
 
 
+CHECKIN_TAB_NAMES = {
+    "team": "Teams",
+    "judge": "Judges",
+    "judge_expected": "Expected Judges",
+    "room": "Rooms",
+}
+
+
+def checkin_history_page(request, entity_type, *, conflict=False):
+    if entity_type not in ENTITY_MODELS:
+        return HttpResponseBadRequest()
+    if is_apda_board_user(request.user) or not user_has_staff_capability(
+        request.user, CAP_CHECKINS,
+    ):
+        return HttpResponseForbidden()
+
+    history = BulkCheckInChange.objects.filter(entity_type=entity_type)
+    page = Paginator(history, 25).get_page(request.GET.get("page"))
+    entries = [
+        (change, sorted({rnd for _, rnd in change.cells if rnd is not None}))
+        for change in page
+    ]
+    target = request.GET.get("before")
+    preview = None
+    if target:
+        try:
+            preview = restore_changes(entity_type, UUID(target))
+        except (ValueError, RestoreConflict):
+            conflict = True
+
+    return render(request, "batch_check_in/history.html", {
+        "entity_type": entity_type,
+        "tab_name": CHECKIN_TAB_NAMES[entity_type],
+        "tab_id": entity_type.replace("_", "-"),
+        "page": page,
+        "entries": entries,
+        "target": target,
+        "preview": preview,
+        "conflict": conflict,
+    }, status=409 if conflict else 200)
+
+
 def bulk_check_in(request):
     if request.method != "POST":
         return JsonResponse({"success": True})
@@ -610,6 +656,19 @@ def bulk_check_in(request):
     action = request.POST.get("action")
     entity_ids = {int(value) for value in request.POST.getlist("entity_ids[]")
                   if value.isdecimal()}
+
+    if action == "restore":
+        if entity_type not in ENTITY_MODELS:
+            return HttpResponseBadRequest()
+        try:
+            change_id = UUID(request.POST.get("change_id", ""))
+            stats = restore_changes(
+                entity_type, change_id, confirmed_head=request.POST.get("head", ""),
+            )
+        except (ValueError, RestoreConflict):
+            return checkin_history_page(request, entity_type, conflict=True)
+        messages.success(request, f"Reversed {stats['edits']} check-in edits.")
+        return redirect(f"{reverse('batch_checkin')}#{entity_type.replace('_', '-')}")
 
     if action == "undo":
         if entity_type in ENTITY_MODELS and undo_change(
@@ -1033,6 +1092,9 @@ def manage_ranking_groups(request):
     )
 
 def batch_checkin(request):
+    if "history" in request.GET:
+        return checkin_history_page(request, request.GET["history"])
+
     round_numbers = list([i + 1 for i in range(TabSettings.get("tot_rounds"))])
     all_round_numbers = round_numbers + [0]
 

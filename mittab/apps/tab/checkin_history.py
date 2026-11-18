@@ -86,26 +86,69 @@ def apply_change(entity_type, ids, rounds, checked):
     return latest_change(entity_type)
 
 
+class RestoreConflict(Exception):
+    """The selected history no longer matches the check-in grid."""
+
+
 @transaction.atomic
+def restore_changes(entity_type, change_id, *, confirmed_head=None):
+    history = BulkCheckInChange.objects.filter(entity_type=entity_type, undone=False)
+    target = history.filter(token=change_id).first()
+    if target is None:
+        raise RestoreConflict
+
+    changes = list(history.filter(pk__gte=target.pk))
+    if not changes or changes[-1].pk != target.pk:
+        raise RestoreConflict
+    head = str(changes[0].token)
+    if confirmed_head is not None and head != confirmed_head:
+        raise RestoreConflict
+
+    cells_by_change = [(change, {tuple(cell) for cell in change.cells}) for change in changes]
+    affected = set().union(*(cells for _, cells in cells_by_change))
+    ids = {pk for pk, _ in affected}
+    if set(lock_entities(entity_type, ids)) != ids:
+        raise RestoreConflict
+
+    if list(history.filter(pk__gte=target.pk).values_list("pk", flat=True)) != [
+        change.pk for change in changes
+    ]:
+        raise RestoreConflict
+
+    current = checked_cells(entity_type, ids, {round_num for _, round_num in affected}) & affected
+    restored = current.copy()
+    for change, cells in cells_by_change:
+        if restored & cells != (cells if change.checked else set()):
+            raise RestoreConflict
+        if change.checked:
+            restored.difference_update(cells)
+        else:
+            restored.update(cells)
+
+    check_in = restored - current
+    check_out = current - restored
+    if confirmed_head is not None:
+        if check_in:
+            write_cells(entity_type, check_in, True)
+        if check_out:
+            write_cells(entity_type, check_out, False)
+        history.filter(pk__in=[change.pk for change in changes]).update(undone=True)
+
+    return {
+        "head": head,
+        "before": target.created_at,
+        "edits": len(changes),
+        "check_in": len(check_in),
+        "check_out": len(check_out),
+    }
+
+
 def undo_change(entity_type, change_id):
     change = latest_change(entity_type)
     if change is None or str(change.token) != change_id:
         return False
-
-    cells = {tuple(cell) for cell in change.cells}
-    ids = {pk for pk, _ in cells}
-    if set(lock_entities(entity_type, ids)) != ids:
+    try:
+        restore_changes(entity_type, change.token, confirmed_head=change_id)
+    except RestoreConflict:
         return False
-
-    # Recheck after acquiring the same locks used by Batch Check-In writes.
-    latest = latest_change(entity_type)
-    if latest is None or latest.pk != change.pk:
-        return False
-    current = checked_cells(entity_type, ids, {rnd for _, rnd in cells}) & cells
-    if current != (cells if change.checked else set()):
-        return False
-
-    write_cells(entity_type, cells, not change.checked)
-    change.undone = True
-    change.save(update_fields=["undone"])
     return True
