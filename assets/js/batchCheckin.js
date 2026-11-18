@@ -42,6 +42,8 @@ const updateJudgeHighlights = (ids, rounds, expected) => {
   });
 };
 
+const checkinControls = ".checkin-toggle, .bulk-toggle, .undo-checkin";
+
 const submitCheckIn = (checkboxes, checked) => {
   const $boxes = $(checkboxes);
   if (!$boxes.length) return;
@@ -75,7 +77,7 @@ const submitCheckIn = (checkboxes, checked) => {
       );
   };
   $pane.data("saving", true).attr("aria-busy", "true");
-  $pane.find(".checkin-toggle, .bulk-toggle").prop("disabled", true);
+  $pane.find(checkinControls).prop("disabled", true);
   $status.removeClass("text-danger").text("Saving check-in changes…");
 
   $.ajax({
@@ -85,6 +87,7 @@ const submitCheckIn = (checkboxes, checked) => {
     data: {
       csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
       entity_type: entityType,
+      include_undo: true,
       action: checked ? "check_in" : "check_out",
       entity_ids: ids,
       rounds: [...new Set(rounds)].filter((r) => r != null),
@@ -106,12 +109,18 @@ const submitCheckIn = (checkboxes, checked) => {
       if (Object.keys(roundDeltas).length) {
         updateCheckinCounts(entityType, roundDeltas);
       }
+      const { undo } = response;
+      $pane
+        .find(".undo-checkin")
+        .attr("data-change-id", undo?.id ?? "")
+        .prop("hidden", !undo)
+        .text(undo ? `Undo last change (${undo.count} changed)` : "");
       $status.text("Check-in changes saved.");
     })
     .fail(showFailure)
     .always(() => {
       $pane.data("saving", false).removeAttr("aria-busy");
-      $pane.find(".checkin-toggle, .bulk-toggle").prop("disabled", false);
+      $pane.find(checkinControls).prop("disabled", false);
     });
 };
 
@@ -135,7 +144,48 @@ const getBulkTargets = (btn) => {
     });
 };
 
+const undoCheckIn = (button) => {
+  const $button = $(button);
+  const $pane = $button.closest(".tab-pane");
+  const $status = $pane.find(".checkin-status");
+  if ($pane.data("saving")) return;
+
+  $pane.data("saving", true).attr("aria-busy", "true");
+  $pane.find(checkinControls).prop("disabled", true);
+  $status.removeClass("text-danger").text("Undoing check-in change…");
+
+  $.ajax({
+    url: "/bulk_check_in/",
+    method: "POST",
+    dataType: "json",
+    data: {
+      csrfmiddlewaretoken: $("[name=csrfmiddlewaretoken]").val(),
+      entity_type: $pane.data("entityType"),
+      action: "undo",
+      change_id: $button.attr("data-change-id"),
+    },
+  })
+    .done(() => {
+      window.history.replaceState(null, "", `#${$pane.attr("id")}`);
+      window.location.reload();
+    })
+    .fail((response) => {
+      const message =
+        response.status === 409
+          ? "This change can no longer be undone. Reload to see the latest check-ins."
+          : "Undo could not be confirmed. Reload before retrying.";
+      $status.addClass("text-danger").text(message);
+      $pane.data("saving", false).removeAttr("aria-busy");
+      $pane.find(checkinControls).prop("disabled", false);
+    });
+};
+
 $(() => {
+  const selectedTab = $("[role='tab'][data-toggle='tab']")
+    .filter((_, tab) => tab.hash === window.location.hash)
+    .get(0);
+  selectedTab?.click();
+
   let drag = null;
   const toggleSelector = ".checkin-toggle";
 
@@ -186,6 +236,7 @@ $(() => {
 
   $(document)
     .on("click", ".checkin-toggle, .checkin-label", (e) => e.preventDefault())
+    .on("click", ".undo-checkin", (e) => undoCheckIn(e.currentTarget))
     .on("click", ".bulk-toggle", (e) => {
       e.preventDefault();
       const targets = getBulkTargets(e.currentTarget);

@@ -163,3 +163,26 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         self.assertFalse(self._toggle(1).is_selected())
         self.assertTrue(self._toggle(1).is_enabled())
         self.assertFalse(CheckIn.objects.filter(judge=self.judge).exists())
+
+    def test_bulk_undo_after_returning_to_batch_check_in(self):
+        CheckIn.objects.create(judge=self.judge, round_number=5)
+        endpoint = self.live_server_url + reverse("batch_checkin")
+        self.driver.get(endpoint + "#judge")
+        self.driver.refresh()
+        self.wait.until(lambda _: self.driver.find_elements(By.CSS_SELECTOR, "#judge.show"))
+        self.assertTrue(self._toggle(5).is_selected())
+
+        self.driver.find_element(
+            By.CSS_SELECTOR, "#judge .bulk-toggle[data-round='5'][data-action='check_out']",
+        ).click()
+        self.wait.until(lambda _: self._status() == "Check-in changes saved.")
+        self.assertFalse(self._toggle(5).is_selected())
+
+        self.driver.get(self.live_server_url)
+        self.driver.get(endpoint + "#judge")
+        self.wait.until(lambda _: self.driver.find_elements(By.CSS_SELECTOR, "#judge.show"))
+        self.driver.find_element(By.CSS_SELECTOR, "#judge .undo-checkin").click()
+        self.wait.until(lambda _: self.driver.find_elements(
+            By.CSS_SELECTOR, "#judge.show",
+        ) and self._toggle(5).is_selected())
+        self.assertTrue(CheckIn.objects.filter(judge=self.judge, round_number=5).exists())

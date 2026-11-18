@@ -46,6 +46,10 @@ The batch check-in interface allows you to:
 
 **Pro tip**: Use the quick search box at the top to quickly find judges, teams, or rooms by typing their name or school. The interface auto-saves changes as you make them, so there's no need to click a "Save" button.
 
+Use **Undo last change** on the affected Batch Check-In tab to reverse an accidental
+change. You can return to the page or sign in on another device to undo it. Each
+tab has its own history, with the most recent change available first.
+
 Alternatively, you can check a judge in individually on the page for that
 specific judge:
 
