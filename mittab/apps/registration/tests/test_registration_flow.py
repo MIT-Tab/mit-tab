@@ -369,8 +369,9 @@ def test_crash_housing_questions_follow_admin_setting(_remote_schools, client):
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("primary_index", [0, 1])
 @mock.patch("mittab.apps.registration.emails.EmailService")
-def test_registration_flow_creates_objects(email_service, client):
+def test_registration_flow_creates_objects(email_service, client, primary_index):
     email_service.return_value.send_bulk.return_value = 1
     School.objects.create(name="Registration U", apda_id=123)
     School.objects.create(name="Judge Hybrid", apda_id=999)
@@ -394,6 +395,12 @@ def test_registration_flow_creates_objects(email_service, client):
             seed_choice=Team.FREE_SEED,
         )
     ]
+    if primary_index == 1:
+        for field in list(teams[0]):
+            if field.startswith("teams-0-debater_one_"):
+                other = field.replace("debater_one", "debater_two")
+                teams[0][field], teams[0][other] = teams[0][other], teams[0][field]
+        teams[0]["teams-0-team_school_source"] = "debater_two"
     judges = [
         judge_entry(
             0,
@@ -423,7 +430,7 @@ def test_registration_flow_creates_objects(email_service, client):
     assert team.name == "Registration U A"
     assert team.seed == Team.FREE_SEED
     assert team.school == registration.school
-    assert team.hybrid_school is None
+    assert team.hybrid_school.name == "Hybrid School"
     debater_schools = {
         d.name: (d.school.name if d.school else None) for d in team.debaters.all()
     }
@@ -708,7 +715,8 @@ def test_registration_ignores_blank_prefilled_team_rows(client):
 
 @pytest.mark.django_db
 @mock.patch("mittab.apps.registration.emails.EmailService")
-def test_registration_edit_logs_changes(email_service, client):
+@pytest.mark.parametrize("existing_hybrid", [False, True])
+def test_registration_edit_logs_changes(email_service, client, existing_hybrid):
     email_service.return_value.send_bulk.return_value = 1
     teams = [
         team_entry(
@@ -727,6 +735,11 @@ def test_registration_edit_logs_changes(email_service, client):
     assert response.status_code == 200
     registration = Registration.objects.get()
     team = registration.teams.first()
+    assert team.hybrid_school is None
+    if existing_hybrid:
+        team.hybrid_school = School.objects.create(name="Staff Hybrid School")
+        team.save()
+    original_hybrid_id = team.hybrid_school_id
     debaters = list(team.debaters.order_by("name"))
 
     edited_team = team_entry(
@@ -738,7 +751,7 @@ def test_registration_edit_logs_changes(email_service, client):
                 "id": str(debaters[0].pk),
             },
             {
-                **speaker("Speaker B", "apda:77", "Log School"),
+                **speaker("Speaker B", "custom:Other%20School", "Other School"),
                 "id": str(debaters[1].pk),
             },
         ],
@@ -754,6 +767,8 @@ def test_registration_edit_logs_changes(email_service, client):
     )
 
     assert response.status_code == 200
+    team.refresh_from_db()
+    assert team.hybrid_school_id == original_hybrid_id
     logs = list(RegistrationChangeLog.objects.order_by("created_at"))
     assert [log.action for log in logs] == [
         RegistrationChangeLog.CREATED,

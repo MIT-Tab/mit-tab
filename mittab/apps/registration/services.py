@@ -645,7 +645,11 @@ def save_registration(
         team.name = uniquify_name(Team, payload["name"], exclude_pk=team.pk)
         team.seed = payload["seed_choice"]
         team.school = primary_school
-        team.hybrid_school = None
+        if team.pk is None:
+            other_school = member_schools[1 - primary_index]
+            team.hybrid_school = (
+                other_school if other_school != primary_school else None
+            )
         team.break_preference = Team.VARSITY
         team.checked_in = False
         try:
