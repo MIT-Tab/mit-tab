@@ -141,6 +141,8 @@ class JudgeForm(forms.ModelForm):
             kwargs.pop("first_entry")
         allow_checkins = kwargs.pop("allow_checkins", True)
         super(JudgeForm, self).__init__(*args, **kwargs)
+        registration = self.fields["registration"]
+        registration.queryset = registration.queryset.select_related("school")
         if not entry and allow_checkins:
             num_rounds = TabSettings.objects.get(key="tot_rounds").value
             try:
@@ -229,6 +231,8 @@ class TeamForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         allow_checkins = kwargs.pop("allow_checkins", True)
         super(TeamForm, self).__init__(*args, **kwargs)
+        registration = self.fields["registration"]
+        registration.queryset = registration.queryset.select_related("school")
         if not allow_checkins:
             self.fields.pop("checked_in", None)
 

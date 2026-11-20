@@ -2,7 +2,9 @@ from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import Client, TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from mittab.apps.registration.models import (
@@ -35,8 +37,15 @@ class TestRegistrationEmailManagement(TestCase):
             school=school,
             email="registration@example.com",
         )
+        for index in range(3):
+            Registration.objects.create(
+                school=school,
+                email=f"other-registration-{index}@example.com",
+            )
 
-        response = self.client.get(reverse("email_management"))
+        url = reverse("email_management")
+        with CaptureQueriesContext(connection) as preview_queries:
+            response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn("Registration Confirmations", content)
@@ -46,15 +55,19 @@ class TestRegistrationEmailManagement(TestCase):
             rf'name="registration_ids" value="{registration.id}" checked',
         )
 
-        response = self.client.post(
-            reverse("email_management"),
-            {
+        with CaptureQueriesContext(connection) as send_queries:
+            response = self.client.post(url, {
                 "email_action": "registration_confirmations",
                 "registration_ids": [str(registration.id)],
-            },
-        )
+            })
 
         self.assertEqual(response.status_code, 302)
+        for queries in (preview_queries, send_queries):
+            for table in ("registration_registration", "registration_registrationlink"):
+                table_name = connection.ops.quote_name(table)
+                self.assertEqual(sum(
+                    f"FROM {table_name} " in query["sql"] for query in queries
+                ), 1, table)
         email_service.return_value.send_bulk.assert_called_once()
         log = RegistrationConfirmationEmailLog.objects.get(
             registration=registration,

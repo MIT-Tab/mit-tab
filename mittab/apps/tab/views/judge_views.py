@@ -24,11 +24,11 @@ from mittab.libs.email_views import (
     build_judge_ballot_code_email,
     build_written_rfd_email,
 )
-from mittab.apps.registration.emails import build_registration_confirmation_email
-from mittab.apps.registration.models import (
-    Registration,
-    RegistrationConfirmationEmailLog,
+from mittab.apps.registration.emails import (
+    build_registration_confirmation_emails,
+    registrations_for_email,
 )
+from mittab.apps.registration.models import RegistrationConfirmationEmailLog
 
 from mittab.apps.tab.views.team_email_views import (
     send_team_code_emails,
@@ -714,7 +714,7 @@ def _send_judge_code_emails(request, selected_entries, judge_context):
 
 def _registration_confirmation_email_management_context(request):
     registrations = list(
-        Registration.objects.select_related("school").order_by(
+        registrations_for_email().order_by(
             "school__name",
             "-created_at",
         )
@@ -729,18 +729,16 @@ def _registration_confirmation_email_management_context(request):
         ).values_list("registration_id", flat=True)
     )
 
-    sendable_by_id = {}
-    for registration in registrations:
-        if not registration.email:
-            continue
-        email_request = build_registration_confirmation_email(
-            registration,
-            request,
-        )
-        sendable_by_id[registration.id] = {
+    sendable = [registration for registration in registrations if registration.email]
+    sendable_by_id = {
+        registration.id: {
             "registration": registration,
             "email_request": email_request,
         }
+        for registration, email_request in zip(
+            sendable, build_registration_confirmation_emails(sendable, request),
+        )
+    }
 
     default_selected_ids = [
         registration_id for registration_id in sendable_by_id.keys()
@@ -1124,25 +1122,26 @@ def _email_history_rows():
 
 
 def email_management(request):
-    team_context = team_email_management_context(request)
-    judge_context = _judge_email_management_context(request)
-    registration_context = _registration_confirmation_email_management_context(request)
-    rfd_context = _written_rfd_email_management_context(request)
-
     if request.method == "POST":
         action = request.POST.get("email_action")
         if action == "team_codes":
+            team_context = team_email_management_context(request)
             return send_team_code_emails(request, team_context["selected_entries"])
         if action == "written_rfds":
+            rfd_context = _written_rfd_email_management_context(request)
             return _send_written_rfd_emails(
                 request,
                 rfd_context["selected_entries"],
             )
         if action == "registration_confirmations":
+            registration_context = _registration_confirmation_email_management_context(
+                request,
+            )
             return _send_registration_confirmation_emails(
                 request,
                 registration_context["selected_entries"],
             )
+        judge_context = _judge_email_management_context(request)
         return _send_judge_code_emails(
             request,
             judge_context["selected_entries"],
@@ -1153,10 +1152,12 @@ def email_management(request):
         request,
         "tab/email_management.html",
         {
-            "team_email": team_context,
-            "judge_email": judge_context,
-            "registration_email": registration_context,
-            "written_rfd_email": rfd_context,
+            "team_email": team_email_management_context(request),
+            "judge_email": _judge_email_management_context(request),
+            "registration_email": _registration_confirmation_email_management_context(
+                request,
+            ),
+            "written_rfd_email": _written_rfd_email_management_context(request),
             "history_rows": _email_history_rows(),
         },
     )

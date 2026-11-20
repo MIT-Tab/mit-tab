@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.shortcuts import render
 from django.utils.text import slugify
 
@@ -62,9 +63,11 @@ def view_debaters(request):
             debater.display,
             0,
             "",
-            list(debater.ranking_groups.order_by("name").values_list("name", flat=True)),
+            [group.name for group in debater.ranking_groups.all()],
         )
-        for debater in Debater.objects.prefetch_related("ranking_groups").all()
+        for debater in Debater.objects.prefetch_related(
+            Prefetch("ranking_groups", queryset=RankingGroup.objects.order_by("name"))
+        )
     ]
     return render(
         request, "common/list_data.html", {
