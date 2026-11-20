@@ -57,7 +57,7 @@ class TestInitializeTourneyCommand(TransactionTestCase):
             {"BOARD_PASSWORD": "", "APDA_BOARD_PASSWORD": ""},
         ), patch(
             "mittab.apps.tab.management.commands.initialize_tourney."
-            "USER_MODEL.objects.make_random_password",
+            "get_random_string",
             return_value="random-board-password",
         ), patch("mittab.apps.tab.management.commands.initialize_tourney.backup_round"):
             call_command(

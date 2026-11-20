@@ -36,15 +36,14 @@ class RegistrationConfig(models.Model):
         config, _ = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
         return config
 
-    def save(
-        self,
-        force_insert=False,
-        force_update=False,
-        using=None,
-        update_fields=None,
-    ):
+    def save(self, *args, **kwargs):
         self.pk = self.SINGLETON_PK
-        super().save(False, force_update, using, update_fields)
+        # Saving the singleton must allow updating its fixed primary key.
+        if args:
+            args = (False, *args[1:])
+        else:
+            kwargs["force_insert"] = False
+        super().save(*args, **kwargs)
 
     @staticmethod
     def _within_window(enabled, opens_at, closes_at, now=None):
