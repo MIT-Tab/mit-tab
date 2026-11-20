@@ -81,6 +81,15 @@ class TestApiViews(TestCase):
         for protected in ("scratch", "rank_min", "wing_only", "judge_rank"):
             self.assertNotIn(protected, serialized)
 
+    def test_import_api_exports_cards_only_after_publication(self):
+        self._unlock_results()
+        TabSettings.set("var_teams_visible", 2)
+        url = reverse("import_results_api")
+        self.assertTrue(self.client.get(url).json()["bundle"]["tab_cards"])
+
+        TabSettings.set("publish_tab_cards_with_first_outround", 0)
+        self.assertIsNone(self.client.get(url).json()["bundle"]["tab_cards"])
+
     def test_render(self):
         self._unlock_results()
         round_obj = Round.objects.filter(round_number=1).first()
