@@ -1,7 +1,9 @@
 import json
 from datetime import datetime, timezone
 
-from mittab.apps.tab.models import Debater, Judge, Outround, Round, School, Team
+from mittab.apps.tab.models import Debater, Outround, Round, School, Team
+from mittab.apps.tab.public_pages import tab_cards_are_public
+from mittab.apps.tab.tab_cards import get_tab_cards
 
 
 class BlackRodBundleExporter:
@@ -21,8 +23,43 @@ class BlackRodBundleExporter:
             "schools": self._build_schools(),
             "debaters": self._build_debaters(),
             "rounds": self._build_rounds(),
+            "tab_cards": self._build_tab_cards() if tab_cards_are_public() else None,
         }
         return json.dumps(payload, indent=2, sort_keys=True)
+
+    @staticmethod
+    def _build_tab_cards():
+        cards = get_tab_cards()
+        speakers_by_team = {
+            card["team"].pk: list(dict.fromkeys([card["debater_1"], card["debater_2"]]))
+            for card in cards
+        }
+        return [
+            {
+                "speakers": [
+                    {"name": card["debater_1"], "status": card["debater_1_status"][:1]},
+                    {"name": card["debater_2"], "status": card["debater_2_status"][:1]},
+                ],
+                "rounds": [
+                    {
+                        "side": "BYE" if number == card["bye_round"] else side.strip(),
+                        "result": result.strip(),
+                        "opponents": speakers_by_team.get(getattr(opponent, "pk", None), []),
+                        "judges": judges.strip(),
+                        "scores": [value if isinstance(value, tuple) else None
+                                   for value in (speaker_1, speaker_2, total)],
+                    }
+                    for number, (side, result, opponent, judges, speaker_1, speaker_2, total)
+                    in enumerate(card["round_stats"], start=1)
+                ],
+                "totals": [
+                    (card["d1st"], card["d1rt"]),
+                    (card["d2st"], card["d2rt"]),
+                    (card["ts"], card["tr"]),
+                ],
+            }
+            for card in cards
+        ]
 
     def _build_schools(self):
         return [
@@ -121,13 +158,13 @@ class BlackRodBundleExporter:
         seen_ids = set()
 
         if chair is not None:
-            judge_rows.append({"original_name": chair.name, "is_chair": True})
+            judge_rows.append({"id": chair.pk, "original_name": chair.name, "is_chair": True})
             seen_ids.add(chair.id)
 
         for judge in sorted(judges, key=lambda value: value.id):
             if judge.id in seen_ids:
                 continue
-            judge_rows.append({"original_name": judge.name, "is_chair": False})
+            judge_rows.append({"id": judge.pk, "original_name": judge.name, "is_chair": False})
             seen_ids.add(judge.id)
 
         return judge_rows

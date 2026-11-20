@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from nplusone.core import profiler
 
+from mittab.apps.tab.tab_cards import get_tab_cards
 from mittab.apps.tab.models import (
     Room, TabSettings, Team, Outround
 )
@@ -97,6 +98,37 @@ class TestExportViews(TestCase):
         self.assertIsInstance(outround_rows[0]["elim_size"], int)
         self.assertIn("victor", outround_rows[0])
         self.assertIsInstance(outround_rows[0]["victor"], int)
+
+    def test_black_rod_bundle_contains_the_public_tab_cards_without_team_names(self):
+        TabSettings.set("var_teams_visible", 2)
+        cards = get_tab_cards()
+        response = self.client.get(reverse("download_black_rod_bundle"))
+        exported_cards = response.json()["tab_cards"]
+        self.assertEqual(len(exported_cards), len(cards))
+        for source, exported in zip(cards, exported_cards):
+            self.assertEqual(set(exported), {"rounds", "speakers", "totals"})
+            self.assertEqual(exported["speakers"][0]["name"], source["debater_1"])
+            self.assertEqual(exported["speakers"][1]["name"], source["debater_2"])
+            self.assertEqual(exported["totals"][-1], [source["ts"], source["tr"]])
+            for number, (source_row, exported_row) in enumerate(
+                zip(source["round_stats"], exported["rounds"]), start=1,
+            ):
+                expected_side = (
+                    "BYE" if number == source["bye_round"] else source_row[0].strip()
+                )
+                self.assertEqual(exported_row["side"], expected_side)
+                self.assertEqual(exported_row["result"], source_row[1].strip())
+                self.assertEqual(exported_row["judges"], source_row[3].strip())
+                self.assertEqual(exported_row["scores"], [
+                    list(score) if isinstance(score, tuple) else None
+                    for score in source_row[4:]
+                ])
+
+    def test_black_rod_bundle_respects_tab_card_publication(self):
+        TabSettings.set("var_teams_visible", 2)
+        TabSettings.set("publish_tab_cards_with_first_outround", 0)
+        response = self.client.get(reverse("download_black_rod_bundle"))
+        self.assertIsNone(response.json()["tab_cards"])
 
     def test_n_plus_one(self):
         export_views = [
