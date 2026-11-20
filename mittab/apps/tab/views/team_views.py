@@ -1,4 +1,5 @@
 from django.http import HttpResponseRedirect
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.cache import never_cache
 from django.utils.text import slugify
@@ -45,9 +46,11 @@ def view_teams(request):
             team.display_backend,
             flags(team),
             TabFlags.flags_to_symbols(flags(team)),
-            list(team.ranking_groups.order_by("name").values_list("name", flat=True)),
+            [group.name for group in team.ranking_groups.all()],
         )
-        for team in Team.objects.prefetch_related("ranking_groups").all()
+        for team in Team.objects.prefetch_related(
+            Prefetch("ranking_groups", queryset=RankingGroup.objects.order_by("name"))
+        )
     ]
     filters, symbol_text = [], ""
     if include_checkins:

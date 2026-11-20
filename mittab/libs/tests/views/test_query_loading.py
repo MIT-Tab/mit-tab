@@ -11,12 +11,13 @@ from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from mittab.apps.registration.models import Registration
 from mittab.apps.tab.board_audit import (
     audit_pairing_generation, pairing_snapshot, with_pairing_snapshot_relations,
 )
 from mittab.apps.tab.models import (
-    AuditEvent, BreakingTeam, Debater, Judge, Outround, Room, Round, RoundStats,
-    School, Scratch, TabSettings, Team,
+    AuditEvent, BreakingTeam, Debater, Judge, Outround, RankingGroup, Room, Round,
+    RoundStats, School, Scratch, TabSettings, Team,
 )
 from mittab.apps.tab.views.api_views import _serialize_live_debater
 from mittab.apps.tab.views.board_views import pairing_rows
@@ -218,6 +219,75 @@ class TestQueryLoading(TestCase):
         for team in self.teams[1:]:
             Scratch.objects.create(team=team, judge=self.judge, scratch_type=0)
         self.assertEqual(single_queries, read_page())
+
+    def test_registration_choices_join_schools_on_staff_forms(self):
+        school_ids = []
+        for index in range(4):
+            school = School.objects.create(name=f"Registered school {index}")
+            school_ids.append(school.pk)
+            Registration.objects.create(
+                school=school, email=f"school{index}@example.com",
+            )
+        self.client.force_login(get_user_model().objects.create_superuser(
+            "tab", password="test"))
+        school_table = connection.ops.quote_name("tab_school")
+        id_column = connection.ops.quote_name("id")
+        individual_lookups = [
+            f"FROM {school_table} WHERE {school_table}.{id_column} = {school_id} "
+            for school_id in school_ids
+        ]
+        for view_name, args in (
+            ("view_team", [self.teams[0].pk]),
+            ("view_judge", [self.judge.pk]),
+            ("enter_judge", []),
+        ):
+            with self.subTest(view=view_name):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(reverse(view_name, args=args))
+                self.assertContains(response, "Registered school 3")
+                self.assertFalse(any(
+                    lookup in query["sql"]
+                    for query in queries
+                    for lookup in individual_lookups
+                ))
+
+    def test_roster_lists_prefetch_sorted_ranking_groups(self):
+        for name in ("Zeta", "Alpha"):
+            group = RankingGroup.objects.create(name=name)
+            group.teams.set(self.teams)
+            group.debaters.set(Debater.objects.all())
+        self.client.force_login(get_user_model().objects.create_superuser(
+            "tab", password="test"))
+        group_table = connection.ops.quote_name("tab_rankinggroup")
+        for view_name in ("view_teams", "view_debaters"):
+            with self.subTest(view=view_name):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(reverse(view_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["item_list"][0][4], ["Alpha", "Zeta"])
+                self.assertEqual(sum(
+                    f"FROM {group_table} " in query["sql"] for query in queries
+                ), 1)
+
+    def test_result_apis_load_published_stages_once_per_division(self):
+        stage_table = connection.ops.quote_name("tab_publishedoutroundstage")
+        outround_table = connection.ops.quote_name("tab_outround")
+        size_column = connection.ops.quote_name("num_teams")
+        for view_name in ("live_results_api", "import_results_api"):
+            with self.subTest(view=view_name):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(reverse(view_name))
+                self.assertEqual(response.status_code, 200)
+                reads = [query["sql"] for query in queries]
+                self.assertEqual(sum(
+                    sql.startswith(f"SELECT {stage_table}.{size_column} ")
+                    for sql in reads
+                ), 2)
+                self.assertEqual(sum(
+                    sql.startswith(f"SELECT {outround_table}.{size_column},")
+                    and f"{outround_table}.{size_column} >=" in sql
+                    for sql in reads
+                ), 2)
 
     def test_staff_outrounds_queries_do_not_grow_with_pairings(self):
         ContentType.objects.get_for_model(Outround)

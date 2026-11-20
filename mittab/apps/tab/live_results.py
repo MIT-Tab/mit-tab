@@ -90,8 +90,11 @@ def speaker_results_available(now=None):
     if any(published_team_placements(division)
            for division in (Outround.VARSITY, Outround.NOVICE)):
         return True
-    completed_at = final_inround_completed_at()
-    if completed_at is None:
-        return False
-    return (now or timezone.now()) >= completed_at + timedelta(hours=3)
+    return speaker_embargo_elapsed(final_inround_completed_at(), now)
+
+
+def speaker_embargo_elapsed(completed_at, now=None):
+    return completed_at is not None and (
+        (now or timezone.now()) >= completed_at + timedelta(hours=3)
+    )
 

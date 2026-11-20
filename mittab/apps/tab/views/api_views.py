@@ -9,7 +9,7 @@ from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.live_results import (
     final_inround_completed_at,
     published_team_placements,
-    speaker_results_available,
+    speaker_embargo_elapsed,
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.tab.models import Debater, Team, Outround, Round, TabSettings
@@ -99,9 +99,8 @@ def _serialize_live_team(team):
     }
 
 
-def _live_team_results(team_type):
+def _live_team_results(team_type, placements):
     """Export the best published placement, including unfinished rounds and byes."""
-    placements = published_team_placements(team_type)
     teams = Team.objects.filter(pk__in=placements).select_related(
         "school", "hybrid_school",
     ).prefetch_related("debaters__school")
@@ -115,10 +114,7 @@ def _live_team_results(team_type):
     ]
 
 
-def _live_speaker_results():
-    if not speaker_results_available():
-        return []
-    all_speakers, novice = get_speaker_rankings()
+def _live_speaker_results(all_speakers, novice):
     varsity = [
         entry for entry in all_speakers
         if entry[0].novice_status == Debater.VARSITY
@@ -162,6 +158,10 @@ def live_results_api(request):
 # Public and unauthenticated, so bound the cost of speaker ranking per worker.
 @cache_logic.cache(seconds=60, stampede=30)
 def _live_results_payload(source_url):
+    return _build_live_results_payload(source_url)
+
+
+def _build_live_results_payload(source_url, *, include_legacy_awards=False):
     host_value = str(TabSettings.get("host_school", "") or "")
     host_id = None
     if host_value.startswith("apda:"):
@@ -173,11 +173,16 @@ def _live_results_payload(source_url):
     held_on = _tournament_date()
     season = held_on.year if held_on.month >= 7 else held_on.year - 1
     completed_at = final_inround_completed_at()
-    speakers_available = speaker_results_available()
+    placements = {
+        division: published_team_placements(division)
+        for division in (Team.VARSITY, Team.NOVICE)
+    }
+    speakers_available = any(placements.values()) or speaker_embargo_elapsed(completed_at)
+    speakers, novice_speakers = get_speaker_rankings() if speakers_available else ([], [])
     team_ids = list(_get_teams_with_min_rounds())
     debaters = Debater.objects.filter(team__pk__in=team_ids).distinct()
 
-    return {
+    payload = {
         "schema_version": 1,
         "source_url": source_url,
         "tournament": {
@@ -201,29 +206,37 @@ def _live_results_payload(source_url):
                 completed_at.isoformat() if completed_at else None
             ),
         },
-        "team_results": (
-            _live_team_results(Team.VARSITY) + _live_team_results(Team.NOVICE)
-        ),
-        "speaker_results": _live_speaker_results(),
+        "team_results": [
+            result
+            for division, division_placements in placements.items()
+            for result in _live_team_results(division, division_placements)
+        ],
+        "speaker_results": _live_speaker_results(speakers, novice_speakers),
         "generated_at": timezone.now().isoformat(),
     }
+    if include_legacy_awards:
+        payload["varsity_speaker_awards"] = _speaker_awards(speakers)
+        payload["novice_speaker_awards"] = _speaker_awards(novice_speakers)
+    return payload
+
+
+def _speaker_awards(entries):
+    return [
+        {"apda_id": entry[0].apda_id, "tournament_id": entry[0].pk}
+        for entry in entries[:10]
+    ]
+
 
 def varsity_speaker_awards_api(request):
     """API endpoint for varsity speaker awards."""
     varsity_speakers, _ = get_speaker_rankings()
-    varsity_speakers = varsity_speakers[:10]
-    data = [{"apda_id": result[0].apda_id, "tournament_id": result[0].pk}
-            for result in varsity_speakers]
-    return JsonResponse({"varsity_speaker_awards": data})
+    return JsonResponse({"varsity_speaker_awards": _speaker_awards(varsity_speakers)})
 
 
 def novice_speaker_awards_api(request):
     """API endpoint for novice speaker awards."""
     _, novice_speakers = get_speaker_rankings()
-    novice_speakers = novice_speakers[:10]
-    data = [{"apda_id": result[0].apda_id, "tournament_id": result[0].pk}
-            for result in novice_speakers]
-    return JsonResponse({"novice_speaker_awards": data})
+    return JsonResponse({"novice_speaker_awards": _speaker_awards(novice_speakers)})
 
 
 def varsity_team_placements_api(request):
@@ -318,8 +331,8 @@ def debater_counts_api(request):
 def import_results_api(request):
     """Complete import snapshot. Keep bundles out of the lightweight live API."""
     source_url = request.build_absolute_uri("/").rstrip("/")
-    payload = dict(_live_results_payload(source_url))
-    ready = speaker_results_available()
+    payload = _build_live_results_payload(source_url, include_legacy_awards=True)
+    ready = payload["availability"]["speakers"]
     payload["import_ready"] = ready
     varsity, varsity_ids = _get_team_placements_and_ids(Team.VARSITY)
     novice, novice_ids = _get_team_placements_and_ids(Team.NOVICE)
@@ -331,11 +344,6 @@ def import_results_api(request):
     ]
     for endpoint in (new_debater_data_api, new_schools_api, debater_counts_api):
         payload.update(json.loads(endpoint(request).content))
-    if ready:
-        for endpoint in (varsity_speaker_awards_api, novice_speaker_awards_api):
-            payload.update(json.loads(endpoint(request).content))
-    else:
-        payload.update(varsity_speaker_awards=[], novice_speaker_awards=[])
     payload["bundle"] = json.loads(BlackRodBundleExporter(
         TabSettings.get("tournament_name", "Tournament")
     ).export_tournament()) if ready else None

@@ -34,7 +34,7 @@ from .team_emails import (
 JUDGE_CODE_EMAIL_RATE_LIMIT_WINDOW = timedelta(hours=6)
 
 
-def _registration_for_email(registration):
+def registrations_for_email():
     return (
         Registration.objects.select_related("school")
         .prefetch_related(
@@ -52,24 +52,28 @@ def _registration_for_email(registration):
                 ),
             ),
         )
-        .get(pk=registration.pk)
     )
+
+
+def build_registration_confirmation_emails(registrations, request):
+    tournament_name = TabSettings.get("tournament_name", "Tournament")
+    followup_links = list(RegistrationLink.objects.filter(is_active=True))
+    for registration in registrations:
+        edit_url = request.build_absolute_uri(
+            reverse("registration_portal_edit", args=[registration.herokunator_code])
+        )
+        yield build_confirmation_email_request(
+            registration,
+            tournament_name,
+            edit_url,
+            followup_links,
+            request,
+        )
 
 
 def build_registration_confirmation_email(registration, request):
-    registration = _registration_for_email(registration)
-    tournament_name = TabSettings.get("tournament_name", "Tournament")
-    edit_url = request.build_absolute_uri(
-        reverse("registration_portal_edit", args=[registration.herokunator_code])
-    )
-    followup_links = list(RegistrationLink.objects.filter(is_active=True))
-    return build_confirmation_email_request(
-        registration,
-        tournament_name,
-        edit_url,
-        followup_links,
-        request,
-    )
+    registration = registrations_for_email().get(pk=registration.pk)
+    return next(build_registration_confirmation_emails([registration], request))
 
 
 def send_registration_confirmation_email(registration, request):
@@ -96,7 +100,7 @@ def send_registration_confirmation_email(registration, request):
 
 
 def build_registration_team_portal_emails(registration, request):
-    registration = _registration_for_email(registration)
+    registration = registrations_for_email().get(pk=registration.pk)
     return [
         email_request
         for team in registration.teams.all()
@@ -105,7 +109,7 @@ def build_registration_team_portal_emails(registration, request):
 
 
 def send_registration_team_portal_emails(registration, request):
-    registration = _registration_for_email(registration)
+    registration = registrations_for_email().get(pk=registration.pk)
     entries = prepare_team_code_plan(registration.teams.all(), request)
     return send_team_code_entries(
         entries, source="registration", service_factory=EmailService,
