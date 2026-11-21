@@ -2,7 +2,7 @@ import pytest
 from django.test import TestCase
 
 from mittab.apps.tab.forms import EBallotForm, ResultEntryForm
-from mittab.apps.tab.models import Judge, Round, RoundStats, TabSettings
+from mittab.apps.tab.models import Round, TabSettings
 
 
 def ballot_form_data(round_obj, **overrides):
@@ -97,17 +97,9 @@ class TestBallotForms(TestCase):
     def test_eballot_decimal_speak_precision_respects_setting(self):
         TabSettings.set("decimal_speaks", 2)
         round_obj = Round.objects.filter(round_number=1).first()
-        judge = round_obj.chair or Judge.objects.first()
-        judge.ballot_code = "DECIMAL1"
-        judge.save()
-        round_obj.chair = judge
-        round_obj.save(update_fields=["chair"])
-        RoundStats.objects.filter(round=round_obj).delete()
-
         valid_form = EBallotForm(
             ballot_form_data(
                 round_obj,
-                ballot_code=judge.ballot_code,
                 pm_speaks="30.7",
                 mg_speaks="29.3",
                 lo_speaks="28.2",
@@ -118,7 +110,6 @@ class TestBallotForms(TestCase):
         invalid_form = EBallotForm(
             ballot_form_data(
                 round_obj,
-                ballot_code=judge.ballot_code,
                 pm_speaks="30.75",
             ),
             round_instance=round_obj,
@@ -135,7 +126,6 @@ class TestBallotForms(TestCase):
         hundredths_form = EBallotForm(
             ballot_form_data(
                 round_obj,
-                ballot_code=judge.ballot_code,
                 pm_speaks="30.75",
             ),
             round_instance=round_obj,

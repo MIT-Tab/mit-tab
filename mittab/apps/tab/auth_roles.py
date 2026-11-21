@@ -197,6 +197,9 @@ PUBLIC_TOURNAMENT_VIEWS = {
     "public_judges", "public_teams", "public_expected_records", "rank_teams_public", "public_speaker_rankings",
     "public_ballots", "outround_pretty_pair", "public_motions",
     "team_portal_search", "team_portal", "public_tab_cards",
+    "judge_portal_sign_out", "team_portal_sign_out",
+    "legacy_team_portal", "legacy_judge_portal", "legacy_enter_e_ballot",
+    "legacy_view_submitted_ballot", "legacy_view_submitted_ballot_round", "legacy_previous_ballots",
 }
 
 COMMON_RESTRICTED_STAFF_VIEWS = {

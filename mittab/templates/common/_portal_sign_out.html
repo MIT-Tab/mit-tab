@@ -1,0 +1,5 @@
+<form method="post" action="{{ sign_out_url }}">
+  {% csrf_token %}
+  {% include "common/_portal_token.html" %}
+  <button type="submit" class="btn btn-outline-secondary btn-sm">Sign out</button>
+</form>

@@ -130,7 +130,7 @@ def _prepare_judge_code_plan(judges, tournament_name, request):
             continue
 
         portal_url = request.build_absolute_uri(
-            reverse("judge_portal", args=[judge.ballot_code])
+            reverse("legacy_judge_portal", args=[judge.ballot_code])
         )
         email_request = build_judge_ballot_code_email(
             email,
@@ -610,7 +610,7 @@ def _judge_email_management_context(request):
             "judge": judge,
             "preview": build_judge_ballot_code_email(
                 judge.email, judge, tournament_name,
-                request.build_absolute_uri(reverse("judge_portal", args=[judge.ballot_code])),
+                request.build_absolute_uri(reverse("legacy_judge_portal", args=[judge.ballot_code])),
                 request.build_absolute_uri(reverse("e_ballot_search")),
             ) if (judge.email and judge.ballot_code
                   and judge.is_valid_ballot_code(raise_error=False)) else None,
