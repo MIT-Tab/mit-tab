@@ -281,7 +281,10 @@ def public_expected_records(request):
     if not TabSettings.get("teams_public", 0):
         response = redirect("public_access_error")
     else:
-        checked_in = request.GET.get("teams") == "checked-in"
+        team_scope = request.GET.get("teams")
+        checked_in = team_scope == "checked-in" or (
+            team_scope is None and Round.objects.exists()
+        )
         teams = Team.objects.filter(checked_in=True) if checked_in else Team.objects.all()
         num_rounds = TabSettings.get("tot_rounds", 5)
         response = render(request, "public/expected_records.html", {
