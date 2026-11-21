@@ -1,10 +1,12 @@
 import json
 from datetime import date
 
+from django.conf import settings
 from django.db.models import Count, Min
 from django.http import JsonResponse
 from django.utils import timezone
 
+from mittab.apps.tab import forum_publication
 from mittab.apps.tab.black_rod_bundle import BlackRodBundleExporter
 from mittab.apps.tab.live_results import (
     final_inround_completed_at,
@@ -334,6 +336,8 @@ def import_results_api(request):
     payload = _build_live_results_payload(source_url, include_legacy_awards=True)
     ready = payload["availability"]["speakers"]
     payload["import_ready"] = ready
+    if forum_publication.publication_enabled():
+        payload["forum_publication_id"] = settings.APDA_FORUM_PUBLICATION_ID
     varsity, varsity_ids = _get_team_placements_and_ids(Team.VARSITY)
     novice, novice_ids = _get_team_placements_and_ids(Team.NOVICE)
     payload.update(varsity_team_placements=varsity, novice_team_placements=novice)

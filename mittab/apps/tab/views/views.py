@@ -13,11 +13,12 @@ from django.http import (
     HttpResponseForbidden,
     JsonResponse,
 )
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from django.shortcuts import render, redirect, reverse
 from django.core.management import call_command
 import yaml
 
+from mittab.apps.tab import forum_publication
 from mittab.apps.tab.archive import ArchiveExporter
 from mittab.apps.tab.auth_roles import (
     CAP_ADD_SCRATCHES,
@@ -1279,9 +1280,47 @@ def public_rankings_control(request):
     )
 
 
+@require_http_methods(["GET", "HEAD", "POST"])
 def forum_post(request):
-    # Get dino judges
-    dinos = Judge.objects.filter(is_dino=True).values_list("name", flat=True)
+    can_publish = (
+        forum_publication.publication_enabled()
+        and request.user.is_superuser
+        and not is_apda_board_user(request.user)
+    )
+    if request.method == "POST" and not can_publish:
+        return HttpResponseForbidden()
+
+    dinos, confirmation = forum_publication.dino_roster()
+    missing_finals = forum_publication.finals_missing() if can_publish else []
+    if request.method == "POST":
+        if missing_finals:
+            messages.error(request, " ".join(missing_finals))
+            return redirect("forum_post")
+        if request.POST.get("confirm_dinos") != confirmation:
+            messages.error(request, "The dino judge list changed. Review the current list before posting.")
+            return redirect("forum_post")
+        try:
+            url = forum_publication.publish_results(forum_publication.results_body(_forum_results(dinos)))
+        except forum_publication.ForumPublicationError as error:
+            messages.error(request, str(error))
+            return redirect("forum_post")
+        TabSettings.set("forum_results_url", url)
+        messages.success(request, "Results posted to the APDA Forum.")
+        return redirect("forum_post")
+
+    context = _forum_results(dinos)
+    if can_publish:
+        context.update(
+            can_publish_forum_results=True,
+            forum_confirmation=confirmation,
+            forum_missing_finals=missing_finals,
+            forum_results_url=TabSettings.get("forum_results_url", ""),
+            forum_publication_id=settings.APDA_FORUM_PUBLICATION_ID,
+        )
+    return render(request, "tab/forum_post.html", context)
+
+
+def _forum_results(dinos):
 
     # Get top debaters (limiting to top 10)
     varsity_debaters, nov_debaters = get_speaker_rankings(None)
@@ -1336,7 +1375,7 @@ def forum_post(request):
         novice_champ = (novice_finals.gov_team if novice_finals.victor % 2 == 1
                         else novice_finals.opp_team)
 
-    return render(request, "tab/forum_post.html", {
+    return {
         "dinos": dinos,
         "nov_debaters": nov_debaters,
         "varsity_debaters": varsity_debaters,
@@ -1348,4 +1387,4 @@ def forum_post(request):
         "varsity_outs": varsity_outs["results"],
         "novice_champ": novice_champ,
         "varsity_champ": varsity_champ,
-    })
+    }
