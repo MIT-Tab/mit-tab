@@ -19,6 +19,10 @@ BLACK_ROD_API_BASE_URL = os.environ.get(
     "https://results.apda.online",
 ).rstrip("/")
 BLACK_ROD_PRIVATE_API_TOKEN = os.environ.get("BLACK_ROD_PRIVATE_API_TOKEN", "")
+APDA_FORUM_URL = os.environ.get("APDA_FORUM_URL", "").rstrip("/")
+APDA_FORUM_PUBLICATION_ID = os.environ.get("APDA_FORUM_PUBLICATION_ID", "")
+APDA_FORUM_TOURNAMENT_TOKEN = os.environ.get("APDA_FORUM_TOURNAMENT_TOKEN", "")
+
 
 ALLOWED_HOSTS = ["*"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

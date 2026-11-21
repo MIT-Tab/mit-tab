@@ -16,6 +16,7 @@ Adding-Teams,-Judges,-Rooms-and-Debaters
 Before-Round-1
 Running-a-Tournament
 Outrounds
+Forum-Results
 Live-Results
 results-import-api
 Board-Access
