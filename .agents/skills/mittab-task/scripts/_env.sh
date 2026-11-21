@@ -25,6 +25,7 @@ export MT_PORT="${MT_PORT:-$((8100 + $(printf %s "$MT_ROOT" | cksum | cut -d' ' 
 export MT_STATE="${TMPDIR:-/tmp}/mittab-agent/${MT_SLUG}-${MT_ID}"
 export MT_CHROME_LIBS="${MT_CHROME_LIBS:-$HOME/.cache/mittab-chrome-libs/usr/lib/x86_64-linux-gnu}"
 mkdir -p "$MT_STATE"
+export MITTAB_FILE_CACHE_LOCATION="$MT_STATE/cache"
 
 mt_mysql() {
   MYSQL_PWD="$MYSQL_PASSWORD" mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -NBe "$1"

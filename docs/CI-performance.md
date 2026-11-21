@@ -32,7 +32,7 @@ Representative backend builds:
 | [5364](https://circleci.com/gh/MIT-Tab/mit-tab/5364) | 224, 185, 144, 531 sec |
 | [5357](https://circleci.com/gh/MIT-Tab/mit-tab/5357) | 241, 644, 181, 195 sec |
 
-## Changes
+## First optimization (merged)
 
 The splitter used imported module names, while JUnit used paths relative to the
 repository. Tests in directories without `__init__.py` therefore had different
@@ -66,6 +66,54 @@ jobs start together; account concurrency limits can introduce queueing. Total
 test work is unchanged, but additional shards repeat setup and fixture loading.
 CircleCI remains the provider because test execution and imbalance dominate
 the measured critical path; a provider migration would not fix the identifier bug.
+
+## Second optimization: toward one minute
+
+The first merged run ([backend 5408](https://circleci.com/gh/MIT-Tab/mit-tab/5408),
+[browser 5407](https://circleci.com/gh/MIT-Tab/mit-tab/5407)) finished the backend
+in 3.80 minutes and the browser job in 3.29 minutes. Backend test steps were now
+balanced at 163–195 seconds. Lint took 1.41 minutes and Docker took 1.33 minutes.
+These are individual job durations, before this second optimization.
+
+A local cProfile run of `test_repeated_rounds_exhaust_each_bye_tier` found that
+`rank_teams()` consumed 93 of the 114 seconds inside `pair_round()`. It scored
+all 157 fixture teams on every later round even when only a few were paired.
+Pairing now ranks just the teams in the generated pairings. The same prefetches
+retain historical opponents, including absent opponents; full public/staff
+rankings still include every team by default. Regression tests compare subset
+scores and order with full rankings, and the existing golden tournament tests
+continue to verify exact pairings. No-show records are inserted in bulk with the
+same teams and round numbers; `NoShow` has no custom save method or save signals.
+
+The browser's tournament setup test previously spent 109 seconds in its test
+body. Its shared helper slept a second after every page visit, including two
+visits for each roster entry. It now waits for document readiness and outstanding
+jQuery requests, retaining thirty seconds for a slow page. Text assertions poll
+every 50 ms rather than 500 ms, with the same timeout.
+
+Backend parallelism rises to twelve `medium` shards. The complete tournament test
+is a separate test class from the repair workflows, allowing their unchanged
+assertions to run on different timing shards. Peak concurrent job instances rise
+from thirteen to nineteen, subject to the account's concurrency limit.
+
+Pytest already creates and migrates its own database, so the separate application
+database initialization is removed. Browser jobs still collect static files.
+Browser bundles are cached using the contents of tracked frontend sources,
+package manifests/lockfile, Webpack/Babel configuration and Node version. Changed
+build inputs get a fresh build; templates and Python code always come from the
+current checkout. Python lint uses the two available CPUs with `--jobs=2`.
+
+The filesystem cache retains Django's file-based backend but uses CircleCI's
+`/mnt/ramdisk` during tests. Local helpers give each checkout a separate cache
+directory alongside its private database, preventing concurrent worktrees from
+sharing cached round settings. Production keeps `/var/tmp/django_cache` unless
+`MITTAB_FILE_CACHE_LOCATION` is explicitly set.
+
+Every test, browser assertion, coverage upload and PR job remains enabled. The
+second pass still needs a completed CI measurement: a sixty-second total is an
+aspiration, not a guarantee. Docker's measured eighty-second cold build and
+occasional 30–45-second container startup delays already exceed that budget;
+cache warmth, queueing and the longest indivisible test also affect the result.
 
 ## Verify a change
 

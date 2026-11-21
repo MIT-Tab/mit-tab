@@ -25,8 +25,10 @@ def rank_speakers():
     ])
 
 
-def rank_teams(exclude_round=None, up_to_round=None):
-    all_teams = Team.objects.all().prefetch_related(
+def rank_teams(exclude_round=None, up_to_round=None, teams=None):
+    if teams is None:
+        teams = Team.objects.all()
+    all_teams = teams.prefetch_related(
         "gov_team",  # poorly named relation, gets rounds as gov team
         "opp_team",  # poorly named relation, rounds as opp team
         "gov_team_outround",  # outround data for gov team
