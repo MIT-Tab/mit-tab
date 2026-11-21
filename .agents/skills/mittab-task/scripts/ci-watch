@@ -2,8 +2,8 @@
 """Wait for a PR's CI without spending agent tokens.
 
 Usage:
-  uv run python ci-watch [PR]             # Claude/other agents: background this via the tool
-  uv run python ci-watch [PR] --detach    # Codex: queue to CODEX_THREAD_ID / --thread
+  uv run python ci-watch [PR]             # Terminal: print the result and exit
+  uv run python ci-watch [PR] --detach    # Codex: queue failures to CODEX_THREAD_ID / --thread
 
 Without a thread, --detach only writes the result to the printed local file.
 
@@ -77,7 +77,7 @@ def ok(check):
 
 
 def wait_for_checks(pr, interval, timeout):
-    """Poll quietly; return (head_sha, checks) once every check is done on two consecutive polls."""
+    """Return on the first failure or two matching successful snapshots of the PR head."""
     started = time.monotonic()
     stable = None
     while True:
@@ -88,6 +88,8 @@ def wait_for_checks(pr, interval, timeout):
             data = None  # transient API/network error; try again next interval
         if data:
             checks = data.get("statusCheckRollup") or []
+            if any(done(c) and not ok(c) for c in checks):
+                return data["headRefOid"], checks
             if checks and all(done(c) for c in checks):
                 signature = (data["headRefOid"], tuple(sorted(name(c) for c in checks)))
                 if signature == stable:
@@ -126,8 +128,8 @@ def circleci_log_tail(target_url, lines=60):
     return "\n".join(parts) or None
 
 
-def report(pr, sha, checks):
-    failed = [c for c in checks if not ok(c)]
+def report(pr, sha, checks, *, include_logs=True):
+    failed = [c for c in checks if done(c) and not ok(c)]
     head = f"PR #{pr} @ {sha[:7]}: "
     if not failed:
         return True, head + f"CI PASSED ({len(checks)} checks green)."
@@ -136,6 +138,8 @@ def report(pr, sha, checks):
         state = check.get("conclusion") or check.get("state")
         url = check.get("targetUrl") or check.get("detailsUrl") or ""
         lines.append(f"* {name(check)}: {state} {url}")
+    if not include_logs:
+        return False, "\n".join(lines)
     for check in failed:
         try:
             tail = circleci_log_tail(check.get("targetUrl"))
@@ -165,33 +169,35 @@ def background(args):
             handle.write(f"[{time.strftime('%H:%M:%S')}] {text}\n")
 
     log(f"watching PR #{args.pr} for thread {args.thread}")
+    checks = []
     try:
         sha, checks = wait_for_checks(args.pr, args.interval, args.timeout)
-        passed, summary = report(args.pr, sha, checks)
+        passed, summary = report(args.pr, sha, checks, include_logs=not args.thread)
     except Exception as exc:  # pylint: disable=broad-except
         passed, summary = False, f"ci-watch for PR #{args.pr} stopped: {exc}"
+
     log(summary)
     (STATE / f"ci-watch-{args.pr}.result").write_text(summary + "\n", encoding="utf-8")
-    if passed:
-        message = (f"[ci-watch] {summary}\nCI is done; do not check it again. Finish the task: "
-                   "give the user the final summary with the PR link.")
-    else:
-        message = (f"[ci-watch] {summary}\n\nFix the failure (reproduce locally with mt-test or "
-                   "lint first), push, then run `ci-watch --detach` again and end your turn.")
-    if args.thread and (passed or not args.only_pass):
-        wake(args.thread, message, log)
-    (STATE / f"ci-watch-{args.pr}.pid").unlink(missing_ok=True)
+    try:
+        if args.thread and not passed:
+            wake(args.thread, f"[ci-watch] {summary}", log)
+            if checks:
+                # Logs may be unavailable while the workflow is still running.
+                # Notify first so fetching logs cannot delay the alert.
+                _, detailed_summary = report(args.pr, sha, checks)
+                if detailed_summary != summary:
+                    log(detailed_summary)
+    finally:
+        (STATE / f"ci-watch-{args.pr}.pid").unlink(missing_ok=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("pr", nargs="?", help="PR number/URL (default: current branch's PR)")
-    parser.add_argument("--detach", action="store_true", help="watch in background; notify if thread set")
+    parser.add_argument("--detach", action="store_true", help="watch in background; report failures to the configured thread")
     parser.add_argument("--thread", default=os.environ.get("CODEX_THREAD_ID"),
                         help="Codex thread to wake (default: $CODEX_THREAD_ID)")
-    parser.add_argument("--only-pass", action="store_true",
-                        help="with --detach, wake the agent only if CI passes")
     parser.add_argument("--interval", type=int, default=60)
     parser.add_argument("--timeout", type=int, default=3 * 3600, help="seconds; 0 = forever")
     parser.add_argument("--background", action="store_true", help=argparse.SUPPRESS)
@@ -215,7 +221,7 @@ def main():
         codex = shutil.which("codex")
         if not codex or subprocess.run([codex, "queue", "--help"],
                                        capture_output=True).returncode:
-            sys.exit("Codex queue is unavailable; use foreground background-task mode instead")
+            sys.exit("Codex queue is unavailable; omit --thread and unset CODEX_THREAD_ID to save results locally")
     pid_file = STATE / f"ci-watch-{args.pr}.pid"
     if pid_file.exists():
         try:
@@ -225,7 +231,7 @@ def main():
     (STATE / f"ci-watch-{args.pr}.result").unlink(missing_ok=True)
     command = [sys.executable, os.path.abspath(__file__), str(args.pr), "--background",
                "--interval", str(args.interval),
-               "--timeout", str(args.timeout)] + (["--only-pass"] if args.only_pass else [])
+               "--timeout", str(args.timeout)]
     if thread:
         command.extend(["--thread", thread])
     proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -233,7 +239,7 @@ def main():
                             start_new_session=True, env=os.environ.copy())
     pid_file.write_text(str(proc.pid))
     print(f"Watching CI for PR #{args.pr} in the background (log {STATE}/ci-watch-{args.pr}.log). "
-          + ("End your turn now; the result will be queued to the specified Codex thread."
+          + ("Failures will be queued to the specified Codex thread."
              if thread else f"No notification configured. Result: {STATE}/ci-watch-{args.pr}.result"))
     return 0
 

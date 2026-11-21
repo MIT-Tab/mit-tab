@@ -70,29 +70,26 @@ gh pr create -R MIT-Tab/mit-tab --base master --head "$(git branch --show-curren
   --title "..." --body-file <file>
 ```
 
-## CI: one watcher, no agent polling
+## CI: detach once and end the turn
 
-The helper polls GitHub quietly at 60-second intervals and prints once when the
-current PR head's checks finish, including failing CircleCI log tails. It has no
-Python dependencies beyond the standard library; invoke with `uv run python`.
+After opening or updating the PR, run `uv run python "$S/ci-watch" --detach` once and give the user the
+handoff with the PR link. Do not manually poll CI or start a second watcher for
+the same PR.
 
-- **Claude Code, or Codex with background task completion notifications:** run
-  `uv run python "$S/ci-watch"` once using the execution tool's background-task
-  mode (Claude: `run_in_background: true`). End the turn and wait for that tool's
-  completion notification. Do not repeatedly read its output or task status.
-- **Codex with `CODEX_THREAD_ID` and a CLI supporting `codex queue`:** run
-  `uv run python "$S/ci-watch" --detach` and end the turn. The watcher queues the
-  result to that explicit thread; `--thread <id>` may also be provided. Never
-  guess another session ID. If `codex` is not on PATH or lacks `queue`, use the
-  background-task method above instead.
-- **Plain terminal / no agent notifications:** run the watcher once in the
-  foreground. `--detach` without a thread instead saves a `.result` file at the
-  printed path; it cannot wake an agent. Report this limitation rather than
-  promising a notification or starting a polling loop.
+The watcher checks GitHub every 60 seconds and reports the first completed failing
+check it sees, even while other checks are running. It sends the check names and
+links before fetching log tails. Two matching successful snapshots of the current
+PR head end the watch quietly. The default timeout is three hours.
 
-On failure, read the reported logs, reproduce locally, fix and push, then start
-one new watcher. On success, give the final summary and PR link. Do not call
-`gh pr checks`, manually poll, or run a second watcher alongside this one.
+With `CODEX_THREAD_ID` and `codex queue`, the watcher alerts the current chat
+on failure or if it stops before reaching a result. You can also supply the
+current chat explicitly with `--thread`. Without notification support, detach
+without a thread and tell the user where the result file will be saved. Use
+foreground mode for an explicit terminal check.
+
+When a failure alert arrives, tell the user which check failed right away.
+Use the check link or the watcher log to investigate. After a fix, push and
+start one new watcher.
 
 ## Keep context small
 
