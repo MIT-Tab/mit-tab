@@ -21,6 +21,7 @@
 {% url "download_archive" as download_archive %}
 {% url "download_black_rod_bundle" as download_black_rod_bundle %}
 {% url "round_stats" as round_stats %}
+{% url "judge_speaker_points" as judge_speaker_points %}
 {% url "forum_post" as forum_post %}
 
 {% url "enter_debater" as enter_debater %}
@@ -107,13 +108,14 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request round_stats %}{% active request forum_post %}">
+          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request round_stats %}{% active request judge_speaker_points %}{% active request forum_post %}">
             Rankings
           </a>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters|with_return_to }}">Debater Ranking</a>
             <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams|with_return_to }}">Team Ranking</a>
             <a class="dropdown-item {% active request round_stats %}" href="{{ round_stats }}">Round Stats</a>
+            <a class="dropdown-item {% active request judge_speaker_points %}" href="{{ judge_speaker_points }}">Judge Speaker Points</a>
             <a class="dropdown-item {% active request forum_post %}" href="{{ forum_post|with_return_to }}">Forum Post Results</a>
           </div>
         </li>

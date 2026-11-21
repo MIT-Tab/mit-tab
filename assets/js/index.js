@@ -2,6 +2,7 @@ import "../css/app.scss";
 import "../css/mobile.scss";
 import "../css/navigation.scss";
 import "../css/tab-cards.scss";
+import "../css/judge-speaker-points.scss";
 
 import "./pairing";
 import "./outround";

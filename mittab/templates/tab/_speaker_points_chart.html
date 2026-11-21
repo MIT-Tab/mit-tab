@@ -1,0 +1,25 @@
+{% load l10n %}
+<svg viewBox="0 0 {{ plot.width }} 303" class="speaker-points-chart {{ chart_class }}" role="img" aria-label="Mean speaks versus generosity by judge. Exact values are in the judge table.">
+  <rect class="speaker-points-field" x="56" y="18" width="{{ plot.field_width }}" height="230" rx="4" />
+  {% for tick in plot.y_ticks %}
+  <line class="speaker-points-grid{% if tick.zero %} speaker-points-zero{% endif %}" x1="56" x2="{{ plot.right }}" y1="{{ tick.position|unlocalize }}" y2="{{ tick.position|unlocalize }}" />
+  <text class="speaker-points-tick" x="47" y="{{ tick.position|unlocalize }}" text-anchor="end" dominant-baseline="central">{{ tick.text }}</text>
+  {% endfor %}
+  {% for tick in plot.x_ticks %}
+  <line class="speaker-points-grid" x1="{{ tick.position|unlocalize }}" x2="{{ tick.position|unlocalize }}" y1="18" y2="248" />
+  <text class="speaker-points-tick" x="{{ tick.position|unlocalize }}" y="268" text-anchor="middle">{{ tick.text }}</text>
+  {% endfor %}
+  <text class="speaker-points-axis" x="{{ plot.x_label }}" y="295" text-anchor="middle">Mean speaker points</text>
+  <text class="speaker-points-axis" x="15" y="133" text-anchor="middle" transform="rotate(-90 15 133)">Generosity (points)</text>
+  {% for label in plot.labels %}
+  <line class="speaker-points-leader" x1="{{ label.point.x|unlocalize }}" y1="{{ label.point.y|unlocalize }}" x2="{{ label.x|unlocalize }}" y2="{{ label.y|unlocalize }}" />
+  {% endfor %}
+  {% for point in plot.points %}
+  <circle class="speaker-points-dot{% if point.highlight %} speaker-points-highlight{% endif %}" cx="{{ point.x|unlocalize }}" cy="{{ point.y|unlocalize }}" r="{% if point.highlight %}5.5{% else %}4.2{% endif %}">
+    <title>{{ point.name }} · Mean {{ point.mean|floatformat:2 }} · Generosity {{ point.generosity|floatformat:2 }}</title>
+  </circle>
+  {% endfor %}
+  {% for label in plot.labels %}
+  <text class="speaker-points-label{% if label.point.highlight %} speaker-points-highlight{% endif %}" x="{{ label.x|unlocalize }}" y="{{ label.y|unlocalize }}" text-anchor="{{ label.anchor }}" dominant-baseline="central">{{ label.text }}<title>{{ label.point.name }}</title></text>
+  {% endfor %}
+</svg>
