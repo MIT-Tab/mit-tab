@@ -103,6 +103,18 @@ Tab cards display:
 - Judges assigned to each round
 - Current tournament statistics and standings
 
+## Comparing Judge Speaker Points
+
+Go to **Rankings → Judge Speaker Points** to see each judge’s average speaker
+points and generosity across scored inrounds. Generosity compares each score
+with the same debater’s average in their other scored rounds. The report
+starts at three scored rounds per judge. Set **Minimum rounds** to include
+judges with fewer rounds, or use **Highlight judges** to find them in the
+chart and table.
+
+Every panelist is credited with the same saved scores for the debate.
+The report excludes byes, forfeits, all-wins, and all-drops.
+
 (pairing-the-next-round)=
 ## Pairing the Next Round
 

@@ -1,0 +1,119 @@
+.judge-speaker-points {
+  --speaker-points-ink: #263c55;
+  --speaker-points-muted: #4d627a;
+  --speaker-points-highlight: #a63e29;
+
+  .speaker-points-figure {
+    padding: clamp(0.85rem, 2.2vw, 1.5rem);
+    border: 1px solid #dbe5f0;
+    background: #f8fafd;
+    color: var(--speaker-points-ink);
+  }
+
+  .speaker-points-chart {
+    display: block;
+    width: 100%;
+    max-width: 58rem;
+    margin: 0 auto;
+    font-family: inherit;
+  }
+
+  .speaker-points-field {
+    fill: #fff;
+  }
+
+  .speaker-points-grid {
+    stroke: #dfe8f2;
+  }
+
+  .speaker-points-zero {
+    stroke: #8095ad;
+    stroke-width: 1.4px;
+  }
+
+  .speaker-points-tick,
+  .speaker-points-axis {
+    fill: var(--speaker-points-muted);
+    font-size: 12px;
+  }
+
+  .speaker-points-axis {
+    font-weight: 600;
+  }
+
+  .speaker-points-dot {
+    fill: #688eaf;
+    stroke: #fff;
+    stroke-width: 1.2px;
+  }
+
+  .speaker-points-dot.speaker-points-highlight {
+    fill: var(--speaker-points-highlight);
+  }
+
+  .speaker-points-leader {
+    stroke: #8095ad;
+    stroke-width: 0.8px;
+  }
+
+  .speaker-points-label {
+    fill: var(--speaker-points-ink);
+    font-size: 11px;
+    stroke: #fff;
+    stroke-width: 3px;
+    paint-order: stroke;
+  }
+
+  .speaker-points-label.speaker-points-highlight {
+    fill: var(--speaker-points-highlight);
+    font-weight: 700;
+  }
+
+  .speaker-points-table {
+    font-variant-numeric: tabular-nums;
+
+    th,
+    td {
+      padding: 0.5rem 0.55rem;
+    }
+
+    thead {
+      background: #e8eff7;
+      color: var(--speaker-points-ink);
+    }
+
+    tbody th {
+      font-weight: 500;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f6f9fc;
+    }
+
+    tbody tr.speaker-points-highlight {
+      background: #fff0e5;
+
+      th {
+        color: var(--speaker-points-highlight);
+        font-weight: 700;
+      }
+    }
+  }
+
+  .speaker-points-rank {
+    display: inline-block;
+    min-width: 2.1rem;
+    color: var(--speaker-points-muted);
+  }
+
+  @media (max-width: 575.98px) {
+    .speaker-points-rank {
+      display: block;
+    }
+
+    .speaker-points-table th,
+    .speaker-points-table td {
+      padding-inline: 0.35rem;
+    }
+  }
+}

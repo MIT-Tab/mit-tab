@@ -1,0 +1,98 @@
+{% extends "base/__wide.html" %}
+{% load l10n tags %}
+
+{% block title %}Judge Speaker Points{% endblock %}
+{% block banner %}Judge Speaker Points{% endblock %}
+
+{% block content %}
+<div class="col-12 judge-speaker-points">
+  <p class="text-muted mb-4">{% tournament_name %} · Inrounds</p>
+
+  <form class="form-row align-items-end mb-4" method="get">
+    <div class="col-5 col-sm-3 col-lg-2">
+      <label for="{{ filters.minimum_rounds.id_for_label }}">Minimum rounds</label>
+      {{ filters.minimum_rounds }}
+    </div>
+    {% if judges %}
+    <div class="col-7 col-sm-6 col-lg-5">
+      <label for="highlight-judges">Highlight judges</label>
+      <select id="highlight-judges" name="judge" class="form-control js-multiselect" multiple>
+        {% for judge in judges %}
+        <option value="{{ judge.id|unlocalize }}"{% if judge.highlight %} selected{% endif %}>{{ judge.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-auto mt-2">
+      <button type="submit" class="btn btn-primary">Apply</button>
+    </div>
+    {% if filters.errors %}
+    <div class="col-12 mt-2 text-danger" role="alert">Enter a whole number of rounds, at least 1.</div>
+    {% endif %}
+  </form>
+
+  {% if metrics %}
+  <figure class="speaker-points-figure rounded mb-4">
+    <h4 class="h5 mb-1">Mean speaks and generosity</h4>
+    <p class="small text-muted mb-3">{{ metrics|length }} judge{{ metrics|pluralize }} with at least {{ minimum_rounds }} scored round{{ minimum_rounds|pluralize }}</p>
+
+    {% if plot %}
+    {% include "tab/_speaker_points_chart.html" with chart_class="d-none d-md-block" %}
+    {% include "tab/_speaker_points_chart.html" with plot=mobile_plot chart_class="d-md-none" %}
+    {% else %}
+    <p class="mb-2">The chart will appear when there are scores to compare across rounds.</p>
+    {% endif %}
+
+    <figcaption class="small text-muted mt-2">
+      Generosity is the average difference between each score and that debater’s mean in their other scored rounds.
+      Panelists share the saved round scores. Byes, forfeits, all-wins, and all-drops are excluded.
+    </figcaption>
+  </figure>
+
+  <h4 class="h5 mb-3">All qualifying judges</h4>
+  <div class="row">
+    {% for panel in panels %}
+    <div class="col-12{% if panels|length > 1 %} col-xl-6{% endif %}">
+      <div class="table-responsive">
+        <table class="table table-sm speaker-points-table">
+          <caption class="sr-only">Judge speaker points, sorted by mean speaker points</caption>
+          <thead>
+            <tr>
+              <th scope="col">Judge</th>
+              <th scope="col" class="text-right">Rounds</th>
+              <th scope="col" class="text-right">Mean speaks</th>
+              <th scope="col" class="text-right">Generosity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in panel %}
+            <tr{% if row.highlight %} class="speaker-points-highlight"{% endif %}>
+              <th scope="row">{{ row.name }}</th>
+              <td class="text-right">{{ row.rounds }}</td>
+              <td class="text-right">
+                {{ row.mean|floatformat:2 }}
+                <small class="speaker-points-rank"><span class="sr-only">Rank </span>#{{ row.mean_rank }}</small>
+              </td>
+              <td class="text-right">
+                {% if row.generosity is not None %}
+                  {% if row.generosity > 0 %}+{% endif %}{{ row.generosity|floatformat:2 }}
+                  <small class="speaker-points-rank"><span class="sr-only">Rank </span>#{{ row.generosity_rank }}</small>
+                {% else %}
+                  <span aria-label="No scores in other rounds">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="speaker-points-figure rounded mb-0">
+    No judges have {{ minimum_rounds }} scored round{{ minimum_rounds|pluralize }} yet. Lower the minimum or enter more results to see the report.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}
