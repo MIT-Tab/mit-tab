@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.cache import caches
-from django.http import HttpResponse
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -32,6 +31,7 @@ from mittab.apps.tab.models import (
     Team,
     TournamentStaffRole,
 )
+from mittab.apps.tab.portal_sessions import judge_session
 from mittab.apps.tab.public_rankings import (
     get_ballot_round_settings,
     get_public_display_flags,
@@ -50,6 +50,7 @@ from mittab.apps.tab.views.public_views import (
 )
 from mittab.libs.cacheing import cache_logic
 from mittab.libs.cacheing.public_cache import invalidate_inround_public_pairings_cache
+from mittab.libs.tests.test_forms import ballot_form_data
 
 
 @pytest.mark.django_db(transaction=True)
@@ -173,6 +174,15 @@ class TestPublicViews(TestCase):
         self.test_round.judges.add(judge)
         return judge, self.test_round
 
+    def _sign_in_judge(self, client, judge):
+        response = client.post(
+            reverse("e_ballot_search"), {"ballot_code": judge.ballot_code}
+        )
+        self.assertRedirects(
+            response, reverse("judge_portal"), fetch_redirect_response=False
+        )
+        return client.session[judge_session.session_key]["token"]
+
     def _make_judge(self, name):
         return Judge.objects.create(name=name, rank=Decimal("4.50"))
 
@@ -225,7 +235,7 @@ class TestPublicViews(TestCase):
                 chair_round.chair = judge
                 chair_round.save()
 
-                url = reverse("enter_e_ballot", args=[judge.ballot_code])
+                url = reverse("legacy_enter_e_ballot", args=[judge.ballot_code])
                 response = client.get(url)
                 self.assertIn(response.status_code, [200, 302],
                     "Failed to handle e-ballot entry for valid ballot code")
@@ -304,9 +314,8 @@ class TestPublicViews(TestCase):
             debater_role="lo",
         )
 
-        context = _submitted_ballot_context(round_obj, "CTX123")
+        context = _submitted_ballot_context(round_obj, round_obj.chair)
 
-        self.assertEqual(context["ballot_code"], "CTX123")
         self.assertEqual(context["winner_display"], "UNKNOWN")
         self.assertEqual(
             context["gov_debaters"][0]["name"],
@@ -322,18 +331,19 @@ class TestPublicViews(TestCase):
     def test_view_submitted_ballot_redirects_without_matching_judge(self):
         client = Client()
 
-        response = client.get(reverse("view_submitted_ballot", args=["BADCODE"]))
+        response = client.get(reverse("legacy_view_submitted_ballot", args=["BADCODE"]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(response.url, reverse("e_ballot_search"))
 
     def test_view_submitted_ballot_redirects_when_ballot_not_submitted(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         RoundStats.objects.filter(round=round_obj).delete()
 
         response = client.get(
-            reverse("view_submitted_ballot", args=[judge.ballot_code])
+            reverse("view_submitted_ballot")
         )
 
         self.assertEqual(response.status_code, 302)
@@ -342,11 +352,12 @@ class TestPublicViews(TestCase):
     def test_view_submitted_ballot_renders_submitted_ballot(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         self._set_disclosure_settings(True, False)
         self._create_round_stats(round_obj)
 
         response = client.get(
-            reverse("view_submitted_ballot", args=[judge.ballot_code])
+            reverse("view_submitted_ballot")
         )
 
         self.assertEqual(response.status_code, 200)
@@ -360,12 +371,13 @@ class TestPublicViews(TestCase):
     def test_submitted_ballot_allows_written_rfd_until_deadline(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
         self._create_round_stats(round_obj)
         TabSettings.set("written_rfd_first_round", round_obj.round_number)
         TabSettings.set("written_rfd_deadline", "2099-01-01 12:00")
 
         response = client.get(
-            reverse("view_submitted_ballot", args=[judge.ballot_code])
+            reverse("view_submitted_ballot")
         )
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
@@ -374,8 +386,8 @@ class TestPublicViews(TestCase):
         self.assertIn("You can edit this written RFD until", content)
 
         response = client.post(
-            reverse("view_submitted_ballot", args=[judge.ballot_code]),
-            {"rfd": "Gov won the central weighing clash."},
+            reverse("view_submitted_ballot_round", args=[round_obj.pk]),
+            {"portal_token": token, "rfd": "Gov won the central weighing clash."},
         )
         self.assertEqual(response.status_code, 302)
         round_obj.refresh_from_db()
@@ -384,6 +396,7 @@ class TestPublicViews(TestCase):
     def test_submitted_ballot_blocks_written_rfd_after_deadline(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
         self._create_round_stats(round_obj)
         round_obj.rfd = "Original RFD"
         round_obj.save(update_fields=["rfd"])
@@ -391,8 +404,8 @@ class TestPublicViews(TestCase):
         TabSettings.set("written_rfd_deadline", "2000-01-01 12:00")
 
         response = client.post(
-            reverse("view_submitted_ballot", args=[judge.ballot_code]),
-            {"rfd": "Changed too late"},
+            reverse("view_submitted_ballot_round", args=[round_obj.pk]),
+            {"portal_token": token, "rfd": "Changed too late"},
         )
         self.assertEqual(response.status_code, 302)
         round_obj.refresh_from_db()
@@ -401,6 +414,7 @@ class TestPublicViews(TestCase):
     def test_previous_ballots_lists_submitted_prior_rounds(self):
         client = Client()
         judge, _ = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         previous_round = Round.objects.filter(round_number=1).first()
         previous_round.chair = judge
         previous_round.save()
@@ -408,7 +422,7 @@ class TestPublicViews(TestCase):
         self._create_round_stats(previous_round)
         TabSettings.set("written_rfd_first_round", previous_round.round_number)
 
-        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+        response = client.get(reverse("previous_ballots"))
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
@@ -417,7 +431,7 @@ class TestPublicViews(TestCase):
         self.assertIn(
             reverse(
                 "view_submitted_ballot_round",
-                args=[judge.ballot_code, previous_round.id],
+                args=[previous_round.id],
             ),
             content,
         )
@@ -425,9 +439,10 @@ class TestPublicViews(TestCase):
     def test_previous_ballots_lists_submitted_current_ballot_round(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         self._create_round_stats(round_obj)
 
-        response = client.get(reverse("previous_ballots", args=[judge.ballot_code]))
+        response = client.get(reverse("previous_ballots"))
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
@@ -435,27 +450,31 @@ class TestPublicViews(TestCase):
         self.assertIn(
             reverse(
                 "view_submitted_ballot_round",
-                args=[judge.ballot_code, round_obj.id],
+                args=[round_obj.id],
             ),
             content,
         )
 
-    def test_enter_e_ballot_post_missing_round_id_redirects(self):
+    def test_enter_e_ballot_post_missing_round_id_rerenders_entry(self):
         client = Client()
-        judge, _ = self._prepare_ballot_round()
+        judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
+        RoundStats.objects.filter(round=round_obj).delete()
 
-        response = client.post(reverse("enter_e_ballot", args=[judge.ballot_code]), {})
+        response = client.post(reverse("enter_e_ballot"), {"portal_token": token})
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("e_ballot_search"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("round_instance", response.context["form"].errors)
 
     def test_enter_e_ballot_post_invalid_form_rerenders_entry(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
+        RoundStats.objects.filter(round=round_obj).delete()
 
         response = client.post(
-            reverse("enter_e_ballot", args=[judge.ballot_code]),
-            {"round_instance": round_obj.id},
+            reverse("enter_e_ballot"),
+            {"portal_token": token, "round_instance": round_obj.id},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -464,27 +483,44 @@ class TestPublicViews(TestCase):
     def test_enter_e_ballot_post_valid_redirects_to_submitted_view(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
+        RoundStats.objects.filter(round=round_obj).delete()
 
-        with patch("mittab.apps.tab.views.public_views.EBallotForm") as mock_form_class:
-            mock_form = MagicMock()
-            mock_form.is_valid.return_value = True
-            mock_form.save.return_value = round_obj
-            mock_form_class.return_value = mock_form
-
-            response = client.post(
-                reverse("enter_e_ballot", args=[judge.ballot_code]),
-                {"round_instance": round_obj.id},
-            )
-
+        response = client.post(
+            reverse("enter_e_ballot"), ballot_form_data(round_obj, portal_token=token)
+        )
+        self.assertEqual(RoundStats.objects.filter(round=round_obj).count(), 4)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            reverse("view_submitted_ballot", kwargs={"ballot_code": judge.ballot_code}),
+            reverse("view_submitted_ballot_round", args=[round_obj.pk]),
         )
+
+    def test_current_ballot_post_rejects_a_different_round(self):
+        client = Client()
+        judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
+        RoundStats.objects.filter(round=round_obj).delete()
+        previous_round = Round.objects.filter(round_number=1).first()
+        original_result = previous_round.victor
+
+        response = client.post(
+            reverse("enter_e_ballot"),
+            ballot_form_data(
+                round_obj, portal_token=token, round_instance=previous_round.pk
+            ),
+        )
+
+        self.assertContains(response, "This ballot is no longer current.")
+        self.assertFalse(RoundStats.objects.filter(round=round_obj).exists())
+        previous_round.refresh_from_db()
+        self.assertEqual(previous_round.victor, original_result)
 
     def test_enter_e_ballot_post_save_error_redirects(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        token = self._sign_in_judge(client, judge)
+        RoundStats.objects.filter(round=round_obj).delete()
 
         with patch("mittab.apps.tab.views.public_views.EBallotForm") as mock_form_class:
             mock_form = MagicMock()
@@ -493,19 +529,20 @@ class TestPublicViews(TestCase):
             mock_form_class.return_value = mock_form
 
             response = client.post(
-                reverse("enter_e_ballot", args=[judge.ballot_code]),
-                {"round_instance": round_obj.id},
+                reverse("enter_e_ballot"),
+                {"portal_token": token, "round_instance": round_obj.id},
             )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("e_ballot_search"))
+        self.assertEqual(response.url, reverse("judge_portal"))
 
     def test_enter_e_ballot_get_renders_submitted_ballot_when_already_entered(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         self._create_round_stats(round_obj)
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        response = client.get(reverse("enter_e_ballot"), follow=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Ballot submitted", response.content.decode())
@@ -513,24 +550,25 @@ class TestPublicViews(TestCase):
     def test_enter_e_ballot_get_redirects_when_judge_code_missing(self):
         client = Client()
 
-        response = client.get(reverse("enter_e_ballot", args=["BADCODE"]))
+        response = client.get(reverse("legacy_enter_e_ballot", args=["BADCODE"]))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(response.url, reverse("e_ballot_search"))
 
     def test_enter_e_ballot_redirects_to_previous_ballots_when_pairings_not_released(
         self,
     ):
         client = Client()
         judge, _ = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         TabSettings.set("pairing_released", 0)
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        response = client.get(reverse("enter_e_ballot"))
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            reverse("previous_ballots", args=[judge.ballot_code]),
+            reverse("previous_ballots"),
         )
 
     def test_enter_e_ballot_get_redirects_when_no_round_found(self):
@@ -538,55 +576,52 @@ class TestPublicViews(TestCase):
         judge = self._make_judge("No Round Judge")
         judge.ballot_code = "NOROUND"
         judge.save()
+        self._sign_in_judge(client, judge)
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        response = client.get(reverse("enter_e_ballot"))
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            reverse("judge_portal", args=[judge.ballot_code]),
+            reverse("judge_portal"),
         )
 
     def test_enter_e_ballot_get_redirects_when_not_chair(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         actual_chair = self._make_judge("Actual Chair Judge")
         round_obj.chair = actual_chair
         round_obj.save()
         round_obj.judges.add(actual_chair)
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        response = client.get(reverse("enter_e_ballot"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(response.url, reverse("judge_portal"))
 
     def test_enter_e_ballot_get_redirects_when_multiple_rounds_found(self):
         client = Client()
         judge, _ = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         self._make_additional_round(judge)
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        response = client.get(reverse("enter_e_ballot"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("tab_login"))
+        self.assertEqual(response.url, reverse("judge_portal"))
 
-    def test_enter_e_ballot_get_delegates_to_result_entry_when_ballot_missing(self):
+    def test_enter_e_ballot_get_renders_entry_when_ballot_missing(self):
         client = Client()
         judge, round_obj = self._prepare_ballot_round()
+        self._sign_in_judge(client, judge)
         RoundStats.objects.filter(round=round_obj).delete()
 
-        with patch(
-            "mittab.apps.tab.views.public_views.enter_result"
-        ) as mock_enter_result:
-            mock_enter_result.return_value = HttpResponse("entry-form")
+        response = client.get(reverse("enter_e_ballot"))
 
-            response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content.decode(), "entry-form")
-        self.assertEqual(mock_enter_result.call_count, 1)
-        self.assertEqual(mock_enter_result.call_args.args[1], round_obj.id)
-        self.assertEqual(mock_enter_result.call_args.args[3], judge.ballot_code)
+        self.assertContains(response, "Entering Ballot for")
+        self.assertEqual(response.context["form"].round_object, round_obj)
+        self.assertNotContains(response, judge.ballot_code)
 
     def test_permissions(self):
         client = Client()
@@ -1103,10 +1138,12 @@ class TestPublicViews(TestCase):
             ballot_code="portal-judge",
         )
         JudgeExpectedCheckIn.objects.create(judge=judge, round_number=1)
+        token = self._sign_in_judge(client, judge)
 
         response = client.post(
-            reverse("judge_portal", args=[judge.ballot_code]),
+            reverse("judge_portal"),
             {
+                "portal_token": token,
                 "availability_round_2": "on",
                 "availability_round_4": "on",
             },
@@ -1133,12 +1170,13 @@ class TestPublicViews(TestCase):
             ballot_code="unpaired-portal",
         )
 
-        response = client.get(reverse("enter_e_ballot", args=[judge.ballot_code]))
+        self._sign_in_judge(client, judge)
+        response = client.get(reverse("enter_e_ballot"))
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(
             response.url,
-            reverse("judge_portal", args=[judge.ballot_code]),
+            reverse("judge_portal"),
         )
 
     def test_public_ballot_modes(self):

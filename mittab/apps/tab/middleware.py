@@ -16,6 +16,7 @@ from mittab.apps.tab.auth_roles import (
 )
 from mittab.apps.tab.helpers import redirect_and_flash_info
 from mittab.apps.tab.live_results import speaker_results_available
+from mittab.apps.tab.portal_sessions import is_code_link
 from mittab.apps.tab.views.tournament_todo_views import StaffLoginView
 from mittab.apps.tab.tournament_start import is_start_tournament_wizard_complete
 from mittab.libs.backup import is_backup_active
@@ -107,6 +108,7 @@ class Login:
         should_store_return_to = (
             request.method == "GET"
             and request.path != reverse("public_tab_cards")
+            and not is_code_link(path)
             and not request.path.startswith("/api/")
             and request.headers.get("X-Requested-With") != "XMLHttpRequest"
         )
@@ -122,7 +124,7 @@ class Login:
                 referer_path = parts.path or "/"
                 if parts.query:
                     referer_path = f"{referer_path}?{parts.query}"
-                if referer_path != request.get_full_path():
+                if referer_path != request.get_full_path() and not is_code_link(referer_path):
                     session_target = referer_path
             request.session["_return_to"] = session_target
 

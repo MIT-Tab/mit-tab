@@ -38,7 +38,7 @@ def build_team_code_emails(team, request):
         return []
     try:
         portal_url = request.build_absolute_uri(
-            reverse("team_portal", args=[team.team_code]),
+            reverse("legacy_team_portal", args=[team.team_code]),
         )
     except NoReverseMatch:
         return []

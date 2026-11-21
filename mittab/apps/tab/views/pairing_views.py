@@ -1005,11 +1005,7 @@ def view_rounds(request):
 
 
 @audit_pairing_change(Round, "ballot entry")
-def enter_result(request,
-                 round_id,
-                 form_class=ResultEntryForm,
-                 ballot_code=None,
-                 redirect_to="/pairings/status"):
+def enter_result(request, round_id):
     round_obj = Round.objects.prefetch_related(
         "judges",
         "chair",
@@ -1025,8 +1021,7 @@ def enter_result(request,
 
     if request.method == "POST":
         if (
-            not ballot_code
-            and submitted_ballot_exists
+            submitted_ballot_exists
             and "rfd" in request.POST
             and "winner" not in request.POST
         ):
@@ -1048,7 +1043,7 @@ def enter_result(request,
                 path=request.path,
             )
 
-        form = form_class(request.POST, round_instance=round_obj)
+        form = ResultEntryForm(request.POST, round_instance=round_obj)
         if form.is_valid():
             try:
                 form.save()
@@ -1057,20 +1052,20 @@ def enter_result(request,
                     request, "Invalid round result, could not remedy.")
             return redirect_and_flash_success(request,
                                               "Result entered successfully",
-                                              path=redirect_to)
+                                              path="/pairings/status")
     else:
-        form_kwargs = {"round_instance": round_obj}
-        if ballot_code:
-            form_kwargs["ballot_code"] = ballot_code
-        form = form_class(**form_kwargs)
+        form = ResultEntryForm(round_instance=round_obj)
 
+    return render_round_entry(request, round_obj, form)
+
+
+def render_round_entry(request, round_obj, form, previous_ballots_url=""):
     return render(
         request, "ballots/round_entry.html", {
             "form": form,
             "title": f"Entering Ballot for {round_obj}",
             "gov_team": round_obj.gov_team,
             "opp_team": round_obj.opp_team,
-            "ballot_code": ballot_code,
             "action": request.path,
             "warn_judges_about_speaks": TabSettings.get(
                 "warn_judges_about_speaks", True),
@@ -1078,9 +1073,7 @@ def enter_result(request,
                 "low_speak_warning_threshold", 25),
             "high_speak_warning_threshold": TabSettings.get(
                 "high_speak_warning_threshold", 34),
-            "previous_ballots_url": reverse(
-                "previous_ballots", args=[ballot_code]
-            ) if ballot_code else "",
+            "previous_ballots_url": previous_ballots_url,
         })
 
 

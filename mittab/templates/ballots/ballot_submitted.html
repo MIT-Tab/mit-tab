@@ -11,11 +11,9 @@
   <div class="container-fluid">
     {% if previous_ballots_url %}
     <div class="d-flex justify-content-start mb-3">
-      {% if ballot_code %}
-      <a class="btn btn-lg btn-outline-secondary mr-2" href="{% url 'judge_portal' ballot_code %}">
+      <a class="btn btn-lg btn-outline-secondary mr-2" href="{% url 'judge_portal' %}">
         Judge Portal
       </a>
-      {% endif %}
       <a class="btn btn-lg btn-outline-primary" href="{{ previous_ballots_url }}">
         Previous Ballots
       </a>
@@ -70,8 +68,9 @@
         {% endif %}
 
         {% if rfd_editable %}
-        <form method="post" action="">
+        <form method="post" action="{{ rfd_action }}">
           {% csrf_token %}
+          {% include "common/_portal_token.html" %}
           <div class="form-group">
             <label class="field-label" for="id_rfd">Why the winning team won</label>
             <textarea class="form-control" id="id_rfd" name="rfd" rows="7">{{ rfd_text }}</textarea>
