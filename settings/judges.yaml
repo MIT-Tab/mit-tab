@@ -24,7 +24,7 @@ settings:
     value: 100
   - repeat_judge_penalty:
     name: repeat_judge_penalty
-    description: "Prefer fresh judges over equally ranked judges who saw either team in the previous round. Applies in outrounds and in inrounds with Allow Rejudges enabled. The default of 1 is a tiebreaker. Higher values give recent repeats more weight. Set to 0 to disable."
+    description: "In outrounds, prefer equally ranked judges who did not see either team in the previous stage of the same bracket. The default of 1 favors simple swaps. Higher values allow more equivalent assignments to change. Set to 0 to disable."
     value: 1
   - repeat_wing_penalty:
     name: repeat_wing_penalty
