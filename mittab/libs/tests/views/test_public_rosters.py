@@ -351,6 +351,27 @@ def test_lists_and_calculator_visibility_toggle_and_round_count(client, roster):
     assert client.get(reverse("public_judges")).status_code == 302
 
 
+@pytest.mark.parametrize("round_number", [1, 3])
+def test_calculator_defaults_to_checked_in_after_pairing(client, roster, round_number):
+    _, school, _, _, unchecked_team, _ = roster
+    checked_team = Team.objects.create(
+        name="Checked-in team", school=school, seed=0, checked_in=True
+    )
+    url = reverse("public_expected_records")
+    assert client.get(url).context["team_count"] == 2
+    assert client.get(url, {"teams": "checked-in"}).context["team_count"] == 1
+
+    Round.objects.create(
+        round_number=round_number, gov_team=checked_team, opp_team=unchecked_team
+    )
+    default = client.get(url)
+    assert default.context["checked_in"]
+    assert default.context["team_count"] == 1
+    total = client.get(url, {"teams": "total"})
+    assert not total.context["checked_in"]
+    assert total.context["team_count"] == 2
+
+
 def test_board_public_schema_ignores_protected_state_and_cannot_mutate(client, roster):
     config, _, _, _, team, judge = roster
     close_registration(config)
