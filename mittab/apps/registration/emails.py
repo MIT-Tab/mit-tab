@@ -193,7 +193,7 @@ def _build_registration_judge_code_plan(registration, request):
             continue
 
         portal_url = request.build_absolute_uri(
-            reverse("judge_portal", args=[judge.ballot_code])
+            reverse("legacy_judge_portal", args=[judge.ballot_code])
         )
         email_request = build_judge_ballot_code_email(
             email,

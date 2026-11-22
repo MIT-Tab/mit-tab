@@ -5,6 +5,7 @@ from mittab.apps.registration.models import RegistrationConfig
 from mittab.apps.registration.tests.test_registration_admin import (  # pylint: disable=unused-import
     fixture_logged_in_admin_client,
 )
+from mittab.apps.tab.portal_sessions import team_session
 from mittab.apps.tab.models import Judge, School, Scratch, TabSettings, Team
 
 
@@ -73,11 +74,14 @@ def test_team_portal_with_hidden_judge_list_never_exposes_scratch_roster(client)
     scratch = Scratch.objects.create(
         team=team, judge=existing_judge, scratch_type=Scratch.TEAM_SCRATCH,
     )
-    url = reverse("team_portal", args=[team.team_code])
+    client.get(reverse("legacy_team_portal", args=[team.team_code]))
+    token = client.session[team_session.session_key]["token"]
+    url = reverse("team_portal")
 
     for response in (
         client.get(url),
         client.post(url, {
+            "portal_token": token,
             "action": "update_scratches", "scratch_0": str(other_judge.pk),
         }),
     ):

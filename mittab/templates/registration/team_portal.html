@@ -18,7 +18,8 @@
           {% if team.school %}{{ team.school.name }} · {% endif %}{{ team.get_seed_display }} seed
         </p>
       </div>
-      <a class="btn btn-outline-primary btn-sm" href="{% url 'team_portal_search' %}">Use a Different Code</a>
+      {% url 'team_portal_sign_out' as sign_out_url %}
+      {% include "common/_portal_sign_out.html" %}
     </div>
     <hr class="registration-admin__divider">
     <h6 class="registration-admin__panel-title">Debaters</h6>
@@ -41,6 +42,7 @@
     {% if config.team_name_changes_allowed and not edits_locked_by_pairings %}
     <form method="post" class="mb-0">
       {% csrf_token %}
+      {% include "common/_portal_token.html" %}
       <input type="hidden" name="action" value="update_name">
       {% for error in name_form.non_field_errors %}
       <div class="alert alert-danger">{{ error }}</div>
@@ -150,6 +152,7 @@
     <div class="modal-content">
       <form method="post">
         {% csrf_token %}
+        {% include "common/_portal_token.html" %}
         <input type="hidden" name="action" value="update_scratches">
         <div class="modal-header">
           <h5 class="modal-title" id="disc-scratch-modal-title">Edit Disc Scratches</h5>

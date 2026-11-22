@@ -13,7 +13,8 @@ from django.forms import BaseFormSet, formset_factory
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 import requests
 from requests.exceptions import RequestException
 
@@ -49,6 +50,7 @@ from mittab.apps.tab.helpers import (
     redirect_and_flash_error,
     redirect_and_flash_success,
 )
+from mittab.apps.tab.portal_sessions import team_session
 from mittab.libs.cacheing.public_cache import invalidate_all_public_caches
 from mittab.libs.email_service import EmailServiceError
 from .models import (
@@ -604,38 +606,28 @@ def _summarize_form_errors(form, fallback):
     return " ".join(parts) if parts else fallback
 
 
-@require_http_methods(["GET", "POST"])
+@never_cache
+@require_http_methods(["GET", "HEAD", "POST"])
 def team_portal_search(request):
     if request.method == "POST":
-        team_code = (request.POST.get("team_code") or "").strip()
-        if team_code:
-            team = Team.objects.filter(team_code__iexact=team_code).first()
-            if team:
-                return redirect("team_portal", team_code=team.team_code)
-            return redirect_and_flash_error(
-                request,
-                (
-                    "We couldn't find a team for that code. "
-                    "Double-check and try again."
-                ),
-                path=reverse("team_portal_search"),
-            )
-        return redirect_and_flash_error(
-            request,
-            "Please enter the team code provided by tab.",
-            path=reverse("team_portal_search"),
+        return team_session.sign_in(
+            request, request.POST.get("team_code", "").strip(), "team_portal"
         )
-
+    if team_session.resume(request):
+        return redirect("team_portal")
     return render(request, "registration/team_portal_search.html")
 
 
-def _team_for_code(team_code):
-    return (
-        Team.objects.select_related("school", "registration")
-        .prefetch_related("debaters__school", "scratches__judge")
-        .filter(team_code=team_code)
-        .first()
-    )
+@never_cache
+@require_GET
+def legacy_team_portal(request, team_code):
+    return team_session.sign_in_from_link(request, team_code, "team_portal")
+
+
+@require_POST
+@team_session.require_identity
+def team_portal_sign_out(request, _team):
+    return team_session.sign_out(request)
 
 
 EDITS_LOCKED_MESSAGE = (
@@ -681,12 +673,12 @@ def _team_round_history(team):
     return history
 
 
-@require_http_methods(["GET", "POST"])
-def team_portal(request, team_code):
-    team = _team_for_code(team_code)
-    if not team:
-        raise Http404()
-
+@require_http_methods(["GET", "HEAD", "POST"])
+@team_session.require_identity(
+    queryset=Team.objects.select_related("school", "registration")
+    .prefetch_related("debaters__school", "scratches__judge"),
+)
+def team_portal(request, team):
     config = RegistrationConfig.get_or_create_active()
     edits_locked_by_pairings = _edits_locked_by_pairings()
     name_form = TeamNameChangeForm(team=team)
@@ -718,7 +710,7 @@ def team_portal(request, team_code):
                 return redirect_and_flash_success(
                     request,
                     "Team name updated.",
-                    path=reverse("team_portal", args=[team.team_code]),
+                    path=reverse("team_portal"),
                 )
         elif action == "update_scratches":
             if scratch_form is not None and scratch_form.is_valid():
@@ -728,7 +720,7 @@ def team_portal(request, team_code):
                 return redirect_and_flash_success(
                     request,
                     "Disc scratches updated.",
-                    path=reverse("team_portal", args=[team.team_code]),
+                    path=reverse("team_portal"),
                 )
         else:
             messages.error(request, "Unknown team portal action.")

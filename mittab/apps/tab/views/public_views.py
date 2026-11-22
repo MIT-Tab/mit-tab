@@ -3,12 +3,14 @@ import os
 from collections import defaultdict
 
 from django.contrib.messages import get_messages
+from django.db import transaction
 from django.db.models import Prefetch
 from django.http import FileResponse
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_safe
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_http_methods, require_POST, require_safe
 
 from mittab import settings
 from mittab.apps.tab import logo_utils
@@ -37,7 +39,8 @@ from mittab.apps.tab.public_rankings import (
 )
 from mittab.apps.tab.views.debater_views import get_speaker_rankings
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
-from mittab.apps.tab.views.pairing_views import enter_result
+from mittab.apps.tab.portal_sessions import judge_session
+from mittab.apps.tab.views.pairing_views import render_round_entry
 from mittab.apps.tab.tournament_staff import get_public_tournament_staff
 from mittab.apps.tab.public_roster_log import public_changes
 from mittab.apps.tab.tournament_calculator import calculator_context, tournament_value
@@ -626,22 +629,28 @@ def missing_ballots(request):
     )
 
 
-def e_ballot_search_page(request):
+@never_cache
+@require_http_methods(["GET", "HEAD", "POST"])
+def e_ballot_search(request):
+    if request.method == "POST":
+        return judge_session.sign_in(
+            request, request.POST.get("ballot_code", "").strip(), "judge_portal"
+        )
+    if judge_session.resume(request):
+        return redirect("judge_portal")
     return render(request, "public/e_ballot_search.html")
 
 
-def e_ballot_search(request):
-    if request.method == "POST":
-        ballot_code = (request.POST.get("ballot_code") or "").strip()
-        if ballot_code:
-            return redirect("judge_portal", ballot_code=ballot_code)
-        return redirect_and_flash_error(
-            request,
-            "Please enter the judge code provided by tab.",
-            path=reverse("e_ballot_search"),
-        )
+@never_cache
+@require_GET
+def legacy_judge_portal(request, ballot_code, destination, **kwargs):
+    return judge_session.sign_in_from_link(request, ballot_code, destination, **kwargs)
 
-    return e_ballot_search_page(request)
+
+@require_POST
+@judge_session.require_identity
+def judge_portal_sign_out(request, _judge):
+    return judge_session.sign_out(request)
 
 
 def _judge_portal_rounds():
@@ -693,19 +702,9 @@ def _sync_judge_expected_checkins(judge, desired_rounds):
         ).delete()
 
 
-def judge_portal(request, ballot_code):
-    judge = _judge_for_ballot_code(ballot_code)
-    if not judge:
-        message = (
-            f'No judges with the judge code "{ballot_code}." '
-            "Try submitting again, or go to tab to resolve the issue."
-        )
-        return redirect_and_flash_error(
-            request,
-            message,
-            path=reverse("e_ballot_search"),
-        )
-
+@require_http_methods(["GET", "HEAD", "POST"])
+@judge_session.require_identity(queryset=Judge.objects.prefetch_related("expected_checkins"))
+def judge_portal(request, judge):
     if request.method == "POST":
         allowed_rounds = _judge_portal_rounds()
         desired_rounds = []
@@ -721,7 +720,7 @@ def judge_portal(request, ballot_code):
         return redirect_and_flash_success(
             request,
             "Availability saved.",
-            path=reverse("judge_portal", args=[ballot_code]),
+            path=reverse("judge_portal"),
         )
 
     return render(
@@ -729,10 +728,9 @@ def judge_portal(request, ballot_code):
         "public/judge_portal.html",
         {
             "judge": judge,
-            "ballot_code": ballot_code,
             "availability_rows": _availability_rows_for_judge(judge),
-            "current_ballot_url": reverse("enter_e_ballot", args=[ballot_code]),
-            "previous_ballots_url": reverse("previous_ballots", args=[ballot_code]),
+            "current_ballot_url": reverse("enter_e_ballot"),
+            "previous_ballots_url": reverse("previous_ballots"),
         },
     )
 
@@ -806,9 +804,7 @@ def _build_disclosure_message():
 
 def _submitted_ballot_context(
     round_obj,
-    ballot_code,
-    judge=None,
-    allow_rfd_edit=False,
+    judge,
 ):
     """Build context for the submitted (frozen) ballot view for the given round."""
     role_names = {
@@ -848,10 +844,7 @@ def _submitted_ballot_context(
     rfd_enabled = round_allows_written_rfd(round_obj)
     rfd_editable = (
         rfd_enabled
-        and (
-            allow_rfd_edit
-            or (judge is not None and round_obj.chair_id == judge.id)
-        )
+        and round_obj.chair_id == judge.id
         and written_rfd_editing_open(round_obj)
     )
     return {
@@ -862,24 +855,15 @@ def _submitted_ballot_context(
         "winner_display": victor_display.get(round_obj.victor, "Unknown"),
         "gov_debaters": gov_debaters,
         "opp_debaters": opp_debaters,
-        "ballot_code": ballot_code,
         "disclosure_message": _build_disclosure_message(),
         "rfd_enabled": rfd_enabled,
         "rfd_text": round_obj.rfd,
         "rfd_editable": rfd_editable,
         "rfd_deadline_display": written_rfd_deadline_display(rfd_deadline),
         "rfd_deadline_configured": rfd_deadline is not None,
-        "previous_ballots_url": (
-            reverse("previous_ballots", args=[ballot_code]) if ballot_code else ""
-        ),
+        "previous_ballots_url": reverse("previous_ballots"),
+        "rfd_action": reverse("view_submitted_ballot_round", args=[round_obj.pk]),
     }
-
-
-def _judge_for_ballot_code(ballot_code):
-    return Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
-        "judges",
-        "expected_checkins",
-    ).first()
 
 
 def _submitted_rounds_for_judge(judge):
@@ -898,24 +882,13 @@ def _submitted_rounds_for_judge(judge):
     )
 
 
-def view_submitted_ballot(request, ballot_code, round_id=None):
-    """Show a read-only frozen view of the submitted ballot for a judge code."""
-    current_round = TabSettings.get(key="cur_round") - 1
-
-    judge = _judge_for_ballot_code(ballot_code)
-
-    if not judge:
-        message = (
-            f'No judges with the judge code "{ballot_code}." '
-            "Try submitting again, or go to tab to resolve the issue."
-        )
-        return redirect_and_flash_error(
-            request, message, path=reverse("tab_login")
-        )
-
+@require_http_methods(["GET", "HEAD", "POST"])
+@judge_session.require_identity
+def view_submitted_ballot(request, judge, round_id=None):
+    """Show a submitted ballot for the signed-in judge."""
     rounds_qs = _submitted_rounds_for_judge(judge)
     if round_id is None:
-        rounds_qs = rounds_qs.filter(round_number=current_round)
+        rounds_qs = rounds_qs.filter(round_number=TabSettings.get("cur_round") - 1)
     else:
         rounds_qs = rounds_qs.filter(id=round_id)
     rounds = list(rounds_qs.all())
@@ -930,7 +903,8 @@ def view_submitted_ballot(request, ballot_code, round_id=None):
     round_obj = rounds[0]
     if request.method == "POST":
         if not (
-            round_allows_written_rfd(round_obj)
+            round_id is not None
+            and round_allows_written_rfd(round_obj)
             and round_obj.chair_id == judge.id
             and written_rfd_editing_open(round_obj)
         ):
@@ -948,21 +922,13 @@ def view_submitted_ballot(request, ballot_code, round_id=None):
             path=request.path,
         )
 
-    context = _submitted_ballot_context(round_obj, ballot_code, judge)
+    context = _submitted_ballot_context(round_obj, judge)
     return render(request, "ballots/ballot_submitted.html", context)
 
 
-def previous_ballots(request, ballot_code):
-    judge = _judge_for_ballot_code(ballot_code)
-    if not judge:
-        message = (
-            f'No judges with the judge code "{ballot_code}." '
-            "Try submitting again, or go to tab to resolve the issue."
-        )
-        return redirect_and_flash_error(
-            request, message, path=reverse("tab_login")
-        )
-
+@require_safe
+@judge_session.require_identity
+def previous_ballots(request, judge):
     current_round = TabSettings.get(key="cur_round") - 1
     rounds = (
         _submitted_rounds_for_judge(judge)
@@ -978,7 +944,7 @@ def previous_ballots(request, ballot_code):
             "rfd_status": "Written" if round_obj.rfd.strip() else "Blank",
             "url": reverse(
                 "view_submitted_ballot_round",
-                args=[ballot_code, round_obj.id],
+                args=[round_obj.id],
             ),
         })
 
@@ -986,119 +952,55 @@ def previous_ballots(request, ballot_code):
         request,
         "ballots/previous_ballots.html",
         {
-            "ballot_code": ballot_code,
             "judge": judge,
             "ballot_rows": ballot_rows,
         },
     )
 
 
-def enter_e_ballot(request, ballot_code):
+@require_http_methods(["GET", "HEAD", "POST"])
+@judge_session.require_identity
+@transaction.atomic
+def enter_e_ballot(request, judge):
+    if TabSettings.get("pairing_released", 0) != 1:
+        return redirect("previous_ballots")
+
+    current_round = TabSettings.get("cur_round") - 1
+    assignments = judge.judges.filter(round_number=current_round).order_by("pk")
     if request.method == "POST":
-        round_id = request.POST.get("round_instance")
+        assignments = assignments.select_for_update()
+    rounds = list(assignments[:2])
+    if len(rounds) != 1:
+        message = (
+            "Found more than one ballot for you this round. Go to tab to resolve this error."
+            if rounds else
+            "Could not find a ballot for you this round. Go to tab if you believe you were paired in."
+        )
+        return redirect_and_flash_error(request, message, path=reverse("judge_portal"))
 
-        if round_id:
-            round_obj = Round.objects.prefetch_related(
-                "judges", "chair", "gov_team", "gov_team__debaters",
-                "opp_team", "opp_team__debaters", "roundstats_set",
-                "roundstats_set__debater",
-            ).get(id=round_id)
+    round_obj = rounds[0]
+    if round_obj.chair_id != judge.pk:
+        return redirect_and_flash_error(
+            request, "Only the chair can submit an e-ballot.", path=reverse("judge_portal")
+        )
+    if RoundStats.objects.filter(round=round_obj).exists():
+        return redirect("view_submitted_ballot_round", round_id=round_obj.pk)
 
-            form = EBallotForm(request.POST, round_instance=round_obj)
-            if form.is_valid():
-                try:
-                    form.save()
-                except ValueError:
-                    return redirect_and_flash_error(
-                        request, "Invalid round result, could not remedy.",
-                        path=reverse("e_ballot_search"))
-                # Redirect to frozen ballot view
-                return redirect(
-                    reverse(
-                        "view_submitted_ballot",
-                        kwargs={"ballot_code": ballot_code},
-                    )
-                )
-            # Re-render the form with errors
-            return render(
-                request, "ballots/round_entry.html", {
-                    "form": form,
-                    "title": f"Entering Ballot for {round_obj}",
-                    "gov_team": round_obj.gov_team,
-                    "opp_team": round_obj.opp_team,
-                    "ballot_code": ballot_code,
-                    "action": request.path,
-                    "warn_judges_about_speaks": TabSettings.get(
-                        "warn_judges_about_speaks", True
-                    ),
-                    "low_speak_warning_threshold": TabSettings.get(
-                        "low_speak_warning_threshold", 25
-                    ),
-                    "high_speak_warning_threshold": TabSettings.get(
-                        "high_speak_warning_threshold", 34
-                    ),
-                    "previous_ballots_url": reverse(
-                        "previous_ballots", args=[ballot_code]
-                    ),
-                })
-        else:
-            message = """
-                      Missing necessary form data. Please go to tab if this
-                      error persists
-                      """
+    form = EBallotForm(
+        request.POST if request.method == "POST" else None, round_instance=round_obj
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            form.save()
+        except ValueError:
             return redirect_and_flash_error(
-                request, message, path=reverse("e_ballot_search")
+                request, "Invalid round result, could not remedy.", path=reverse("judge_portal")
             )
+        return redirect("view_submitted_ballot_round", round_id=round_obj.pk)
 
-    current_round = TabSettings.get(key="cur_round") - 1
-
-    judge = Judge.objects.filter(ballot_code=ballot_code).prefetch_related(
-        # bad use of related_name in the model, this gets the rounds
-        "judges",
-    ).first()
-
-    if not judge:
-        message = f"""
-                    No judges with the judge code "{ballot_code}." Try submitting again, or
-                    go to tab to resolve the issue.
-                    """
-    elif TabSettings.get("pairing_released", 0) != 1:
-        return redirect("previous_ballots", ballot_code=ballot_code)
-    else:
-        # see above, judge.judges is rounds
-        rounds = list(judge.judges.prefetch_related("chair", "roundstats_set",
-                                                     "roundstats_set__debater",
-                                                     "gov_team", "opp_team")
-                      .filter(round_number=current_round).all())
-        if len(rounds) > 1:
-            message = """
-                    Found more than one ballot for you this round.
-                    Go to tab to resolve this error.
-                    """
-        elif not rounds:
-            message = """
-                    Could not find a ballot for you this round. Go to tab
-                    to resolve the issue if you believe you were paired in.
-                    """
-            return redirect_and_flash_error(
-                request,
-                message,
-                path=reverse("judge_portal", args=[ballot_code]),
-            )
-        elif rounds[0].chair != judge:
-            message = """
-                    You are not the chair of this round. If you are on a panel,
-                    only the chair can submit an e-ballot. If you are not on a
-                    panel, go to tab and make sure the chair is properly set for
-                    the round.
-                    """
-        elif RoundStats.objects.filter(round=rounds[0]).exists():
-            # Ballot already submitted — show frozen view
-            context = _submitted_ballot_context(rounds[0], ballot_code, judge)
-            return render(request, "ballots/ballot_submitted.html", context)
-        else:
-            return enter_result(request, rounds[0].id, EBallotForm, ballot_code)
-    return redirect_and_flash_error(request, message, path=reverse("tab_login"))
+    return render_round_entry(
+        request, round_obj, form, previous_ballots_url=reverse("previous_ballots")
+    )
 
 
 @cache_public_view(timeout=60)

@@ -16,6 +16,7 @@ from mittab.apps.registration.models import (
     RegistrationConfig,
 )
 from mittab.apps.registration.views import MAX_TEAMS
+from mittab.apps.tab.portal_sessions import team_session
 from mittab.apps.tab.models import (
     CheckIn,
     Debater,
@@ -888,6 +889,7 @@ def test_registration_does_not_update_unrelated_debater_id(email_service, client
 
 @pytest.mark.django_db
 def test_team_portal_updates_team_name_and_disc_scratches(client):
+    TabSettings.set("cur_round", 1)
     TabSettings.set("judges_public", 1)
     config = RegistrationConfig.get_or_create_active()
     config.team_name_changes_allowed = True
@@ -910,11 +912,12 @@ def test_team_portal_updates_team_name_and_disc_scratches(client):
     )
 
     assert response.status_code == 302
-    assert response.url == reverse("team_portal", args=[team.team_code])
+    assert response.url == reverse("team_portal")
+    token = client.session[team_session.session_key]["token"]
 
     response = client.post(
-        reverse("team_portal", args=[team.team_code]),
-        {"action": "update_name", "name": "Portal Team Renamed"},
+        reverse("team_portal"),
+        {"portal_token": token, "action": "update_name", "name": "Portal Team Renamed"},
         follow=True,
     )
 
@@ -923,8 +926,9 @@ def test_team_portal_updates_team_name_and_disc_scratches(client):
     assert team.name == "Portal Team Renamed"
 
     response = client.post(
-        reverse("team_portal", args=[team.team_code]),
+        reverse("team_portal"),
         {
+            "portal_token": token,
             "action": "update_scratches",
             "scratch_0": str(judge_one.pk),
             "scratch_1": str(judge_two.pk),
@@ -939,8 +943,9 @@ def test_team_portal_updates_team_name_and_disc_scratches(client):
     ) == {judge_one.pk, judge_two.pk}
 
     response = client.post(
-        reverse("team_portal", args=[team.team_code]),
+        reverse("team_portal"),
         {
+            "portal_token": token,
             "action": "update_scratches",
             "scratch_0": str(judge_three.pk),
             "scratch_1": "",
@@ -968,10 +973,12 @@ def test_team_portal_respects_closed_settings(client):
         seed=Team.UNSEEDED,
     )
     judge = Judge.objects.create(name="Closed Portal Judge", rank=5)
+    client.get(reverse("legacy_team_portal", args=[team.team_code]))
+    token = client.session[team_session.session_key]["token"]
 
     response = client.post(
-        reverse("team_portal", args=[team.team_code]),
-        {"action": "update_name", "name": "Should Not Save"},
+        reverse("team_portal"),
+        {"portal_token": token, "action": "update_name", "name": "Should Not Save"},
     )
 
     assert response.status_code == 200
@@ -979,8 +986,12 @@ def test_team_portal_respects_closed_settings(client):
     assert team.name == "Closed Portal Team"
 
     response = client.post(
-        reverse("team_portal", args=[team.team_code]),
-        {"action": "update_scratches", "scratch_0": str(judge.pk)},
+        reverse("team_portal"),
+        {
+            "portal_token": token,
+            "action": "update_scratches",
+            "scratch_0": str(judge.pk),
+        },
     )
 
     assert response.status_code == 200

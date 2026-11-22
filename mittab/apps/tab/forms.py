@@ -624,71 +624,28 @@ class ResultEntryForm(forms.Form):
 
 
 class EBallotForm(ResultEntryForm):
-    ballot_code = forms.CharField(
-        label="Judge code",
-        max_length=BALLOT_CODE_MAX_LENGTH,
-        min_length=0,
-    )
-
-    def __init__(self, *args, **kwargs):
-        ballot_code = ""
-
-        if "ballot_code" in kwargs:
-            ballot_code = kwargs.pop("ballot_code")
-
-        super(EBallotForm, self).__init__(*args, **kwargs)
-        self.fields["ballot_code"].initial = ballot_code
+    def clean_round_instance(self):
+        round_id = self.cleaned_data["round_instance"]
+        if round_id != self.round_object.pk:
+            raise ValidationError("This ballot is no longer current. Reopen the current ballot.")
+        return round_id
 
     def clean(self):
-        cleaned_data = super(EBallotForm, self).clean()
+        cleaned_data = super().clean()
         if self.errors:
             return cleaned_data
 
-        try:
-            round_obj = Round.objects.get(pk=cleaned_data["round_instance"])
-            cur_round = TabSettings.get("cur_round", 0) - 1
-            ballot_code = cleaned_data.get("ballot_code")
-            judge = Judge.objects.filter(ballot_code=ballot_code).first()
+        if cleaned_data["winner"] not in (Round.GOV, Round.OPP):
+            self.add_error("winner", "Go to tab to submit a result other than a win or loss.")
 
-            if not judge:
-                msg = "Incorrect judge code. Enter again."
-                self._errors["ballot_code"] = self.error_class([msg])
-            elif round_obj.round_number != cur_round:
-                msg = (
-                    f"This ballot is for round {round_obj.round_number}, "
-                    f"but the current round is {cur_round}. "
-                    "Go to tab to submit this result."
-                )
-                self._errors["winner"] = self.error_class([msg])
-            else:
-                if round_obj.chair.ballot_code != judge.ballot_code:
-                    msg = "You are not judging the round, or you are not the chair"
-                    self._errors["ballot_code"] = self.error_class([msg])
-                elif RoundStats.objects.filter(round=round_obj).first():
-                    msg = (
-                        "A ballot has already been completed for this round. "
-                        "Go to tab if you need to change the results."
-                    )
-                    self._errors["ballot_code"] = self.error_class([msg])
-
-            if int(cleaned_data["winner"]) not in [Round.GOV, Round.OPP]:
-                msg = "Go to tab to submit a result other than a win or loss."
-                self._errors["winner"] = self.error_class([msg])
-
-            for deb in self.DEBATERS:
-                speaks = self.deb_attr_val(deb, "speaks", float)
-                key = self.deb_attr_name(deb, "speaks")
-                if speaks > float(TabSettings.get("max_eballot_speak", 35)) or \
-                        speaks < float(TabSettings.get("min_eballot_speak", 15)):
-                    msg = "Speaks must be justified to tab."
-                    self._errors[key] = self.error_class([msg])
-
-        except Exception as e:
-            print(f"Caught error {e}")
-            self._errors["winner"] = self.error_class(
-                ["Non handled error, preventing data contamination"])
-
+        min_speaks = float(TabSettings.get("min_eballot_speak", 15))
+        max_speaks = float(TabSettings.get("max_eballot_speak", 35))
+        for debater in self.DEBATERS:
+            speaks = self.deb_attr_val(debater, "speaks", float)
+            if not min_speaks <= speaks <= max_speaks:
+                self.add_error(self.deb_attr_name(debater, "speaks"), "Speaks must be justified to tab.")
         return cleaned_data
+
 
 class SettingsForm(forms.Form):
     def __init__(self, *args, **kwargs):

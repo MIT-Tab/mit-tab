@@ -1,0 +1,3 @@
+{% if request.portal_token %}
+<input type="hidden" name="portal_token" value="{{ request.portal_token }}">
+{% endif %}

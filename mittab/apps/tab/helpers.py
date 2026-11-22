@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from mittab.apps.tab.portal_sessions import is_code_link
+
 
 def get_redirect_target(request, path=None, fallback="/"):
     """
@@ -31,7 +33,7 @@ def get_redirect_target(request, path=None, fallback="/"):
     require_https = request.is_secure()
 
     for candidate in candidates:
-        if candidate and url_has_allowed_host_and_scheme(
+        if candidate and not is_code_link(candidate) and url_has_allowed_host_and_scheme(
             candidate,
             allowed_hosts=allowed_hosts,
             require_https=require_https,
