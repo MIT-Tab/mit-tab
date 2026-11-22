@@ -1,7 +1,8 @@
 import random
+from collections import defaultdict
 from types import SimpleNamespace
 from django.db import transaction
-from django.db.models import Min
+from django.db.models import Max, Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 from mittab.apps.tab.judge_history import record_judge_pairing
@@ -33,6 +34,7 @@ class WingPairingMode:
 
 
 WING_PREFERENCE_WEIGHT = 100
+REPEAT_JUDGE_PENALTY_DEFAULT = 1
 
 
 def chair_wing_preference_weight(chair):
@@ -57,6 +59,9 @@ def get_inround_settings():
         allow_rejudges=TabSettings.get("allow_rejudges", False),
         rejudge_penalty=TabSettings.get("rejudge_penalty", 100),
         repeat_wing_penalty=TabSettings.get("repeat_wing_penalty", 10),
+        repeat_judge_penalty=TabSettings.get(
+            "repeat_judge_penalty", REPEAT_JUDGE_PENALTY_DEFAULT
+        ),
     )
 
 
@@ -110,6 +115,114 @@ def construct_judge_scores(judges, mode=JudgePairingMode.DEFAULT):
             previous_rank = judge.rank
         judge_scores.append(judge_score)
     return judge_scores
+
+
+def _team_judges(rounds):
+    result = defaultdict(set)
+    for pairing in rounds:
+        judge_ids = {judge.id for judge in pairing.judges.all()}
+        if pairing.chair_id is not None:
+            judge_ids.add(pairing.chair_id)
+        result[pairing.gov_team_id].update(judge_ids)
+        result[pairing.opp_team_id].update(judge_ids)
+    return result
+
+
+def _previous_inround_judges(round_number):
+    return _team_judges(
+        Round.objects.filter(round_number=round_number).prefetch_related("judges")
+    )
+
+
+def _judge_assignment_group(judge, is_chair):
+    if is_chair:
+        return judge.rank, judge.wing_only, judge.request_wing, judge.no_wings
+    return judge.rank
+
+
+def _prefer_fresh_judges(
+        joins, round_field, judges, previous_judges, penalty,
+        rejudge_counts=None, rejudge_penalty=0,
+        repeat_wing_counts=None, repeat_wing_penalty=0):
+    """Reassign equal-ranked judges within their roles on completed panels."""
+    rooms = defaultdict(list)
+    for join in joins:
+        rooms[getattr(join, round_field).id].append(join)
+
+    # At the default, even all recent repeats combined cost less than one
+    # point of either existing repeat penalty.
+    scale = max(1000, 2 * len(joins) + 1)
+    rejudge_counts = rejudge_counts or {}
+    repeat_wing_counts = repeat_wing_counts or {}
+
+    def recent_repeats(room, judge):
+        return sum(
+            judge.id in previous_judges[room.id].get(team_id, ())
+            for team_id in (room.gov_team_id, room.opp_team_id)
+        )
+
+    def prior_cost(room, judge, is_chair):
+        history = rejudge_counts.get(judge.id, {})
+        cost = rejudge_penalty * (
+            history.get(room.gov_team_id, 0) + history.get(room.opp_team_id, 0)
+        )
+        if is_chair:
+            repeats = sum(
+                repeat_wing_counts.get(other.judge_id, {}).get(judge.id, 0)
+                for other in rooms[room.id] if other.judge_id != room.chair_id
+            )
+        else:
+            repeats = repeat_wing_counts.get(judge.id, {}).get(room.chair_id, 0)
+        return cost + repeat_wing_penalty * repeats
+
+    chair_seats = [
+        join for join in joins if join.judge_id == getattr(join, round_field).chair_id
+    ]
+    original_chairs = {join.judge_id for join in chair_seats}
+    wing_seats = [join for join in joins if join.judge_id not in original_chairs]
+    for is_chair, seats in ((True, chair_seats), (False, wing_seats)):
+        original_repeats = sum(
+            recent_repeats(getattr(join, round_field), join.judge) for join in seats
+        )
+        if not original_repeats:
+            continue
+        if is_chair:
+            blocked = {join.judge_id for join in wing_seats}
+        else:
+            blocked = original_chairs | {join.judge_id for join in chair_seats}
+        candidates = [judge for judge in judges if judge.id not in blocked]
+        candidate_groups = defaultdict(list)
+        for index, judge in enumerate(candidates, start=len(seats)):
+            group = _judge_assignment_group(judge, is_chair)
+            candidate_groups[group].append((index, judge))
+
+        edges = []
+        for index, join in enumerate(seats):
+            room = getattr(join, round_field)
+            group = _judge_assignment_group(join.judge, is_chair)
+            for judge_index, judge in candidate_groups[group]:
+                same_judge = judge.id == join.judge_id
+                if not same_judge and judge_conflict(
+                        judge, room.gov_team, room.opp_team, allow_rejudges=True):
+                    continue
+                cost = scale * prior_cost(room, judge, is_chair)
+                cost += penalty * recent_repeats(room, judge)
+                # Keep the existing assignments when the weighted costs tie.
+                weight = -cost * (len(seats) + 1) + same_judge
+                edges.append((index, judge_index, weight))
+
+        matches = mwmatching.maxWeightMatching(edges, maxcardinality=True)
+        replacements = [
+            candidates[index - len(seats)] for index in matches[:len(seats)]
+        ]
+        if sum(
+                recent_repeats(getattr(join, round_field), judge)
+                for join, judge in zip(seats, replacements)) >= original_repeats:
+            continue
+        for join, judge in zip(seats, replacements):
+            join.judge = judge
+            if is_chair:
+                getattr(join, round_field).chair = judge
 
 
 @transaction.atomic
@@ -259,7 +372,6 @@ def add_judges():
             Round.judges.through(judge=chair, round=round_obj)
         )
 
-    Round.objects.bulk_update(pairings, ["chair"])
     if (
             pairing_settings.pair_wings
             and num_rounds
@@ -355,6 +467,28 @@ def add_judges():
                 )
                 assigned_judge_objects.add(judge.id)
 
+    if (
+            round_number > 1 and pairing_settings.allow_rejudges
+            and pairing_settings.repeat_judge_penalty > 0):
+        previous_judges = _previous_inround_judges(round_number - 1)
+        if previous_judges:
+            prior_team_counts = (
+                judge_team_rejudge_counts(
+                    all_judges, all_teams, before_round_number=round_number
+                )
+                if pairing_settings.rejudge_penalty > 0 else {}
+            )
+            _prefer_fresh_judges(
+                judge_round_joins, "round", all_judges,
+                {pairing.id: previous_judges for pairing in pairings},
+                pairing_settings.repeat_judge_penalty,
+                rejudge_counts=prior_team_counts,
+                rejudge_penalty=max(0, pairing_settings.rejudge_penalty),
+                repeat_wing_counts=repeat_wing_counts,
+                repeat_wing_penalty=pairing_settings.repeat_wing_penalty,
+            )
+
+    Round.objects.bulk_update(pairings, ["chair"])
     Round.judges.through.objects.bulk_create(judge_round_joins)
     record_judge_pairing(pairings, Round)
 
@@ -526,6 +660,39 @@ def _collect_outround_pairing_data(round_specs, round_priority):
     return pairings_by_spec, panel_size_by_spec
 
 
+def _previous_outround_judges(pairings):
+    """Use the previous stage in the same bracket, or the final inround."""
+    stages = defaultdict(set)
+    existing_stages = Outround.objects.values_list(
+        "type_of_round", "num_teams",
+    ).distinct()
+    for round_type, size in existing_stages:
+        stages[round_type].add(size)
+
+    final_inround = Round.objects.aggregate(last=Max("round_number"))["last"]
+    by_stage = {}
+    for pairing in pairings:
+        stage = (pairing.type_of_round, pairing.num_teams)
+        if stage in by_stage:
+            continue
+        previous = min(
+            (size for size in stages[pairing.type_of_round]
+             if size > pairing.num_teams),
+            default=None,
+        )
+        if previous is not None:
+            by_stage[stage] = _team_judges(Outround.objects.filter(
+                type_of_round=pairing.type_of_round, num_teams=previous,
+            ).prefetch_related("judges"))
+        else:
+            by_stage[stage] = _previous_inround_judges(final_inround)
+
+    return {
+        pairing.id: by_stage[(pairing.type_of_round, pairing.num_teams)]
+        for pairing in pairings
+    }
+
+
 @transaction.atomic
 def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     normalized_specs = _normalize_round_specs(round_specs, round_type=round_type)
@@ -538,14 +705,20 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
         pairing_settings.round_priority,
     )
 
-    active_round_ids = [
-        pairing.id
-        for pairings in pairings_by_spec.values()
-        for pairing in pairings
+    rounds_to_update = [
+        pairing for pairings in pairings_by_spec.values() for pairing in pairings
     ]
-    if not active_round_ids:
+    if not rounds_to_update:
         return
 
+    repeat_judge_penalty = TabSettings.get(
+        "repeat_judge_penalty", REPEAT_JUDGE_PENALTY_DEFAULT
+    )
+    previous_judges = (
+        _previous_outround_judges(rounds_to_update) if repeat_judge_penalty > 0 else {}
+    )
+
+    active_round_ids = [pairing.id for pairing in rounds_to_update]
     # Clear existing assignments only for undecided rounds in the selected scope.
     Outround.judges.through.objects.filter(outround_id__in=active_round_ids).delete()
     Outround.objects.filter(id__in=active_round_ids).update(chair=None)
@@ -606,12 +779,13 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
                 )
             )
 
-    rounds_to_update = []
-    for round_type, num_teams in normalized_specs:
-        rounds_to_update.extend(pairings_by_spec.get((round_type, num_teams), []))
+    if previous_judges:
+        _prefer_fresh_judges(
+            judge_round_joins, "outround", judges,
+            previous_judges, repeat_judge_penalty,
+        )
 
-    if rounds_to_update:
-        Outround.objects.bulk_update(rounds_to_update, ["chair"])
+    Outround.objects.bulk_update(rounds_to_update, ["chair"])
     if judge_round_joins:
         Outround.judges.through.objects.bulk_create(judge_round_joins)
     record_judge_pairing(rounds_to_update, Outround)
@@ -704,16 +878,21 @@ def can_judge_teams(list_of_judges, team1, team2, allow_rejudges=None):
             result.append(judge)
     return result
 
-def judge_team_rejudge_counts(judges, teams, exclude_round_id=None):
+def judge_team_rejudge_counts(
+        judges, teams, exclude_round_id=None, before_round_number=None):
     """Judges must have prefetch_related('judges') to prevent N+1
         before calling this function"""
     result = {}
-    team_ids = [team.id for team in teams]
+    team_ids = {team.id for team in teams}
 
     for judge in judges:
         result[judge.id] = {}
         for round_obj in judge.judges.all():
             if exclude_round_id and round_obj.id == exclude_round_id:
+                continue
+            if (
+                    before_round_number is not None
+                    and round_obj.round_number >= before_round_number):
                 continue
 
             if round_obj.gov_team_id in team_ids:

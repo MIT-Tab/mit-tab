@@ -137,6 +137,33 @@ class TestOutroundAssignmentScope(TestCase):
         self.assertEqual(self._assigned_ranks(varsity_rounds), [9, 8, 6, 5, 3, 2])
         self.assertEqual(self._assigned_ranks([novice_round]), [7, 4, 1])
 
+    def test_repeat_judge_preference_uses_the_previous_bracket_stage(self):
+        TabSettings.set("var_panel_size", 1)
+        TabSettings.set("repeat_judge_penalty", 0)
+        Judge.objects.filter(name="Judge 8").update(rank=9)
+        assign_judges.add_outround_judges()
+
+        original_chairs = []
+        for debate in self.var_round:
+            debate.refresh_from_db()
+            original_chairs.append(debate.chair_id)
+            previous = Outround.objects.create(
+                num_teams=8,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                victor=Outround.GOV,
+                chair_id=debate.chair_id,
+            )
+            previous.judges.add(debate.chair_id)
+
+        TabSettings.set("repeat_judge_penalty", 1)
+        assign_judges.add_outround_judges()
+
+        for debate, chair_id in zip(self.var_round, reversed(original_chairs)):
+            debate.refresh_from_db()
+            self.assertEqual(debate.chair_id, chair_id)
+            self.assertQuerySetEqual(debate.judges.all(), [debate.chair])
+
     def test_assign_outround_rooms_across_scope_has_no_overlap(self):
         assign_rooms.add_outround_rooms(
             round_specs=[(Outround.VARSITY, 4), (Outround.NOVICE, 2)]

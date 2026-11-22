@@ -140,6 +140,12 @@ assignment algorithm:
 - **Excludes wing-only judges from chair positions** (they can still be assigned as panel members)
 - Uses a maximum weight matching algorithm for optimal assignments
 
+**Repeat Judge Penalty** in Judges settings gives preference to an equally ranked judge
+who did not see either team in the previous round. It applies to outrounds and to
+inrounds when **Allow Rejudges** is on. The default of `1` breaks ties while
+preserving chair and wing ranks and panel sizes. Set it to `0` to turn it off,
+or raise it to give recent repeats more weight relative to the other repeat penalties.
+
 **Manual Judge Assignment**: You can also manually assign or swap judges, this is frequently needed after the automatic assignments:
 - Click on any judge name in the pairing to see alternative options
 - Use "Set To Chair" to change who is chairing the round (for paneled rounds)
