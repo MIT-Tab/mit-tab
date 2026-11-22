@@ -151,6 +151,11 @@ def test_open_judge_form_cannot_write_after_switching_judges(client):
 def test_legacy_ballot_bookmark_redirects_to_same_ballot_without_code(client):
     judge = Judge.objects.create(name="Booked Judge", rank=5)
     url = reverse("legacy_view_submitted_ballot_round", args=[judge.ballot_code, 42])
-    response = client.get(url)
+    response = client.get(url, {
+        "destination": "https://example.com/",
+        "next": "https://example.com/",
+        "return_to": "https://example.com/",
+        "round_id": 99,
+    })
     assert response.url == reverse("view_submitted_ballot_round", args=[42])
     assert client.session[judge_session.session_key]["id"] == judge.pk

@@ -3,11 +3,12 @@ from secrets import token_urlsafe
 from urllib.parse import unquote, urlsplit
 
 from django.contrib import messages
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import redirect
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 
 from mittab.apps.tab.models import Judge, Team
@@ -53,12 +54,16 @@ class PortalSession:
         request.session.pop(self.session_key, None)
         return None
 
-    def sign_in(self, request, code, destination, **kwargs):
+    def sign_in(self, request, code, destination_view, **route_kwargs):
         identity = (
             self.model.objects.filter(**{f"{self.code_field}__iexact": code}).first()
             if code else None
         )
         if identity:
+            target = reverse(destination_view, kwargs=route_kwargs)
+            if not url_has_allowed_host_and_scheme(target, allowed_hosts=None):
+                return redirect(self.sign_in_view)
+
             request.session.cycle_key()
             request.session[self.session_key] = {
                 "id": identity.pk,
@@ -66,7 +71,7 @@ class PortalSession:
                 "expires_at": timezone.now().timestamp() + PORTAL_LIFETIME_SECONDS,
                 "token": token_urlsafe(),
             }
-            return redirect(destination, **kwargs)
+            return HttpResponseRedirect(target)
         message = (
             f"We couldn't find a {self.label} for that code. Double-check and try again."
             if code else f"Please enter the {self.label} code provided by tab."
@@ -74,8 +79,8 @@ class PortalSession:
         messages.error(request, message)
         return redirect(self.sign_in_view)
 
-    def sign_in_from_link(self, request, code, destination, **kwargs):
-        response = self.sign_in(request, code, destination, **kwargs)
+    def sign_in_from_link(self, request, code, destination_view, **route_kwargs):
+        response = self.sign_in(request, code, destination_view, **route_kwargs)
         response["Referrer-Policy"] = "no-referrer"
         return response
 
