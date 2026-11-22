@@ -150,14 +150,17 @@ def invalidate_inround_public_pairings_cache(*_args, **_kwargs):
     _delete_key_for_all_auth_states("public_home")
 
 
-def invalidate_outround_public_pairings_cache(type_of_round, *_args, **_kwargs):
+def invalidate_outround_public_pairings_cache(type_of_round=None):
     """
-    Invalidate cached outround public pages for the provided division.
+    Invalidate cached outround public pages for one division or both.
 
     Clears origin cache immediately. CDN will refresh within 10 seconds.
     """
-    kwargs = {"type_of_round": type_of_round}
-    _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
+    if type_of_round is None:
+        _delete_all_keys_for_view("outround_pretty_pair")
+    else:
+        kwargs = {"type_of_round": type_of_round}
+        _delete_key_for_all_auth_states("outround_pretty_pair", kwargs)
     _delete_key_for_all_auth_states("public_home")
     _delete_key_for_all_auth_states("cached_public_tab_cards")
 

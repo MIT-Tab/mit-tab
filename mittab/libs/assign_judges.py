@@ -5,6 +5,7 @@ from django.db.models import Min
 from mittab.libs import tab_logic, mwmatching, errors
 from mittab.apps.tab.models import *
 from mittab.apps.tab.judge_history import record_judge_pairing
+from mittab.libs.cacheing.public_cache import invalidate_outround_public_pairings_cache
 
 class JudgePairingMode:
     DEFAULT = 0
@@ -615,6 +616,7 @@ def add_outround_judges(round_type=Outround.VARSITY, round_specs=None):
     if judge_round_joins:
         Outround.judges.through.objects.bulk_create(judge_round_joins)
     record_judge_pairing(rounds_to_update, Outround)
+    transaction.on_commit(invalidate_outround_public_pairings_cache, robust=True)
 
 def calc_weight(
         judge_i,

@@ -1,7 +1,6 @@
 import json
 
 from mittab.apps.tab.models import BreakingTeam, Outround
-from mittab.libs.cacheing.cache_logic import cache
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 
 LOCKED, WAITING, READY, COMPLETED = 0, 1, 2, 4
@@ -278,7 +277,6 @@ def generate_bracket_data(outround_pairings):
         "match_metadata": metadata,
     }
 
-@cache(60)
 def get_bracket_data_json(outround_pairings):
     try:
         bracket_data = generate_bracket_data(outround_pairings)
