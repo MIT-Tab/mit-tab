@@ -18,7 +18,7 @@ from mittab.apps.tab.auth_roles import (
 )
 from mittab.apps.tab.admin import RoundStatsAdmin
 from mittab.apps.tab.board_audit import (
-    pairing_history, pairing_revision, pairing_snapshot,
+    pairing_history, pairing_revision, pairing_snapshot, record_pairing_change,
 )
 from mittab.apps.tab.board_operations import edit_board_outround, pair_board_outround
 from mittab.apps.tab.forms import OutroundResultEntryForm
@@ -284,6 +284,43 @@ class TestBoardAuditAccess(TestCase):
         response = self.client.get(reverse("board_inrounds", args=[number]))
         self.assertNotIn(object_id, [row["id"] for row in response.context["deleted"]])
 
+    def test_staff_room_reassignments_do_not_record_audit_events(self):
+        staff = get_user_model().objects.create_superuser(
+            "room_editor", "room_editor@example.com", "password")
+        self.client.force_login(staff)
+        for route, pairing in (("assign_room", Round.objects.first()),
+                               ("assign_room_outround", self.pairing)):
+            room = Room.objects.exclude(pk=pairing.room_id).first()
+            with self.subTest(route=route):
+                count = AuditEvent.objects.count()
+                response = self.client.get(reverse(route, args=[pairing.pk, room.pk]))
+                self.assertTrue(response.json()["success"])
+                pairing.refresh_from_db()
+                self.assertEqual(pairing.room_id, room.pk)
+                self.assertEqual(AuditEvent.objects.count(), count)
+
+    def test_mixed_corrections_preserve_non_room_changes_in_audit_history(self):
+        pairing = Round.objects.first()
+        before = pairing_snapshot(pairing)
+        pairing.room = Room.objects.exclude(pk=pairing.room_id).first()
+        pairing.victor = Round.OPP if pairing.victor == Round.GOV else Round.GOV
+        pairing.save()
+        record_pairing_change(pairing, before, self.user, "admin correction")
+        event = AuditEvent.objects.latest("id")
+        self.assertNotIn("room", event.changes["public"]["before"])
+        self.assertNotIn("room", event.changes["public"]["after"])
+
+        # Legacy mixed records still show their non-room corrections.
+        AuditEvent.record(pairing, AuditEvent.EDIT, self.user, changes={
+            "public": {"before": before, "after": pairing_snapshot(pairing),
+                       "source": "admin correction"},
+        })
+        page = self.client.get(reverse("board_inrounds", args=[pairing.round_number]))
+        row = next(row for row in page.context["pairings"] if row["id"] == pairing.pk)
+        self.assertEqual(row["room"]["name"], pairing.room.name)
+        self.assertEqual([[change["field"] for change in item["changes"]]
+                          for item in row["history"]], [["victor"], ["victor"]])
+
     def test_manual_team_and_chair_edits_use_shared_cards_and_yellow_highlights(self):
         pairing = Round.objects.first()
         staff = get_user_model().objects.create_superuser(
@@ -341,6 +378,12 @@ class TestBoardAuditAccess(TestCase):
             AuditEvent.record(other, AuditEvent.EDIT, self.user, changes={
                 "public": {"before": before, "after": snapshot, "source": source},
             })
+        for source in ("staff room correction", "admin correction"):
+            AuditEvent.record(other, AuditEvent.EDIT, self.user, changes={
+                "public": {"before": dict(snapshot, room=None), "after": snapshot,
+                           "source": source},
+            })
+        self.assertEqual(pairing_history(Round, other.pk), [])
         AuditEvent.record(other, AuditEvent.EDIT, self.user,
                           changes={"rank": "CALIBRATION_SECRET"})
         url = reverse("board_inrounds", args=[other.round_number])
@@ -408,13 +451,18 @@ class TestBoardAuditAccess(TestCase):
                        judges="999", round_instance="999")
             self._edit("sides")
             self._edit("team", position="gov", team=self.teams[2].pk)
-            self._edit("room", room=Room.objects.last().pk)
+            count = AuditEvent.objects.count()
+            room = Room.objects.exclude(pk=self.pairing.room_id).first()
+            self._edit("room", room=room.pk)
+            self.pairing.refresh_from_db()
+            self.assertEqual(self.pairing.room_id, room.pk)
+            self.assertEqual(AuditEvent.objects.count(), count)
             self._edit("choice", choice=2)
         self.assertEqual(self._protected_state(), protected)
         self.pairing.refresh_from_db()
         self.assertEqual(self.pairing.victor, Outround.UNKNOWN)
         self.assertEqual(self.pairing.choice, Outround.OPP)
-        self.assertGreaterEqual(len(pairing_history(Outround, self.pairing.pk)), 5)
+        self.assertEqual(len(pairing_history(Outround, self.pairing.pk)), 4)
 
     def test_services_also_reject_actors_without_board_membership(self):
         user = get_user_model().objects.create_user("ordinary_user")

@@ -75,9 +75,10 @@ Existing structured manual judge assignment/removal/chair records are visible
 through a safe field projection. New pairing/result changes add before/after
 snapshots with actor, timestamp and operation source. The board audit displays
 only manual corrections: board corrections, staff
-team/room/side/choice/result corrections, structured judge/chair edits, and
-Round/Outround/RoundStats admin edits. Automatic pairing, re-pairing, bulk
-judge/room assignment, initial breaks, and routine ballot/panel entry are excluded
+team/side/choice/result corrections, structured judge/chair edits, and
+Round/Outround/RoundStats admin edits. Room changes are excluded from manual
+history. Automatic pairing, re-pairing, bulk judge assignment, initial breaks,
+and routine ballot/panel entry are excluded
 by an explicit operation allowlist, including previously recorded events. Removed
 pairings appear only for manual deletion, never automatic re-pairing.
 Protected fields and arbitrary notes are never part of the board projection.

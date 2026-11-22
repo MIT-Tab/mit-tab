@@ -59,6 +59,10 @@ def pairing_snapshot(pairing):
 
 def record_pairing_change(pairing, before, actor, source):
     after = pairing_snapshot(pairing)
+    if before is not None:
+        # Rooms are shown on pairing cards, but changes to them are not audited.
+        before = {key: value for key, value in before.items() if key != "room"}
+        after.pop("room")
     if before != after:
         AuditEvent.record(
             pairing, AuditEvent.CREATE if before is None else AuditEvent.EDIT, actor,
@@ -92,10 +96,8 @@ def audit_pairing_change(model, source):
         def wrapper(request, *args, **kwargs):
             round_id = args[0] if args else kwargs.get(
                 "round_id", kwargs.get("outround_id"))
-            round_model = model or (Outround if kwargs.get(
-                "outround") or kwargs.get("is_outround") else Round)
             with transaction.atomic():
-                pairing = round_model.objects.select_for_update().filter(
+                pairing = model.objects.select_for_update().filter(
                     pk=round_id).first()
                 if pairing is None:
                     return view(request, *args, **kwargs)
@@ -139,7 +141,7 @@ PUBLIC_SNAPSHOT_KEYS = {
 }
 # Explicit manual-operation allowlist also filters previously recorded bulk events.
 PUBLIC_SOURCES = {
-    "board correction", "board team swap", "staff room correction",
+    "board correction", "board team swap",
     "staff team correction", "staff side correction", "staff outround result",
     "staff choice correction", "admin correction", "admin scores", "admin deletion",
 }
@@ -223,7 +225,7 @@ def _project_history(events):
                         "before": _history_value(key, before.get(key)),
                         "after": _history_value(key, after.get(key))}
                        for key in sorted(set(before) | set(after))
-                       if before.get(key) != after.get(key)]
+                       if key != "room" and before.get(key) != after.get(key)]
         elif event.event_type in manual_fields:
             changes = [{"field": field.replace("_", " "), "before": "",
                         "after": event.changes[field]}
