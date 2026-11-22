@@ -144,6 +144,34 @@ def test_registration_config_is_singleton():
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("positional", [False, True])
+def test_registration_config_force_insert_updates_existing_singleton(positional):
+    config = RegistrationConfig.objects.create(
+        allow_new_registrations=False,
+        allow_registration_edits=False,
+    )
+    replacement = RegistrationConfig(
+        pk=99,
+        allow_new_registrations=True,
+        allow_registration_edits=True,
+    )
+    if positional:
+        replacement.save(True, False, "default", ["allow_new_registrations"])
+    else:
+        replacement.save(
+            force_insert=True,
+            using="default",
+            update_fields=["allow_new_registrations"],
+        )
+
+    assert replacement.pk == RegistrationConfig.SINGLETON_PK
+    assert RegistrationConfig.objects.count() == 1
+    config.refresh_from_db()
+    assert config.allow_new_registrations is True
+    assert config.allow_registration_edits is False
+
+
+@pytest.mark.django_db
 def test_registration_schedule_controls_new_and_edit_windows_independently():
     now = timezone.now()
     config = RegistrationConfig.objects.create(
