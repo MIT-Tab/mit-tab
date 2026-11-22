@@ -8,6 +8,7 @@ import mittab.apps.tab.views.views as views
 import mittab.apps.tab.views.public_views as public_views
 import mittab.apps.tab.views.api_views as api_views
 import mittab.apps.tab.views.judge_views as judge_views
+import mittab.apps.tab.views.judge_speaker_points_views as judge_speaker_points_views
 import mittab.apps.tab.views.team_views as team_views
 import mittab.apps.tab.views.tab_card_views as tab_card_views
 import mittab.apps.tab.views.debater_views as debater_views
@@ -96,6 +97,8 @@ urlpatterns = [
 
 
     # Judge related
+    path("judges/speaker-points/", judge_speaker_points_views.judge_speaker_points,
+         name="judge_speaker_points"),
     re_path(r"^judge/(\d+)/$", judge_views.view_judge, name="view_judge"),
     re_path(r"^judge/(\d+)/delete/$", judge_views.delete_judge, name="delete_judge"),
     re_path(r"^judge/(\d+)/scratches/add/(\d+)/",
