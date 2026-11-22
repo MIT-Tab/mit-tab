@@ -144,7 +144,8 @@ assignment algorithm:
 who did not see either team in the previous round. It applies to outrounds and to
 inrounds when **Allow Rejudges** is on. The default of `1` breaks ties while
 preserving chair and wing ranks and panel sizes. Set it to `0` to turn it off,
-or raise it to give recent repeats more weight relative to the other repeat penalties.
+or raise it to give recent repeats more weight. A value of `1,000` gives a recent repeat
+roughly the weight of one point in the other repeat penalties.
 
 **Manual Judge Assignment**: You can also manually assign or swap judges, this is frequently needed after the automatic assignments:
 - Click on any judge name in the pairing to see alternative options
