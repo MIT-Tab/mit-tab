@@ -39,6 +39,7 @@ class Command(BaseCommand):
         initialize_kwargs = {
             "tab_password": tab_password,
             "first_init": True,
+            "hide_passwords": True,
         }
         if entry_password:
             initialize_kwargs["entry_password"] = entry_password
