@@ -17,7 +17,8 @@ function showSources(items) {
     const summary = document.createElement("summary");
     summary.textContent = `${item.path}:${item.line}`;
     const excerpt = document.createElement("pre");
-    excerpt.className = "text-wrap text-break";
+    excerpt.className = "text-break";
+    excerpt.style.whiteSpace = "pre-wrap";
     excerpt.textContent = item.text;
     details.append(summary, excerpt);
     if (item.url) {
