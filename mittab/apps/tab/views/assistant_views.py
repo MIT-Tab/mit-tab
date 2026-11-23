@@ -2,14 +2,13 @@
 
 from django.conf import settings
 from django.http import HttpResponseForbidden, HttpResponseNotFound, JsonResponse
-from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST
 
 from mittab.apps.tab import assistant
 from mittab.apps.tab.assistant_sources import search_source, source_url
-from mittab.apps.tab.auth_roles import is_apda_board_user
+from mittab.apps.tab.auth_roles import can_use_assistant
 
 
 def _source_links(sources):
@@ -22,14 +21,12 @@ def _source_links(sources):
 
 @sensitive_post_parameters("question", "history")
 @never_cache
-@require_http_methods(["GET", "POST"])
+@require_POST
 def ask_mittab(request):
     if not settings.MITTAB_ASSISTANT_ENABLED:
         return HttpResponseNotFound()
-    if not request.user.is_superuser or is_apda_board_user(request.user):
+    if not can_use_assistant(request.user):
         return HttpResponseForbidden()
-    if request.method == "GET":
-        return render(request, "tab/assistant.html", {"can_ask": assistant.is_configured()})
 
     question = request.POST.get("question", "").strip()
     history = request.POST.get("history", "")

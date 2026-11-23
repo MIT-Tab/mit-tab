@@ -1,5 +1,5 @@
 {% extends "admin/base.html" %}
-{% load i18n %}
+{% load i18n tags %}
 
 {% block title %}{{ title }} | {% trans 'MIT-TAB site admin' %}{% endblock %}
 
@@ -8,3 +8,8 @@
 {% endblock %}
 
 {% block nav-global %}<div style="padding: 0 10px 10px;font-size: 18px;"><a  href="/">Go Back to Main Homepage</a></div>{% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+  {% tab_gpt user %}
+{% endblock %}

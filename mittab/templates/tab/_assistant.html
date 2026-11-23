@@ -1,0 +1,42 @@
+{% load static %}
+{% if enabled %}
+<link rel="stylesheet" href="{% static 'css/tabAssistant.css' %}">
+<script defer src="{% static 'js/tabAssistant.js' %}"></script>
+
+<button class="tab-gpt-launcher" id="tab-gpt-launcher" type="button"
+        aria-label="Open tab GPT" aria-expanded="false" aria-controls="tab-gpt-panel"
+        title="tab GPT">
+  <span class="tab-gpt-icon" aria-hidden="true"></span>
+</button>
+
+<dialog class="tab-gpt-panel" id="tab-gpt-panel" aria-labelledby="tab-gpt-title">
+  <header class="tab-gpt-header">
+    <h2 id="tab-gpt-title">tab GPT</h2>
+    <button class="tab-gpt-close" type="button" aria-label="Close tab GPT">×</button>
+  </header>
+  <div class="tab-gpt-transcript">
+    <p class="tab-gpt-intro">
+      {% if can_ask %}Ask about MIT-Tab or this tournament.{% else %}
+      Search the code and docs for this version of MIT-Tab.{% endif %}
+    </p>
+    <div id="assistant-conversation" role="log" aria-label="Conversation"></div>
+    <p id="assistant-status" role="status"></p>
+  </div>
+  <form class="tab-gpt-form" id="assistant-form" method="post" action="{% url 'ask_mittab' %}">
+    {% csrf_token %}
+    <div class="tab-gpt-composer">
+      <textarea id="assistant-question" name="question" rows="2" aria-label="{% if can_ask %}Message tab GPT{% else %}Search code and docs{% endif %}"
+                required minlength="2" maxlength="600"
+                placeholder="{% if can_ask %}Message tab GPT…{% else %}Search code and docs…{% endif %}"></textarea>
+      <button class="tab-gpt-send" type="submit" name="mode" value="{% if can_ask %}ask{% else %}search{% endif %}"
+              aria-label="{% if can_ask %}Send message{% else %}Search{% endif %}">↑</button>
+    </div>
+    {% if can_ask %}
+    <div class="tab-gpt-form-footer">
+      <small>Cloudflare processes chat requests.</small>
+      <button class="tab-gpt-search" type="submit" name="mode" value="search">Search code</button>
+    </div>
+    {% endif %}
+  </form>
+</dialog>
+{% endif %}

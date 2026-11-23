@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from requests import Timeout
@@ -39,10 +39,10 @@ class TestAssistant(TestCase):
     def test_only_full_staff_can_call_assistant(self):
         user = get_user_model().objects.create_user("limited-staff")
         self.client.force_login(user)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.post(self.url).status_code, 403)
         apply_staff_permission_preset(user, PRESET_TAB_ASSISTANT)
         self.client.force_login(user)
-        self.assertNotEqual(self.client.get(self.url).status_code, 200)
+        self.assertNotEqual(self.client.post(self.url).status_code, 200)
         group, _ = Group.objects.get_or_create(name=APDA_BOARD_GROUP_NAME)
         self.admin.groups.add(group)
         self.client.force_login(self.admin)
@@ -58,7 +58,29 @@ class TestAssistant(TestCase):
 
     @override_settings(MITTAB_ASSISTANT_ENABLED=False)
     def test_disabled_assistant_is_hidden(self):
-        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.url).status_code, 404)
+
+    def test_launcher_appears_on_staff_and_admin_pages(self):
+        for route in ("index", "settings_form", "admin:index"):
+            with self.subTest(route=route):
+                page = self.client.get(reverse(route))
+                self.assertContains(page, 'aria-label="Open tab GPT"')
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+
+    def test_cached_public_page_does_not_share_the_staff_launcher(self):
+        path = reverse("public_home")
+        visitor = Client()
+        self.assertNotContains(visitor.get(path), 'id="tab-gpt-launcher"')
+        staff_page = self.client.get(path)
+        self.assertContains(staff_page, 'id="tab-gpt-launcher"')
+        self.assertIn("no-store", staff_page.headers["Cache-Control"])
+        self.assertNotContains(visitor.get(path), 'id="tab-gpt-launcher"')
+
+        restricted = get_user_model().objects.create_user("checkin-helper")
+        apply_staff_permission_preset(restricted, PRESET_TAB_ASSISTANT)
+        visitor.force_login(restricted)
+        self.assertNotContains(visitor.get(path), 'id="tab-gpt-launcher"')
+        self.assertContains(self.client.get(path), 'id="tab-gpt-launcher"')
 
     def test_provider_failure_returns_local_sources(self):
         with patch(
@@ -117,8 +139,8 @@ class TestAssistant(TestCase):
 
     @override_settings(MITTAB_ASSISTANT_API_TOKEN="", MITTAB_SOURCE_REVISION="")
     def test_local_search_when_provider_is_unconfigured(self):
-        page = self.client.get(self.url)
-        self.assertContains(page, "Search code and docs")
+        page = self.client.get(reverse("index"))
+        self.assertContains(page, "Search the code and docs")
         self.assertNotContains(page, 'value="ask"')
         with patch("mittab.apps.tab.assistant.requests.post") as send:
             response = self.client.post(

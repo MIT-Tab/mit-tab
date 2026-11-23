@@ -1,14 +1,15 @@
 from django import template
-from django.conf import settings
 from django.forms.fields import FileField
 from django.urls import reverse
 from django.utils.html import urlize
 from django.utils.safestring import mark_safe
 
 from mittab.apps.tab.auth_roles import (
+    can_use_assistant,
     is_apda_board_user,
     user_has_staff_capability,
 )
+from mittab.apps.tab.assistant import is_configured as assistant_is_configured
 from mittab.apps.tab.helpers import get_redirect_target
 from mittab.apps.tab import logo_utils
 from mittab.apps.tab.models import DEFAULT_TOURNAMENT_NAME, TabSettings
@@ -19,9 +20,10 @@ from mittab.apps.tab.public_rankings import get_public_display_flags
 register = template.Library()
 
 
-@register.simple_tag
-def assistant_enabled():
-    return settings.MITTAB_ASSISTANT_ENABLED
+@register.inclusion_tag("tab/_assistant.html")
+def tab_gpt(user):
+    enabled = can_use_assistant(user)
+    return {"enabled": enabled, "can_ask": enabled and assistant_is_configured()}
 
 
 @register.simple_tag
