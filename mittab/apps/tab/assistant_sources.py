@@ -85,10 +85,11 @@ def search_source(query):
             score = sum(term in line_text for term in terms)
             if score > best_score:
                 best_score, best_line = score, index
+        help_priority = 8 if path.startswith(("settings/", "docs/")) else 0
         score = (
             5 * best_score + 2 * file_score
             + 3 * sum(term in path_words for term in terms)
-            + int(path.startswith(("settings/", "docs/", "mittab/templates/")))
+            + help_priority
         )
         matches.append((-score, path, best_line))
 
