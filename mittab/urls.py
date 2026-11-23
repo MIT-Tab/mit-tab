@@ -4,6 +4,8 @@ from django.urls import path, re_path
 from django.contrib import admin
 
 import mittab.settings as settings
+from mittab.apps.tab.views import assistant_views
+
 import mittab.apps.tab.views.views as views
 import mittab.apps.tab.views.public_views as public_views
 import mittab.apps.tab.views.api_views as api_views
@@ -26,6 +28,7 @@ import mittab.apps.registration.views as registration_views
 admin.autodiscover()
 
 urlpatterns = [
+    path("ask-mittab/", assistant_views.ask_mittab, name="ask_mittab"),
     path("setup/public-change-log/", roster_log_views.manage_roster_log,
          name="manage_roster_log"),
     path("setup/public-change-log/<int:entry_id>/", roster_log_views.edit_roster_log,

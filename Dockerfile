@@ -18,6 +18,9 @@ COPY package-lock.json ./
 COPY manage.py ./
 COPY webpack.config.js ./
 COPY ./settings ./settings
+COPY docs/*.md ./docs/
+ARG MITTAB_SOURCE_REVISION
+ENV MITTAB_SOURCE_REVISION=$MITTAB_SOURCE_REVISION
 COPY ./mittab ./mittab
 COPY ./bin    ./bin
 COPY ./assets ./assets

@@ -1,4 +1,5 @@
 from django import template
+from django.conf import settings
 from django.forms.fields import FileField
 from django.urls import reverse
 from django.utils.html import urlize
@@ -16,6 +17,11 @@ from mittab.apps.tab.public_pages import get_public_navigation_pages
 from mittab.apps.tab.public_rankings import get_public_display_flags
 
 register = template.Library()
+
+
+@register.simple_tag
+def assistant_enabled():
+    return settings.MITTAB_ASSISTANT_ENABLED
 
 
 @register.simple_tag

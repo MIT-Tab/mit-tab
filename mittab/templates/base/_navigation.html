@@ -194,6 +194,13 @@
       </ul>
       <ul class="navbar-nav ml-auto">
         {% include "base/_public_navigation.html" %}
+        {% assistant_enabled as show_assistant %}
+        {% if show_assistant and user.is_superuser %}
+        {% url "ask_mittab" as ask_mittab %}
+        <li class="nav-item">
+          <a class="nav-link {% active request ask_mittab %}" href="{{ ask_mittab }}">Ask MIT-Tab</a>
+        </li>
+        {% endif %}
         <li class="nav-item">
           <a class="nav-link" href="{{ logout|with_return_to }}">Logout</a>
         </li>

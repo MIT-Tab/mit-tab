@@ -1,0 +1,35 @@
+{% extends "base/__normal.html" %}
+{% load static %}
+
+{% block title %}Ask MIT-Tab{% endblock %}
+{% block banner %}Ask MIT-Tab{% endblock %}
+{% block extra_head %}
+<script defer src="{% static 'js/tabAssistant.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-9 col-xl-8">
+  {% if can_ask %}
+  <p>Ask about MIT-Tab or this tournament. Cloudflare processes chat questions and the information needed to answer them.</p>
+  {% else %}
+  <p>Search the code and help files for this version of MIT-Tab.</p>
+  {% endif %}
+  <div id="assistant-conversation" role="log" aria-label="Conversation" aria-live="polite"></div>
+  <form id="assistant-form" method="post" action="{% url 'ask_mittab' %}">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="assistant-question">Question or search terms</label>
+      <textarea id="assistant-question" name="question" class="form-control" rows="3"
+                required minlength="2" maxlength="600"
+                placeholder="Where do I enable half-point speaks?"></textarea>
+    </div>
+    {% if can_ask %}
+    <button class="btn btn-primary mr-2" type="submit" name="mode" value="ask">Ask</button>
+    {% endif %}
+    <button class="btn {% if can_ask %}btn-outline-secondary{% else %}btn-primary{% endif %}"
+            type="submit" name="mode" value="search">Search code and docs</button>
+  </form>
+  <p id="assistant-status" class="mt-3" role="status"></p>
+  <div id="assistant-sources"></div>
+</div>
+{% endblock %}
