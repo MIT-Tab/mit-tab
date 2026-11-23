@@ -1,5 +1,9 @@
+from contextlib import redirect_stdout
+from io import StringIO
+import os
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import connection
 from django.test import TransactionTestCase
@@ -62,6 +66,32 @@ class TestEnsureTournamentInitializedCommand(TransactionTestCase):
 
         self.assertTrue(self._is_initialized())
         self.assertFalse(School.objects.exists())
+
+    def test_startup_sets_passwords_without_logging_them(self):
+        passwords = {
+            "tab": "synthetic-tab-password",
+            "entry": "synthetic-entry-password",
+            "board": "synthetic-board-password",
+        }
+        output = StringIO()
+        with (
+            redirect_stdout(output),
+            patch.dict(os.environ, {"BOARD_PASSWORD": passwords["board"]}),
+            patch(
+                "mittab.apps.tab.management.commands.initialize_tourney.backup_round"
+            ),
+        ):
+            call_command(
+                "ensure_tournament_initialized",
+                tab_password=passwords["tab"],
+                entry_password=passwords["entry"],
+            )
+
+        self.assertIn("Done setting up tournament", output.getvalue())
+        for username, password in passwords.items():
+            self.assertNotIn(password, output.getvalue())
+            user = get_user_model().objects.get(username=username)
+            self.assertTrue(user.check_password(password))
 
     def test_fixture_failure_does_not_mark_tournament_initialized(self):
         with patch(

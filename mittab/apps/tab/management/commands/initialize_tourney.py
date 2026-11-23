@@ -52,6 +52,11 @@ class Command(BaseCommand):
             help="Skip backup creation during initialization.",
             action="store_true",
             default=False)
+        parser.add_argument(
+            "--hide-passwords",
+            action="store_true",
+            help="Suppress the credential table in command output.",
+        )
 
     def handle(self, *args, **options):
         apda_board_password = (
@@ -94,21 +99,15 @@ class Command(BaseCommand):
         TabSettings.set("theme_color", "#00438A")
         apply_new_tournament_defaults()
         InfoText.ensure_defaults()
-        self.stdout.write(
-            "Done setting up tournament "
-            "New tournament information:")
-        username_label = "Username".ljust(10, " ")
-        password_label = "Password".ljust(10, " ")
-        self.stdout.write(f"{username_label} | {password_label}")
-        self.stdout.write(
-            f"{'tab'.ljust(10, ' ')} | {options['tab_password'].ljust(10, ' ')}"
-        )
-        self.stdout.write(
-            f"{'entry'.ljust(10, ' ')} | {options['entry_password'].ljust(10, ' ')}"
-        )
-        self.stdout.write(
-            f"{'board'.ljust(10, ' ')} | "
-            f"{apda_board_password.ljust(10, ' ')}"
-        )
+        self.stdout.write("Done setting up tournament")
+        if not options["hide_passwords"]:
+            self.stdout.write("New tournament information:")
+            self.stdout.write(f"{'Username':<10} | {'Password':<10}")
+            for username, password in (
+                ("tab", options["tab_password"]),
+                ("entry", options["entry_password"]),
+                ("board", apda_board_password),
+            ):
+                self.stdout.write(f"{username:<10} | {password:<10}")
         if options["first_init"] and not options["skip_backups"]:
             backup_round(name="initial-tournament", btype=INITIAL)
