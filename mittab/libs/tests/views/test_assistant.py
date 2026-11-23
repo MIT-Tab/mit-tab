@@ -64,7 +64,7 @@ class TestAssistant(TestCase):
         for route in ("index", "settings_form", "admin:index"):
             with self.subTest(route=route):
                 page = self.client.get(reverse(route))
-                self.assertContains(page, 'aria-label="Open tab GPT"')
+                self.assertContains(page, 'aria-label="Open TabGPT"')
         self.assertEqual(self.client.get(self.url).status_code, 405)
 
     def test_cached_public_page_does_not_share_the_staff_launcher(self):

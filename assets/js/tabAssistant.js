@@ -82,7 +82,7 @@ function addMessage(text, isUser = false, sources = []) {
   message.className = isUser
     ? "tab-gpt-message tab-gpt-message--user"
     : "tab-gpt-message";
-  message.setAttribute("aria-label", isUser ? "You" : "tab GPT");
+  message.setAttribute("aria-label", isUser ? "You" : "TabGPT");
   message.textContent = text;
   addSources(message, sources);
   conversation.appendChild(message);
