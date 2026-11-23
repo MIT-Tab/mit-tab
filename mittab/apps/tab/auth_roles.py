@@ -10,7 +10,9 @@ APDA_BOARD_GROUP_NAME = "APDA Board"
 # Named routes and methods, never whole path prefixes: new endpoints fail closed.
 APDA_BOARD_ALLOWED_VIEWS = {
     name: {"GET", "HEAD"} for name in (
-        "index", "403", "404", "500", "public_home", "pretty_pair",
+        "index", "403", "404", "500", "public_home", "public_access_error", "tab_login",
+        "pretty_pair", "previous_pretty_pair", "public_tab_cards",
+        "registration_portal",
         "missing_ballots", "public_judges", "public_teams", "public_expected_records", "rank_teams_public",
         "public_speaker_rankings", "public_ballots", "outround_pretty_pair",
         "public_motions", "favicon", "tournament_logo", "js18", "forum_post",

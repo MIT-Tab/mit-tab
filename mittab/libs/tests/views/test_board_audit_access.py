@@ -1,6 +1,7 @@
 """Board confidentiality and write boundaries are release invariants."""
 from contextlib import ExitStack
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -155,6 +156,44 @@ class TestBoardAuditAccess(TestCase):
                     self.assertEqual(response.status_code, 302)
                     self.assertEqual(response.url, "/403/")
         self.assertEqual(self.client.get(reverse("board_outrounds")).status_code, 200)
+
+    def test_public_pages_are_available_without_expanding_write_access(self):
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_staff", "is_superuser"])
+        urls = [reverse("public_access_error"),
+                reverse("previous_pretty_pair", args=[1]),
+                reverse("public_tab_cards"), reverse("registration_portal")]
+        protected_before = self._protected_state()
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertNotEqual(response.status_code, 500)
+                if response.status_code == 302:
+                    self.assertNotEqual(response.url, "/403/")
+                self.assertEqual(response["Cache-Control"], "private, no-store")
+                self.assertEqual(self.client.post(url).url, "/403/")
+        self.assertEqual(self._protected_state(), protected_before)
+
+    def test_new_public_responses_ignore_protected_judge_data(self):
+        urls = [reverse("public_access_error"),
+                reverse("previous_pretty_pair", args=[1]),
+                reverse("registration_portal")]
+        def snapshot():
+            return [(response.status_code, re.sub(
+                rb'name="csrfmiddlewaretoken" value="[^"]+"',
+                b'name="csrfmiddlewaretoken" value="TOKEN"', response.content))
+                    for response in (self.client.get(url) for url in urls)]
+
+        before = snapshot()
+        self.judge.rank = (self.judge.rank or 0) + 1
+        self.judge.wing_only = not self.judge.wing_only
+        self.judge.save(update_fields=["rank", "wing_only"])
+        Scratch.objects.filter(judge=self.judge, team=self.teams[0]).delete()
+        Scratch.objects.create(
+            judge=self.judge, team=self.teams[0], scratch_type=Scratch.TEAM_SCRATCH)
+        after = snapshot()
+        self.assertEqual(before, after)
 
     def test_new_routes_and_unlisted_methods_fail_closed(self):
         for name in (
