@@ -5,20 +5,15 @@
 {% block banner %}Invite Tab Staff{% endblock %}
 
 {% block content %}
-<div class="col-md-6">
+<div class="readable-page col-md-6">
   <form action="" method="post" novalidate>
     {% csrf_token %}
     {% render_form form %}
     <button type="submit" class="btn btn-primary">Send Invite</button>
   </form>
 </div>
-<div class="col-md-6">
-  <p class="text-muted">
-    Invited users receive a single-use password setup link using Django's
-    built-in password reset tokens. The username entered here is the username
-    they will use to sign in. New invited accounts are created with the selected
-    permission preset and no usable password until the recipient sets one.
-  </p>
+<div class="readable-page col-md-6">
+  <p>Invited staff receive a one-time link to set their password.</p>
   <h5>Permission Presets</h5>
   <div class="list-group">
     {% for preset in staff_preset_details %}
@@ -31,7 +26,7 @@
       </div>
       <div class="row">
         <div class="col-md-6">
-          <strong>Can</strong>
+          <div class="font-weight-semibold">Can</div>
           <ul class="mb-2 pl-3">
             {% for item in preset.can %}
             <li>{{ item }}</li>
@@ -40,7 +35,7 @@
         </div>
         {% if preset.cannot %}
         <div class="col-md-6">
-          <strong>Cannot</strong>
+          <div class="font-weight-semibold">Cannot</div>
           <ul class="mb-0 pl-3">
             {% for item in preset.cannot %}
             <li>{{ item }}</li>

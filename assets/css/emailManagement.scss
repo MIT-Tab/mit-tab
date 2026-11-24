@@ -53,3 +53,9 @@ body.email-preview-open {
     border-top: 1px solid #dee2e6;
   }
 }
+
+.email-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.15rem;
+}

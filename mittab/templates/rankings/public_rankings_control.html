@@ -3,7 +3,7 @@
 {% block title %}Public Rankings Control Panel{% endblock %}
 
 {% block content %}
-<div class="col-12">
+<div class="readable-page col-12">
   <form method="post" class="card shadow-sm">
     {% csrf_token %}
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
@@ -17,7 +17,7 @@
 
       <section class="mb-4">
         <h5>Rankings</h5>
-        <div class="table-responsive">
+        <div class="table-responsive" role="region" aria-label="Rankings settings" tabindex="0">
           <table class="table table-striped table-bordered table-sm">
             <thead class="thead-light">
               <tr>
@@ -69,7 +69,7 @@
       <section>
         <h5>Ballots</h5>
         {% if ballot_settings %}
-        <div class="table-responsive">
+        <div class="table-responsive" role="region" aria-label="Ballot settings" tabindex="0">
           <table class="table table-striped table-bordered table-sm">
             <thead class="thead-light">
               <tr>

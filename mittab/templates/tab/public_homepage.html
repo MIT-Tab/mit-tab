@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="col-12 ph">
+<div class="readable-page col-12 ph">
 
   <form method="post" enctype="multipart/form-data" class="ph__form ph__section">
     {% csrf_token %}
@@ -96,16 +96,25 @@
                 id="ph-text-{{ item.pk }}">
             {% csrf_token %}
           </form>
-          <input type="text" name="title" form="ph-text-{{ item.pk }}"
+          <label class="ph__link-field">
+            <span>Title</span>
+            <input type="text" name="title" form="ph-text-{{ item.pk }}"
                  class="form-control form-control-sm"
                  value="{{ item.title }}" maxlength="80" placeholder="Label (e.g. GA)" required>
-          <input type="text" name="text" form="ph-text-{{ item.pk }}"
+          </label>
+          <label class="ph__link-field">
+            <span>Information</span>
+            <input type="text" name="text" form="ph-text-{{ item.pk }}"
                  class="form-control form-control-sm"
                  value="{{ item.text }}" maxlength="500" placeholder="Information" required>
-          <input type="number" name="display_order" form="ph-text-{{ item.pk }}"
+          </label>
+          <label class="ph__link-field">
+            <span>Order</span>
+            <input type="number" name="display_order" form="ph-text-{{ item.pk }}"
                  class="form-control form-control-sm ph__link-order"
                  value="{{ item.display_order }}" min="0" step="1"
                  title="Display order (lowest first)">
+          </label>
           <div class="ph__link-actions">
             <label class="ph__link-toggle">
               <input type="checkbox" name="is_active" form="ph-text-{{ item.pk }}"
@@ -133,12 +142,21 @@
             action="{% url 'info_text_create' %}"
             class="ph__link-row ph__link-row--add ph__text-row">
         {% csrf_token %}
-        <input type="text" name="title" class="form-control form-control-sm"
+        <label class="ph__link-field">
+          <span>Title</span>
+          <input type="text" name="title" class="form-control form-control-sm"
                placeholder="Label (e.g. Day 1 GA)" maxlength="80" required>
-        <input type="text" name="text" class="form-control form-control-sm"
+        </label>
+        <label class="ph__link-field">
+          <span>Information</span>
+          <input type="text" name="text" class="form-control form-control-sm"
                placeholder="Information (e.g. Student center, room 201)" maxlength="500" required>
-        <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
+        </label>
+        <label class="ph__link-field">
+          <span>Order</span>
+          <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
                value="0" min="0" step="1" title="Display order (lowest first)">
+        </label>
         <div class="ph__link-actions">
           <label class="ph__link-toggle">
             <input type="checkbox" name="is_active" checked> Active
@@ -156,20 +174,32 @@
                 id="ph-link-{{ link.pk }}">
             {% csrf_token %}
           </form>
-          <input type="text" name="title" form="ph-link-{{ link.pk }}"
+          <label class="ph__link-field">
+            <span>Title</span>
+            <input type="text" name="title" form="ph-link-{{ link.pk }}"
                  class="form-control form-control-sm"
                  value="{{ link.title }}" maxlength="80" placeholder="Title" required>
-          <input type="url" name="url" form="ph-link-{{ link.pk }}"
+          </label>
+          <label class="ph__link-field">
+            <span>URL</span>
+            <input type="url" name="url" form="ph-link-{{ link.pk }}"
                  class="form-control form-control-sm"
                  value="{{ link.url }}" placeholder="https://..." required>
-          <input type="text" name="description" form="ph-link-{{ link.pk }}"
+          </label>
+          <label class="ph__link-field">
+            <span>Description (optional)</span>
+            <input type="text" name="description" form="ph-link-{{ link.pk }}"
                  class="form-control form-control-sm"
                  value="{{ link.description }}" maxlength="160"
                  placeholder="Short description (optional)">
-          <input type="number" name="display_order" form="ph-link-{{ link.pk }}"
+          </label>
+          <label class="ph__link-field">
+            <span>Order</span>
+            <input type="number" name="display_order" form="ph-link-{{ link.pk }}"
                  class="form-control form-control-sm ph__link-order"
                  value="{{ link.display_order }}" min="0" step="1"
                  title="Display order (lowest first)">
+          </label>
           <div class="ph__link-actions">
             <label class="ph__link-toggle">
               <input type="checkbox" name="is_active" form="ph-link-{{ link.pk }}"
@@ -197,14 +227,26 @@
             action="{% url 'tournament_link_create' link_kind='info' %}"
             class="ph__link-row ph__link-row--add">
         {% csrf_token %}
-        <input type="text" name="title" class="form-control form-control-sm"
+        <label class="ph__link-field">
+          <span>Title</span>
+          <input type="text" name="title" class="form-control form-control-sm"
                placeholder="Title (e.g. Tournament Discord)" maxlength="80" required>
-        <input type="url" name="url" class="form-control form-control-sm"
+        </label>
+        <label class="ph__link-field">
+          <span>URL</span>
+          <input type="url" name="url" class="form-control form-control-sm"
                placeholder="https://..." inputmode="url" required>
-        <input type="text" name="description" class="form-control form-control-sm"
+        </label>
+        <label class="ph__link-field">
+          <span>Description (optional)</span>
+          <input type="text" name="description" class="form-control form-control-sm"
                placeholder="Short description (optional)" maxlength="160">
-        <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
+        </label>
+        <label class="ph__link-field">
+          <span>Order</span>
+          <input type="number" name="display_order" class="form-control form-control-sm ph__link-order"
                value="0" min="0" step="1" title="Display order (lowest first)">
+        </label>
         <div class="ph__link-actions">
           <label class="ph__link-toggle">
             <input type="checkbox" name="is_active" checked> Active

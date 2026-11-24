@@ -11,7 +11,7 @@
 
 {% block content %}
 {% render_bundle 'registrationPortal' %}
-<div class="col-12" id="registration-app" data-max-teams="{{ max_teams }}">
+<div class="readable-page col-12" id="registration-app" data-max-teams="{{ max_teams }}">
     {% if registration_lock_message %}
     <div class="alert alert-warning registration-lock-alert">{{ registration_lock_message }}</div>
     {% endif %}

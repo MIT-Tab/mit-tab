@@ -884,14 +884,6 @@
   gap: 1.25rem;
   width: 100%;
 
-  .registration-admin__header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-
   .registration-admin__titles h5 {
     margin: 0;
     font-size: 1.2rem;
@@ -901,8 +893,7 @@
 
   .registration-admin__titles p {
     margin: 0.25rem 0 0;
-    color: rgba(28, 45, 70, 0.7);
-    font-size: 0.9rem;
+    color: var(--ui-muted);
   }
 
   .registration-admin__settings,
@@ -925,6 +916,12 @@
     align-items: flex-start;
     gap: 0.75rem 1rem;
     margin-bottom: 1rem;
+  }
+
+  .registration-admin__settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .registration-admin__schedule-grid {
@@ -963,8 +960,8 @@
 
     label {
       margin-bottom: 0.25rem;
-      color: rgba(28, 45, 70, 0.7);
-      font-size: 0.78rem;
+      color: var(--ui-ink);
+      font-size: 0.875rem;
       font-weight: 500;
     }
   }
@@ -1002,9 +999,9 @@
   .registration-admin__hint {
     flex-basis: 100%;
     margin: 0;
-    font-size: 0.78rem;
-    color: rgba(28, 45, 70, 0.7);
-    line-height: 1.35;
+    font-size: 0.875rem;
+    color: var(--ui-muted);
+    line-height: 1.45;
   }
 
   .registration-admin__panel-title {
@@ -1029,6 +1026,7 @@
   }
 
   .registration-admin__table-wrap {
+    max-width: 100%;
     overflow-x: auto;
   }
 
@@ -1062,7 +1060,7 @@
       background: rgba(244, 249, 255, 0.7);
       font-size: 0.82rem;
       font-weight: 600;
-      color: rgba(28, 45, 70, 0.75);
+      color: var(--ui-ink);
       border-bottom: 1px solid rgba(28, 54, 94, 0.12);
     }
 
@@ -1126,7 +1124,7 @@
       th,
       td {
         padding: 0.45rem 0.5rem;
-        font-size: 0.82rem;
+        font-size: 0.875rem;
       }
     }
   }

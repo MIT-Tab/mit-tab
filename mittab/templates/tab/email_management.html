@@ -10,21 +10,19 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-3 px-md-4">
-  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between mb-3">
-    <div>
-      <h1 class="h3 mb-1">Email Management</h1>
-      <div class="text-muted small">
-        <strong>{{ team_email.sendable_count }}</strong> team(s) ready.
-        <strong>{{ judge_email.sendable_count }}</strong> judge code{{ judge_email.sendable_count|pluralize }} ready.
-        <span class="ml-2"><strong>{{ registration_email.sendable_count }}</strong> registration confirmation{{ registration_email.sendable_count|pluralize }} ready.</span>
-        <span class="ml-2"><strong>{{ written_rfd_email.sendable_count }}</strong> written RFD round{{ written_rfd_email.sendable_count|pluralize }} ready.</span>
-      </div>
-    </div>
-    <div class="text-muted small mt-2 mt-lg-0">
+<div class="readable-page container-fluid px-3 px-md-4">
+  <header class="mb-3">
+    <h1 class="h3 mb-2">Email Management</h1>
+    <ul class="email-summary list-unstyled mb-2">
+      <li><strong>{{ team_email.sendable_count }}</strong> team code{{ team_email.sendable_count|pluralize }} ready</li>
+      <li><strong>{{ judge_email.sendable_count }}</strong> judge code{{ judge_email.sendable_count|pluralize }} ready</li>
+      <li><strong>{{ registration_email.sendable_count }}</strong> registration confirmation{{ registration_email.sendable_count|pluralize }} ready</li>
+      <li><strong>{{ written_rfd_email.sendable_count }}</strong> written RFD round{{ written_rfd_email.sendable_count|pluralize }} ready</li>
+    </ul>
+    <p class="text-muted small mb-0">
       Judge code rate limit: 1 email per judge/email every {{ judge_email.rate_limit_hours }} hour{{ judge_email.rate_limit_hours|pluralize }}.
-    </div>
-  </div>
+    </p>
+  </header>
 
   <div class="form-group mb-3">
     <label class="font-weight-semibold" for="email-management-view">Email Type</label>
