@@ -181,7 +181,8 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         self.driver.get(endpoint + "#judge")
         self.wait.until(EC.visibility_of_element_located((By.ID, "judge")))
         self.driver.find_element(By.CSS_SELECTOR, "#judge .undo-checkin").click()
-        self.wait.until(lambda _: self.driver.find_element(
-            By.ID, "judge",
-        ).is_displayed() and self._toggle(5).is_selected())
+        self.wait.until(EC.all_of(
+            EC.visibility_of_element_located((By.ID, "judge")),
+            lambda _: self._toggle(5).is_selected(),
+        ))
         self.assertTrue(CheckIn.objects.filter(judge=self.judge, round_number=5).exists())
