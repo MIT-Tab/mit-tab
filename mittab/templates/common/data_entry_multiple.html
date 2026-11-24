@@ -1,5 +1,5 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 tags %}
+{% load ui_forms tags %}
 
 {% block title %} {{title}} {% endblock %}
 {% block banner %} {{title}} {% endblock %}
@@ -43,10 +43,10 @@
         {% endif %}
         {% if read_only %}
           <fieldset disabled>
-            {% bootstrap_form form %}
+            {% render_form form %}
           </fieldset>
         {% else %}
-          {% bootstrap_form form %}
+          {% render_form form %}
         {% endif %}
       </div>
     </div>

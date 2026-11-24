@@ -71,7 +71,7 @@
     </div>
 
     {% if user.is_authenticated %}
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-ui-collapse="navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
@@ -97,9 +97,9 @@
       <ul class="navbar-nav mr-auto order-0">
         {% if user.is_superuser %}
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request pair_round %}{% active request view_status %}{% active request view_rounds %}">
             Pairings
-          </a>
+          </button>
           <div class="dropdown-menu">
             <a class="dropdown-item {%active request view_status %}" href="{{ view_status|with_return_to }}">Current Round</a>
             <a class="dropdown-item {%active request view_rounds %}" href="{{ view_rounds|with_return_to }}">All Rounds</a>
@@ -108,9 +108,9 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request round_stats %}{% active request judge_speaker_points %}{% active request forum_post %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request rank_teams %}{% active request rank_debaters %}{% active request round_stats %}{% active request judge_speaker_points %}{% active request forum_post %}">
             Rankings
-          </a>
+          </button>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request rank_debaters %}" href="{{ rank_debaters|with_return_to }}">Debater Ranking</a>
             <a class="dropdown-item {% active request rank_teams %}" href="{{ rank_teams|with_return_to }}">Team Ranking</a>
@@ -121,9 +121,9 @@
         </li>
 
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}{% active request download_black_rod_bundle %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request tab_cards %}{% active request backup %}{% active request view_backups %}{%active request download_archive %}{% active request download_black_rod_bundle %}">
             Backups
-          </a>
+          </button>
 
           <div class="dropdown-menu">
             <a class="dropdown-item {%active request view_backups %}" href="{{ view_backups|with_return_to }}">View Backups</a>
@@ -136,9 +136,9 @@
 
         {% if can_add_scratches or can_view_scratches %}
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request view_scratches %}{% active request add_scratch %}">
             Scratches
-          </a>
+          </button>
           <div class="dropdown-menu">
             {% if can_view_scratches %}
             <a class="dropdown-item {%active request view_scratches %}" href="{{ view_scratches|with_return_to }}">View Scratches</a>
@@ -152,9 +152,9 @@
 
         {% if user.is_superuser %}
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request start_tournament %}{% active request settings_form %}{% active request public_homepage_admin %}{% active request public_rankings_control %}{% active request tournament_todo %}{% active request invite_staff %}{% active request email_management %}{% active request registration_admin %}{% active request manage_motions %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request start_tournament %}{% active request settings_form %}{% active request public_homepage_admin %}{% active request public_rankings_control %}{% active request tournament_todo %}{% active request invite_staff %}{% active request email_management %}{% active request registration_admin %}{% active request manage_motions %}">
             Setup
-          </a>
+          </button>
           <div class="dropdown-menu">
             <a class="dropdown-item {% active request start_tournament %}" href="{{ start_tournament|with_return_to }}">Tournament Basics</a>
             <a class="dropdown-item {% active request tournament_todo %}" href="{{ tournament_todo|with_return_to }}">Tournament To-Do List</a>
@@ -174,9 +174,9 @@
 
         {% if user.is_superuser or can_checkins or can_data_entry %}
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle {% active request batch_checkin %}{% active request upload_data %}{% active request confirm_start_new_tourny %}">
             Admin
-          </a>
+          </button>
           <div class="dropdown-menu">
             {% if can_checkins %}
             <a class="dropdown-item {% active request batch_checkin %}" href="{{ batch_checkin|with_return_to }}">Batch Checkin</a>
@@ -201,7 +201,7 @@
       {% endif %}
     </div>
     {% else %}
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-ui-collapse="navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
@@ -215,7 +215,7 @@
         {% else %}
         {% if forloop.counter == 7 %}
         <li class="nav-item dropdown">
-          <a data-toggle="dropdown" class="nav-link dropdown-toggle">More</a>
+          <button type="button" data-ui-dropdown class="nav-link dropdown-toggle">More</button>
           <div class="dropdown-menu">
         {% endif %}
             <a class="dropdown-item {% active request page.url %}" href="{{ page.url|with_return_to }}">{{ page.title }}</a>

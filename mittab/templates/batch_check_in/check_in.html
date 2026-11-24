@@ -13,35 +13,35 @@
 
 {% block content %}
 
-<div class="container mt-2">
+<div class="container readable-page mt-2">
         <div class="mb-4">
             {% quick_search %}
             <ul class="nav nav-tabs mb-3" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link active" id="team-tab" data-toggle="tab" href="#team" role="tab" aria-controls="team" aria-selected="true">Team</a>
+                            <a class="nav-link active" id="team-tab" data-ui-tab href="#team" role="tab" aria-controls="team" aria-selected="true">Team</a>
                         </li>
                         <li class="nav-item" role="presentation">
-                           <a class="nav-link" id="judge-tab" data-toggle="tab" href="#judge" role="tab" aria-controls="judge" aria-selected="false">Judge</a>
+                           <a class="nav-link" id="judge-tab" data-ui-tab href="#judge" role="tab" aria-controls="judge" aria-selected="false">Judge</a>
                        </li>
                         <li class="nav-item" role="presentation">
-                           <a class="nav-link" id="judge-expected-tab" data-toggle="tab" href="#judge-expected" role="tab" aria-controls="judge-expected" aria-selected="false">Expected Judges</a>
+                           <a class="nav-link" id="judge-expected-tab" data-ui-tab href="#judge-expected" role="tab" aria-controls="judge-expected" aria-selected="false">Expected Judges</a>
                        </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link" id="room-tab" data-toggle="tab" href="#room" role="tab" aria-controls="room" aria-selected="false">Room</a>
+                            <a class="nav-link" id="room-tab" data-ui-tab href="#room" role="tab" aria-controls="room" aria-selected="false">Room</a>
                         </li>
                     </ul>
                 
                     <div class="tab-content">
-                    <div class="tab-pane fade show active" id="team" role="tabpanel" data-entity-type="team" aria-labelledby="team-tab">
+                    <div class="tab-pane active" id="team" role="tabpanel" data-entity-type="team" aria-labelledby="team-tab">
                            {% include "batch_check_in/_checkin_pane.html" with entity_type='team' undo=checkin_undo.team data=team_data headers=team_headers checked_total=team_total_count checked_in_count=team_checked_in_count %}
                        </div>
-                  <div class="tab-pane fade" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
+                  <div class="tab-pane" id="judge" role="tabpanel" data-entity-type="judge" aria-labelledby="judge-tab">
                            {% include "batch_check_in/_checkin_pane.html" with entity_type='judge' undo=checkin_undo.judge data=judge_data headers=judge_headers checked_total=judge_total_count round_counts=judge_round_counts outround_count=judge_outround_count %}
                    </div>
-                       <div class="tab-pane fade" id="judge-expected" role="tabpanel" data-entity-type="judge_expected" aria-labelledby="judge-expected-tab">
+                       <div class="tab-pane" id="judge-expected" role="tabpanel" data-entity-type="judge_expected" aria-labelledby="judge-expected-tab">
                             {% include "batch_check_in/_checkin_pane.html" with entity_type='judge_expected' undo=checkin_undo.judge_expected data=judge_expectation_data headers=judge_headers checked_total=judge_total_count round_counts=judge_expectation_round_counts outround_count=judge_expectation_outround_count action_label='Expected' action_on_label='Yes' action_off_label='No' %}
                     </div>
-                       <div class="tab-pane fade" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
+                       <div class="tab-pane" id="room" role="tabpanel" data-entity-type="room" aria-labelledby="room-tab">
                             {% include "batch_check_in/_checkin_pane.html" with entity_type='room' undo=checkin_undo.room data=room_data headers=room_headers checked_total=room_total_count round_counts=room_round_counts outround_count=room_outround_count %}
                         </div>
 

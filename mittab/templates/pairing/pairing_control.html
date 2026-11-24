@@ -16,30 +16,30 @@
     margin-bottom: 0;
   }
   #quick-judge-checkin .quick-checkin-grow,
-  #quick-judge-checkin .select2-container--bootstrap4 {
+  #quick-judge-checkin .select2-container--default {
     flex: 1 1 12rem;
     min-width: 0;
   }
   /* Size select2 widget to match form-control-sm so heights line up */
-  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection--multiple {
+  #quick-judge-checkin .select2-container--default .select2-selection--multiple {
     min-height: calc(1.5em + 0.5rem + 2px);
     padding: 0.125rem 0.25rem;
     font-size: 0.875rem;
     line-height: 1.5;
     border-radius: 0.2rem;
   }
-  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection__rendered {
+  #quick-judge-checkin .select2-container--default .select2-selection__rendered {
     padding: 0;
     display: flex;
     flex-wrap: wrap;
     gap: 0.15rem;
   }
-  #quick-judge-checkin .select2-container--bootstrap4 .select2-selection__choice {
+  #quick-judge-checkin .select2-container--default .select2-selection__choice {
     margin-top: 0;
     font-size: 0.75rem;
     line-height: 1.4;
   }
-  #quick-judge-checkin .select2-container--bootstrap4 .select2-search--inline .select2-search__field {
+  #quick-judge-checkin .select2-container--default .select2-search--inline .select2-search__field {
     margin-top: 0;
     height: 1.5em;
     font-size: 0.875rem;
@@ -191,7 +191,7 @@
         <div class="alert alert-danger">
           {{ num_excluded }} teams are checked-in but have no round or bye.
 
-          <button class="btn btn-small btn-link" data-toggle="collapse" data-target="#excluded_teams_no_bye">Show/Hide</button>
+          <button type="button" class="btn btn-sm btn-link" data-ui-collapse="excluded_teams_no_bye">Show/Hide</button>
 
           <div id="excluded_teams_no_bye" class="collapse">
           {% for team in excluded_teams_no_bye %}

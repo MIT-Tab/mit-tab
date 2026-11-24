@@ -1,0 +1,163 @@
+.nav, .navbar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  padding-left: 0;
+  list-style: none;
+}
+
+.navbar-nav { margin-bottom: 0; }
+.navbar-collapse { flex-grow: 1; }
+.navbar-brand { display: inline-block; white-space: nowrap; }
+.navbar-brand:hover { text-decoration: none; }
+.navbar-toggler { display: none; }
+.navbar-toggler-icon { display: block; }
+
+.nav-link {
+  display: block;
+  padding: 0.5rem 0.85rem;
+  background: none;
+  border: 0;
+  text-align: left;
+
+  &:hover { text-decoration: none; }
+}
+
+.nav-tabs {
+  border-bottom: 1px solid var(--ui-border);
+
+  .nav-link {
+    margin-bottom: -1px;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius) var(--ui-radius) 0 0;
+
+    &:hover { background: var(--ui-subtle); }
+    &.active {
+      color: var(--ui-ink);
+      background: var(--ui-surface);
+      border-color: var(--ui-border) var(--ui-border) var(--ui-surface);
+    }
+  }
+}
+
+.nav-pills .nav-link { border-radius: var(--ui-radius); }
+.nav-pills .nav-link.active { background: var(--ui-accent); color: white; }
+.nav-fill > * { flex: 1 1 auto; }
+.nav-fill .nav-link { text-align: center; }
+
+.tab-pane:not(.active), .collapse:not(.show) { display: none; }
+
+[data-ui-collapse]:not(button), [data-ui-dropdown] { cursor: pointer; }
+
+.dropdown-toggle::after {
+  content: "";
+  display: inline-block;
+  margin-left: 0.25em;
+  vertical-align: 0.2em;
+  border: 0.3em solid transparent;
+  border-top-color: currentColor;
+  border-bottom: 0;
+}
+
+.dropdown-menu {
+  position: fixed;
+  z-index: 1030;
+  top: var(--menu-top, 0);
+  left: var(--menu-left, 0);
+  display: none;
+  min-width: min(10rem, 80vw);
+  max-width: calc(100vw - 1rem);
+  max-height: var(--menu-height, 25rem);
+  overflow: auto;
+  padding: 0.35rem;
+  margin: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  box-shadow: 0 8px 22px rgb(16 34 54 / 18%);
+  text-align: left;
+  list-style: none;
+
+  &.show { display: block; }
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.65rem;
+  color: inherit;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+  text-align: left;
+
+  &:is(:hover, :focus-visible) { background: var(--ui-subtle); color: var(--ui-ink); text-decoration: none; }
+  &:is(.disabled, :disabled) { opacity: 0.6; pointer-events: none; }
+}
+
+.dropdown-header { padding: 0.4rem 0.65rem; color: var(--ui-muted); }
+.dropdown-divider { margin: 0.3rem 0; border-top: 1px solid var(--ui-line); }
+
+dialog.modal {
+  width: min(31rem, calc(100% - 1.5rem));
+  max-height: calc(100% - 1.5rem);
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 0.75rem;
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  box-shadow: 0 22px 60px rgb(16 34 54 / 24%);
+
+  &::backdrop { background: rgb(15 26 43 / 54%); }
+}
+
+html:has(dialog.modal[open]) { overflow: hidden; }
+.modal-header, .modal-footer { display: flex; align-items: center; padding: 1rem; }
+.modal-header { justify-content: space-between; border-bottom: 1px solid var(--ui-line); }
+.modal-title { margin: 0; }
+.modal-body { padding: 1rem; }
+.modal-footer { justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--ui-line); }
+.close {
+  padding: 0 0.35rem;
+  border: 0;
+  background: none;
+  color: var(--ui-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+
+  &:hover { color: var(--ui-ink); }
+}
+
+.ui-tooltip {
+  position: fixed;
+  z-index: 1060;
+  max-width: min(24rem, calc(100vw - 1rem));
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--ui-radius);
+  background: #263241;
+  color: #fff;
+  font-size: 0.81rem;
+  text-align: left;
+  pointer-events: none;
+}
+
+.section-toggle {
+  border: 0;
+  background: none;
+  padding: 0.2rem 0.35rem;
+  border-radius: var(--ui-radius);
+
+  &::before {
+    content: "";
+    display: inline-block;
+    width: 0.42em;
+    height: 0.42em;
+    margin-right: 0.5em;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+    vertical-align: 0.12em;
+    transform: rotate(-45deg);
+  }
+
+  &[aria-expanded="true"]::before { transform: rotate(45deg); }
+  &:hover { background: var(--ui-subtle); }
+}

@@ -257,25 +257,9 @@
     padding: 0.85rem 0.6rem;
     border-radius: 0;
     background: #f8f9fa;
-    // Add chevron indicator
-      &[data-toggle="collapse"] {
-        padding-left: 2.5rem;
-        
-        &::before {
-          content: "\f078"; // chevron-down
-          font-family: "Font Awesome 5 Free";
-          font-weight: 900;
-          position: absolute;
-          left: 0.8rem;
-          font-size: 0.85rem;
-          transition: transform 0.3s ease;
-          color: #495057;
-        }
-
-        &[aria-expanded="true"]::before {
-          transform: translateY(-50%) rotate(-180deg);
-        }
-      }
+    .section-toggle {
+      min-height: 2rem;
+    }
   }
 
   .public-home {
@@ -334,4 +318,45 @@
       flex-direction: column;
     }
   }
+}
+
+// Settings and reports need ordinary reading sizes on smaller screens.
+@include respond-max(991.98px) {
+  #container-main:has(.readable-page) > .row > .col > h3 {
+    font-size: 1.4rem;
+  }
+
+  .readable-page {
+    font-size: 0.95rem;
+
+    h1 { font-size: 1.45rem; }
+    h2, h3, .h5 { font-size: 1.15rem; }
+    h4, h5, h6 { font-size: 1rem; }
+    p { overflow-wrap: anywhere; }
+
+    small, .small, .form-text { font-size: 0.85rem; }
+    .alert { font-size: 0.9rem; padding: 0.65rem 0.8rem; }
+    table { font-size: 0.875rem; }
+
+    .btn {
+      min-height: 2.25rem;
+      padding: 0.4rem 0.55rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    :is(.form-control, .custom-select, .form-control-file) {
+      min-height: 2.5rem;
+      font-size: 1rem;
+    }
+
+    .select2-container .select2-search__field { font-size: 1rem; }
+
+    .nav-tabs { flex-wrap: wrap; overflow: visible; }
+    .table-responsive { max-width: 100%; }
+  }
+}
+
+@include respond-max(767.98px) {
+  .readable-page + .readable-page { margin-top: 1rem; }
 }

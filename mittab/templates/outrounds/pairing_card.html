@@ -18,7 +18,7 @@
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
                     <a class="dropdown-toggle outround-team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-ui-dropdown
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -47,7 +47,7 @@
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
                     <a class="dropdown-toggle outround-team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-ui-dropdown
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -73,7 +73,7 @@
         {% for judge in pairing.judges.all %}
         <span round-id="{{pairing.id}}" judge-id="{{judge.id}}">
           <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
-             data-toggle="dropdown" href="#">
+             data-ui-dropdown href="#">
             {{judge.name}} <small>({{judge.rank}})</small>
             {% if judge.wing_only %}
               <span class="badge badge-warning badge-wing-only ml-1">Wing Only</span>
@@ -92,7 +92,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light outround-judge-toggle dropdown-toggle" data-ui-dropdown href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
@@ -127,7 +127,7 @@
               href="#"
               role="button"
               id="roomDropdown-{{pairing.id}}"
-              data-toggle="dropdown"
+              data-ui-dropdown
               aria-haspopup="true"
               aria-expanded="false"
               style="white-space: normal;">

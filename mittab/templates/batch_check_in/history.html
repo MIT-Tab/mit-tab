@@ -4,7 +4,7 @@
 {% block banner %}{{ tab_name }} Check-In History{% endblock %}
 
 {% block content %}
-<div class="col-12">
+<div class="readable-page col-12">
 <a href="{% url 'batch_checkin' %}#{{ tab_id }}">Back to Batch Check-In</a>
 
 {% if conflict %}

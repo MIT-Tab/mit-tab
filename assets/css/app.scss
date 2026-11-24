@@ -1,3 +1,10 @@
+@use "ui/foundation";
+@use "ui/layout";
+@use "ui/components";
+@use "ui/forms";
+@use "ui/overlays";
+@use "ui/utilities";
+
 body {
     background-color: #f4f9ff !important;
     background-color: color-mix(in srgb, var(--theme-color, #00438A) 6%, white) !important;
@@ -9,14 +16,6 @@ body {
   --theme-color: #00438A;
   --theme-color-rgb: 0, 67, 138;
 }
-$font-size-base: 0.95rem !default;
-
-.form-control {
-  background-image: none !important;
-}
-
-@import "~bootstrap/scss/bootstrap";
-
 // Overrides
 .bg-dark {
   background-color: var(--theme-color, #00438A) !important;
@@ -89,7 +88,7 @@ $font-size-base: 0.95rem !default;
     // close to the navbar instead of below a phantom heading.
     > .row > .col > h3:empty { display: none; }
 
-    // __wide.html applies Bootstrap's `mt-2` to the content row, which adds
+    // __wide.html applies `mt-2` to the content row, which adds
     // 0.5rem of dead space above the hero. Drop it on this page so the
     // padding on .public-home is the sole top-gap source.
     > .row.content { margin-top: 0 !important; }
@@ -194,9 +193,8 @@ $font-size-base: 0.95rem !default;
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6c757d;
-  border: 1px solid #ced4da;
+  color: var(--ui-muted);
+  border: 1px solid var(--ui-border);
   border-radius: 3px;
   padding: 1px 6px;
   background: #fff;
@@ -230,12 +228,10 @@ $font-size-base: 0.95rem !default;
 }
 
 .field-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #6c757d;
-  margin-bottom: 3px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ui-ink);
+  margin-bottom: 0.25rem;
 }
 
 .not-paired-in {
@@ -252,6 +248,12 @@ $font-size-base: 0.95rem !default;
 
 .tabcard abbr {
   text-decoration: none;
+}
+
+.pairing-card .judges > .btn-sm,
+.pairing-card .judges > span > .btn-sm {
+  // Keep the badge compact while leaving space between judge rows.
+  display: inline;
 }
 
 .judges > span > .btn-sm {
@@ -285,11 +287,6 @@ $font-size-base: 0.95rem !default;
   font-family: "Font Awesome 5 Free";
   font-weight: 900;
   content: " \f6c0";
-}
-
-.dropdown-menu {
-  max-height: 500px;
-  overflow-y: auto;
 }
 
 .form-inline .input-group {
@@ -478,4 +475,26 @@ details[open] > .audit-trail-summary::before {
 
 .font-weight-semibold {
   font-weight: 600;
+}
+
+.backup-layout {
+  display: grid;
+  grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+
+  @media (max-width: 767.98px) {
+    grid-template-columns: minmax(0, 1fr);
+
+    .backup-filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+      gap: 0.75rem;
+
+      .form-group { margin: 0; }
+    }
+  }
+
+  table:has(.filterable-row) { min-width: 28rem; }
+  td { overflow-wrap: anywhere; }
 }

@@ -1,0 +1,52 @@
+@use "sass:map";
+
+$breakpoints: (sm: 576px, md: 768px, lg: 992px, xl: 1200px);
+$container-widths: (sm: 540px, md: 720px, lg: 960px, xl: 1140px);
+
+.container, .container-fluid {
+  width: 100%;
+  padding-inline: 15px;
+  margin-inline: auto;
+}
+
+.row, .form-row {
+  --gutter: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  margin-inline: calc(-1 * var(--gutter));
+}
+
+.form-row { --gutter: 5px; }
+.no-gutters { --gutter: 0px; }
+
+@mixin columns($suffix: "") {
+  .col#{$suffix} { flex: 1 0 0%; max-width: 100%; }
+  .col#{$suffix}-auto { flex: 0 0 auto; width: auto; max-width: 100%; }
+
+  @for $span from 1 through 12 {
+    .col#{$suffix}-#{$span} {
+      flex: 0 0 calc(100% * #{$span} / 12);
+      max-width: calc(100% * #{$span} / 12);
+    }
+  }
+}
+
+[class^="col-"], [class*=" col-"], .col {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding-inline: var(--gutter, 15px);
+}
+
+@include columns;
+
+@each $breakpoint, $min in $breakpoints {
+  @media (min-width: $min) {
+    .container { max-width: map.get($container-widths, $breakpoint); }
+    @include columns("-#{$breakpoint}");
+  }
+}
+
+@media (min-width: 992px) {
+  .offset-lg-1 { margin-left: calc(100% / 12); }
+}

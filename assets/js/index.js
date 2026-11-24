@@ -4,15 +4,12 @@ import "../css/navigation.scss";
 import "../css/tab-cards.scss";
 import "../css/judge-speaker-points.scss";
 
+import "./ui";
 import "./pairing";
 import "./outround";
 
 import $ from "jquery";
 
-import "popper.js";
-import "bootstrap";
-
-import bsCustomFileInput from "bs-custom-file-input";
 import ballotsInit from "./ballots";
 import filtersInit from "./filters";
 import quickSearchInit from "./quickSearch";
@@ -32,10 +29,6 @@ function initializeRevealButtons() {
     $(e.target).slideUp(250);
     $(`#${$(e.target).data("to-reveal")}`).slideDown(250);
   });
-}
-
-function initializeTooltips() {
-  $('[data-toggle="tooltip"]').tooltip();
 }
 
 function initializeSettingsForm() {
@@ -90,8 +83,6 @@ $(document).ready(() => {
   filtersInit();
   quickSearchInit();
   multiselectInit();
-  bsCustomFileInput.init();
-  initializeTooltips();
   initializeSettingsForm();
   initializeThemeColorPicker();
 

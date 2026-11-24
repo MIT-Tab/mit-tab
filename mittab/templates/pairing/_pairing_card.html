@@ -19,7 +19,7 @@
                     position="gov"
                     team-id={{pairing.gov_team.id}}>
                     <a class="dropdown-toggle team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-ui-dropdown
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -48,7 +48,7 @@
                     position="opp"
                     team-id={{pairing.opp_team.id}}>
                     <a class="dropdown-toggle team-toggle text-dark"
-                        data-toggle="dropdown"
+                        data-ui-dropdown
                         href="#"
                         title="Swap teams">
                       <span class="caret"></span>
@@ -80,7 +80,7 @@
               round-id="{{pairing.id}}"
               judge-id="{{judge.id}}">
           <a class="btn-sm btn-light judge-toggle dropdown-toggle{% if pairing.chair == judge %} chair{% endif %}"
-             data-toggle="dropdown" href="#"
+             data-ui-dropdown href="#"
              {% if is_manual_assignment %}title="{{ manual_assignment_label }}"{% endif %}>
             {{judge.name}} <small>({{judge.rank}})</small>
             {% judge_team_count judge pairing as rejudge_count %}
@@ -104,7 +104,7 @@
         {% for slot in judge_slots %}
         {% if pairing.judges.all|length < slot %}
         <span class="unassigned" round-id="{{pairing.id}}" judge-id="">
-          <a class="btn-sm btn-light judge-toggle dropdown-toggle" data-toggle="dropdown" href="#">
+          <a class="btn-sm btn-light judge-toggle dropdown-toggle" data-ui-dropdown href="#">
               N/A
           </a>
           <ul class="dropdown-menu"></ul>
@@ -148,7 +148,7 @@
               href="#"
               role="button"
               id="roomDropdown-{{pairing.id}}"
-              data-toggle="dropdown"
+              data-ui-dropdown
               aria-haspopup="true"
               aria-expanded="false"
               style="white-space: normal;">

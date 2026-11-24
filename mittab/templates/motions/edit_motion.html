@@ -1,12 +1,11 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
 
 {% block title %}Edit Motion{% endblock %}
 
 {% block banner %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="col-md-8">
+<div class="readable-page col-md-8">
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0">Edit Motion for {{ motion.round_display }}</h5>
@@ -15,7 +14,7 @@
             <form method="post">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="round_selection" class="font-weight-bold">Round</label>
+                    <label for="round_selection">Round</label>
                     <select name="round_selection" id="round_selection" class="form-control" required>
                         <option value="">-- Select Round --</option>
                         <optgroup label="Preliminary Rounds">
@@ -53,7 +52,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="info_slide" class="font-weight-bold">
+                    <label for="info_slide">
                         Info Slide <small class="text-muted">(optional)</small>
                     </label>
                     <textarea name="info_slide" id="info_slide" class="form-control" rows="4"
@@ -63,7 +62,7 @@
                     </small>
                 </div>
                 <div class="form-group">
-                    <label for="motion_text" class="font-weight-bold">Motion Text</label>
+                    <label for="motion_text">Motion Text</label>
                     <textarea name="motion_text" id="motion_text" class="form-control" rows="4"
                               required>{{ submitted_motion_text }}</textarea>
                 </div>
@@ -79,7 +78,7 @@
         </div>
     </div>
 </div>
-<div class="col-md-4">
+<div class="readable-page col-md-4">
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0">Motion Info</h5>

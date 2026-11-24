@@ -1,0 +1,35 @@
+// App styling for Select2's default theme.
+.select2-container--default {
+  .select2-selection--multiple {
+    min-height: calc(1.5em + 0.65rem + 2px);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
+  }
+
+  &.select2-container--focus .select2-selection--multiple,
+  .select2-selection--single:focus-visible {
+    border-color: var(--ui-focus);
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 1px;
+  }
+
+  .select2-selection--multiple .select2-selection__choice {
+    background: #ecf2f9;
+    color: var(--ui-ink);
+    border-color: var(--ui-border);
+    white-space: normal;
+  }
+
+  .select2-selection--multiple .select2-selection__choice__remove {
+    color: var(--ui-muted);
+  }
+
+  .select2-dropdown, .select2-search--dropdown .select2-search__field {
+    border-color: var(--ui-border);
+  }
+
+  .select2-results__option--highlighted[aria-selected] {
+    background: var(--ui-accent);
+    color: white;
+  }
+}

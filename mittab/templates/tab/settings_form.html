@@ -1,18 +1,17 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
 
 {% block title %}Tab Settings{% endblock %}
 
 {% block banner %} {{title}} {% endblock %}
 
 {% block content %}
-<div class="col-md-8">
-    <ul class="nav nav-tabs mb-3">
+<div class="readable-page col-md-8">
+    <ul class="nav nav-tabs mb-3" role="tablist" aria-label="Settings categories">
         {% for category in categories %}
-            <li class="nav-item">
+            <li class="nav-item" role="presentation">
                 <a class="nav-link{% if forloop.first %} active{% endif %}" 
                    id="{{ category.id }}-tab" 
-                   data-toggle="tab" 
+                   data-ui-tab
                    href="#{{ category.id }}">
                     {{ category.name }}
                 </a>
@@ -33,7 +32,7 @@
         <input type="hidden" name="visited_categories" id="visited-categories">
         <div class="tab-content">
             {% for category in categories %}
-                <div class="tab-pane fade{% if forloop.first %} show active{% endif %}" id="{{ category.id }}">
+                <div class="tab-pane{% if forloop.first %} active{% endif %}" id="{{ category.id }}">
                     <div class="alert alert-info mb-4">
                         <strong>{{ category.name }}</strong><br>
                         {{ category.description }}
@@ -44,13 +43,12 @@
                             <div class="col-md-6 mb-3">
                                 <label for="{{ field.id_for_label }}" class="font-weight-bold">
                                     {{ field.label }}
-                                    {% if field.help_text %}
-                                        <span class="badge badge-info help-badge" 
-                                              data-toggle="tooltip" 
-                                              data-html="true"
-                                              title="{{ field.help_text }}">?</span>
-                                    {% endif %}
                                 </label>
+                                {% if field.help_text %}
+                                    <button type="button" class="badge badge-info help-badge"
+                                            aria-label="Help for {{ field.label }}" data-ui-tooltip
+                                            title="{{ field.help_text }}">?</button>
+                                {% endif %}
                                 
                                 {% if field.field.widget.input_type == 'checkbox' %}
                                     <div class="custom-control custom-switch">
@@ -84,17 +82,17 @@
             {% endfor %}
         </div>
 
-        {% buttons %}
+        <div class="form-group">
             <input type="submit" value="Save" class="btn btn-primary"/>
-        {% endbuttons %}
+        </div>
     </form>
 </div>
-<div class="col-md-4">
+<div class="readable-page col-md-4">
     <div class="alert alert-warning">Please be careful editing these settings.   If you require assistance, please check out the <a href="https://mit-tab.readthedocs.io/en/latest/Advanced-Topics.html"> documentation!</a>
     </div>
 </div>
 <script>
-  (function() {
+  document.addEventListener("DOMContentLoaded", function() {
     const visitedField = document.getElementById("visited-categories");
     const visited = new Set();
 
@@ -102,7 +100,7 @@
       visitedField.value = Array.from(visited).join(",");
     }
 
-    const activeTab = document.querySelector('.nav-link[data-toggle="tab"].active');
+    const activeTab = document.querySelector('.nav-link[data-ui-tab].active');
     if (activeTab) {
       const target = (activeTab.getAttribute("href") || "").replace("#", "");
       if (target) {
@@ -110,7 +108,7 @@
       }
     }
 
-    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+    document.addEventListener("mittab:tab-shown", function(e) {
       const target = (e.target.getAttribute("href") || "").replace("#", "");
       if (target) {
         visited.add(target);
@@ -129,10 +127,10 @@
           '.nav-link[href="#' + errorTabPane.id + '"]'
         );
         if (errorTab) {
-          $(errorTab).tab('show');
+          errorTab.click();
         }
       }
     }
-  })();
+  });
 </script>
 {% endblock %}

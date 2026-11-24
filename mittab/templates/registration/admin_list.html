@@ -9,15 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="col-12 registration-admin">
-    <div class="registration-admin__header">
-        <div class="registration-admin__titles">
-            <h5>Registration Settings &amp; Submissions</h5>
-            <p>Toggle availability and manage existing registrations.</p>
-        </div>
-        <a class="btn btn-primary" href="{% url 'registration_portal' %}">Open Portal</a>
-    </div>
-
+<div class="readable-page col-12 registration-admin">
     <form method="post" id="registration-settings" class="registration-admin__settings"
           data-judge-list-public="{{ form.judge_list_is_public|yesno:'true,false' }}">
         {{ form.confirm_judge_list_publication }}
@@ -25,9 +17,12 @@
         <div class="registration-admin__settings-head">
             <div>
                 <h6 class="registration-admin__panel-title mb-1">Registration Availability</h6>
-                <p class="text-muted small mb-0">Manual switches are the master controls. Optional windows automatically open and close each type independently. All schedule times use Eastern time (EST/EDT).</p>
+                <p class="registration-admin__hint">Manual switches are the master controls. Optional windows automatically open and close each type independently. All schedule times use Eastern time (EST/EDT).</p>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Save Settings</button>
+            <div class="registration-admin__settings-actions">
+                <a class="btn btn-outline-primary" href="{% url 'registration_portal' %}">Open portal</a>
+                <button type="submit" class="btn btn-primary">Save settings</button>
+            </div>
         </div>
         <div class="registration-admin__schedule-grid">
             <section class="registration-admin__schedule-card">

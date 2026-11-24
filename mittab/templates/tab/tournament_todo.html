@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="todo-checklist-page col-12 col-xl-10">
+<div class="readable-page todo-checklist-page col-12 col-xl-10">
   <p class="text-muted mb-2">
     Track pre-tournament and day-of progress. Checklist status is shared across all staff users.
   </p>
@@ -50,32 +50,18 @@
           <div class="todo-step-content">
             {% if step.url %}
             <a class="todo-step-item-link" href="{{ step.url|with_return_to }}">
-              <span class="todo-step-title mb-0">{{ step.title }}</span>
-              {% if step.optional_label %}
-              <span class="badge badge-light todo-step-context">{{ step.optional_label }}</span>
-              {% endif %}
-              {% if step.description %}
-              <span
-                class="badge badge-info help-badge todo-step-help"
-                data-toggle="tooltip"
-                title="{{ step.description }}"
-              >?</span>
-              {% endif %}
+              <span class="todo-step-title">{{ step.title }}</span>
             </a>
             {% else %}
-            <div class="todo-step-item-link">
-              <span class="todo-step-title mb-0">{{ step.title }}</span>
-              {% if step.optional_label %}
-              <span class="badge badge-light todo-step-context">{{ step.optional_label }}</span>
-              {% endif %}
-              {% if step.description %}
-              <span
-                class="badge badge-info help-badge todo-step-help"
-                data-toggle="tooltip"
-                title="{{ step.description }}"
-              >?</span>
-              {% endif %}
-            </div>
+            <span class="todo-step-title">{{ step.title }}</span>
+            {% endif %}
+            {% if step.optional_label %}
+            <span class="badge badge-light todo-step-context">{{ step.optional_label }}</span>
+            {% endif %}
+            {% if step.description %}
+            <button type="button" class="badge badge-info help-badge todo-step-help"
+                    aria-label="About {{ step.title }}" data-ui-tooltip
+                    title="{{ step.description }}">?</button>
             {% endif %}
             {% if step.auto_completed %}
             <div class="small text-success mt-1">Auto</div>

@@ -3,9 +3,7 @@
   <div class="alert alert-danger">
     <h6 class="alert-heading">
       Errors in {{ obj_type }} file, all {{ obj_type }} uploads aborted
-      <small data-toggle="collapse" class="float-right" data-target="#{{ obj_type }}-errors">
-        Show/hide errors
-      </small>
+      <button type="button" class="btn btn-link btn-sm float-right" data-ui-collapse="{{ obj_type }}-errors" aria-controls="{{ obj_type }}-errors" aria-expanded="true">Show/hide errors</button>
     </h6>
     <div class="alert-content collapse show" id="{{ obj_type }}-errors">
       <ul>

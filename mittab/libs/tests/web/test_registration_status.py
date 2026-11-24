@@ -7,6 +7,7 @@ from django.test import override_settings
 from django.urls import reverse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 from mittab.apps.registration.models import Registration
@@ -130,3 +131,23 @@ class RegistrationStatusWebTestCase(StaticLiveServerTestCase):
         self.driver.refresh()
         self._wait_for_roster(option_count=2)
         self.assertEqual(self._field("novice_status", "two").get_attribute("value"), "0")
+
+    def test_add_school_dialog_can_close_and_reopen_without_blocking_registration(self):
+        self._open()
+        opener = self.driver.find_element(By.CSS_SELECTOR, '[data-ui-dialog="new-school-modal"]')
+        dialog = self.driver.find_element(By.ID, "new-school-modal")
+        name_input = dialog.find_element(By.ID, "new-school-name")
+
+        opener.click()
+        self.assertEqual(self.driver.switch_to.active_element, name_input)
+        name_input.send_keys(Keys.ESCAPE)
+        self.wait.until(lambda _: not dialog.is_displayed())
+        self.assertEqual(self.driver.switch_to.active_element, opener)
+
+        opener.click()
+        name_input.send_keys("New Local School")
+        dialog.find_element(By.ID, "create-school-btn").click()
+        self.wait.until(lambda _: not dialog.is_displayed())
+        select = self.driver.find_element(By.CSS_SELECTOR, '[data-school-select="registration"]')
+        Select(select).select_by_visible_text("New Local School")
+        self.assertEqual(Select(select).first_selected_option.text, "New Local School")
