@@ -22,6 +22,10 @@ settings:
     name: rejudge_penalty
     description: "When rejudges are turned on, set the penalty value applied for each rejudge. A higher penalty reduces the likelihood of rejudging. Lower values prefer rejudges over lower ranked judges being in the top rooms."
     value: 100
+  - repeat_judge_penalty:
+    name: repeat_judge_penalty
+    description: "In outrounds, prefer equally ranked judges who did not see either team in the previous stage of the same bracket. The default of 1 favors simple swaps. Higher values allow more equivalent assignments to change. Set to 0 to disable."
+    value: 1
   - repeat_wing_penalty:
     name: repeat_wing_penalty
     description: "Set the penalty applied in inrounds each time a wing judge has previously winged the assigned chair. A higher penalty makes repeat chair-wing pairings less likely. Set to 0 to disable."

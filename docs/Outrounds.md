@@ -32,6 +32,12 @@ You can also manually assign judges using the dropdowns on the pairing view, whi
 
 Please also note the release pairings button that appears on the pairings page as normally appears.  This will toggle the visibility of that round's pairings.
 
+**Repeat Judge Penalty** in **Tab Settings → Judges** favors equally ranked judges
+who saw fewer of the teams in the previous stage of the same bracket. The opening
+stage has no prior stage. The default of `1` favors simple swaps while preserving chair
+and wing ranks and panel sizes. Raise it to allow more equivalent assignments to
+change, or set it to `0` to turn the preference off.
+
 ## Viewing Pairings
 
 MIT-Tab supports both list and bracket views for outround pairings. If the `show_outrounds_bracket` setting is enabled, users can switch between "List View" and "Bracket View" tabs on the outround pairings page. 

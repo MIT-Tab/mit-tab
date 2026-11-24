@@ -9,6 +9,7 @@ from mittab.apps.tab.models import (
     CheckIn,
     Judge,
     Outround,
+    Round,
     Room,
     RoomCheckIn,
     School,
@@ -136,6 +137,107 @@ class TestOutroundAssignmentScope(TestCase):
 
         self.assertEqual(self._assigned_ranks(varsity_rounds), [9, 8, 6, 5, 3, 2])
         self.assertEqual(self._assigned_ranks([novice_round]), [7, 4, 1])
+
+    def test_opening_outround_ignores_inrounds_and_the_other_bracket(self):
+        TabSettings.set("var_panel_size", 1)
+        TabSettings.set("repeat_judge_penalty", 0)
+        Judge.objects.filter(name="Judge 8").update(rank=9)
+        assign_judges.add_outround_judges()
+
+        original_chairs = []
+        for debate in self.var_round:
+            debate.refresh_from_db()
+            original_chairs.append(debate.chair_id)
+            final_inround = Round.objects.create(
+                round_number=5,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                chair_id=debate.chair_id,
+            )
+            final_inround.judges.add(debate.chair_id)
+            novice_outround = Outround.objects.create(
+                num_teams=8,
+                type_of_round=Outround.NOVICE,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                chair_id=debate.chair_id,
+            )
+            novice_outround.judges.add(debate.chair_id)
+
+        TabSettings.set("repeat_judge_penalty", 1000)
+        assign_judges.add_outround_judges()
+
+        for debate, chair_id in zip(self.var_round, original_chairs):
+            debate.refresh_from_db()
+            self.assertEqual(debate.chair_id, chair_id)
+
+    def test_repeat_judge_preference_uses_the_previous_bracket_stage(self):
+        TabSettings.set("var_panel_size", 1)
+        TabSettings.set("repeat_judge_penalty", 0)
+        Judge.objects.filter(name="Judge 8").update(rank=9)
+        assign_judges.add_outround_judges()
+
+        original_chairs = []
+        for debate in self.var_round:
+            debate.refresh_from_db()
+            original_chairs.append(debate.chair_id)
+            previous = Outround.objects.create(
+                num_teams=8,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                victor=Outround.GOV,
+                chair_id=debate.chair_id,
+            )
+            previous.judges.add(debate.chair_id)
+
+        for debate, fresh_judge_id in zip(self.var_round, reversed(original_chairs)):
+            older_stage = Outround.objects.create(
+                num_teams=16,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                victor=Outround.GOV,
+                chair_id=fresh_judge_id,
+            )
+            older_stage.judges.add(fresh_judge_id)
+
+        TabSettings.set("repeat_judge_penalty", 1)
+        assign_judges.add_outround_judges()
+
+        for debate, chair_id in zip(self.var_round, reversed(original_chairs)):
+            debate.refresh_from_db()
+            self.assertEqual(debate.chair_id, chair_id)
+            self.assertQuerySetEqual(debate.judges.all(), [debate.chair])
+
+    def test_outround_repeat_judge_preference_preserves_chairs_and_wing_ranks(self):
+        TabSettings.set("var_panel_size", 2)
+        TabSettings.set("repeat_judge_penalty", 0)
+        Judge.objects.filter(name="Judge 6").update(rank=7)
+        assign_judges.add_outround_judges()
+
+        original_panels = []
+        for debate in self.var_round:
+            debate.refresh_from_db()
+            wing = debate.judges.exclude(pk=debate.chair_id).get()
+            original_panels.append((debate.chair_id, wing.id))
+            previous = Outround.objects.create(
+                num_teams=8,
+                gov_team=debate.gov_team,
+                opp_team=debate.opp_team,
+                victor=Outround.GOV,
+                chair_id=debate.chair_id,
+            )
+            previous.judges.add(debate.chair_id, wing)
+
+        TabSettings.set("repeat_judge_penalty", 1)
+        assign_judges.add_outround_judges()
+
+        for index, debate in enumerate(self.var_round):
+            debate.refresh_from_db()
+            self.assertEqual(debate.chair_id, original_panels[index][0])
+            self.assertEqual(
+                set(debate.judges.values_list("pk", flat=True)),
+                {debate.chair_id, original_panels[1 - index][1]},
+            )
 
     def test_assign_outround_rooms_across_scope_has_no_overlap(self):
         assign_rooms.add_outround_rooms(
