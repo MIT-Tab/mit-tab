@@ -253,6 +253,12 @@ body {
   text-decoration: none;
 }
 
+.pairing-card .judges > .btn-sm,
+.pairing-card .judges > span > .btn-sm {
+  // Keep the badge compact while leaving space between judge rows.
+  display: inline;
+}
+
 .judges > span > .btn-sm {
   line-height: 2.5;
 }
