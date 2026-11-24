@@ -181,7 +181,7 @@ const undoCheckIn = (button) => {
 };
 
 $(() => {
-  const selectedTab = $("[role='tab'][data-toggle='tab']")
+  const selectedTab = $("[role='tab'][data-ui-tab]")
     .filter((_, tab) => tab.hash === window.location.hash)
     .get(0);
   selectedTab?.click();

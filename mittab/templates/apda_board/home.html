@@ -14,13 +14,8 @@
 
   <div class="row">
     <div class="col-sm index-section" id="apda-school-list-section">
-      <h4 class="text-center font-weight-normal index-section-header"
-          data-toggle="collapse"
-          data-target="#apda-school-list-content"
-          aria-expanded="true">
-        <span class="section-title">
-          {{ school_list|length }} Schools
-        </span>
+      <h4 class="text-center font-weight-normal index-section-header">
+        <button type="button" class="section-toggle" data-ui-collapse="apda-school-list-content" aria-controls="apda-school-list-content" aria-expanded="true">{{ school_list|length }} Schools</button>
       </h4>
       <div class="collapse show" id="apda-school-list-content">
         <div class="index-section-content">
@@ -58,13 +53,8 @@
     </div>
 
     <div class="col-sm index-section" id="apda-debater-list-section">
-      <h4 class="text-center font-weight-normal index-section-header"
-          data-toggle="collapse"
-          data-target="#apda-debater-list-content"
-          aria-expanded="true">
-        <span class="section-title">
-          {{ debater_list|length }} Debaters
-        </span>
+      <h4 class="text-center font-weight-normal index-section-header">
+        <button type="button" class="section-toggle" data-ui-collapse="apda-debater-list-content" aria-controls="apda-debater-list-content" aria-expanded="true">{{ debater_list|length }} Debaters</button>
       </h4>
       <div class="collapse show" id="apda-debater-list-content">
         <div class="index-section-content">

@@ -353,7 +353,6 @@ const initJudgeSchoolSelect = ($scope = $(document)) => {
     if ($select.data("select2")) return;
     $select.find('option[value=""]').remove();
     $select.select2({
-      theme: "bootstrap4",
       width: "100%",
       placeholder: "Select schools",
       closeOnSelect: false,
@@ -629,63 +628,6 @@ const addForm = (type, maxTeams) => {
   updateSubformSummary($element);
 };
 
-// Hide a Bootstrap modal cleanly. Two cross-browser quirks to handle:
-//   1. iOS Safari leaves the modal/keyboard stuck if hide() is called
-//      while a child input still has focus — so we blur first.
-//   2. Bootstrap occasionally fails to remove the .modal-backdrop and the
-//      .modal-open class from <body> when hide() is triggered
-//      programmatically. We force-clean both on hidden.bs.modal as a
-//      backstop so the page doesn't stay greyed out.
-const hideModal = (selector) => {
-  if (
-    document.activeElement &&
-    typeof document.activeElement.blur === "function"
-  ) {
-    document.activeElement.blur();
-  }
-  const $modal = $(selector);
-  // Bootstrap ignores hide() while the show transition is still running.
-  if ($modal.data("modalState") === "showing") {
-    $modal.one("shown.bs.modal", () => hideModal(selector));
-    return;
-  }
-  $modal.one("hidden.bs.modal", () => {
-    if (!$(".modal.show").length) {
-      $(".modal-backdrop").remove();
-      $("body").removeClass("modal-open").css("padding-right", "");
-    }
-  });
-  $modal.modal("hide");
-};
-
-// Bootstrap 4.3 allows show() during the backdrop fade-out of a previous
-// hide, which leaves an invisible modal behind an orphaned backdrop that
-// blocks the whole page. Wait for the hide to finish before reopening.
-const showModal = (selector) => {
-  const $modal = $(selector);
-  if ($modal.data("modalState") === "hiding") {
-    $modal.one("hidden.bs.modal", () => $modal.modal("show"));
-    return;
-  }
-  $modal.modal("show");
-};
-
-const trackModalState = ($modals) => {
-  $modals
-    .on("show.bs.modal", function onShow() {
-      $(this).data("modalState", "showing");
-    })
-    .on("shown.bs.modal", function onShown() {
-      $(this).data("modalState", "shown");
-    })
-    .on("hide.bs.modal", function onHide() {
-      $(this).data("modalState", "hiding");
-    })
-    .on("hidden.bs.modal", function onHidden() {
-      $(this).data("modalState", "hidden");
-    });
-};
-
 const registerQuickActions = () => {
   const $newSchoolInput = $("#new-school-name");
   $("#create-school-btn").on("click", () => {
@@ -702,7 +644,7 @@ const registerQuickActions = () => {
     const value = `custom:${encodeURIComponent(name)}`;
     appendSchoolOption(value, name);
     $newSchoolInput.val("");
-    hideModal("#new-school-modal");
+    document.getElementById("new-school-modal").close();
     scheduleDraftSave();
   });
 
@@ -734,7 +676,7 @@ const registerQuickActions = () => {
     broadcastCustomDebater(schoolValue, debater);
     $("#new-debater-name").val("");
     $("#new-debater-status").val("0");
-    hideModal("#new-debater-modal");
+    document.getElementById("new-debater-modal").close();
     scheduleDraftSave();
   });
 };
@@ -1056,12 +998,6 @@ export default function initRegistrationPortal() {
       }
     },
   );
-
-  trackModalState($root.find(".registration-modal"));
-  $root.on("click", "[data-open-modal]", function onOpenModal(event) {
-    event.preventDefault();
-    showModal($(this).data("openModal"));
-  });
 
   $root.on("click", "[data-add-form]", function onAddClick(event) {
     event.preventDefault();

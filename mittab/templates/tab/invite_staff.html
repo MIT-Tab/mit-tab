@@ -1,5 +1,5 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
+{% load ui_forms %}
 
 {% block title %}Invite Tab Staff{% endblock %}
 {% block banner %}Invite Tab Staff{% endblock %}
@@ -8,7 +8,7 @@
 <div class="col-md-6">
   <form action="" method="post" novalidate>
     {% csrf_token %}
-    {% bootstrap_form form %}
+    {% render_form form %}
     <button type="submit" class="btn btn-primary">Send Invite</button>
   </form>
 </div>

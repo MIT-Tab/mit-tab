@@ -257,25 +257,9 @@
     padding: 0.85rem 0.6rem;
     border-radius: 0;
     background: #f8f9fa;
-    // Add chevron indicator
-      &[data-toggle="collapse"] {
-        padding-left: 2.5rem;
-        
-        &::before {
-          content: "\f078"; // chevron-down
-          font-family: "Font Awesome 5 Free";
-          font-weight: 900;
-          position: absolute;
-          left: 0.8rem;
-          font-size: 0.85rem;
-          transition: transform 0.3s ease;
-          color: #495057;
-        }
-
-        &[aria-expanded="true"]::before {
-          transform: translateY(-50%) rotate(-180deg);
-        }
-      }
+    .section-toggle {
+      min-height: 2rem;
+    }
   }
 
   .public-home {

@@ -1,5 +1,5 @@
 {% extends "base/__normal.html" %}
-{% load bootstrap4 %}
+{% load ui_forms %}
 {% load tags %}
 
 {% block title %}{{ title }}{% endblock %}
@@ -14,27 +14,27 @@
           <h6 class="text-uppercase text-muted small font-weight-bold mb-3">Backup Actions</h6>
           <ul class="nav nav-pills nav-fill mb-3" id="backup-tabs" role="tablist">
             <li class="nav-item">
-              <a class="nav-link active py-1 px-2 small" id="create-tab" data-toggle="pill" href="#create-form" role="tab">Create</a>
+              <a class="nav-link active py-1 px-2 small" id="create-tab" data-ui-tab href="#create-form" role="tab">Create</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link py-1 px-2 small" id="upload-tab" data-toggle="pill" href="#upload-form" role="tab">Upload</a>
+              <a class="nav-link py-1 px-2 small" id="upload-tab" data-ui-tab href="#upload-form" role="tab">Upload</a>
             </li>
           </ul>
           <div class="tab-content">
-            <div class="tab-pane fade show active" id="create-form" role="tabpanel">
+            <div class="tab-pane active" id="create-form" role="tabpanel">
               <form method="post" action="{% url 'manual_backup' %}" class="mb-0">
                 {% csrf_token %}
-                {% bootstrap_field create_form.backup_name form_group_class="form-group mb-3" size="small" %}
-                {% bootstrap_field create_form.include_scratches form_group_class="form-group mb-3" %}
+                {% render_field create_form.backup_name compact=True %}
+                {% render_field create_form.include_scratches %}
                 <button type="submit" class="btn btn-sm btn-primary btn-block">
                   <i class="fas fa-save mr-1"></i>Create
                 </button>
               </form>
             </div>
-            <div class="tab-pane fade" id="upload-form" role="tabpanel">
+            <div class="tab-pane" id="upload-form" role="tabpanel">
               <form method="post" action="{% url 'upload_backup' %}" enctype="multipart/form-data" class="mb-0">
                 {% csrf_token %}
-                {% bootstrap_field upload_form.file form_group_class="form-group mb-3" size="small" %}
+                {% render_field upload_form.file compact=True %}
                 <button type="submit" class="btn btn-sm btn-primary btn-block">
                   <i class="fas fa-upload mr-1"></i>Upload
                 </button>

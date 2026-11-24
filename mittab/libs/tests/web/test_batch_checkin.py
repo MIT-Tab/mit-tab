@@ -10,6 +10,7 @@ from django.urls import reverse
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from mittab.apps.tab.models import CheckIn, Judge, TabSettings
@@ -45,9 +46,7 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.driver.current_url
                         == self.live_server_url + reverse("batch_checkin"))
         self.driver.find_element(By.ID, "judge-tab").click()
-        self.wait.until(lambda _: self.driver.find_element(
-            By.CSS_SELECTOR, "#judge.show"
-        ))
+        self.wait.until(EC.visibility_of_element_located((By.ID, "judge")))
 
     def _toggle(self, round_number):
         return self.driver.find_element(
@@ -169,7 +168,7 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
         endpoint = self.live_server_url + reverse("batch_checkin")
         self.driver.get(endpoint + "#judge")
         self.driver.refresh()
-        self.wait.until(lambda _: self.driver.find_elements(By.CSS_SELECTOR, "#judge.show"))
+        self.wait.until(EC.visibility_of_element_located((By.ID, "judge")))
         self.assertTrue(self._toggle(5).is_selected())
 
         self.driver.find_element(
@@ -180,9 +179,9 @@ class BatchCheckinWebTestCase(StaticLiveServerTestCase):
 
         self.driver.get(self.live_server_url)
         self.driver.get(endpoint + "#judge")
-        self.wait.until(lambda _: self.driver.find_elements(By.CSS_SELECTOR, "#judge.show"))
+        self.wait.until(EC.visibility_of_element_located((By.ID, "judge")))
         self.driver.find_element(By.CSS_SELECTOR, "#judge .undo-checkin").click()
-        self.wait.until(lambda _: self.driver.find_elements(
-            By.CSS_SELECTOR, "#judge.show",
-        ) and self._toggle(5).is_selected())
+        self.wait.until(lambda _: self.driver.find_element(
+            By.ID, "judge",
+        ).is_displayed() and self._toggle(5).is_selected())
         self.assertTrue(CheckIn.objects.filter(judge=self.judge, round_number=5).exists())

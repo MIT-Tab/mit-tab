@@ -1,0 +1,26 @@
+{% if field.is_hidden %}
+  {{ widget_html }}
+{% else %}
+  <div class="form-group">
+    {% if checkbox %}
+      <div class="form-check">
+        {{ widget_html }}
+        {{ field.label_tag }}
+      </div>
+    {% elif choices %}
+      <fieldset>
+        {{ field.legend_tag }}
+        {{ widget_html }}
+      </fieldset>
+    {% else %}
+      {{ field.label_tag }}
+      {{ widget_html }}
+    {% endif %}
+    {% if field.help_text %}<small class="form-text text-muted" {% if help_id %}id="{{ help_id }}"{% endif %}>{{ field.help_text }}</small>{% endif %}
+    {% if field.errors %}
+      <div class="invalid-feedback d-block" {% if error_id %}id="{{ error_id }}"{% endif %}>
+        {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endif %}

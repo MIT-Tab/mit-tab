@@ -1,7 +1,7 @@
 import $ from "jquery";
 import "select2";
 import "select2/dist/css/select2.css";
-import "@ttskch/select2-bootstrap4-theme/dist/select2-bootstrap4.min.css";
+import "../css/ui/select2.scss";
 
 function multiselectInit($elem) {
   let $select = $elem;
@@ -10,7 +10,7 @@ function multiselectInit($elem) {
       "#data-entry-form select[multiple], select[multiple].js-multiselect",
     );
   }
-  $select.select2({ theme: "bootstrap4" });
+  $select.select2();
 }
 
 export default multiselectInit;

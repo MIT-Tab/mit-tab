@@ -462,18 +462,18 @@
 
   // ---------- select2 polish ----------
 
-  .select2-container--bootstrap4 {
+  .select2-container--default {
     width: 100% !important;
   }
 
-  .select2-container--bootstrap4 .select2-selection--multiple {
+  .select2-container--default .select2-selection--multiple {
     min-height: 2.3rem;
     padding: 0.2rem 0.4rem;
     border-radius: 0.3rem;
     border-color: #ced4da;
   }
 
-  .select2-container--bootstrap4
+  .select2-container--default
     .select2-selection--multiple
     .select2-selection__rendered {
     display: flex;
@@ -482,7 +482,7 @@
     padding: 0;
   }
 
-  .select2-container--bootstrap4
+  .select2-container--default
     .select2-selection--multiple
     .select2-selection__choice {
     margin-top: 0;
@@ -733,16 +733,9 @@
   }
 }
 
-// ---------- Modal styling (modal lives outside #registration-app since
-//            Bootstrap moves it under <body>) ----------
+// ---------- Registration dialogs ----------
 
 .registration-modal {
-  .modal-content {
-    border: 1px solid rgba(21, 33, 61, 0.12);
-    border-radius: 0.75rem;
-    box-shadow: 0 24px 60px -28px rgba(12, 31, 58, 0.4);
-  }
-
   .modal-header {
     border-bottom: 1px solid rgba(28, 54, 94, 0.1);
     padding: 1rem 1.25rem;
@@ -798,10 +791,6 @@
 
   // Mobile: stack footer buttons full-width with primary on top
   @media (max-width: 575.98px) {
-    .modal-dialog {
-      margin: 0.75rem;
-    }
-
     .modal-header,
     .modal-body,
     .modal-footer {
@@ -1248,7 +1237,7 @@
       gap: 0.5rem;
     }
 
-    // Override Bootstrap btn-sm for tap-friendliness; all section CTAs
+    // Increase the small button size for tap-friendliness; all section CTAs
     // share one regular-sized footprint regardless of which class they had.
     .registration-section-action-btn,
     .registration-section-actions .btn,

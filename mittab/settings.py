@@ -30,7 +30,7 @@ INSTALLED_APPS = ("django.contrib.admin", "django.contrib.auth",
                   "django.contrib.messages", "django.contrib.staticfiles",
                   "mittab.apps.tab", "mittab.apps.registration",
                   "sentry_sdk.integrations.django",
-                  "webpack_loader", "bootstrap4",)
+                  "webpack_loader",)
 
 MIDDLEWARE = (
     "mittab.apps.tab.middleware.FailoverDuringBackup",

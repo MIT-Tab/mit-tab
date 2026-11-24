@@ -1,5 +1,5 @@
 {% extends "base/__wide.html" %}
-{% load bootstrap4 %}
+{% load ui_forms %}
 
 {% block title %}{{ title }}{% endblock %}
 
@@ -13,7 +13,7 @@
     <div class="card-body">
       <form method="post">
         {% csrf_token %}
-        {% bootstrap_form form %}
+        {% render_form form %}
         <button type="submit" class="btn btn-primary">Save APDA ID</button>
       </form>
     </div>
