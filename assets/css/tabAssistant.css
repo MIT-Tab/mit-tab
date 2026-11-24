@@ -1,0 +1,235 @@
+.tab-gpt-launcher,
+.tab-gpt-panel {
+  --tab-gpt-accent: var(--theme-color, #00438a);
+  --tab-gpt-on-accent: rgb(var(--theme-on-color-rgb, 255, 255, 255));
+  --tab-gpt-edge: max(1rem, env(safe-area-inset-right));
+  --tab-gpt-bottom: max(1rem, env(safe-area-inset-bottom));
+  --tab-gpt-surface: #fff;
+  --tab-gpt-ink: #16263b;
+  --tab-gpt-muted: #4b5e74;
+  --tab-gpt-border: #cbd7e5;
+  --tab-gpt-reply: #edf3fa;
+  position: fixed;
+  inset: auto var(--tab-gpt-edge) var(--tab-gpt-bottom) auto;
+  z-index: 1040;
+}
+
+.tab-gpt-launcher,
+.tab-gpt-panel button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab-gpt-launcher,
+.tab-gpt-send {
+  display: grid;
+  place-items: center;
+  background: var(--tab-gpt-accent);
+  color: var(--tab-gpt-on-accent);
+  border: 0;
+}
+
+.tab-gpt-launcher {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  box-shadow: 0 5px 18px #142f5050;
+}
+
+.tab-gpt-icon {
+  width: 1.35rem;
+  height: 1.05rem;
+  position: relative;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+}
+
+.tab-gpt-icon::after {
+  content: "";
+  position: absolute;
+  width: 0.35rem;
+  height: 0.35rem;
+  bottom: -0.25rem;
+  left: 0.22rem;
+  transform: skewY(-33deg);
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  background: var(--tab-gpt-accent);
+}
+
+.tab-gpt-panel {
+  bottom: calc(var(--tab-gpt-bottom) + 4rem);
+  width: min(25rem, calc(100vw - 2rem));
+  height: min(33rem, calc(100dvh - var(--tab-gpt-bottom) - 5rem));
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--tab-gpt-border);
+  border-radius: 1rem;
+  box-shadow: 0 12px 36px #142f5040;
+  color: var(--tab-gpt-ink);
+  background: var(--tab-gpt-surface);
+  font: 0.9375rem/1.45 system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.tab-gpt-panel[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-gpt-header,
+.tab-gpt-composer,
+.tab-gpt-form-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-gpt-header {
+  justify-content: space-between;
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid var(--tab-gpt-border);
+}
+
+.tab-gpt-header h2 {
+  margin: 0;
+  color: inherit;
+  font: 700 1.0625rem/1.2 system-ui, sans-serif;
+}
+
+.tab-gpt-close,
+.tab-gpt-search {
+  background: transparent;
+  color: inherit;
+  border: 0;
+}
+
+.tab-gpt-panel .tab-gpt-close {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.5rem;
+  border-radius: 0.5rem;
+}
+
+.tab-gpt-close:hover,
+.tab-gpt-search:hover {
+  background: var(--tab-gpt-reply);
+}
+
+.tab-gpt-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.tab-gpt-panel .tab-gpt-intro,
+#assistant-status {
+  margin: 0;
+  color: var(--tab-gpt-muted);
+  font: inherit;
+}
+
+#assistant-status:not(:empty) {
+  margin-top: 0.625rem;
+}
+
+.tab-gpt-message {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.75rem 0;
+  padding: 0.625rem 0.8rem;
+  border-radius: 0.875rem;
+  background: var(--tab-gpt-reply);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tab-gpt-message--user {
+  max-width: 87%;
+  margin-left: auto;
+  color: var(--tab-gpt-on-accent);
+  background: var(--tab-gpt-accent);
+}
+
+.tab-gpt-sources {
+  margin-top: 0.5rem;
+  padding: 0.375rem 0;
+  color: var(--tab-gpt-muted);
+  font-size: 0.8125rem;
+}
+
+.tab-gpt-sources summary {
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.tab-gpt-sources pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--tab-gpt-ink);
+}
+
+.tab-gpt-form {
+  padding: 0.75rem;
+  border-top: 1px solid var(--tab-gpt-border);
+}
+
+.tab-gpt-composer textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--tab-gpt-border);
+  border-radius: 0.625rem;
+  background: var(--tab-gpt-surface);
+  color: var(--tab-gpt-ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.tab-gpt-panel .tab-gpt-send {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.tab-gpt-panel button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.tab-gpt-form-footer {
+  justify-content: space-between;
+  margin-top: 0.375rem;
+  color: var(--tab-gpt-muted);
+  font-size: 0.75rem;
+}
+
+.tab-gpt-search {
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.25rem;
+  text-decoration: underline;
+}
+
+@media (max-width: 440px) {
+  .tab-gpt-panel {
+    --tab-gpt-edge: max(0.5rem, env(safe-area-inset-right));
+    width: calc(100vw - 2 * var(--tab-gpt-edge));
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .tab-gpt-panel {
+    --tab-gpt-surface: #17212e;
+    --tab-gpt-ink: #edf3fa;
+    --tab-gpt-muted: #bdcadd;
+    --tab-gpt-border: #465970;
+    --tab-gpt-reply: #26374a;
+  }
+}

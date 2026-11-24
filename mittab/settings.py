@@ -1,5 +1,6 @@
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
+from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -19,6 +20,11 @@ BLACK_ROD_API_BASE_URL = os.environ.get(
     "https://results.apda.online",
 ).rstrip("/")
 BLACK_ROD_PRIVATE_API_TOKEN = os.environ.get("BLACK_ROD_PRIVATE_API_TOKEN", "")
+
+MITTAB_ASSISTANT_ENABLED = os.environ.get("MITTAB_ASSISTANT_ENABLED") == "1"
+MITTAB_ASSISTANT_ACCOUNT_ID = os.environ.get("MITTAB_ASSISTANT_ACCOUNT_ID", "")
+MITTAB_ASSISTANT_API_TOKEN = os.environ.get("MITTAB_ASSISTANT_API_TOKEN", "")
+MITTAB_SOURCE_REVISION = os.environ.get("MITTAB_SOURCE_REVISION", "")
 
 ALLOWED_HOSTS = ["*"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -48,6 +54,7 @@ if os.environ.get("SILK_ENABLED"):
     INSTALLED_APPS = INSTALLED_APPS + ("silk",)
     MIDDLEWARE = MIDDLEWARE + ("silk.middleware.SilkyMiddleware",)
     SILK_ENABLED = True
+    SILKY_IGNORE_PATHS = ["/ask-mittab/"]
 else:
     SILK_ENABLED = False
 
@@ -107,12 +114,21 @@ BACKUPS = {
 
 # Error monitoring
 # https://docs.sentry.io/clients/python/integrations/django/
+def filter_error_event(event, _hint):
+    """Keep private staff conversations and tool results out of error reports."""
+    request_url = event.get("request", {}).get("url") or ""
+    if urlsplit(request_url).path.endswith("/ask-mittab/"):
+        return None
+    return event
+
+
 if os.environ.get("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=os.environ["SENTRY_DSN"],
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        before_send=filter_error_event,
         )
 
 # Internationalization

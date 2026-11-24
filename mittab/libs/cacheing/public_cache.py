@@ -67,7 +67,10 @@ def cache_public_view(timeout=60):
         def wrapper(request, *args, **kwargs):
             # Models import this module; defer the role import to avoid a cycle.
             from mittab.apps.tab.auth_roles import is_apda_board_user  # pylint: disable=import-outside-toplevel
-            if is_apda_board_user(request.user):
+            if (
+                is_apda_board_user(request.user)
+                or (settings.MITTAB_ASSISTANT_ENABLED and request.user.is_superuser)
+            ):
                 response = view_func(request, *args, **kwargs)
                 response["Cache-Control"] = "private, no-store"
                 return response

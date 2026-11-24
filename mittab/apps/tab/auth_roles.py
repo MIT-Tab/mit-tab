@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit
 
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.urls import Resolver404, resolve, reverse
 
@@ -223,6 +224,16 @@ def is_apda_board_user(user):
     if not user or not user.is_authenticated:
         return False
     return user.groups.filter(name=APDA_BOARD_GROUP_NAME).exists()
+
+
+def can_use_assistant(user):
+    return (
+        settings.MITTAB_ASSISTANT_ENABLED
+        and getattr(user, "is_authenticated", False)
+        and user.is_active
+        and user.is_superuser
+        and not is_apda_board_user(user)
+    )
 
 
 def is_apda_board_access_open():
