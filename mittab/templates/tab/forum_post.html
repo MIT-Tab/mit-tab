@@ -4,6 +4,61 @@
 {% block content %}
 
 <div class="container-fluid">
+{% if can_publish_forum_results %}
+  <div class="mb-3">
+    {% if forum_results_url %}
+      <a class="btn btn-outline-primary" href="{{ forum_results_url }}">View forum post</a>
+    {% else %}
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#publish-forum-results">
+        Post to APDA Forum
+      </button>
+    {% endif %}
+    <details class="mt-2">
+      <summary>Forum posting ID</summary>
+      <code>{{ forum_publication_id }}</code>
+    </details>
+  </div>
+  <div class="modal fade" id="publish-forum-results" tabindex="-1"
+       aria-labelledby="publish-forum-results-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title" id="publish-forum-results-title">
+            {% if forum_missing_finals %}Complete finals before posting{% else %}Confirm dino judges{% endif %}
+          </h4>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          {% if forum_missing_finals %}
+            <ul class="mb-0">
+              {% for error in forum_missing_finals %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+          {% elif dinos %}
+            <p>Are these all the dino judges, and are their names correct?</p>
+            <ul class="mb-0">
+              {% for judge in dinos %}<li>{{ judge }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <p class="mb-0">No judges are marked as dinos. Is that correct?</p>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          {% if forum_missing_finals %}
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          {% else %}
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            <form method="post" action="{% url 'forum_post' %}">
+              {% csrf_token %}
+              <input type="hidden" name="confirm_dinos" value="{{ forum_confirmation }}">
+              <button type="submit" class="btn btn-primary">Confirm and post</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
   <div class="w-100 mt-4 mb-4">
     <p class="lead">Thank you for a great tournament!
       {% if dinos %} 
