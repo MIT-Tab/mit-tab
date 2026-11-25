@@ -1146,7 +1146,6 @@ def assign_judges_to_pairing(request, round_type=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@audit_pairing_generation(Outround, "staff room assignment")
 def assign_rooms_to_pairing(request):
     if request.method != "POST":
         return redirect_and_flash_error(request, "Invalid request method.")

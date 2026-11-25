@@ -236,7 +236,6 @@ def assign_judges_to_pairing(request):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@audit_pairing_generation(Round, "staff room assignment")
 def assign_rooms_to_pairing(request):
     current_round_number = TabSettings.objects.get(key="cur_round").value - 1
     if request.method == "POST":
@@ -290,13 +289,11 @@ def alternative_rooms(request, round_id, current_room_id=None):
 
 
 @permission_required("tab.tab_settings.can_change", login_url="/403/")
-@audit_pairing_change(None, "staff room correction")
+@transaction.atomic
 def assign_room(request, round_id, new_room_id, outround=False):
     try:
-        if outround:
-            round_obj = Outround.objects.get(id=int(round_id))
-        else:
-            round_obj = Round.objects.get(id=int(round_id))
+        model = Outround if outround else Round
+        round_obj = model.objects.select_for_update().get(id=int(round_id))
         room_obj = Room.objects.get(id=int(new_room_id))
         round_obj.room = room_obj
         round_obj.save()
