@@ -2984,3 +2984,169 @@ def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
                     assert exported[-2:] == ["", "yes"]
                 if kind == "scratches":
                     assert exported == [team.name, judge.name, "tab"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_manual_pairing_corrections_are_transactional_and_staff_only():
+    from mittab.apps.tab.models import ManualJudgeAssignment, NoShow
+
+    tab = legacy_tab_session("manual-pairing-tab")
+    board = legacy_tab_session("manual-pairing-board")
+    get_user_model().objects.get(username="manual-pairing-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("allow_rejudges", 0)
+    school = School.objects.create(name="Manual Pair School")
+    gov = Team.objects.create(school=school, name="Government Before", seed=0)
+    opp = Team.objects.create(school=school, name="Opposition Before", seed=0)
+    spare = Team.objects.create(school=school, name="Replacement Team", seed=0)
+    judge = Judge.objects.create(name="Original Chair", rank=8)
+    wing = Judge.objects.create(name="Original Wing", rank=3)
+    substitute = Judge.objects.create(name="Available Replacement", rank=5, wing_only=True)
+    scratched = Judge.objects.create(name="Blocked judge", rank=99)
+    room = Room.objects.create(name="Old Room", rank=1)
+    other = Room.objects.create(name="Room With Tag", rank=4)
+    unsuitable = Room.objects.create(name="Room Missing Tag", rank=3)
+    tag = RoomTag.objects.create(tag="Required Projector", priority=1)
+    gov.required_room_tags.add(tag)
+    other.tags.add(tag)
+    for person in (judge, wing, substitute, scratched):
+        CheckIn.objects.create(judge=person, round_number=1)
+    for location in (room, other, unsuitable):
+        RoomCheckIn.objects.create(room=location, round_number=1)
+    Scratch.objects.create(team=gov, judge=scratched, scratch_type=Scratch.TAB_SCRATCH)
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, chair=judge, room=room,
+                                  pullup=Round.GOV, victor=Round.GOV)
+    debate.judges.set([judge, wing])
+    left = Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY, gov_team=gov, opp_team=opp,
+                                   chair=judge, room=room, choice=Outround.GOV)
+    left.judges.set([judge, wing])
+    BreakingTeam.objects.create(team=gov, seed=1, effective_seed=1, type_of_team=BreakingTeam.VARSITY)
+    BreakingTeam.objects.create(team=opp, seed=2, effective_seed=2, type_of_team=BreakingTeam.VARSITY)
+    NoShow.objects.create(no_show_team=spare, round_number=1)
+    path = f"/round/{debate.id}/edit/"
+
+    with rust_server() as port:
+        status, headers, page = request(port, path, cookie=tab)
+        assert status == 200, (status, page)
+        assert b"Available Replacement" in page and b"Wing only" in page
+        assert b"Blocked judge" not in page
+        assert b"Room With Tag" in page and b"Room Missing Tag" not in page
+        csrf = load_cookies(headers)["csrftoken"].value
+        revision = re.search(rb'name="revision" value="([^"]+)"', page).group(1).decode()
+
+        def post(path, data=None, *, session=tab, token=csrf):
+            return request(port, path, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": token, **(data or {})})
+
+        commands = [
+            f"/round/{debate.id}/assign_room/{other.id}/",
+            f"/round/{debate.id}/assign_judge/{substitute.id}/{judge.id}/",
+            f"/round/{debate.id}/assign_chair/{wing.id}/",
+            f"/round/{debate.id}/remove_judge/{substitute.id}/",
+            f"/round/{debate.id}/switch_sides/",
+            f"/pairings/assign_team/{debate.id}/gov/{spare.id}/",
+            f"/outround/{left.id}/assign_room/{other.id}/",
+            f"/outround/{left.id}/assign_judge/{substitute.id}/",
+            f"/outround/{left.id}/switch_sides/",
+        ]
+        assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        assert request(port, f"/round/{debate.id}/alternative_judges/", cookie=board)[1]["Location"] == "/403/"
+        for command in commands:
+            assert post(command, session=board)[1]["Location"] == "/403/"
+            assert post(command, token="invalid")[0] == 403
+        assert debate.judges.count() == 2 and left.judges.count() == 2
+        assert post(commands[0], {"revision": revision})[0] == 200
+        assert post(commands[1], {"revision": revision})[0] == 422
+        assert post(f"/round/{debate.id}/assign_judge/{substitute.id}/{scratched.id}/")[0] == 422
+        assert set(debate.judges.values_list("id", flat=True)) == {judge.id, wing.id}
+        result = post(commands[1])
+        assert result[0] == 200 and json.loads(result[2])["chair_id"] == substitute.id
+        assert ManualJudgeAssignment.objects.filter(round=debate, judge=substitute).exists()
+        assert post(commands[2])[0] == 200
+        assert post(commands[3])[0] == 200
+        assert not ManualJudgeAssignment.objects.filter(round=debate, judge=substitute).exists()
+        assert post(commands[4])[0] == 200
+        debate.refresh_from_db()
+        assert (debate.gov_team_id, debate.opp_team_id, debate.pullup, debate.room_id, debate.chair_id) == (
+            opp.id, gov.id, Round.OPP, other.id, wing.id,
+        )
+        assert post(f"/pairings/assign_team/{debate.id}/gov/{gov.id}/")[0] == 422
+        assert post(commands[5])[0] == 200
+        assert not NoShow.objects.filter(no_show_team=spare).exists()
+
+        for command in commands[6:]:
+            assert post(command)[0] == 200
+        left.refresh_from_db()
+        assert (left.gov_team_id, left.opp_team_id, left.choice, left.room_id, left.chair_id) == (
+            opp.id, gov.id, Outround.OPP, other.id, judge.id,
+        )
+        assert set(left.judges.values_list("id", flat=True)) == {judge.id, wing.id, substitute.id}
+        manual = AuditEvent.objects.filter(event_type__startswith="manual_")
+        for event in manual:
+            assert "rank" not in event.changes and "wing_only" not in event.changes
+        board_page = request(port, "/apda-board/inrounds/1/", cookie=board)[2]
+        assert b"Blocked judge" not in board_page and b"Wing only" not in board_page and b"Requests no wings" not in board_page
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_pairing_stats_checkin_and_csv():
+    from mittab.libs.data_export.pairings_export import export_pairings_csv
+
+    tab = legacy_tab_session("round-tools-tab")
+    school = School.objects.create(name="Round Tools School")
+    gov = Team.objects.create(name="Government Export", seed=3, school=school)
+    opp = Team.objects.create(name="Opposition Export", seed=0, school=school)
+    bye = Team.objects.create(name="Export Bye", seed=0, school=school)
+    Team.objects.create(name="Export Unpaired", seed=0, school=school)
+    gov_speaker = Debater.objects.create(name="Export Gov Debater", novice_status=0)
+    opp_speaker = Debater.objects.create(name="Export Opp Debater", novice_status=1)
+    gov.debaters.add(gov_speaker)
+    opp.debaters.add(opp_speaker)
+    judge = Judge.objects.create(name="Export Judge", rank="8.25")
+    room = Room.objects.create(name="Export Room", rank="4.50")
+    debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, chair=judge,
+                                  room=room, victor=Round.GOV)
+    debate.judges.add(judge)
+    Bye.objects.create(round_number=1, bye_team=bye)
+    RoundStats.objects.create(round=debate, debater=gov_speaker, speaks=Decimal("28.0"), ranks=1, debater_role="PM")
+    RoundStats.objects.create(round=debate, debater=opp_speaker, speaks=Decimal("27.5"), ranks=2, debater_role="LO")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 5)
+    TabSettings.set("lenient_late", 0)
+
+    with rust_server() as port:
+        checkin = "/pairings/quick_judge_checkin/"
+        status, headers, page = request(port, checkin, cookie=tab)
+        assert status == 200 and b"Export Judge" in page
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(fields):
+            return request(port, checkin, method="POST", extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                           form=[("csrfmiddlewaretoken", csrf), *fields])
+
+        assert post([("round_number", 6), ("judge_id", judge.id)])[0] == 400
+        assert post([("round_number", 2), ("judge_id", 999999)])[0] == 404
+        present = post([("round_number", 2), ("judge_id", judge.id)])
+        assert json.loads(present[2]) == {"success": True, "created": False,
+                                         "judge": {"id": judge.id, "name": judge.name, "rank": "8.25"}}
+        assert post([("round_number", 2), ("judge_id", judge.id)])[0] == 200
+        assert CheckIn.objects.filter(judge=judge, round_number=2).count() == 1
+        created = post([("round_number", 2), ("name", "New Walk-In Judge"), ("school_ids[]", school.id)])
+        assert created[0] == 200 and json.loads(created[2])["created"]
+        walk_in = Judge.objects.get(name="New Walk-In Judge")
+        assert walk_in.rank == 5 and walk_in.schools.get() == school
+        assert CheckIn.objects.filter(judge=walk_in, round_number=2).exists()
+
+        status, headers, raw = request(port, "/pairings/export_csv/", cookie=tab)
+        assert status == 200 and headers["Content-Disposition"].endswith("round_1_pairings.csv")
+        assert raw == export_pairings_csv().content
+        outcome = request(port, "/round/1/stats/", cookie=tab)
+        assert outcome[0] == 200
+        stats = json.loads(outcome[2])
+        assert stats[str(gov.id)]["wins"] == 1 and stats[str(gov.id)]["seed"] == "Full"
+        assert stats[str(gov.id)]["total_speaks"] == 28.0
+        assert stats[str(opp.id)]["opps"] == 1 and stats[str(opp.id)]["debaters"] == opp_speaker.name
+        stats_page = request(port, "/pairings/round_stats/", cookie=tab)[2]
+        assert b"All preliminary rounds" in stats_page and b"27.75" in stats_page
+        assert b"Round 5" in request(port, "/pairings/view_rounds/", cookie=tab)[2]

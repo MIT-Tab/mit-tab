@@ -176,7 +176,7 @@ struct TeamRanking {
     ranks: Option<String>,
 }
 
-fn policy(settings: &Settings) -> ScoringPolicy {
+pub fn policy(settings: &Settings) -> ScoringPolicy {
     ScoringPolicy {
         current_round: settings.integer("cur_round", 1),
         lenient_late_through: settings.integer("lenient_late", 0),

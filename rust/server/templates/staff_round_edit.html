@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% macro hidden(csrf, revision, action) %}
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+<input type="hidden" name="revision" value="{{ revision }}">
+<input type="hidden" name="action" value="{{ action }}">
+{% endmacro %}
+{% macro pick(label, action, choices, csrf, revision) %}
+<form method="post" class="mb-3">
+  {{ hidden(csrf, revision, action) }}
+  <label class="form-label">{{ label }}
+    <select class="custom-select" name="target" required>
+      <option value="">Choose an option</option>
+      {% with options = choices %}{% include "staff_round_choices.html" %}{% endwith %}
+    </select>
+  </label>
+  <button class="btn btn-outline-primary" type="submit">Save</button>
+</form>
+{% endmacro %}
+{% block content %}
+<div class="col-12">
+  <div class="d-flex gap-3 align-items-baseline flex-wrap">
+    <h1 class="h3">{{ title }}</h1>
+    <a href="{% if out %}/outround_pairing/{{ pairing.division }}/{{ pairing.num_teams }}{% else %}/round/{{ pairing.round_number }}/{% endif %}">Back to Pairings</a>
+  </div>
+  {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+  <div class="row">
+    <section class="col-lg-6">
+      <h2 class="h5">Teams</h2>
+      <form method="post" class="my-2">
+        {{ hidden(csrf, revision, "swap") }}
+        <button class="btn btn-outline-primary" type="submit">Switch Sides</button>
+      </form>
+      {{ pick("Government · " ~ pairing.gov_team.name, "government", options.government, csrf, revision) }}
+      {{ pick("Opposition · " ~ pairing.opp_team.name, "opposition", options.opposition, csrf, revision) }}
+    </section>
+    <section class="col-lg-6">
+      <h2 class="h5">Room</h2>
+      {{ pick("Room · " ~ (pairing.room.name or "Unassigned"), "room", options.rooms, csrf, revision) }}
+      <h2 class="h5">Judges</h2>
+      {% for judge in pairing.judges %}
+      <article class="border rounded p-2 mb-2">
+        <p class="mb-2"><strong>{{ judge.name }}</strong>{% if judge.id == pairing.chair %} · Chair{% endif %}</p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if judge.id != pairing.chair %}
+          <form method="post">{{ hidden(csrf, revision, "chair") }}<input type="hidden" name="target" value="{{ judge.id }}"><button class="btn btn-outline-primary btn-sm" type="submit">Make Chair</button></form>
+          {% endif %}
+          <form method="post">{{ hidden(csrf, revision, "remove") }}<input type="hidden" name="target" value="{{ judge.id }}"><button class="btn btn-outline-danger btn-sm" type="submit">Remove</button></form>
+        </div>
+        <form method="post" class="mt-2">
+          {{ hidden(csrf, revision, "judge") }}
+          <input type="hidden" name="replace" value="{{ judge.id }}">
+          <label class="form-label">Replacement for {{ judge.name }}
+            <select class="custom-select" name="target" required><option value="">Choose a judge</option>
+              {% with options = options.judges %}{% include "staff_round_choices.html" %}{% endwith %}
+            </select>
+          </label>
+          <button class="btn btn-outline-primary btn-sm" type="submit">Replace</button>
+        </form>
+      </article>
+      {% else %}<p>No judges assigned.</p>{% endfor %}
+      {{ pick("Add judge", "judge", options.judges, csrf, revision) }}
+    </section>
+  </div>
+</div>
+{% endblock %}

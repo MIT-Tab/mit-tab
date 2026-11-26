@@ -1,0 +1,9 @@
+{% for occupied, label in [(false, "Available"), (true, "Already assigned")] %}
+<optgroup label="{{ label }}">
+  {% for option in options %}
+  {% if option.occupied == occupied %}
+  <option value="{{ option.id }}">{{ option.name }}{% for badge in option.badges %} · {{ badge }}{% endfor %}</option>
+  {% endif %}
+  {% endfor %}
+</optgroup>
+{% endfor %}

@@ -57,6 +57,10 @@ mod staff_pairing;
 mod staff_roles;
 mod staff_roster;
 mod staff_roster_data;
+mod staff_round_choices;
+mod staff_round_store;
+mod staff_round_tools;
+mod staff_rounds;
 mod staff_scratches;
 mod tab_cards;
 mod team_portal;
@@ -317,6 +321,8 @@ fn router(app: App) -> Router {
                     "/settings_form/viewed/",
                     axum::routing::post(settings_form::viewed),
                 )
+                .merge(staff_rounds::routes())
+                .merge(staff_round_tools::routes())
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(

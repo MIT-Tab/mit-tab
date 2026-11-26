@@ -317,6 +317,12 @@ impl TournamentData {
             .map_err(|_| "Could not pair the teams with the current results and settings.")
     }
 
+    pub fn side_counts(&self, team: TeamId) -> (u32, u32) {
+        self.history
+            .get(&team)
+            .map_or((0, 0), |history| (history.government, history.opposition))
+    }
+
     pub fn scores_by_team(
         &self,
         policy: ScoringPolicy,
