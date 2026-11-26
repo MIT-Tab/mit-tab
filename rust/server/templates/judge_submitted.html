@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>{{ title }}</h2>
+  <p>{{ gov }} vs. {{ opp }}</p>
+  <p>Outcome <strong>{{ outcome }}</strong></p>
+  {% if open_speaks or open_ranks %}
+  <p>
+    {% if open_speaks == 1 %}Disclose speaker points to debaters who opt in.{% elif open_speaks == 2 %}Speaker points are closed.{% endif %}
+    {% if open_ranks == 1 %}Disclose ranks to debaters who opt in.{% elif open_ranks == 2 %}Ranks are closed.{% endif %}
+  </p>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Position</th><th scope="col">Debater</th><th scope="col">Speaker points</th><th scope="col">Rank</th></tr></thead>
+      <tbody>
+      {% for score in scores %}
+      <tr><td>{{ score.role }}</td><td>{{ score.name }}</td><td>{{ score.speaks }}</td><td>{{ score.ranks }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if rfd_enabled %}
+  {% if editable %}
+  <form method="post" class="mb-3">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="form-label" for="rfd">Reason for decision</label>
+    <textarea class="form-control" id="rfd" name="rfd" rows="6">{{ rfd }}</textarea>
+    {% if deadline %}<small>Deadline {{ deadline }}</small><br>{% endif %}
+    <button class="btn btn-primary mt-2" type="submit">Save Reason</button>
+  </form>
+  {% else %}
+  <h3 class="h5">Reason for decision</h3>
+  <p style="white-space: pre-wrap;">{{ rfd or "No written reason submitted." }}</p>
+  {% endif %}
+  {% endif %}
+  <a class="btn btn-outline-primary" href="/public/e-ballots/{{ code }}/">Judge Portal</a>
+  <a class="btn btn-outline-secondary" href="/public/e-ballots/{{ code }}/previous/">Previous Ballots</a>
+</div>
+{% endblock %}

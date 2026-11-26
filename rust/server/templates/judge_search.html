@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>Judge Portal and Ballots</h2>
+  <form method="post" class="mb-3">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="form-label" for="ballot_code">Judge code</label>
+    <input class="form-control mb-3" id="ballot_code" name="ballot_code" type="text" maxlength="30" autocomplete="off" required>
+    <button class="btn btn-primary" type="submit">Open Judge Portal</button>
+  </form>
+</div>
+{% endblock %}

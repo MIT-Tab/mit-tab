@@ -22,7 +22,7 @@ use crate::{
     unavailable,
 };
 
-const FORM_SETTINGS: &[&str] = &[
+pub const FORM_SETTINGS: &[&str] = &[
     "decimal_speaks",
     "min_speak",
     "max_speak",
@@ -40,7 +40,7 @@ pub const OUTCOMES: [(i32, &str); 6] = [
     (6, "Both win"),
 ];
 
-type Submitted = HashMap<String, String>;
+pub type Submitted = HashMap<String, String>;
 
 #[derive(Serialize)]
 struct Team {
@@ -55,7 +55,7 @@ struct Speaker {
     name: String,
 }
 
-struct Debate {
+pub struct Debate {
     id: i32,
     number: i32,
     winner: i32,
@@ -81,13 +81,13 @@ struct FormValues<'a> {
     outcome: Option<i32>,
 }
 
-struct RfdAccess {
-    allowed: bool,
-    open: bool,
-    deadline: String,
+pub struct RfdAccess {
+    pub allowed: bool,
+    pub open: bool,
+    pub deadline: String,
 }
 
-fn rfd_access(settings: &Settings, round: i32) -> RfdAccess {
+pub fn rfd_access(settings: &Settings, round: i32) -> RfdAccess {
     let first = settings.integer("written_rfd_first_round", -1);
     let raw = settings.string("written_rfd_deadline", "");
     let est = FixedOffset::west_opt(5 * 3600).expect("fixed offset");
@@ -130,7 +130,7 @@ fn policy(settings: &Settings) -> SpeakPolicy {
     }
 }
 
-async fn load(db: &mut MySqlConnection, id: i32) -> Result<Option<Debate>, sqlx::Error> {
+pub async fn load(db: &mut MySqlConnection, id: i32) -> Result<Option<Debate>, sqlx::Error> {
     let Some(row) = sqlx::query(
         "SELECT r.round_number, r.victor, r.rfd, g.id gov, g.name government, o.id opp, o.name opposition
            FROM tab_round r JOIN tab_team g ON g.id = r.gov_team_id
@@ -214,7 +214,7 @@ async fn show(
     }
     .await;
     match result {
-        Ok((Some(debate), settings)) => page(actor, headers, &debate, &settings, count, None),
+        Ok((Some(debate), settings)) => page(actor, headers, &debate, &settings, count, None, None),
         Ok((None, _)) => not_found(),
         Err(_) => unavailable(),
     }
@@ -224,13 +224,14 @@ fn not_found() -> Response {
     private((StatusCode::NOT_FOUND, "Ballot not found."))
 }
 
-fn page(
+pub fn page(
     actor: Actor,
     headers: &HeaderMap,
     debate: &Debate,
     settings: &Settings,
     count: Option<usize>,
     invalid: Option<(&Submitted, &'static str)>,
+    judge_code: Option<&str>,
 ) -> Response {
     let Ok(csrf) = html::page_csrf(headers) else {
         return unavailable();
@@ -279,12 +280,17 @@ fn page(
         .collect();
     let rfd = rfd_access(settings, debate.number);
     let title = format!("Round {} Ballot", debate.number);
+    let outcomes = if judge_code.is_some() {
+        &OUTCOMES[..2]
+    } else {
+        &OUTCOMES[..]
+    };
     let response = html::render(
         "ballot_entry.html",
         context! {
             title, forms, panel => count.is_some(), id => debate.id,
             gov => debate.teams[0].name, opp => debate.teams[1].name,
-            csrf, outcomes => OUTCOMES, step => format!("{:.2}", f64::from(policy(settings).step) / 10_000.0),
+            csrf, outcomes, judge_code, step => format!("{:.2}", f64::from(policy(settings).step) / 10_000.0),
             rfd_allowed => count.is_none() && rfd.allowed, rfd_open => rfd.open,
             deadline => rfd.deadline, rfd => submitted.and_then(|form| form.get("rfd")).unwrap_or(&debate.rfd),
             discard_minority => submitted.is_some_and(|form| form.contains_key("discard_minority")),
@@ -369,6 +375,7 @@ async fn submit(
                 &settings,
                 count,
                 Some((&form, "Written reasons cannot be edited for this ballot.")),
+                None,
             ));
         }
         let result = if rfd_only {
@@ -384,6 +391,7 @@ async fn submit(
                         &settings,
                         count,
                         Some((&form, error)),
+                        None,
                     ));
                 }
             }
@@ -418,12 +426,12 @@ async fn submit(
     result.unwrap_or_else(|_| unavailable())
 }
 
-enum WriteBallot {
+pub enum WriteBallot {
     Rfd,
     Scores(i32, Vec<(usize, i32, String, i32)>),
 }
 
-fn extract(
+pub fn extract(
     debate: &Debate,
     settings: &Settings,
     form: &Submitted,
@@ -500,7 +508,7 @@ fn extract(
     ))
 }
 
-fn decimal(raw: &str) -> Option<i32> {
+pub fn decimal(raw: &str) -> Option<i32> {
     let raw = raw.trim();
     let (negative, digits) = if let Some(value) = raw.strip_prefix('-') {
         (true, value)
@@ -533,7 +541,7 @@ fn decimal(raw: &str) -> Option<i32> {
     Some(if negative { -value } else { value })
 }
 
-async fn save(
+pub async fn save(
     db: &mut MySqlConnection,
     debate: &Debate,
     ballot: WriteBallot,

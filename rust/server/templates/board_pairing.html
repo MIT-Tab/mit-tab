@@ -1,0 +1,18 @@
+<h4 class="h6">{{ row.data.gov_team.name }} vs. {{ row.data.opp_team.name }}</h4>
+<dl class="row mb-0">
+  <dt class="col-sm-3">Government</dt><dd class="col-sm-9">{{ row.data.gov_team.name }}</dd>
+  <dt class="col-sm-3">Opposition</dt><dd class="col-sm-9">{{ row.data.opp_team.name }}</dd>
+  <dt class="col-sm-3">Room</dt><dd class="col-sm-9">{{ row.data.room.name if row.data.room else "Unassigned" }}</dd>
+  <dt class="col-sm-3">Judges</dt><dd class="col-sm-9">{% for judge in row.data.judges %}{% if judge.id == row.data.chair %}<strong>{{ judge.name }}</strong> (chair){% else %}{{ judge.name }}{% endif %}{% if not loop.last %}, {% endif %}{% else %}Unassigned{% endfor %}</dd>
+  <dt class="col-sm-3">Outcome</dt><dd class="col-sm-9">{{ row.outcome }}</dd>
+  {% if row.choice %}<dt class="col-sm-3">Choice</dt><dd class="col-sm-9">{{ row.choice }}</dd>{% endif %}
+</dl>
+{% if row.data.scores %}
+<div class="table-responsive">
+<table class="table table-sm">
+  <thead><tr><th scope="col">Debater</th><th scope="col">Position</th><th scope="col">Speaks</th><th scope="col">Rank</th></tr></thead>
+  <tbody>{% for score in row.data.scores %}<tr><td>{{ score.name }}</td><td>{{ score.role|upper or "—" }}</td><td>{{ score.speaks }}</td><td>{{ score.ranks }}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+{% endif %}
+{% include "board_history.html" %}

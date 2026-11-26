@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Judges</h2>
+  {% include "board_nav.html" %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Judge</th><th scope="col">Dino</th><th scope="col">History</th></tr></thead>
+      <tbody>
+      {% for judge in judges %}
+        <tr>
+          <td>{{ judge.name }}</td>
+          <td>
+            <form method="post" class="d-flex align-items-center gap-2">
+              <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+              <input type="hidden" name="judge" value="{{ judge.id }}">
+              <label><input type="checkbox" name="is_dino"{% if judge.is_dino %} checked{% endif %}> Dino</label>
+              <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+            </form>
+          </td>
+          <td>
+            {% if judge.history %}<details><summary>Changes</summary><ul>
+            {% for event in judge.history %}<li>{{ event.time }} · {{ event.actor }} · {{ "Dino" if event.after else "Non-dino" }}</li>{% endfor %}
+            </ul></details>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

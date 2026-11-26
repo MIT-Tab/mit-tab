@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>{{ name }}</h2>
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <a class="btn btn-primary" href="/public/e-ballots/{{ code }}/current/">Current Ballot</a>
+    <a class="btn btn-outline-primary" href="/public/e-ballots/{{ code }}/previous/">Previous Ballots</a>
+  </div>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <fieldset>
+      <legend>Expected Availability</legend>
+      {% for row in rows %}
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="{{ row.field }}" name="{{ row.field }}"{% if row.checked %} checked{% endif %}>
+        <label class="form-check-label" for="{{ row.field }}">{{ row.label }}</label>
+      </div>
+      {% endfor %}
+    </fieldset>
+    <button class="btn btn-success mt-3" type="submit">Save Availability</button>
+  </form>
+</div>
+{% endblock %}

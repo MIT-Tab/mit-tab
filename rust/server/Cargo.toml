@@ -6,7 +6,7 @@ rust-version = "1.94"
 publish = false
 
 [dependencies]
-axum = { version = "0.8.8", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
+axum = { version = "0.8.8", default-features = false, features = ["form", "http1", "json", "matched-path", "query", "tokio"] }
 base64 = "0.22.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 flate2 = "1.1.5"

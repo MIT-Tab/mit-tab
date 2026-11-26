@@ -1,0 +1,11 @@
+{% if row.history %}
+<details class="mt-2">
+  <summary>Manual edits</summary>
+  {% for event in row.history %}
+  <div class="mt-2">
+    <div>{{ event.actor }} · {{ event.time }}</div>
+    <ul>{% for change in event.changes %}<li>{{ change.field|title }} {% if change.before %}{{ change.before }} → {% endif %}{{ change.after }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}

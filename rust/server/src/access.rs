@@ -1,9 +1,11 @@
 use axum::{
-    extract::{Request, State},
+    extract::{MatchedPath, Request, State},
     http::{Method, StatusCode, header},
     middleware::Next,
     response::Response,
 };
+
+use sqlx::MySqlConnection;
 
 use crate::{
     App,
@@ -177,9 +179,14 @@ pub fn access_denied() -> Response {
 }
 
 pub async fn board_access_open(app: &App) -> Result<bool, sqlx::Error> {
+    let mut db = app.db.acquire().await?;
+    board_access_open_on(&mut db).await
+}
+
+pub async fn board_access_open_on(db: &mut MySqlConnection) -> Result<bool, sqlx::Error> {
     let total_rounds = sqlx::query_as::<_, (Option<i32>, Option<String>)>(
         "SELECT value, value_string FROM tab_tabsettings WHERE `key` = 'tot_rounds' ORDER BY id LIMIT 1",
-    ).fetch_optional(&app.db).await?
+    ).fetch_optional(&mut *db).await?
         .and_then(|(value, text)| match text {
             Some(text) => text.trim().parse().ok(),
             None => value,
@@ -195,7 +202,50 @@ pub async fn board_access_open(app: &App) -> Result<bool, sqlx::Error> {
     ";
     let open = sqlx::query_scalar::<_, i64>(MILESTONE)
         .bind(final_round)
-        .fetch_one(&app.db)
+        .fetch_one(db)
         .await?;
     Ok(open != 0)
+}
+
+pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    if !matches!(actor, Actor::User { board: true, .. }) {
+        return private((StatusCode::FORBIDDEN, "Board access is unavailable."));
+    }
+    match board_access_open(&app).await {
+        Ok(true) => {}
+        Ok(false) => return board_closed(),
+        Err(_) => return unavailable(),
+    }
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str);
+    let allowed = matches!(
+        (request.method(), route),
+        (
+            &Method::GET | &Method::HEAD,
+            Some(
+                "/apda-board/"
+                    | "/apda-board/inrounds/"
+                    | "/apda-board/inrounds/{round}/"
+                    | "/apda-board/outrounds/"
+                    | "/apda-board/judges/"
+            )
+        ) | (
+            &Method::POST,
+            Some(
+                "/apda-board/outrounds/pair/"
+                    | "/apda-board/outround/{id}/"
+                    | "/apda-board/judges/"
+            )
+        )
+    );
+    if !allowed {
+        return access_denied();
+    }
+    request.extensions_mut().insert(actor);
+    private(next.run(request).await)
 }

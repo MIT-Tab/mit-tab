@@ -12,6 +12,7 @@ from http.cookies import SimpleCookie
 import json
 import os
 import random
+import re
 from pathlib import Path
 import subprocess
 from urllib.parse import urlencode
@@ -1236,3 +1237,270 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
         history = list(AuditEvent.objects.values_list("changes", flat=True))
         assert {event["public"]["source"] for event in history} == {"ballot entry", "panel ballot entry"}
         assert "Synthetic note" not in json.dumps(history) and "Edited reason" not in json.dumps(history)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_judge_portal_availability_current_previous_and_reason_edits():
+    path = "/public/e-ballots/"
+    chair_code = "Synthetic-Chair-a1"
+    wing_code = "Synthetic-Wing-b2"
+    other_code = "Synthetic-Other-c3"
+    chair = Judge.objects.create(name="Portal Chair", rank=5, ballot_code=chair_code)
+    wing = Judge.objects.create(name="Portal Wing", rank=4, ballot_code=wing_code)
+    other = Judge.objects.create(name="Portal Other", rank=3, ballot_code=other_code)
+    JudgeExpectedCheckIn.objects.create(judge=chair, round_number=1)
+    JudgeExpectedCheckIn.objects.create(judge=other, round_number=2)
+    board = legacy_tab_session("portal-board")
+    get_user_model().objects.get(username="portal-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("decimal_speaks", 3)
+    TabSettings.set("written_rfd_first_round", 1)
+    TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
+    TabSettings.set("open_speaks", 1)
+    TabSettings.set("open_ranks", 2)
+    school = School.objects.create(name="Portal School")
+    teams = [Team.objects.create(name=f"Portal Team {i}", school=school, seed=Team.UNSEEDED) for i in range(2)]
+    speakers = [Debater.objects.create(name=f"Portal Speaker {i}", novice_status=Debater.VARSITY) for i in range(4)]
+    teams[0].debaters.add(*speakers[:2])
+    teams[1].debaters.add(*speakers[2:])
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
+    debate.judges.add(chair, wing)
+    Round.objects.filter(id=debate.id).update(chair=chair)
+    chair_portal = f"{path}{chair_code}/"
+    chair_current = f"{chair_portal}current/"
+    chair_previous = f"{chair_portal}previous/"
+    chair_submitted = f"{chair_portal}submitted/"
+    chair_specific = f"{chair_submitted}{debate.id}/"
+    wing_current = f"{path}{wing_code}/current/"
+    wing_specific = f"{path}{wing_code}/submitted/{debate.id}/"
+    other_specific = f"{path}{other_code}/submitted/{debate.id}/"
+
+    with rust_server() as port:
+        status, headers, page = request(port, path)
+        assert status == 200 and b"Judge code" in page
+        assert headers["Referrer-Policy"] == "same-origin"
+        assert headers["Cache-Control"] == "private, no-store"
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(url, fields, *, token=csrf, session=None, origin=None):
+            cookie = f"csrftoken={csrf}" + (f"; sessionid={session}" if session else "")
+            extra = {"Cookie": cookie}
+            if origin:
+                extra["Origin"] = origin
+            return request(port, url, method="POST", extra_headers=extra,
+                           form={"csrfmiddlewaretoken": token, **fields})
+
+        assert post(path, {"ballot_code": chair_code})[1]["Location"] == chair_portal
+        assert post(path, {"ballot_code": "unexpected/path"})[0] == 422
+        assert request(port, chair_portal, cookie=board)[0] == 403
+        page = request(port, chair_portal)[2]
+        assert b"Portal Chair" in page and b'for="availability_round_1"' in page
+        assert post(chair_portal, {"availability_outround": "on"}, token="bad")[0] == 403
+        assert set(chair.expected_checkins.values_list("round_number", flat=True)) == {1}
+        assert post(chair_portal, {"availability_outround": "on", "availability_round_99": "on"})[0] == 302
+        assert set(chair.expected_checkins.values_list("round_number", flat=True)) == {0}
+        assert set(other.expected_checkins.values_list("round_number", flat=True)) == {2}
+
+        data = {"winner": 1, "ballot_code": chair_code, "round_instance": debate.id, "rfd": " First reason "}
+        for i, (role, speaker) in enumerate(zip(("pm", "mg", "lo", "mo"), speakers)):
+            data.update({f"{role}_debater": speaker.id, f"{role}_speaks": 31 - i, f"{role}_ranks": i + 1})
+        assert request(port, chair_current)[1]["Location"] == chair_previous
+        assert post(chair_current, data)[1]["Location"] == chair_previous
+        assert not debate.roundstats_set.exists()
+        TabSettings.set("pairing_released", 1)
+        status, _, page = request(port, chair_current)
+        assert status == 200 and b"Portal Speaker 0" in page
+        assert b"Government by forfeit" not in page
+        assert request(port, wing_current)[0] == 403
+        assert post(wing_current, {**data, "ballot_code": wing_code})[0] == 403
+        assert post(chair_current, data, origin="https://example.invalid")[0] == 403
+        for invalid in (
+            {"round_instance": debate.id + 1}, {"winner": 3}, {"pm_speaks": 36}, {"ballot_code": wing_code},
+        ):
+            assert post(chair_current, {**data, **invalid})[0] == 422
+            assert not debate.roundstats_set.exists()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(lambda _: post(chair_current, data), range(2)))
+        assert all(status == 302 and response["Location"] == chair_submitted for status, response, _ in responses)
+        debate.refresh_from_db()
+        assert debate.victor == Round.GOV and debate.rfd == "First reason"
+        assert debate.roundstats_set.count() == 4
+        assert request(port, chair_current)[1]["Location"] == chair_submitted
+        status, _, page = request(port, chair_submitted)
+        assert status == 200 and b"First reason" in page
+        assert b"Disclose speaker points" in page and b"Ranks are closed" in page
+        assert request(port, wing_specific)[0] == 200
+        assert request(port, other_specific)[1]["Location"] == f"{path}{other_code}/previous/"
+        assert post(wing_specific, {"rfd": "Forbidden change"})[0] == 403
+        assert post(chair_specific, {"rfd": "Updated reason"})[0] == 302
+        debate.refresh_from_db()
+        assert debate.rfd == "Updated reason"
+        assert b"Written" in request(port, chair_previous)[2]
+
+        for protected in (path, chair_portal, chair_current, chair_previous, chair_specific, chair_submitted):
+            assert request(port, protected, cookie=board)[1]["Location"] == "/403/"
+            assert request(port, protected, cookie=board, method="HEAD")[1]["Location"] == "/403/"
+        assert post(chair_specific, {"rfd": "Board write"}, session=board)[1]["Location"] == "/403/"
+        assert post(chair_portal, {"availability_round_1": "on"}, session=board)[1]["Location"] == "/403/"
+        assert set(chair.expected_checkins.values_list("round_number", flat=True)) == {0}
+        debate.refresh_from_db()
+        assert debate.rfd == "Updated reason"
+
+        TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
+        assert post(chair_specific, {"rfd": "Late edit"})[0] == 403
+        debate.refresh_from_db()
+        assert debate.rfd == "Updated reason"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_board_bracket_operations_allow_only_team_room_and_result_fields():
+    user = get_user_model().objects.create_superuser(username="board-brackets", password="synthetic")
+    user.groups.add(Group.objects.create(name="APDA Board"))
+    client = Client()
+    client.force_login(user)
+    board = client.cookies["sessionid"].value
+    tab = legacy_tab_session("board-brackets-tab")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("var_teams_to_break", 4)
+    TabSettings.set("nov_teams_to_break", 0)
+    school = School.objects.create(name="Board Bracket School")
+    teams = [
+        Team.objects.create(name=f"Board Bracket Team {i}", school=school, seed=Team.UNSEEDED,
+                            checked_in=True, tiebreaker=i + 1)
+        for i in range(4)
+    ]
+    judges = [
+        Judge.objects.create(name=f"Board Bracket Judge {i}", rank=i + 1,
+                             ballot_code=f"Synthetic-Board-{i}")
+        for i in range(2)
+    ]
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
+    debate.judges.add(*judges)
+    Round.objects.filter(id=debate.id).update(chair=judges[0], rfd="private reason fixture")
+    rooms = [Room.objects.create(name=f"Board Bracket Room {i}", rank=10 - i) for i in range(3)]
+    home = "/apda-board/"
+    inrounds = f"{home}inrounds/"
+    outrounds = f"{home}outrounds/"
+    judge_page = f"{home}judges/"
+    pair = f"{outrounds}pair/"
+    paths = (home, inrounds, outrounds, judge_page)
+
+    with rust_server() as port:
+        for path in paths:
+            assert request(port, path, cookie=board)[0] == 403
+        assert request(port, outrounds, cookie=tab)[0] == 403
+        Round.objects.filter(id=debate.id).update(victor=Round.GOV)
+        status, headers, body = request(port, outrounds, cookie=board)
+        assert status == 200 and b"Pair Next Varsity Round" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+        jar = {"Cookie": f"sessionid={board}; csrftoken={csrf}"}
+
+        def post(path, data, *, token=csrf):
+            return request(port, path, method="POST", extra_headers=jar,
+                           form={"csrfmiddlewaretoken": token, **data})
+
+        assert post(pair, {"division": 0}, token="invalid")[0] == 403
+        assert post(pair, {"division": 0, "judge": judges[0].id})[0] == 422
+        assert post(pair, {"division": 0})[0] == 409
+        assert not Outround.objects.exists()
+        assert not BreakingTeam.objects.exists()
+        for room in rooms:
+            RoomCheckIn.objects.create(room=room, round_number=0)
+        assert post(pair, {"division": 0})[1]["Location"] == outrounds
+        assert post(pair, {"division": 0})[0] == 409
+        first, second = list(Outround.objects.filter(num_teams=4).order_by("id"))
+        assert (first.room_id, second.room_id) == (rooms[0].id, rooms[1].id)
+        assert first.chair_id is None and not first.judges.exists()
+        for snapshot in (first, second):
+            snapshot.judges.add(*judges)
+        Outround.objects.filter(id__in=(first.id, second.id)).update(chair=judges[0])
+        AuditEvent.record(
+            debate, AuditEvent.MANUAL_CHAIR_CHANGE, user,
+            changes={"new_chair": judges[0].name, "rank": "protected rank fixture"},
+            note="protected note fixture",
+        )
+        AuditEvent.record(
+            first, AuditEvent.EDIT, user,
+            changes={"public": {"source": "staff room correction", "before": {"room": None}, "after": {
+                "room": {"id": rooms[0].id, "name": rooms[0].name, "note": "protected room fixture"},
+                "scratches": ["protected scratch fixture"],
+            }}},
+        )
+        before = {path: request(port, path, extra_headers=jar)[2] for path in paths}
+        assert b"(chair)" in before[inrounds] and b"New Chair" in before[inrounds]
+        assert b"Manual edits" in before[outrounds]
+        assert b"New Chair" in request(port, f"{inrounds}?manual=1", extra_headers=jar)[2]
+        for body in before.values():
+            assert b"protected" not in body and b"private reason fixture" not in body
+            assert b"Synthetic-Board" not in body
+
+        Scratch.objects.create(team=teams[0], judge=judges[0], scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(id=judges[0].id).update(rank=Decimal("9.57"), wing_only=True,
+                                                   request_wing=True, no_wings=True)
+        assert {path: request(port, path, extra_headers=jar)[2] for path in paths} == before
+        assert request(port, f"{home}inrounds/1/", method="HEAD", extra_headers=jar)[0] == 200
+        assert post(inrounds, {"action": "result", "victor": 1})[1]["Location"] == "/403/"
+        assert request(port, pair, extra_headers=jar)[1]["Location"] == "/403/"
+        assert post(judge_page, {"judge": judges[0].id, "is_dino": "on", "rank": 3})[2] == b"Invalid form submission."
+        assert post(judge_page, {"judge": judges[0].id, "is_dino": "on"})[0] == 302
+        judges[0].refresh_from_db()
+        assert judges[0].is_dino and judges[0].rank == Decimal("9.57") and judges[0].wing_only
+        assert judges[0].ballot_code == "Synthetic-Board-0"
+        assert list(Scratch.objects.values_list("team_id", "judge_id")) == [(teams[0].id, judges[0].id)]
+
+        def token_for(round_id):
+            page = request(port, outrounds, extra_headers=jar)[2].decode()
+            found = re.search(
+                rf'action="{home}outround/{round_id}/"[^>]*>\s*<input[^>]*>\s*<input type="hidden" name="revision" value="([^"]+)"',
+                page,
+            )
+            assert found is not None
+            return found[1]
+
+        def correction(round_id, data, revision=None):
+            return post(f"{home}outround/{round_id}/", {"revision": revision or token_for(round_id), **data})
+
+        revision = token_for(first.id)
+        assert correction(first.id, {"action": "room", "room": rooms[1].id}, revision)[0] == 409
+        assert correction(first.id, {"action": "judge", "judge": judges[1].id}, revision)[0] == 422
+        assert correction(first.id, {"action": "choice", "choice": 1}, revision)[0] == 302
+        assert correction(first.id, {"action": "sides"}, revision)[0] == 409
+        first.refresh_from_db()
+        old = first.gov_team_id, first.opp_team_id
+        assert correction(first.id, {"action": "sides"})[0] == 302
+        first.refresh_from_db()
+        assert (first.gov_team_id, first.opp_team_id) == old[::-1] and first.choice == 2
+        second.refresh_from_db()
+        replacement = second.gov_team_id
+        original = first.gov_team_id
+        assert correction(first.id, {"action": "team", "position": "gov", "team": replacement})[0] == 302
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert first.gov_team_id == replacement and second.gov_team_id == original
+        assert correction(first.id, {"action": "team", "position": "gov", "team": original})[0] == 302
+        assert correction(first.id, {"action": "room", "room": rooms[2].id})[0] == 302
+        for matchup in (first, second):
+            assert correction(matchup.id, {"action": "result", "victor": Outround.GOV})[0] == 302
+        assert post(pair, {"division": 0})[0] == 302
+        final = Outround.objects.get(num_teams=2)
+        assert {final.gov_team_id, final.opp_team_id} == {replacement, original}
+        assert final.chair_id is None and not final.judges.exists()
+        for matchup in (first, second):
+            matchup.refresh_from_db()
+            assert matchup.chair_id == judges[0].id
+            assert set(matchup.judges.values_list("id", flat=True)) == {j.id for j in judges}
+        debate.refresh_from_db()
+        assert debate.victor == Round.GOV and debate.rfd == "private reason fixture"
+        assert debate.chair_id == judges[0].id
+        assert Scratch.objects.count() == 1
+        for changes in AuditEvent.objects.filter(user=user).values_list("changes", flat=True):
+            snapshot = changes.get("public", {})
+            if snapshot.get("source") in {"board pairing", "board team swap", "board correction"}:
+                for frame in (snapshot.get("before"), snapshot.get("after")):
+                    if frame:
+                        assert set(frame) == {"gov_team", "opp_team", "room", "judges", "chair",
+                                              "victor", "num_teams", "division", "choice", "sidelock"}
+                        assert all(set(judge) == {"id", "name"} for judge in frame["judges"])

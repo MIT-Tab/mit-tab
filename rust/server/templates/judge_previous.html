@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>Previous Ballots</h2>
+  <p>Submitted ballots for {{ name }}</p>
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" href="/public/e-ballots/{{ code }}/">Judge Portal</a>
+    <a class="btn btn-outline-secondary" href="/public/e-ballots/{{ code }}/current/">Current Ballot</a>
+  </div>
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Round</th><th scope="col">Government</th><th scope="col">Opposition</th><th scope="col">Winner</th><th scope="col">Written RFD</th><th scope="col">Ballot</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr><td>{{ row.number }}</td><td>{{ row.government }}</td><td>{{ row.opposition }}</td><td>{{ row.outcome }}</td><td>{{ row.rfd_status }}</td><td><a href="{{ row.url }}">View Ballot</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No submitted ballots were found for this judge code.</p>
+  {% endif %}
+</div>
+{% endblock %}

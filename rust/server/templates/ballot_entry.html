@@ -5,6 +5,12 @@
   <p>{{ gov }} vs. {{ opp }}</p>
   <form method="post">
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% if judge_code %}
+    <div class="mb-3">
+      <label class="form-label" for="ballot_code">Judge code</label>
+      <input class="form-control" type="text" id="ballot_code" name="ballot_code" value="{{ judge_code }}" autocomplete="off" required>
+    </div>
+    {% endif %}
     {% for ballot in forms %}
     <fieldset class="mb-4">
       {% if panel %}<legend>Ballot {{ loop.index }}</legend>{% endif %}
@@ -53,7 +59,11 @@
     </div>
     {% endif %}
     <button type="submit" class="btn btn-primary">Save Ballot</button>
+    {% if judge_code %}
+    <a class="btn btn-secondary" href="/public/e-ballots/{{ judge_code }}/">Judge Portal</a>
+    {% else %}
     <a class="btn btn-secondary" href="/pairings/status/">Cancel</a>
+    {% endif %}
   </form>
 </div>
 {% endblock %}

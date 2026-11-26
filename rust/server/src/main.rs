@@ -1,11 +1,15 @@
 mod access;
 mod backups;
 mod ballot_entry;
+mod board;
+mod board_outrounds;
+mod board_snapshot;
 mod bundle;
 mod config;
 mod home;
 mod html;
 mod judge_assignment;
+mod judge_portal;
 mod legacy_session;
 mod live_results;
 mod login;
@@ -128,6 +132,40 @@ fn router(app: App) -> Router {
         )
         .merge(
             Router::new()
+                .route(
+                    "/public/e-ballots/",
+                    get(judge_portal::search).post(judge_portal::search_submit),
+                )
+                .route(
+                    "/public/e-ballots/{code}/",
+                    get(judge_portal::portal).post(judge_portal::availability),
+                )
+                .route(
+                    "/public/e-ballots/{code}/current/",
+                    get(judge_portal::current).post(judge_portal::submit),
+                )
+                .route(
+                    "/public/e-ballots/{code}/previous/",
+                    get(judge_portal::previous),
+                )
+                .route(
+                    "/public/e-ballots/{code}/submitted/",
+                    get(judge_portal::submitted).post(judge_portal::edit_reason),
+                )
+                .route(
+                    "/public/e-ballots/{code}/submitted/{id}/",
+                    get(judge_portal::submitted_one).post(judge_portal::edit_reason_one),
+                )
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::public_tournament,
+                ))
+                .layer(axum::middleware::map_response(
+                    judge_portal::protect_response,
+                )),
+        )
+        .merge(
+            Router::new()
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(
@@ -186,6 +224,29 @@ fn router(app: App) -> Router {
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::staff_settings,
+                )),
+        )
+        .merge(
+            Router::new()
+                .route("/apda-board/", get(board::home))
+                .route("/apda-board/inrounds/", get(board::inrounds))
+                .route("/apda-board/inrounds/{round}/", get(board::inround))
+                .route("/apda-board/outrounds/", get(board_outrounds::list))
+                .route(
+                    "/apda-board/outrounds/pair/",
+                    axum::routing::post(board_outrounds::pair),
+                )
+                .route(
+                    "/apda-board/outround/{id}/",
+                    axum::routing::post(board_outrounds::correct),
+                )
+                .route(
+                    "/apda-board/judges/",
+                    get(board::judges).post(board::update_judge),
+                )
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::board,
                 )),
         )
         .route("/public/login/", get(login::page).post(login::sign_in))
