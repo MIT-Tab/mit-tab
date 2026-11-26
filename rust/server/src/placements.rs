@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use axum::{Json, extract::State, response::Response};
 use serde::Serialize;
+use sqlx::MySqlConnection;
 
 use crate::{App, private, unavailable};
 
@@ -59,7 +60,7 @@ struct DebaterRef {
     tournament_id: i32,
 }
 
-struct Placements {
+pub struct Placements {
     divisions: [Vec<i32>; 2],
     rosters: BTreeMap<i32, Vec<DebaterRef>>,
 }
@@ -67,9 +68,15 @@ struct Placements {
 impl Placements {
     async fn load(app: &App) -> Result<Self, sqlx::Error> {
         let mut snapshot = app.db.begin().await?;
+        let result = Self::load_from(&mut snapshot).await?;
+        snapshot.commit().await?;
+        Ok(result)
+    }
+
+    pub async fn load_from(db: &mut MySqlConnection) -> Result<Self, sqlx::Error> {
         let mut divisions = [Vec::new(), Vec::new()];
         for (division, team_id, _) in sqlx::query_as::<_, (i32, i32, i64)>(PLACEMENTS)
-            .fetch_all(&mut *snapshot)
+            .fetch_all(&mut *db)
             .await?
         {
             divisions[division as usize].push(team_id);
@@ -77,7 +84,7 @@ impl Placements {
         let mut rosters: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (team_id, debater_id, apda_id) in
             sqlx::query_as::<_, (i32, Option<i32>, Option<i32>)>(ROSTERS)
-                .fetch_all(&mut *snapshot)
+                .fetch_all(&mut *db)
                 .await?
         {
             let members = rosters.entry(team_id).or_default();
@@ -88,8 +95,23 @@ impl Placements {
                 });
             }
         }
-        snapshot.commit().await?;
         Ok(Self { divisions, rosters })
+    }
+
+    pub fn legacy_fields(&self) -> serde_json::Value {
+        serde_json::json!({
+            "varsity_team_placements": self.for_division(0),
+            "novice_team_placements": self.for_division(1),
+            "non_placing_teams": self.remaining(),
+        })
+    }
+
+    fn remaining(&self) -> Vec<&Vec<DebaterRef>> {
+        let placed: HashSet<_> = self.divisions.iter().flatten().collect();
+        self.rosters
+            .iter()
+            .filter_map(|(team, members)| (!placed.contains(team)).then_some(members))
+            .collect()
     }
 
     fn for_division(&self, division: usize) -> Vec<&[DebaterRef]> {
@@ -120,15 +142,9 @@ pub async fn novice(State(app): State<App>) -> Response {
 
 pub async fn non_placing(State(app): State<App>) -> Response {
     match Placements::load(&app).await {
-        Ok(results) => {
-            let placed: HashSet<_> = results.divisions.iter().flatten().collect();
-            let remaining: Vec<_> = results
-                .rosters
-                .iter()
-                .filter_map(|(team, members)| (!placed.contains(team)).then_some(members))
-                .collect();
-            private(Json(serde_json::json!({"non_placing_teams": remaining})))
-        }
+        Ok(results) => private(Json(
+            serde_json::json!({"non_placing_teams": results.remaining()}),
+        )),
         Err(_) => unavailable(),
     }
 }

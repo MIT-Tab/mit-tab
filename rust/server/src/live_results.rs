@@ -12,8 +12,10 @@ use serde_json::json;
 use sqlx::{MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
-    App, private,
-    public_api::ELIGIBLE_TEAMS,
+    App, bundle,
+    placements::Placements,
+    private,
+    public_api::{self, ELIGIBLE_TEAMS},
     publication,
     settings::Settings,
     speakers::{self, RankedSpeaker},
@@ -68,6 +70,14 @@ struct SpeakerResult<'a> {
 }
 
 pub async fn get(State(app): State<App>, headers: HeaderMap) -> Response {
+    respond(&app, headers, false).await
+}
+
+pub async fn import(State(app): State<App>, headers: HeaderMap) -> Response {
+    respond(&app, headers, true).await
+}
+
+async fn respond(app: &App, headers: HeaderMap, include_import: bool) -> Response {
     let scheme = headers
         .get("x-forwarded-proto")
         .and_then(|value| value.to_str().ok())
@@ -81,18 +91,23 @@ pub async fn get(State(app): State<App>, headers: HeaderMap) -> Response {
     let host = headers
         .get(header::HOST)
         .and_then(|value| value.to_str().ok())
-        .and_then(|host| host.parse::<axum::http::uri::Authority>().ok());
+        .and_then(|host| host.parse::<axum::http::uri::Authority>().ok())
+        .filter(|host| !host.as_str().contains('@'));
     let Some(host) = host else {
         return private(axum::http::StatusCode::BAD_REQUEST);
     };
     let source = format!("{scheme}://{host}");
-    match payload(&app, &source).await {
+    match payload(app, &source, include_import).await {
         Ok(value) => private(Json(value)),
         Err(_) => unavailable(),
     }
 }
 
-async fn payload(app: &App, source: &str) -> Result<serde_json::Value, sqlx::Error> {
+async fn payload(
+    app: &App,
+    source: &str,
+    include_import: bool,
+) -> Result<serde_json::Value, sqlx::Error> {
     let mut db = app.db.begin().await?;
     let keys: Vec<_> = speakers::SETTINGS
         .iter()
@@ -144,7 +159,6 @@ async fn payload(app: &App, source: &str) -> Result<serde_json::Value, sqlx::Err
     )
     .fetch_one(&mut *db)
     .await?;
-    db.commit().await?;
 
     let held_on = first_result
         .map(|date| date.date())
@@ -157,11 +171,12 @@ async fn payload(app: &App, source: &str) -> Result<serde_json::Value, sqlx::Err
         .strip_prefix("apda:")
         .and_then(|value| value.trim().parse::<i64>().ok());
     let season = held_on.year() - i32::from(held_on.month() < 7);
-    Ok(json!({
+    let tournament_name = settings.string("tournament_name", "Tournament");
+    let mut payload = json!({
         "schema_version": 1,
         "source_url": source,
         "tournament": {
-            "name": settings.string("tournament_name", "Tournament"),
+            "name": tournament_name,
             "date": held_on.to_string(),
             "season": season.to_string(),
             "host_school": {
@@ -180,7 +195,61 @@ async fn payload(app: &App, source: &str) -> Result<serde_json::Value, sqlx::Err
         "team_results": team_results,
         "speaker_results": speaker_results(&ranked_speakers, &debaters),
         "generated_at": iso_timestamp(now),
-    }))
+    });
+    if include_import {
+        let object = payload
+            .as_object_mut()
+            .expect("live-results payload is an object");
+        append_import(
+            &mut db,
+            object,
+            &ranked_speakers,
+            speakers_available,
+            &tournament_name,
+        )
+        .await?;
+    }
+    db.commit().await?;
+    Ok(payload)
+}
+
+async fn append_import(
+    db: &mut MySqlConnection,
+    payload: &mut serde_json::Map<String, serde_json::Value>,
+    ranked: &[RankedSpeaker],
+    ready: bool,
+    tournament_name: &str,
+) -> Result<(), sqlx::Error> {
+    payload.insert("import_ready".into(), json!(ready));
+    for (key, novice) in [
+        ("varsity_speaker_awards", false),
+        ("novice_speaker_awards", true),
+    ] {
+        let awards: Vec<_> = ranked
+            .iter()
+            .filter(|row| !novice || row.debater.novice_status == 1)
+            .take(10)
+            .map(|row| json!({"apda_id": row.debater.apda_id, "tournament_id": row.debater.id}))
+            .collect();
+        payload.insert(key.into(), json!(awards));
+    }
+    for value in [
+        Placements::load_from(db).await?.legacy_fields(),
+        public_api::debaters_payload(&mut *db).await?,
+        public_api::schools_payload(&mut *db).await?,
+        public_api::counts_payload(&mut *db).await?,
+    ] {
+        if let serde_json::Value::Object(fields) = value {
+            payload.extend(fields);
+        }
+    }
+    let bundle = if ready {
+        bundle::export(db, tournament_name, &iso_timestamp(Utc::now())).await?
+    } else {
+        serde_json::Value::Null
+    };
+    payload.insert("bundle".into(), bundle);
+    Ok(())
 }
 
 fn iso_timestamp(timestamp: DateTime<Utc>) -> String {

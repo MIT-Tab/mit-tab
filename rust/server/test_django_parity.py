@@ -19,7 +19,7 @@ from django.test import Client
 from django.utils import timezone
 
 from mittab.apps.tab.models import (
-    BreakingTeam, Bye, Debater, Outround, PublishedTeamPlacement, Round, RoundStats,
+    BreakingTeam, Bye, Debater, Judge, Outround, PublishedTeamPlacement, Round, RoundStats,
     School, TabSettings, Team,
 )
 
@@ -27,6 +27,7 @@ COUNTS = "/api/debater-counts"
 DEBATERS = "/api/new-debater-data"
 SCHOOLS = "/api/new-schools"
 LIVE = "/api/live-results"
+IMPORT = "/api/import-results"
 PLACEMENTS = (
     "/api/varsity-team-placements", "/api/novice-team-placements", "/api/non-placing-teams",
 )
@@ -241,6 +242,10 @@ def test_speaker_awards_match_legacy_scoring_and_publication_gates():
                 ranks=Decimal(4 - pos),
             )
     Bye.objects.create(bye_team=teams[0], round_number=2)
+    judge = Judge.objects.create(name="Example Chair", rank=3)
+    last_judge = Judge.objects.create(name="Example Wing", rank=1)
+    Round.objects.filter(pk=rounds[0].pk).update(chair=judge)
+    rounds[0].judges.add(last_judge)
     paths = ("/api/varsity-speaker-awards", "/api/novice-speaker-awards")
     client = Client()
 
@@ -255,9 +260,11 @@ def test_speaker_awards_match_legacy_scoring_and_publication_gates():
 
     with rust_server() as port:
         check(port, 423)
+        compare_import(port, client, ready=False)
         old = timezone.now() - timedelta(hours=4)
         Round.objects.filter(pk=rounds[-1].pk).update(result_entered_at=old)
         check(port, 200)
+        compare_import(port, client, ready=True)
         TabSettings.set("speaker_rankings_use_single_adjusted", 1)
         check(port, 200)
         Round.objects.filter(pk=rounds[-1].pk).update(victor=Round.UNKNOWN)
@@ -269,7 +276,9 @@ def test_speaker_awards_match_legacy_scoring_and_publication_gates():
             gov_team=teams[0], opp_team=teams[1], num_teams=4,
             type_of_round=Outround.NOVICE,
         )
+        outround.judges.add(judge, last_judge)
         compare_live(port, client, completed=True, expected_placement_count=3)
+        compare_import(port, client, ready=True)
         check(port, 200)
         TabSettings.set("nov_teams_visible", 256)
         outround.delete()
@@ -292,3 +301,40 @@ def compare_live(port, client, *, completed, expected_placement_count=None):
         generated = datetime.fromisoformat(payload.pop("generated_at"))
         assert abs((generated - timezone.now()).total_seconds()) < 5
     assert actual == expected
+
+
+
+def compare_import(port, client, *, ready):
+    status, _, raw = request(port, IMPORT)
+    expected = client.get(IMPORT, HTTP_HOST=f"127.0.0.1:{port}")
+    assert status == expected.status_code == 200
+    actual = json.loads(raw)
+    expected = expected.json()
+    for value in (actual, expected):
+        value.pop("generated_at")
+        assert value["import_ready"] is ready
+        if ready:
+            bundle = value["bundle"]
+            bundle.pop("exported_at")
+            assert bundle["source"] == "mit_tab_black_rod_bundle"
+            assert all(set(judge) == {"original_name", "is_chair"}
+                       for row in bundle["rounds"] for judge in row["judges"])
+        else:
+            assert value["bundle"] is None
+    assert actual == expected
+
+
+@pytest.mark.django_db(transaction=True)
+def test_superuser_setup_gate_precedes_api_reads():
+    user = get_user_model().objects.create_superuser(username="tab-test", password="synthetic")
+    client = Client()
+    client.force_login(user)
+    cookie = client.cookies["sessionid"].value
+    TabSettings.set("start_tournament_wizard_completed", 0)
+    with rust_server() as port:
+        for path in (COUNTS, LIVE, IMPORT):
+            expected = client.get(path)
+            status, headers, _ = request(port, path, cookie=cookie)
+            assert status == expected.status_code == 302
+            assert headers["location"] == expected["Location"] == "/setup/start-tournament/"
+            assert request(port, path)[0] == 200

@@ -8,7 +8,9 @@ use axum::{
 use crate::{
     App,
     legacy_session::{Actor, actor},
-    private, unavailable,
+    private,
+    settings::Settings,
+    unavailable,
 };
 
 pub async fn public_api(State(app): State<App>, request: Request, next: Next) -> Response {
@@ -34,6 +36,31 @@ pub async fn public_api(State(app): State<App>, request: Request, next: Next) ->
             superuser: false,
             ..
         } => access_denied(),
+        Actor::User {
+            superuser: true, ..
+        } => {
+            let Ok(mut db) = app.db.acquire().await else {
+                return unavailable();
+            };
+            let Ok(settings) =
+                Settings::load(&mut db, &["start_tournament_wizard_completed"]).await
+            else {
+                return unavailable();
+            };
+            let completed = settings.string("start_tournament_wizard_completed", "1");
+            if matches!(
+                completed.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            ) {
+                drop(db);
+                next.run(request).await
+            } else {
+                private((
+                    StatusCode::FOUND,
+                    [(header::LOCATION, "/setup/start-tournament/")],
+                ))
+            }
+        }
         _ => next.run(request).await,
     }
 }

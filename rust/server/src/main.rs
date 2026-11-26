@@ -1,4 +1,5 @@
 mod access;
+mod bundle;
 mod config;
 mod legacy_session;
 mod live_results;
@@ -73,6 +74,7 @@ fn router(app: App) -> Router {
         .route("/api/varsity-speaker-awards", get(speakers::varsity))
         .route("/api/novice-speaker-awards", get(speakers::novice))
         .route("/api/live-results", get(live_results::get))
+        .route("/api/import-results", get(live_results::import))
         .route_layer(axum::middleware::from_fn_with_state(
             app.clone(),
             access::public_api,

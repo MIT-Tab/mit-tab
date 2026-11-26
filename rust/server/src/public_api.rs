@@ -1,7 +1,7 @@
 use axum::{Json, extract::State, response::Response};
 use serde::Serialize;
-use serde_json::json;
-use sqlx::{MySql, QueryBuilder};
+use serde_json::{Value, json};
+use sqlx::{MySql, MySqlExecutor, QueryBuilder};
 
 use crate::{App, private, unavailable};
 
@@ -19,7 +19,26 @@ pub(crate) const ELIGIBLE_TEAMS: &str = "
 ";
 
 pub async fn counts(State(app): State<App>) -> Response {
-    let result = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
+    respond(counts_payload(&app.db).await)
+}
+
+pub async fn new_debaters(State(app): State<App>) -> Response {
+    respond(debaters_payload(&app.db).await)
+}
+
+pub async fn new_schools(State(app): State<App>) -> Response {
+    respond(schools_payload(&app.db).await)
+}
+
+fn respond(result: Result<Value, sqlx::Error>) -> Response {
+    match result {
+        Ok(value) => private(Json(value)),
+        Err(_) => unavailable(),
+    }
+}
+
+pub async fn counts_payload<'e>(db: impl MySqlExecutor<'e>) -> Result<Value, sqlx::Error> {
+    let (varsity, novice, teams) = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
         .push(
             "SELECT COUNT(CASE WHEN d.novice_status = 0 THEN 1 END),
                       COUNT(CASE WHEN d.novice_status = 1 THEN 1 END),
@@ -29,14 +48,9 @@ pub async fn counts(State(app): State<App>) -> Response {
                JOIN tab_debater d ON d.id = members.debater_id",
         )
         .build_query_as::<(i64, i64, i64)>()
-        .fetch_one(&app.db)
-        .await;
-    match result {
-        Ok((varsity, novice, teams)) => private(Json(json!({
-            "debater_counts": {"varsity": varsity, "novice": novice, "teams": teams}
-        }))),
-        Err(_) => unavailable(),
-    }
+        .fetch_one(db)
+        .await?;
+    Ok(json!({"debater_counts": {"varsity": varsity, "novice": novice, "teams": teams}}))
 }
 
 #[derive(Serialize)]
@@ -48,8 +62,8 @@ struct NewDebater {
     debater_id: i32,
 }
 
-pub async fn new_debaters(State(app): State<App>) -> Response {
-    let result = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
+pub async fn debaters_payload<'e>(db: impl MySqlExecutor<'e>) -> Result<Value, sqlx::Error> {
+    let rows: Vec<_> = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
         .push(
             "SELECT d.name, d.novice_status, school.apda_id, school.name, d.id
                FROM eligible_teams t
@@ -60,30 +74,24 @@ pub async fn new_debaters(State(app): State<App>) -> Response {
                ORDER BY d.name, d.id, t.id",
         )
         .build_query_as::<(String, i32, Option<i32>, String, i32)>()
-        .fetch_all(&app.db)
-        .await;
-    match result {
-        Ok(rows) => {
-            let rows: Vec<_> = rows
-                .into_iter()
-                .map(
-                    |(name, novice_status, school_id, school_name, debater_id)| NewDebater {
-                        name,
-                        novice_status,
-                        school_id,
-                        school_name,
-                        debater_id,
-                    },
-                )
-                .collect();
-            private(Json(json!({"new_debater_data": rows})))
-        }
-        Err(_) => unavailable(),
-    }
+        .fetch_all(db)
+        .await?
+        .into_iter()
+        .map(
+            |(name, novice_status, school_id, school_name, debater_id)| NewDebater {
+                name,
+                novice_status,
+                school_id,
+                school_name,
+                debater_id,
+            },
+        )
+        .collect();
+    Ok(json!({"new_debater_data": rows}))
 }
 
-pub async fn new_schools(State(app): State<App>) -> Response {
-    let result = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
+pub async fn schools_payload<'e>(db: impl MySqlExecutor<'e>) -> Result<Value, sqlx::Error> {
+    let rows = QueryBuilder::<MySql>::new(ELIGIBLE_TEAMS)
         .push(
             "SELECT DISTINCT school.name
                FROM eligible_teams t
@@ -94,10 +102,7 @@ pub async fn new_schools(State(app): State<App>) -> Response {
                ORDER BY school.name",
         )
         .build_query_scalar::<String>()
-        .fetch_all(&app.db)
-        .await;
-    match result {
-        Ok(rows) => private(Json(json!({"new_schools": rows}))),
-        Err(_) => unavailable(),
-    }
+        .fetch_all(db)
+        .await?;
+    Ok(json!({"new_schools": rows}))
 }
