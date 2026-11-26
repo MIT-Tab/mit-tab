@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>{{ title }}</h2>
+  {% if locked %}
+  <p>Registration editing is currently disabled.</p>
+  {% else %}
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="form-label" for="{{ field }}">{{ label }}</label>
+    <input type="text" id="{{ field }}" name="{{ field }}" class="form-control mb-3" maxlength="255" autocomplete="off" required>
+    <button class="btn btn-primary" type="submit">{{ button }}</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

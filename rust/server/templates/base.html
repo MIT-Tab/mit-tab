@@ -10,6 +10,11 @@
   {% for file in webpack_files("main") %}
     {% if file.stylesheet %}<link rel="stylesheet" href="{{ file.href }}">{% else %}<script defer src="{{ file.href }}"></script>{% endif %}
   {% endfor %}
+  <style>
+    .gap-2 { gap: .5rem; }
+    .gap-3 { gap: 1rem; }
+    .form-label { display: block; }
+  </style>
   {% block head %}{% endblock %}
 </head>
 <body>

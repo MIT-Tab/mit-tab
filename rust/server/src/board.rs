@@ -79,31 +79,43 @@ pub async fn lock_board(db: &mut MySqlConnection, actor: Actor) -> Result<i32, B
     Ok(id)
 }
 
-#[derive(Serialize)]
-struct MissingCounts {
-    schools: i64,
-    debaters: i64,
+#[derive(Deserialize)]
+pub struct ImportStatus {
+    ids_updated: Option<usize>,
+    rows_ignored: Option<usize>,
 }
 
-pub async fn home(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let Ok((schools, debaters)) = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT (SELECT COUNT(*) FROM tab_school WHERE apda_id IS NULL OR apda_id = -1),
-                (SELECT COUNT(*) FROM tab_debater WHERE apda_id IS NULL OR apda_id = -1)",
-    )
-    .fetch_one(&app.db)
-    .await
-    else {
-        return unavailable();
-    };
-    html::render(
-        "board_home.html",
-        context! {
-            title => "APDA Board",
-            missing => MissingCounts { schools, debaters },
-            nav => Navigation::new(actor, true),
-        },
-        StatusCode::OK,
-    )
+pub async fn home(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    Query(status): Query<ImportStatus>,
+) -> Response {
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let schools = crate::board_ids::list(&mut db, crate::board_ids::Kind::School).await?;
+        let debaters = crate::board_ids::list(&mut db, crate::board_ids::Kind::Debater).await?;
+        let schools_missing = schools.iter().filter(|school| school.missing()).count();
+        let debaters_missing = debaters.iter().filter(|debater| debater.missing()).count();
+        db.commit().await?;
+        let Ok(csrf) = html::page_csrf(&headers) else {
+            return Ok(unavailable());
+        };
+        let response = html::render(
+            "board_home.html",
+            context! {
+                title => "APDA Board", schools, debaters, schools_missing, debaters_missing, csrf,
+            message => status.ids_updated.zip(status.rows_ignored).map(|(updated, ignored)| {
+                format!("Updated {updated} APDA IDs. Ignored {ignored} rows.")
+            }),
+                nav => Navigation::new(actor, true),
+            },
+            StatusCode::OK,
+        );
+        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 #[derive(Deserialize)]

@@ -243,8 +243,12 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
                     | "/apda-board/inrounds/{round}/"
                     | "/apda-board/outrounds/"
                     | "/apda-board/judges/"
+                    | "/apda-board/schools/export/"
+                    | "/apda-board/debaters/export/"
                     | "/apda-board/tab-cards/"
                     | "/apda-board/tab-card/{id}/"
+                    | "/apda-board/school/{id}/"
+                    | "/apda-board/debater/{id}/"
             )
         ) | (
             &Method::POST,
@@ -252,6 +256,10 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
                 "/apda-board/outrounds/pair/"
                     | "/apda-board/outround/{id}/"
                     | "/apda-board/judges/"
+                    | "/apda-board/schools/import/"
+                    | "/apda-board/debaters/import/"
+                    | "/apda-board/school/{id}/"
+                    | "/apda-board/debater/{id}/"
             )
         )
     );

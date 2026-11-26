@@ -1997,3 +1997,198 @@ def test_native_tab_cards_and_export_honor_board_and_public_release():
         assert b"Manual edits" not in page and b"private notes" not in page
         TabSettings.set("publish_tab_cards_with_first_outround", 0)
         assert request(port, public)[1]["Location"] == "/public/access-error/"
+
+
+def multipart_request(port, path, *, fields, file, cookie):
+    boundary = "mittab-rust-test-boundary"
+    body = bytearray()
+    for name, value in fields.items():
+        body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    filename, content = file
+    body.extend(
+        (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+         'Content-Type: application/octet-stream\r\n\r\n').encode(),
+    )
+    body.extend(content)
+    body.extend(f"\r\n--{boundary}--\r\n".encode())
+    client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        client.request("POST", path, body=bytes(body), headers={
+            "Cookie": cookie,
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        })
+        reply = client.getresponse()
+        return reply.status, reply.headers, reply.read()
+    finally:
+        client.close()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_board_apda_id_forms_and_spreadsheets_update_only_ids():
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from mittab.libs.spreadsheets import read_rows, spreadsheet_response
+
+    tab = legacy_tab_session("apda-ids-staff")
+    board = legacy_tab_session("apda-ids-board")
+    get_user_model().objects.get(username="apda-ids-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    first = School.objects.create(name="Example, East", apda_id=-1)
+    second = School.objects.create(name="École de l’Ouest", apda_id=8)
+    debater = Debater.objects.create(name="Example Speaker", novice_status=Debater.VARSITY,
+                                     apda_id=-1, email="private@example.invalid")
+    teams = [
+        Team.objects.create(name=f"APDA ID Team {i}", school=school, seed=Team.UNSEEDED)
+        for i, school in enumerate((first, second))
+    ]
+    teams[0].debaters.add(debater)
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    home = "/apda-board/"
+    school_path = f"{home}school/{first.id}/"
+    debater_path = f"{home}debater/{debater.id}/"
+    school_import = f"{home}schools/import/"
+    debater_import = f"{home}debaters/import/"
+    school_export = f"{home}schools/export/"
+    debater_export = f"{home}debaters/export/"
+    with rust_server() as port:
+        assert request(port, school_export, cookie=tab)[0] == 403
+        status, headers, page = request(port, home, cookie=board)
+        assert status == 200 and b"Example, East" in page
+        assert b"private@example.invalid" not in page
+        csrf = load_cookies(headers)["csrftoken"].value
+        jar = f"sessionid={board}; csrftoken={csrf}"
+        assert b"APDA ID Team 0" in request(port, school_path, cookie=board)[2]
+        assert b"private@example.invalid" not in request(port, debater_path, cookie=board)[2]
+
+        def update(path, **fields):
+            return request(port, path, method="POST", extra_headers={"Cookie": jar},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        assert update(school_path, apda_id=12, name="Other name")[0] == 422
+        assert update(school_path, apda_id=12)[0] == 302
+        assert update(school_path, apda_id=12)[0] == 302
+        assert update(debater_path, apda_id=77)[0] == 302
+        first.refresh_from_db()
+        debater.refresh_from_db()
+        assert (first.name, first.apda_id) == ("Example, East", 12)
+        assert (debater.name, debater.apda_id, debater.email) == ("Example Speaker", 77, "private@example.invalid")
+        for format in ("csv", "xls", "xlsx"):
+            for path, kind, query in ((school_export, "school", [[name, str(number)] for name, number in School.objects.order_by("name").values_list("name", "apda_id")]),
+                                      (debater_export, "debater", [[debater.name, "77"]])):
+                status, headers, body = request(port, f"{path}?format={format}", cookie=board)
+                assert status == 200
+                assert headers["Content-Disposition"].endswith(f".{format}")
+                file = SimpleUploadedFile(f"native.{format}", body)
+                assert [cells for _, cells in read_rows(file)] == [[kind, "id"], *query]
+        invalid = multipart_request(
+            port, school_import, fields={"csrfmiddlewaretoken": csrf}, cookie=jar,
+            file=("invalid.csv", f'school,id\r\n"{first.name}",99\r\n{second.name},bad\r\n'.encode()),
+        )
+        assert invalid[0] == 422
+        first.refresh_from_db()
+        assert first.apda_id == 12
+
+        for index, format in enumerate(("csv", "xls", "xlsx"), 1):
+            number = 100 + index
+            valid = spreadsheet_response("test", format, ["APDA ID", "School name"],
+                                         [[number, first.name], [99, "Missing Example"]]).content
+            status, headers, _ = multipart_request(
+                port, school_import, fields={"csrfmiddlewaretoken": csrf}, cookie=jar,
+                file=(f"valid.{format}", valid),
+            )
+            assert status == 302
+            assert headers["Location"] == f"{home}?ids_updated=1&rows_ignored=1"
+            first.refresh_from_db()
+            assert first.apda_id == number
+
+        valid = b"Debater name,APDA ID\r\nExample Speaker,199\r\n"
+        assert multipart_request(port, debater_import, fields={"csrfmiddlewaretoken": "invalid"},
+                                 cookie=jar, file=("valid.csv", valid))[0] == 403
+        assert multipart_request(port, debater_import, fields={"csrfmiddlewaretoken": csrf, "email": "hidden"},
+                                 cookie=jar, file=("valid.csv", valid))[0] == 422
+        assert multipart_request(port, debater_import, fields={"csrfmiddlewaretoken": csrf},
+                                 cookie=jar, file=("valid.csv", valid))[0] == 302
+        debater.refresh_from_db()
+        assert debater.apda_id == 199 and debater.email == "private@example.invalid"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scratches():
+    code = "Synthetic-Team-01"
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("judges_public", 1)
+    options, _ = RegistrationConfig.objects.update_or_create(
+        id=1, defaults={"team_name_changes_allowed": True, "disc_scratches_open": True, "disc_scratch_quantity": 2},
+    )
+    school = School.objects.create(name="Team Portal School")
+    team = Team.objects.create(name="Original Team", school=school, seed=Team.HALF_SEED, team_code=code)
+    opposite = Team.objects.create(name="Opponent Team", school=school, seed=Team.UNSEEDED)
+    team.debaters.add(Debater.objects.create(name="Team Portal Debater", novice_status=Debater.VARSITY))
+    allowed = Judge.objects.create(name="Available to scratch", rank=4)
+    hidden = Judge.objects.create(name="Tab blocked judge", rank=8)
+    assigned = Judge.objects.create(name="Previously assigned chair", rank=8)
+    room = Room.objects.create(name="Previously assigned room", rank=4)
+    tab_scratch = Scratch.objects.create(team=team, judge=hidden, scratch_type=Scratch.TAB_SCRATCH)
+    board = legacy_tab_session("team-portal-board")
+    get_user_model().objects.get(username="team-portal-board").groups.add(Group.objects.create(name="APDA Board"))
+    search = "/team_portal/"
+    path = f"{search}{code}/"
+
+    with rust_server() as port:
+        status, headers, body = request(port, search)
+        assert status == 200 and b"Team code" in body
+        assert headers["Referrer-Policy"] == "same-origin"
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(url, form, *, token=csrf, session=None):
+            session = f"; sessionid={session}" if session else ""
+            return request(port, url, method="POST", form={"csrfmiddlewaretoken": token, **form},
+                           extra_headers={"Cookie": f"csrftoken={csrf}{session}"})
+
+        assert post(search, {"team_code": code.lower()})[1]["Location"] == path
+        assert post(search, {"team_code": "unknown"})[0] == 422
+        assert request(port, f"{search}unknown/")[0] == 404
+        status, _, body = request(port, path)
+        assert status == 200 and b"Team Portal Debater" in body
+        assert b"Half seed" in body and b"Available to scratch" in body
+        assert b"Tab blocked judge" not in body
+        assert request(port, path, cookie=board)[0] == 403
+
+        name = {"action": "update_name", "name": "Renamed Team"}
+        assert post(path, name, token="invalid")[0] == 403
+        assert post(path, {**name, "name": opposite.name})[0] == 422
+        assert post(path, name)[1]["Location"] == path
+        old_coin = team.tiebreaker
+        team.refresh_from_db()
+        assert team.name == "Renamed Team" and team.tiebreaker == old_coin
+        fields = {"action": "update_scratches", "scratch_0": allowed.id}
+        assert post(path, {**fields, "scratch_1": allowed.id})[0] == 422
+        assert post(path, {**fields, "scratch_1": hidden.id})[0] == 422
+        assert not Scratch.objects.filter(team=team, scratch_type=Scratch.TEAM_SCRATCH).exists()
+        assert post(path, fields)[1]["Location"] == path
+        assert Scratch.objects.filter(team=team, judge=allowed, scratch_type=Scratch.TEAM_SCRATCH).exists()
+        assert Scratch.objects.filter(pk=tab_scratch.id).exists()
+        TabSettings.set("judges_public", 0)
+        assert b"Available to scratch" not in request(port, path)[2]
+        assert post(path, fields)[0] == 422
+        TabSettings.set("judges_public", 1)
+        TabSettings.set("cur_round", 3)
+        first = Round.objects.create(round_number=1, gov_team=team, opp_team=opposite, room=room)
+        first.judges.add(assigned)
+        Round.objects.filter(pk=first.id).update(chair=assigned)
+        Round.objects.create(round_number=2, gov_team=opposite, opp_team=team, victor=Round.GOV)
+        body = request(port, path)[2]
+        assert b"Previous Pairings" in body and b"Previously assigned chair" in body
+        assert b"Previously assigned room" in body and b"Opponent Team" in body
+        assert b"Save Scratches" not in body and b"Save Team Name" not in body
+        assert post(path, {**name, "name": "Late Change"})[0] == 422
+        assert post(path, {"action": "update_scratches"})[0] == 422
+        for guarded in (path, search):
+            assert request(port, guarded, cookie=board)[1]["Location"] == "/403/"
+            assert post(guarded, name, session=board)[1]["Location"] == "/403/"
+        team.refresh_from_db()
+        assert team.name == "Renamed Team"
+        assert set(Scratch.objects.filter(team=team).values_list("judge", flat=True)) == {allowed.id, hidden.id}
+    options.refresh_from_db()
+    assert options.disc_scratch_quantity == 2

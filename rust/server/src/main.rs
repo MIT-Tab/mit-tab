@@ -2,6 +2,7 @@ mod access;
 mod backups;
 mod ballot_entry;
 mod board;
+mod board_ids;
 mod board_outrounds;
 mod board_snapshot;
 mod bracket_display;
@@ -35,9 +36,11 @@ mod school_directory;
 mod settings;
 mod settings_form;
 mod speakers;
+mod spreadsheets;
 mod staff_pairing;
 mod staff_roles;
 mod tab_cards;
+mod team_portal;
 mod tournament_data;
 mod tournament_setup;
 
@@ -152,6 +155,14 @@ fn router(app: App) -> Router {
         )
         .merge(
             Router::new()
+                .route(
+                    "/team_portal/",
+                    get(team_portal::search).post(team_portal::lookup),
+                )
+                .route(
+                    "/team_portal/{code}/",
+                    get(team_portal::page).post(team_portal::update),
+                )
                 .route(
                     "/public/e-ballots/",
                     get(judge_portal::search).post(judge_portal::search_submit),
@@ -277,6 +288,30 @@ fn router(app: App) -> Router {
         .merge(
             Router::new()
                 .route("/apda-board/", get(board::home))
+                .route(
+                    "/apda-board/schools/export/",
+                    get(board_ids::export_schools),
+                )
+                .route(
+                    "/apda-board/debaters/export/",
+                    get(board_ids::export_debaters),
+                )
+                .route(
+                    "/apda-board/schools/import/",
+                    axum::routing::post(board_ids::import_schools),
+                )
+                .route(
+                    "/apda-board/debaters/import/",
+                    axum::routing::post(board_ids::import_debaters),
+                )
+                .route(
+                    "/apda-board/school/{id}/",
+                    get(board_ids::school).post(board_ids::school_save),
+                )
+                .route(
+                    "/apda-board/debater/{id}/",
+                    get(board_ids::debater).post(board_ids::debater_save),
+                )
                 .route("/apda-board/inrounds/", get(board::inrounds))
                 .route("/apda-board/inrounds/{round}/", get(board::inround))
                 .route("/apda-board/outrounds/", get(board_outrounds::list))
