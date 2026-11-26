@@ -1,0 +1,33 @@
+{% macro teams(rows, links=true) %}
+<div class="table-responsive"><table class="table table-striped table-sm">
+  <thead><tr><th scope="col">Place</th><th scope="col">Team</th><th scope="col">Debaters</th><th scope="col">Wins</th><th scope="col">Speaks</th><th scope="col">Ranks</th><th scope="col">Tiebreaker</th></tr></thead>
+  <tbody>
+    {% for row in rows %}<tr>
+      <td>{{ loop.index }}</td><th scope="row">{% if links %}<a href="/team/{{ row.id }}/">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</th>
+      <td>{{ row.members }}</td><td>{{ row.wins }}</td><td>{{ row.speaks }}</td><td>{{ row.ranks }}</td><td>{{ row.tiebreaker }}</td>
+    </tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endmacro %}
+
+{% macro speakers(rows, adjusted_first=false, show_adjusted=true, links=true) %}
+<div class="table-responsive"><table class="table table-striped table-sm">
+  <thead><tr>
+    <th scope="col">Place</th><th scope="col">Debater</th><th scope="col">Team</th>
+    {% if adjusted_first %}<th scope="col">Single adjusted speaks</th><th scope="col">Single adjusted ranks</th>{% endif %}
+    <th scope="col">{{ "Unadjusted speaks" if show_adjusted else "Speaks" }}</th><th scope="col">{{ "Unadjusted ranks" if show_adjusted else "Ranks" }}</th>
+    {% if show_adjusted and not adjusted_first %}<th scope="col">Single adjusted speaks</th><th scope="col">Single adjusted ranks</th>{% endif %}
+    <th scope="col">Tiebreaker</th>
+  </tr></thead>
+  <tbody>
+    {% for row in rows %}<tr>
+      <td>{{ loop.index }}</td><th scope="row">{% if links %}<a href="/debater/{{ row.id }}/">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}</th>
+      <td>{% if links and row.team_id %}<a href="/team/{{ row.team_id }}/">{{ row.team }}</a>{% else %}{{ row.team }}{% endif %}</td>
+      {% if adjusted_first %}<td>{{ row.adjusted_speaks }}</td><td>{{ row.adjusted_ranks }}</td>{% endif %}
+      <td>{{ row.speaks }}</td><td>{{ row.ranks }}</td>
+      {% if show_adjusted and not adjusted_first %}<td>{{ row.adjusted_speaks }}</td><td>{{ row.adjusted_ranks }}</td>{% endif %}
+      <td>{{ row.tiebreaker }}</td>
+    </tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endmacro %}

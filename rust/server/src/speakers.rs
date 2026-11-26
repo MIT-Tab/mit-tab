@@ -4,7 +4,7 @@ use axum::{Json, extract::State, http::StatusCode, response::Response};
 use chrono::Utc;
 use mittab_tabulation::{
     ballots::{Ballot, Outcome, Round, ScoringPolicy, TeamAttendance},
-    rankings::Score,
+    rankings::{Score, Stat},
     standings::{Speaker, speaker_standings},
 };
 use serde::Serialize;
@@ -32,6 +32,7 @@ pub struct SpeakerRow {
 pub struct RankedSpeaker {
     pub debater: SpeakerRow,
     pub tied_forward: bool,
+    pub tiebreaker: Option<Stat>,
     pub score: Score,
 }
 
@@ -229,6 +230,7 @@ pub async fn ordered_speaker_rows(
         .map(|(index, standing)| RankedSpeaker {
             debater: by_id[&standing.id],
             score: standing.score,
+            tiebreaker: standing.tiebreaker_with_next,
             tied_forward: index + 1 < count && standing.tiebreaker_with_next.is_none(),
         })
         .collect())

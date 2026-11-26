@@ -5,6 +5,10 @@
     {% for url, name in toolbar %}<a href="{{ url }}" class="btn btn-outline-primary btn-sm"{% if name == title %} aria-current="page"{% endif %}>{{ name }}</a>{% endfor %}
     {% if admin and key == "room" %}<a href="/manage-room-tags" class="btn btn-outline-primary btn-sm">Room Tags</a>{% endif %}
     {% if admin and key in ["team", "debater"] %}<a href="/manage-ranking-groups" class="btn btn-outline-primary btn-sm">Ranking Groups</a>{% endif %}
+    {% if admin and key in ["team", "judge"] %}<a href="/setup/public-change-log/" class="btn btn-outline-primary btn-sm">Public Change Log</a>{% endif %}
+    {% if admin and key == "team" %}<a href="/team/ranking/" class="btn btn-outline-primary btn-sm">Team Rankings</a>{% endif %}
+    {% if admin and key == "debater" %}<a href="/debater/ranking/" class="btn btn-outline-primary btn-sm">Speaker Rankings</a>{% endif %}
+    {% if admin and key == "judge" %}<a href="/judges/speaker-points/" class="btn btn-outline-primary btn-sm">Judge Speaker Points</a>{% endif %}
     <a href="/import_data/" class="btn btn-outline-primary btn-sm">Import and Export</a>
   </nav>
   <div class="d-flex align-items-center flex-wrap justify-content-between gap-3 mb-3">

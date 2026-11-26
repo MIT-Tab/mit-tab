@@ -660,8 +660,28 @@ async fn forum(
     }
     let result = async {
         let mut db = app.db.begin().await?;
-        let pairs = board_snapshot::capture(&mut db, Pairings::Outround).await?;
-        let rows = sqlx::query_as::<_, (i32, String, i32, String, String)>(
+        let (rows, _) = forum_results(&mut db, division).await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(html::render(
+            "elimination_forum.html",
+            context! {
+                title => "Elimination Results", nav => Navigation::new(actor, true), rows,
+            },
+            StatusCode::OK,
+        ))
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
+}
+
+type ForumRows = Vec<(String, Vec<String>)>;
+
+pub async fn forum_results(
+    db: &mut sqlx::MySqlConnection,
+    division: i32,
+) -> Result<(ForumRows, Option<String>), sqlx::Error> {
+    let pairs = board_snapshot::capture(&mut *db, Pairings::Outround).await?;
+    let rows = sqlx::query_as::<_, (i32, String, i32, String, String)>(
             "SELECT t.id, t.name, b.seed, CONCAT(s.name, IF(h.id IS NULL, '', CONCAT(' / ', h.name))),
               COALESCE(GROUP_CONCAT(d.name ORDER BY d.name SEPARATOR ', '), '')
              FROM tab_team t JOIN tab_breakingteam b ON b.team_id = t.id
@@ -669,27 +689,55 @@ async fn forum(
              LEFT JOIN tab_team_debaters members ON members.team_id = t.id LEFT JOIN tab_debater d ON d.id = members.debater_id
              WHERE b.type_of_team = ? GROUP BY t.id, b.seed, s.name, h.id, h.name",
         ).bind(division).fetch_all(&mut *db).await?;
-        let lines: BTreeMap<_, _> = rows.into_iter().map(|(id, name, seed, school, people)| {
+    let lines: BTreeMap<_, _> = rows
+        .into_iter()
+        .map(|(id, name, seed, school, people)| {
             (id, format!("[{seed}] {name} ({people}) from {school}"))
-        }).collect();
-        let mut rounds: BTreeMap<i32, Vec<String>> = BTreeMap::new();
-        for pair in pairs.values().filter(|pair| pair.division == Some(division)) {
-            let winner = pair.victor.unwrap_or_default();
-            if !(1..=4).contains(&winner) { continue; }
-            let (Some(gov), Some(opp)) = (&pair.gov_team, &pair.opp_team) else { continue; };
-            let gov = lines.get(&gov.id).unwrap_or(&gov.name);
-            let opp = lines.get(&opp.id).unwrap_or(&opp.name);
-            let (winner, loser) = if matches!(winner, 1 | 3) {
-                (format!("{gov} (GOV)"), format!("{opp} (OPP)"))
-            } else { (format!("{opp} (OPP)"), format!("{gov} (GOV)")) };
-            rounds.entry(pair.num_teams.unwrap_or_default()).or_default().push(format!("{loser} drops to\n{winner}"));
+        })
+        .collect();
+    let mut champion = None;
+    let mut rounds: BTreeMap<i32, Vec<String>> = BTreeMap::new();
+    for pair in pairs
+        .values()
+        .filter(|pair| pair.division == Some(division))
+    {
+        let winner = pair.victor.unwrap_or_default();
+        if !(1..=4).contains(&winner) {
+            continue;
         }
-        db.commit().await?;
-        let rows = rounds.into_iter().rev().map(|(size, entries)| (format!("[{}] Ro{size}", if division == 0 { "V" } else { "N" }), entries))
-            .collect::<Vec<_>>();
-        Ok::<_, sqlx::Error>(html::render("elimination_forum.html", context! {
-            title => "Elimination Results", nav => Navigation::new(actor, true), rows,
-        }, StatusCode::OK))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
+        let (Some(gov_team), Some(opp_team)) = (&pair.gov_team, &pair.opp_team) else {
+            continue;
+        };
+        let gov = lines.get(&gov_team.id).unwrap_or(&gov_team.name);
+        let opp = lines.get(&opp_team.id).unwrap_or(&opp_team.name);
+        if pair.num_teams == Some(2) {
+            champion.get_or_insert_with(|| {
+                if matches!(winner, 1 | 3) {
+                    gov_team.name.clone()
+                } else {
+                    opp_team.name.clone()
+                }
+            });
+        }
+        let (winner, loser) = if matches!(winner, 1 | 3) {
+            (format!("{gov} (GOV)"), format!("{opp} (OPP)"))
+        } else {
+            (format!("{opp} (OPP)"), format!("{gov} (GOV)"))
+        };
+        rounds
+            .entry(pair.num_teams.unwrap_or_default())
+            .or_default()
+            .push(format!("{loser} drops to\n{winner}"));
+    }
+    let rows = rounds
+        .into_iter()
+        .rev()
+        .map(|(size, entries)| {
+            (
+                format!("[{}] Ro{size}", if division == 0 { "V" } else { "N" }),
+                entries,
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok((rows, champion))
 }

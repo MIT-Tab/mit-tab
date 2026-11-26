@@ -117,7 +117,8 @@ pub async fn judges(State(app): State<App>, Extension(actor): Extension<Actor>) 
     let Ok(judges) = judge_rows(&mut db, &rounds).await else {
         return unavailable();
     };
-    let Ok(changes) = changes(&mut db, "judges", true).await else {
+    let Ok(changes) = changes(&mut db, "judges", settings.flag("debaters_public", true)).await
+    else {
         return unavailable();
     };
     if db.commit().await.is_err() {

@@ -25,6 +25,8 @@ mod homepage_admin;
 mod html;
 mod judge_assignment;
 mod judge_portal;
+mod judge_report;
+mod legacy_archive;
 mod legacy_session;
 mod live_results;
 mod login;
@@ -46,6 +48,7 @@ mod registration_views;
 mod room_assignment;
 mod roster_groups;
 mod roster_log;
+mod roster_log_admin;
 mod roster_spreadsheet_data;
 mod roster_spreadsheet_layout;
 mod roster_spreadsheets;
@@ -62,6 +65,7 @@ mod staff_elimination_assign;
 mod staff_elimination_store;
 mod staff_invites;
 mod staff_pairing;
+mod staff_rankings;
 mod staff_roles;
 mod staff_roster;
 mod staff_roster_data;
@@ -333,7 +337,10 @@ fn router(app: App) -> Router {
                 .merge(staff_round_tools::routes())
                 .merge(staff_elimination::routes())
                 .merge(backup_views::routes())
+                .route("/archive/download/", get(legacy_archive::download))
                 .merge(roster_groups::routes())
+                .merge(staff_rankings::routes())
+                .route("/judges/speaker-points/", get(judge_report::page))
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(
@@ -480,6 +487,12 @@ fn router(app: App) -> Router {
                     app.clone(),
                     access::staff_or_board,
                 )),
+        )
+        .merge(
+            roster_log_admin::routes().route_layer(axum::middleware::from_fn_with_state(
+                app.clone(),
+                access::roster_log,
+            )),
         )
         .route("/theme.css", get(homepage_admin::theme))
         .route("/public/login/", get(login::page).post(login::sign_in))

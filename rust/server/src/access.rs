@@ -138,10 +138,14 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
 }
 
 async fn has_settings_permission(app: &App, user: i32) -> Result<bool, sqlx::Error> {
+    user_permission(app, user, "tab_settings.can_change").await
+}
+
+async fn user_permission(app: &App, user: i32, code: &'static str) -> Result<bool, sqlx::Error> {
     let allowed = sqlx::query_scalar::<_, i64>(
         "SELECT EXISTS(
             SELECT 1 FROM auth_permission p JOIN django_content_type ct ON ct.id = p.content_type_id
-            WHERE ct.app_label = 'tab' AND p.codename = 'tab_settings.can_change'
+            WHERE ct.app_label = 'tab' AND p.codename = ?
               AND (
                   EXISTS(SELECT 1 FROM auth_user_user_permissions up
                          WHERE up.user_id = ? AND up.permission_id = p.id)
@@ -153,11 +157,54 @@ async fn has_settings_permission(app: &App, user: i32) -> Result<bool, sqlx::Err
               )
         )",
     )
+    .bind(code)
     .bind(user)
     .bind(user)
     .fetch_one(&app.db)
     .await?;
     Ok(allowed != 0)
+}
+
+pub async fn allowed_permission(
+    app: &App,
+    actor: Actor,
+    code: &'static str,
+) -> Result<bool, sqlx::Error> {
+    match actor {
+        Actor::User {
+            board: false,
+            superuser: true,
+            ..
+        } => Ok(true),
+        Actor::User {
+            board: false, id, ..
+        } => user_permission(app, id, code).await,
+        _ => Ok(false),
+    }
+}
+
+pub async fn roster_log(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    match actor {
+        Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
+        Actor::User { board: true, .. } => {
+            return match board_access_open(&app).await {
+                Ok(true) => access_denied(),
+                Ok(false) => board_closed(),
+                Err(_) => unavailable(),
+            };
+        }
+        _ => {}
+    }
+    match allowed_permission(&app, actor, "change_publicrosterchange").await {
+        Ok(true) => {}
+        Ok(false) => return access_denied(),
+        Err(_) => return unavailable(),
+    }
+    request.extensions_mut().insert(actor);
+    next.run(request).await
 }
 
 pub fn found(target: impl AsRef<str>) -> Response {

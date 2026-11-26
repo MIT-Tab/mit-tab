@@ -3522,3 +3522,157 @@ def test_native_roster_groups_change_members_atomically():
         assert post(group_url, {"_method": "DELETE"})[0] == 302
         assert post(uri, {"_method": "DELETE"})[0] == 302
         assert not RankingGroup.objects.exists() and not RoomTag.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_raw_archive_matches_legacy_xml_and_is_staff_only():
+    from xml.etree.ElementTree import fromstring, tostring
+
+    from mittab.apps.tab.archive import ArchiveExporter
+
+    staff = legacy_tab_session("archive-staff")
+    board = legacy_tab_session("archive-board")
+    get_user_model().objects.get(username="archive-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="École & Company")
+    other = School.objects.create(name="Alternate School")
+    names = ('Home "Team"', "Away & Team")
+    teams = [Team.objects.create(name=name, school=school, hybrid_school=other, seed=0,
+                                  team_code=f"fixture-code-{index}")
+             for index, name in enumerate(names)]
+    judge = Judge.objects.create(name="Private rank & Judge", rank=Decimal("5.25"))
+    judge.schools.add(school, other)
+    room = Room.objects.create(name="Room < 3", rank=1)
+    played = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV,
+                                  room=room, chair=judge)
+    played.judges.add(judge)
+    for index, role in enumerate(("pm", "lo", "mg", "mo")):
+        debater = Debater.objects.create(name=f"Test speaker {index} œ", novice_status=index % 2)
+        teams[index % 2].debaters.add(debater)
+        RoundStats.objects.create(round=played, debater=debater, speaks=Decimal("26.25")+index,
+                                  ranks=index+1, debater_role=role)
+    uri = "/archive/download/"
+    with rust_server() as port:
+        status, headers, body = request(port, uri, cookie=staff, extra_headers={"Host": "fixture.example.test"})
+        assert status == 200, body
+        assert headers["Content-Disposition"] == "attachment; filename=fixture.xml"
+        assert headers["Cache-Control"] == "private, no-store"
+        expected = fromstring(ArchiveExporter("fixture").export_tournament())
+        actual = fromstring(body)
+        assert tostring(actual) == tostring(expected)
+        assert request(port, uri, cookie=board)[1]["Location"] == "/403/"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_roster_log_management_uses_fixed_est_permissions_and_privacy():
+    from django.contrib.auth.models import Permission
+
+    staff = legacy_tab_session("log-admin")
+    board = legacy_tab_session("log-board")
+    get_user_model().objects.get(username="log-board").groups.add(Group.objects.create(name="APDA Board"))
+    editor = get_user_model().objects.create_user("log-editor", password="fixture-editor-password", is_staff=True)
+    editor.user_permissions.add(Permission.objects.get(codename="change_publicrosterchange"))
+    editor_client = Client()
+    editor_client.force_login(editor, backend="mittab.apps.tab.auth_backends.TabAuthenticationBackend")
+    editor_session = editor_client.cookies["sessionid"].value
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("teams_public", 1)
+    TabSettings.set("judges_public", 1)
+    TabSettings.set("debaters_public", 0)
+    school = School.objects.create(name="Log Test")
+    teams = [Team.objects.create(name=f"Log Team {i}", school=school, seed=0) for i in (1, 2)]
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    entry = PublicRosterChange.objects.create(list_kind="teams", message="Edited public label")
+    PublicRosterChange.objects.bulk_create([
+        PublicRosterChange(list_kind="judges", message=f"Fixture availability {i}") for i in range(34)
+    ])
+    base = "/setup/public-change-log/"
+    uri = f"{base}{entry.id}/"
+    with rust_server() as port:
+        status, _, body = request(port, f"{base}?kind=judges&page=2", cookie=staff)
+        assert status == 200 and b"Page 2 of 2" in body and b"Edited public label" not in body
+        assert request(port, base, cookie=board)[1]["Location"] == "/403/"
+        assert request(port, uri, cookie=board)[1]["Location"] == "/403/"
+        status, headers, body = request(port, uri, cookie=editor_session)
+        assert status == 200 and b"Edited public label" in body and b"Delete Entry" not in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(session, **fields):
+            return request(port, uri, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        assert post(editor_session, action="delete")[0] == 403
+        fields = {"list_kind": "judges", "message": "Corrected private debater label",
+                  "occurred_at": "2026-07-01T12:10", "involves_debaters": "on"}
+        assert post(board, **fields)[1]["Location"] == "/403/"
+        assert post(editor_session, **fields)[0] == 302
+        entry.refresh_from_db()
+        assert entry.created_at.isoformat() == "2026-07-01T17:10:00+00:00"
+        assert entry.involves_debaters
+        assert b"Corrected private debater label" not in request(port, "/public/judges/")[2]
+        assert post(staff, action="delete")[0] == 302
+        assert not PublicRosterChange.objects.filter(id=entry.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_rankings_and_report_match_reference():
+    from mittab.apps.tab.judge_speaker_points import judge_speaker_metrics
+    from mittab.apps.tab.models import RankingGroup
+    from mittab.apps.tab.views.debater_views import get_speaker_rankings
+    from mittab.libs.tab_logic.rankings import get_team_rankings
+
+    staff = legacy_tab_session("ranking-staff")
+    board = legacy_tab_session("ranking-board")
+    get_user_model().objects.get(username="ranking-board").groups.add(Group.objects.create(name="APDA Board"))
+    for key, value in {"cur_round": 4, "tot_rounds": 3, "var_teams_to_break": 2,
+                       "nov_teams_to_break": 0, "speaker_rankings_use_single_adjusted": 1}.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Rank School")
+    teams = [Team.objects.create(name=f"Rank Team {i}", school=school, seed=0) for i in (1, 2)]
+    speakers = [Debater.objects.create(name=f"Rank Person {i}", novice_status=i % 2) for i in range(4)]
+    for i, speaker in enumerate(speakers):
+        teams[i % 2].debaters.add(speaker)
+    judges = [Judge.objects.create(name=f"Rank Judge {i}", rank=3, is_dino=i == 0) for i in range(3)]
+    group = RankingGroup.objects.create(name="Regional Fixture")
+    group.teams.add(teams[1])
+    group.debaters.add(speakers[0], speakers[3])
+    for number in range(1, 4):
+        played = Round.objects.create(round_number=number, gov_team=teams[0], opp_team=teams[1],
+                                      victor=Round.GOV if number != 3 else Round.OPP)
+        played.judges.add(judges[0], judges[number % 2 + 1])
+        for i, role in enumerate(("pm", "lo", "mg", "mo")):
+            RoundStats.objects.create(round=played, debater=speakers[i], speaks=Decimal("25.2557") + i + number,
+                                      ranks=i+1, debater_role=role)
+    judges_url = "/judges/speaker-points/"
+    with rust_server() as port:
+        for url in ("/team/ranking/", "/team/rank/", "/debater/ranking/", "/debater/rank/", "/forum_post", judges_url):
+            assert request(port, url, cookie=board)[1]["Location"] == "/403/"
+        status, _, team_ranks = request(port, "/team/rank/", cookie=staff)
+        assert status == 200 and b"Regional Fixture Rankings" in team_ranks, team_ranks
+        expected_teams, _ = get_team_rankings(None)
+        locations = [team_ranks.index(f"/team/{row[0].id}/".encode()) for row in expected_teams]
+        assert locations == sorted(locations)
+        status, _, speakers_result = request(port, "/debater/rank/", cookie=staff)
+        assert status == 200 and b"Regional Fixture Rankings" in speakers_result, speakers_result
+        assert speakers_result.index(b"Single adjusted speaks") < speakers_result.index(b"Unadjusted speaks")
+        expected_speakers, _ = get_speaker_rankings()
+        locations = [speakers_result.index(f"/debater/{row[0].id}/".encode()) for row in expected_speakers]
+        assert locations == sorted(locations)
+        status, _, preview = request(port, "/forum_post", cookie=staff)
+        assert status == 200, preview
+        for value in (b"Rank Judge 0", b"2 teams", b"2 novices", b"Novice Speaker Awards", b"Varsity Breaking Teams"):
+            assert value in preview
+        highlighted = judges[2]
+        status, headers, report = request(port, f"{judges_url}?minimum_rounds=1&judge={highlighted.id}", cookie=staff)
+        assert status == 200 and headers["Cache-Control"] == "private, no-store"
+        report = report.decode()
+        assert report.count('aria-label="Scatter plot') == 2
+        for row in judge_speaker_metrics(1):
+            attributes, cells = re.search(rf'<tr data-judge-id="{row["id"]}"([^>]*)>(.*?)</tr>',
+                                          report, re.DOTALL).groups()
+            assert ("speaker-points-highlight" in attributes) == (row["id"] == highlighted.id)
+            assert row["name"] in cells and f'{row["mean"]:.2f} ' in cells and f'#{row["mean_rank"]}' in cells
+            assert f'{row["generosity"]:.2f} ' in cells and f'#{row["generosity_rank"]}' in cells
+        assert f'data-judge-id="{highlighted.id}"'.encode() not in request(port, judges_url, cookie=staff)[2]

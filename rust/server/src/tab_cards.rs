@@ -435,17 +435,7 @@ async fn page(app: &App, actor: Actor, chosen: Option<i32>, public: bool) -> Res
 }
 
 pub async fn bundle(State(app): State<App>, headers: HeaderMap) -> Response {
-    let label = headers
-        .get(header::HOST)
-        .and_then(|host| host.to_str().ok())
-        .and_then(|host| host.split(['.', ':']).next())
-        .filter(|label| {
-            !label.is_empty()
-                && label
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        })
-        .unwrap_or("tournament");
+    let label = crate::legacy_archive::tournament_slug(&headers);
     let exported_at = Utc::now().to_rfc3339();
     let result = async {
         let mut db = app.db.begin().await?;

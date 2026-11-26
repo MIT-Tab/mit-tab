@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% macro scatter(plot, layout) %}
+<svg class="{{ layout }} w-100" viewBox="0 0 {{ plot.width }} 286" role="img" aria-label="Scatter plot of judge mean speaks and generosity">
+  <g fill="currentColor" font-size="12">
+    {% for tick in plot.y_ticks %}
+    <line x1="54" x2="{{ plot.right }}" y1="{{ tick.position }}" y2="{{ tick.position }}" stroke="currentColor" opacity="{{ '0.55' if tick.zero else '0.16' }}"></line>
+    <text x="48" y="{{ tick.position + 4 }}" text-anchor="end">{{ tick.text }}</text>
+    {% endfor %}
+    {% for tick in plot.x_ticks %}
+    <line x1="{{ tick.position }}" x2="{{ tick.position }}" y1="18" y2="238" stroke="currentColor" opacity=".16"></line>
+    <text x="{{ tick.position }}" y="255" text-anchor="middle">{{ tick.text }}</text>
+    {% endfor %}
+    <text x="{{ plot.midpoint }}" y="277" text-anchor="middle">Mean speaks</text>
+    <text transform="rotate(-90)" x="-128" y="12" text-anchor="middle">Generosity</text>
+    {% for point in plot.points %}
+    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="{{ 5 if point.judge.highlight else 3.5 }}" fill="{{ 'var(--theme-color, #00438a)' if point.judge.highlight else 'currentColor' }}" opacity="{{ '1' if point.judge.highlight else '.6' }}">
+      <title>{{ point.judge.name }} · {{ point.judge.mean_text }} mean · {{ point.judge.generosity_text }} generosity</title>
+    </circle>
+    {% endfor %}
+    {% for label in plot.labels %}
+    <line x1="{{ label.origin_x }}" y1="{{ label.origin_y }}" x2="{{ label.x }}" y2="{{ label.y }}" stroke="currentColor" opacity=".45"></line>
+    <text x="{{ label.x }}" y="{{ label.y }}" text-anchor="{{ label.anchor }}" dominant-baseline="central">{{ label.text }}</text>
+    {% endfor %}
+  </g>
+</svg>
+{% endmacro %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  <form method="get" class="d-flex align-items-end flex-wrap gap-3 mb-3">
+    <label class="form-label">Minimum rounds<input name="minimum_rounds" type="number" min="1" class="form-control" value="{{ minimum }}" required></label>
+    {% if alphabetic %}
+    <label class="form-label">Highlight judges<select name="judge" class="form-select" multiple size="4">
+      {% for judge in alphabetic %}<option value="{{ judge.id }}"{% if judge.highlight %} selected{% endif %}>{{ judge.name }}</option>{% endfor %}
+    </select></label>
+    {% endif %}
+    <button class="btn btn-primary mb-2" type="submit">Apply</button>
+  </form>
+  {% if invalid %}<p class="alert alert-danger">Enter a whole number of rounds, at least one.</p>{% endif %}
+  {% if alphabetic %}
+  <figure class="mb-4">
+    <h2 class="h5">Mean speaks and generosity</h2>
+    {% if chart %}{{ scatter(chart, "d-none d-md-block") }}{{ scatter(narrow, "d-md-none") }}
+    {% else %}<p>The chart needs scores that can be compared across rounds.</p>{% endif %}
+    <figcaption class="text-muted small">Generosity averages the difference between each score and that debater’s mean in their other scored rounds. Panelists share saved round scores. The report counts played inrounds.</figcaption>
+  </figure>
+  <div class="row">
+  {% for rows in panels %}
+  <div class="table-responsive col-12{% if panels|length > 1 %} col-xl-6{% endif %}"><table class="table table-striped table-sm">
+    <caption class="sr-only">Judge speaker points, sorted by mean speaker points</caption>
+    <thead><tr><th scope="col">Judge</th><th scope="col">Rounds</th><th scope="col">Mean speaks</th><th scope="col">Generosity</th></tr></thead>
+    <tbody>
+      {% for row in rows %}<tr data-judge-id="{{ row.id }}"{% if row.highlight %} class="speaker-points-highlight"{% endif %}>
+        <th scope="row">{{ row.name }}</th><td>{{ row.rounds }}</td>
+        <td>{{ row.mean_text }} <small class="text-muted">#{{ row.mean_rank }}</small></td>
+        <td>{% if row.generosity_text is not none %}{{ row.generosity_text }} <small class="text-muted">#{{ row.generosity_rank }}</small>{% else %}—{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% endfor %}
+  </div>
+  {% else %}<p>No judges have {{ minimum }} scored rounds yet.</p>{% endif %}
+</div>
+{% endblock %}
