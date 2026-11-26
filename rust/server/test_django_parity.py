@@ -56,6 +56,14 @@ def rust_server(session_key_configured=True, overrides=None):
     environment = {
         **os.environ,
         "MITTAB_RUST_LISTEN": "127.0.0.1:0",
+        "AWS_SES_ACCESS_KEY_ID": "",
+        "AWS_SES_SECRET_ACCESS_KEY": "",
+        "AWS_ACCESS_KEY_ID": "",
+        "AWS_SECRET_ACCESS_KEY": "",
+        "AWS_SESSION_TOKEN": "",
+        "AWS_MAILMANAGER_ADDRESS_LIST": "",
+        "MITTAB_PUBLIC_URL": "",
+        "MITTAB_SES_ENDPOINT": "",
         "MYSQL_DATABASE": db["NAME"],
         "MYSQL_HOST": db["HOST"] or "127.0.0.1",
         "MYSQL_PORT": db["PORT"] or "3306",
@@ -1999,14 +2007,14 @@ def test_native_tab_cards_and_export_honor_board_and_public_release():
         assert request(port, public)[1]["Location"] == "/public/access-error/"
 
 
-def multipart_request(port, path, *, fields, file, cookie):
+def multipart_request(port, path, *, fields, file, cookie, file_field="file"):
     boundary = "mittab-rust-test-boundary"
     body = bytearray()
     for name, value in fields.items():
         body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
     filename, content = file
     body.extend(
-        (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        (f'--{boundary}\r\nContent-Disposition: form-data; name="{file_field}"; filename="{filename}"\r\n'
          'Content-Type: application/octet-stream\r\n\r\n').encode(),
     )
     body.extend(content)
@@ -2192,3 +2200,521 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
         assert set(Scratch.objects.filter(team=team).values_list("judge", flat=True)) == {allowed.id, hidden.id}
     options.refresh_from_db()
     assert options.disc_scratch_quantity == 2
+
+
+@contextmanager
+def mock_registration_directory(deliveries=None):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    class DirectoryHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            data = {
+                "/api/schools/all/": [{"id": 71, "name": "North Institute"}],
+                "/api/debaters/71/": [{"apda_id": 8101, "name": "Test First", "novice_status": 1}],
+            }
+            if self.path not in data:
+                self.send_error(404)
+                return
+            self.reply(data[self.path])
+
+        def do_POST(self):
+            if self.path == "/v2/email/outbound-emails" and deliveries is not None:
+                signature = self.headers.get("Authorization", "")
+                if not signature.startswith("AWS4-HMAC-SHA256 Credential=fixture-access/") or "/ses/aws4_request" not in signature:
+                    self.send_error(403)
+                    return
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                deliveries.append(body)
+                self.reply({"MessageId": "example"})
+                return
+            if self.path != "/api/private/debater-emails/" or self.headers.get("Authorization") != "Bearer fixture":
+                self.send_error(403)
+                return
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            if body["debater_ids"] != [8101]:
+                self.send_error(422)
+                return
+            self.reply({"debaters": [{"id": 8101, "email": "hidden-fixture-address@example.test"}]})
+
+        def reply(self, payload):
+            content = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+
+        def log_message(self, _format, *_args):
+            pass
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), DirectoryHandler) as server:
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            worker.join(timeout=5)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_registration_create_edit_privacy_and_delete():
+    from mittab.apps.registration.models import Registration, RegistrationChangeLog, RegistrationLink
+
+    tab = legacy_tab_session("registration-staff")
+    board = legacy_tab_session("registration-board")
+    get_user_model().objects.get(username="registration-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 3)
+    school = School.objects.create(name="North Institute", apda_id=71)
+    secondary = School.objects.create(name="South Institute")
+    options, _ = RegistrationConfig.objects.update_or_create(id=1, defaults={"crash_housing_enabled": True})
+    RegistrationLink.objects.create(title="Join the Discord", url="https://example.test/confirm", description="Schedule and updates")
+    prepared = rust_command("migrate", connection.settings_dict["NAME"])
+    assert prepared.returncode == 0, prepared.stderr
+    path = "/registration/"
+    manage = "/registration/manage/"
+    ready = {
+        "school": "apda:71",
+        "email": "school@example.test",
+        "dietary_requests": "No dairy",
+        "housing_requests": "Two students",
+        "teams-TOTAL_FORMS": "1",
+        "teams-0-name": "Hybrid Example",
+        "teams-0-seed_choice": "2",
+        "teams-0-team_school_source": "debater_one",
+        "teams-0-debater_one_name": "Test First",
+        "teams-0-debater_one_school": "apda:71",
+        "teams-0-debater_one_apda_id": "8101",
+        "teams-0-debater_one_novice_status": "1",
+        "teams-0-debater_one_use_private_email": "on",
+        "teams-0-debater_one_requests_wgm_housing": "on",
+        "teams-0-debater_two_name": "Test Second",
+        "teams-0-debater_two_email": "second@example.test",
+        "teams-0-debater_two_school": f"pk:{secondary.id}",
+        "judges-TOTAL_FORMS": "1",
+        "judges-0-name": "Example Judge",
+        "judges-0-email": "judge@example.test",
+        "judges-0-experience": "7",
+        "judges-0-availability_outround": "on",
+        "judges-0-availability_round_2": "on",
+    }
+    with mock_registration_directory() as endpoint, rust_server(overrides={
+            "MITTAB_SCHOOL_DIRECTORY_URL": f"{endpoint}/api/schools/all/",
+            "BLACK_ROD_API_BASE_URL": endpoint,
+            "BLACK_ROD_PRIVATE_API_TOKEN": "fixture",
+    }) as port:
+        status, headers, body = request(port, path)
+        assert status == 200 and b"North Institute" in body and b"Add team" in body
+        assert headers["referrer-policy"] == "same-origin"
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(url, fields, *, session=None, token=csrf):
+            jar = (f"sessionid={session}; " if session else "") + f"csrftoken={csrf}"
+            return request(port, url, method="POST", extra_headers={"Cookie": jar},
+                           form=[("csrfmiddlewaretoken", token), *fields])
+
+        def email_status(school_id):
+            client = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            try:
+                client.request("POST", "/registration/api/debater-email-status/", body=json.dumps(
+                    {"school_id": school_id, "debater_id": 8101}), headers={"Cookie": f"csrftoken={csrf}",
+                    "X-CSRFToken": csrf, "Content-Type": "application/json"})
+                response = client.getresponse()
+                return response.status, json.loads(response.read())
+            finally:
+                client.close()
+
+        assert email_status(71) == (200, {"id": 8101, "has_email": True, "masked_email": "hi***@example.test"})
+        assert email_status(72) == (404, {"id": 8101, "has_email": False, "masked_email": ""})
+        assert request(port, path, cookie=board)[0] == 403
+        assert post(path, ready.items(), token="invalid")[0] == 403
+        for overrides in (
+            {"teams-0-team_school_source": "debater_two"},
+            {"teams-0-debater_one_apda_id": "9999"},
+            {"teams-0-debater_one_id": "9999"},
+            {"teams-TOTAL_FORMS": "201"},
+        ):
+            response = post(path, {**ready, **overrides}.items())
+            assert response[0] == 422, response
+            assert not Registration.objects.exists() and not Team.objects.exists()
+        payload = [*ready.items(), ("judges-0-schools", f"pk:{secondary.id}"), ("judges-0-schools", "apda:71")]
+        status, headers, body = post(path, payload)
+        assert status == 302, (status, body)
+        target = headers["Location"]
+        edit = target.split("?")[0]
+        registration = Registration.objects.get()
+        assert target == f"/registration/{registration.herokunator_code}/?saved=1&email=unavailable"
+        team = registration.teams.get()
+        assert (team.school_id, team.hybrid_school_id, team.checked_in, team.seed) == (school.id, secondary.id, False, 2)
+        first = team.debaters.get(apda_id=8101)
+        second = team.debaters.exclude(id=first.id).get()
+        assert first.email == "hidden-fixture-address@example.test" and first.novice_status == 1
+        assert first.needs_crash_housing and first.requests_wgm_housing
+        judge = registration.judges.get()
+        assert judge.ballot_code and team.team_code
+        assert judge.reported_experience == 7 and judge.rank == 0
+        assert set(judge.schools.values_list("id", flat=True)) == {school.id, secondary.id}
+        assert list(judge.expected_checkins.order_by("round_number").values_list("round_number", flat=True)) == [0, 2]
+        assert registration.change_logs.get().action == "created"
+        status, _, body = request(port, target)
+        assert status == 200 and b"Join the Discord" in body and b"Hybrid Example" in body
+        assert b"Using the email on file" in body and b"hidden-fixture-address" not in body
+        assert first.email not in json.dumps(registration.change_logs.get().snapshot)
+        revision = re.search(rb'name="revision" value="([^"]+)"', body).group(1).decode()
+        assert post("/registration/edit/", [("registration_code", registration.herokunator_code)])[1]["Location"] == edit
+
+        Judge.objects.filter(id=judge.id).update(rank=8.5, wing_only=True)
+        update = {
+            **ready, "revision": revision, "teams-0-team_id": team.id, "teams-0-name": "Renamed Hybrid",
+            "teams-0-debater_one_id": first.id, "teams-0-debater_two_id": second.id,
+            "teams-0-debater_two_school": "apda:71", "judges-0-judge_id": judge.id, "judges-0-experience": 9,
+        }
+        coin = team.tiebreaker
+        assert post(edit, update.items())[0] == 302
+        assert post(edit, update.items())[0] == 422
+        team.refresh_from_db()
+        judge.refresh_from_db()
+        assert (team.name, team.tiebreaker, team.hybrid_school_id) == ("Renamed Hybrid", coin, secondary.id)
+        assert (judge.rank, judge.wing_only, judge.reported_experience) == (Decimal("8.50"), True, 9)
+        assert registration.change_logs.filter(action="updated").exists()
+        assert request(port, manage, cookie=tab)[0] == 200
+        assert request(port, manage, cookie=board)[0] == 403
+        assert post(manage, [("registration_id", registration.id)], session=board)[0] == 403
+
+        options.allow_registration_edits = False
+        options.save(update_fields=["allow_registration_edits"])
+        assert b"Registration updates are currently disabled." in request(port, edit)[2]
+        assert post(edit, update.items())[0] == 422
+        assert post(manage, [("registration_id", registration.id)], session=tab)[1]["Location"] == f"{manage}?saved=2"
+        assert not Registration.objects.exists() and not Team.objects.exists() and not Judge.objects.exists()
+        assert not Debater.objects.filter(id__in=(first.id, second.id)).exists()
+        assert RegistrationChangeLog.objects.filter(action="deleted", registration_id=None).exists()
+        assert request(port, edit)[0] == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_registration_schedule_and_get_links():
+    from mittab.apps.registration.models import RegistrationLink
+
+    tab = legacy_tab_session("registration-schedule")
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("judges_public", 0)
+    manage = "/registration/manage/"
+    target = "/registration/manage/links/registration/"
+    with rust_server(overrides={"MITTAB_SCHOOL_DIRECTORY_URL": ""}) as port:
+        status, headers, body = request(port, manage, cookie=tab)
+        assert status == 200 and b"Eastern Time" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(url, form):
+            return request(port, url, method="POST", extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **form})
+
+        values = {
+            "allow_new_registrations": "on", "allow_registration_edits": "on",
+            "new_registrations_open_at": "2026-10-15T16:00", "new_registrations_close_at": "2026-11-15T10:00",
+            "disc_scratches_open": "on", "disc_scratch_quantity": "3",
+        }
+        assert post(manage, values)[0] == 422
+        assert TabSettings.get("judges_public", use_cache=False) == 0
+        for change in ({"new_registrations_open_at": "2026-11-01T01:30"},
+                       {"new_registrations_close_at": "2026-09-15T12:00"}):
+            assert post(manage, {**values, **change, "confirm_judge_list_publication": "on"})[0] == 422
+        assert post(manage, {**values, "confirm_judge_list_publication": "on"})[0] == 302
+        config = RegistrationConfig.objects.get()
+        assert config.disc_scratch_quantity == 3 and config.disc_scratches_open
+        assert config.new_registrations_open_at.isoformat() == "2026-10-15T20:00:00+00:00"
+        assert config.new_registrations_close_at.isoformat() == "2026-11-15T15:00:00+00:00"
+        assert TabSettings.get("judges_public", use_cache=False) == 1
+        assert b'value="2026-10-15T16:00"' in request(port, manage, cookie=tab)[2]
+        assert b"New registrations are currently closed" in request(port, "/registration/")[2]
+        link = {"title": "Example Resource", "url": "https://example.test/link", "is_active": "on", "display_order": "1"}
+        assert post(target, {**link, "url": "javascript:alert(1)"})[1]["Location"] == f"{manage}?error=1"
+        assert not RegistrationLink.objects.exists()
+        assert post(target, link)[1]["Location"] == f"{manage}?saved=3"
+        row = RegistrationLink.objects.get()
+        assert post(f"{target}{row.id}/", {**link, "title": "Updated Resource"})[0] == 302
+        assert b"Updated Resource" in request(port, manage, cookie=tab)[2]
+        assert post(f"{target}{row.id}/delete/", {})[0] == 302
+        assert not RegistrationLink.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_public_homepage_branding_logo_and_resources():
+    from io import BytesIO
+    from PIL import Image
+
+    tab = legacy_tab_session("homepage-admin-tab")
+    board = legacy_tab_session("homepage-admin-board")
+    get_user_model().objects.get(username="homepage-admin-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tournament_name", "Original Tournament")
+    prepared = rust_command("migrate", connection.settings_dict["NAME"])
+    assert prepared.returncode == 0, prepared.stderr
+    page = "/settings/public-homepage/"
+    with rust_server() as port:
+        status, headers, body = request(port, page, cookie=tab)
+        assert status == 200 and b"Original Tournament" in body
+        assert request(port, page, cookie=board)[0] == 403
+        csrf = load_cookies(headers)["csrftoken"].value
+        jar = f"sessionid={tab}; csrftoken={csrf}"
+        fields = {"csrfmiddlewaretoken": csrf, "tournament_name": "Example Branding", "theme_color": "#F0C020"}
+        invalid = multipart_request(port, page, fields=fields, file=("wrong.png", b"not an image"),
+                                    cookie=jar, file_field="tournament_logo")
+        assert invalid[0] == 422
+        assert TabSettings.get("tournament_name", use_cache=False) == "Original Tournament"
+        assert b"#00438A" in request(port, "/theme.css")[2]
+        converted = BytesIO()
+        Image.new("RGB", (42, 26), color=(100, 140, 180)).save(converted, format="JPEG")
+        valid = multipart_request(port, page, fields=fields, file=("logo.jpg", converted.getvalue()),
+                                  cookie=jar, file_field="tournament_logo")
+        assert valid[0] == 302 and valid[1]["Location"] == page, valid
+        assert TabSettings.get("tournament_name", use_cache=False) == "Example Branding"
+        assert TabSettings.get("theme_color", use_cache=False) == "#F0C020"
+        _, headers, css = request(port, "/theme.css")
+        assert headers["Content-Type"].startswith("text/css") and b"#F0C020" in css and b"#1a1a1a" in css
+        status, headers, logo = request(port, "/tournament-logo/")
+        assert status == 200 and headers["Content-Type"] == "image/png"
+        assert Image.open(BytesIO(logo)).size == (42, 26)
+        assert request(port, "/favicon.ico")[2] == logo
+
+        def post(path, fields):
+            return request(port, path, method="POST", extra_headers={"Cookie": jar},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        path = "/registration/manage/info-text/"
+        assert post(path, {"title": "GA", "text": "Main library room 301", "is_active": "on"})[0] == 302
+        assert b"Main library room 301" in request(port, "/public/")[2]
+        line = InfoText.objects.get()
+        assert post(f"{path}{line.id}/", {"title": "GA", "text": "Second room", "is_active": "on"})[0] == 302
+        assert b"Second room" in request(port, "/public/")[2]
+        assert post(f"{path}{line.id}/delete/", {})[0] == 302
+        assert b"Second room" not in request(port, "/public/")[2]
+        assert post("/registration/manage/links/info/", {"title": "Handbook", "url": "https://example.test/guide",
+                                                        "is_active": "on"})[1]["Location"].startswith(page)
+        assert b"Handbook" in request(port, "/public/")[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_registration_delivers_confirmation_and_codes_via_ses():
+    from mittab.apps.registration.models import Registration, RegistrationConfirmationEmailLog
+    from mittab.apps.tab.models import JudgeCodeEmailLog, TeamCodeEmailLog
+
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tournament_name", "Email Test & Tournament")
+    school = School.objects.create(name="Email Test School")
+    prepared = rust_command("migrate", connection.settings_dict["NAME"])
+    assert prepared.returncode == 0, prepared.stderr
+    deliveries = []
+    with mock_registration_directory(deliveries) as fixture, rust_server(overrides={
+            "MITTAB_SCHOOL_DIRECTORY_URL": "",
+            "AWS_SES_ACCESS_KEY_ID": "fixture-access",
+            "AWS_SES_SECRET_ACCESS_KEY": "fixture-secret",
+            "MITTAB_SES_ENDPOINT": fixture,
+            "EMAIL_FROM_NAME": "Example Tab",
+            "EMAIL_FROM_ADDRESS": "tab@example.test",
+            "EMAIL_REPLY_TO": "reply@example.test",
+            "AWS_SES_CONFIGURATION_SET": "fixture-config",
+            "MITTAB_PUBLIC_URL": "https://tournament.example.test",
+    }) as port:
+        path = "/registration/"
+        status, headers, _ = request(port, path)
+        assert status == 200
+        csrf = load_cookies(headers)["csrftoken"].value
+        fields = {
+            "csrfmiddlewaretoken": csrf,
+            "school": f"pk:{school.id}",
+            "email": "contact@example.test",
+            "teams-TOTAL_FORMS": "1",
+            "teams-0-name": "Example & Team",
+            "teams-0-debater_one_name": "First Member",
+            "teams-0-debater_one_email": "first@example.test",
+            "teams-0-debater_one_school": f"pk:{school.id}",
+            "teams-0-debater_two_name": "Second Member",
+            "teams-0-debater_two_email": "second@example.test",
+            "teams-0-debater_two_school": f"pk:{school.id}",
+            "judges-TOTAL_FORMS": "1",
+            "judges-0-name": "Judge Example",
+            "judges-0-experience": "3",
+            "judges-0-email": "judge@example.test",
+        }
+        jar = {"Cookie": f"csrftoken={csrf}"}
+        status, headers, _ = request(port, path, method="POST", form=fields, extra_headers=jar)
+        registration = Registration.objects.get()
+        assert status == 302 and headers["Location"] == f"/registration/{registration.herokunator_code}/?saved=1"
+        team = registration.teams.get()
+        judge = registration.judges.get()
+        expected = {
+            "contact@example.test": f"/registration/{registration.herokunator_code}/",
+            "judge@example.test": f"/public/e-ballots/{judge.ballot_code}/",
+            "first@example.test": f"/team_portal/{team.team_code}/",
+            "second@example.test": f"/team_portal/{team.team_code}/",
+        }
+        assert len(deliveries) == 4
+        for message in deliveries:
+            assert message["FromEmailAddress"] == "Example Tab <tab@example.test>"
+            assert message["ReplyToAddresses"] == ["reply@example.test"]
+            assert message["ConfigurationSetName"] == "fixture-config"
+            recipient = message["Destination"]["ToAddresses"][0]
+            body = message["Content"]["Simple"]["Body"]
+            assert f"https://tournament.example.test{expected.pop(recipient)}" in body["Text"]["Data"]
+            assert "href=" in body["Html"]["Data"]
+            assert "Example & Team" not in body["Html"]["Data"]
+        assert not expected
+        assert RegistrationConfirmationEmailLog.objects.get().successful
+        assert TeamCodeEmailLog.objects.filter(team=team, successful=True, source="registration").count() == 2
+        assert JudgeCodeEmailLog.objects.filter(judge=judge, source="registration").count() == 1
+
+        fields["teams-0-team_id"] = team.id
+        fields["teams-0-debater_one_id"] = team.debaters.get(name="First Member").id
+        fields["teams-0-debater_two_id"] = team.debaters.get(name="Second Member").id
+        fields["judges-0-judge_id"] = judge.id
+        status, _, _ = request(port, f"/registration/{registration.herokunator_code}/",
+                               method="POST", form=fields, extra_headers=jar)
+        assert status == 302
+        assert len(deliveries) == 5
+        assert TeamCodeEmailLog.objects.count() == 2 and JudgeCodeEmailLog.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_invites_and_legacy_password_links_are_single_use():
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.encoding import force_bytes
+    from django.utils.http import urlsafe_base64_encode
+    from mittab.apps.tab.models import StaffInviteEmailLog
+
+    tab = legacy_tab_session("staff-invite-tab")
+    board = legacy_tab_session("staff-invite-board")
+    board_user = get_user_model().objects.get(username="staff-invite-board")
+    board_user.email = "board@example.test"
+    board_user.save(update_fields=["email"])
+    board_user.groups.add(Group.objects.create(name="APDA Board"))
+    older = get_user_model().objects.create(username="existing-staff", email="existing@example.test",
+                                            is_active=True, is_staff=True)
+    older.set_unusable_password()
+    older.save()
+    old_token = default_token_generator.make_token(older)
+    old_path = f"/public/staff-invite/{urlsafe_base64_encode(force_bytes(older.id))}/{old_token}/"
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("start_tournament_wizard_completed", 0)
+    prepared = rust_command("migrate", connection.settings_dict["NAME"])
+    assert prepared.returncode == 0, prepared.stderr
+    deliveries = []
+    with mock_registration_directory(deliveries) as fixture, rust_server(overrides={
+            "MITTAB_SCHOOL_DIRECTORY_URL": "",
+            "AWS_SES_ACCESS_KEY_ID": "fixture-access",
+            "AWS_SES_SECRET_ACCESS_KEY": "fixture-secret",
+            "MITTAB_SES_ENDPOINT": fixture,
+            "EMAIL_FROM_ADDRESS": "tab@example.test",
+            "MITTAB_PUBLIC_URL": "https://tournament.example.test",
+    }) as port:
+        start = "/setup/start-tournament/"
+        invite = "/staff/invite/"
+        status, headers, body = request(port, start, cookie=tab)
+        assert status == 200 and b"Send Staff Invite" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields, session=None, *, token=csrf, ajax=False):
+            headers = {"Cookie": (f"sessionid={session}; " if session else "") + f"csrftoken={csrf}"}
+            if ajax:
+                headers["X-Requested-With"] = "XMLHttpRequest"
+            return request(port, path, method="POST", extra_headers=headers,
+                           form={"csrfmiddlewaretoken": token, **fields})
+
+        new = {
+            "action": "send_invite", "invite-email": "helper@example.test", "invite-username": "helper-example",
+            "invite-permission_preset": "checkin_helper",
+        }
+        assert post(start, new, tab, token="invalid")[0] == 403
+        assert post(start, new, board)[0] == 403
+        denied = post(start, {**new, "invite-email": "board@example.test",
+                              "invite-username": board_user.username}, tab, ajax=True)
+        assert denied[0] == 400 and not deliveries
+        sent = post(start, new, tab, ajax=True)
+        assert sent[0] == 200 and json.loads(sent[2])["invite_count"] == 1
+        assert TabSettings.get("start_tournament_staff_invites_sent", use_cache=False) == 1
+        user = get_user_model().objects.get(username="helper-example")
+        assert user.is_staff and user.is_active and not user.is_superuser and not user.has_usable_password()
+        assert list(user.groups.values_list("name", flat=True)) == ["MIT-TAB: Check-in helper"]
+        assert StaffInviteEmailLog.objects.get().successful
+        assert len(deliveries) == 1
+        payload = deliveries[0]["Content"]["Simple"]["Body"]["Text"]["Data"]
+        native_path = re.search(r"https://tournament.example.test(/public/staff-invite/[^\s]+)", payload).group(1)
+        status, headers, body = request(port, native_path)
+        assert status == 200 and headers["Referrer-Policy"] == "same-origin" and b"Confirm password" in body
+        setup = {"new_password1": "fixture_staff_phrase_87#", "new_password2": "fixture_staff_phrase_87#"}
+        assert post(native_path, {**setup, "new_password2": "different"})[0] == 422
+        for path in (native_path, old_path):
+            status, _, body = request(port, path)
+            assert status == 200 and b"Confirm password" in body
+            accepted = post(path, setup)
+            assert accepted[0] == 302 and accepted[1]["Location"] == "/public/staff-invite/complete/"
+            assert b"already used" in request(port, path)[2]
+            assert post(path, setup)[0] == 200
+        user.refresh_from_db()
+        older.refresh_from_db()
+        assert user.check_password(setup["new_password1"]) and older.check_password(setup["new_password1"])
+
+        TabSettings.set("start_tournament_wizard_completed", 1)
+        assert post(start, new, tab, ajax=True)[0] == 400
+        assert request(port, invite, cookie=tab)[0] == 200
+        stand_alone = {"email": "assistant@example.test", "username": "example-assistant", "permission_preset": "tab_assistant"}
+        assert post(invite, stand_alone, tab)[1]["Location"] == f"{invite}?sent=true"
+        assert get_user_model().objects.get(username="example-assistant").groups.filter(name="MIT-TAB: Tab assistant").exists()
+        assert len(deliveries) == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_email_management_writes_history_and_sends_written_decisions():
+    from mittab.apps.tab.models import WrittenRFDEmailLog
+
+    tab = legacy_tab_session("email-management-tab")
+    board = legacy_tab_session("email-management-board")
+    get_user_model().objects.get(username="email-management-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 3)
+    TabSettings.set("written_rfd_first_round", 2)
+    school = School.objects.create(name="Example School")
+    gov = Team.objects.create(name="Example Gov", school=school, seed=0)
+    opp = Team.objects.create(name="Example Opp", school=school, seed=0)
+    first = Debater.objects.create(name="First Debater", novice_status=0, email="speaker@example.test")
+    second = Debater.objects.create(name="Second Debater", novice_status=0, email="SPEAKER@example.test")
+    gov.debaters.add(first)
+    opp.debaters.add(second)
+    judge = Judge.objects.create(name="Example Chair", rank=5, ballot_code="bright-tree-abcdef")
+    debate = Round.objects.create(round_number=2, gov_team=gov, opp_team=opp, chair=judge, victor=Round.GOV,
+                                  rfd="Example <b>reason</b>")
+    RoundStats.objects.create(round=debate, debater=first, speaks=Decimal("27"), ranks=1, debater_role="PM")
+    Round.objects.filter(id=debate.id).update(rfd="Example <b>reason</b>")
+    deliveries = []
+    with mock_registration_directory(deliveries) as fixture, rust_server(overrides={
+            "AWS_SES_ACCESS_KEY_ID": "fixture-access", "AWS_SES_SECRET_ACCESS_KEY": "fixture-secret",
+            "MITTAB_SES_ENDPOINT": fixture, "EMAIL_FROM_ADDRESS": "tab@example.test",
+            "MITTAB_PUBLIC_URL": "https://tournament.example.test",
+    }) as port:
+        path = "/email_management/"
+        status, headers, body = request(port, path, cookie=tab)
+        assert status == 200 and b"Example Gov vs Example Opp" in body, (status, body)
+        csrf = load_cookies(headers)["csrftoken"].value
+        assert request(port, path, cookie=board)[0] == 403
+        assert request(port, "/download_judge_codes/", cookie=board)[0] == 403
+        assert b"Example Chair: bright-tree-abcdef" in request(port, "/download_judge_codes/", cookie=tab)[2]
+
+        def post(session, token=csrf):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form=[("csrfmiddlewaretoken", token), ("email_action", "written_rfds"),
+                                 ("round_ids", debate.id), ("round_ids", debate.id)])
+
+        assert post(board)[0] == 403
+        assert post(tab, token="invalid")[0] == 403
+        status, headers, _ = post(tab)
+        assert status == 302 and headers["Location"] == f"{path}?sent=1"
+        assert len(deliveries) == 1
+        message = deliveries[0]["Content"]["Simple"]
+        assert "Example <b>reason</b>" in message["Body"]["Text"]["Data"]
+        assert "Example &lt;b&gt;reason&lt;/b&gt;" in message["Body"]["Html"]["Data"]
+        assert WrittenRFDEmailLog.objects.get().email.lower() == "speaker@example.test"
+        assert b"Delivery History" in request(port, path, cookie=tab)[2]

@@ -170,6 +170,34 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             "team_portal.html",
             include_str!("../templates/team_portal.html"),
         ),
+        (
+            "registration.html",
+            include_str!("../templates/registration.html"),
+        ),
+        (
+            "registration_admin.html",
+            include_str!("../templates/registration_admin.html"),
+        ),
+        (
+            "resource_forms.html",
+            include_str!("../templates/resource_forms.html"),
+        ),
+        (
+            "homepage_admin.html",
+            include_str!("../templates/homepage_admin.html"),
+        ),
+        (
+            "staff_invite.html",
+            include_str!("../templates/staff_invite.html"),
+        ),
+        (
+            "staff_invite_confirm.html",
+            include_str!("../templates/staff_invite_confirm.html"),
+        ),
+        (
+            "email_admin.html",
+            include_str!("../templates/email_admin.html"),
+        ),
         ("error.html", include_str!("../templates/error.html")),
     ] {
         env.add_template(name, source)

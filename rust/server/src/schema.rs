@@ -94,6 +94,9 @@ async fn prepare_locked(db: &mut MySqlConnection, initialize: bool) -> Result<()
     }
 
     install_sessions(db).await?;
+    install_registration_email_privacy(db).await?;
+    install_public_logo(db).await?;
+    install_staff_invite_token(db).await?;
     sqlx::query(
         "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround'), ('tab', 'judge'), ('tab', 'breakingteam')
          ON DUPLICATE KEY UPDATE model = django_content_type.model",
@@ -141,6 +144,45 @@ async fn install_sessions(db: &mut MySqlConnection) -> Result<(), &'static str> 
     .execute(db)
     .await
     .map_err(|_| "Could not record the Rust session schema")?;
+    Ok(())
+}
+
+async fn install_registration_email_privacy(db: &mut MySqlConnection) -> Result<(), &'static str> {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS mittab_registration_private_email (
+            debater_id int NOT NULL PRIMARY KEY,
+            CONSTRAINT mittab_registration_email_debater FOREIGN KEY (debater_id)
+                REFERENCES tab_debater (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB",
+    )
+    .execute(db)
+    .await
+    .map_err(|_| "Could not prepare registration email privacy")?;
+    Ok(())
+}
+
+async fn install_public_logo(db: &mut MySqlConnection) -> Result<(), &'static str> {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS mittab_public_logo (
+            id int NOT NULL PRIMARY KEY, bytes longblob NOT NULL, updated_at datetime(6) NOT NULL
+        ) ENGINE=InnoDB",
+    )
+    .execute(db)
+    .await
+    .map_err(|_| "Could not prepare tournament logos")?;
+    Ok(())
+}
+
+async fn install_staff_invite_token(db: &mut MySqlConnection) -> Result<(), &'static str> {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS mittab_staff_invite_token (
+            user_id int NOT NULL PRIMARY KEY, token_hash binary(32) NOT NULL, expires_at datetime(6) NOT NULL,
+            CONSTRAINT mittab_invite_user FOREIGN KEY (user_id) REFERENCES auth_user (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB",
+    )
+    .execute(db)
+    .await
+    .map_err(|_| "Could not prepare staff invitations")?;
     Ok(())
 }
 

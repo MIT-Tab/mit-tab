@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use axum::{
-    Extension, Form,
+    Extension, Form, Json,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::Response,
@@ -19,6 +19,7 @@ use crate::{
     login, private,
     school_directory::{self, SchoolChoice},
     settings::{SettingValue, Settings, put},
+    staff_invites,
     staff_pairing::lock_round,
     unavailable,
 };
@@ -43,6 +44,7 @@ const SETTINGS: &[&str] = &[
     "open_speaks",
     "open_ranks",
     COMPLETED,
+    staff_invites::INVITE_COUNT,
     "tournament_director",
     "tab_director",
     "equity_officers",
@@ -205,6 +207,7 @@ fn render(actor: Actor, headers: &HeaderMap, data: &Data, error: Option<&'static
         "tournament_setup.html",
         context! {
             title, csrf, fields => data.fields, roles => data.roles, schools => data.schools, types,
+            invitation_roles => staff_invites::ROLES, invite_available => !data.complete && matches!(actor, Actor::User { superuser: true, board: false, .. }),
             message => error, has_error => error.is_some(),
             nav => Navigation::new(actor, false),
         },
@@ -228,6 +231,34 @@ pub async fn save(
     let Ok(mut data) = Data::load(&app).await else {
         return unavailable();
     };
+    if value(&fields, "action") == "send_invite" {
+        let invite = staff_invites::InviteForm::setup(
+            value(&fields, "invite-email"),
+            value(&fields, "invite-username"),
+            value(&fields, "invite-permission_preset"),
+        );
+        let result = staff_invites::send(&app, &headers, actor, &invite, true).await;
+        if headers
+            .get("x-requested-with")
+            .is_some_and(|value| value == "XMLHttpRequest")
+        {
+            let (status, body) = match result {
+                Ok(count) => (
+                    StatusCode::OK,
+                    serde_json::json!({"ok": true, "message": "Staff invite sent.", "invite_count": count}),
+                ),
+                Err(error) => (
+                    StatusCode::BAD_REQUEST,
+                    serde_json::json!({"ok": false, "message": error, "errors": {"__all__": [{"message": error}]}}),
+                ),
+            };
+            return private((status, Json(body)));
+        }
+        return match result {
+            Ok(_) => access::found(PATH),
+            Err(message) => render(actor, &headers, &data, Some(message)),
+        };
+    }
     let schools = school_directory::by_code(&data.schools);
     let form = validate(&fields, &schools);
     let (values, roles) = match form {
@@ -311,9 +342,6 @@ fn validate<'a>(
     fields: &'a FormFields,
     schools: &HashMap<&str, &'a str>,
 ) -> Result<(Values<'a>, Vec<Role>), &'static str> {
-    if value(fields, "action") == "send_invite" {
-        return Err("Send staff invitations from the Invite Staff page.");
-    }
     for &key in TEXT_FIELDS {
         if !valid_length(value(fields, key), 200) {
             return Err(

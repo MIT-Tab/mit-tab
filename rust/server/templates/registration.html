@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% macro school_field(name, label, selected) %}
+<label class="form-label">{{ label }}
+  <select name="{{ name }}" class="custom-select" data-choose-school>
+    <option value="">Select a school</option>
+    {% for school in schools %}
+      <option value="{{ school.value }}"{% if school.value == selected.value %} selected{% endif %}>{{ school.name }}</option>
+    {% endfor %}
+    {% if selected.value and selected.value not in schools|map(attribute="value")|list and selected.value[:7] != "custom:" %}
+      <option value="{{ selected.value }}" selected>{{ selected.name or selected.value }}</option>
+    {% endif %}
+    <option value="custom:-1"{% if selected.value[:7] == "custom:" %} selected{% endif %}>Other school</option>
+  </select>
+</label>
+<label class="form-label" data-custom-school{% if selected.value[:7] != "custom:" %} hidden{% endif %}>School name
+  <input class="form-control" name="{{ name }}_name" maxlength="50" value="{% if selected.value[:7] == 'custom:' %}{{ selected.name }}{% endif %}">
+</label>
+{% endmacro %}
+{% macro member_fields(prefix, label, member) %}
+<fieldset class="col-md-6" data-member>
+  <legend class="h6">{{ label }}</legend>
+  <input type="hidden" name="{{ prefix }}_id" value="{{ member.id or '' }}">
+  <input type="hidden" name="{{ prefix }}_apda_id" value="{{ member.apda_id or '' }}" data-apda-id>
+  <input type="hidden" name="{{ prefix }}_use_private_email" value="{{ 'on' if member.use_private_email else '' }}" data-private-email>
+  <input type="hidden" name="{{ prefix }}_qualified" value="{{ 'on' if member.qualified else '' }}" data-qualified>
+  {{ school_field(prefix ~ "_school", "School", member.school) }}
+  <label class="form-label" hidden data-directory-wrapper>APDA debater
+    <select class="custom-select" data-directory><option value="">Enter debater manually</option></select>
+  </label>
+  <label class="form-label">Debater name
+    <input class="form-control" name="{{ prefix }}_name" value="{{ member.name }}" maxlength="30" data-member-name>
+  </label>
+  <label class="form-label">Debater email
+    <input class="form-control" type="email" name="{{ prefix }}_email" value="{{ member.email }}" maxlength="254" data-member-email>
+  </label>
+  <div class="small text-muted" data-email-status aria-live="polite">{% if member.use_private_email %}Using the email on file with APDA.{% endif %}</div>
+  <label class="form-label">Division
+    <select class="custom-select" name="{{ prefix }}_novice_status" data-novice-status>
+      <option value="0"{% if member.novice_status == 0 %} selected{% endif %}>Varsity</option>
+      <option value="1"{% if member.novice_status == 1 %} selected{% endif %}>Novice</option>
+    </select>
+  </label>
+  {% if config.housing %}
+    <label class="d-block"><input type="checkbox" name="{{ prefix }}_needs_crash_housing"{% if member.needs_crash_housing %} checked{% endif %}> Needs crash housing</label>
+    <label class="d-block"><input type="checkbox" name="{{ prefix }}_requests_wgm_housing"{% if member.requests_wgm_housing %} checked{% endif %}> Requests WGM housing</label>
+  {% endif %}
+</fieldset>
+{% endmacro %}
+{% macro team_fields(i, team) %}
+<section class="card card-body mb-3" data-form-row>
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="h5 mb-0">Team</h3>
+    <button type="button" class="btn btn-outline-danger btn-sm" data-remove-row>Remove team</button>
+  </div>
+  <input type="hidden" name="teams-{{ i }}-team_id" value="{{ team.id or '' }}">
+  <input type="hidden" name="teams-{{ i }}-DELETE" value="" data-delete-row>
+  <div class="row">
+    <label class="col-md-6 form-label">Team name<input class="form-control" name="teams-{{ i }}-name" value="{{ team.name }}" maxlength="30"></label>
+    <label class="col-md-6 form-label">Seed
+      <select class="custom-select" name="teams-{{ i }}-seed_choice">
+        {% for seed, label in [(0, "Unseeded"), (1, "Free seed"), (2, "Half seed"), (3, "Full seed")] %}
+          <option value="{{ seed }}"{% if seed == team.seed %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="row">
+    {{ member_fields("teams-" ~ i ~ "-debater_one", "First debater", team.members[0]) }}
+    {{ member_fields("teams-" ~ i ~ "-debater_two", "Second debater", team.members[1]) }}
+  </div>
+  <label class="form-label">Which debater represents the registration school?
+    <select name="teams-{{ i }}-team_school_source" class="custom-select">
+      <option value="debater_one"{% if not team.second_primary %} selected{% endif %}>First debater</option>
+      <option value="debater_two"{% if team.second_primary %} selected{% endif %}>Second debater</option>
+    </select>
+  </label>
+</section>
+{% endmacro %}
+{% macro judge_fields(i, judge) %}
+<section class="card card-body mb-3" data-form-row>
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <h3 class="h5 mb-0">Judge</h3>
+    <button type="button" class="btn btn-outline-danger btn-sm" data-remove-row>Remove judge</button>
+  </div>
+  <input type="hidden" name="judges-{{ i }}-judge_id" value="{{ judge.id or '' }}">
+  <input type="hidden" name="judges-{{ i }}-DELETE" value="" data-delete-row>
+  <div class="row">
+    <label class="col-md-6 form-label">Name<input class="form-control" name="judges-{{ i }}-name" maxlength="30" value="{{ judge.name }}"></label>
+    <label class="col-md-6 form-label">Email<input class="form-control" type="email" name="judges-{{ i }}-email" maxlength="254" value="{{ judge.email }}"></label>
+    <label class="col-md-6 form-label">Years of judging experience<input class="form-control" type="number" name="judges-{{ i }}-experience" min="0" max="10" value="{% if judge.id or judge.name %}{{ judge.experience }}{% endif %}"></label>
+    <label class="col-md-6 form-label">School affiliations
+      <select class="custom-select" name="judges-{{ i }}-schools" size="4" multiple>
+        {% for school in schools %}
+          <option value="{{ school.value }}"{% if school.value in judge.schools|map(attribute="value")|list %} selected{% endif %}>{{ school.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <fieldset class="mb-2"><legend class="h6">Availability</legend>
+    <div class="d-flex flex-wrap gap-3">
+      {% for round, field, label in rounds %}
+        <label><input type="checkbox" name="judges-{{ i }}-{{ field }}"{% if round in judge.rounds %} checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% if config.housing %}
+    <label><input type="checkbox" name="judges-{{ i }}-needs_crash_housing"{% if judge.needs_crash_housing %} checked{% endif %}> Needs crash housing</label>
+    <label><input type="checkbox" name="judges-{{ i }}-requests_wgm_housing"{% if judge.requests_wgm_housing %} checked{% endif %}> Requests WGM housing</label>
+  {% endif %}
+</section>
+{% endmacro %}
+{% block content %}
+<div class="col-12">
+  <header class="d-flex flex-wrap align-items-baseline gap-3 mb-3">
+    <h1 class="h3 mb-0">{{ 'Edit Registration' if code else 'Tournament Registration' }}</h1>
+    {% if not code and config.can_edit %}<a href="/registration/edit/">Edit an existing registration</a>{% endif %}
+  </header>
+  {% if saved %}
+    <section class="alert alert-success">
+      <h2 class="h5">Registration saved</h2>
+      <p class="mb-0">Keep your registration code <strong>{{ code }}</strong> to make updates.</p>
+      {% if delivery_warning %}<p class="mb-0 mt-2">Email delivery did not complete. Save the code before closing this page.</p>{% endif %}
+      {% if links %}<ul class="mb-0 mt-2">{% for name, url, description in links %}<li><a href="{{ url }}">{{ name }}</a>{% if description %} {{ description }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+    </section>
+  {% endif %}
+  {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+  {% if not can_submit and not error %}<p class="alert alert-info">{{ 'Registration updates are currently disabled.' if code else 'New registrations are currently closed.' }}</p>{% endif %}
+  {% if code or can_submit %}
+  <form method="post" id="registration" data-max-teams="{{ max_teams }}" data-private-email-enabled="{{ 1 if private_email_enabled else 0 }}">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <input type="hidden" name="revision" value="{{ registration.revision }}">
+    <input type="hidden" name="teams-TOTAL_FORMS" value="{{ registration.teams|length }}">
+    <input type="hidden" name="judges-TOTAL_FORMS" value="{{ registration.judges|length }}">
+    <fieldset{% if not can_submit %} disabled{% endif %}>
+      <legend class="h5">School contact</legend>
+      <div class="row">
+        <div class="col-md-6">{{ school_field("school", "School", registration.school) }}</div>
+        <label class="col-md-6 form-label">Contact email<input class="form-control" type="email" name="email" required maxlength="254" value="{{ registration.email }}"></label>
+      </div>
+      <label class="form-label">Dietary requests<textarea class="form-control" name="dietary_requests" maxlength="2000" rows="2">{{ registration.dietary_requests }}</textarea></label>
+      {% if config.housing %}<label class="form-label">Housing requests<textarea class="form-control" name="housing_requests" maxlength="2000" rows="2">{{ registration.housing_requests }}</textarea></label>{% endif %}
+      <div class="d-flex justify-content-between align-items-center my-3"><h2 class="h4 mb-0">Teams</h2><button type="button" class="btn btn-outline-primary" data-add="teams">Add team</button></div>
+      <div id="registration-teams">{% for team in registration.teams %}{{ team_fields(loop.index0, team) }}{% endfor %}</div>
+      <div class="d-flex justify-content-between align-items-center my-3"><h2 class="h4 mb-0">Judges</h2><button type="button" class="btn btn-outline-primary" data-add="judges">Add judge</button></div>
+      <div id="registration-judges">{% for judge in registration.judges %}{{ judge_fields(loop.index0, judge) }}{% endfor %}</div>
+      {% if can_submit %}<button class="btn btn-primary mt-3" type="submit">Save Registration</button>{% endif %}
+    </fieldset>
+    <template id="registration-teams-template">{{ team_fields("__index__", blank_team) }}</template>
+    <template id="registration-judges-template">{{ judge_fields("__index__", blank_judge) }}</template>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block head %}
+<style>
+  #registration [hidden] { display: none !important; }
+</style>
+<script defer src="/registration/form.js"></script>
+{% endblock %}

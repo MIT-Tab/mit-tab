@@ -1,4 +1,5 @@
 mod access;
+mod aws_http;
 mod backups;
 mod ballot_entry;
 mod board;
@@ -10,8 +11,13 @@ mod bundle;
 mod checkin;
 mod checkin_data;
 mod checklist;
+mod codes;
 mod config;
+mod email;
+mod email_admin;
+mod entity_store;
 mod home;
+mod homepage_admin;
 mod html;
 mod judge_assignment;
 mod judge_portal;
@@ -27,6 +33,12 @@ mod public_outrounds;
 mod public_pairings;
 mod public_rankings;
 mod publication;
+mod registration_admin;
+mod registration_directory;
+mod registration_emails;
+mod registration_form;
+mod registration_store;
+mod registration_views;
 mod room_assignment;
 mod roster_log;
 mod rosters;
@@ -37,6 +49,7 @@ mod settings;
 mod settings_form;
 mod speakers;
 mod spreadsheets;
+mod staff_invites;
 mod staff_pairing;
 mod staff_roles;
 mod tab_cards;
@@ -156,6 +169,38 @@ fn router(app: App) -> Router {
         .merge(
             Router::new()
                 .route(
+                    "/public/staff-invite/{uid}/{token}/",
+                    get(staff_invites::confirm).post(staff_invites::accept),
+                )
+                .route(
+                    "/public/staff-invite/complete/",
+                    get(staff_invites::complete),
+                )
+                .route(
+                    "/registration/",
+                    get(registration_views::new_page).post(registration_views::create),
+                )
+                .route(
+                    "/registration/edit/",
+                    get(registration_views::search).post(registration_views::lookup),
+                )
+                .route(
+                    "/registration/{code}/",
+                    get(registration_views::edit_page).post(registration_views::edit),
+                )
+                .route(
+                    "/registration/form.js",
+                    get(registration_views::form_script),
+                )
+                .route(
+                    "/registration/api/debaters/{school}/",
+                    get(registration_views::debaters),
+                )
+                .route(
+                    "/registration/api/debater-email-status/",
+                    axum::routing::post(registration_views::email_status),
+                )
+                .route(
                     "/team_portal/",
                     get(team_portal::search).post(team_portal::lookup),
                 )
@@ -197,6 +242,51 @@ fn router(app: App) -> Router {
         )
         .merge(
             Router::new()
+                .route(
+                    "/email_management/",
+                    get(email_admin::page).post(email_admin::send),
+                )
+                .route("/download_judge_codes/", get(email_admin::judge_codes))
+                .route(
+                    "/staff/invite/",
+                    get(staff_invites::page).post(staff_invites::submit),
+                )
+                .route(
+                    "/settings/public-homepage/",
+                    get(homepage_admin::page)
+                        .post(homepage_admin::update)
+                        .layer(axum::extract::DefaultBodyLimit::max(
+                            homepage_admin::MAX_BODY,
+                        )),
+                )
+                .route(
+                    "/registration/manage/",
+                    get(registration_admin::page).post(registration_admin::update),
+                )
+                .route(
+                    "/registration/manage/links/{kind}/",
+                    axum::routing::post(registration_admin::link_add),
+                )
+                .route(
+                    "/registration/manage/links/{kind}/{id}/",
+                    axum::routing::post(registration_admin::link_edit),
+                )
+                .route(
+                    "/registration/manage/links/{kind}/{id}/delete/",
+                    axum::routing::post(registration_admin::link_delete),
+                )
+                .route(
+                    "/registration/manage/info-text/",
+                    axum::routing::post(registration_admin::text_add),
+                )
+                .route(
+                    "/registration/manage/info-text/{id}/",
+                    axum::routing::post(registration_admin::text_edit),
+                )
+                .route(
+                    "/registration/manage/info-text/{id}/delete/",
+                    axum::routing::post(registration_admin::text_delete),
+                )
                 .route(
                     "/setup/start-tournament/",
                     get(tournament_setup::page).post(tournament_setup::save),
@@ -354,6 +444,7 @@ fn router(app: App) -> Router {
                     access::staff_or_board,
                 )),
         )
+        .route("/theme.css", get(homepage_admin::theme))
         .route("/public/login/", get(login::page).post(login::sign_in))
         .route(
             "/accounts/logout/",

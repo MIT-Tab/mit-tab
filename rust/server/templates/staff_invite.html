@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12 col-lg-7 mx-auto">
+  <h1 class="h3">Invite Tab Staff</h1>
+  {% if sent %}<p class="alert alert-success" role="status">Staff invite sent.</p>{% endif %}
+  {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <label class="form-label">Email<input class="form-control" type="email" name="email" required maxlength="254" value="{{ email or '' }}"></label>
+    <label class="form-label">Username<input class="form-control" name="username" required maxlength="150" value="{{ username or '' }}"></label>
+    <label class="form-label">Permission preset
+      <select class="custom-select" name="permission_preset">
+        {% for id, label, group in roles %}<option value="{{ id }}"{% if choice == id %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-primary mt-2">Send Staff Invite</button>
+  </form>
+</div>
+{% endblock %}

@@ -209,7 +209,7 @@ async fn page(app: &App, actor: Actor) -> Result<Response, sqlx::Error> {
     nav.teams_public = teams_public;
     nav.judges_public = judges_public;
     let tournament_name = settings.string("tournament_name", "New Tournament");
-    let logo = logo_url().await;
+    let logo = logo_url(app).await;
     let public_tiles_odd = (quick_links.len() + usize::from(show_registration_lead)) % 2 == 1;
     Ok(html::render(
         "home.html",
@@ -355,7 +355,12 @@ fn uploads_dir() -> PathBuf {
     )
 }
 
-async fn logo_url() -> Option<String> {
+pub async fn logo_url(app: &App) -> Option<String> {
+    if let Ok(Some(version)) = sqlx::query_scalar::<_, i64>(
+        "SELECT TIMESTAMPDIFF(MICROSECOND, '1970-01-01', updated_at) FROM mittab_public_logo WHERE id = 1",
+    ).fetch_optional(&app.db).await {
+        return Some(format!("/tournament-logo/?v={version}"));
+    }
     let path = uploads_dir().join("tournament_logo.png");
     let metadata = tokio::fs::symlink_metadata(path).await.ok()?;
     if !metadata.is_file() {
@@ -371,7 +376,14 @@ async fn logo_url() -> Option<String> {
     ))
 }
 
-async fn read_logo() -> Option<Vec<u8>> {
+async fn read_logo(app: &App) -> Option<Vec<u8>> {
+    if let Ok(Some(bytes)) =
+        sqlx::query_scalar::<_, Vec<u8>>("SELECT bytes FROM mittab_public_logo WHERE id = 1")
+            .fetch_optional(&app.db)
+            .await
+    {
+        return Some(bytes);
+    }
     let path = uploads_dir().join("tournament_logo.png");
     let metadata = tokio::fs::symlink_metadata(&path).await.ok()?;
     if !metadata.is_file() {
@@ -381,15 +393,15 @@ async fn read_logo() -> Option<Vec<u8>> {
     bytes.starts_with(b"\x89PNG\r\n\x1a\n").then_some(bytes)
 }
 
-pub async fn logo() -> Response {
-    match read_logo().await {
+pub async fn logo(State(app): State<App>) -> Response {
+    match read_logo(&app).await {
         Some(bytes) => asset("image/png", bytes),
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
-pub async fn favicon() -> Response {
-    match read_logo().await {
+pub async fn favicon(State(app): State<App>) -> Response {
+    match read_logo(&app).await {
         Some(bytes) => asset("image/png", bytes),
         None => asset(
             "image/x-icon",

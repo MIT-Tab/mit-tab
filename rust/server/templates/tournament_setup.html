@@ -89,6 +89,26 @@
     </fieldset>
     <button class="btn btn-primary" type="submit">Save Tournament Basics</button>
   </form>
+  {% if invite_available %}
+  <section class="card card-body mt-4">
+    <h2 class="h5">Invite Tab Staff</h2>
+    {% if fields.start_tournament_staff_invites_sent %}<p>Invites sent {{ fields.start_tournament_staff_invites_sent }}</p>{% endif %}
+    <form method="post">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="action" value="send_invite">
+      <div class="row">
+        <label class="col-md-4">Email<input type="email" class="form-control" name="invite-email" required maxlength="254"></label>
+        <label class="col-md-4">Username<input class="form-control" name="invite-username" required maxlength="150"></label>
+        <label class="col-md-4">Permission preset
+          <select class="custom-select" name="invite-permission_preset">
+            {% for id, label, group in invitation_roles %}<option value="{{ id }}">{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-outline-primary mt-2">Send Staff Invite</button>
+    </form>
+  </section>
+  {% endif %}
 </div>
 <script>
   const school = document.getElementById('host_school');

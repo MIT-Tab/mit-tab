@@ -7,12 +7,16 @@ publish = false
 
 [dependencies]
 axum = { version = "0.8.8", default-features = false, features = ["form", "http1", "json", "matched-path", "multipart", "query", "tokio"] }
+aws-credential-types = "1"
+aws-sigv4 = { version = "1", default-features = false, features = ["sign-http", "http1"] }
 base64 = "0.22.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+chrono-tz = "0.10.4"
 csv = "1.4.0"
 excelerate = "0.14.0"
 flate2 = "1.1.5"
 hex = "0.4.3"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 minijinja = "2.12"
 ring = "0.17.14"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
