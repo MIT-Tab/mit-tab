@@ -18,6 +18,7 @@ flate2 = "1.1.5"
 hex = "0.4.3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 minijinja = "2.12"
+quick-xml = { version = "0.42", features = ["serialize"] }
 ring = "0.17.14"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -27,7 +28,7 @@ sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio
 tower-http = { version = "0.6", features = ["fs"] }
 unicode-normalization = "0.1.24"
 url = "2.5.8"
-tokio = { version = "1.48", features = ["fs", "macros", "net", "process", "rt-multi-thread", "signal"] }
+tokio = { version = "1.48", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal"] }
 
 [lints.rust]
 unsafe_code = "forbid"

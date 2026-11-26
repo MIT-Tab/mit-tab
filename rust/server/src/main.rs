@@ -1,5 +1,9 @@
 mod access;
 mod aws_http;
+mod backup_dump;
+mod backup_objects;
+mod backup_restore;
+mod backup_views;
 mod backups;
 mod ballot_entry;
 mod board;
@@ -40,6 +44,7 @@ mod registration_form;
 mod registration_store;
 mod registration_views;
 mod room_assignment;
+mod roster_groups;
 mod roster_log;
 mod roster_spreadsheet_data;
 mod roster_spreadsheet_layout;
@@ -327,6 +332,8 @@ fn router(app: App) -> Router {
                 .merge(staff_rounds::routes())
                 .merge(staff_round_tools::routes())
                 .merge(staff_elimination::routes())
+                .merge(backup_views::routes())
+                .merge(roster_groups::routes())
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(

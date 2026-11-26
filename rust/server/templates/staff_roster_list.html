@@ -3,6 +3,8 @@
 <div class="col-12">
   <nav aria-label="Roster" class="d-flex flex-wrap gap-2 mb-3">
     {% for url, name in toolbar %}<a href="{{ url }}" class="btn btn-outline-primary btn-sm"{% if name == title %} aria-current="page"{% endif %}>{{ name }}</a>{% endfor %}
+    {% if admin and key == "room" %}<a href="/manage-room-tags" class="btn btn-outline-primary btn-sm">Room Tags</a>{% endif %}
+    {% if admin and key in ["team", "debater"] %}<a href="/manage-ranking-groups" class="btn btn-outline-primary btn-sm">Ranking Groups</a>{% endif %}
     <a href="/import_data/" class="btn btn-outline-primary btn-sm">Import and Export</a>
   </nav>
   <div class="d-flex align-items-center flex-wrap justify-content-between gap-3 mb-3">

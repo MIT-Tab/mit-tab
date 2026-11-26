@@ -15,6 +15,10 @@ use crate::{
 static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     let mut env = Environment::new();
     for (name, source) in [
+        (
+            "roster_groups.html",
+            include_str!("../templates/roster_groups.html"),
+        ),
         ("base.html", include_str!("../templates/base.html")),
         ("home.html", include_str!("../templates/home.html")),
         (
@@ -265,6 +269,14 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "elimination_forum.html",
             include_str!("../templates/elimination_forum.html"),
+        ),
+        (
+            "backup_list.html",
+            include_str!("../templates/backup_list.html"),
+        ),
+        (
+            "backup_detail.html",
+            include_str!("../templates/backup_detail.html"),
         ),
         ("error.html", include_str!("../templates/error.html")),
     ] {

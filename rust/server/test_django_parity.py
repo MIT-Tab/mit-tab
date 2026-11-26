@@ -3293,3 +3293,232 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path):
         assert BreakingTeam.objects.get(team_id=c).effective_seed == 4
         assert TabSettings.get(f"challenge_once_applied_0_{min(seed.id for seed in seeds)}", use_cache=False) == 1
         assert post(path, action)[0] == 422
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
+    from urllib.parse import quote
+
+    staff = legacy_tab_session("backup-staff")
+    board = legacy_tab_session("backup-board")
+    get_user_model().objects.get(username="backup-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Backup example school")
+    team = Team.objects.create(name="Backup's example team", school=school, seed=0)
+    opponent = Team.objects.create(name="Backup other team", school=school, seed=0)
+    judge = Judge.objects.create(name="Backup example judge", rank=5)
+    scratch = Scratch.objects.create(judge=judge, team=team, scratch_type=Scratch.TAB_SCRATCH)
+    Round.objects.create(round_number=1, gov_team=team, opp_team=opponent, victor=Round.GOV)
+    listing = "/pairing/view_backups/"
+    creation = "/pairing/backup/"
+    with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
+        status, headers, body = request(port, listing, cookie=staff)
+        assert status == 200 and b"No backups yet." in body, body
+        csrf = load_cookies(headers)["csrftoken"].value
+        cookie = f"sessionid={staff}; csrftoken={csrf}"
+
+        def post(path, fields):
+            return request(port, path, method="POST", extra_headers={"Cookie": cookie},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        assert request(port, creation, cookie=staff)[0] == 302
+        assert not list(tmp_path.iterdir())
+        assert request(port, creation, method="POST", cookie=staff, form={"backup_name": "CSRF"})[0] == 403
+        assert post(creation, {"backup_name": "Round + example"})[0] == 302
+        clean, = tmp_path.glob("Round + example*.dump.sql")
+        assert clean.stat().st_mode & 0o777 == 0o600
+        data = clean.read_bytes()
+        assert b"CREATE TABLE `tab_scratch`" not in data
+        key = quote(clean.name.removesuffix(".dump.sql"), safe="")
+        download = f"/backup/download/{key}/"
+        restore = f"/backup/restore/{key}/"
+        assert key.encode() in request(port, listing, cookie=staff)[2]
+        status, headers, body = request(port, download, cookie=staff)
+        assert status == 200 and body == data
+        assert headers["Content-Type"] == "application/sql"
+        assert key in headers["Content-Disposition"]
+        for path in (listing, download, restore, "/upload_backup/"):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+
+        assert post(creation, {"backup_name": "Full", "include_scratches": "on"})[0] == 302
+        full, = tmp_path.glob("Full*.dump.sql")
+        assert b"CREATE TABLE `tab_scratch`" in full.read_bytes()
+        assert b"Restore Backup" in request(port, restore, cookie=staff)[2]
+        assert post(restore, {})[0] == 422
+
+        bad = tmp_path / "Invalid_7_2_3_U.dump.sql"
+        bad.write_bytes(full.read_bytes() + b"\nINSERT INTO `tab_team` (`id`,`absent_column`) VALUES (10000,0);\n")
+        Judge.objects.filter(id=judge.id).update(rank=9)
+        response = post("/backup/restore/Invalid_7_2_3_U/", {"confirm": "on"})
+        assert response[0] == 422 and b"incompatible with the installed" in response[2], response
+        judge.refresh_from_db()
+        assert judge.rank == 9 and Scratch.objects.filter(id=scratch.id).exists()
+        assert multipart_request(port, "/upload_backup/", fields={"csrfmiddlewaretoken": csrf},
+                                 file=("bad.sql", b"not a backup"), cookie=cookie)[0] == 422
+        assert multipart_request(port, "/upload_backup/", fields={"csrfmiddlewaretoken": csrf},
+                                 file=("example.sql", data), cookie=cookie)[0] == 302
+        uploaded, = tmp_path.glob("example_7*.dump.sql")
+        assert uploaded.read_bytes() == data
+
+        response = post(restore, {"confirm": "on"})
+        assert response[0] == 302 and response[1]["Location"] == "/public/login/", response
+        judge.refresh_from_db()
+        assert judge.rank == 5
+        assert Scratch.objects.filter(id=scratch.id, team_id=team.id, judge_id=judge.id).exists()
+        assert len(list(tmp_path.glob("Before Restoring Backup*.dump.sql"))) == 2
+        assert request(port, listing, cookie=staff)[1]["Location"].startswith("/public/login/")
+
+
+@contextmanager
+def mock_backup_objects():
+    from html import escape
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from urllib.parse import parse_qs, unquote, urlsplit
+
+    objects = {}
+    received = []
+
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def respond(self, status, body=b""):
+            self.send_response(status)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def signed(self, data=b""):
+            auth = self.headers.get("Authorization", "")
+            return ("Credential=fixture-access/" in auth and "/s3/aws4_request" in auth
+                    and self.headers.get("x-amz-content-sha256") == sha256(data).hexdigest())
+
+        def do_PUT(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            path = unquote(self.path)
+            received.append((self.command, path))
+            if not self.signed(body) or self.headers.get("If-None-Match") != "*":
+                return self.respond(400)
+            if path in objects:
+                return self.respond(412)
+            objects[path] = body
+            return self.respond(200)
+
+        def do_GET(self):
+            uri = urlsplit(self.path)
+            path = unquote(uri.path)
+            received.append((self.command, path))
+            if not self.signed():
+                return self.respond(400)
+            if path == "/fixture-bucket":
+                params = parse_qs(uri.query)
+                if params.get("prefix") != ["example/backups/"] or params.get("list-type") != ["2"]:
+                    return self.respond(400)
+                keys = sorted(key.removeprefix("/fixture-bucket/") for key in objects)
+                if params.get("continuation-token") == ["next/+"]:
+                    contents = keys[1:]
+                    cursor = "<IsTruncated>false</IsTruncated>"
+                else:
+                    contents = keys[:1]
+                    cursor = "<IsTruncated>true</IsTruncated><NextContinuationToken>next/+</NextContinuationToken>"
+                xml = ("<ListBucketResult>" + cursor
+                       + "".join(f"<Contents><Key>{escape(item)}</Key></Contents>" for item in contents)
+                       + "</ListBucketResult>")
+                return self.respond(200, xml.encode())
+            return self.respond(200, objects[path]) if path in objects else self.respond(404)
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Fixture) as server:
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}", objects, received
+        finally:
+            server.shutdown()
+            thread.join()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_signed_s3_backups_page_through_objects():
+    from urllib.parse import quote
+
+    staff = legacy_tab_session("backup-object-staff")
+    TabSettings.set("cur_round", 1)
+    listing = "/pairing/view_backups/"
+    with mock_backup_objects() as (endpoint, objects, received), rust_server(overrides={
+        "BACKUP_STORAGE": "S3", "BACKUP_PREFIX": "example/backups", "BACKUP_BUCKET": "fixture-bucket",
+        "BACKUP_S3_ENDPOINT": endpoint, "AWS_ACCESS_KEY_ID": "fixture-access",
+        "AWS_SECRET_ACCESS_KEY": "fixture-secret", "BACKUP_S3_REGION": "fixture-1",
+    }) as port:
+        status, headers, body = request(port, listing, cookie=staff)
+        assert status == 200 and b"No backups yet." in body, body
+        csrf = load_cookies(headers)["csrftoken"].value
+        for name in ("First & backup", "Second backup"):
+            result = request(port, "/pairing/backup/", method="POST",
+                             extra_headers={"Cookie": f"sessionid={staff}; csrftoken={csrf}"},
+                             form={"csrfmiddlewaretoken": csrf, "backup_name": name})
+            assert result[0] == 302, result
+        assert len(objects) == 2
+        assert all(key.startswith("/fixture-bucket/example/backups/") for key in objects)
+        status, _, body = request(port, listing, cookie=staff)
+        assert status == 200 and b"First &amp; backup" in body and b"Second backup" in body, body
+        assert sum(path == "/fixture-bucket" for _, path in received) == 4
+        for key, data in objects.items():
+            name = quote(key.rsplit("/", 1)[-1].removesuffix(".dump.sql"), safe="")
+            status, _, raw = request(port, f"/backup/download/{name}/", cookie=staff)
+            assert status == 200 and raw == data and b"tab_tabsettings" in raw
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_roster_groups_change_members_atomically():
+    from mittab.apps.tab.models import RankingGroup
+
+    staff = legacy_tab_session("roster-group-staff")
+    board = legacy_tab_session("roster-group-board")
+    get_user_model().objects.get(username="roster-group-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Group School")
+    teams = [Team.objects.create(name=f"Group Team {i}", school=school, seed=0) for i in (1, 2)]
+    debater = Debater.objects.create(name="Group Debater", novice_status=0)
+    judge = Judge.objects.create(name="Group Judge", rank=3)
+    room = Room.objects.create(name="Group Room", rank=2)
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    with rust_server() as port:
+        status, headers, body = request(port, "/manage-room-tags", cookie=staff)
+        assert status == 200 and b"Create Room Tag" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields, session=staff):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        fields = {"tag": "Accessibility", "priority": "75.25", "teams": teams[0].id,
+                  "judges": judge.id, "rooms": room.id}
+        assert post("/room-tag/", fields, board)[1]["Location"] == "/403/"
+        assert post("/room-tag/", {**fields, "priority": "100"})[0] == 422
+        assert post("/room-tag/", fields)[0] == 302
+        tag = RoomTag.objects.get()
+        assert list(tag.team_set.all()) == teams[:1]
+        assert list(tag.judge_set.all()) == [judge] and list(tag.room_set.all()) == [room]
+        uri = f"/room-tag/{tag.id}/"
+        assert b"Group Judge" in request(port, uri, cookie=staff)[2]
+        assert post(uri, {**fields, "priority": "98", "teams": 9999999})[0] == 422
+        tag.refresh_from_db()
+        assert tag.priority == Decimal("75.25") and list(tag.team_set.all()) == teams[:1]
+        assert post(uri, {**fields, "teams": teams[1].id})[0] == 302
+        assert list(tag.team_set.all()) == teams[1:]
+
+        group_fields = {"name": "Regional", "teams": teams[1].id, "debaters": debater.id}
+        assert post("/ranking-group/", group_fields)[0] == 302
+        assert post("/ranking-group/", group_fields)[0] == 422
+        group = RankingGroup.objects.get()
+        assert list(group.teams.all()) == teams[1:] and list(group.debaters.all()) == [debater]
+        group_url = f"/ranking-group/{group.id}/"
+        assert request(port, group_url, cookie=staff)[0] == 200
+        assert request(port, group_url, cookie=board)[1]["Location"] == "/403/"
+        assert post(group_url, {"_method": "DELETE"})[0] == 302
+        assert post(uri, {"_method": "DELETE"})[0] == 302
+        assert not RankingGroup.objects.exists() and not RoomTag.objects.exists()

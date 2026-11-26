@@ -14,6 +14,32 @@ const LEGACY_BASELINE: [(&str, &str); 6] = [
     ("tab", "0059_bulkcheckinchange"),
 ];
 
+pub fn temporary_backup_table(table: &str) -> bool {
+    matches!(
+        table,
+        "django_session"
+            | "mittab_rust_session"
+            | "mittab_staff_invite_token"
+            | "mittab_rust_schema"
+            | "django_migrations"
+            | "tab_bulkcheckinchange"
+    )
+}
+
+pub fn backup_table(table: &str) -> bool {
+    matches!(
+        table,
+        "mittab_public_logo"
+            | "mittab_registration_private_email"
+            | "mittab_rust_session"
+            | "mittab_staff_invite_token"
+            | "mittab_rust_schema"
+    ) || BASELINE
+        .lines()
+        .filter_map(|line| line.strip_prefix("CREATE TABLE IF NOT EXISTS `"))
+        .any(|line| line.split_once('`').is_some_and(|(name, _)| name == table))
+}
+
 pub async fn prepare(pool: &MySqlPool, initialize: bool) -> Result<(), &'static str> {
     let mut db = pool
         .acquire()
