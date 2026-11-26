@@ -1,3 +1,6 @@
+#[path = "parity/tournament.rs"]
+mod tournament;
+
 // Reads generated parity cases on stdin. This is a test driver for the Rust library.
 use std::{
     fmt::Display,
@@ -149,6 +152,7 @@ fn result(line: &str) -> String {
         .to_owned(),
         "weight" => weight(&mut fields).to_string(),
         "standings" => standings(&mut fields),
+        "tournament" => tournament::run(&mut fields),
         "scores" => {
             let count = read::<usize>(&mut fields);
             let scores: Vec<Vec<f64>> = (0..count)

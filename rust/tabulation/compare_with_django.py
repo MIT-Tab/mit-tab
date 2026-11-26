@@ -17,6 +17,7 @@ from mittab.libs import tab_logic
 from mittab.libs.errors import ByeAssignmentError
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.tab_logic import rankings, stats
+from .tournament_parity import tournament_cases
 
 
 def bracket_cases():
@@ -220,7 +221,7 @@ def main():
     manifest = Path(__file__).with_name("Cargo.toml")
     tests = [
         *bracket_cases(), *bye_cases(), *side_cases(), *weight_cases(),
-        *standings_cases(), *totals_cases(),
+        *standings_cases(), *totals_cases(), *tournament_cases(),
     ]
     commands = [command for command, _ in tests]
     output = subprocess.run(
@@ -234,6 +235,23 @@ def main():
         elif isinstance(expected, tuple):
             actual = tuple(map(float, actual.split(",")))
         if actual != expected:
+            if command.startswith("tournament "):
+                description = " ".join(command.split(maxsplit=6)[:6])
+                actual_rows = actual.split(",") if actual else []
+                expected_rows = expected.split(",") if expected else []
+                if len(actual_rows) != len(expected_rows):
+                    raise AssertionError(
+                        f"{description}: Django returned {len(expected_rows)} rows, "
+                        f"Rust returned {len(actual_rows)} rows"
+                    )
+                for position, (python_row, rust_row) in enumerate(
+                    zip(expected_rows, actual_rows), start=1
+                ):
+                    if python_row != rust_row:
+                        raise AssertionError(
+                            f"{description}, place {position}\n"
+                            f"Django: {python_row}\nRust: {rust_row}"
+                        )
             raise AssertionError(f"{command}\nDjango: {expected}\nRust: {actual}")
     print(f"{len(tests):,} Django/Rust comparisons passed.")
 

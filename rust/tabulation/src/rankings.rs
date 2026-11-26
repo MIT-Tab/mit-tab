@@ -58,6 +58,10 @@ impl Score {
         }
         Some(Self { values: stats })
     }
+
+    pub fn get(&self, stat: Stat) -> f64 {
+        self.values[stat as usize]
+    }
 }
 
 impl Ranking {
