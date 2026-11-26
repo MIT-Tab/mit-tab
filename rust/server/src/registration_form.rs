@@ -22,6 +22,13 @@ impl Fields {
         fields
     }
 
+    pub fn push(&mut self, name: impl Into<String>, value: impl ToString) {
+        self.0
+            .entry(name.into())
+            .or_default()
+            .push(value.to_string());
+    }
+
     pub fn get(&self, key: &str) -> &str {
         self.all(key)
             .last()

@@ -41,6 +41,9 @@ mod registration_store;
 mod registration_views;
 mod room_assignment;
 mod roster_log;
+mod roster_spreadsheet_data;
+mod roster_spreadsheet_layout;
+mod roster_spreadsheets;
 mod rosters;
 mod round_audit;
 mod schema;
@@ -428,10 +431,12 @@ fn router(app: App) -> Router {
                 )),
         )
         .merge(
-            staff_roster::routes().route_layer(axum::middleware::from_fn_with_state(
-                app.clone(),
-                access::data_entry,
-            )),
+            staff_roster::routes()
+                .merge(roster_spreadsheets::routes())
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::data_entry,
+                )),
         )
         .merge(
             staff_scratches::routes().route_layer(axum::middleware::from_fn_with_state(

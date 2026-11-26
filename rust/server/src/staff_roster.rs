@@ -206,6 +206,7 @@ async fn edit(
             id,
             user,
             checkins: is_tab(actor),
+            public_log: true,
             fields: &fields,
         },
     )

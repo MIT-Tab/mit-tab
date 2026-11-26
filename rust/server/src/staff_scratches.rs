@@ -486,7 +486,7 @@ async fn apply(
     Ok(())
 }
 
-async fn audit(
+pub async fn audit(
     db: &mut MySqlConnection,
     id: i32,
     user: i32,

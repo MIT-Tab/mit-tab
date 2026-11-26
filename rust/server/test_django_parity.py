@@ -104,9 +104,22 @@ def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form
 
 
 @pytest.fixture(autouse=True)
-def isolate_tournament_settings():
+def isolate_tournament_settings(django_db_setup, django_db_blocker):
     caches["default"].clear()
     caches["filesystem"].clear()
+    with django_db_blocker.unblock(), connection.cursor() as cursor:
+        assert connection.settings_dict["NAME"].startswith("test_")
+        cursor.execute(
+            """
+            SELECT TABLE_NAME FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('mittab_rust_session', 'mittab_public_logo',
+                                 'mittab_staff_invite_token', 'mittab_registration_private_email')
+            """
+        )
+        for (table,) in cursor.fetchall():
+            # Django's flush knows only about Django-owned tables.
+            cursor.execute(f"DELETE FROM `{table}`")
     yield
     caches["default"].clear()
     caches["filesystem"].clear()
@@ -2886,3 +2899,88 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
         assert Scratch.objects.filter(id=scratch.id).exists()
         assert post(delete, {})[1]["Location"] == edit
         assert not Scratch.objects.filter(id=scratch.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from mittab.libs.spreadsheets import read_rows, spreadsheet_response
+
+    tab = legacy_tab_session("sheet-tab")
+    board = legacy_tab_session("sheet-board")
+    get_user_model().objects.get(username="sheet-board").groups.add(Group.objects.create(name="APDA Board"))
+    helper = get_user_model().objects.create_user(username="sheet-helper", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    client = Client()
+    client.force_login(helper)
+    entry = client.cookies["sessionid"].value
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 2)
+    path = "/import_data/"
+
+    def workbook(fmt, header, rows):
+        return bytes(spreadsheet_response("roster", fmt, header, rows).content)
+
+    with rust_server() as port:
+        status, headers, body = request(port, path, cookie=tab)
+        assert status == 200 and b"Scratches" in body
+        assert b"Scratches" not in request(port, path, cookie=entry)[2]
+        assert request(port, path, cookie=board)[0] == 403
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def upload(kind, fmt, header, rows, session=tab, token=csrf):
+            return multipart_request(port, path, fields={"csrfmiddlewaretoken": token},
+                                     file=(f"roster.{fmt}", workbook(fmt, header, rows)),
+                                     file_field=kind, cookie=f"sessionid={session}; csrftoken={csrf}")
+
+        team_header = ["Debater 2 name", "School", "Team name", "Seed", "Debater 1 name",
+                       "Debater 2 status", "Debater 2 email", "Debater 1 APDA ID", "Hybrid school"]
+        teams = [("Debater Two", "Example School", "Imported Team", "half", "Debater One",
+                  "Novice", "speaker@example.test", 71, "Example Hybrid")]
+        assert upload("team_file", "xlsx", team_header, teams, session=entry, token="bad")[0] == 403
+        mixed = upload("team_file", "xlsx", team_header,
+                       [*teams, ("Debater Four", "Rollback School", "Conflicting Team", "invalid",
+                                 "Debater Three", "Varsity", "", "", "")], session=entry)
+        assert mixed[0] == 422 and b"Row 3" in mixed[2], mixed
+        assert not Team.objects.exists() and not School.objects.exists() and not Debater.objects.exists()
+        uploaded = upload("team_file", "xlsx", team_header, teams, session=entry)
+        assert uploaded[0] == 302, uploaded
+        team = Team.objects.get()
+        assert team.name == "Imported Team" and team.seed == 2 and team.hybrid_school.name == "Example Hybrid"
+        assert team.debaters.get(name="Debater One").apda_id == 71
+        assert team.debaters.get(name="Debater Two").email == "speaker@example.test"
+        assert team.created_by.username == "sheet-helper" and team.checked_in and team.ranking_public
+
+        judge = upload("judge_file", "xls", ["Round 2 expected", "Judge name", "School 1", "Calibration"],
+                       [("yes", "Imported Judge", "Example School", 5.25)])
+        assert judge[0] == 302, judge
+        judge = Judge.objects.get()
+        assert judge.rank == Decimal("5.25") and judge.schools.get().name == "Example School"
+        assert list(JudgeExpectedCheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)) == [2]
+
+        rooms = upload("room_file", "csv", ["Room name", "Rank"], [("Test Room", "3.5"), ("Invalid Room", "bad")])
+        assert rooms[0] == 422 and b"Row 3" in rooms[2]
+        assert not Room.objects.exists()
+        rooms = upload("room_file", "csv", ["Room name", "Rank"], [("Test Room", "3.5")])
+        assert rooms[0] == 302 and Room.objects.get().rank == Decimal("3.50")
+
+        scratch_args = ("scratch_file", "csv", ["Judge name", "Scratch type", "Team name"],
+                        [(judge.name, "tab", team.name)])
+        assert upload(*scratch_args, session=entry)[0] == 422
+        assert not Scratch.objects.exists()
+        assert upload(*scratch_args)[0] == 302 and Scratch.objects.get().scratch_type == Scratch.TAB_SCRATCH
+        assert request(port, "/export_data/scratches.csv", cookie=entry)[1]["Location"] == "/403/"
+        for kind in ("teams", "judges", "rooms", "scratches"):
+            for fmt in ("csv", "xls", "xlsx"):
+                filename = f"{kind}.{fmt}"
+                status, headers, data = request(port, f"/export_data/{filename}", cookie=tab)
+                assert status == 200 and filename in headers["content-disposition"]
+                values = read_rows(SimpleUploadedFile(filename, data))
+                assert len(values) == 2
+                _, exported = values[1]
+                if kind == "teams":
+                    assert exported[:4] == ["Imported Team", "Example School", "Example Hybrid", "Half Seed"]
+                if kind == "judges":
+                    assert exported[-2:] == ["", "yes"]
+                if kind == "scratches":
+                    assert exported == [team.name, judge.name, "tab"]

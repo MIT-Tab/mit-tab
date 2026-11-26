@@ -263,6 +263,7 @@ pub struct Edit<'a> {
     pub id: Option<i32>,
     pub user: i32,
     pub checkins: bool,
+    pub public_log: bool,
     pub fields: &'a Fields,
 }
 
@@ -304,7 +305,7 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
             original.as_deref(),
         )
         .await?;
-        if roster_log::enabled(db).await? {
+        if edit.public_log && roster_log::enabled(db).await? {
             let message = match original {
                 None => Some(format!("Added {} “{new_name}”.", kind.model())),
                 Some(old) if old != new_name => {
@@ -555,7 +556,7 @@ async fn save_team(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Res
             members,
         )
         .await?;
-        if edit.id.is_some() && roster_log::enabled(db).await? {
+        if edit.public_log && edit.id.is_some() && roster_log::enabled(db).await? {
             roster_log::record(
                 db,
                 "teams",
