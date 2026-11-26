@@ -1504,3 +1504,266 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
                         assert set(frame) == {"gov_team", "opp_team", "room", "judges", "chair",
                                               "victor", "num_teams", "division", "choice", "sidelock"}
                         assert all(set(judge) == {"id", "name"} for judge in frame["judges"])
+
+
+@contextmanager
+def mock_school_directory():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    class DirectoryHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path != "/api/schools/all/":
+                self.send_error(404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"schools": [
+                {"id": 17, "name": "Remote Institute"},
+                {"apda_id": 20, "name": "Another Remote School"},
+            ]}).encode())
+
+        def log_message(self, _format, *_args):
+            pass
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), DirectoryHandler) as server:
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}/api/schools/all/"
+        finally:
+            server.shutdown()
+            worker.join(timeout=5)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
+    from mittab.apps.tab.models import TournamentStaffRole, UserTournamentSetupPreference
+
+    tab = legacy_tab_session("setup-staff")
+    board = legacy_tab_session("setup-board")
+    get_user_model().objects.get(username="setup-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("tournament_name", "New Tournament")
+    TabSettings.set("start_tournament_wizard_completed", 0)
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 5)
+    school = School.objects.create(name="Local Host")
+    InfoText.objects.create(title="GA", text="TBD", is_active=True)
+    basics = "/setup/start-tournament/"
+    todo = "/setup/tournament-todo/"
+    toggle = f"{todo}toggle/"
+    ready = {
+        "tournament_name": "Rust Invitational",
+        "host_school": "apda:17",
+        "tournament_type": "12",
+        "ga_room": "Main Library 102",
+        "facebook_url": "https://www.facebook.com/events/1",
+        "sanctioned": "on",
+        "tournament_director": "Taylor Director",
+        "tab_director": "Sam Director",
+        "equity_officers": "Alex Officer\nMorgan Officer",
+        "tournament_observer": "Jordan Observer",
+        "open_speaks": "2",
+        "open_ranks": "1",
+        "custom_staff-TOTAL_FORMS": "1",
+        "custom_staff-0-title": "Room Coordinator",
+        "custom_staff-0-names": "Robin Coordinator",
+    }
+    with mock_school_directory() as endpoint, rust_server(overrides={"MITTAB_SCHOOL_DIRECTORY_URL": endpoint}) as port:
+        assert request(port, "/", cookie=tab)[1]["Location"] == basics
+        assert request(port, todo, cookie=tab)[1]["Location"] == basics
+        assert request(port, basics, cookie=board)[0] == 403
+        status, headers, page = request(port, basics, cookie=tab)
+        assert status == 200 and b"Start Tournament" in page
+        assert b"Remote Institute" in page and b"Local Host" in page
+        assert b'value="New Tournament"' not in page and b'value="TBD"' not in page
+        csrf = load_cookies(headers)["csrftoken"].value
+        jar = {"Cookie": f"sessionid={tab}; csrftoken={csrf}"}
+
+        def post(path, form, token=csrf):
+            return request(port, path, method="POST", extra_headers=jar,
+                           form={"csrfmiddlewaretoken": token, **form})
+
+        assert post(basics, ready, token="invalid")[0] == 403
+        for invalid in ({"host_school": "apda:999"},
+                        {"custom_staff-0-names": ""},
+                        {"open_speaks": "3"},
+                        {"facebook_url": "javascript:alert(1)"}):
+            assert post(basics, {**ready, **invalid})[0] == 422
+            assert TabSettings.get("start_tournament_wizard_completed", use_cache=False) == 0
+            assert not TournamentStaffRole.objects.exists()
+
+        assert post(basics, ready)[1]["Location"] == todo
+        assert TabSettings.get("start_tournament_wizard_completed", use_cache=False) == 1
+        assert TabSettings.get("host_school_name", use_cache=False) == "Remote Institute"
+        assert TabSettings.get("tournament_type", use_cache=False) == 12
+        assert TabSettings.get("open_ranks", use_cache=False) == 1
+        tournament_date = TabSettings.get("tournament_date", use_cache=False)
+        assert tournament_date
+        assert InfoText.objects.get(title="GA").text == "Main Library 102"
+        assert InfoLink.objects.get(title="Facebook").url == ready["facebook_url"]
+        assert TournamentStaffRole.objects.get().title == "Room Coordinator"
+        assert b"Robin Coordinator" in request(port, "/public/")[2]
+        assert request(port, "/", cookie=tab)[1]["Location"] == "/pairings/status/"
+
+        status, _, page = request(port, todo, extra_headers=jar)
+        assert status == 200 and b"Configure Core Settings" in page
+        assert b"Day of Tournament" in page and b"Speaker Results Auto-Published" in page
+        assert re.search(rb'id="step_set_tournament_name"[^>]* checked[^>]* disabled', page)
+        assert post(toggle, {"field": "step_unrecognized", "checked": "true"})[0] == 400
+        activity = post(toggle, {"field": "step_add_tab_user_accounts", "checked": "true"})
+        assert activity[0] == 200 and json.loads(activity[2])["section_completed"] == 2
+        refusal = post(toggle, {"field": "step_set_tournament_name", "checked": "false"})
+        assert json.loads(refusal[2])["checked"] is True
+        assert post(todo, {"hide_tournament_todo": "on"})[0] == 302
+        assert UserTournamentSetupPreference.objects.get().hide_tournament_todo
+        assert TabSettings.get("todo_add_tab_user_accounts", use_cache=False) == 0
+        assert TabSettings.get("todo_set_tournament_name", use_cache=False) == 1
+
+        assert post(basics, {**ready, "host_school": f"pk:{school.id}",
+                             "custom_staff-0-DELETE": "on"})[1]["Location"] == basics
+        assert TabSettings.get("host_school_name", use_cache=False) == "Local Host"
+        assert TabSettings.get("tournament_date", use_cache=False) == tournament_date
+        assert not TournamentStaffRole.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_settings_write_only_declared_fields_and_honor_discretionary_scratch_lock():
+    from mittab.apps.tab.views.views import get_settings_from_yaml
+
+    tab = legacy_tab_session("settings-staff")
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 5)
+    TabSettings.set("judges_public", 1)
+    registration, _ = RegistrationConfig.objects.update_or_create(
+        id=1, defaults={"disc_scratches_open": True},
+    )
+    fields, _, categories = get_settings_from_yaml()
+    path = "/settings_form"
+    data = {}
+    for setting in fields:
+        value = setting["value"]
+        if setting.get("type") == "choice" and value in ("", None):
+            value = setting["choices"][0][0]
+        if setting.get("type") == "boolean":
+            if value:
+                data[f"setting_{setting['name']}"] = "on"
+        else:
+            data[f"setting_{setting['name']}"] = value
+    data.pop("setting_judges_public", None)
+    data["setting_tot_rounds"] = "7"
+    data["setting_written_rfd_deadline"] = "2099-11-10T20:15"
+
+    with rust_server() as port:
+        status, headers, page = request(port, path, cookie=tab)
+        assert status == 200
+        assert b"Tab Settings" in page and b"Speaker Points" in page
+        assert re.search(rb'id="setting_judges_public"[^>]* disabled', page)
+        csrf = load_cookies(headers)["csrftoken"].value
+        jar = {"Cookie": f"sessionid={tab}; csrftoken={csrf}"}
+
+        def post(path, form):
+            return request(port, path, method="POST", extra_headers=jar,
+                           form={"csrfmiddlewaretoken": csrf, **form})
+
+        assert post(path, {**data, "setting_min_byes": "-1"})[0] == 422
+        assert TabSettings.get("tot_rounds", use_cache=False) == 5
+        assert post(path, {**data, "setting_cur_round": "10"})[1]["Location"] == path
+        assert TabSettings.get("tot_rounds", use_cache=False) == 7
+        assert TabSettings.get("cur_round", use_cache=False) == 1
+        assert TabSettings.get("judges_public", use_cache=False) == 1
+        assert TabSettings.get("written_rfd_deadline", use_cache=False) == "2099-11-10 20:15"
+        registration.disc_scratches_open = False
+        registration.save(update_fields=["disc_scratches_open"])
+        assert post(path, data)[0] == 302
+        assert TabSettings.get("judges_public", use_cache=False) == 0
+        viewed = f"{path}/viewed/"
+        assert post(viewed, {"category": "invalid"})[0] == 400
+        for category in categories:
+            assert post(viewed, {"category": category["id"]})[0] == 204
+        page = request(port, "/setup/tournament-todo/", extra_headers=jar)[2]
+        assert re.search(rb'id="step_configure_settings"[^>]* checked[^>]* disabled', page)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_batch_checkin_and_history_restore_keep_durable_cells_and_role_boundaries():
+    from mittab.apps.tab.models import BulkCheckInChange
+
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("teams_public", 1)
+    TabSettings.set("judges_public", 1)
+    school = School.objects.create(name="Check-In School")
+    teams = [
+        Team.objects.create(name=f"Check-In Team {i}", school=school, seed=Team.UNSEEDED, checked_in=False)
+        for i in range(2)
+    ]
+    judges = [Judge.objects.create(name=f"Check-In Judge {i}", rank=4) for i in range(2)]
+    room = Room.objects.create(name="Check-In Room", rank=3)
+    Round.objects.create(round_number=2, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    helper = get_user_model().objects.create_user(username="native-checkin", password="synthetic", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Check-in helper"))
+    helper_client = Client()
+    helper_client.force_login(helper)
+    helper_cookie = helper_client.cookies["sessionid"].value
+    board = legacy_tab_session("board-checkin")
+    get_user_model().objects.get(username="board-checkin").groups.add(Group.objects.create(name="APDA Board"))
+    page_url, update_url = "/batch_checkin/", "/bulk_check_in/"
+
+    def post(port, session, csrf, kind="team", action="check_in", ids=(), rounds=(), **more):
+        form = [
+            ("csrfmiddlewaretoken", csrf),
+            ("entity_type", kind), ("action", action), ("include_undo", "1"),
+            *(("entity_ids[]", item) for item in ids),
+            *(("rounds[]", item) for item in rounds),
+            *more.items(),
+        ]
+        return request(port, update_url, method="POST", form=form,
+                       extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"})
+
+    with rust_server() as port:
+        assert request(port, page_url)[1]["Location"].startswith("/public/login/")
+        status, headers, page = request(port, page_url, cookie=helper_cookie)
+        assert status == 200 and b"Expected Judges" in page and b"Check-In Team 0" in page
+        assert b"Check-In Judge 0" in page and b"Check-In Room" in page
+        assert request(port, page_url, cookie=board)[1]["Location"] == "/403/"
+        assert request(port, "/pairings/status/", cookie=helper_cookie)[1]["Location"] == "/403/"
+        csrf = load_cookies(headers)["csrftoken"].value
+        assert post(port, board, csrf, ids=[teams[0].id])[1]["Location"] == "/403/"
+        assert post(port, helper_cookie, "invalid", ids=[teams[0].id])[0] == 403
+        first = json.loads(post(port, helper_cookie, csrf, ids=[teams[0].id, teams[1].id])[2])["undo"]
+        assert first["count"] == 2
+        assert list(Team.objects.values_list("checked_in", flat=True)) == [True, True]
+        token = str(BulkCheckInChange.objects.get().token)
+        assert first["id"] == token
+        latest = json.loads(post(port, helper_cookie, csrf, action="check_out", ids=[teams[0].id])[2])["undo"]
+        assert latest["count"] == 1
+        assert post(port, helper_cookie, csrf, action="undo", change_id=token)[0] == 409
+        preview_url = f"{page_url}?history=team&before={token}"
+        preview = request(port, preview_url, cookie=helper_cookie)[2]
+        assert b"Reverse 2 edits" in preview and b"Set 1 to Checked Out." in preview
+        assert post(port, helper_cookie, csrf, action="restore", change_id=token, head=token)[0] == 409
+        assert list(Team.objects.values_list("checked_in", flat=True)) == [False, True]
+
+        assert post(port, helper_cookie, csrf, "judge", ids=[judges[0].id], rounds=[0, 1, 99])[0] == 200
+        assert set(CheckIn.objects.values_list("round_number", flat=True)) == {0, 1}
+        assert post(port, helper_cookie, csrf, "room", ids=[room.id], rounds=[2])[0] == 200
+        assert RoomCheckIn.objects.get().round_number == 2
+        expect = post(port, helper_cookie, csrf, "judge_expected", ids=[judges[1].id], rounds=[0, 1])
+        assert expect[0] == 200
+        expected_head = json.loads(expect[2])["undo"]["id"]
+        assert JudgeExpectedCheckIn.objects.count() == 2
+        assert PublicRosterChange.objects.filter(message__startswith="Changed availability for “Check-In Judge 1”", list_kind="judges").count() == 2
+
+    with rust_server() as port:
+        assert b"Undo last change (1 changed)" in request(port, page_url, cookie=helper_cookie)[2]
+        restore = post(port, helper_cookie, csrf, action="restore", change_id=token, head=latest["id"])
+        assert restore[1]["Location"] == f"{page_url}#team"
+        assert list(Team.objects.values_list("checked_in", flat=True)) == [False, False]
+        assert BulkCheckInChange.objects.filter(entity_type="team", undone=True).count() == 2
+        assert b"Reversed" in request(port, f"{page_url}?history=team", cookie=helper_cookie)[2]
+        assert post(port, helper_cookie, csrf, "judge_expected", "undo", change_id=expected_head)[0] == 200
+        assert not JudgeExpectedCheckIn.objects.exists()
+        assert PublicRosterChange.objects.filter(message__startswith="Changed availability for “Check-In Judge 1”", list_kind="judges").count() == 4
+        assert CheckIn.objects.count() == 2 and RoomCheckIn.objects.count() == 1

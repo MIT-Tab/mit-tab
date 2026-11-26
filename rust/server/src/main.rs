@@ -5,6 +5,9 @@ mod board;
 mod board_outrounds;
 mod board_snapshot;
 mod bundle;
+mod checkin;
+mod checkin_data;
+mod checklist;
 mod config;
 mod home;
 mod html;
@@ -21,13 +24,18 @@ mod public_api;
 mod public_pairings;
 mod publication;
 mod room_assignment;
+mod roster_log;
 mod rosters;
 mod round_audit;
 mod schema;
+mod school_directory;
 mod settings;
+mod settings_form;
 mod speakers;
 mod staff_pairing;
+mod staff_roles;
 mod tournament_data;
+mod tournament_setup;
 
 use std::{process::ExitCode, sync::Arc};
 
@@ -166,6 +174,30 @@ fn router(app: App) -> Router {
         )
         .merge(
             Router::new()
+                .route(
+                    "/setup/start-tournament/",
+                    get(tournament_setup::page).post(tournament_setup::save),
+                )
+                .route(
+                    "/setup/tournament-todo/",
+                    get(checklist::page).post(checklist::save),
+                )
+                .route(
+                    "/setup/tournament-todo/toggle/",
+                    axum::routing::post(checklist::toggle),
+                )
+                .route(
+                    "/settings_form",
+                    get(settings_form::page).post(settings_form::save),
+                )
+                .route(
+                    "/settings_form/",
+                    get(settings_form::page).post(settings_form::save),
+                )
+                .route(
+                    "/settings_form/viewed/",
+                    axum::routing::post(settings_form::viewed),
+                )
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(
@@ -247,6 +279,15 @@ fn router(app: App) -> Router {
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::board,
+                )),
+        )
+        .merge(
+            Router::new()
+                .route("/batch_checkin/", get(checkin::page))
+                .route("/bulk_check_in/", axum::routing::post(checkin::update))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::checkins,
                 )),
         )
         .route("/public/login/", get(login::page).post(login::sign_in))

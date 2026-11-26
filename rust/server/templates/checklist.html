@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Tournament Checklist</h2>
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <a class="btn btn-outline-primary" href="/setup/start-tournament/">Tournament Basics</a>
+    <a class="btn btn-outline-primary" href="/pairings/status/">Current Round</a>
+    <a class="btn btn-outline-primary" href="/motions/">Manage Motions</a>
+    <a class="btn btn-outline-primary" href="/public/">Public Homepage</a>
+  </div>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <div class="form-check mb-4">
+      <input class="form-check-input" type="checkbox" name="hide_tournament_todo" id="hide_tournament_todo"{% if hide %} checked{% endif %}>
+      <label class="form-check-label" for="hide_tournament_todo">Skip this checklist after signing in</label>
+    </div>
+    {% for section in sections %}
+    <section class="mb-4">
+      <h3>{{ section.title }}</h3>
+      <p>{{ section.completed }} of {{ section.total }} completed</p>
+      <div class="progress mb-3"><div class="progress-bar" role="progressbar" aria-label="{{ section.title }}" aria-valuenow="{{ section.progress }}" aria-valuemin="0" aria-valuemax="100" style="width: {{ section.progress }}%"></div></div>
+      {% for step in section.steps %}
+      <div class="form-check my-3">
+        <input class="form-check-input" type="checkbox" id="{{ step.field }}" name="{{ step.field }}"{% if step.checked %} checked{% endif %}{% if step.auto %} disabled{% endif %}>
+        <label class="form-check-label" for="{{ step.field }}">{{ step.title }}{% if step.optional %} <small>({{ step.optional }})</small>{% endif %}</label>
+        <details>
+          <summary>Details</summary>
+          <p>{{ step.description }}</p>
+          {% if step.url %}<a href="{{ step.url }}">Open {{ step.title }}</a>{% endif %}
+        </details>
+      </div>
+      {% endfor %}
+    </section>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Save Checklist</button>
+  </form>
+</div>
+{% endblock %}

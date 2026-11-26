@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>{{ title }}</h2>
+  <a class="btn btn-outline-secondary mb-3" href="/batch_checkin/#{{ fragment }}">Back to Batch Check-In</a>
+  {% if conflict %}
+  <div class="alert alert-warning" role="alert">This restore conflicts with newer edits or removed entries. Review the history before trying again.</div>
+  {% endif %}
+  {% if preview %}
+  <section class="border rounded p-3 mb-3">
+    <h3>Restore Preview</h3>
+    <p>Reverse {{ preview.edits }} {{ "edit" if preview.edits == 1 else "edits" }} to restore check-ins to before {{ preview.before }}.</p>
+    <ul>
+      {% if preview.check_in %}<li>Set {{ preview.check_in }} to {{ "Expected" if expected else "Checked In" }}.</li>{% endif %}
+      {% if preview.check_out %}<li>Set {{ preview.check_out }} to {{ "Not Expected" if expected else "Checked Out" }}.</li>{% endif %}
+    </ul>
+    {% if not preview.check_in and not preview.check_out %}<p>The current statuses already match the restored state.</p>{% endif %}
+    <form method="post" action="/bulk_check_in/">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="action" value="restore">
+      <input type="hidden" name="entity_type" value="{{ kind }}">
+      <input type="hidden" name="change_id" value="{{ target }}">
+      <input type="hidden" name="head" value="{{ preview.head }}">
+      <button class="btn btn-primary" type="submit">Restore Check-Ins</button>
+      <a class="btn btn-secondary" href="/batch_checkin/?history={{ kind }}&amp;page={{ current }}">Cancel</a>
+    </form>
+  </section>
+  {% endif %}
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Saved</th><th scope="col">Change</th>{% if not team %}<th scope="col">Rounds</th>{% endif %}<th scope="col">Statuses</th><th scope="col">Restore</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.time }}</td>
+        <td>{% if expected %}{{ "Expected" if row.checked else "Not Expected" }}{% else %}{{ "Checked In" if row.checked else "Checked Out" }}{% endif %}</td>
+        {% if not team %}<td>{% for round in row.rounds %}{{ "Outrounds" if round == 0 else round }}{% if not loop.last %}, {% endif %}{% endfor %}</td>{% endif %}
+        <td>{{ row.count }}</td>
+        <td>{% if row.undone %}Reversed{% else %}<a href="/batch_checkin/?history={{ kind }}&amp;page={{ current }}&amp;before={{ row.token }}">Restore to before this edit</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <nav aria-label="Check-in history pages">
+    {% if current > 1 %}<a class="btn btn-sm btn-outline-secondary" href="?history={{ kind }}&amp;page={{ current - 1 }}">Newer</a>{% endif %}
+    <span>Page {{ current }} of {{ pages }}</span>
+    {% if current < pages %}<a class="btn btn-sm btn-outline-secondary" href="?history={{ kind }}&amp;page={{ current + 1 }}">Older</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% else %}
+  <p>No saved changes for this tab.</p>
+  {% endif %}
+</div>
+{% endblock %}

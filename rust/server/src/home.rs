@@ -410,10 +410,17 @@ fn asset(content_type: &'static str, body: impl IntoResponse) -> Response {
     response
 }
 
-pub async fn index(Extension(actor): Extension<Actor>) -> Response {
+pub async fn index(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     match actor {
         Actor::Anonymous => access::found("/public/"),
         Actor::User { board: true, .. } => access::found("/apda-board/"),
-        Actor::User { .. } => access::found("/setup/tournament-todo/"),
+        Actor::User {
+            superuser: true, ..
+        } => match access::wizard_complete(&app).await {
+            Ok(true) => access::found("/pairings/status/"),
+            Ok(false) => access::found("/setup/start-tournament/"),
+            Err(_) => unavailable(),
+        },
+        Actor::User { .. } => access::found("/public/"),
     }
 }

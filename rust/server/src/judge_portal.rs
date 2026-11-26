@@ -219,7 +219,7 @@ pub async fn availability(
     }
     let result = async {
         let mut db = app.db.begin().await?;
-        let Some((id, _)) = judge(&mut db, &code, true).await? else {
+        let Some((id, name)) = judge(&mut db, &code, true).await? else {
             return Ok(access::found(SEARCH));
         };
         let settings = Settings::load(&mut db, PORTAL_SETTINGS).await?;
@@ -238,7 +238,11 @@ pub async fn availability(
                     .is_some_and(|value| !value.is_empty())
             })
             .collect();
-        for round in existing.difference(&desired) {
+        let log_changes = existing != desired && crate::roster_log::enabled(&mut db).await?;
+        let removed: std::collections::BTreeSet<_> =
+            existing.difference(&desired).copied().collect();
+        let added: std::collections::BTreeSet<_> = desired.difference(&existing).copied().collect();
+        for round in removed {
             sqlx::query(
                 "DELETE FROM tab_judgeexpectedcheckin WHERE judge_id = ? AND round_number = ?",
             )
@@ -246,8 +250,11 @@ pub async fn availability(
             .bind(round)
             .execute(&mut *db)
             .await?;
+            if log_changes {
+                crate::roster_log::availability(&mut db, &name, round, false).await?;
+            }
         }
-        for round in desired.difference(&existing) {
+        for round in added {
             sqlx::query(
                 "INSERT INTO tab_judgeexpectedcheckin (judge_id, round_number) VALUES (?, ?)",
             )
@@ -255,6 +262,9 @@ pub async fn availability(
             .bind(round)
             .execute(&mut *db)
             .await?;
+            if log_changes {
+                crate::roster_log::availability(&mut db, &name, round, true).await?;
+            }
         }
         db.commit().await?;
         Ok::<_, sqlx::Error>(access::found(target(&code, "")))

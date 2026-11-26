@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Tab Settings</h2>
+  <a class="btn btn-outline-primary mb-3" href="/setup/tournament-todo/">Tournament Checklist</a>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% for category in categories %}
+    <details class="mb-3 border rounded p-3" data-category="{{ category.id }}"{% if loop.first %} open{% endif %}>
+      <summary class="h5">{{ category.name }}</summary>
+      <p>{{ category.description }}</p>
+      <div class="row">
+        {% for field in category.fields %}
+        <div class="col-md-6 mb-3">
+          {% if field.kind == "boolean" %}
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="{{ field.form_name }}" name="{{ field.form_name }}" aria-describedby="{{ field.form_name }}_help"{% if field.checked %} checked{% endif %}{% if field.disabled %} disabled{% endif %}>
+            <label class="form-check-label" for="{{ field.form_name }}">{{ field.label }}</label>
+          </div>
+          {% else %}
+          <label class="form-label" for="{{ field.form_name }}">{{ field.label }}</label>
+          {% if field.kind == "choice" %}
+          <select class="form-select" id="{{ field.form_name }}" name="{{ field.form_name }}" aria-describedby="{{ field.form_name }}_help" required>
+            {% if not field.value %}<option value="">Choose a value</option>{% endif %}
+            {% for value, label in field.choices %}<option value="{{ value }}"{% if value|string == field.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          {% else %}
+          <input class="form-control" type="{{ 'datetime-local' if field.kind == 'datetime' else 'number' if field.kind == 'integer' else 'text' }}" id="{{ field.form_name }}" name="{{ field.form_name }}" value="{{ field.value }}" aria-describedby="{{ field.form_name }}_help"{% if field.minimum is not none %} min="{{ field.minimum }}"{% endif %}{% if field.kind == "integer" %} required{% endif %}>
+          {% endif %}
+          {% endif %}
+          <small id="{{ field.form_name }}_help">{{ field.description }}</small>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Save Tab Settings</button>
+  </form>
+</div>
+<script>
+  const recordCategory = async (section) => {
+    if (!section.open) return;
+    const token = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    await fetch('/settings_form/viewed/', {
+      method: 'POST',
+      body: new URLSearchParams({ csrfmiddlewaretoken: token, category: section.dataset.category })
+    });
+  };
+  for (const section of document.querySelectorAll('details[data-category]')) {
+    recordCategory(section);
+    section.addEventListener('toggle', () => recordCategory(section));
+  }
+</script>
+{% endblock %}

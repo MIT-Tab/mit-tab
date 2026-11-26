@@ -111,11 +111,16 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
         },
         Actor::User {
             superuser: true, ..
-        } => match wizard_complete(&app).await {
-            Ok(true) => {}
-            Ok(false) => return found("/setup/start-tournament/"),
-            Err(_) => return unavailable(),
-        },
+        } if request.uri().path() != "/setup/start-tournament/" => {
+            match wizard_complete(&app).await {
+                Ok(true) => {}
+                Ok(false) => return found("/setup/start-tournament/"),
+                Err(_) => return unavailable(),
+            }
+        }
+        Actor::User {
+            superuser: true, ..
+        } => {}
         Actor::User { staff: true, .. } => return access_denied(),
         Actor::User { id, .. } => match has_settings_permission(&app, id).await {
             Ok(true) => {}
@@ -248,4 +253,42 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
     }
     request.extensions_mut().insert(actor);
     private(next.run(request).await)
+}
+
+pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    match actor {
+        Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
+        Actor::User { board: true, .. } => match board_access_open(&app).await {
+            Ok(true) => return access_denied(),
+            Ok(false) => return board_closed(),
+            Err(_) => return unavailable(),
+        },
+        Actor::User {
+            superuser: true, ..
+        } => match wizard_complete(&app).await {
+            Ok(true) => {}
+            Ok(false) => return found("/setup/start-tournament/"),
+            Err(_) => return unavailable(),
+        },
+        Actor::User {
+            id, staff: true, ..
+        } => match crate::staff_roles::preset(&app.db, id).await {
+            Ok(Some(preset)) if preset.checkins() => {}
+            Ok(_) => return access_denied(),
+            Err(_) => return unavailable(),
+        },
+        Actor::User { .. } => return access_denied(),
+    }
+    let allowed = matches!(
+        (request.method(), request.uri().path()),
+        (&Method::GET | &Method::HEAD, "/batch_checkin/") | (&Method::POST, "/bulk_check_in/")
+    );
+    if !allowed {
+        return access_denied();
+    }
+    request.extensions_mut().insert(actor);
+    next.run(request).await
 }

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Batch Check-In</h2>
+  <nav class="d-flex flex-wrap gap-2 mb-4" aria-label="Check-in categories">
+    {% for grid in grids %}<a class="btn btn-outline-primary" href="#{{ grid.fragment }}">{{ grid.title }}</a>{% endfor %}
+  </nav>
+  {% for grid in grids %}
+  <section id="{{ grid.fragment }}" class="mb-5">
+    <h3>{{ grid.title }}</h3>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <a class="btn btn-outline-secondary" href="/batch_checkin/?history={{ grid.kind }}">Check-In History</a>
+      {% if grid.undo %}
+      <form method="post" action="/bulk_check_in/">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+        <input type="hidden" name="entity_type" value="{{ grid.kind }}">
+        <input type="hidden" name="change_id" value="{{ grid.undo.id }}">
+        <input type="hidden" name="action" value="undo">
+        <input type="hidden" name="return_to" value="checkin">
+        <button class="btn btn-outline-secondary" type="submit">Undo last change ({{ grid.undo.count }} changed)</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if grid.rows %}
+    <form method="post" action="/bulk_check_in/" data-checkin-grid>
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="entity_type" value="{{ grid.kind }}">
+      <input type="hidden" name="return_to" value="checkin">
+      {% if not grid.team %}
+      <fieldset class="mb-3">
+        <legend class="h6">Rounds to update</legend>
+        <div class="d-flex flex-wrap gap-3">
+        {% for round in rounds %}
+          <label><input class="form-check-input" type="checkbox" name="rounds[]" value="{{ round }}"> {{ "Outrounds" if round == 0 else "Round " ~ round }}</label>
+        {% endfor %}
+        </div>
+      </fieldset>
+      {% endif %}
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <label><input class="form-check-input" type="checkbox" data-select-all> Select all {{ grid.title|lower }}</label>
+        <button class="btn btn-primary" type="submit" name="action" value="check_in">{{ "Mark Expected" if grid.expected else "Check In" }}</button>
+        <button class="btn btn-outline-primary" type="submit" name="action" value="check_out">{{ "Mark Not Expected" if grid.expected else "Check Out" }}</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead><tr>
+            <th scope="col">Select</th><th scope="col">Name</th>
+            {% if grid.team %}
+            <th scope="col">Checked In ({{ grid.totals[0] }})</th>
+            {% else %}
+            {% for round in rounds %}
+              <th scope="col">{{ "Outrounds" if round == 0 else "Round " ~ round }} ({{ grid.totals[loop.index0] }})</th>
+            {% endfor %}
+            {% endif %}
+          </tr></thead>
+          <tbody>
+          {% for row in grid.rows %}
+            <tr>
+              <td><input name="entity_ids[]" class="form-check-input" value="{{ row.id }}" type="checkbox" aria-label="Select {{ row.name }}"></td>
+              <th scope="row">{{ row.name }}{% if row.secondary %}<br><small>{{ row.secondary }}</small>{% endif %}</th>
+              {% for mark in row.marks %}
+              <td>
+                <button type="button" class="btn btn-sm {{ 'btn-success' if mark.status else 'btn-outline-secondary' }}"
+                    data-mark data-entity="{{ row.id }}" data-round="{{ mark.round if mark.round is not none else '' }}"
+                    data-action="{{ 'check_out' if mark.status else 'check_in' }}"
+                    aria-label="{{ row.name }} {{ 'Outrounds' if mark.round == 0 else 'Round ' ~ mark.round if mark.round is not none else 'check-in' }}: {{ 'Yes' if mark.status else 'No' }}">
+                  {{ "Yes" if mark.status else "No" }}
+                </button>
+                {% if mark.expected %}<small>Expected</small>{% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <output class="text-danger" aria-live="polite" data-checkin-error></output>
+    </form>
+    {% else %}
+    <p>No {{ grid.title|lower }} to check in.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+<script>
+  for (const grid of document.querySelectorAll('[data-checkin-grid]')) {
+    grid.querySelector('[data-select-all]').addEventListener('change', (event) => {
+      for (const row of grid.querySelectorAll('[name="entity_ids[]"]')) {
+        row.checked = event.currentTarget.checked;
+      }
+    });
+    grid.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-mark]');
+      if (!button) return;
+      button.disabled = true;
+      const input = new URLSearchParams({
+        csrfmiddlewaretoken: grid.querySelector('[name="csrfmiddlewaretoken"]').value,
+        entity_type: grid.querySelector('[name="entity_type"]').value,
+        action: button.dataset.action,
+        'entity_ids[]': button.dataset.entity
+      });
+      if (button.dataset.round !== '') input.set('rounds[]', button.dataset.round);
+      try {
+        const reply = await fetch(grid.action, { method: 'POST', body: input });
+        if (!reply.ok) throw new Error();
+        const result = await reply.json();
+        if (!result.success) throw new Error();
+        location.reload();
+      } catch {
+        grid.querySelector('[data-checkin-error]').textContent = 'Could not save check-in. Reload and try again.';
+        button.disabled = false;
+      }
+    });
+  }
+</script>
+{% endblock %}

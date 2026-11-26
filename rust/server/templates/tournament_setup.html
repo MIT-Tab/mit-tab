@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="readable-page col">
+  <h2>{{ title }}</h2>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    <fieldset>
+      <legend>Tournament</legend>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="tournament_name" class="form-label">Tournament name</label>
+          <input class="form-control" id="tournament_name" name="tournament_name" value="{{ fields.tournament_name }}" maxlength="200" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label for="host_school" class="form-label">Host school</label>
+          <select class="form-select" id="host_school" name="host_school" required>
+            <option value="">Choose a school</option>
+            {% for school in schools %}<option value="{{ school.value }}"{% if school.value == fields.host_school %} selected{% endif %}>{{ school.name }}</option>{% endfor %}
+            <option value="manual"{% if fields.host_school == "manual" %} selected{% endif %}>Other school</option>
+          </select>
+          <div class="mt-2" id="other_school" {% if fields.host_school != "manual" %}hidden{% endif %}>
+            <label for="host_school_name" class="form-label">Other school name</label>
+            <input class="form-control" id="host_school_name" name="host_school_name" value="{{ fields.host_school_name }}" maxlength="200">
+          </div>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label for="tournament_type" class="form-label">Tournament type</label>
+          <select class="form-select" id="tournament_type" name="tournament_type" required>
+            {% for value, label in types %}<option value="{{ value }}"{% if value == fields.tournament_type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label for="ga_room" class="form-label">GA location / room</label>
+          <input class="form-control" id="ga_room" name="ga_room" value="{{ fields.ga_room }}" maxlength="500" required>
+        </div>
+        <div class="col-md-8 mb-3">
+          <label for="facebook_url" class="form-label">Facebook link</label>
+          <input class="form-control" id="facebook_url" name="facebook_url" type="url" value="{{ fields.facebook_url }}" maxlength="500" required>
+        </div>
+        <div class="col-md-4 d-flex align-items-center">
+          <label><input type="checkbox" name="sanctioned"{% if fields.sanctioned %} checked{% endif %}> Sanctioned APDA tournament</label>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset class="mt-3">
+      <legend>Staff</legend>
+      <div class="row">
+      {% for key, label in [("tournament_director", "Tournament Director"), ("tab_director", "Tab Director"), ("equity_officers", "Equity Officer(s)"), ("tournament_observer", "Tournament Observer")] %}
+        <div class="col-md-6 mb-3">
+          <label for="{{ key }}" class="form-label">{{ label }}</label>
+          {% if key == "equity_officers" %}<textarea class="form-control" id="{{ key }}" name="{{ key }}" rows="2" maxlength="200" required>{{ fields[key] }}</textarea>
+          {% else %}<input class="form-control" id="{{ key }}" name="{{ key }}" value="{{ fields[key] }}" maxlength="200" required>{% endif %}
+        </div>
+      {% endfor %}
+      </div>
+      <input type="hidden" id="custom_staff_total" name="custom_staff-TOTAL_FORMS" value="{{ roles|length }}">
+      <div id="additional_staff">
+        {% for role in roles %}
+        <div class="row mb-2">
+          <div class="col-md-4"><label class="form-label">Role title <input class="form-control" name="custom_staff-{{ loop.index0 }}-title" value="{{ role.title }}" maxlength="100"></label></div>
+          <div class="col-md-5"><label class="form-label">Names <textarea class="form-control" name="custom_staff-{{ loop.index0 }}-names" rows="2" maxlength="500">{{ role.names }}</textarea></label></div>
+          <div class="col-md-3"><label><input type="checkbox" name="custom_staff-{{ loop.index0 }}-DELETE"> Remove</label></div>
+        </div>
+        {% endfor %}
+      </div>
+      <button class="btn btn-outline-primary mb-3" type="button" id="add_staff">Add Staff Role</button>
+      <template id="staff_role">
+        <div class="row mb-2">
+          <div class="col-md-4"><label class="form-label">Role title <input class="form-control" data-field="title" maxlength="100"></label></div>
+          <div class="col-md-5"><label class="form-label">Names <textarea class="form-control" data-field="names" rows="2" maxlength="500"></textarea></label></div>
+          <div class="col-md-3"><label><input type="checkbox" data-field="DELETE"> Remove</label></div>
+        </div>
+      </template>
+    </fieldset>
+    <fieldset>
+      <legend>Ballot Disclosure</legend>
+      <div class="row">
+      {% for key, label in [("open_speaks", "Speaker points"), ("open_ranks", "Speaker ranks")] %}
+        <div class="col-md-6 mb-3">
+          <label for="{{ key }}" class="form-label">{{ label }}</label>
+          <select class="form-select" id="{{ key }}" name="{{ key }}" required>
+            <option value="">Choose a policy</option>
+            <option value="1"{% if fields[key] == "1" %} selected{% endif %}>Open</option>
+            <option value="2"{% if fields[key] == "2" %} selected{% endif %}>Closed</option>
+          </select>
+        </div>
+      {% endfor %}
+      </div>
+    </fieldset>
+    <button class="btn btn-primary" type="submit">Save Tournament Basics</button>
+  </form>
+</div>
+<script>
+  const school = document.getElementById('host_school');
+  school.addEventListener('change', () => {
+    const other = document.getElementById('other_school');
+    other.hidden = school.value !== 'manual';
+    document.getElementById('host_school_name').required = !other.hidden;
+  });
+  document.getElementById('add_staff').addEventListener('click', (event) => {
+    const total = document.getElementById('custom_staff_total');
+    const index = Number(total.value);
+    if (index >= 100) return;
+    const section = document.getElementById('staff_role').content.cloneNode(true);
+    section.querySelectorAll('[data-field]').forEach((input) => {
+      input.name = 'custom_staff-' + index + '-' + input.dataset.field;
+    });
+    const first = section.querySelector('input');
+    document.getElementById('additional_staff').append(section);
+    total.value = index + 1;
+    event.currentTarget.disabled = index + 1 >= 100;
+    first.focus();
+  });
+</script>
+{% endblock %}

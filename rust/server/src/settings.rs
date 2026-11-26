@@ -69,3 +69,41 @@ impl Settings {
         }
     }
 }
+
+pub enum SettingValue<'a> {
+    Number(i32),
+    Text(&'a str),
+}
+
+pub async fn put(
+    db: &mut MySqlConnection,
+    key: &str,
+    value: SettingValue<'_>,
+) -> Result<(), sqlx::Error> {
+    let id = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM tab_tabsettings WHERE `key` = ? ORDER BY id LIMIT 1 FOR UPDATE",
+    )
+    .bind(key)
+    .fetch_optional(&mut *db)
+    .await?;
+    let (number, text) = match value {
+        SettingValue::Number(number) => (Some(number), None),
+        SettingValue::Text(text) => (None, Some(text)),
+    };
+    if let Some(id) = id {
+        sqlx::query("UPDATE tab_tabsettings SET value = ?, value_string = ? WHERE id = ?")
+            .bind(number)
+            .bind(text)
+            .bind(id)
+            .execute(db)
+            .await?;
+    } else {
+        sqlx::query("INSERT INTO tab_tabsettings (`key`, value, value_string) VALUES (?, ?, ?)")
+            .bind(key)
+            .bind(number)
+            .bind(text)
+            .execute(db)
+            .await?;
+    }
+    Ok(())
+}

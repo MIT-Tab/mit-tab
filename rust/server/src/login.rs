@@ -167,23 +167,10 @@ async fn destination(app: &App, account: &Account, next: &str) -> Result<String,
         if next.starts_with("/public/") {
             return Ok(next.into());
         }
-        let role = sqlx::query_scalar::<_, String>(
-            "SELECT g.name FROM auth_group g
-             JOIN auth_user_groups m ON m.group_id = g.id WHERE m.user_id = ?
-               AND g.name IN ('MIT-TAB: Add scratches', 'MIT-TAB: Manage scratches',
-                              'MIT-TAB: Check-in helper', 'MIT-TAB: Data entry helper', 'MIT-TAB: Tab assistant')
-             ORDER BY FIELD(g.name, 'MIT-TAB: Add scratches', 'MIT-TAB: Manage scratches',
-                            'MIT-TAB: Check-in helper', 'MIT-TAB: Data entry helper', 'MIT-TAB: Tab assistant')
-             LIMIT 1",
-        ).bind(account.id).fetch_optional(&app.db).await?;
-        return Ok(match role.as_deref() {
-            Some("MIT-TAB: Add scratches") => "/enter_scratch/",
-            Some("MIT-TAB: Manage scratches") => "/scratches/view/",
-            Some("MIT-TAB: Check-in helper") => "/batch_checkin/",
-            Some("MIT-TAB: Data entry helper" | "MIT-TAB: Tab assistant") => "/",
-            _ => "/403/",
-        }
-        .into());
+        let preset = crate::staff_roles::preset(&app.db, account.id).await?;
+        return Ok(preset
+            .map_or("/403/", crate::staff_roles::Preset::landing)
+            .into());
     }
     if !next.is_empty() {
         return Ok(next.into());
