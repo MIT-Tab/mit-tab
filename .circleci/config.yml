@@ -176,6 +176,14 @@ jobs:
   lint:
     docker:
       - image: cimg/python:3.10.16-node
+        environment:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PASSWORD: secret
+      - image: cimg/mysql:8.0
+        environment:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: mittab
+          MYSQL_ROOT_HOST: 127.0.0.1
     steps:
       - checkout
       - restore_cache:
@@ -221,11 +229,13 @@ jobs:
             curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- \
               -y --no-modify-path --profile minimal --default-toolchain 1.100.0 --component rustfmt,clippy
             export PATH="$HOME/.cargo/bin:$PATH"
-            manifest=rust/tabulation/Cargo.toml
-            cargo fmt --manifest-path "$manifest" --check
-            cargo clippy --locked --all-targets --manifest-path "$manifest" -- -D warnings
-            cargo test --locked --all-targets --manifest-path "$manifest"
+            manifest=rust/Cargo.toml
+            cargo fmt --manifest-path "$manifest" --all --check
+            cargo clippy --locked --workspace --all-targets --manifest-path "$manifest" -- -D warnings
+            cargo test --locked --workspace --all-targets --manifest-path "$manifest"
             DJANGO_SETTINGS_MODULE=mittab.settings uv run --frozen python -m rust.tabulation.compare_with_django
+            cargo build --locked --manifest-path "$manifest" -p mittab-server
+            uv run --frozen pytest rust/server/test_django_parity.py
   docs:
     docker:
       - image: cimg/python:3.10.16

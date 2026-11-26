@@ -1,3 +1,5 @@
+#[path = "parity/matching.rs"]
+mod matching;
 #[path = "parity/tournament.rs"]
 mod tournament;
 
@@ -153,6 +155,7 @@ fn result(line: &str) -> String {
         "weight" => weight(&mut fields).to_string(),
         "standings" => standings(&mut fields),
         "tournament" => tournament::run(&mut fields),
+        "matching" => matching::run(&mut fields),
         "scores" => {
             let count = read::<usize>(&mut fields);
             let scores: Vec<Vec<f64>> = (0..count)

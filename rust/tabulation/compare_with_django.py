@@ -13,7 +13,7 @@ from django.test.utils import override_settings
 django.setup()
 
 from mittab.apps.tab.models import TabSettings
-from mittab.libs import tab_logic
+from mittab.libs import mwmatching, tab_logic
 from mittab.libs.errors import ByeAssignmentError
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.tab_logic import rankings, stats
@@ -209,6 +209,46 @@ def totals_cases():
                         yield case("scores", 1, *fields), expected
 
 
+def matching_cases():
+    rng = Random(74732)
+    graphs = [(0, []), (6, []), (6, [(1, 4, -8)])]
+    for vertex_count in range(2, 25):
+        for sample in range(75):
+            graph = []
+            for first in range(vertex_count):
+                for second in range(first):
+                    if rng.randrange(16) >= 1 + sample % 16:
+                        continue
+                    if sample % 3 == 0:
+                        weight = rng.randint(-2, 2)
+                    elif sample % 3 == 1:
+                        weight = rng.randint(-100, 100) / 10
+                    else:
+                        weight = rng.randint(-600, 1200) / 2
+                    if rng.choice((False, True)):
+                        graph.append((first, second, weight))
+                    else:
+                        graph.append((second, first, weight))
+            rng.shuffle(graph)
+            graphs.append((vertex_count, graph))
+    # Include larger graphs shaped like team pairing and judge assignment.
+    for count in (40, 60, 96, 150):
+        for bipartite in (False, True):
+            graph = [
+                (first, second, rng.randint(-2000, 10) / 4)
+                for first in range(count)
+                for second in range(first)
+                if not bipartite or second < count // 2 <= first
+            ]
+            graphs.append((count, graph))
+    for count, edges in graphs:
+        for max_cardinality in (False, True):
+            result = mwmatching.maxWeightMatching(edges, max_cardinality)
+            result.extend([-1] * (count - len(result)))
+            payload = (value for edge in edges for value in edge)
+            yield case("matching", count, int(max_cardinality), *payload), joined(result)
+
+
 def case(*fields):
     return " ".join(map(str, fields))
 
@@ -222,6 +262,7 @@ def main():
     tests = [
         *bracket_cases(), *bye_cases(), *side_cases(), *weight_cases(),
         *standings_cases(), *totals_cases(), *tournament_cases(),
+        *matching_cases(),
     ]
     commands = [command for command, _ in tests]
     output = subprocess.run(
