@@ -12,6 +12,7 @@ use std::{
 
 use mittab_tabulation::{
     bracket::opening_matchups,
+    calculator::{award_points, expected_records, tournament_value},
     pairing::{
         first_round_bye_candidates, government, pairing_weight, required_bye_count, ByeCountError,
         Government, PairingTeam, PairingWeights, PowerPairingDistance, SideHistory,
@@ -156,6 +157,30 @@ fn result(line: &str) -> String {
         "standings" => standings(&mut fields),
         "tournament" => tournament::run(&mut fields),
         "matching" => matching::run(&mut fields),
+        "calculator" => {
+            let teams = read(&mut fields);
+            let num_rounds = read(&mut fields);
+            let awards = award_points(teams);
+            let toty = joined(
+                awards
+                    .toty
+                    .into_iter()
+                    .map(|(name, points)| format!("{name}:{points}")),
+            );
+            let soty = joined(
+                awards
+                    .soty
+                    .into_iter()
+                    .map(|(place, points)| format!("{place}:{points}")),
+            );
+            let brackets = expected_records(teams, num_rounds);
+            let columns = brackets
+                .into_iter()
+                .map(joined)
+                .collect::<Vec<_>>()
+                .join(";");
+            format!("{}|{toty}|{soty}|{columns}", tournament_value(teams))
+        }
         "scores" => {
             let count = read::<usize>(&mut fields);
             let scores: Vec<Vec<f64>> = (0..count)

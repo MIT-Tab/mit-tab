@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "home_resources.html" import resources %}
+{% block head %}
+{% for bundle in ["publicHome", "publicDisplay"] %}
+  {% for file in webpack_files(bundle) %}
+    {% if file.stylesheet %}<link rel="stylesheet" href="{{ file.href }}">{% else %}<script defer src="{{ file.href }}"></script>{% endif %}
+  {% endfor %}
+{% endfor %}
+{% endblock %}
+{% block content %}
+<div class="col-12 d-flex justify-content-center public-home-wrapper">
+  <div class="public-home{% if not info_links and not info_texts and not tournament_staff %} public-home--single{% endif %}">
+
+    <header class="public-home-hero desktop-only">
+      {% if logo %}
+      <div class="tournament-logo-shell tournament-logo-shell-hero">
+        <img class="tournament-logo-image"
+             src="{{ logo }}"
+             alt="{{ tournament_name }} logo">
+      </div>
+      {% endif %}
+      <h1 class="public-home-hero__title">Welcome to {{ tournament_name }}!</h1>
+    </header>
+
+    <header class="public-home-hero-mobile mobile-only">
+      {% if logo %}
+      <div class="tournament-logo-shell tournament-logo-shell-mobile">
+        <img class="tournament-logo-image"
+             src="{{ logo }}"
+             alt="{{ tournament_name }} logo">
+      </div>
+      {% endif %}
+      <h1 class="public-home-hero-mobile__title">Welcome to {{ tournament_name }}!</h1>
+    </header>
+
+    <div class="grid">
+      {% if info_links or info_texts or tournament_staff %}
+      <aside class="sidebar" aria-labelledby="public-home-resources">
+        <div class="public-sidebar-card">
+          <h2 class="public-card-header" id="public-home-resources">External Information</h2>
+          <div class="info-links" aria-label="Tournament resources">
+            {{ resources(info_texts, info_links, tournament_staff) }}
+          </div>
+        </div>
+      </aside>
+      {% endif %}
+
+      <aside class="links" aria-labelledby="public-home-quick-links">
+        <h2 class="public-card-header desktop-only" id="public-home-quick-links">Tournament Pages</h2>
+
+        {% if info_links or info_texts or tournament_staff %}
+        <div class="info-links info-links--mobile" aria-label="Tournament resources">
+          <h2 class="public-card-header">External Information</h2>
+          {{ resources(info_texts, info_links, tournament_staff, true) }}
+        </div>
+        {% endif %}
+
+        <h2 class="public-card-header public-card-header--mobile-pages mobile-only">Tournament Pages</h2>
+
+        <nav class="public-links{% if public_tiles_odd %} public-links--odd{% endif %}" aria-label="Quick links">
+          {% if show_registration_lead %}
+          <div class="register-cta">
+            <div class="register-cta__text">
+              <p class="register-cta__title">Registration is open</p>
+              <p class="register-cta__body">Sign up your teams and judges here.</p>
+            </div>
+            <div class="register-cta__actions">
+              <a class="btn btn-primary btn-sm register-cta__btn" href="/registration/">Register new team</a>
+              <a class="btn btn-outline-primary btn-sm register-cta__btn" href="/registration/edit/">Edit existing</a>
+            </div>
+          </div>
+          {% endif %}
+          {% for shortcut in quick_links %}
+          <a class="tile shadow-sm" href="{{ shortcut.url }}">
+            <span class="body">
+              <span class="title">{{ shortcut.title }}</span>
+              <span class="subtitle">{{ shortcut.subtitle }}</span>
+            </span>
+            <span class="chevron"><i class="fas fa-arrow-right"></i></span>
+          </a>
+          {% endfor %}
+        </nav>
+      </aside>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -7,16 +7,16 @@ use ring::{digest, hmac};
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
-const COOKIE_NAME: &str = "sessionid";
 const AUTH_BACKEND: &str = "mittab.apps.tab.auth_backends.TabAuthenticationBackend";
 const SIGNER_SALT: &str = "django.contrib.sessions.SessionStoresigner";
 const AUTH_HASH_SALT: &str = "django.contrib.auth.models.AbstractBaseUser.get_session_auth_hash";
 const MAX_SESSION_BYTES: usize = 64 * 1024;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Actor {
     Anonymous,
     User {
+        id: i32,
         board: bool,
         staff: bool,
         superuser: bool,
@@ -43,7 +43,15 @@ pub async fn actor(
     headers: &HeaderMap,
     secret: Option<&str>,
 ) -> Result<Actor, SessionError> {
-    let Some(key) = session_key(headers) else {
+    let Some(key) = cookie(headers, "sessionid") else {
+        return Ok(Actor::Anonymous);
+    };
+    if crate::native_session::is_native_key(key) {
+        return crate::native_session::actor(db, key)
+            .await
+            .map_err(|_| SessionError::Database);
+    }
+    if !is_legacy_key(key) {
         return Ok(Actor::Anonymous);
     };
     let Some(data) = sqlx::query_scalar::<_, String>(
@@ -90,13 +98,14 @@ pub async fn actor(
         return Ok(Actor::Anonymous);
     }
     Ok(Actor::User {
+        id: user_id,
         board: board != 0,
         staff,
         superuser,
     })
 }
 
-fn session_key(headers: &HeaderMap) -> Option<&str> {
+pub fn cookie<'a>(headers: &'a HeaderMap, target: &str) -> Option<&'a str> {
     // Django overwrites an earlier cookie if another cookie of the same name
     // appears later in the header.
     headers
@@ -105,15 +114,16 @@ fn session_key(headers: &HeaderMap) -> Option<&str> {
         .filter_map(|value| value.to_str().ok())
         .flat_map(|header| header.split(';'))
         .filter_map(|cookie| cookie.trim().split_once('='))
-        .filter(|(name, _)| name.trim() == COOKIE_NAME)
+        .filter(|(name, _)| name.trim() == target)
         .map(|(_, value)| value.trim().trim_matches('"'))
         .next_back()
-        .filter(|key| {
-            key.len() == 32
-                && key
-                    .bytes()
-                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-        })
+}
+
+pub fn is_legacy_key(key: &str) -> bool {
+    key.len() == 32
+        && key
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
 }
 
 fn decode_session(encoded: &str, secret: &str) -> Option<Session> {

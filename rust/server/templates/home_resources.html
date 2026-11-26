@@ -1,0 +1,28 @@
+{% macro resources(info_texts, info_links, tournament_staff, compact_staff=false) %}
+{% for item in info_texts %}
+<div class="info-text-chip">
+  <span class="info-text-chip__title">{{ item.title }}:</span>
+  <span class="info-text-chip__value">{{ item.text }}</span>
+</div>
+{% endfor %}
+{% for link in info_links %}
+<a class="info-link-chip" href="{{ link.url }}" target="_blank" rel="noopener noreferrer"
+   {% if link.description %}title="{{ link.description }}"{% endif %}>
+  <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+  <span class="info-link-chip__title">{{ link.title }}</span>
+</a>
+{% endfor %}
+{% if tournament_staff %}
+<section class="tournament-staff-list{% if compact_staff %} tournament-staff-list--compact{% endif %}" aria-label="Tournament staff">
+  <h3 class="tournament-staff-list__heading">Tournament Staff</h3>
+  <dl class="tournament-staff-list__roles">
+    {% for role in tournament_staff %}
+    <div class="tournament-staff-list__role">
+      <dt>{{ role.title }}</dt>
+      <dd>{% for name in role.names %}<span>{{ name }}</span>{% endfor %}</dd>
+    </div>
+    {% endfor %}
+  </dl>
+</section>
+{% endif %}
+{% endmacro %}

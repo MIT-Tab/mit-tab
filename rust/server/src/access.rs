@@ -1,6 +1,6 @@
 use axum::{
     extract::{Request, State},
-    http::{StatusCode, header},
+    http::{Method, StatusCode, header},
     middleware::Next,
     response::Response,
 };
@@ -39,20 +39,10 @@ pub async fn public_api(State(app): State<App>, request: Request, next: Next) ->
         Actor::User {
             superuser: true, ..
         } => {
-            let Ok(mut db) = app.db.acquire().await else {
+            let Ok(completed) = wizard_complete(&app).await else {
                 return unavailable();
             };
-            let Ok(settings) =
-                Settings::load(&mut db, &["start_tournament_wizard_completed"]).await
-            else {
-                return unavailable();
-            };
-            let completed = settings.string("start_tournament_wizard_completed", "1");
-            if matches!(
-                completed.trim().to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "on"
-            ) {
-                drop(db);
+            if completed {
                 next.run(request).await
             } else {
                 private((
@@ -65,11 +55,128 @@ pub async fn public_api(State(app): State<App>, request: Request, next: Next) ->
     }
 }
 
+pub async fn public_tournament(
+    State(app): State<App>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    if matches!(actor, Actor::User { board: true, .. }) {
+        let Ok(open) = board_access_open(&app).await else {
+            return unavailable();
+        };
+        if !open {
+            return board_closed();
+        }
+        let read = matches!(request.method(), &Method::GET | &Method::HEAD);
+        let allowed = matches!(
+            request.uri().path(),
+            "/" | "/public/"
+                | "/favicon.ico"
+                | "/tournament-logo/"
+                | "/public/motions/"
+                | "/public/pairings/"
+                | "/public/missing-ballots/"
+                | "/public/teams/"
+                | "/public/judges/"
+                | "/public/teams/expected-records/"
+                | "/403/"
+        );
+        if !read || !allowed {
+            return access_denied();
+        }
+    }
+    request.extensions_mut().insert(actor);
+    next.run(request).await
+}
+
+pub async fn staff_settings(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    match actor {
+        Actor::Anonymous => {
+            let mut target = "/public/login/?next=".to_string();
+            target.push_str(request.uri().path());
+            return found(target);
+        }
+        Actor::User { board: true, .. } => match board_access_open(&app).await {
+            Ok(true) => return access_denied(),
+            Ok(false) => return board_closed(),
+            Err(_) => return unavailable(),
+        },
+        Actor::User {
+            superuser: true, ..
+        } => match wizard_complete(&app).await {
+            Ok(true) => {}
+            Ok(false) => return found("/setup/start-tournament/"),
+            Err(_) => return unavailable(),
+        },
+        Actor::User { staff: true, .. } => return access_denied(),
+        Actor::User { id, .. } => match has_settings_permission(&app, id).await {
+            Ok(true) => {}
+            Ok(false) => return access_denied(),
+            Err(_) => return unavailable(),
+        },
+    }
+    request.extensions_mut().insert(actor);
+    next.run(request).await
+}
+
+async fn has_settings_permission(app: &App, user: i32) -> Result<bool, sqlx::Error> {
+    let allowed = sqlx::query_scalar::<_, i64>(
+        "SELECT EXISTS(
+            SELECT 1 FROM auth_permission p JOIN django_content_type ct ON ct.id = p.content_type_id
+            WHERE ct.app_label = 'tab' AND p.codename = 'tab_settings.can_change'
+              AND (
+                  EXISTS(SELECT 1 FROM auth_user_user_permissions up
+                         WHERE up.user_id = ? AND up.permission_id = p.id)
+                  OR EXISTS(
+                      SELECT 1 FROM auth_group_permissions gp
+                      JOIN auth_user_groups ug ON ug.group_id = gp.group_id
+                      WHERE ug.user_id = ? AND gp.permission_id = p.id
+                  )
+              )
+        )",
+    )
+    .bind(user)
+    .bind(user)
+    .fetch_one(&app.db)
+    .await?;
+    Ok(allowed != 0)
+}
+
+pub fn found(target: impl AsRef<str>) -> Response {
+    match axum::http::HeaderValue::from_str(target.as_ref()) {
+        Ok(target) => private((StatusCode::FOUND, [(header::LOCATION, target)])),
+        Err(_) => unavailable(),
+    }
+}
+
+fn board_closed() -> Response {
+    private((
+        StatusCode::FORBIDDEN,
+        "Board access opens near the end of inrounds.",
+    ))
+}
+
+pub async fn wizard_complete(app: &App) -> Result<bool, sqlx::Error> {
+    let mut db = app.db.acquire().await?;
+    let settings = Settings::load(&mut db, &["start_tournament_wizard_completed"]).await?;
+    let completed = settings.string("start_tournament_wizard_completed", "1");
+    Ok(matches!(
+        completed.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    ))
+}
+
 fn access_denied() -> Response {
     private((StatusCode::FOUND, [(header::LOCATION, "/403/")]))
 }
 
-async fn board_access_open(app: &App) -> Result<bool, sqlx::Error> {
+pub async fn board_access_open(app: &App) -> Result<bool, sqlx::Error> {
     let total_rounds = sqlx::query_as::<_, (Option<i32>, Option<String>)>(
         "SELECT value, value_string FROM tab_tabsettings WHERE `key` = 'tot_rounds' ORDER BY id LIMIT 1",
     ).fetch_optional(&app.db).await?

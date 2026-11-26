@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block head %}
+{% for file in webpack_files("publicDisplay") %}
+  {% if file.stylesheet %}<link rel="stylesheet" href="{{ file.href }}">{% else %}<script defer src="{{ file.href }}"></script>{% endif %}
+{% endfor %}
+{% endblock %}

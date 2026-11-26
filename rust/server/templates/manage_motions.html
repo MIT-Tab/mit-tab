@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "motion_fields.html" import fields %}
+{% block banner %}<h3>Manage Motions</h3>{% endblock %}
+{% block content %}
+<div class="readable-page col-12">
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header"><h5 class="mb-0">Add New Motion</h5></div>
+        <div class="card-body">
+          <form method="post" action="/motions/add/">
+            {{ fields(rounds, csrf, "", "", "") }}
+            <button type="submit" class="btn btn-primary">Add Motion</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><h5 class="mb-0">Bulk Actions</h5></div>
+        <div class="card-body">
+          <form method="post" action="/motions/publish-all/" onsubmit="return confirm('Publish all motions? They will become visible on the public page.');">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+            <button type="submit" class="btn btn-success btn-block mb-2">Publish All Motions</button>
+          </form>
+          <form method="post" action="/motions/unpublish-all/" onsubmit="return confirm('Unpublish all motions? They will be hidden from the public page.');">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+            <button type="submit" class="btn btn-warning btn-block">Unpublish All Motions</button>
+          </form>
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header"><h5 class="mb-0">Quick Links</h5></div>
+        <div class="card-body"><a href="/public/motions/" class="btn btn-outline-primary btn-block" target="_blank" rel="noopener">View Public Page</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Current Motions</h5>
+      <span class="badge badge-secondary">{{ motions|length }} motion{% if motions|length != 1 %}s{% endif %}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if motions %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Round</th><th>Info Slide</th><th>Motion</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for motion in motions %}
+            <tr>
+              <td><strong>{{ motion.round_display }}</strong></td>
+              <td>{% if motion.info_preview %}{{ motion.info_preview }}{% else %}<small class="text-muted">No info slide</small>{% endif %}</td>
+              <td>{{ motion.motion_preview }}</td>
+              <td><span class="badge badge-{{ 'success' if motion.published else 'secondary' }}">{{ 'Published' if motion.published else 'Draft' }}</span></td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="/motions/{{ motion.id }}/edit/" class="btn btn-outline-primary">Edit</a>
+                  <form method="post" action="/motions/{{ motion.id }}/toggle-published/">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+                    <button type="submit" class="btn btn-outline-{{ 'warning' if motion.published else 'success' }}">{{ 'Unpublish' if motion.published else 'Publish' }}</button>
+                  </form>
+                  <form method="post" action="/motions/{{ motion.id }}/delete/" onsubmit="return confirm('Delete this motion?');">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5"><p class="text-muted">No motions have been added yet.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

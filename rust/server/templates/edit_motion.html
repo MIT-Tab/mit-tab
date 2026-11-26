@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "motion_fields.html" import fields %}
+{% block banner %}<h3>{{ title }}</h3>{% endblock %}
+{% block content %}
+<div class="readable-page col-md-8">
+  <div class="card">
+    <div class="card-header"><h5 class="mb-0">Edit Motion for {{ motion.round_display }}</h5></div>
+    <div class="card-body">
+      <form method="post">
+        {{ fields(rounds, csrf, selected, info_slide, motion_text) }}
+        <div class="d-flex justify-content-between">
+          <a href="/motions/" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="readable-page col-md-4">
+  <div class="card">
+    <div class="card-header"><h5 class="mb-0">Motion Info</h5></div>
+    <div class="card-body">
+      <dl>
+        <dt>Status</dt><dd>{{ 'Published' if motion.published else 'Draft' }}</dd>
+        <dt>Created</dt><dd>{{ motion.created }}</dd>
+        <dt>Last Updated</dt><dd>{{ motion.updated }}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}

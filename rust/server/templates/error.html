@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block banner %}<h3>{{ banner }}</h3>{% endblock %}
+{% block content %}
+<div class="col-12 col-lg-8 mx-auto">
+  <div class="card shadow-sm border-0">
+    <div class="card-body py-5 text-center">
+      <h1 class="h4 mb-3">{{ heading }}</h1>
+      {% if detail %}<p class="text-muted mb-0">{{ detail }}</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

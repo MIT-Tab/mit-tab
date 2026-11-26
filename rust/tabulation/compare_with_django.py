@@ -13,6 +13,7 @@ from django.test.utils import override_settings
 django.setup()
 
 from mittab.apps.tab.models import TabSettings
+from mittab.apps.tab.tournament_calculator import calculator_context
 from mittab.libs import mwmatching, tab_logic
 from mittab.libs.errors import ByeAssignmentError
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
@@ -249,6 +250,20 @@ def matching_cases():
             yield case("matching", count, int(max_cardinality), *payload), joined(result)
 
 
+def calculator_cases():
+    for teams, rounds in product(range(257), range(13)):
+        expected = calculator_context(teams, rounds)
+        toty = joined(f"{name}:{value:g}" for name, value in expected["toty"])
+        soty = joined(f"{place}:{value:g}" for place, value in expected["soty"])
+        columns = [
+            joined(row[column]["count"] for row in expected["record_rows"] if row[column])
+            for column in range(rounds - 1, -1, -1)
+        ]
+        yield case("calculator", teams, rounds), "|".join(
+            (str(expected["value"]), toty, soty, ";".join(columns))
+        )
+
+
 def case(*fields):
     return " ".join(map(str, fields))
 
@@ -262,7 +277,7 @@ def main():
     tests = [
         *bracket_cases(), *bye_cases(), *side_cases(), *weight_cases(),
         *standings_cases(), *totals_cases(), *tournament_cases(),
-        *matching_cases(),
+        *matching_cases(), *calculator_cases(),
     ]
     commands = [command for command, _ in tests]
     output = subprocess.run(

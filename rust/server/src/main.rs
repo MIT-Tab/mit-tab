@@ -1,11 +1,20 @@
 mod access;
 mod bundle;
 mod config;
+mod home;
+mod html;
 mod legacy_session;
 mod live_results;
+mod login;
+mod motions;
+mod native_session;
+mod passwords;
 mod placements;
 mod public_api;
+mod public_pairings;
 mod publication;
+mod rosters;
+mod schema;
 mod settings;
 mod speakers;
 
@@ -40,8 +49,17 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> Result<(), &'static str> {
+    let command = std::env::args().nth(1).unwrap_or_else(|| "serve".into());
+    if !matches!(command.as_str(), "serve" | "migrate" | "init") {
+        return Err("Usage: mittab-server [serve|migrate|init]");
+    }
     let config = Config::from_env()?;
     let db = config.connect().await?;
+    if command != "serve" {
+        schema::prepare(&db, command == "init").await?;
+        eprintln!("MIT-Tab database is ready");
+        return Ok(());
+    }
     let listener = TcpListener::bind(config.listen)
         .await
         .map_err(|_| "Could not bind the MIT-Tab HTTP listener")?;
@@ -79,6 +97,70 @@ fn router(app: App) -> Router {
             app.clone(),
             access::public_api,
         ))
+        .merge(
+            Router::new()
+                .route("/", get(home::index))
+                .route("/public/", get(home::public_home))
+                .route("/favicon.ico", get(home::favicon))
+                .route("/tournament-logo/", get(home::logo))
+                .route("/public/motions/", get(motions::public))
+                .route("/public/pairings/", get(public_pairings::current))
+                .route("/public/pairings/{round}/", get(public_pairings::previous))
+                .route("/public/missing-ballots/", get(public_pairings::missing))
+                .route("/public/teams/", get(rosters::teams))
+                .route("/public/judges/", get(rosters::judges))
+                .route("/public/teams/expected-records/", get(rosters::records))
+                .route("/public/access-error/", get(motions::public_error))
+                .route("/403/", get(motions::forbidden))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::public_tournament,
+                )),
+        )
+        .merge(
+            Router::new()
+                .route("/motions/", get(motions::manage))
+                .route(
+                    "/motions/add/",
+                    get(motions::back_to_manage).post(motions::add),
+                )
+                .route(
+                    "/motions/{id}/edit/",
+                    get(motions::edit).post(motions::save),
+                )
+                .route(
+                    "/motions/{id}/delete/",
+                    get(motions::back_to_manage).post(motions::delete),
+                )
+                .route(
+                    "/motions/{id}/toggle-published/",
+                    get(motions::back_to_manage).post(motions::toggle),
+                )
+                .route(
+                    "/motions/publish-all/",
+                    get(motions::back_to_manage).post(motions::publish_all),
+                )
+                .route(
+                    "/motions/unpublish-all/",
+                    get(motions::back_to_manage).post(motions::unpublish_all),
+                )
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::staff_settings,
+                )),
+        )
+        .route("/public/login/", get(login::page).post(login::sign_in))
+        .route(
+            "/accounts/logout/",
+            get(login::sign_out).post(login::sign_out),
+        )
+        .route("/admin/logout/", get(login::sign_out).post(login::sign_out))
+        .nest_service(
+            "/static",
+            tower_http::services::ServeDir::new(
+                std::env::var_os("MITTAB_STATIC_ROOT").unwrap_or_else(|| "staticfiles".into()),
+            ),
+        )
         .with_state(app)
 }
 

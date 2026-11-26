@@ -1,0 +1,63 @@
+{% extends "public_table.html" %}
+{% block head %}{{ super() }}<meta name="round-number" content="{{ round }}">{% endblock %}
+{% block content %}
+<div class="col-12 public-table-root">
+  <div class="public-table-header">
+    <h1>Pairings for Round {{ round }}</h1>
+    <span class="badge badge-secondary bg-secondary text-white public-table-header__badge">{{ team_count }} teams</span>
+  </div>
+  {% if numbers or varsity or novice %}
+  <nav class="mb-3" aria-label="Round pairings">
+    <span class="mr-2">Pairings:</span>
+    {% for number in numbers %}
+    <a class="btn btn-outline-primary btn-sm" href="{% if number == current %}/public/pairings/{% else %}/public/pairings/{{ number }}/{% endif %}">Round {{ number }}</a>
+    {% endfor %}
+    {% if varsity %}<a class="btn btn-outline-primary btn-sm" href="/public/outrounds/0/">Varsity Outrounds</a>{% endif %}
+    {% if novice %}<a class="btn btn-outline-primary btn-sm" href="/public/outrounds/1/">Novice Outrounds</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% if published %}
+  <div id="scrollPage" class="hidden"></div>
+  <div class="public-table-wrap">
+    <table class="public_table">
+      <thead><tr><th style="width:25%">Government</th><th style="width:25%">Opposition</th><th style="width:30%">Judge</th><th style="width:20%">Room</th></tr></thead>
+      <tbody>
+      {% for pairing in rows %}
+        <tr>
+          {% for label, team in [("Government", pairing.government), ("Opposition", pairing.opposition)] %}
+          <td data-label="{{ label }}"><div class="team-names">{{ team.name }}</div>
+            {% if members_public %}<div class="member-names">{{ team.debaters }}</div>{% endif %}
+          </td>
+          {% endfor %}
+          <td data-label="Judge">{% for judge in pairing.judges %}
+            {% if judge.chair and pairing.judges|length > 1 %}<b>{{ judge.name }}</b>{% else %}{{ judge.name }}{% endif %}<br>
+          {% endfor %}</td>
+          <td data-label="Room">{{ pairing.room or "" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="public_footer_spacer"></div>
+  <div class="public_footer">
+    {% for label, teams in [("Giving the Bye to:", byes), ("Teams not Paired in:", unpaired)] %}
+    {% if teams %}
+    <span class="pairings_bye_entry">
+      <span class="pairings_bye_label">{{ label }}</span>
+      <span class="team-names">{% for team in teams %}{{ team.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      {% if members_public %}
+      <span class="member-names">{% for team in teams %}{{ team.debaters }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      {% endif %}
+    </span>
+    {% endif %}
+    {% endfor %}
+    <div class="footer-controls right">
+      {% if members_public %}<label for="name_display_toggle">Member Names <input type="checkbox" name="names" id="name_display_toggle"></label>{% endif %}
+      <label for="autoscroll">Autoscroll <input type="checkbox" name="autoscroll" id="autoscroll"></label>
+    </div>
+  </div>
+  {% else %}
+  Round {{ round }} does not yet have a valid pairing. Please wait until your tournament directors release a valid pairing before viewing this page.
+  {% endif %}
+</div>
+{% endblock %}
