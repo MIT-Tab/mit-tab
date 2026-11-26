@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <nav aria-label="Roster" class="d-flex flex-wrap gap-2 mb-3">
+    {% for url, name in toolbar %}<a href="{{ url }}" class="btn btn-outline-primary btn-sm"{% if name == title %} aria-current="page"{% endif %}>{{ name }}</a>{% endfor %}
+    <a href="/import_data/" class="btn btn-outline-primary btn-sm">Import and Export</a>
+  </nav>
+  <div class="d-flex align-items-center flex-wrap justify-content-between gap-3 mb-3">
+    <h1 class="h3 mb-0">{{ title }}</h1>
+    <a class="btn btn-primary" href="/enter_{{ key }}/">Add {{ subject }}</a>
+  </div>
+  {% if rows %}
+    <div class="table-responsive"><table class="table table-striped">
+      <thead><tr><th> Name </th><th>{{ column }}</th></tr></thead>
+      <tbody>{% for id, name, value in rows %}<tr><th><a href="/{{ key }}/{{ id }}/">{{ name }}</a></th><td>{{ value }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  {% else %}<p>No {{ title|lower }} yet.</p>{% endif %}
+</div>
+{% endblock %}

@@ -433,6 +433,14 @@ pub async fn index(State(app): State<App>, Extension(actor): Extension<Actor>) -
             Ok(false) => access::found("/setup/start-tournament/"),
             Err(_) => unavailable(),
         },
+        Actor::User {
+            id, staff: true, ..
+        } => match crate::staff_roles::preset(&app.db, id).await {
+            Ok(Some(preset)) if preset.data_entry() => access::found("/view_teams/"),
+            Ok(Some(preset)) => access::found(preset.landing()),
+            Ok(None) => access::access_denied(),
+            Err(_) => unavailable(),
+        },
         Actor::User { .. } => access::found("/public/"),
     }
 }

@@ -98,7 +98,7 @@ async fn prepare_locked(db: &mut MySqlConnection, initialize: bool) -> Result<()
     install_public_logo(db).await?;
     install_staff_invite_token(db).await?;
     sqlx::query(
-        "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround'), ('tab', 'judge'), ('tab', 'breakingteam')
+        "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround'), ('tab', 'judge'), ('tab', 'breakingteam'), ('tab', 'team'), ('tab', 'scratch')
          ON DUPLICATE KEY UPDATE model = django_content_type.model",
     )
     .execute(&mut *db)

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "scratches_fields.html" import fields %}
+{% block content %}
+<div class="col-12">
+  <header class="d-flex flex-wrap gap-3 align-items-baseline mb-3">
+    <h1 class="h3 mb-0">{{ title }}</h1>
+    <a class="btn btn-sm btn-outline-primary" href="{{ base ~ 'add/1/' if base else '/enter_scratch/' }}">Add Scratch</a>
+    {% if base %}<a href="/scratches/view/">All scratches</a>{% endif %}
+  </header>
+  {% if edit %}
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% for id, team_id, team, judge_id, judge, kind, author in rows %}
+    <div class="card card-body mb-2">
+      {{ fields(loop.index ~ "-", {"id": id, "team": team_id, "judge": judge_id, "kind": kind}, teams, judges) }}
+      {% if author %}<small>Added by {{ author }}</small>{% endif %}
+      <div><a class="btn btn-sm btn-outline-danger mt-2" href="{{ base }}delete/{{ id }}/">Delete Scratch</a></div>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Save Scratches</button>
+  </form>
+  {% elif rows %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th>Team</th><th>Judge</th><th>Type</th><th>Added by</th></tr></thead>
+      <tbody>{% for id, team_id, team, judge_id, judge, kind, author in rows %}
+        <tr><td><a href="/team/{{ team_id }}/scratches/view/">{{ team }}</a></td>
+          <td><a href="/judge/{{ judge_id }}/scratches/view/">{{ judge }}</a></td>
+          <td>{{ "Team" if kind == 0 else "Tab" }}</td><td>{{ author }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p>No scratches recorded.</p>{% endif %}
+</div>
+{% endblock %}

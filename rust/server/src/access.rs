@@ -174,6 +174,14 @@ fn board_closed() -> Response {
     ))
 }
 
+pub async fn board_restricted(app: &App) -> Response {
+    match board_access_open(app).await {
+        Ok(true) => access_denied(),
+        Ok(false) => board_closed(),
+        Err(_) => unavailable(),
+    }
+}
+
 pub async fn wizard_complete(app: &App) -> Result<bool, sqlx::Error> {
     let mut db = app.db.acquire().await?;
     let settings = Settings::load(&mut db, &["start_tournament_wizard_completed"]).await?;
@@ -303,6 +311,38 @@ pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) 
     );
     if !allowed {
         return access_denied();
+    }
+    request.extensions_mut().insert(actor);
+    next.run(request).await
+}
+
+/// The router that uses this middleware contains only roster data entry routes.
+pub async fn data_entry(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    match actor {
+        Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
+        Actor::User { board: true, .. } => match board_access_open(&app).await {
+            Ok(true) => return access_denied(),
+            Ok(false) => return board_closed(),
+            Err(_) => return unavailable(),
+        },
+        Actor::User {
+            superuser: true, ..
+        } => match wizard_complete(&app).await {
+            Ok(true) => {}
+            Ok(false) => return found("/setup/start-tournament/"),
+            Err(_) => return unavailable(),
+        },
+        Actor::User {
+            id, staff: true, ..
+        } => match crate::staff_roles::preset(&app.db, id).await {
+            Ok(Some(preset)) if preset.data_entry() => {}
+            Ok(_) => return access_denied(),
+            Err(_) => return unavailable(),
+        },
+        Actor::User { .. } => return access_denied(),
     }
     request.extensions_mut().insert(actor);
     next.run(request).await

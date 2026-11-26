@@ -198,6 +198,34 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             "email_admin.html",
             include_str!("../templates/email_admin.html"),
         ),
+        (
+            "staff_roster_list.html",
+            include_str!("../templates/staff_roster_list.html"),
+        ),
+        (
+            "staff_roster_edit.html",
+            include_str!("../templates/staff_roster_edit.html"),
+        ),
+        (
+            "staff_roster_delete.html",
+            include_str!("../templates/staff_roster_delete.html"),
+        ),
+        (
+            "scratches_fields.html",
+            include_str!("../templates/scratches_fields.html"),
+        ),
+        (
+            "scratches_form.html",
+            include_str!("../templates/scratches_form.html"),
+        ),
+        (
+            "scratches_list.html",
+            include_str!("../templates/scratches_list.html"),
+        ),
+        (
+            "scratches_delete.html",
+            include_str!("../templates/scratches_delete.html"),
+        ),
         ("error.html", include_str!("../templates/error.html")),
     ] {
         env.add_template(name, source)

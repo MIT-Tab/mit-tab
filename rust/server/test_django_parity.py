@@ -2718,3 +2718,171 @@ def test_native_email_management_writes_history_and_sends_written_decisions():
         assert "Example &lt;b&gt;reason&lt;/b&gt;" in message["Body"]["Html"]["Data"]
         assert WrittenRFDEmailLog.objects.get().email.lower() == "speaker@example.test"
         assert b"Delivery History" in request(port, path, cookie=tab)[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_roster_edits_and_data_entry_scope():
+    tab = legacy_tab_session("native-roster-tab")
+    board = legacy_tab_session("native-roster-board")
+    get_user_model().objects.get(username="native-roster-board").groups.add(Group.objects.create(name="APDA Board"))
+    helper = get_user_model().objects.create_user(username="native-roster-helper", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    django = Client()
+    django.force_login(helper)
+    helper = django.cookies["sessionid"].value
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 2)
+    tag = RoomTag.objects.create(tag="Accessible", priority="1.00")
+
+    with rust_server() as port:
+        status, headers, body = request(port, "/enter_school/", cookie=tab)
+        assert status == 200 and b"Create School" in body, (status, body)
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, values, session=tab, token=csrf):
+            return request(port, path, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form=[("csrfmiddlewaretoken", token), *values])
+
+        fields = {"name": "Roster School", "apda_id": 445}
+        assert post("/enter_school/", fields.items(), token="bad")[0] == 403
+        assert post("/enter_school/", fields.items(), session=board)[0] == 403
+        response = post("/enter_school/", fields.items(), session=helper)
+        assert response[0] == 302, response
+        school = School.objects.get(name="Roster School")
+        assert school.apda_id == 445
+        assert post("/enter_school/", fields.items())[0] == 422
+        assert request(port, "/", cookie=helper)[1]["Location"] == "/view_teams/"
+        assert request(port, "/view_schools/", cookie=helper)[0] == 200
+        assert request(port, "/registration/manage/", cookie=helper)[1]["Location"] == "/403/"
+
+        for name in ("Example Speaker One", "Example Speaker Two"):
+            response = post("/enter_debater/", {"name": name, "school": school.id, "novice_status": 1,
+                                                "email": "example@example.test"}.items(), session=helper)
+            assert response[0] == 302, response
+        first, second = list(Debater.objects.order_by("id"))
+        team_path = "/enter_team/"
+        team_fields = [("school", school.id), ("name", "Roster Team"), ("seed", 2), ("debaters", first.id),
+                       ("debaters", second.id), ("required_room_tags", tag.id), ("ranking_public", "on")]
+        assert post(team_path, team_fields, session=helper)[0] == 302
+        team = Team.objects.get(name="Roster Team")
+        assert team.team_code and team.tiebreaker and team.created_by.username == "native-roster-helper"
+        assert team.required_room_tags.get() == tag and team.checked_in
+        assert set(team.debaters.values_list("id", flat=True)) == {first.id, second.id}
+        assert post(team_path, [(key, "Different Team" if key == "name" else value) for key, value in team_fields], session=helper)[0] == 422
+        path = f"/team/{team.id}/"
+        assert b'name="checked_in"' not in request(port, path, cookie=helper)[2]
+        assert b'name="checked_in"' in request(port, path, cookie=tab)[2]
+        assert post(path, team_fields, session=helper)[0] == 302
+        team.refresh_from_db()
+        assert team.checked_in
+        assert post(f"/debater/{second.id}/delete/", [], session=helper)[0] == 422
+        assert post(f"/school/{school.id}/delete/", [], session=helper)[0] == 422
+
+        judge = [("name", "Roster Judge"), ("rank", "5.50"), ("schools", school.id),
+                 ("required_room_tags", tag.id), ("email", "judge@example.test"), ("reported_experience", 6)]
+        assert post("/enter_judge/", [*judge, ("request_wing", "on"), ("no_wings", "on")])[0] == 422
+        assert post("/enter_judge/", [*judge, ("request_wing", "on")])[0] == 302
+        judge_obj = Judge.objects.get(name="Roster Judge")
+        assert judge_obj.rank == Decimal("5.50")
+        assert judge_obj.request_wing and judge_obj.schools.get() == school
+        assert judge_obj.ballot_code and judge_obj.required_room_tags.get() == tag
+        judge_path = f"/judge/{judge_obj.id}/"
+        assert post(judge_path, [*judge, ("checkin_0", "on")])[0] == 302
+        assert CheckIn.objects.filter(judge=judge_obj, round_number=1).exists()
+        assert post(judge_path, [*judge, ("checkin_1", "on")], session=helper)[0] == 302
+        assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [1]
+
+        room = [("name", "Roster Room"), ("rank", "4.25"), ("tags", tag.id)]
+        assert post("/enter_room/", room)[0] == 302
+        room_obj = Room.objects.get(name="Roster Room")
+        assert room_obj.tags.get() == tag and room_obj.rank == Decimal("4.25")
+        room_path = f"/room/{room_obj.id}/"
+        assert post(room_path, [*room, ("checkin_-1", "on")])[0] == 302
+        assert RoomCheckIn.objects.filter(room=room_obj, round_number=0).exists()
+        opponent = Team.objects.create(name="Roster Opponent", school=school, seed=0)
+        Round.objects.create(round_number=2, gov_team=team, opp_team=opponent, room=room_obj, victor=Round.GOV)
+        assert post(f"{room_path}delete/", [])[0] == 422
+        assert request(port, "/view_judges/", cookie=board)[1]["Location"] == "/403/"
+        assert b"Roster Judge" in request(port, "/view_judges/", cookie=tab)[2]
+        assert request(port, f"/judge/{judge_obj.id}/delete/", cookie=tab)[0] == 200
+        assert Judge.objects.filter(pk=judge_obj.pk).exists()
+        assert post(f"/judge/{judge_obj.id}/delete/", [])[0] == 302
+        assert not Judge.objects.filter(pk=judge_obj.pk).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
+    tab = legacy_tab_session("native-scratch-tab")
+    board = legacy_tab_session("native-scratch-board")
+    get_user_model().objects.get(username="native-scratch-board").groups.add(Group.objects.create(name="APDA Board"))
+
+    def scoped_login(username, group):
+        user = get_user_model().objects.create_user(username=username, is_staff=True)
+        user.groups.add(Group.objects.create(name=group))
+        client = Client()
+        client.force_login(user)
+        return client.cookies["sessionid"].value
+
+    submitter = scoped_login("scratch-submitter", "MIT-TAB: Add scratches")
+    reviewer = scoped_login("scratch-reviewer", "MIT-TAB: Create and view scratches")
+    school = School.objects.create(name="Scratch School")
+    team = Team.objects.create(name="Scratch Team", school=school, seed=0)
+    opponent = Team.objects.create(name="Scratch Opponent", school=school, seed=0)
+    judge = Judge.objects.create(name="Scratch Example Judge", rank=5)
+    other_judge = Judge.objects.create(name="Second Example Judge", rank=4)
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 1)
+    Round.objects.create(round_number=1, gov_team=team, opp_team=opponent, victor=Round.GOV)
+
+    start = "/enter_scratch/"
+    global_list = "/scratches/view/"
+    edit = f"/team/{team.id}/scratches/view/"
+    with rust_server() as port:
+        status, headers, body = request(port, start, cookie=submitter)
+        assert status == 200 and b"Scratch Example Judge" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields, session=tab):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        payload = {"team": team.id, "judge": judge.id, "scratch_type": Scratch.TAB_SCRATCH}
+        first = post(start, payload, submitter)
+        second = post(start, payload, submitter)
+        assert first[0] == second[0] == 302
+        assert first[1]["Location"] == second[1]["Location"] == f"{start}?submitted=1"
+        assert first[2] == second[2]
+        assert request(port, start, cookie=submitter)[2] != b""
+        scratch = Scratch.objects.get()
+        assert scratch.created_by.username == "scratch-submitter"
+        assert AuditEvent.objects.filter(content_type__model="scratch", object_id=scratch.id).count() == 1
+        for path in (start, global_list, edit, f"/judge/{judge.id}/scratches/view/"):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            assert post(path, payload, board)[1]["Location"] == "/403/"
+        assert request(port, global_list, cookie=submitter)[1]["Location"] == "/403/"
+        reviewer_response = request(port, edit, cookie=reviewer)
+        assert reviewer_response[0] == 200 and b"Scratch Example Judge" in reviewer_response[2]
+        assert b"Delete Scratch" not in reviewer_response[2] and b"Save Scratches" not in reviewer_response[2]
+
+        changes = {"1-id": scratch.id, "1-team": team.id, "1-judge": other_judge.id,
+                   "1-scratch_type": Scratch.TEAM_SCRATCH}
+        assert post(edit, changes, reviewer)[1]["Location"] == "/403/"
+        assert post(edit, changes)[1]["Location"] == edit
+        scratch.refresh_from_db()
+        assert scratch.judge_id == other_judge.id and scratch.scratch_type == Scratch.TEAM_SCRATCH
+        assert scratch.created_by.username == "scratch-submitter"
+        assert post(start, {**payload, "judge": 999999})[0] == 422
+
+        add = f"/judge/{judge.id}/scratches/add/2/"
+        invalid = {"1-team": team.id, "1-scratch_type": 0, "2-team": 999999, "2-scratch_type": 0}
+        assert post(add, invalid, reviewer)[0] == 422
+        assert Scratch.objects.count() == 1
+        assert post(add, {**invalid, "2-team": opponent.id}, reviewer)[0] == 302
+        assert Scratch.objects.count() == 3
+        delete = f"/team/{team.id}/scratches/delete/{scratch.id}/"
+        assert post(delete, {}, reviewer)[1]["Location"] == "/403/"
+        assert request(port, delete, cookie=tab)[0] == 200
+        assert Scratch.objects.filter(id=scratch.id).exists()
+        assert post(delete, {})[1]["Location"] == edit
+        assert not Scratch.objects.filter(id=scratch.id).exists()

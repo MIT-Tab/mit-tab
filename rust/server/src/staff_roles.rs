@@ -22,6 +22,9 @@ impl Preset {
     pub fn checkins(self) -> bool {
         matches!(self, Self::Checkin | Self::Assistant)
     }
+    pub fn data_entry(self) -> bool {
+        matches!(self, Self::DataEntry | Self::Assistant)
+    }
 }
 
 pub async fn preset(db: &MySqlPool, user: i32) -> Result<Option<Preset>, sqlx::Error> {

@@ -163,7 +163,7 @@ pub async fn delete_outrounds(db: &mut MySqlConnection, ids: &[i32]) -> Result<(
     .await
 }
 
-async fn delete_links(
+pub async fn delete_links(
     db: &mut MySqlConnection,
     ids: &[i32],
     links: &[(&str, &str)],

@@ -52,6 +52,9 @@ mod spreadsheets;
 mod staff_invites;
 mod staff_pairing;
 mod staff_roles;
+mod staff_roster;
+mod staff_roster_data;
+mod staff_scratches;
 mod tab_cards;
 mod team_portal;
 mod tournament_data;
@@ -423,6 +426,18 @@ fn router(app: App) -> Router {
                     app.clone(),
                     access::board,
                 )),
+        )
+        .merge(
+            staff_roster::routes().route_layer(axum::middleware::from_fn_with_state(
+                app.clone(),
+                access::data_entry,
+            )),
+        )
+        .merge(
+            staff_scratches::routes().route_layer(axum::middleware::from_fn_with_state(
+                app.clone(),
+                staff_scratches::middleware,
+            )),
         )
         .merge(
             Router::new()

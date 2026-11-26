@@ -43,7 +43,7 @@ pub async fn protect_response(mut response: Response) -> Response {
     response
 }
 
-fn valid_code(code: &str) -> bool {
+pub fn valid_code(code: &str) -> bool {
     if code.is_empty() || code.len() > 30 {
         return false;
     }
