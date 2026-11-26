@@ -13,7 +13,7 @@
         </div>
         <div class="col-md-6 mb-3">
           <label for="host_school" class="form-label">Host school</label>
-          <select class="form-select" id="host_school" name="host_school" required>
+          <select class="custom-select" id="host_school" name="host_school" required>
             <option value="">Choose a school</option>
             {% for school in schools %}<option value="{{ school.value }}"{% if school.value == fields.host_school %} selected{% endif %}>{{ school.name }}</option>{% endfor %}
             <option value="manual"{% if fields.host_school == "manual" %} selected{% endif %}>Other school</option>
@@ -25,7 +25,7 @@
         </div>
         <div class="col-md-6 mb-3">
           <label for="tournament_type" class="form-label">Tournament type</label>
-          <select class="form-select" id="tournament_type" name="tournament_type" required>
+          <select class="custom-select" id="tournament_type" name="tournament_type" required>
             {% for value, label in types %}<option value="{{ value }}"{% if value == fields.tournament_type %} selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
@@ -78,7 +78,7 @@
       {% for key, label in [("open_speaks", "Speaker points"), ("open_ranks", "Speaker ranks")] %}
         <div class="col-md-6 mb-3">
           <label for="{{ key }}" class="form-label">{{ label }}</label>
-          <select class="form-select" id="{{ key }}" name="{{ key }}" required>
+          <select class="custom-select" id="{{ key }}" name="{{ key }}" required>
             <option value="">Choose a policy</option>
             <option value="1"{% if fields[key] == "1" %} selected{% endif %}>Open</option>
             <option value="2"{% if fields[key] == "2" %} selected{% endif %}>Closed</option>

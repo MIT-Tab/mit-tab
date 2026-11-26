@@ -1767,3 +1767,233 @@ def test_native_batch_checkin_and_history_restore_keep_durable_cells_and_role_bo
         assert not JudgeExpectedCheckIn.objects.exists()
         assert PublicRosterChange.objects.filter(message__startswith="Changed availability for “Check-In Judge 1”", list_kind="judges").count() == 4
         assert CheckIn.objects.count() == 2 and RoomCheckIn.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_anonymous():
+    from mittab.apps.tab.models import PublicDisplaySetting
+    from mittab.apps.tab.public_rankings import get_ranking_settings
+
+    tab = legacy_tab_session("public-ranking-staff")
+    board = legacy_tab_session("public-ranking-board")
+    get_user_model().objects.get(username="public-ranking-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("debaters_public", 1)
+    school = School.objects.create(name="Ranking School")
+    names = ["Top Example", "Second Example", "Private Example", "Additional Example"]
+    teams = [
+        Team.objects.create(name=name, seed=Team.UNSEEDED, school=school, ranking_public=i != 2)
+        for i, name in enumerate(names)
+    ]
+    people = [
+        Debater.objects.create(name=f"Ranking Speaker {i}", novice_status=i % 2)
+        for i in range(4)
+    ]
+    for team, speaker in zip(teams, people):
+        team.debaters.add(speaker)
+    first = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    private_debate = Round.objects.create(round_number=1, gov_team=teams[2], opp_team=teams[3], victor=Round.GOV)
+    future = Round.objects.create(round_number=2, gov_team=teams[1], opp_team=teams[0], victor=Round.GOV)
+    for debate, pair, score in ((first, (0, 1), "31.75"),
+                                (private_debate, (2, 3), "28.00"),
+                                (future, (1, 0), "35.00")):
+        for rank, index in enumerate(pair, 1):
+            RoundStats.objects.create(round=debate, debater=people[index],
+                                      speaks=Decimal(score) - (rank - 1), ranks=rank)
+    control = "/rankings/public-control/"
+    standings = "/public/team-rankings/"
+    speakers_page = "/public/speaker-rankings/"
+    ballots = "/public/ballots/"
+    paths = (standings, speakers_page, ballots)
+
+    with rust_server() as port:
+        for path in paths:
+            assert request(port, path)[1]["Location"] == "/public/access-error/"
+        status, headers, page = request(port, control, cookie=tab)
+        assert status == 200 and b"Publish Round 1 ballots" in page
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(data, session=tab):
+            return request(port, control, method="POST", form={"csrfmiddlewaretoken": csrf, **data},
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"})
+
+        policy = {"team_public": "on", "team_up_to_round": 1, "team_max_visible": 4,
+                  "varsity_public": "on", "round_1_visible": "on", "round_1_include_ranks": "on"}
+        assert post(policy, board)[1]["Location"] == "/403/"
+        assert post(policy)[1]["Location"] == control
+        assert get_ranking_settings("team")["up_to_round"] == 1
+        assert PublicDisplaySetting.objects.get(slug="ballot_round_1").include_ranks
+        teams_page = request(port, standings)[2]
+        assert b"Top Example" in teams_page and b"Private Example" not in teams_page
+        assert b"31.75" not in teams_page and b"Speaks</th>" not in teams_page
+        vars_page = request(port, speakers_page)[2]
+        assert b"Varsity Speakers" in vars_page and b"Novice Speakers" not in vars_page
+        assert b"Ranking Speaker 0" in vars_page and b"Ranking Speaker 1" not in vars_page
+        round_page = request(port, ballots)[2]
+        assert b"Ranking Speaker 0" in round_page and b"Ranking Speaker 1" in round_page
+        assert b"31.7500" not in round_page and b"Ranks" in round_page
+        assert b"Private Example" not in round_page and b"Round 2</h3>" not in round_page
+        for path in paths:
+            anonymous = request(port, path)
+            restricted = request(port, path, cookie=board)
+            assert restricted[0] == anonymous[0] == 200
+            assert restricted[1]["Cache-Control"] == "private, no-store"
+            assert request(port, path, cookie=board, method="POST")[1]["Location"] == "/403/"
+        assert post({**policy, "team_include_speaks": "on", "round_1_include_speaks": "on",
+                     "varsity_include_speaks": "on"})[0] == 302
+        assert b"31.75" in request(port, standings)[2]
+        assert b"35.00" not in request(port, standings)[2]
+        assert b"31.7500" in request(port, ballots)[2]
+        assert b"Unadjusted speaks" in request(port, speakers_page)[2]
+
+
+class BracketMarkup(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.payload = None
+
+    def handle_starttag(self, tag, attrs):
+        fields = dict(attrs)
+        if tag == "div" and fields.get("id") == "brackets-viewer-container":
+            self.payload = json.loads(fields["data-bracket"])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_public_outrounds_match_the_visible_django_bracket_payload():
+    from mittab.libs.bracket_display_logic import generate_bracket_data
+
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("var_teams_visible", 8)
+    TabSettings.set("debaters_public", 1)
+    school = School.objects.create(name="Outrounds School")
+    teams = {}
+    for seed in range(1, 7):
+        name = "Outround </script> Team" if seed == 5 else f"Outround Team {seed}"
+        team = Team.objects.create(name=name, school=school, seed=Team.UNSEEDED)
+        team.debaters.add(Debater.objects.create(name=f"Outround Speaker {seed}", novice_status=0))
+        BreakingTeam.objects.create(team=team, seed=seed, effective_seed=seed, type_of_team=0)
+        teams[seed] = team
+    chair = Judge.objects.create(name="Public Outround Chair", rank=9)
+    wing = Judge.objects.create(name="Public Outround Wing", rank=8)
+    hidden = Judge.objects.create(name="Undisclosed Outround Judge", rank=10, wing_only=True)
+    room = Room.objects.create(name="Public Outround Room", rank=10)
+    first = Outround.objects.create(num_teams=8, gov_team=teams[5], opp_team=teams[4], victor=1, room=room)
+    first.judges.add(chair, wing)
+    Outround.objects.filter(id=first.id).update(chair=chair)
+    other = Outround.objects.create(num_teams=8, gov_team=teams[3], opp_team=teams[6], victor=1)
+    next_round = Outround.objects.create(num_teams=4, gov_team=teams[1], opp_team=teams[5])
+    next_round.judges.add(hidden)
+    board = legacy_tab_session("public-outs-board")
+    get_user_model().objects.get(username="public-outs-board").groups.add(Group.objects.create(name="APDA Board"))
+    varsity = "/public/outrounds/0/"
+    novice = "/public/outrounds/1/"
+
+    def payload(page):
+        parser = BracketMarkup()
+        parser.feed(page.decode())
+        return parser.payload
+
+    with rust_server() as port:
+        assert request(port, novice)[1]["Location"] == "/public/access-error/"
+        status, _, page = request(port, varsity, cookie=board)
+        assert status == 200 and b"Round of 8" in page and b"Round of 4" not in page
+        assert b"Advancing Teams" in page and b"<b>Public Outround Chair</b>" in page
+        assert b"Undisclosed Outround Judge" not in page and b"Outround </script> Team" not in page
+        pairings = list(Outround.objects.filter(pk__in=(first.id, other.id)).order_by("id"))
+        assert payload(page) == json.loads(json.dumps(generate_bracket_data([{"rounds": pairings}])))
+        Scratch.objects.create(team=teams[4], judge=chair, scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(id=chair.id).update(rank=1, wing_only=True, request_wing=True)
+        assert request(port, varsity, cookie=board)[2] == page
+        assert request(port, varsity, cookie=board, method="POST")[1]["Location"] == "/403/"
+
+        TabSettings.set("var_teams_visible", 4)
+        updated = request(port, varsity)[2]
+        assert b"Round of 4" in updated and b"Undisclosed Outround Judge" in updated
+        expected = generate_bracket_data([{"rounds": pairings}, {"rounds": [next_round]}])
+        assert payload(updated) == json.loads(json.dumps(expected))
+        TabSettings.set("debaters_public", 0)
+        confidential = request(port, varsity)[2]
+        assert b"Outround Speaker" not in confidential
+        assert b"Outround Team 1" in confidential
+        TabSettings.set("outround_pairing_mode", 1)
+        assert payload(request(port, varsity)[2]) is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_tab_cards_and_export_honor_board_and_public_release():
+    tab = legacy_tab_session("tab-card-staff")
+    board = legacy_tab_session("tab-card-board")
+    board_user = get_user_model().objects.get(username="tab-card-board")
+    board_user.groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("publish_tab_cards_with_first_outround", 1)
+    school = School.objects.create(name="Card School")
+    teams = [
+        Team.objects.create(name=f"Card Team {i}", school=school, seed=Team.UNSEEDED)
+        for i in range(2)
+    ]
+    people = [Debater.objects.create(name=f"Card Debater {i}", novice_status=i % 2) for i in range(3)]
+    teams[0].debaters.add(*people[:2])
+    teams[1].debaters.add(people[2])
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1],
+                                  victor=Round.GOV, rfd="private notes on the ballot")
+    chair = Judge.objects.create(name="Card Judge Chair", rank=6, ballot_code="Synthetic-Cards-224")
+    debate.judges.add(chair)
+    Round.objects.filter(id=debate.id).update(chair=chair)
+    for rank, person in enumerate(people, 1):
+        RoundStats.objects.create(round=debate, debater=person,
+                                  speaks=Decimal("32.25") - rank, ranks=rank)
+    Bye.objects.create(round_number=2, bye_team=teams[0])
+    NoShow.objects.create(round_number=2, no_show_team=teams[1])
+    Outround.objects.create(num_teams=2, gov_team=teams[0], opp_team=teams[1])
+    AuditEvent.record(debate, AuditEvent.MANUAL_CHAIR_CHANGE, board_user,
+                      changes={"new_chair": chair.name, "remarks": "protected remarks fixture"},
+                      note="protected audit fixture")
+    public = "/public/tab-cards/"
+    staff = "/all_tab_cards/"
+    board_url = "/apda-board/tab-cards/"
+    private_card = f"/team/card/{teams[0].id}/pretty/"
+    board_card = f"/apda-board/tab-card/{teams[0].id}/"
+    download = "/archive/black_rod_bundle/"
+
+    with rust_server() as port:
+        assert request(port, public)[1]["Location"] == "/public/access-error/"
+        assert request(port, public, cookie=tab)[1]["Location"] == staff
+        assert request(port, public, cookie=board)[1]["Location"] == "/403/"
+        assert request(port, staff)[1]["Location"].startswith("/public/login/")
+        assert request(port, staff, cookie=tab)[0] == 200
+        assert request(port, board_url, cookie=tab)[0] == 403
+        assert b"Choose a team" in request(port, board_url, cookie=board)[2]
+
+        status, headers, page = request(port, board_card, cookie=board)
+        assert status == 200 and headers["cache-control"] == "private, no-store"
+        assert b"Card Debater 0" in page and b"Card Debater 2" not in page
+        assert b"Byes" in page and b"New Chair" in page
+        assert b"private notes" not in page and b"protected" not in page
+        assert request(port, private_card, cookie=board)[2] == page
+        assert request(port, private_card, cookie=board, method="POST")[1]["Location"] == "/403/"
+        Scratch.objects.create(team=teams[0], judge=chair, scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(id=chair.id).update(rank=9, wing_only=True)
+        assert request(port, board_card, cookie=board)[2] == page
+
+        assert request(port, download)[1]["Location"].startswith("/public/login/")
+        status, headers, archive = request(port, download, cookie=board)
+        assert status == 200 and headers["Content-Disposition"].endswith("-black-rod-bundle.json")
+        bundle = json.loads(archive)
+        assert set(bundle) == {"schema_version", "source", "exported_at", "tournament_name",
+                               "schools", "debaters", "rounds"}
+        assert bundle["rounds"][0]["judges"] == [{"original_name": chair.name, "is_chair": True}]
+        assert b"private notes" not in archive and b"protected" not in archive
+        assert b"Synthetic-Cards" not in archive and b"scratches" not in archive
+        assert request(port, download, cookie=board, method="POST")[1]["Location"] == "/403/"
+
+        TabSettings.set("var_teams_visible", 2)
+        status, _, page = request(port, public)
+        assert status == 200 and b"Card Debater 2" in page and b"No-shows" in page
+        assert b"31.25" in page and b"Card Judge Chair" in page
+        assert b"Manual edits" not in page and b"private notes" not in page
+        TabSettings.set("publish_tab_cards_with_first_outround", 0)
+        assert request(port, public)[1]["Location"] == "/public/access-error/"

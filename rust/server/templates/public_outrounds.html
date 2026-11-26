@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block head %}
+{% for file in webpack_files("publicDisplay") %}
+  {% if file.stylesheet %}<link rel="stylesheet" href="{{ file.href }}">{% else %}<script defer src="{{ file.href }}"></script>{% endif %}
+{% endfor %}
+{% if bracket %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/brackets-viewer@latest/dist/brackets-viewer.min.js"></script>
+{% for file in webpack_files("bracket") %}
+  {% if file.stylesheet %}<link rel="stylesheet" href="{{ file.href }}">{% else %}<script defer src="{{ file.href }}"></script>{% endif %}
+{% endfor %}
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="col-12 public-table-root">
+  <h1>{{ title }}</h1>
+  <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Tournament pairings">
+    {% for round in rounds %}
+      <a class="btn btn-sm btn-outline-primary" href="/public/pairings/{% if round != current %}{{ round }}/{% endif %}">Round {{ round }}</a>
+    {% endfor %}
+    {% if varsity %}<a class="btn btn-sm btn-outline-primary" href="/public/outrounds/0/"{% if division == 0 %} aria-current="page"{% endif %}>Varsity Outrounds</a>{% endif %}
+    {% if novice %}<a class="btn btn-sm btn-outline-primary" href="/public/outrounds/1/"{% if division == 1 %} aria-current="page"{% endif %}>Novice Outrounds</a>{% endif %}
+  </nav>
+  {% if bracket %}
+  <ul class="nav nav-tabs" role="tablist">
+    <li class="nav-item" role="presentation"><a class="nav-link active" id="list-view-tab" href="#list-view" role="tab" aria-controls="list-view" aria-selected="true">List View</a></li>
+    <li class="nav-item" role="presentation"><a class="nav-link" id="bracket-view-tab" href="#bracket-view" role="tab" aria-controls="bracket-view" aria-selected="false">Bracket View</a></li>
+  </ul>
+  {% endif %}
+  <div class="tab-content">
+    <div id="list-view" class="tab-pane active" role="tabpanel" aria-labelledby="list-view-tab">
+      {% for stage in stages %}
+      <h2 class="h4 mt-4">Round of {{ stage.size }}</h2>
+      <div class="public-table-wrap">
+        <table class="public_table">
+          {% set gov_label = "Government" if show_sides else "Team 1" %}
+          {% set opp_label = "Opposition" if show_sides else "Team 2" %}
+          <thead><tr><th scope="col">{{ gov_label }}</th><th scope="col">{{ opp_label }}</th><th scope="col">Judge</th><th scope="col">Room</th></tr></thead>
+          <tbody>
+            {% for match in stage.matches %}
+            <tr{% if sidelock and match.sidelock %} class="font-weight-bold"{% endif %}>
+              <td data-label="{{ gov_label }}"><div class="team-names">{% if choice and match.choice == 1 %}<b>{{ match.gov.name }}</b>{% else %}{{ match.gov.name }}{% endif %}</div>{% if names %}<div class="member-names">{{ match.gov.debaters }}</div>{% endif %}</td>
+              <td data-label="{{ opp_label }}"><div class="team-names">{% if choice and match.choice == 2 %}<b>{{ match.opp.name }}</b>{% else %}{{ match.opp.name }}{% endif %}</div>{% if names %}<div class="member-names">{{ match.opp.debaters }}</div>{% endif %}</td>
+              <td data-label="Judge">{% for judge in match.judges %}{% if judge.is_chair and match.judges|length > 1 %}<b>{{ judge.name }}</b>{% else %}{{ judge.name }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+              <td data-label="Room">{{ match.room or "" }}</td>
+            </tr>
+            {% endfor %}
+            {% if stage.advancing %}<tr><th scope="row">Advancing Teams</th><td colspan="3">{{ stage.advancing|join(", ") }}</td></tr>{% endif %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+    </div>
+    {% if bracket %}
+    <div id="bracket-view" class="tab-pane" role="tabpanel" aria-labelledby="bracket-view-tab">
+      <div class="brackets-viewer" id="brackets-viewer-container" data-bracket="{{ bracket }}"></div>
+      <div id="match-modal-backdrop" class="match-modal__backdrop" hidden></div>
+      <div id="match-metadata-modal" class="match-modal" role="dialog" aria-modal="true" aria-labelledby="match-modal-title" hidden>
+        <div class="match-modal__content card shadow-lg border border-primary">
+          <button type="button" class="match-modal__close close text-muted" id="close-modal" aria-label="Close">×</button>
+          <div class="card-body match-modal__body">
+            <h2 id="match-modal-title" class="h5 mb-3">Match Details</h2>
+            <div class="match-teams">
+              {% for side in ["gov", "opp"] %}
+              <div class="match-team" data-team="{{ side }}">
+                <span class="match-team__label" data-team-label="{{ side }}">Team {{ loop.index }}</span>
+                <span class="match-team__name" data-team-name="{{ side }}">TBD</span>
+                <span class="match-team__members d-none" data-team-members="{{ side }}"></span>
+              </div>
+              {% endfor %}
+            </div>
+            <div class="match-section match-room">
+              <span class="match-section__label">Room</span><span class="room-name" data-room>TBD</span>
+            </div>
+            <div class="match-section match-judges">
+              <span class="match-section__label">Judges</span><ul class="match-section__value judge-list list-unstyled mb-0" data-judges></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        window.bracketViewerData = JSON.parse(document.getElementById('brackets-viewer-container').dataset.bracket);
+      </script>
+    </div>
+    {% endif %}
+  </div>
+  {% set member_toggle = names %}
+  {% include "public_footer.html" %}
+</div>
+<script>document.body.classList.add('show-team-names');</script>
+{% endblock %}

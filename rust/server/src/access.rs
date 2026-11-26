@@ -81,6 +81,11 @@ pub async fn public_tournament(
                 | "/public/motions/"
                 | "/public/pairings/"
                 | "/public/missing-ballots/"
+                | "/public/team-rankings/"
+                | "/public/speaker-rankings/"
+                | "/public/ballots/"
+                | "/public/outrounds/0/"
+                | "/public/outrounds/1/"
                 | "/public/teams/"
                 | "/public/judges/"
                 | "/public/teams/expected-records/"
@@ -238,6 +243,8 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
                     | "/apda-board/inrounds/{round}/"
                     | "/apda-board/outrounds/"
                     | "/apda-board/judges/"
+                    | "/apda-board/tab-cards/"
+                    | "/apda-board/tab-card/{id}/"
             )
         ) | (
             &Method::POST,
@@ -291,4 +298,38 @@ pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) 
     }
     request.extensions_mut().insert(actor);
     next.run(request).await
+}
+
+pub async fn staff_or_board(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str);
+    if !matches!(request.method(), &Method::GET | &Method::HEAD)
+        || !matches!(
+            route,
+            Some(
+                "/all_tab_cards/"
+                    | "/team/card/{id}/"
+                    | "/team/card/{id}/pretty/"
+                    | "/archive/black_rod_bundle/"
+            )
+        )
+    {
+        return access_denied();
+    }
+    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
+        return unavailable();
+    };
+    if matches!(actor, Actor::User { board: true, .. }) {
+        match board_access_open(&app).await {
+            Ok(true) => {
+                request.extensions_mut().insert(actor);
+                return private(next.run(request).await);
+            }
+            Ok(false) => return board_closed(),
+            Err(_) => return unavailable(),
+        }
+    }
+    staff_settings(State(app), request, next).await
 }

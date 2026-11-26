@@ -23,6 +23,11 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav ml-auto">
+        {% if nav.tab %}
+        <li class="nav-item"><a class="nav-link" href="/pairings/status/">Pairings</a></li>
+        <li class="nav-item"><a class="nav-link" href="/batch_checkin/">Check-In</a></li>
+        <li class="nav-item"><a class="nav-link" href="/setup/tournament-todo/">Setup</a></li>
+        {% endif %}
         {% if nav.teams_public %}<li class="nav-item"><a class="nav-link" href="/public/teams/">Team List</a></li>{% endif %}
         {% if nav.judges_public %}<li class="nav-item"><a class="nav-link" href="/public/judges/">Judge List</a></li>{% endif %}
         {% if nav.motions_enabled %}<li class="nav-item"><a class="nav-link" href="/public/motions/">Motions</a></li>{% endif %}

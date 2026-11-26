@@ -134,6 +134,30 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             "checkin_history.html",
             include_str!("../templates/checkin_history.html"),
         ),
+        (
+            "ranking_control.html",
+            include_str!("../templates/ranking_control.html"),
+        ),
+        (
+            "public_team_rankings.html",
+            include_str!("../templates/public_team_rankings.html"),
+        ),
+        (
+            "public_speaker_rankings.html",
+            include_str!("../templates/public_speaker_rankings.html"),
+        ),
+        (
+            "public_ballots.html",
+            include_str!("../templates/public_ballots.html"),
+        ),
+        (
+            "public_outrounds.html",
+            include_str!("../templates/public_outrounds.html"),
+        ),
+        (
+            "tab_cards.html",
+            include_str!("../templates/tab_cards.html"),
+        ),
         ("error.html", include_str!("../templates/error.html")),
     ] {
         env.add_template(name, source)
@@ -188,6 +212,7 @@ fn webpack_files(bundle: String) -> Value {
 pub struct Navigation {
     pub authenticated: bool,
     pub board: bool,
+    pub tab: bool,
     pub motions_enabled: bool,
     pub teams_public: bool,
     pub judges_public: bool,
@@ -198,6 +223,14 @@ impl Navigation {
         Self {
             authenticated: !matches!(actor, Actor::Anonymous),
             board: matches!(actor, Actor::User { board: true, .. }),
+            tab: matches!(
+                actor,
+                Actor::User {
+                    board: false,
+                    superuser: true,
+                    ..
+                }
+            ),
             motions_enabled,
             teams_public: false,
             judges_public: false,

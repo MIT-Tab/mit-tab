@@ -38,7 +38,7 @@
           <form method="post" action="/apda-board/outround/{{ row.id }}/">
             {{ hidden(row, csrf, "result") }}
             <label>
-              Outcome <select class="form-select" name="victor">
+              Outcome <select class="custom-select" name="victor">
                 <option value="0">Pending</option>{% for value, label in outcomes %}<option value="{{ value }}"{% if row.data.victor == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
               </select>
             </label>
@@ -47,7 +47,7 @@
           <form method="post" action="/apda-board/outround/{{ row.id }}/">
             {{ hidden(row, csrf, "room") }}
             <label>
-              Room <select class="form-select" name="room">
+              Room <select class="custom-select" name="room">
                 <option value="">Unassigned</option>{% for room in rooms %}<option value="{{ room.id }}"{% if row.data.room and row.data.room.id == room.id %} selected{% endif %}>{{ room.name }}</option>{% endfor %}
               </select>
             </label>
@@ -56,7 +56,7 @@
           <form method="post" action="/apda-board/outround/{{ row.id }}/">
             {{ hidden(row, csrf, "choice") }}
             <label>
-              Choice <select class="form-select" name="choice">
+              Choice <select class="custom-select" name="choice">
                 {% for label in ["No choice", "Government", "Opposition"] %}<option value="{{ loop.index0 }}"{% if row.data.choice == loop.index0 %} selected{% endif %}>{{ label }}</option>{% endfor %}
               </select>
             </label>
@@ -65,8 +65,8 @@
           {% if division.teams %}
           <form method="post" action="/apda-board/outround/{{ row.id }}/">
             {{ hidden(row, csrf, "team") }}
-            <label>Side <select class="form-select" name="position"><option value="gov">Government</option><option value="opp">Opposition</option></select></label>
-            <label>Breaking team <select class="form-select" name="team">
+            <label>Side <select class="custom-select" name="position"><option value="gov">Government</option><option value="opp">Opposition</option></select></label>
+            <label>Breaking team <select class="custom-select" name="team">
               {% for team in division.teams %}<option value="{{ team.team }}">{{ team.name }}</option>{% endfor %}
             </select></label>
             <button class="btn btn-outline-primary" type="submit">Save Team</button>

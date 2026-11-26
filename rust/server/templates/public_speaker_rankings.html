@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Speaker Rankings</h2>
+  {% for section in sections %}
+  <h3>{{ section.name }}</h3>
+  {% if section.rows %}
+  <div class="table-responsive mb-3">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Place</th><th scope="col">Debater</th><th scope="col">Team</th>
+        {% if section.show_scores %}{% for label, _, _ in section.rows[0].columns %}
+        <th scope="col">{{ label }} speaks</th><th scope="col">{{ label }} ranks</th>{% endfor %}{% endif %}</tr></thead>
+      <tbody>
+      {% for row in section.rows %}
+      <tr><td>{{ row.place }}</td><th scope="row">{{ row.name }}</th><td>{{ row.team or "—" }}</td>
+        {% for _, speaks, ranks in row.columns %}<td>{{ speaks }}</td><td>{{ ranks }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No speakers are available yet.</p>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

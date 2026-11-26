@@ -30,10 +30,10 @@ const DISPLAY_SETTINGS: &[&str] = &[
 ];
 
 #[derive(Serialize)]
-struct Team {
-    id: i32,
-    name: String,
-    debaters: String,
+pub struct Team {
+    pub id: i32,
+    pub name: String,
+    pub debaters: String,
 }
 
 #[derive(Serialize)]
@@ -181,7 +181,7 @@ async fn has_inrounds(db: &mut MySqlConnection) -> Result<bool, sqlx::Error> {
     Ok(exists != 0)
 }
 
-async fn paired_teams(
+pub async fn paired_teams(
     db: &mut MySqlConnection,
     members_public: bool,
 ) -> Result<HashMap<i32, Team>, sqlx::Error> {

@@ -4,6 +4,7 @@ mod ballot_entry;
 mod board;
 mod board_outrounds;
 mod board_snapshot;
+mod bracket_display;
 mod bundle;
 mod checkin;
 mod checkin_data;
@@ -21,7 +22,9 @@ mod native_session;
 mod passwords;
 mod placements;
 mod public_api;
+mod public_outrounds;
 mod public_pairings;
+mod public_rankings;
 mod publication;
 mod room_assignment;
 mod roster_log;
@@ -34,6 +37,7 @@ mod settings_form;
 mod speakers;
 mod staff_pairing;
 mod staff_roles;
+mod tab_cards;
 mod tournament_data;
 mod tournament_setup;
 
@@ -128,6 +132,14 @@ fn router(app: App) -> Router {
                 .route("/public/pairings/", get(public_pairings::current))
                 .route("/public/pairings/{round}/", get(public_pairings::previous))
                 .route("/public/missing-ballots/", get(public_pairings::missing))
+                .route("/public/team-rankings/", get(public_rankings::teams))
+                .route(
+                    "/public/speaker-rankings/",
+                    get(public_rankings::speaker_page),
+                )
+                .route("/public/ballots/", get(public_rankings::ballots))
+                .route("/public/tab-cards/", get(tab_cards::public))
+                .route("/public/outrounds/{division}/", get(public_outrounds::page))
                 .route("/public/teams/", get(rosters::teams))
                 .route("/public/judges/", get(rosters::judges))
                 .route("/public/teams/expected-records/", get(rosters::records))
@@ -228,6 +240,10 @@ fn router(app: App) -> Router {
                     "/pairing/release/",
                     axum::routing::post(staff_pairing::release),
                 )
+                .route(
+                    "/rankings/public-control/",
+                    get(public_rankings::control).post(public_rankings::update),
+                )
                 .route("/motions/", get(motions::manage))
                 .route(
                     "/motions/add/",
@@ -276,6 +292,8 @@ fn router(app: App) -> Router {
                     "/apda-board/judges/",
                     get(board::judges).post(board::update_judge),
                 )
+                .route("/apda-board/tab-cards/", get(tab_cards::all))
+                .route("/apda-board/tab-card/{id}/", get(tab_cards::single))
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::board,
@@ -288,6 +306,17 @@ fn router(app: App) -> Router {
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::checkins,
+                )),
+        )
+        .merge(
+            Router::new()
+                .route("/all_tab_cards/", get(tab_cards::all))
+                .route("/team/card/{id}/", get(tab_cards::single))
+                .route("/team/card/{id}/pretty/", get(tab_cards::single))
+                .route("/archive/black_rod_bundle/", get(tab_cards::bundle))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    app.clone(),
+                    access::staff_or_board,
                 )),
         )
         .route("/public/login/", get(login::page).post(login::sign_in))

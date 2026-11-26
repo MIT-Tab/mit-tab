@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>Team Rankings</h2>
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Place</th><th scope="col">Team</th><th scope="col">Wins</th>{% if show_scores %}<th scope="col">Speaks</th><th scope="col">Ranks</th>{% endif %}</tr></thead>
+      <tbody>
+      {% for row in rows %}
+      <tr><td>{{ row.place }}</td><th scope="row">{{ row.name }}{% if row.debaters %}<br><small>{{ row.debaters }}</small>{% endif %}</th><td>{{ row.wins }}</td>{% if show_scores %}<td>{{ row.speaks }}</td><td>{{ row.ranks }}</td>{% endif %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No team rankings are available yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
