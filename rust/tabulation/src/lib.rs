@@ -5,6 +5,7 @@ pub mod calculator;
 pub mod judges;
 pub mod legacy_random;
 pub mod matching;
+pub mod outrounds;
 pub mod pairing;
 pub mod prelim;
 pub mod rankings;

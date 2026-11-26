@@ -283,6 +283,117 @@ pub fn assign_inround(
     Ok(panels)
 }
 
+pub struct OutroundGroup<'a> {
+    pub division: i32,
+    pub panel_size: usize,
+    pub debates: &'a [Debate],
+}
+
+pub struct OutroundPolicy {
+    pub ranking: RankingMode,
+    pub snake: bool,
+    pub novice_chairs_first: bool,
+}
+
+pub fn assign_outrounds(
+    groups: &[OutroundGroup<'_>],
+    judges: &[Judge],
+    policy: &OutroundPolicy,
+) -> Result<Vec<Panel>, JudgeError> {
+    let mut judges: Vec<_> = judges.iter().collect();
+    let mut rng = LegacyRandom::seeded(1337);
+    rng.shuffle(&mut judges);
+    judges.sort_by_key(|judge| std::cmp::Reverse(judge.rank));
+    // Django groups equal calibration scores for outrounds in both weight modes.
+    let scores = scores(&judges, RankingMode::Shared);
+    let mut reserved = HashSet::new();
+    let mut result: HashMap<_, _> = groups
+        .iter()
+        .flat_map(|group| group.debates)
+        .map(|debate| {
+            (
+                debate.id,
+                Panel {
+                    debate: debate.id,
+                    chair: 0,
+                    wings: Vec::new(),
+                },
+            )
+        })
+        .collect();
+    let mut ordered: Vec<_> = groups.iter().collect();
+    ordered.sort_by_key(|group| group.division);
+    let combined = policy.novice_chairs_first
+        && ordered.iter().any(|group| group.division == 0)
+        && ordered.iter().any(|group| group.division == 1);
+    let sessions: Vec<_> = if combined {
+        vec![ordered.as_slice()]
+    } else {
+        let varsity = ordered.partition_point(|group| group.division == 0);
+        vec![&ordered[..varsity], &ordered[varsity..]]
+    };
+    for session in sessions {
+        let size = session
+            .iter()
+            .map(|group| group.panel_size)
+            .max()
+            .unwrap_or_default();
+        for seat in 0..size {
+            let mut active = Vec::new();
+            for group in session.iter().filter(|group| group.panel_size > seat) {
+                if policy.snake && seat % 2 == 1 {
+                    active.extend(group.debates.iter().rev());
+                } else {
+                    active.extend(group.debates);
+                }
+            }
+            if active.is_empty() {
+                continue;
+            }
+            let rounds = active.len();
+            let mut edges = Vec::new();
+            for (index, judge) in judges
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !reserved.contains(index))
+            {
+                for (position, debate) in active.iter().enumerate() {
+                    if eligible(judge, debate, true) {
+                        edges.push(Edge {
+                            first: position,
+                            second: rounds + index,
+                            weight: weight(scores[index], position, policy.ranking, None, &mut rng),
+                        });
+                    }
+                }
+            }
+            let mates = maximum_matching(rounds + judges.len(), &edges, true)
+                .map_err(JudgeError::Matching)?;
+            for (position, debate) in active.iter().enumerate() {
+                let index = mates[position].ok_or(JudgeError::IncompleteChairs)? - rounds;
+                reserved.insert(index);
+                let panel = result
+                    .get_mut(&debate.id)
+                    .expect("active debate registered");
+                if seat == 0 {
+                    panel.chair = judges[index].id;
+                } else {
+                    panel.wings.push(judges[index].id);
+                }
+            }
+        }
+    }
+    let mut panels = Vec::new();
+    for group in groups {
+        for debate in group.debates {
+            if let Some(panel) = result.remove(&debate.id).filter(|panel| panel.chair > 0) {
+                panels.push(panel);
+            }
+        }
+    }
+    Ok(panels)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

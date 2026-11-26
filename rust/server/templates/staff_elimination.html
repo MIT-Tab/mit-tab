@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <header class="d-flex align-items-baseline gap-3 flex-wrap">
+    <h1 class="h3">{{ title }}</h1>
+    <a href="/break/">Break Teams</a>
+    <a href="/pairings/status/">Preliminary Pairings</a>
+  </header>
+  <form method="get" class="d-flex gap-3 flex-wrap mb-3 align-items-end">
+    {% for division, label, name, selected in [(0, "Varsity", "select_varsity", vars), (1, "Novice", "select_novice", novs)] %}
+      <label class="mb-0">{{ label }}<select name="{{ name }}" class="custom-select">
+        <option value="">Choose a stage</option>{% for kind, size in stages if kind == division %}
+        <option value="{{ size }}"{% if selected == size %} selected{% endif %}>Round of {{ size }}</option>{% endfor %}
+      </select></label>
+    {% endfor %}
+    <button class="btn btn-outline-primary" type="submit">View Selected Stages</button>
+  </form>
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    {% for label, action in [("Assign Judges", "assign_judges"), ("Assign Rooms", "assign_rooms")] %}
+    <form action="/outround_pairing/{{ action }}/" method="post">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="selected_varsity" value="{{ vars or '' }}">
+      <input type="hidden" name="selected_novice" value="{{ novs or '' }}">
+      <button class="btn btn-outline-primary" type="submit">{{ label }}</button>
+    </form>
+    {% endfor %}
+    <a class="btn btn-outline-primary" href="/pairings/quick_judge_checkin/">Quick Judge Check-In</a>
+  </div>
+  {% for section in sections %}
+  <section class="mb-4">
+    <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+      <h2 class="h5 mb-0">{{ section.label }}</h2>
+      {% if section.debates %}
+      <form method="post" action="/outround_pairing/release/{{ section.stage.size }}/{{ section.stage.division }}/">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+        <input type="hidden" name="redirect" value="on">
+        <button class="btn btn-sm btn-outline-primary" type="submit">{{ "Unpublish" if section.released else "Publish" }}</button>
+      </form>
+      <a class="btn btn-sm btn-outline-secondary" href="/outround_pairings/export_csv/{{ section.stage.division }}/">Export Published Pairings</a>
+      <a class="btn btn-sm btn-outline-secondary" href="/outround_result/{{ section.stage.division }}">Forum Results</a>
+      {% endif %}
+      {% if section.next %}
+        <a class="btn btn-sm btn-primary" href="/outround_pairing/pair/{{ section.stage.division }}/{{ section.stage.size }}/">Prepare Next Stage</a>
+      {% elif section.first_challenge %}
+        <a class="btn btn-sm btn-primary" href="/outround_pairing/pair/{{ section.stage.division }}/{{ section.stage.size * 2 }}/">Prepare Challenges</a>
+      {% endif %}
+    </div>
+    {% if section.debates %}
+    <div class="table-responsive"><table class="table table-striped">
+      <thead><tr><th>Government</th><th>Opposition</th><th>Judges</th><th>Room</th><th>Result</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for round in section.debates %}
+        <tr>
+          <td>{{ round.data.gov_team.name }}{% if round.data.sidelock %} · Side locked{% endif %}</td>
+          <td>{{ round.data.opp_team.name }}</td>
+          <td>{% for judge in round.data.judges %}{{ judge.name }}{% if judge.id == round.data.chair %} (chair){% endif %}{% if not loop.last %}, {% endif %}{% else %}Unassigned{% endfor %}</td>
+          <td>{{ round.data.room.name or "Unassigned" }}</td>
+          <td>{{ ["Pending", "Government", "Opposition", "Government by forfeit", "Opposition by forfeit"][round.data.victor] or "Pending" }}</td>
+          <td><a href="/outround/{{ round.id }}/result/">Ballot</a> · <a href="/outround/{{ round.id }}/edit/">Assignments</a>
+            <form method="post" action="/outround_choice/{{ round.id }}">
+              <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}"><input type="hidden" name="redirect" value="on">
+              <button class="btn btn-link btn-sm p-0" type="submit">{{ ["No team choice", "Government choice", "Opposition choice"][round.data.choice] or "Team choice" }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p>No pairings for this stage.</p>{% endif %}
+    {% if section.survivors %}
+    <details><summary>Unpaired breaking teams</summary><ul>{% for team in section.survivors %}<li>{{ team.name }} · Seed {{ team.seed }}</li>{% endfor %}</ul></details>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

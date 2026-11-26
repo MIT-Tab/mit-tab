@@ -52,6 +52,9 @@ mod settings;
 mod settings_form;
 mod speakers;
 mod spreadsheets;
+mod staff_elimination;
+mod staff_elimination_assign;
+mod staff_elimination_store;
 mod staff_invites;
 mod staff_pairing;
 mod staff_roles;
@@ -323,6 +326,7 @@ fn router(app: App) -> Router {
                 )
                 .merge(staff_rounds::routes())
                 .merge(staff_round_tools::routes())
+                .merge(staff_elimination::routes())
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
                 .route(

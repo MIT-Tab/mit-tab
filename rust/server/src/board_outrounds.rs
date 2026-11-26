@@ -202,9 +202,18 @@ async fn initialize_break(
     if existing != 0 {
         return Ok(());
     }
+    seed_break(db, user, settings, true).await
+}
+
+pub async fn seed_break(
+    db: &mut MySqlConnection,
+    user: i32,
+    settings: &Settings,
+    require_varsity: bool,
+) -> Result<(), BoardError> {
     let vars = settings.integer("var_teams_to_break", 8);
     let novs = settings.integer("nov_teams_to_break", 4);
-    if vars < 2 || novs < 0 {
+    if !(0..=256).contains(&vars) || !(0..=256).contains(&novs) || (require_varsity && vars < 2) {
         return Err(BoardError::Conflict("Check the configured break sizes."));
     }
     let data = TournamentData::load(db).await?;
@@ -229,7 +238,7 @@ async fn initialize_break(
         .take(vars as usize)
         .map(|entry| entry.id)
         .collect();
-    if varsity.len() < 2 {
+    if require_varsity && varsity.len() < 2 {
         return Err(BoardError::Conflict(
             "The varsity break needs at least two eligible teams.",
         ));
@@ -448,7 +457,7 @@ async fn pair_next(app: &App, actor: Actor, division: i32) -> Result<(), BoardEr
     Ok(())
 }
 
-async fn sides(
+pub async fn sides(
     db: &mut MySqlConnection,
     first: i32,
     second: i32,

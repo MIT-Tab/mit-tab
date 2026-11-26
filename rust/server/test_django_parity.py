@@ -3150,3 +3150,146 @@ def test_native_staff_pairing_stats_checkin_and_csv():
         stats_page = request(port, "/pairings/round_stats/", cookie=tab)[2]
         assert b"All preliminary rounds" in stats_page and b"27.75" in stats_page
         assert b"Round 5" in request(port, "/pairings/view_rounds/", cookie=tab)[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path):
+    tab = legacy_tab_session("elimination-staff")
+    board = legacy_tab_session("elimination-board")
+    get_user_model().objects.get(username="elimination-board").groups.add(Group.objects.create(name="APDA Board"))
+    for key, value in {
+        "cur_round": 2, "tot_rounds": 1, "var_teams_to_break": 4, "nov_teams_to_break": 2,
+        "outround_pairing_mode": 0, "var_panel_size": 2, "nov_panel_size": 1, "outround_judge_priority": 1,
+        "enable_room_seeding": 1, "var_teams_visible": 256, "nov_teams_visible": 256,
+    }.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Elim Test School")
+    teams = []
+    for index in range(6):
+        novice = int(index >= 4)
+        team = Team.objects.create(name=f"Elim Team {index + 1}", school=school, seed=0, break_preference=novice)
+        team.debaters.add(Debater.objects.create(name=f"Elim Debater {index + 1}", novice_status=novice))
+        teams.append(team)
+    preliminary = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
+    Round.objects.create(round_number=1, gov_team=teams[2], opp_team=teams[3], victor=Round.OPP)
+    Round.objects.create(round_number=1, gov_team=teams[4], opp_team=teams[5], victor=Round.GOV)
+    for index in range(3):
+        room = Room.objects.create(name=f"Elim Room {index + 1}", rank=index + 1)
+        RoomCheckIn.objects.create(room=room, round_number=0)
+    judges = []
+    for index in range(6):
+        judge = Judge.objects.create(name=f"Elim Judge {index + 1}", rank=index + 1)
+        CheckIn.objects.create(judge=judge, round_number=0)
+        judges.append(judge)
+    Scratch.objects.create(team=teams[0], judge=judges[-1], scratch_type=Scratch.TAB_SCRATCH)
+
+    with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
+        start = "/break/"
+        status, headers, body = request(port, start, cookie=tab)
+        assert status == 200 and b"Enter all preliminary outcomes" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields=None, session=tab):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **(fields or {})})
+
+        assert post(start)[0] == 422
+        assert not BreakingTeam.objects.exists() and not list(tmp_path.glob("*.dump.sql"))
+        Round.objects.filter(id=preliminary.id).update(victor=Round.GOV)
+        result = post(start)
+        assert result[0] == 302 and result[1]["Location"] == "/outround_pairing", result
+        assert BreakingTeam.objects.count() == 6
+        assert Outround.objects.filter(type_of_round=0, num_teams=4).count() == 2
+        assert Outround.objects.filter(type_of_round=1, num_teams=2).count() == 1
+        assert not Outround.objects.exclude(chair=None, room=None).exists()
+        assert list(tmp_path.glob("Before the Break*.dump.sql"))
+        assert post(start)[0] == 422
+        scope = {"selected_varsity": 4, "selected_novice": 2}
+        endpoint = "/outround_pairing/assign_judges/"
+        assert post(endpoint, scope, session=board)[1]["Location"] == "/403/"
+        assert request(port, "/outround_pairing/0/4?select_varsity=4&select_novice=", cookie=tab)[0] == 200
+
+        assign_judges.add_outround_judges(round_specs=[(0, 4), (1, 2)])
+        expected = {row.id: (row.chair_id, set(row.judges.values_list("id", flat=True))) for row in Outround.objects.all()}
+        for row in Outround.objects.all():
+            row.judges.clear()
+        Outround.objects.all().update(chair=None)
+        result = post(endpoint, scope)
+        assert result[0] == 302, result
+        actual = {row.id: (row.chair_id, set(row.judges.values_list("id", flat=True))) for row in Outround.objects.all()}
+        assert actual == expected
+        room_endpoint = "/outround_pairing/assign_rooms/"
+        assert post(room_endpoint, scope)[0] == 302
+        assert len(set(Outround.objects.values_list("room_id", flat=True))) == 3
+        assert json.loads(post("/outround_pairing/release/4/0/")[2])["pairing_released"]
+        assert TabSettings.get("var_teams_visible", use_cache=False) == 4
+        status, _, csv_data = request(port, "/outround_pairings/export_csv/0/", cookie=tab)
+        assert status == 200 and b"[V] Ro4," in csv_data
+        rows = list(Outround.objects.filter(type_of_round=0).order_by("id"))
+        hop = "/outround_pairing/pair/0/4/"
+        assert post(hop)[0] == 422
+        for row in rows:
+            ballot = f"/outround/{row.id}/result/"
+            assert request(port, ballot, cookie=tab)[0] == 200
+            assert post(ballot, {"winner": 1, "round_instance": 9999})[0] == 422
+            assert post(ballot, {"winner": 1, "round_instance": row.id})[0] == 302
+        assert b"drops to" in request(port, "/outround_result/0", cookie=tab)[2]
+        result = post(hop)
+        assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/2", result
+        final = Outround.objects.get(type_of_round=0, num_teams=2)
+        assert {final.gov_team_id, final.opp_team_id} == {row.gov_team_id for row in rows}
+        assert not final.judges.exists() and final.chair_id is None
+        assert set(Outround.objects.filter(type_of_round=0, num_teams=4).values_list("id", flat=True)) == {row.id for row in rows}
+        assert TabSettings.get("var_teams_visible", use_cache=False) == 4
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path):
+    from mittab.apps.tab.models import OutroundChallenge
+
+    tab = legacy_tab_session("challenge-staff")
+    for key, value in {
+        "cur_round": 2, "tot_rounds": 1, "var_teams_to_break": 4, "nov_teams_to_break": 0,
+        "outround_pairing_mode": 2, "var_panel_size": 1,
+    }.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Challenge School")
+    teams = [Team.objects.create(name=f"Challenge Team {index + 1}", school=school, seed=0) for index in range(4)]
+    for index in range(2):
+        room = Room.objects.create(name=f"Challenge Room {index + 1}", rank=index + 1)
+        RoomCheckIn.objects.create(room=room, round_number=0)
+        Round.objects.create(round_number=1, gov_team=teams[index * 2], opp_team=teams[index * 2 + 1], victor=Round.GOV)
+    with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
+        status, headers, _ = request(port, "/break/", cookie=tab)
+        assert status == 200
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields=None):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **(fields or {})})
+
+        assert post("/break/")[0] == 302
+        assert BreakingTeam.objects.filter(type_of_team=0).count() == 4 and not Outround.objects.exists()
+        assert b"Prepare Challenges" in request(port, "/outround_pairing/0/4", cookie=tab)[2]
+        path = "/outround_pairing/pair/0/8/"
+        seeds = list(BreakingTeam.objects.order_by("seed"))
+        a, b, c, d = [seed.team_id for seed in seeds]
+        assert b"Challenge Picks" in request(port, path, cookie=tab)[2]
+        action = {"action": "set_challenge", "challenger_id": a, "challenged_id": c}
+        assert post(path, {**action, "challenged_id": a})[0] == 422
+        assert post(path, action)[0] == 302
+        assert post(path, {**action, "challenger_id": b})[0] == 422
+        assert OutroundChallenge.objects.count() == 1
+        assert post(path, {"action": "delete_challenge", "challenger_id": a})[0] == 302
+        assert not OutroundChallenge.objects.exists()
+        assert post(path, action)[0] == 302
+        result = post(path)
+        assert result[0] == 302 and result[1]["Location"] == "/outround_pairing/0/4", result
+        assert {frozenset((row.gov_team_id, row.opp_team_id)) for row in Outround.objects.all()} == {
+            frozenset((a, c)), frozenset((b, d)),
+        }
+        assert BreakingTeam.objects.get(team_id=c).effective_seed == 4
+        assert TabSettings.get(f"challenge_once_applied_0_{min(seed.id for seed in seeds)}", use_cache=False) == 1
+        assert post(path, action)[0] == 422

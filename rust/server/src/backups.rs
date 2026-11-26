@@ -35,15 +35,19 @@ const BACKUP_ERROR: &str = "Could not save the database backup. The pairings are
 
 impl Backups {
     pub async fn pre_pairing(&self, round: i32, trigger: Trigger) -> Result<(), &'static str> {
-        if self.s3 {
-            return Err("This instance requires S3 backups before changing pairings.");
-        }
         let (name, kind) = match trigger {
             Trigger::Pair => (format!("Before Pairing Round {round}"), 4),
             Trigger::RePair => (format!("Before Re-pairing Round {round}"), 8),
             Trigger::Rooms => (format!("Before Room Assign Round {round}"), 5),
             Trigger::Judges => (format!("Before Judge Assign Round {round}"), 3),
         };
+        self.save_named(&name, kind, &round.to_string()).await
+    }
+
+    pub async fn save_named(&self, name: &str, kind: u8, round: &str) -> Result<(), &'static str> {
+        if self.s3 {
+            return Err("This instance requires S3 backups before changing pairings.");
+        }
         let seconds = Utc::now().timestamp();
         let temporary = self
             .prefix
@@ -51,7 +55,7 @@ impl Backups {
         let temporary = self.snapshot(&temporary).await.map_err(|_| BACKUP_ERROR)?;
         for counter in 1.. {
             let label = if counter == 1 {
-                name.clone()
+                name.to_owned()
             } else {
                 format!("{name} ({counter})")
             };

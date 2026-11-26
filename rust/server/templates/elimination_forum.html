@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12">
+  <h1 class="h3">{{ title }}</h1>
+  {% for round, matches in rows %}
+  <section><h2 class="h5">{{ round }}</h2>{% for match in matches %}<pre class="text-wrap">{{ match }}</pre>{% endfor %}</section>
+  {% else %}<p>No elimination outcomes entered.</p>{% endfor %}
+</div>
+{% endblock %}
