@@ -94,6 +94,13 @@ async fn prepare_locked(db: &mut MySqlConnection, initialize: bool) -> Result<()
     }
 
     install_sessions(db).await?;
+    sqlx::query(
+        "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround')
+         ON DUPLICATE KEY UPDATE model = django_content_type.model",
+    )
+    .execute(&mut *db)
+    .await
+    .map_err(|_| "Could not prepare pairing audit types")?;
     if initialize {
         initialize_tournament(db).await?;
     }

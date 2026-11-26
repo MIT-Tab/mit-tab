@@ -172,7 +172,7 @@ pub async fn wizard_complete(app: &App) -> Result<bool, sqlx::Error> {
     ))
 }
 
-fn access_denied() -> Response {
+pub fn access_denied() -> Response {
     private((StatusCode::FOUND, [(header::LOCATION, "/403/")]))
 }
 

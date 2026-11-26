@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>{{ title }}</h2>
+  <p>{{ gov }} vs. {{ opp }}</p>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% for ballot in forms %}
+    <fieldset class="mb-4">
+      {% if panel %}<legend>Ballot {{ loop.index }}</legend>{% endif %}
+      <input type="hidden" name="{{ ballot.prefix }}round_instance" value="{{ id }}">
+      <label class="form-label" for="{{ ballot.prefix }}winner">Outcome</label>
+      <select id="{{ ballot.prefix }}winner" name="{{ ballot.prefix }}winner" class="form-select mb-3" required>
+        <option value="">Choose an outcome</option>
+        {% for value, label in outcomes %}<option value="{{ value }}"{% if value == ballot.outcome %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      {% for position in ballot.positions %}
+      {% set field = ballot.prefix ~ position.code %}
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label" for="{{ field }}_debater">{{ position.label }}</label>
+          <select id="{{ field }}_debater" name="{{ field }}_debater" class="form-select" required>
+            <option value="">Choose a speaker</option>
+            {% for speaker in position.team.speakers %}<option value="{{ speaker.id }}"{% if speaker.id == position.selected %} selected{% endif %}>{{ speaker.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="{{ field }}_speaks">Speaker points</label>
+          <input id="{{ field }}_speaks" name="{{ field }}_speaks" class="form-control" type="number" step="{{ step }}" value="{{ position.speaks }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="{{ field }}_ranks">Rank</label>
+          <select id="{{ field }}_ranks" name="{{ field }}_ranks" class="form-select" required>
+            <option value="">Choose a rank</option>
+            {% for rank in range(1, 5) %}<option value="{{ rank }}"{% if rank == position.ranks %} selected{% endif %}>{{ rank }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+    {% if panel %}
+    <div class="form-check mb-3">
+      <input id="discard_minority" type="checkbox" class="form-check-input" name="discard_minority"{% if discard_minority %} checked{% endif %}>
+      <label for="discard_minority" class="form-check-label">Discard minority ballots when averaging scores</label>
+    </div>
+    {% endif %}
+    {% if rfd_allowed %}
+    <div class="mb-3">
+      <label for="rfd" class="form-label">Reason for decision</label>
+      <textarea id="rfd" name="rfd" class="form-control" rows="6"{% if not rfd_open %} readonly{% endif %}>{{ rfd }}</textarea>
+      {% if deadline %}<small>Deadline {{ deadline }}</small>{% endif %}
+    </div>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Save Ballot</button>
+    <a class="btn btn-secondary" href="/pairings/status/">Cancel</a>
+  </form>
+</div>
+{% endblock %}

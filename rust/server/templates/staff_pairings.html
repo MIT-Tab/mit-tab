@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col">
+  <h2>{{ title }}</h2>
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    {% if next_round %}<a class="btn btn-primary" href="/pairing/pair_round/">Pair Round {{ current + 1 }}</a>{% endif %}
+    {% if round == current and round > 0 %}
+    <a class="btn btn-outline-primary" href="/pairing/re_pair_round/">Re-pair Round {{ round }}</a>
+    {% if pairings %}
+    <form action="/pairing/assign_judges/" method="post">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="round" value="{{ round }}">
+      <button class="btn btn-outline-primary" type="submit">Assign Judges</button>
+    </form>
+    <form action="/pairing/assign_rooms_to_pairing/" method="post">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="round" value="{{ round }}">
+      <button class="btn btn-outline-primary" type="submit">Assign Rooms</button>
+    </form>
+    {% endif %}
+    <form action="/pairing/release/" method="post">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+      <input type="hidden" name="round" value="{{ round }}">
+      <button class="btn btn-outline-primary" type="submit">{{ "Unpublish Pairings" if released else "Publish Pairings" }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if current > 1 %}
+  <nav aria-label="Preliminary rounds" class="mb-3">
+    {% for n in range(1, current + 1) %}
+    <a class="btn btn-sm {{ 'btn-secondary' if n == round else 'btn-outline-secondary' }}" href="/round/{{ n }}/">Round {{ n }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+  {% if pairings %}
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead><tr><th scope="col">Government</th><th scope="col">Opposition</th><th scope="col">Judges</th><th scope="col">Room</th><th scope="col">Result</th><th scope="col">Ballots</th></tr></thead>
+      <tbody>
+      {% for pairing in pairings %}
+      {% set outcomes = ["Pending", "Government", "Opposition", "Government by forfeit", "Opposition by forfeit", "Both lose", "Both win"] %}
+      <tr><td>{{ pairing.government }}</td><td>{{ pairing.opposition }}</td><td>{% for judge in pairing.judges %}{% if judge.chair %}<b>{{ judge.name }}</b>{% else %}{{ judge.name }}{% endif %}{% if not loop.last %}, {% endif %}{% else %}Unassigned{% endfor %}</td><td>{{ pairing.room or "Unassigned" }}</td><td>{{ outcomes[pairing.victor] or "Pending" }}</td><td><a href="/round/{{ pairing.id }}/result/">{{ "Enter" if pairing.victor == 0 else "Edit" }} Ballot</a>{% if pairing.judges|length > 1 %} · <a href="/round/{{ pairing.id }}/result/{{ pairing.judges|length }}/">Enter Panel</a>{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif round > 0 %}
+  <p>No debates in this round.</p>
+  {% endif %}
+  {% if byes %}<h3>Byes</h3><ul>{% for team in byes %}<li>{{ team }}</li>{% endfor %}</ul>{% endif %}
+  {% if no_shows %}<h3>No-shows</h3><ul>{% for team in no_shows %}<li>{{ team }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endblock %}

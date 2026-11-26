@@ -1,5 +1,6 @@
 """Compare the Rust HTTP server with Django over a shared disposable test DB."""
 
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -10,6 +11,7 @@ import http.client
 from http.cookies import SimpleCookie
 import json
 import os
+import random
 from pathlib import Path
 import subprocess
 from urllib.parse import urlencode
@@ -19,16 +21,19 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import caches
-from django.db import connection
+from django.db import connection, transaction
 from django.test import Client
 from django.utils import timezone
 
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 
 from mittab.apps.tab.models import (
-    BreakingTeam, Bye, Debater, Judge, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
-    PublicRosterChange, Room, School, Scratch, TabSettings, Team,
+    AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
+    NoShow, PublicRosterChange, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
 )
+
+from mittab.libs import assign_judges, tab_logic
+from mittab.libs.cacheing import cache_logic
 
 COUNTS = "/api/debater-counts"
 DEBATERS = "/api/new-debater-data"
@@ -42,7 +47,7 @@ API_PATHS = (COUNTS, DEBATERS, SCHOOLS, *PLACEMENTS)
 
 
 @contextmanager
-def rust_server(session_key_configured=True):
+def rust_server(session_key_configured=True, overrides=None):
     db = connection.settings_dict
     assert db["HOST"] in ("localhost", "127.0.0.1", "::1", "")
     assert db["NAME"].startswith("test_"), "Rust parity requires a disposable Django test DB"
@@ -56,6 +61,7 @@ def rust_server(session_key_configured=True):
         "MYSQL_USER": db["USER"],
         "MYSQL_PASSWORD": db["PASSWORD"],
         "MITTAB_DJANGO_SECRET_KEY": settings.SECRET_KEY if session_key_configured else "",
+        **(overrides or {}),
     }
     assert binary.is_file(), "Build mittab-server before running the Rust HTTP parity suite"
     with subprocess.Popen([binary], env=environment, stderr=subprocess.PIPE, text=True) as process:
@@ -843,3 +849,390 @@ def test_native_pairings_release_previous_rounds_and_missing_ballots():
         assert b"Assigned Chair" in request(port, missing)[2]
         Round.objects.filter(pk=round_obj.pk).update(victor=Round.GOV)
         assert b"All ballots entered!" in request(port, missing)[2]
+
+
+def legacy_tab_session(username):
+    user = get_user_model().objects.create_superuser(username=username, password="synthetic")
+    client = Client()
+    client.force_login(user)
+    return client.cookies["sessionid"].value
+
+
+def round_signature(number):
+    return list(Round.objects.filter(round_number=number).order_by("id").values_list(
+        "gov_team_id", "opp_team_id", "pullup",
+    )), list(Bye.objects.filter(round_number=number).order_by("id").values_list(
+        "bye_team_id", flat=True,
+    )), list(NoShow.objects.filter(round_number=number).order_by("id").values_list(
+        "no_show_team_id", flat=True,
+    ))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch):
+    # Old cache expiry jitter draws from the same generator as side assignment.
+    monkeypatch.setattr(cache_logic, "random", random.Random(1234))
+    tab = legacy_tab_session("pairing-staff")
+    board = legacy_tab_session("pairing-board")
+    board_user = get_user_model().objects.get(username="pairing-board")
+    board_user.groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("enable_room_seeding", 1)
+    school = School.objects.create(name="Pairing School")
+    teams = [
+        Team.objects.create(name=f"Pairing Team {i}", school=school, seed=(i % 4),
+                            checked_in=i < 5)
+        for i in range(6)
+    ]
+    for index, team in enumerate(teams):
+        team.debaters.add(*[
+            Debater.objects.create(name=f"Pairing Speaker {index} {speaker}", novice_status=Debater.VARSITY)
+            for speaker in range(2)
+        ])
+    judges = [Judge.objects.create(name=f"Pairing Judge {i}", rank=i + 2) for i in range(2)]
+    rooms = [Room.objects.create(name=f"Pairing Room {i}", rank=Decimal(5 - i)) for i in range(2)]
+    pair_page = "/pairing/pair_round/"
+    repair_page = "/pairing/re_pair_round/"
+    room_page = "/pairing/assign_rooms_to_pairing/"
+    release_page = "/pairing/release/"
+    status_page = "/pairings/status/"
+    backup_dir = tmp_path / "backups"
+    with rust_server(overrides={"BACKUP_STORAGE": "", "BACKUP_PREFIX": str(backup_dir)}) as port:
+        status, headers, body = request(port, pair_page, cookie=tab)
+        assert status == 200
+        assert b"0 of 2" in body and b"disabled" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, *, session=tab, round_number=1, token=csrf):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": token, "round": round_number})
+
+        assert post(pair_page, token="invalid")[0] == 403
+        assert post(pair_page)[0] == 409
+        assert post(pair_page, session=board)[0] == 403
+        assert not backup_dir.exists()
+        for number in (1, 2):
+            for judge, room in zip(judges, rooms):
+                CheckIn.objects.create(judge=judge, round_number=number)
+                RoomCheckIn.objects.create(room=room, round_number=number)
+
+        with transaction.atomic():
+            tab_logic.pair_round()
+            legacy_round = round_signature(1)
+            transaction.set_rollback(True)
+
+        with rust_server(overrides={
+            "BACKUP_STORAGE": "", "BACKUP_PREFIX": str(backup_dir),
+            "MITTAB_MYSQLDUMP": str(tmp_path / "missing-dump-tool"),
+        }) as broken_port:
+            status, _, body = request(
+                broken_port, pair_page, method="POST",
+                extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                form={"csrfmiddlewaretoken": csrf, "round": 1},
+            )
+            assert status == 409 and b"pairings are unchanged" in body
+            assert round_signature(1) == ([], [], [])
+
+        assert post(pair_page)[1]["Location"] == status_page
+        assert round_signature(1) == legacy_round
+        assert len(legacy_round[0]) == 2 and len(legacy_round[1]) == 1
+        assert legacy_round[2] == [teams[-1].id]
+        assert post(pair_page)[0] == 409
+        assert post(pair_page, round_number=2)[0] == 409
+        assert round_signature(2) == ([], [], [])
+        assert not b"Pairing Room 0" in request(port, status_page, cookie=tab)[2]
+
+        first, second = list(Round.objects.filter(round_number=1).order_by("id"))
+        tag = RoomTag.objects.create(tag="Accessible Room", priority=Decimal("4.75"))
+        judges[0].required_room_tags.add(tag)
+        second.judges.add(judges[0])
+        rooms[1].tags.add(tag)
+        assert post(room_page)[1]["Location"] == status_page
+        first.refresh_from_db()
+        second.refresh_from_db()
+        assert (first.room_id, second.room_id) == (rooms[0].id, rooms[1].id)
+        assert b"Pairing Room 1" in request(port, status_page, cookie=tab)[2]
+        RoomCheckIn.objects.filter(room=rooms[1], round_number=1).delete()
+        assert post(room_page)[0] == 409
+        second.refresh_from_db()
+        assert second.room_id == rooms[1].id
+        RoomCheckIn.objects.create(room=rooms[1], round_number=1)
+
+        assert post(release_page)[0] == 302
+        assert b"Pairing Room 1" in request(port, "/public/pairings/")[2]
+        assert post(release_page)[0] == 302
+        assert b"Pairing Room 1" not in request(port, "/public/pairings/")[2]
+
+        RoundStats.objects.create(round=first, debater=first.gov_team.debaters.first(),
+                                  speaks=26, ranks=1, debater_role=None)
+        assert post(repair_page)[0] == 302
+        assert round_signature(1) == legacy_round
+        assert not Round.objects.filter(pk__in=[first.id, second.id]).exists()
+        assert not RoundStats.objects.exists()
+        deleted = AuditEvent.objects.filter(object_id=first.id, event_type="edit")
+        snapshots = [event.changes["public"] for event in deleted]
+        assert any(item["after"] is None and item["before"]["scores"] for item in snapshots)
+        assert all("rank" not in judge for item in snapshots
+                   for snapshot in (item["before"], item["after"]) if snapshot
+                   for judge in snapshot["judges"])
+
+        for battle in Round.objects.order_by("id"):
+            Round.objects.filter(pk=battle.pk).update(victor=Round.GOV)
+            for team in (battle.gov_team, battle.opp_team):
+                for index, debater in enumerate(team.debaters.all()):
+                    RoundStats.objects.create(round=battle, debater=debater,
+                                              speaks=Decimal("26.25") + index,
+                                              ranks=index + 1)
+        caches["default"].clear()
+        caches["filesystem"].clear()
+        with transaction.atomic():
+            assert TabSettings.get("cur_round") == 2
+            tab_logic.pair_round()
+            expected_second = round_signature(2)
+            transaction.set_rollback(True)
+        assert post(pair_page, round_number=2)[0] == 302
+        assert round_signature(2) == expected_second
+        Round.objects.filter(round_number=2).update(victor=Round.GOV)
+        for path in (pair_page, repair_page, room_page, release_page, status_page):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            assert post(path, session=board, round_number=2)[1]["Location"] == "/403/"
+
+    backups = list(backup_dir.glob("*.dump.sql"))
+    assert len(backups) == 4
+    assert not list(backup_dir.glob(".backup-*"))
+    assert all(path.stat().st_mode & 0o777 == 0o600 for path in backups)
+    for path in backups:
+        dump = path.read_text()
+        assert "CREATE TABLE `tab_team`" in dump
+        assert "Pairing Team 0" in dump
+
+
+@pytest.mark.django_db(transaction=True)
+def test_simultaneous_all_bye_pairing_cannot_advance_two_rounds(tmp_path):
+    tab = legacy_tab_session("pairing-race")
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("min_byes", 2)
+    school = School.objects.create(name="All Bye School")
+    for i in range(2):
+        Team.objects.create(name=f"All Bye Team {i}", seed=Team.UNSEEDED,
+                            school=school, checked_in=True)
+    pair_page = "/pairing/pair_round/"
+    with rust_server(overrides={"BACKUP_STORAGE": "", "BACKUP_PREFIX": str(tmp_path)}) as port:
+        status, headers, _ = request(port, pair_page, cookie=tab)
+        assert status == 200
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def advance(_):
+            return request(
+                port, pair_page, method="POST",
+                extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                form={"csrfmiddlewaretoken": csrf, "round": 1},
+            )[0]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            assert sorted(executor.map(advance, range(2))) == [302, 409]
+        assert Bye.objects.filter(round_number=1).count() == 2
+        assert Bye.objects.filter(round_number=2).count() == 0
+    assert len(list(tmp_path.glob("*.dump.sql"))) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_judge_assignment_matches_django_for_all_prelim_modes(tmp_path, monkeypatch):
+    monkeypatch.setattr(cache_logic, "random", random.Random(1234))
+    tab = legacy_tab_session("assignment-staff")
+    TabSettings.set("cur_round", 3)
+    schools = [School.objects.create(name=f"Assignment School {i}") for i in range(4)]
+    teams = [
+        Team.objects.create(name=f"Assignment Team {i}", school=schools[i // 2],
+                            hybrid_school=schools[-1] if i == 2 else None,
+                            seed=Team.UNSEEDED, checked_in=True)
+        for i in range(8)
+    ]
+    for index, team in enumerate(teams):
+        team.debaters.add(*[
+            Debater.objects.create(name=f"Assignment Speaker {index} {speaker}",
+                                   novice_status=Debater.VARSITY)
+            for speaker in range(2)
+        ])
+    judges = [
+        Judge.objects.create(name=f"Assignment Judge {i:02}", rank=Decimal(8 - i // 2),
+                             wing_only=i in (1, 3, 10), request_wing=i in (2, 4), no_wings=i == 7)
+        for i in range(11)
+    ]
+    for judge in judges:
+        CheckIn.objects.create(judge=judge, round_number=2)
+    judges[1].schools.add(schools[0])
+    judges[2].schools.add(schools[-1])
+    Scratch.objects.create(team=teams[0], judge=judges[0], scratch_type=Scratch.TAB_SCRATCH)
+    Scratch.objects.create(team=teams[4], judge=judges[3], scratch_type=Scratch.TEAM_SCRATCH)
+    for index in range(4):
+        gov, opp = teams[index * 2:index * 2 + 2]
+        debate = Round.objects.create(round_number=1, gov_team=gov, opp_team=opp,
+                                      victor=Round.GOV if index % 2 == 0 else Round.OPP)
+        debate.judges.add(judges[index * 2], judges[index * 2 + 1])
+        Round.objects.filter(id=debate.id).update(chair=judges[index * 2])
+        for member in (gov, opp):
+            for i, speaker in enumerate(member.debaters.all()):
+                RoundStats.objects.create(round=debate, debater=speaker,
+                                          speaks=Decimal(26 + ((index + i) % 3)), ranks=i + 1)
+        Round.objects.create(round_number=2, gov_team=teams[index],
+                             opp_team=teams[(index + 1) % 4 + 4])
+    path = "/pairing/assign_judges/"
+
+    def signature():
+        return [(debate.id, debate.chair_id, tuple(sorted(j.id for j in debate.judges.all())))
+                for debate in Round.objects.filter(round_number=2).order_by("id")]
+
+    with rust_server(overrides={"BACKUP_STORAGE": "", "BACKUP_PREFIX": str(tmp_path)}) as port:
+        status, headers, _ = request(port, "/pairings/status/", cookie=tab)
+        assert status == 200
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def assign():
+            return request(
+                port, path, method="POST",
+                extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"},
+                form={"csrfmiddlewaretoken": csrf, "round": 2},
+            )
+
+        for wing_mode in (0, 1, 2):
+            for pairing_mode in (0, 1):
+                for allow_rejudges in (0, 1):
+                    TabSettings.set("wing_pairing_mode", wing_mode)
+                    TabSettings.set("judge_pairing_mode", pairing_mode)
+                    TabSettings.set("allow_rejudges", allow_rejudges)
+                    TabSettings.set("inround_round_priority", wing_mode % 2)
+                    TabSettings.set("pair_wings", 1)
+                    caches["default"].clear()
+                    caches["filesystem"].clear()
+                    with transaction.atomic():
+                        assign_judges.add_judges()
+                        expected = signature()
+                        transaction.set_rollback(True)
+                    assert assign()[0] == 302
+                    assert signature() == expected, (wing_mode, pairing_mode, allow_rejudges)
+
+        actual = signature()
+        assert AuditEvent.objects.filter(event_type="judges_paired").count() == 12 * 4
+        assert b"<b>Assignment Judge" in request(port, "/pairings/status/", cookie=tab)[2]
+        Judge.objects.filter(pk__in=[judge.id for judge in judges]).update(wing_only=True)
+        status, _, body = assign()
+        assert status == 409 and b"eligible chair" in body
+        assert signature() == actual
+        assert AuditEvent.objects.filter(event_type="judges_paired").count() == 12 * 4
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_input():
+    from mittab.apps.tab.forms import ResultEntryForm, score_panel
+
+    tab = legacy_tab_session("native-ballots")
+    board = legacy_tab_session("ballots-board")
+    get_user_model().objects.get(username="ballots-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("decimal_speaks", 3)
+    TabSettings.set("written_rfd_first_round", 1)
+    TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
+    school = School.objects.create(name="Ballot School")
+    teams = [Team.objects.create(name=f"Ballot Team {i}", school=school, seed=Team.UNSEEDED) for i in range(2)]
+    speakers = [
+        Debater.objects.create(name=f"Ballot Speaker {i}", novice_status=Debater.VARSITY)
+        for i in range(4)
+    ]
+    teams[0].debaters.add(*speakers[:2])
+    teams[1].debaters.add(*speakers[2:])
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
+    NoShow.objects.create(round_number=1, no_show_team=teams[0])
+    single = f"/round/{debate.id}/result/"
+    panel = f"{single}3/"
+    roles = ("pm", "mg", "lo", "mo")
+
+    def ballot(winner, values, ranks, prefix=""):
+        fields = {f"{prefix}winner": winner, f"{prefix}round_instance": debate.id}
+        for role, speaker, speaks, rank in zip(roles, speakers, values, ranks):
+            fields.update({
+                f"{prefix}{role}_debater": speaker.id,
+                f"{prefix}{role}_speaks": speaks,
+                f"{prefix}{role}_ranks": rank,
+            })
+        return fields
+
+    first = ballot(Round.GOV, (30.23, 29, 28, 27), (1, 2, 3, 4))
+    legacy = ResultEntryForm(first, round_instance=debate)
+    assert legacy.is_valid(), legacy.errors
+
+    with rust_server() as port:
+        status, headers, body = request(port, single, cookie=tab)
+        assert status == 200 and b"Ballot Speaker 3" in body and b"Reason for decision" in body
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields, *, token=csrf, session=tab):
+            return request(
+                port, path, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                form={"csrfmiddlewaretoken": token, **fields},
+            )
+
+        assert post(single, first, token="bad")[0] == 403
+        assert post(single, first, session=board)[0] == 403
+        for invalid in (
+            {"winner": 2}, {"pm_speaks": "NaN"}, {"pm_speaks": "30.0001"}, {"pm_ranks": 2},
+            {"pm_debater": speakers[3].id}, {"round_instance": debate.id + 1},
+        ):
+            assert post(single, {**first, **invalid})[0] == 422
+            debate.refresh_from_db()
+            assert debate.victor == Round.UNKNOWN and debate.result_entered_at is None
+            assert not debate.roundstats_set.exists()
+
+        assert post(single, {**first, "rfd": " Synthetic note "})[1]["Location"] == "/pairings/status/"
+        debate.refresh_from_db()
+        assert debate.victor == Round.GOV and debate.result_entered_at
+        entered = debate.result_entered_at
+        assert debate.rfd == "Synthetic note"
+        assert not NoShow.objects.exists()
+        scores = dict(debate.roundstats_set.values_list("debater_role", "speaks"))
+        assert scores["pm"] == Decimal("30.2300")
+        assert post(single, {"rfd": "Edited reason"})[1]["Location"] == single
+        debate.refresh_from_db()
+        assert debate.rfd == "Edited reason" and debate.result_entered_at == entered
+        assert post(single, first, session=board)[1]["Location"] == "/403/"
+        assert request(port, single, cookie=board)[1]["Location"] == "/403/"
+
+        cases = [
+            (Round.GOV, (30.23, 29, 28, 27), (1, 2, 3, 4)),
+            (Round.OPP, (28, 27, 30.5, 29), (3, 4, 1, 2)),
+            (Round.GOV, (31, 29, 27, 26), (1, 2, 3, 4)),
+        ]
+        grouped = {}
+        fields = {}
+        for i, (winner, speaks, ranks) in enumerate(cases, 1):
+            fields.update(ballot(winner, speaks, ranks, f"{i}-"))
+            grouped.setdefault(winner, []).append(list(zip(speakers, roles, speaks, ranks)))
+
+        prior_ids = list(debate.roundstats_set.order_by("id").values_list("id", flat=True))
+        assert post(panel, {**fields, "2-pm_debater": speakers[1].id})[0] == 422
+        assert list(debate.roundstats_set.order_by("id").values_list("id", flat=True)) == prior_ids
+        for discard_minority in (False, True):
+            expected, winner = score_panel(grouped, discard_minority)
+            data = {**fields, "discard_minority": "on"} if discard_minority else fields
+            assert post(panel, data)[0] == 302
+            debate.refresh_from_db()
+            assert debate.victor == winner and debate.result_entered_at == entered
+            stored = dict(
+                (role, (debater, speaks, ranks)) for role, debater, speaks, ranks
+                in debate.roundstats_set.values_list("debater_role", "debater_id", "speaks", "ranks")
+            )
+            assert stored == {
+                role: (debater.id, Decimal(f"{speaks:.4f}"), ranks)
+                for debater, role, speaks, ranks in expected
+            }
+
+        TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
+        assert post(single, {"rfd": "Too late"})[0] == 422
+        debate.refresh_from_db()
+        assert debate.rfd == "Edited reason"
+        history = list(AuditEvent.objects.values_list("changes", flat=True))
+        assert {event["public"]["source"] for event in history} == {"ballot entry", "panel ballot entry"}
+        assert "Synthetic note" not in json.dumps(history) and "Edited reason" not in json.dumps(history)

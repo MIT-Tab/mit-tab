@@ -114,6 +114,10 @@ impl Ranking {
         positions
     }
 
+    pub fn compare_scores(self, first: &Score, second: &Score) -> Ordering {
+        self.compare(first, second).0
+    }
+
     pub fn tiebreaker(self, first: &Score, second: &Score) -> Option<Stat> {
         self.compare(first, second).1
     }

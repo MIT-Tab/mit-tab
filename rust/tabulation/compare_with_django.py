@@ -18,6 +18,8 @@ from mittab.libs import mwmatching, tab_logic
 from mittab.libs.errors import ByeAssignmentError
 from mittab.libs.outround_tab_logic.bracket_generation import gen_bracket
 from mittab.libs.tab_logic import rankings, stats
+from .prelim_parity import prelim_cases
+from .room_parity import room_cases
 from .tournament_parity import tournament_cases
 
 
@@ -277,7 +279,7 @@ def main():
     tests = [
         *bracket_cases(), *bye_cases(), *side_cases(), *weight_cases(),
         *standings_cases(), *totals_cases(), *tournament_cases(),
-        *matching_cases(), *calculator_cases(),
+        *matching_cases(), *calculator_cases(), *room_cases(), *prelim_cases(),
     ]
     commands = [command for command, _ in tests]
     output = subprocess.run(

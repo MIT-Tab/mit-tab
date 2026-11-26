@@ -1,8 +1,11 @@
 mod access;
+mod backups;
+mod ballot_entry;
 mod bundle;
 mod config;
 mod home;
 mod html;
+mod judge_assignment;
 mod legacy_session;
 mod live_results;
 mod login;
@@ -13,10 +16,14 @@ mod placements;
 mod public_api;
 mod public_pairings;
 mod publication;
+mod room_assignment;
 mod rosters;
+mod round_audit;
 mod schema;
 mod settings;
 mod speakers;
+mod staff_pairing;
+mod tournament_data;
 
 use std::{process::ExitCode, sync::Arc};
 
@@ -34,6 +41,7 @@ use crate::config::Config;
 #[derive(Clone)]
 struct App {
     db: MySqlPool,
+    backups: Arc<backups::Backups>,
     django_secret: Option<Arc<str>>,
 }
 
@@ -65,6 +73,7 @@ async fn run() -> Result<(), &'static str> {
         .map_err(|_| "Could not bind the MIT-Tab HTTP listener")?;
     let app = router(App {
         db,
+        backups: Arc::new(config.backups),
         django_secret: config.django_secret.map(Arc::from),
     });
     eprintln!(
@@ -119,6 +128,36 @@ fn router(app: App) -> Router {
         )
         .merge(
             Router::new()
+                .route("/pairings/status/", get(staff_pairing::status))
+                .route("/round/{round}/", get(staff_pairing::previous))
+                .route(
+                    "/round/{round}/result/",
+                    get(ballot_entry::single_page).post(ballot_entry::single),
+                )
+                .route(
+                    "/round/{round}/result/{count}/",
+                    get(ballot_entry::panel_page).post(ballot_entry::panel),
+                )
+                .route(
+                    "/pairing/pair_round/",
+                    get(staff_pairing::pair_page).post(staff_pairing::pair),
+                )
+                .route(
+                    "/pairing/re_pair_round/",
+                    get(staff_pairing::repair_page).post(staff_pairing::repair),
+                )
+                .route(
+                    "/pairing/assign_rooms_to_pairing/",
+                    get(staff_pairing::back_to_status).post(staff_pairing::rooms),
+                )
+                .route(
+                    "/pairing/assign_judges/",
+                    get(staff_pairing::back_to_status).post(staff_pairing::judges),
+                )
+                .route(
+                    "/pairing/release/",
+                    axum::routing::post(staff_pairing::release),
+                )
                 .route("/motions/", get(motions::manage))
                 .route(
                     "/motions/add/",

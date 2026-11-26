@@ -1,11 +1,14 @@
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
 
+use crate::backups::Backups;
+
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions, MySqlSslMode};
 
 pub struct Config {
     pub listen: SocketAddr,
     pub db: MySqlConnectOptions,
     pub django_secret: Option<String>,
+    pub backups: Backups,
 }
 
 impl Config {
@@ -31,8 +34,8 @@ impl Config {
             .charset("utf8mb4")
             .timezone(Some("+00:00".into()));
 
-        let db = if matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1") {
-            options.ssl_mode(MySqlSslMode::Preferred)
+        let (db, ca) = if matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1") {
+            (options.ssl_mode(MySqlSslMode::Preferred), None)
         } else {
             let ca = env::var_os("MYSQL_SSL_CA")
                 .map(PathBuf::from)
@@ -45,7 +48,10 @@ impl Config {
             if !ca.is_file() {
                 return Err("Configure a readable MYSQL_SSL_CA for remote MySQL");
             }
-            options.ssl_mode(MySqlSslMode::VerifyIdentity).ssl_ca(ca)
+            (
+                options.ssl_mode(MySqlSslMode::VerifyIdentity).ssl_ca(&ca),
+                Some(ca),
+            )
         };
         let django_secret = env::var("MITTAB_DJANGO_SECRET_KEY")
             .ok()
@@ -54,6 +60,18 @@ impl Config {
             listen,
             db,
             django_secret,
+            backups: Backups {
+                host,
+                port,
+                database,
+                user: username,
+                password,
+                ca,
+                prefix: env::var_os("BACKUP_PREFIX")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from("mittab/backups")),
+                s3: env::var("BACKUP_STORAGE").is_ok_and(|storage| storage == "S3"),
+            },
         })
     }
 

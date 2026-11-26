@@ -1,5 +1,7 @@
 #[path = "parity/matching.rs"]
 mod matching;
+#[path = "parity/prelim.rs"]
+mod prelim;
 #[path = "parity/tournament.rs"]
 mod tournament;
 
@@ -18,6 +20,7 @@ use mittab_tabulation::{
         Government, PairingTeam, PairingWeights, PowerPairingDistance, SideHistory,
     },
     rankings::{Ranking, Score, Stat},
+    rooms::{assign_rooms, Room, Tag},
     scoring::totals,
 };
 
@@ -157,6 +160,41 @@ fn result(line: &str) -> String {
         "standings" => standings(&mut fields),
         "tournament" => tournament::run(&mut fields),
         "matching" => matching::run(&mut fields),
+        "prelim" => prelim::run(&mut fields),
+        "legacy-random" => prelim::random(&mut fields),
+        "rooms" => {
+            let seeding = read::<u8>(&mut fields) == 1;
+            let pairing_count = read::<usize>(&mut fields);
+            let requirements: Vec<Vec<Tag>> = (0..pairing_count)
+                .map(|_| {
+                    (0..read::<usize>(&mut fields))
+                        .map(|_| Tag {
+                            id: read(&mut fields),
+                            priority_hundredths: read(&mut fields),
+                        })
+                        .collect()
+                })
+                .collect();
+            let room_count = read::<usize>(&mut fields);
+            let rooms: Vec<(i32, Vec<i64>)> = (0..room_count)
+                .map(|_| {
+                    let rank = read(&mut fields);
+                    let tags = (0..read::<usize>(&mut fields))
+                        .map(|_| read(&mut fields))
+                        .collect();
+                    (rank, tags)
+                })
+                .collect();
+            let references: Vec<_> = requirements.iter().map(Vec::as_slice).collect();
+            let rooms: Vec<_> = rooms
+                .iter()
+                .map(|(rank, tags)| Room {
+                    rank_hundredths: *rank,
+                    tags,
+                })
+                .collect();
+            joined(assign_rooms(&references, &rooms, seeding).unwrap())
+        }
         "calculator" => {
             let teams = read(&mut fields);
             let num_rounds = read(&mut fields);
