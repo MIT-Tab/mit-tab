@@ -294,12 +294,16 @@ def test_backup_listing_html_matches_django_bytes(html_assets, tmp_path):
                 strict=True, raises=pytest.fail.Exception, reason="Pairing control still has a different template",
             ),
         ),
-        pytest.param(
-            "score repair",
-            marks=pytest.mark.xfail(
-                strict=True, raises=pytest.fail.Exception, reason="Score editor still has a different template",
-            ),
-        ),
+        "admin index",
+        "admin app",
+        "scores",
+        "empty scores",
+        "scores second page",
+        "score repair",
+        "add score",
+        "score delete",
+        "score history",
+        "delete selected scores",
     ],
 )
 def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
@@ -312,23 +316,68 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     first.debaters.add(speaker)
     debate = Round.objects.create(round_number=1, gov_team=first, opp_team=second, victor=Round.GOV)
     score = RoundStats.objects.create(round=debate, debater=speaker, speaks=Decimal("29.25"), ranks=1)
-    user = get_user_model().objects.create_superuser(username="staff-screenshot-parity")
+    user = get_user_model().objects.create_superuser(
+        username="staff-screenshot-parity", first_name="Fixture & Staff",
+    )
+    if screen == "empty scores":
+        score.delete()
+    elif screen == "scores second page":
+        RoundStats.objects.bulk_create([
+            RoundStats(round=debate, debater=speaker, speaks=score.speaks, ranks=1)
+            for _ in range(100)
+        ])
+    if screen == "score history":
+        from django.contrib.admin.models import CHANGE, LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        LogEntry.objects.create(
+            action_time=timezone.make_aware(datetime(2025, 11, 12, 14, 5)),
+            content_type=ContentType.objects.get_for_model(RoundStats),
+            user=user, object_id=score.id, object_repr=str(score),
+            action_flag=CHANGE, change_message='[{"changed": {"fields": ["Speaks"]}}]',
+        )
     client = Client()
     client.force_login(user)
     session = client.cookies["sessionid"].value
     csrf = "a" * 32
     client.cookies["csrftoken"] = csrf
-    path = "/pairings/status/" if screen == "pairings" else f"/admin/tab/roundstats/{score.id}/change/"
+    path = {
+        "pairings": "/pairings/status/",
+        "admin index": "/admin/",
+        "admin app": "/admin/tab/",
+        "scores": "/admin/tab/roundstats/",
+        "empty scores": "/admin/tab/roundstats/",
+        "scores second page": "/admin/tab/roundstats/?p=2",
+        "score repair": f"/admin/tab/roundstats/{score.id}/change/",
+        "add score": "/admin/tab/roundstats/add/",
+        "score delete": f"/admin/tab/roundstats/{score.id}/delete/",
+        "score history": f"/admin/tab/roundstats/{score.id}/history/",
+        "delete selected scores": "/admin/tab/roundstats/",
+    }[screen]
+    post_data = (
+        {"action": "delete_selected", "_selected_action": score.id, "index": "0", "csrfmiddlewaretoken": csrf}
+        if screen == "delete selected scores" else None
+    )
     with rust_server(overrides=html_assets) as port:
         status, _, body = request(
             port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+            method="POST" if post_data else "GET", form=post_data,
         )
     token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]+)"', body)
     mask = token[1][:32].decode() if token and len(token[1]) == 64 else csrf
     with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
-        response = client.get(path)
+        response = client.post(path, post_data) if post_data else client.get(path)
     assert status == response.status_code == 200
     assert_html_bytes(body, response.content)
+
+
+def test_admin_template_sources_match_locked_django():
+    from django.template.loader import get_template
+
+    vendor = Path(__file__).parent / "templates" / "django_admin"
+    for snapshot in vendor.rglob("*.html"):
+        template = get_template(f"admin/{snapshot.relative_to(vendor).as_posix()}")
+        assert snapshot.read_bytes() == Path(template.origin.name).read_bytes(), snapshot
 
 
 @pytest.mark.django_db(transaction=True)
@@ -4328,11 +4377,27 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
             assert request(port, path, cookie=staff)[0] == 200
             assert request(port, path, cookie=board)[1]["Location"] == "/403/"
             assert post(path, {"confirm": "on"}, board)[1]["Location"] == "/403/"
-        fields = {"round_id": debate.id, "debater_id": speaker.id, "role": "pm", "speaks": "31.2575", "ranks": "1"}
+        fields = {"round": debate.id, "debater": speaker.id, "debater_role": "pm", "speaks": "31.2575", "ranks": "1"}
+        add = "/admin/tab/roundstats/add/"
+        scores = "/admin/tab/roundstats/"
+        history = f"{scores}{score.id}/history/"
+        for path in ("/admin/tab/", scores, add, history):
+            assert request(port, path, cookie=staff)[0] == 200
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
         assert post(edit, {**fields, "speaks": "101.0000"})[0] == 422
-        assert post(edit, fields)[0] == 302
+        assert post(edit, {**fields, "_continue": "Save and continue editing"})[1]["Location"] == edit
         assert RoundStats.objects.get(id=score.id).speaks == Decimal("31.2575")
+        assert b"Changed Speaks." in request(port, history, cookie=staff)[2]
         assert AuditEvent.objects.filter(changes__public__source="admin scores", object_id=debate.id).exists()
+        assert post(add, fields)[1]["Location"] == scores
+        extra = RoundStats.objects.exclude(id=score.id).get(round=debate)
+        selected = {"action": "delete_selected", "_selected_action": extra.id}
+        confirmation = post(scores, selected)
+        assert confirmation[0] == 200 and b"Yes, I" in confirmation[2]
+        assert RoundStats.objects.filter(id=extra.id).exists()
+        assert post(scores, {**selected, "post": "yes"}, board)[1]["Location"] == "/403/"
+        assert post(scores, {**selected, "post": "yes"})[1]["Location"] == scores
+        assert not RoundStats.objects.filter(id=extra.id).exists()
         assert post(delete, {})[0] == 422
         assert post(delete, {"confirm": "on"})[0] == 302
         assert not Round.objects.filter(id=debate.id).exists() and not RoundStats.objects.filter(id=score.id).exists()

@@ -22,7 +22,7 @@ static URLS: LazyLock<BTreeMap<String, String>> = LazyLock::new(|| {
         .expect("valid legacy navigation URLs")
 });
 
-static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
+pub fn environment() -> Environment<'static> {
     let mut env = Environment::new();
     env.set_keep_trailing_newline(true);
     env.set_undefined_behavior(UndefinedBehavior::Chainable);
@@ -56,6 +56,11 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
                 .replace('\n', "<br>"),
         )
     });
+    env
+}
+
+static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
+    let mut env = environment();
     env.add_function("legacy_bundle", html::legacy_bundle);
     env.add_function("legacy_active", |path: String, target: Value| {
         if target.as_str() == Some(path.as_str()) {
@@ -128,7 +133,7 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     env
 });
 
-fn escape(value: &str) -> String {
+pub(crate) fn escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
         .replace('<', "&lt;")

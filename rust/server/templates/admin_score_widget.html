@@ -1,0 +1,12 @@
+{% if options is defined -%}
+<select name="{{ name }}" required id="id_{{ name }}">
+  <option value=""{% if not selected %} selected{% endif %}>---------</option>
+
+{% for id, label in options %}  <option value="{{ id }}"{% if id == selected %} selected{% endif %}>{{ label }}</option>
+
+{% endfor %}</select>
+{%- elif name == "debater_role" -%}
+<input type="text" name="{{ name }}"{% if value is not none %} value="{{ value }}"{% endif %} class="vTextField" maxlength="4" required id="id_{{ name }}">
+{%- else -%}
+<input type="number" name="{{ name }}"{% if value is not none %} value="{{ value }}"{% endif %} step="0.0001" required id="id_{{ name }}">
+{%- endif %}

@@ -1,0 +1,257 @@
+[
+  {
+    "name": "Authentication and Authorization",
+    "app_label": "auth",
+    "app_url": "/admin/auth/",
+    "has_module_perms": true,
+    "models": [
+      {
+        "name": "Groups",
+        "object_name": "Group",
+        "admin_url": "/admin/auth/group/",
+        "add_url": "/admin/auth/group/add/",
+        "view_only": false
+      },
+      {
+        "name": "Users",
+        "object_name": "User",
+        "admin_url": "/admin/auth/user/",
+        "add_url": "/admin/auth/user/add/",
+        "view_only": false
+      }
+    ]
+  },
+  {
+    "name": "MIT Tab",
+    "app_label": "tab",
+    "app_url": "/admin/tab/",
+    "has_module_perms": true,
+    "models": [
+      {
+        "name": "Audit events",
+        "object_name": "AuditEvent",
+        "admin_url": "/admin/tab/auditevent/",
+        "add_url": null,
+        "view_only": true
+      },
+      {
+        "name": "Breaking teams",
+        "object_name": "BreakingTeam",
+        "admin_url": "/admin/tab/breakingteam/",
+        "add_url": "/admin/tab/breakingteam/add/",
+        "view_only": false
+      },
+      {
+        "name": "Byes",
+        "object_name": "Bye",
+        "admin_url": "/admin/tab/bye/",
+        "add_url": "/admin/tab/bye/add/",
+        "view_only": false
+      },
+      {
+        "name": "Check ins",
+        "object_name": "CheckIn",
+        "admin_url": "/admin/tab/checkin/",
+        "add_url": "/admin/tab/checkin/add/",
+        "view_only": false
+      },
+      {
+        "name": "Debaters",
+        "object_name": "Debater",
+        "admin_url": "/admin/tab/debater/",
+        "add_url": "/admin/tab/debater/add/",
+        "view_only": false
+      },
+      {
+        "name": "Judge code email logs",
+        "object_name": "JudgeCodeEmailLog",
+        "admin_url": "/admin/tab/judgecodeemaillog/",
+        "add_url": "/admin/tab/judgecodeemaillog/add/",
+        "view_only": false
+      },
+      {
+        "name": "Judges",
+        "object_name": "Judge",
+        "admin_url": "/admin/tab/judge/",
+        "add_url": "/admin/tab/judge/add/",
+        "view_only": false
+      },
+      {
+        "name": "Manual judge assignments",
+        "object_name": "ManualJudgeAssignment",
+        "admin_url": "/admin/tab/manualjudgeassignment/",
+        "add_url": null,
+        "view_only": true
+      },
+      {
+        "name": "Motions",
+        "object_name": "Motion",
+        "admin_url": "/admin/tab/motion/",
+        "add_url": "/admin/tab/motion/add/",
+        "view_only": false
+      },
+      {
+        "name": "No shows",
+        "object_name": "NoShow",
+        "admin_url": "/admin/tab/noshow/",
+        "add_url": "/admin/tab/noshow/add/",
+        "view_only": false
+      },
+      {
+        "name": "Outround challenges",
+        "object_name": "OutroundChallenge",
+        "admin_url": "/admin/tab/outroundchallenge/",
+        "add_url": "/admin/tab/outroundchallenge/add/",
+        "view_only": false
+      },
+      {
+        "name": "Outrounds",
+        "object_name": "Outround",
+        "admin_url": "/admin/tab/outround/",
+        "add_url": "/admin/tab/outround/add/",
+        "view_only": false
+      },
+      {
+        "name": "Ranking groups",
+        "object_name": "RankingGroup",
+        "admin_url": "/admin/tab/rankinggroup/",
+        "add_url": "/admin/tab/rankinggroup/add/",
+        "view_only": false
+      },
+      {
+        "name": "Room check ins",
+        "object_name": "RoomCheckIn",
+        "admin_url": "/admin/tab/roomcheckin/",
+        "add_url": "/admin/tab/roomcheckin/add/",
+        "view_only": false
+      },
+      {
+        "name": "Room tags",
+        "object_name": "RoomTag",
+        "admin_url": "/admin/tab/roomtag/",
+        "add_url": "/admin/tab/roomtag/add/",
+        "view_only": false
+      },
+      {
+        "name": "Rooms",
+        "object_name": "Room",
+        "admin_url": "/admin/tab/room/",
+        "add_url": "/admin/tab/room/add/",
+        "view_only": false
+      },
+      {
+        "name": "Round stats",
+        "object_name": "RoundStats",
+        "admin_url": "/admin/tab/roundstats/",
+        "add_url": "/admin/tab/roundstats/add/",
+        "view_only": false
+      },
+      {
+        "name": "Rounds",
+        "object_name": "Round",
+        "admin_url": "/admin/tab/round/",
+        "add_url": "/admin/tab/round/add/",
+        "view_only": false
+      },
+      {
+        "name": "Schools",
+        "object_name": "School",
+        "admin_url": "/admin/tab/school/",
+        "add_url": "/admin/tab/school/add/",
+        "view_only": false
+      },
+      {
+        "name": "Scratches",
+        "object_name": "Scratch",
+        "admin_url": "/admin/tab/scratch/",
+        "add_url": "/admin/tab/scratch/add/",
+        "view_only": false
+      },
+      {
+        "name": "Tab settings",
+        "object_name": "TabSettings",
+        "admin_url": "/admin/tab/tabsettings/",
+        "add_url": "/admin/tab/tabsettings/add/",
+        "view_only": false
+      },
+      {
+        "name": "Teams",
+        "object_name": "Team",
+        "admin_url": "/admin/tab/team/",
+        "add_url": "/admin/tab/team/add/",
+        "view_only": false
+      },
+      {
+        "name": "Tournament setup preferences",
+        "object_name": "UserTournamentSetupPreference",
+        "admin_url": "/admin/tab/usertournamentsetuppreference/",
+        "add_url": "/admin/tab/usertournamentsetuppreference/add/",
+        "view_only": false
+      },
+      {
+        "name": "Written rfd email logs",
+        "object_name": "WrittenRFDEmailLog",
+        "admin_url": "/admin/tab/writtenrfdemaillog/",
+        "add_url": "/admin/tab/writtenrfdemaillog/add/",
+        "view_only": false
+      }
+    ]
+  },
+  {
+    "name": "Registration",
+    "app_label": "registration",
+    "app_url": "/admin/registration/",
+    "has_module_perms": true,
+    "models": [
+      {
+        "name": "Info links",
+        "object_name": "InfoLink",
+        "admin_url": "/admin/registration/infolink/",
+        "add_url": "/admin/registration/infolink/add/",
+        "view_only": false
+      },
+      {
+        "name": "Info texts",
+        "object_name": "InfoText",
+        "admin_url": "/admin/registration/infotext/",
+        "add_url": "/admin/registration/infotext/add/",
+        "view_only": false
+      },
+      {
+        "name": "Registration change logs",
+        "object_name": "RegistrationChangeLog",
+        "admin_url": "/admin/registration/registrationchangelog/",
+        "add_url": null,
+        "view_only": false
+      },
+      {
+        "name": "Registration configs",
+        "object_name": "RegistrationConfig",
+        "admin_url": "/admin/registration/registrationconfig/",
+        "add_url": "/admin/registration/registrationconfig/add/",
+        "view_only": false
+      },
+      {
+        "name": "Registration confirmation email logs",
+        "object_name": "RegistrationConfirmationEmailLog",
+        "admin_url": "/admin/registration/registrationconfirmationemaillog/",
+        "add_url": null,
+        "view_only": false
+      },
+      {
+        "name": "Registration links",
+        "object_name": "RegistrationLink",
+        "admin_url": "/admin/registration/registrationlink/",
+        "add_url": "/admin/registration/registrationlink/add/",
+        "view_only": false
+      },
+      {
+        "name": "Registrations",
+        "object_name": "Registration",
+        "admin_url": "/admin/registration/registration/",
+        "add_url": "/admin/registration/registration/add/",
+        "view_only": false
+      }
+    ]
+  }
+]

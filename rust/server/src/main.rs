@@ -1,6 +1,8 @@
 mod access;
 mod admin_accounts;
+mod admin_html;
 mod admin_repairs;
+mod admin_scores;
 mod administration;
 mod aws_http;
 mod backup_dump;

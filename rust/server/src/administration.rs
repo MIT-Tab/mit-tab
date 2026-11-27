@@ -1,7 +1,7 @@
 use axum::{
     Extension, Router,
     extract::{Path, Query, Request, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Response,
     routing::get,
 };
@@ -10,81 +10,63 @@ use serde::Deserialize;
 use sqlx::AssertSqlSafe;
 
 use crate::{
-    App, access, admin_accounts,
+    App, access, admin_accounts, admin_html, diagnostics,
     html::{self, Navigation},
     legacy_session::Actor,
     private, unavailable,
 };
-
-type AdminSection = (&'static str, &'static [(&'static str, &'static str)]);
-
-const LINKS: &[AdminSection] = &[
-    (
-        "Staff and Access",
-        &[
-            ("Users", "/admin/auth/user/"),
-            ("Groups", "/admin/auth/group/"),
-            ("Invite Staff", "/staff/invite/"),
-            ("Audit Events", "/admin/tab/auditevent/"),
-            ("Email History", "/email_management/"),
-            ("Backups", "/pairing/view_backups/"),
-        ],
-    ),
-    (
-        "Tournament Setup",
-        &[
-            ("Tournament Settings", "/settings_form"),
-            ("Registration", "/registration/manage/"),
-            (
-                "Registration Changes",
-                "/admin/registration/registrationchangelog/",
-            ),
-            ("Schools", "/view_schools/"),
-            ("Teams", "/view_teams/"),
-            ("Debaters", "/view_debaters/"),
-            ("Judges", "/view_judges/"),
-            ("Rooms", "/view_rooms/"),
-            ("Room Tags", "/manage-room-tags"),
-            ("Ranking Groups", "/manage-ranking-groups"),
-        ],
-    ),
-    (
-        "Rounds and Publication",
-        &[
-            ("Scratches", "/scratches/view/"),
-            ("Check-In", "/batch_checkin/"),
-            ("Preliminary Pairings", "/pairings/view_rounds/"),
-            ("Round Statistics", "/admin/tab/roundstats/"),
-            ("Elimination Pairings", "/outround_pairing"),
-            (
-                "Manual Judge Assignments",
-                "/admin/tab/manualjudgeassignment/",
-            ),
-            ("Motions", "/motions/"),
-            ("Public Change Log", "/setup/public-change-log/"),
-        ],
-    ),
-];
 
 pub fn routes() -> Router<App> {
     Router::new()
         .route("/admin", get(login))
         .route("/admin/", get(index))
         .route("/admin/login/", get(login))
+        .route("/admin/jsi18n/", get(diagnostics::js_catalog))
+        .route("/admin/{application}/", get(app_index))
         .route("/admin/{application}/{model}/", get(model))
         .route("/admin/{application}/{model}/{id}/change/", get(change))
         .merge(admin_accounts::routes())
         .merge(crate::admin_repairs::routes())
+        .merge(crate::admin_scores::routes())
 }
 
-async fn index(Extension(actor): Extension<Actor>) -> Response {
-    html::render(
-        "administration.html",
-        context! {
-            title => "Administration", nav => Navigation::new(actor, true), sections => LINKS,
-        },
-        StatusCode::OK,
-    )
+async fn index(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
+    let shell = match admin_html::Shell::load(&app, actor, &headers, "/admin/").await {
+        Ok(shell) => shell,
+        Err(response) => return *response,
+    };
+    let page = context! { title => "Site administration", app_list => &shell.applications };
+    shell.render("admin/index.html", page, &headers)
+}
+
+async fn app_index(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    Path(application): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let path = format!("/admin/{application}/");
+    let shell = match admin_html::Shell::load(&app, actor, &headers, &path).await {
+        Ok(shell) => shell,
+        Err(response) => return *response,
+    };
+    let Some(found) = shell
+        .applications
+        .iter()
+        .find(|app| app.app_label == application)
+    else {
+        return missing().await;
+    };
+    let page = context! {
+        title => format!("{} administration", found.name),
+        app_label => &found.app_label,
+        app_list => vec![found],
+    };
+    shell.render("admin/app_index.html", page, &headers)
 }
 
 async fn login() -> Response {
