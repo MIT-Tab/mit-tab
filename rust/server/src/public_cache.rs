@@ -62,6 +62,15 @@ const SCORES: Dependency = (
     "tab_roundstats",
     "id, debater_id, round_id, speaks, ranks, debater_role",
 );
+// Ballot scores are the largest input to the rankings cache. Fixed-width
+// SQL types and a hex-encoded role make the separators unambiguous.
+const SCORE_VERSION: &str = "(SELECT IF(COUNT(*) > 16384, NULL,
+    UNHEX(SHA2(COALESCE(JSON_ARRAYAGG(score_row), ''), 256)))
+    FROM (
+        SELECT CONCAT_WS(':', id, debater_id, round_id, speaks, ranks,
+                         COALESCE(HEX(debater_role), '~')) AS score_row
+        FROM tab_roundstats ORDER BY id LIMIT 16385
+    ) AS ballot_scores)";
 const SCHOOLS: Dependency = ("tab_school", "id, name");
 const JUDGES: Dependency = ("tab_judge", "id, name");
 const ROOMS: Dependency = ("tab_room", "id, name");
@@ -237,10 +246,14 @@ impl Page {
         // keeps distinct rows distinct even when all their display values match.
         let mut query = QueryBuilder::<MySql>::new("SELECT CONCAT(");
         let mut inputs = query.separated(", ");
-        for (table, columns) in self.dependencies() {
-            inputs.push(format!(
-                "(SELECT BIT_XOR(UNHEX(SHA2(JSON_ARRAY({columns}), 256))) FROM {table})"
-            ));
+        for &(table, columns) in self.dependencies() {
+            if table == SCORES.0 {
+                inputs.push(SCORE_VERSION);
+            } else {
+                inputs.push(format!(
+                    "(SELECT BIT_XOR(UNHEX(SHA2(JSON_ARRAY({columns}), 256))) FROM {table})"
+                ));
+            }
         }
         if matches!(self, Self::Home) {
             inputs.push(
@@ -254,7 +267,10 @@ impl Page {
             inputs.push("UTC_DATE()");
         }
         query.push(")");
-        let mut version: Vec<u8> = query.build_query_scalar().fetch_one(&mut *db).await?;
+        let version: Option<Vec<u8>> = query.build_query_scalar().fetch_one(&mut *db).await?;
+        let mut version = version.ok_or_else(|| {
+            sqlx::Error::Protocol("Public cache inputs exceeded the aggregate limit".into())
+        })?;
         if matches!(self, Self::LiveResults) {
             let settings = Settings::load(db, &["tot_rounds"]).await?;
             let completed_at = publication::completion_time(db, &settings).await?;
@@ -321,6 +337,10 @@ enum Lookup {
 pub struct PublicCache(Mutex<HashMap<Key, Entry>>);
 
 impl PublicCache {
+    fn has_entry(&self, key: &Key) -> bool {
+        self.0.lock().is_ok_and(|cache| cache.contains_key(key))
+    }
+
     fn get(&self, key: &Key, version: &[u8]) -> Lookup {
         let Ok(cache) = self.0.lock() else {
             return Lookup::Miss;
@@ -404,8 +424,6 @@ async fn render_response(
     source: Option<String>,
     load: impl for<'db> AsyncFnOnce(&'db mut MySqlConnection) -> Result<Response, sqlx::Error>,
 ) -> Result<Response, sqlx::Error> {
-    let mut db = app.db.begin().await?;
-    // The revision and response are read in the same repeatable-read transaction.
     // Board always renders through its own authorization and projection.
     let cache_key = app
         .cache_public_pages
@@ -416,24 +434,48 @@ async fn render_response(
             audience,
             source,
         });
+
+    // A warm page needs one consistent SQL read. Only rendering a cache miss
+    // needs a transaction spanning the revision query and the page queries.
+    let mut refresh = None;
+    if page != Page::LiveResults
+        && let Some(key) = &cache_key
+        && app.public_cache.has_entry(key)
+    {
+        let cached = async {
+            let mut db = app.db.acquire().await?;
+            let version = page.version(&mut db).await?;
+            Ok::<_, sqlx::Error>(app.public_cache.get(key, &version))
+        }
+        .await
+        .unwrap_or(Lookup::Miss);
+        match cached {
+            Lookup::Hit(response) => return Ok(response),
+            Lookup::Refresh(guard) => refresh = Some(guard),
+            Lookup::Miss => {}
+        }
+    }
+
+    let mut db = app.db.begin().await?;
     let version = if cache_key.is_some() {
         page.version(&mut db).await.ok()
     } else {
         None
     };
-    let lookup = match (&cache_key, &version) {
-        (Some(key), Some(version)) => app.public_cache.get(key, version),
-        _ => Lookup::Miss,
-    };
-    let _refresh = match lookup {
-        Lookup::Hit(response) => {
-            db.commit().await?;
-            return Ok(response);
+    if refresh.is_none()
+        && let (Some(key), Some(version)) = (&cache_key, &version)
+    {
+        match app.public_cache.get(key, version) {
+            Lookup::Hit(response) => {
+                db.commit().await?;
+                return Ok(response);
+            }
+            Lookup::Refresh(guard) => refresh = Some(guard),
+            Lookup::Miss => {}
         }
-        Lookup::Refresh(guard) => Some(guard),
-        Lookup::Miss => None,
-    };
+    }
 
+    let _refresh = refresh;
     let response = load(&mut db).await?;
     db.commit().await?;
     let (Some(key), Some(version)) = (cache_key, version) else {
