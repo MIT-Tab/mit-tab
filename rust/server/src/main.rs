@@ -120,6 +120,10 @@ async fn main() -> ExitCode {
 async fn run() -> Result<(), &'static str> {
     let mut args = std::env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "serve".into());
+    if matches!(command.as_str(), "--version" | "-V") {
+        println!("mittab-server {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     if !matches!(
         command.as_str(),
         "serve" | "migrate" | "init" | "simulate-rounds" | "export-stats" | "load-test"
