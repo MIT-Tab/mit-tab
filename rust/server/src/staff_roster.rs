@@ -445,6 +445,19 @@ pub(super) async fn submitted_fields(app: &App, request: Request) -> Result<Fiel
 }
 
 pub(super) fn form_return_path(uri: &Uri, headers: &HeaderMap, fields: Option<&Fields>) -> String {
+    form_return_target(uri, headers, fields)
+        .or_else(|| {
+            uri.path_and_query()
+                .and_then(|target| local_form_target(headers, target.as_str()))
+        })
+        .unwrap_or_else(|| "/".into())
+}
+
+pub(super) fn form_return_target(
+    uri: &Uri,
+    headers: &HeaderMap,
+    fields: Option<&Fields>,
+) -> Option<String> {
     let query: BTreeMap<_, _> =
         url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes()).collect();
     [
@@ -454,12 +467,10 @@ pub(super) fn form_return_path(uri: &Uri, headers: &HeaderMap, fields: Option<&F
         headers
             .get(header::REFERER)
             .and_then(|value| value.to_str().ok()),
-        uri.path_and_query().map(|value| value.as_str()),
     ]
     .into_iter()
     .flatten()
     .find_map(|target| local_form_target(headers, target))
-    .unwrap_or_else(|| "/".into())
 }
 
 fn local_form_target(headers: &HeaderMap, target: &str) -> Option<String> {

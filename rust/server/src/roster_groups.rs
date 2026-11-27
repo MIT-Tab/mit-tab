@@ -2,24 +2,24 @@ use std::collections::BTreeSet;
 
 use axum::{
     Extension, Router,
-    body::Bytes,
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Path, Request, State},
+    http::{HeaderMap, StatusCode, Uri},
     response::Response,
     routing::get,
 };
-use minijinja::context;
+use minijinja::{Value, context};
 use serde::Serialize;
 use sqlx::{AssertSqlSafe, MySqlConnection, mysql::MySqlQueryResult};
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
-    legacy_session::Actor,
-    login, private,
+    App, access, legacy_html,
+    legacy_session::{self, Actor, SessionError},
+    login::{self, TemplateCsrf},
     registration_form::Fields,
-    staff_pairing::lock_round,
-    unavailable,
+    staff_pairing::lock_round_if_configured,
+    staff_roster::{form_return_path, form_return_target, submitted_fields},
+    staff_roster_fields::{input, multi_select, rank_input},
+    staff_roster_notice, unavailable,
 };
 
 #[derive(Clone, Copy)]
@@ -94,10 +94,33 @@ impl GroupKind {
         }
     }
 
-    fn label(self) -> &'static str {
+    fn detail_title(self, record: Option<&Record>) -> String {
+        match (self, record) {
+            (RoomTag, Some(record)) => format!("Viewing Tag: {}", record.name),
+            (RankingGroup, Some(record)) => format!("Viewing Ranking Group: {}", record.name),
+            (RoomTag, None) => "Create New Tag".into(),
+            (RankingGroup, None) => "Create Ranking Group".into(),
+        }
+    }
+
+    fn noun(self) -> &'static str {
         match self {
-            RoomTag => "Room Tag",
-            RankingGroup => "Ranking Group",
+            RoomTag => "Tag",
+            RankingGroup => "Ranking group",
+        }
+    }
+
+    fn template(self) -> &'static str {
+        match self {
+            RoomTag => "pairing/manage_room_tags.html",
+            RankingGroup => "pairing/manage_ranking_groups.html",
+        }
+    }
+
+    fn field(self) -> (&'static str, &'static str) {
+        match self {
+            RoomTag => ("tag", "Tag:"),
+            RankingGroup => ("name", "Name:"),
         }
     }
 
@@ -138,43 +161,50 @@ struct Record {
     id: i32,
     name: String,
     priority: String,
+    team_count: i64,
+    debater_count: i64,
 }
 
-async fn records(db: &mut MySqlConnection, kind: GroupKind) -> Result<Vec<Record>, sqlx::Error> {
+async fn records(
+    db: &mut MySqlConnection,
+    kind: GroupKind,
+    id: Option<i32>,
+) -> Result<Vec<Record>, sqlx::Error> {
     let query = match kind {
         RoomTag => {
-            "SELECT id, tag AS name, CAST(priority AS CHAR) AS priority FROM tab_roomtag ORDER BY priority DESC, tag, id"
+            "SELECT id, tag AS name, CAST(t.priority AS CHAR) AS priority,
+                    0 AS team_count, 0 AS debater_count
+             FROM tab_roomtag t WHERE (? IS NULL OR t.id = ?) ORDER BY t.priority DESC, t.id"
         }
-        RankingGroup => "SELECT id, name, '' AS priority FROM tab_rankinggroup ORDER BY name, id",
+        RankingGroup => {
+            "SELECT g.id, g.name, '' AS priority,
+                    (SELECT COUNT(*) FROM tab_rankinggroup_teams WHERE rankinggroup_id = g.id) AS team_count,
+                    (SELECT COUNT(*) FROM tab_rankinggroup_debaters WHERE rankinggroup_id = g.id) AS debater_count
+             FROM tab_rankinggroup g WHERE (? IS NULL OR g.id = ?) ORDER BY g.name, g.id"
+        }
     };
-    let rows = sqlx::query_as::<_, (i32, String, String)>(query)
+    let rows = sqlx::query_as::<_, (i32, String, String, i64, i64)>(query)
+        .bind(id)
+        .bind(id)
         .fetch_all(db)
         .await?;
     Ok(rows
         .into_iter()
-        .map(|(id, name, priority)| Record { id, name, priority })
+        .map(|(id, name, priority, team_count, debater_count)| Record {
+            id,
+            name,
+            priority,
+            team_count,
+            debater_count,
+        })
         .collect())
-}
-
-#[derive(Serialize)]
-struct MemberList {
-    field: &'static str,
-    label: &'static str,
-    options: Vec<Member>,
-}
-
-#[derive(Serialize)]
-struct Member {
-    id: i32,
-    name: String,
-    selected: bool,
 }
 
 async fn members(
     db: &mut MySqlConnection,
     kind: GroupKind,
     id: Option<i32>,
-) -> Result<Vec<MemberList>, sqlx::Error> {
+) -> Result<Vec<Value>, sqlx::Error> {
     let mut sections = Vec::new();
     for member in kind.members() {
         let query = format!(
@@ -190,52 +220,75 @@ async fn members(
             .bind(id)
             .fetch_all(&mut *db)
             .await?;
-        sections.push(MemberList {
-            field: member.field,
-            label: member.label,
-            options: rows
-                .into_iter()
-                .map(|(id, name, selected)| Member { id, name, selected })
-                .collect(),
-        });
+        let mut options = Vec::with_capacity(rows.len());
+        let mut selected = Vec::new();
+        for (id, name, included) in rows {
+            let id = id.to_string();
+            if included {
+                selected.push(id.clone());
+            }
+            options.push((id, name));
+        }
+        sections.push(multi_select(
+            member.field,
+            &format!("{}:", member.label),
+            &options,
+            &selected,
+            None,
+        ));
     }
     Ok(sections)
+}
+
+fn input_fields(kind: GroupKind, record: Option<&Record>) -> Vec<Value> {
+    let (name, label) = kind.field();
+    let value = record.map_or("", |record| record.name.as_str());
+    let mut fields = vec![input(
+        name,
+        label,
+        "text",
+        value,
+        r#" maxlength="255""#,
+        true,
+        None,
+    )];
+    if matches!(kind, RoomTag) {
+        fields.push(input(
+            "priority",
+            "Priority:",
+            "number",
+            record.map_or("", |record| record.priority.as_str()),
+            r#" step="0.01""#,
+            true,
+            None,
+        ));
+    }
+    fields
+}
+
+enum Screen {
+    List,
+    Form(Option<i32>),
 }
 
 async fn list(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Extension(kind): Extension<GroupKind>,
+    uri: Uri,
     headers: HeaderMap,
 ) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    let Ok(records) = records(&mut db, kind).await else {
-        return unavailable();
-    };
-    let Ok(csrf) = html::page_csrf(&headers) else {
-        return unavailable();
-    };
-    let response = html::render(
-        "roster_groups.html",
-        context! {
-            title => format!("Manage {}s", kind.label()), nav => Navigation::new(actor, true),
-            label => kind.label(), priority => matches!(kind, RoomTag), prefix => kind.prefix(),
-            back => kind.list(), records, csrf, list => true,
-        },
-        StatusCode::OK,
-    );
-    html::form_response(response, &headers, &csrf)
+    page(&app, actor, kind, Screen::List, &uri, &headers).await
 }
 
 async fn new(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Extension(kind): Extension<GroupKind>,
+    uri: Uri,
     headers: HeaderMap,
 ) -> Response {
-    page(&app, actor, kind, None, &headers).await
+    page(&app, actor, kind, Screen::Form(None), &uri, &headers).await
 }
 
 async fn detail(
@@ -243,75 +296,99 @@ async fn detail(
     Extension(actor): Extension<Actor>,
     Extension(kind): Extension<GroupKind>,
     Path(id): Path<i32>,
+    uri: Uri,
     headers: HeaderMap,
 ) -> Response {
-    page(&app, actor, kind, Some(id), &headers).await
+    page(&app, actor, kind, Screen::Form(Some(id)), &uri, &headers).await
 }
 
 async fn page(
     app: &App,
     actor: Actor,
     kind: GroupKind,
-    id: Option<i32>,
+    screen: Screen,
+    uri: &Uri,
     headers: &HeaderMap,
 ) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let record = if let Some(id) = id {
-        let Ok(records) = records(&mut db, kind).await else {
-            return unavailable();
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
+        let return_path = form_return_path(uri, headers, None);
+        let (template, page, fields) = match screen {
+            Screen::List => {
+                let groups = records(&mut db, kind, None).await?;
+                let page = match kind {
+                    RoomTag => context! { room_tags => groups },
+                    RankingGroup => context! { ranking_groups => groups },
+                };
+                (kind.template(), page, input_fields(kind, None))
+            }
+            Screen::Form(id) => {
+                let record = match id {
+                    Some(id) => records(&mut db, kind, Some(id)).await?.pop(),
+                    None => None,
+                };
+                let title = kind.detail_title(record.as_ref());
+                let mut fields = input_fields(kind, record.as_ref());
+                fields.extend(members(&mut db, kind, record.map(|record| record.id)).await?);
+                ("common/data_entry.html", context! { title }, fields)
+            }
         };
-        let Some(record) = records.into_iter().find(|entry| entry.id == id) else {
-            return not_found();
-        };
-        Some(record)
-    } else {
-        None
-    };
-    let Ok(members) = members(&mut db, kind, id).await else {
-        return unavailable();
-    };
-    let Ok(csrf) = html::page_csrf(headers) else {
-        return unavailable();
-    };
-    let title = match &record {
-        Some(record) => format!("Edit {}: {}", kind.label(), record.name),
-        None => format!("Create {}", kind.label()),
-    };
-    let response = html::render(
-        "roster_groups.html",
-        context! {
-            title, nav => Navigation::new(actor, true), label => kind.label(), record, members,
-            priority => matches!(kind, RoomTag), prefix => kind.prefix(), back => kind.list(), csrf,
-        },
-        StatusCode::OK,
-    );
-    html::form_response(response, headers, &csrf)
+        db.commit().await?;
+        let mut response = staff_roster_notice::render(
+            app,
+            headers,
+            uri.path(),
+            template,
+            shell,
+            context! {
+                form => context! { visible_fields => fields },
+                csrf_input => csrf.input(),
+                return_path,
+                ..page
+            },
+            StatusCode::OK,
+        );
+        csrf.set_cookie(&mut response, headers);
+        Ok::<_, sqlx::Error>(response)
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 async fn create(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Extension(kind): Extension<GroupKind>,
-    headers: HeaderMap,
-    body: Bytes,
+    request: Request,
 ) -> Response {
-    save(&app, kind, None, &headers, &body).await
+    save(&app, actor, kind, None, request).await
 }
 
 async fn update(
     State(app): State<App>,
+    Extension(actor): Extension<Actor>,
     Extension(kind): Extension<GroupKind>,
     Path(id): Path<i32>,
-    headers: HeaderMap,
-    body: Bytes,
+    request: Request,
 ) -> Response {
-    save(&app, kind, Some(id), &headers, &body).await
+    save(&app, actor, kind, Some(id), request).await
+}
+
+enum Change {
+    Saved(String),
+    Deleted,
 }
 
 enum SaveError {
-    Invalid(&'static str),
+    Invalid,
+    PriorityRange,
     Missing,
+    Forbidden,
+    Session(SessionError),
     Database(sqlx::Error),
 }
 
@@ -323,50 +400,91 @@ impl From<sqlx::Error> for SaveError {
 
 async fn save(
     app: &App,
+    actor: Actor,
     kind: GroupKind,
     id: Option<i32>,
-    headers: &HeaderMap,
-    body: &[u8],
+    request: Request,
 ) -> Response {
-    let fields = Fields::parse(body);
-    if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
+    let headers = request.headers().clone();
+    let uri = request.uri().clone();
+    let fields = match submitted_fields(app, request).await {
+        Ok(fields) => fields,
+        Err(error) => return *error,
+    };
+    if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    match change(app, kind, id, &fields).await {
-        Ok(()) => access::found(kind.list()),
-        Err(SaveError::Missing) => not_found(),
-        Err(SaveError::Invalid(message)) => private((StatusCode::UNPROCESSABLE_ENTITY, message)),
-        Err(SaveError::Database(sqlx::Error::Database(error))) if error.is_unique_violation() => {
-            private((
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "A ranking group already has that name.",
-            ))
+    let deleting = fields
+        .all("_method")
+        .last()
+        .is_some_and(|value| value == "DELETE");
+    let target = form_return_target(&uri, &headers, Some(&fields));
+    let return_to = target.as_deref().unwrap_or(kind.list());
+    let noun = kind.noun();
+    let invalid = |text: &str| staff_roster_notice::failed(app, &headers, return_to, text);
+    let error = match kind {
+        RoomTag => "Error saving tag.",
+        RankingGroup => "Error saving ranking group.",
+    };
+    match change(app, actor, &headers, kind, id, &fields, deleting).await {
+        Ok(Change::Saved(name)) => {
+            let verb = if id.is_some() { "updated" } else { "created" };
+            staff_roster_notice::saved(
+                app,
+                &headers,
+                kind.list(),
+                &format!("{noun} {name} {verb} successfully"),
+            )
+        }
+        Ok(Change::Deleted) => staff_roster_notice::saved(
+            app,
+            &headers,
+            return_to,
+            &format!("{noun} deleted successfully"),
+        ),
+        Err(SaveError::Missing) => invalid(&format!("{noun} does not exist")),
+        Err(SaveError::Invalid) => invalid(error),
+        Err(SaveError::PriorityRange) => invalid("Priority must be between 0 and 100."),
+        Err(SaveError::Forbidden) => access::access_denied(),
+        Err(SaveError::Session(error)) => error.response(),
+        Err(SaveError::Database(sqlx::Error::Database(database_error)))
+            if database_error.is_unique_violation() =>
+        {
+            invalid(error)
         }
         Err(SaveError::Database(_)) => unavailable(),
     }
 }
 
-fn not_found() -> Response {
-    private((StatusCode::NOT_FOUND, "Group not found."))
-}
-
 async fn change(
     app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
     kind: GroupKind,
     id: Option<i32>,
     fields: &Fields,
-) -> Result<(), SaveError> {
+    deleting: bool,
+) -> Result<Change, SaveError> {
     let mut db = app.db.begin().await?;
-    lock_round(&mut db).await?;
-    if let Some(id) = id
-        && !records(&mut db, kind)
+    lock_round_if_configured(&mut db).await?;
+    let exists = if let Some(id) = id {
+        let query = match kind {
+            RoomTag => "SELECT id FROM tab_roomtag WHERE id = ? FOR UPDATE",
+            RankingGroup => "SELECT id FROM tab_rankinggroup WHERE id = ? FOR UPDATE",
+        };
+        sqlx::query_scalar::<_, i32>(query)
+            .bind(id)
+            .fetch_optional(&mut *db)
             .await?
-            .iter()
-            .any(|record| record.id == id)
-    {
+            .is_some()
+    } else {
+        !deleting
+    };
+    confirm_writer(app, &mut db, headers, actor).await?;
+    if !exists {
         return Err(SaveError::Missing);
     }
-    if fields.get("_method") == "DELETE" {
+    if deleting {
         let id = id.ok_or(SaveError::Missing)?;
         for member in kind.members() {
             clear(&mut db, kind, member, id).await?;
@@ -377,26 +495,18 @@ async fn change(
         };
         sqlx::query(query).bind(id).execute(&mut *db).await?;
         db.commit().await?;
-        return Ok(());
+        return Ok(Change::Deleted);
     }
 
-    let name = fields
-        .get(match kind {
-            RoomTag => "tag",
-            RankingGroup => "name",
-        })
-        .trim();
-    if name.is_empty() || name.chars().count() > 255 {
-        return Err(SaveError::Invalid("Enter a name up to 255 characters."));
+    let name = fields.get(kind.field().0);
+    if name.is_empty() || name.chars().count() > 255 || name.contains('\0') {
+        return Err(SaveError::Invalid);
     }
+    let mut invalid_priority = false;
     let id = match kind {
         RoomTag => {
-            let value = fields.get("priority").trim();
-            if !valid_priority(value) {
-                return Err(SaveError::Invalid(
-                    "Enter a priority from 0 to 99.99 with at most two decimal places.",
-                ));
-            }
+            let value = rank_input(fields.get("priority")).map_err(|_| SaveError::Invalid)?;
+            invalid_priority = value.starts_with('-');
             let result = if let Some(id) = id {
                 sqlx::query("UPDATE tab_roomtag SET tag = ?, priority = ? WHERE id = ?")
                     .bind(name)
@@ -435,51 +545,108 @@ async fn change(
             .iter()
             .map(|value| {
                 value
-                    .parse()
-                    .map_err(|_| SaveError::Invalid("An invalid roster member was selected."))
+                    .parse::<i32>()
+                    .ok()
+                    .filter(|id| id.to_string() == *value)
+                    .ok_or(SaveError::Invalid)
             })
             .collect::<Result<_, _>>()?;
-        clear(&mut db, kind, member, id).await?;
-        let query = format!(
-            "INSERT INTO {} ({}, {}) SELECT ?, id FROM {} WHERE id = ?",
-            member.relation,
-            kind.id_column(),
-            member.member_id,
-            member.roster
-        );
-        for member_id in ids {
-            let saved = sqlx::query(AssertSqlSafe(query.clone()))
-                .bind(id)
-                .bind(member_id)
-                .execute(&mut *db)
-                .await?;
-            if saved.rows_affected() != 1 {
-                return Err(SaveError::Invalid(
-                    "A selected roster member no longer exists.",
-                ));
-            }
-        }
+        set_members(&mut db, kind, member, id, &ids).await?;
+    }
+    if invalid_priority {
+        return Err(SaveError::PriorityRange);
     }
     db.commit().await?;
-    Ok(())
+    Ok(Change::Saved(name.into()))
+}
+
+async fn confirm_writer(
+    app: &App,
+    db: &mut MySqlConnection,
+    headers: &HeaderMap,
+    actor: Actor,
+) -> Result<(), SaveError> {
+    let Actor::User { id: requested, .. } = actor else {
+        return Err(SaveError::Forbidden);
+    };
+    let session = legacy_session::cookie(headers, "sessionid").ok_or(SaveError::Forbidden)?;
+    let current = legacy_session::actor_on(db, session, app.django_secret.as_deref())
+        .await
+        .map_err(SaveError::Session)?;
+    let allowed = match current {
+        Actor::User {
+            id,
+            board: false,
+            superuser: true,
+            ..
+        } => id == requested,
+        Actor::User {
+            id,
+            board: false,
+            staff: false,
+            ..
+        } if id == requested => access::user_permission(db, id, "tab_settings.can_change").await?,
+        _ => false,
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err(SaveError::Forbidden)
+    }
 }
 
 fn saved_id(id: Option<i32>, result: MySqlQueryResult) -> Result<i32, SaveError> {
     if let Some(id) = id {
         Ok(id)
     } else {
-        i32::try_from(result.last_insert_id())
-            .map_err(|_| SaveError::Invalid("No more groups can be created."))
+        i32::try_from(result.last_insert_id()).map_err(|_| SaveError::Invalid)
     }
 }
 
-fn valid_priority(value: &str) -> bool {
-    let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
-    !whole.is_empty()
-        && whole.bytes().all(|byte| byte.is_ascii_digit())
-        && whole.parse::<u8>().is_ok_and(|number| number <= 99)
-        && fraction.len() <= 2
-        && fraction.bytes().all(|byte| byte.is_ascii_digit())
+async fn set_members(
+    db: &mut MySqlConnection,
+    kind: GroupKind,
+    member: &MemberKind,
+    id: i32,
+    selected: &BTreeSet<i32>,
+) -> Result<(), SaveError> {
+    let MemberKind {
+        member_id,
+        relation,
+        roster,
+        ..
+    } = member;
+    let group_id = kind.id_column();
+    let current: BTreeSet<_> = sqlx::query_scalar::<_, i32>(AssertSqlSafe(format!(
+        "SELECT {member_id} FROM {relation} WHERE {group_id} = ?",
+    )))
+    .bind(id)
+    .fetch_all(&mut *db)
+    .await?
+    .into_iter()
+    .collect();
+    let delete = format!("DELETE FROM {relation} WHERE {group_id} = ? AND {member_id} = ?");
+    for removed in current.difference(selected) {
+        sqlx::query(AssertSqlSafe(delete.as_str()))
+            .bind(id)
+            .bind(removed)
+            .execute(&mut *db)
+            .await?;
+    }
+    let insert = format!(
+        "INSERT INTO {relation} ({group_id}, {member_id}) SELECT ?, id FROM {roster} WHERE id = ?",
+    );
+    for added in selected.difference(&current) {
+        let result = sqlx::query(AssertSqlSafe(insert.as_str()))
+            .bind(id)
+            .bind(added)
+            .execute(&mut *db)
+            .await?;
+        if result.rows_affected() != 1 {
+            return Err(SaveError::Invalid);
+        }
+    }
+    Ok(())
 }
 
 async fn clear(

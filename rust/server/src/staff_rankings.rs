@@ -287,7 +287,7 @@ async fn team_rankings(
 async fn render_team_rankings(
     db: &mut MySqlConnection,
     actor: Actor,
-    message: Option<&str>,
+    message: Option<&staff_roster_notice::Notice>,
 ) -> Result<Response, sqlx::Error> {
     let settings = Settings::load(db, SETTINGS).await?;
     let rankings = teams(db, &settings).await?;
@@ -359,7 +359,7 @@ async fn rankings_response(
     path: &str,
     load: impl for<'db, 'message> AsyncFnOnce(
         &'db mut MySqlConnection,
-        Option<&'message str>,
+        Option<&'message staff_roster_notice::Notice>,
     ) -> Result<Response, sqlx::Error>,
 ) -> Response {
     if let Some(message) = staff_roster_notice::message(app, headers, path) {
@@ -381,7 +381,7 @@ async fn rankings_response(
 
 async fn render_speaker_rankings(
     db: &mut MySqlConnection,
-    message: Option<&str>,
+    message: Option<&staff_roster_notice::Notice>,
 ) -> Result<Response, sqlx::Error> {
     let settings = Settings::load(db, SETTINGS).await?;
     let rankings = speaker_rows(db, &settings).await?;

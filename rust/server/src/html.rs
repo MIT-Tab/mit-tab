@@ -16,10 +16,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     let mut env = Environment::new();
     for (name, source) in [
         (
-            "roster_groups.html",
-            include_str!("../templates/roster_groups.html"),
-        ),
-        (
             "roster_log_admin.html",
             include_str!("../templates/roster_log_admin.html"),
         ),

@@ -6046,8 +6046,10 @@ def test_native_roster_groups_change_members_atomically():
     from mittab.apps.tab.models import RankingGroup
 
     staff = legacy_tab_session("roster-group-staff")
+    staff_user = get_user_model().objects.get(username="roster-group-staff")
     board = legacy_tab_session("roster-group-board")
-    get_user_model().objects.get(username="roster-group-board").groups.add(Group.objects.create(name="APDA Board"))
+    board_group = Group.objects.create(name="APDA Board")
+    get_user_model().objects.get(username="roster-group-board").groups.add(board_group)
     TabSettings.set("cur_round", 2)
     TabSettings.set("tot_rounds", 1)
     school = School.objects.create(name="Group School")
@@ -6058,7 +6060,7 @@ def test_native_roster_groups_change_members_atomically():
     Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
     with rust_server() as port:
         status, headers, body = request(port, "/manage-room-tags", cookie=staff)
-        assert status == 200 and b"Create Room Tag" in body
+        assert status == 200 and b"Add New Room Tag" in body
         csrf = load_cookies(headers)["csrftoken"].value
 
         def post(path, fields, session=staff):
@@ -6066,33 +6068,130 @@ def test_native_roster_groups_change_members_atomically():
                            extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
                            form={"csrfmiddlewaretoken": csrf, **fields})
 
+        def flash(path, fields, text, *, target=None, error=False):
+            status, headers, _ = post(path, fields)
+            target = target or ("/manage-room-tags" if path.startswith("/room-tag") else "/manage-ranking-groups")
+            assert status == 302 and headers["Location"] == target
+            notice = load_cookies(headers)["mittab_roster_notice"].value
+            with_notice = f"sessionid={staff}; csrftoken={csrf}; mittab_roster_notice={notice}"
+            status, headers, body = request(port, target, extra_headers={"Cookie": with_notice})
+            variant = b"danger" if error else b"success"
+            assert status == 200 and b'class="alert alert-' + variant + b'"' in body
+            assert text.encode() in body
+            assert load_cookies(headers)["mittab_roster_notice"]["max-age"] == "0"
+
         fields = {"tag": "Accessibility", "priority": "75.25", "teams": teams[0].id,
                   "judges": judge.id, "rooms": room.id}
         assert post("/room-tag/", fields, board)[1]["Location"] == "/403/"
-        assert post("/room-tag/", {**fields, "priority": "100"})[0] == 422
-        assert post("/room-tag/", fields)[0] == 302
+        flash("/room-tag/", {**fields, "priority": "100"}, "Error saving tag.", error=True)
+        flash("/room-tag/", {**fields, "priority": "-.5"}, "Priority must be between 0 and 100.", error=True)
+        flash("/room-tag/", fields, "Tag Accessibility created successfully")
         tag = RoomTag.objects.get()
         assert list(tag.team_set.all()) == teams[:1]
         assert list(tag.judge_set.all()) == [judge] and list(tag.room_set.all()) == [room]
         uri = f"/room-tag/{tag.id}/"
         assert b"Group Judge" in request(port, uri, cookie=staff)[2]
-        assert post(uri, {**fields, "priority": "98", "teams": 9999999})[0] == 422
+        flash(uri, {**fields, "priority": "98", "teams": 9999999}, "Error saving tag.", error=True)
+        flash(uri, {**fields, "priority": "not-a-number", "return_to": "/team/rank/"},
+              "Error saving tag.", target="/team/rank/", error=True)
+        _, error_headers, _ = post(uri, {**fields, "priority": "100", "return_to": "/team/rank/"})
+        error_notice = load_cookies(error_headers)["mittab_roster_notice"].value
+        peer = legacy_tab_session("roster-group-other-session")
+        for session, path in ((peer, "/team/rank/"), (staff, "/debater/rank/")):
+            isolated = {"Cookie": f"sessionid={session}; mittab_roster_notice={error_notice}"}
+            status, headers, body = request(port, path, extra_headers=isolated)
+            assert status == 200 and b"Error saving tag." not in body
+            assert "mittab_roster_notice" not in load_cookies(headers)
         tag.refresh_from_db()
         assert tag.priority == Decimal("75.25") and list(tag.team_set.all()) == teams[:1]
-        assert post(uri, {**fields, "teams": teams[1].id})[0] == 302
+        flash(uri, {**fields, "priority": "1e1", "teams": teams[1].id}, "Tag Accessibility updated successfully")
+        tag.refresh_from_db()
+        assert tag.priority == Decimal("10.00")
         assert list(tag.team_set.all()) == teams[1:]
 
         group_fields = {"name": "Regional", "teams": teams[1].id, "debaters": debater.id}
-        assert post("/ranking-group/", group_fields)[0] == 302
-        assert post("/ranking-group/", group_fields)[0] == 422
+        flash("/ranking-group/", group_fields, "Ranking group Regional created successfully")
+        flash("/ranking-group/", group_fields, "Error saving ranking group.", error=True)
         group = RankingGroup.objects.get()
         assert list(group.teams.all()) == teams[1:] and list(group.debaters.all()) == [debater]
         group_url = f"/ranking-group/{group.id}/"
         assert request(port, group_url, cookie=staff)[0] == 200
         assert request(port, group_url, cookie=board)[1]["Location"] == "/403/"
-        assert post(group_url, {"_method": "DELETE"})[0] == 302
-        assert post(uri, {"_method": "DELETE"})[0] == 302
+        member_link = RankingGroup.teams.through.objects.get(rankinggroup=group).id
+        flash(group_url, group_fields, "Ranking group Regional updated successfully")
+        assert RankingGroup.teams.through.objects.get(rankinggroup=group).id == member_link
+        flash(group_url, {**group_fields, "teams": f"0{teams[0].id}"}, "Error saving ranking group.", error=True)
+        assert list(group.teams.all()) == teams[1:]
+
+        from time import monotonic, sleep
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = executor.submit(post, group_url, {"_method": "DELETE"})
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The membership mutation did not reach the tournament lock"
+                staff_user.groups.add(board_group)
+            assert pending.result(timeout=6)[1]["Location"] == "/403/"
+        assert RankingGroup.objects.filter(pk=group.pk).exists()
+        assert list(group.teams.all()) == teams[1:]
+        staff_user.groups.remove(board_group)
+
+        flash(group_url, {"_method": "DELETE"}, "Ranking group deleted successfully")
+        flash(uri, {"_method": "DELETE", "return_to": "/manage-room-tags"}, "Tag deleted successfully")
+        flash(group_url, {**group_fields, "return_to": "https://invalid.example/"}, "Ranking group does not exist", error=True)
         assert not RankingGroup.objects.exists() and not RoomTag.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_roster_group_management_matches_django(html_assets, subtests):
+    user = get_user_model().objects.create_superuser(username="roster-groups-html")
+    client = Client()
+    client.force_login(user)
+    client.cookies["csrftoken"] = "a" * 32
+    tags_path, groups_path = "/manage-room-tags", "/manage-ranking-groups"
+    school = School.objects.create(name="Room & Ranking Exhibition School")
+    teams = [Team.objects.create(name=name, school=school, seed=0) for name in ("Z Team", "Alps & Team", "A Team")]
+    judges = [Judge.objects.create(name=name, rank=2) for name in ("Judgment Z", "Judge <A>")]
+    rooms = [Room.objects.create(name=name, rank=3) for name in ("Room Z", "Borrowed & Room")]
+    debaters = [Debater.objects.create(name=name, novice_status=0) for name in ("Cora Speaker", "Ábby & Speaker")]
+    with rust_server(overrides=html_assets) as port:
+        for path in (tags_path, groups_path, "/room-tag/", "/ranking-group/",
+                     "/room-tag/999999/", "/ranking-group/999999/"):
+            with subtests.test(state="unpopulated", path=path):
+                compare_admin_page(port, path, client)
+        low = RoomTag.objects.create(tag="All speakers <Workshop>", priority=Decimal("9.00"))
+        high = RoomTag.objects.create(tag="Quiet & Accessible", priority=Decimal("80.25"))
+        RoomTag.objects.create(tag="Early & Low", priority=Decimal("1.22"))
+        tags = (low, high)
+        teams[0].required_room_tags.add(*tags)
+        judges[1].required_room_tags.add(high)
+        rooms[1].tags.add(high)
+        group = RankingGroup.objects.create(name="Élite & Novice")
+        RankingGroup.objects.create(name="All <Regional>")
+        group.teams.add(*teams)
+        group.debaters.add(*debaters)
+        group_path = f"/ranking-group/{group.id}/"
+        tag_path = f"/room-tag/{high.id}/"
+        for path in (tags_path, groups_path, group_path, tag_path, f"{tag_path}?return_to={tags_path}"):
+            with subtests.test(state="populated", path=path):
+                compare_admin_page(port, path, client)
+        for path, fields in (
+            (tag_path, {"tag": high.tag, "priority": "nonsense", "return_to": tags_path}),
+            (group_path, {"name": group.name, "debaters": "9999999", "return_to": groups_path}),
+            (groups_path, {"name": group.name, "return_to": groups_path}),
+        ):
+            with subtests.test(state="invalid", path=path):
+                compare_admin_page(port, path, client, post=fields)
 
 
 @pytest.mark.django_db(transaction=True)

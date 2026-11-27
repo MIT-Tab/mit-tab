@@ -225,10 +225,14 @@ fn entry_roster_route(request: &Request) -> bool {
 }
 
 async fn has_settings_permission(app: &App, user: i32) -> Result<bool, sqlx::Error> {
-    user_permission(app, user, "tab_settings.can_change").await
+    user_permission(&app.db, user, "tab_settings.can_change").await
 }
 
-async fn user_permission(app: &App, user: i32, code: &'static str) -> Result<bool, sqlx::Error> {
+pub(super) async fn user_permission<'db>(
+    db: impl sqlx::MySqlExecutor<'db>,
+    user: i32,
+    code: &'static str,
+) -> Result<bool, sqlx::Error> {
     let allowed = sqlx::query_scalar::<_, i64>(
         "SELECT EXISTS(
             SELECT 1 FROM auth_permission p JOIN django_content_type ct ON ct.id = p.content_type_id
@@ -247,7 +251,7 @@ async fn user_permission(app: &App, user: i32, code: &'static str) -> Result<boo
     .bind(code)
     .bind(user)
     .bind(user)
-    .fetch_one(&app.db)
+    .fetch_one(db)
     .await?;
     Ok(allowed != 0)
 }
@@ -265,7 +269,7 @@ pub async fn allowed_permission(
         } => Ok(true),
         Actor::User {
             board: false, id, ..
-        } => user_permission(app, id, code).await,
+        } => user_permission(&app.db, id, code).await,
         _ => Ok(false),
     }
 }

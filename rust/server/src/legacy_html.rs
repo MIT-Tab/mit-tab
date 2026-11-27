@@ -148,6 +148,7 @@ pub fn environment() -> Environment<'static> {
 static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     let mut env = environment();
     env.add_global("urls", Value::from_serialize(&*URLS));
+    env.add_global("DEFAULT_MESSAGE_LEVELS", context! { ERROR => 40 });
     env.add_function("legacy_bundle", html::legacy_bundle);
     env.add_filter("django_default", |value: Value, fallback: Value| {
         if value.is_true() { value } else { fallback }
@@ -409,6 +410,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "tab/_speaker_points_chart.html",
             include_str!("../../../mittab/templates/tab/_speaker_points_chart.html"),
+        ),
+        (
+            "pairing/manage_ranking_groups.html",
+            include_str!("../../../mittab/templates/pairing/manage_ranking_groups.html"),
+        ),
+        (
+            "pairing/manage_room_tags.html",
+            include_str!("../../../mittab/templates/pairing/manage_room_tags.html"),
         ),
         (
             "tab/rank_debaters.html",
@@ -838,7 +847,7 @@ fn translate(name: &str, source: &str) -> String {
         "tab/rank_teams_component.html" | "tab/rank_debaters_component.html" => {
             // Direct fragment requests can also be a saved form's return target.
             [
-                "{% if ranking_notice %}<div class=\"col-12\"><div class=\"alert alert-success\">{{ ranking_notice }}</div></div>{% endif %}",
+                "{% if ranking_notice %}<div class=\"col-12\"><div class=\"alert alert-{{ 'danger' if ranking_notice.error else 'success' }}\">{{ ranking_notice.text }}</div></div>{% endif %}",
                 &translated,
             ].concat()
         }
@@ -851,6 +860,10 @@ fn translate(name: &str, source: &str) -> String {
             .replace("team.3", "team[3]")
             .replace("team.4", "team[4]"),
         "tab/_rank_debaters_table.html" => translated.replace("debaters.0.", "debaters[0]."),
+        "pairing/manage_room_tags.html" => translated.replace("tag.tag", "tag.name"),
+        "pairing/manage_ranking_groups.html" => translated
+            .replace("group.teams.count", "group.team_count")
+            .replace("group.debaters.count", "group.debater_count"),
         "tab/judge_speaker_points.html" => translated
             .replace("{{ filters.minimum_rounds }}", "{{ filters.minimum_rounds.html|safe }}")
             .replace("metrics|django_pluralize", "metrics|length|django_pluralize")
