@@ -1,6 +1,8 @@
 mod access;
 mod admin_accounts;
+mod admin_changelist;
 mod admin_html;
+mod admin_records;
 mod admin_repairs;
 mod admin_scores;
 mod administration;

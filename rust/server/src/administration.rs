@@ -1,22 +1,31 @@
 use axum::{
     Extension, Router,
-    extract::{Path, Query, Request, State},
+    extract::{Path, RawQuery, Request, State},
     http::{HeaderMap, StatusCode},
     response::Response,
     routing::get,
 };
 use minijinja::context;
-use serde::Deserialize;
 use sqlx::AssertSqlSafe;
 
 use crate::{
-    App, access, admin_accounts, admin_html, diagnostics,
+    App, access, admin_accounts, admin_changelist, admin_html, admin_records, diagnostics,
     html::{self, Navigation},
     legacy_session::Actor,
     private, unavailable,
 };
 
 pub fn routes() -> Router<App> {
+    let records = [
+        "/admin/tab/auditevent/add/",
+        "/admin/tab/auditevent/{id}/delete/",
+        "/admin/tab/manualjudgeassignment/add/",
+        "/admin/tab/manualjudgeassignment/{id}/delete/",
+    ]
+    .into_iter()
+    .fold(Router::new(), |router, path| {
+        router.route(path, get(deny_readonly).post(deny_readonly))
+    });
     Router::new()
         .route("/admin", get(login))
         .route("/admin/", get(index))
@@ -24,7 +33,12 @@ pub fn routes() -> Router<App> {
         .route("/admin/jsi18n/", get(diagnostics::js_catalog))
         .route("/admin/{application}/", get(app_index))
         .route("/admin/{application}/{model}/", get(model))
-        .route("/admin/{application}/{model}/{id}/change/", get(change))
+        .route(
+            "/admin/{application}/{model}/{id}/change/",
+            get(change).post(readonly_write),
+        )
+        .route("/admin/{application}/{model}/{id}/history/", get(history))
+        .merge(records)
         .merge(admin_accounts::routes())
         .merge(crate::admin_repairs::routes())
         .merge(crate::admin_scores::routes())
@@ -82,44 +96,6 @@ struct Resource {
 
 fn report(application: &str, model: &str) -> Option<Resource> {
     Some(match (application, model) {
-        ("tab", "auditevent") => Resource {
-            title: "Audit Events",
-            table: "tab_auditevent",
-            columns: &[
-                ("Created", "created_at"),
-                ("Event", "event_type"),
-                ("Record", "object_repr"),
-                ("User ID", "user_id"),
-            ],
-            detail: &[
-                ("Record ID", "object_id"),
-                ("Changes", "changes"),
-                ("Note", "note"),
-            ],
-        },
-        ("tab", "manualjudgeassignment") => Resource {
-            title: "Manual Judge Assignments",
-            table: "tab_manualjudgeassignment",
-            columns: &[
-                ("Created", "created_at"),
-                ("Round ID", "round_id"),
-                ("Judge ID", "judge_id"),
-                ("Staff ID", "created_by_id"),
-            ],
-            detail: &[],
-        },
-        ("tab", "roundstats") => Resource {
-            title: "Round Statistics",
-            table: "tab_roundstats",
-            columns: &[
-                ("Round ID", "round_id"),
-                ("Debater ID", "debater_id"),
-                ("Role", "debater_role"),
-                ("Speaks", "speaks"),
-                ("Ranks", "ranks"),
-            ],
-            detail: &[],
-        },
         ("tab", "bye") => Resource {
             title: "Byes",
             table: "tab_bye",
@@ -217,18 +193,22 @@ fn destination(application: &str, model: &str, record: Option<i32>) -> Option<St
     })
 }
 
-#[derive(Deserialize)]
-struct Page {
-    q: Option<String>,
-    page: Option<u64>,
-}
-
 async fn model(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Path((application, model)): Path<(String, String)>,
-    Query(page): Query<Page>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
 ) -> Response {
+    if let Some(record) = admin_records::Record::find(&application, &model) {
+        return admin_records::list(&app, actor, &headers, record, raw).await;
+    }
+    if let Some(response) =
+        admin_changelist::get(&app, actor, &headers, &application, &model, raw.clone()).await
+    {
+        return response;
+    }
+    let query = admin_changelist::Query::new(raw);
     if let Some(link) = destination(&application, &model, None) {
         return access::found(link);
     }
@@ -242,8 +222,12 @@ async fn model(
         .iter()
         .map(|(_, name)| format!("CAST(`{name}` AS CHAR)"))
         .collect();
-    let query = page.q.as_deref().unwrap_or_default().trim();
-    let number = page.page.unwrap_or(1).clamp(1, 1_000_000);
+    let number = query
+        .get("page")
+        .and_then(|page| page.parse::<u64>().ok())
+        .unwrap_or(1)
+        .clamp(1, 1_000_000);
+    let query = query.get("q").unwrap_or_default().trim();
     let sql = format!(
         "SELECT id, CAST(JSON_ARRAY({}) AS CHAR) FROM `{}`
          WHERE ? = '' OR LOCATE(?, CONCAT_WS(' ', {})) > 0
@@ -287,7 +271,12 @@ async fn change(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     Path((application, model, id)): Path<(String, String, i32)>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
 ) -> Response {
+    if let Some(record) = admin_records::Record::find(&application, &model) {
+        return admin_records::detail(&app, actor, &headers, record, id, raw, false).await;
+    }
     if let Some(link) = destination(&application, &model, Some(id)) {
         return access::found(link);
     }
@@ -304,10 +293,22 @@ async fn change(
         fields.join(", "),
         resource.table
     );
+    let mut db = match app.db.begin().await {
+        Ok(db) => db,
+        Err(_) => return unavailable(),
+    };
+    match admin_html::model_enabled(&mut db, &application, &model).await {
+        Ok(true) => {}
+        Ok(false) => return private((StatusCode::FORBIDDEN, "Access denied.")),
+        Err(_) => return unavailable(),
+    }
     let row = sqlx::query_scalar::<_, String>(AssertSqlSafe(sql))
         .bind(id)
-        .fetch_optional(&app.db)
+        .fetch_optional(&mut *db)
         .await;
+    if db.commit().await.is_err() {
+        return unavailable();
+    }
     let row = match row {
         Ok(Some(row)) => match serde_json::from_str::<Vec<Option<String>>>(&row) {
             Ok(record) => record,
@@ -329,6 +330,35 @@ async fn change(
         },
         StatusCode::OK,
     )
+}
+
+async fn history(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    Path((application, model, id)): Path<(String, String, i32)>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Response {
+    match admin_records::Record::find(&application, &model) {
+        Some(record) => admin_records::detail(&app, actor, &headers, record, id, raw, true).await,
+        None => missing().await,
+    }
+}
+
+async fn readonly_write(Path(params): Path<std::collections::HashMap<String, String>>) -> Response {
+    let record = params
+        .get("application")
+        .zip(params.get("model"))
+        .and_then(|(application, model)| admin_records::Record::find(application, model));
+    if record.is_some() {
+        deny_readonly().await
+    } else {
+        private(StatusCode::METHOD_NOT_ALLOWED)
+    }
+}
+
+async fn deny_readonly() -> Response {
+    private((StatusCode::FORBIDDEN, "This record is read-only."))
 }
 
 async fn missing() -> Response {

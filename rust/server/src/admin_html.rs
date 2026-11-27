@@ -4,8 +4,10 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{Html, Response},
 };
+use chrono::{Datelike, NaiveDateTime, Timelike};
 use minijinja::{Environment, Value, context};
 use serde::{Deserialize, Serialize};
+use sqlx::MySqlConnection;
 
 use crate::{
     App, access, legacy_html, legacy_session::Actor, login::TemplateCsrf, private,
@@ -80,7 +82,7 @@ impl Shell {
         .fetch_one(&mut *db)
         .await
         .map_err(|_| Box::new(unavailable()))?;
-        let settings = Settings::load(&mut db, &["outround_pairing_mode"])
+        let challenges = model_enabled(&mut db, "tab", "outroundchallenge")
             .await
             .map_err(|_| Box::new(unavailable()))?;
         let has_registration_config: bool =
@@ -88,7 +90,6 @@ impl Shell {
                 .fetch_one(&mut *db)
                 .await
                 .map_err(|_| Box::new(unavailable()))?;
-        let challenges = matches!(settings.integer("outround_pairing_mode", 0), 1 | 2);
         let mut applications = APPLICATIONS.clone();
         for application in &mut applications {
             application
@@ -138,6 +139,21 @@ impl Shell {
     }
 }
 
+pub async fn model_enabled(
+    db: &mut MySqlConnection,
+    application: &str,
+    model: &str,
+) -> Result<bool, sqlx::Error> {
+    if (application, model) != ("tab", "outroundchallenge") {
+        return Ok(true);
+    }
+    let settings = Settings::load(db, &["outround_pairing_mode"]).await?;
+    Ok(matches!(
+        settings.integer("outround_pairing_mode", 0),
+        1 | 2
+    ))
+}
+
 fn templates(env: &mut Environment<'static>) {
     env.add_filter("admin_spaceless", |value: String| {
         let mut output = String::with_capacity(value.len());
@@ -165,13 +181,7 @@ fn templates(env: &mut Environment<'static>) {
             words.join(" ")
         }
     });
-    env.add_filter("capfirst", |value: String| {
-        let mut characters = value.chars();
-        match characters.next() {
-            Some(first) => format!("{}{}", first.to_uppercase(), characters.as_str()),
-            None => value,
-        }
-    });
+    env.add_filter("capfirst", |value: String| capitalized(&value));
     macro_rules! upstream {
         ($name:literal) => {
             (
@@ -191,6 +201,8 @@ fn templates(env: &mut Environment<'static>) {
         upstream!("change_list_results.html"),
         upstream!("change_list_object_tools.html"),
         upstream!("actions.html"),
+        upstream!("search_form.html"),
+        upstream!("filter.html"),
         upstream!("pagination.html"),
         upstream!("object_history.html"),
         upstream!("delete_confirmation.html"),
@@ -222,6 +234,14 @@ fn templates(env: &mut Environment<'static>) {
 fn translate(source: &str) -> String {
     let source = source
         .replace("{{ block.super }}", "{{ super() }}")
+        .replace("{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}", " By {{ title }} ")
+        .replace("{% blocktranslate count counter=cl.result_count %}{{ counter }} result{% plural %}{{ counter }} results{% endblocktranslate %}", "{{ cl.result_count }} result{% if cl.result_count != 1 %}s{% endif %}")
+        .replace("{% blocktranslate with full_result_count=cl.full_result_count %}{{ full_result_count }} total{% endblocktranslate %}", "{{ cl.full_result_count }} total")
+        .replace("in cl.params.items %}", "in cl.params %}")
+        .replace("pair.0", "pair[0]")
+        .replace("pair.1", "pair[1]")
+        .replace("|iriencode", "")
+        .replace("{{ field.contents }}", "{{ field.contents|safe }}")
         .replace("LANGUAGE_CODE|default:\"en-us\"", "\"en-us\"")
         .replace("LANGUAGE_BIDI|yesno:'rtl,ltr,auto'", "\"ltr\"")
         .replace("request.path|urlencode", "request.path")
@@ -350,6 +370,9 @@ fn translate(source: &str) -> String {
                 "tournament_todo" => "/setup/tournament-todo/",
                 path => panic!("unsupported Django admin URL {path}"),
             }),
+            ["add_preserved_filters", "changelist_url"] => {
+                translated.push_str("{{ changelist_url }}{{ close_suffix }}")
+            }
             ["add_preserved_filters", value, ..] => {
                 translated.push_str(&format!("{{{{ {value} }}}}{{{{ filter_suffix }}}}"))
             }
@@ -407,4 +430,129 @@ fn translate(source: &str) -> String {
     }
     translated.push_str(rest);
     translated
+}
+
+const ADMIN_MEDIA: &[&str] = &[
+    "vendor/jquery/jquery.min.js",
+    "jquery.init.js",
+    "core.js",
+    "admin/RelatedObjectLookups.js",
+    "actions.js",
+    "urlify.js",
+    "prepopulate.js",
+    "vendor/xregexp/xregexp.min.js",
+];
+
+pub fn scripts() -> String {
+    ADMIN_MEDIA
+        .iter()
+        .map(|script| format!("<script src=\"/static/admin/js/{script}\"></script>"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn preserved_filters(query: &str) -> String {
+    if query.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "?{}",
+            url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("_changelist_filters", query)
+                .finish()
+        )
+    }
+}
+
+pub fn paginator_links(page: u32, pages: u32, href: impl Fn(u32) -> String) -> Vec<String> {
+    let mut links = Vec::new();
+    let mut previous = 0;
+    let numbers = if pages <= 10 {
+        (1..=pages).collect()
+    } else {
+        (1..=2)
+            .chain(page.saturating_sub(3).max(1)..=page.saturating_add(3).min(pages))
+            .chain(pages - 1..=pages)
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    for number in numbers {
+        if number > previous + 1 {
+            links.push("… ".into());
+        }
+        links.push(if number == page {
+            format!(r#"<span class="this-page">{number}</span> "#)
+        } else {
+            let href = legacy_html::escape(&href(number));
+            let end = if number == pages {
+                r#" class="end""#
+            } else {
+                ""
+            };
+            format!(r#"<a href="{href}"{end}>{number}</a> "#)
+        });
+        previous = number;
+    }
+    links
+}
+
+pub fn django_datetime(time: NaiveDateTime) -> String {
+    let month = [
+        "Jan.", "Feb.", "March", "April", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.",
+        "Dec.",
+    ][time.month0() as usize];
+    let clock = match (time.hour(), time.minute()) {
+        (0, 0) => "midnight".into(),
+        (12, 0) => "noon".into(),
+        (hour, minute) => {
+            let suffix = if hour < 12 { "a.m." } else { "p.m." };
+            let hour = (hour + 11) % 12 + 1;
+            if minute == 0 {
+                format!("{hour} {suffix}")
+            } else {
+                format!("{hour}:{minute:02} {suffix}")
+            }
+        }
+    };
+    format!("{month} {}, {}, {clock}", time.day(), time.year())
+}
+
+pub fn admin_change_message(message: &str) -> String {
+    let Ok(entries) = serde_json::from_str::<Vec<serde_json::Value>>(message) else {
+        return message.into();
+    };
+    let messages = entries
+        .iter()
+        .filter_map(|entry| {
+            if entry.get("added").is_some() {
+                return Some("Added.".into());
+            }
+            if entry.get("deleted").is_some() {
+                return Some("Deleted.".into());
+            }
+            let fields: Vec<_> = entry["changed"]["fields"]
+                .as_array()?
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect();
+            let (last, rest) = fields.split_last()?;
+            if rest.is_empty() {
+                Some(format!("Changed {last}."))
+            } else {
+                Some(format!("Changed {} and {last}.", rest.join(", ")))
+            }
+        })
+        .collect::<Vec<_>>();
+    if messages.is_empty() {
+        "No fields changed.".into()
+    } else {
+        messages.join(" ")
+    }
+}
+
+pub fn capitalized(value: &str) -> String {
+    let mut letters = value.chars();
+    match letters.next() {
+        Some(first) => format!("{}{}", first.to_uppercase(), letters.as_str()),
+        None => value.into(),
+    }
 }

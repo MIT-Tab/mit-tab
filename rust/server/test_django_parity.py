@@ -4466,6 +4466,162 @@ def test_native_test_deployment_seeds_fixture_without_overwriting_credentials():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_default_admin_model_lists_match_django_bytes(html_assets):
+    from mittab.apps.tab.models import (
+        JudgeCodeEmailLog, OutroundChallenge, RankingGroup, UserTournamentSetupPreference, WrittenRFDEmailLog,
+    )
+
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("outround_pairing_mode", 1)
+    TabSettings.set("admin-list-test", None)
+    school = School.objects.create(name="Zebra & School")
+    School.objects.create(name="A. Example")
+    team = Team.objects.create(name="Zebra 'A'", school=school, seed=Team.UNSEEDED)
+    second = Team.objects.create(name="Apex", school=school, seed=Team.UNSEEDED)
+    Debater.objects.create(name="Debater & Example", novice_status=0)
+    judge = Judge.objects.create(name="Judge <Example>", rank=5)
+    room = Room.objects.create(name="Room Example", rank=2)
+    RoomTag.objects.create(tag="Tag Example", priority=1)
+    RankingGroup.objects.create(name="Zebra Ranking Group")
+    debate = Round.objects.create(round_number=1, gov_team=team, opp_team=second)
+    Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY, gov_team=team, opp_team=second)
+    challenge = OutroundChallenge.objects.create(
+        num_teams=2, type_of_round=Outround.VARSITY, challenger=team, challenged=second,
+    )
+    Scratch.objects.create(judge=judge, team=team, scratch_type=Scratch.TAB_SCRATCH)
+    CheckIn.objects.create(judge=judge, round_number=1)
+    RoomCheckIn.objects.create(room=room, round_number=0)
+    Bye.objects.create(bye_team=team, round_number=2)
+    NoShow.objects.create(no_show_team=second, round_number=1)
+    BreakingTeam.objects.create(team=team, seed=1)
+    JudgeCodeEmailLog.objects.create(judge=judge, email="fixture@example.invalid", ballot_code="fixture")
+    WrittenRFDEmailLog.objects.create(round=debate, email="test@example.invalid")
+    session = legacy_tab_session("model-list-parity")
+    user = get_user_model().objects.get(username="model-list-parity")
+    UserTournamentSetupPreference.objects.create(user=user, hide_tournament_todo=True)
+    RoomTag.objects.bulk_create([RoomTag(tag=f"Tag {index}", priority=1) for index in range(101)])
+
+    models = (
+        "school", "debater", "team", "judge", "room", "roomtag", "rankinggroup", "round", "outround",
+        "scratch", "checkin", "roomcheckin", "bye", "noshow", "breakingteam", "tabsettings",
+        "usertournamentsetuppreference", "judgecodeemaillog", "writtenrfdemaillog", "outroundchallenge",
+    )
+    paths = [f"/admin/tab/{model}/" for model in models]
+    paths += [
+        "/admin/tab/roomtag/?p=2", "/admin/tab/roomtag/?all=", "/admin/tab/school/?_to_field=id&_popup=1",
+        "/admin/tab/roomtag/?p=999", f"/admin/tab/team/?id__exact={team.id}",
+        "/admin/tab/team/?id__exact=0", "/admin/tab/team/?id__exact=bad", "/admin/tab/team/?missing_field=1",
+    ]
+    client = Client()
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = "a" * 32
+    with rust_server(overrides=html_assets) as port:
+        for path in paths:
+            compare_admin_page(port, path, client)
+        challenge_path = "/admin/tab/outroundchallenge/"
+        detail = f"{challenge_path}{challenge.id}/change/"
+        assert request(port, detail, cookie=session)[0] == 200
+        TabSettings.set("outround_pairing_mode", 0)
+        for path in (challenge_path, detail):
+            assert client.get(path).status_code == 403
+            assert request(port, path, cookie=session)[0] == 403
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_assignment_and_audit_records_match_django_bytes(html_assets):
+    from django.apps import apps
+    from django.contrib.admin.models import CHANGE, LogEntry
+    from django.contrib.contenttypes.models import ContentType
+    from mittab.apps.tab.models import ManualJudgeAssignment
+
+    type_names = Path(__file__).parent / "templates" / "django_admin" / "content_type_names.json"
+    assert json.loads(type_names.read_text()) == {
+        model._meta.label_lower: str(model._meta.verbose_name) for model in apps.get_models()
+    }
+
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    staff = legacy_tab_session("record-parity")
+    user = get_user_model().objects.get(username="record-parity")
+    board = legacy_tab_session("records-board")
+    get_user_model().objects.get(username="records-board").groups.add(Group.objects.create(name="APDA Board"))
+    school = School.objects.create(name="Admin Place")
+    first = Team.objects.create(name="Company & West", school=school, seed=0)
+    second = Team.objects.create(name="East Side", school=school, seed=0)
+    debate = Round.objects.create(round_number=1, gov_team=first, opp_team=second, victor=Round.GOV)
+    judge = Judge.objects.create(name="Z. Example", rank=3)
+    other = Judge.objects.create(name="A. Example", rank=4)
+    debate.judges.add(judge, other)
+    row, _ = ManualJudgeAssignment.objects.update_or_create(round=debate, judge=judge, defaults={"created_by": user})
+    later, _ = ManualJudgeAssignment.objects.update_or_create(round=debate, judge=other, defaults={"created_by": None})
+    fixed = datetime(2025, 9, 7, 12, 0, tzinfo=timezone.get_default_timezone())
+    ManualJudgeAssignment.objects.filter(pk=row.id).update(created_at=fixed)
+    ManualJudgeAssignment.objects.filter(pk=later.id).update(created_at=fixed + timedelta(minutes=5))
+    event = AuditEvent.record(debate, AuditEvent.MANUAL_JUDGE_ASSIGN, user, changes={
+        "fields": ["judges", "éclair"], "reason": "fixture <evidence>", "a": {"vote": 1},
+    }, note="Added by hand & checked.\nSecond line.")
+    excluded = AuditEvent.record(judge, AuditEvent.EDIT, note="Earlier note")
+    AuditEvent.objects.filter(pk=event.id).update(created_at=fixed)
+    AuditEvent.objects.filter(pk=excluded.id).update(created_at=fixed - timedelta(days=1))
+    LogEntry.objects.create(
+        action_time=fixed, content_type=ContentType.objects.get_for_model(ManualJudgeAssignment),
+        user=user, object_id=row.id, object_repr=str(row), action_flag=CHANGE,
+        change_message='[{"changed": {"fields": ["Judge"]}}]',
+    )
+    assignments = "/admin/tab/manualjudgeassignment/"
+    events = "/admin/tab/auditevent/"
+    paths = [
+        assignments, f"{assignments}?o=1", f"{assignments}?o=-0.1",
+        f"{assignments}{row.id}/change/", f"{assignments}{later.id}/change/", f"{assignments}{row.id}/history/",
+        events, f"{events}?event_type__exact={event.event_type}", f"{events}?content_type__id__exact={event.content_type_id}",
+        f"{events}?q=Company+West", f"{events}?o=2&q=Added+hand", f"{events}?q=missing",
+        f"{events}{event.id}/change/", f"{events}{excluded.id}/change/", f"{events}{event.id}/history/",
+        f"{events}{event.id}/change/?_changelist_filters=q%3DCompany%2BWest",
+        f"{events}{event.id}/change/?_popup=1&_to_field=id",
+        f"{events}?q=%22Added+by+hand%22", f"{events}?id__exact={event.id}",
+        f"{assignments}?id__exact={row.id}", f"{events}?q=+Added+hand+",
+    ]
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = "a" * 32
+    with rust_server(overrides=html_assets) as port:
+        for path in paths:
+            compare_admin_page(port, path, client)
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        for path in (
+            f"{assignments}add/", f"{events}add/",
+            f"{assignments}{row.id}/delete/", f"{events}{event.id}/delete/",
+        ):
+            assert request(port, path, cookie=staff)[0] == 403, path
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/", path
+        for path in (f"{assignments}{row.id}/change/", f"{events}{event.id}/change/"):
+            status, _, _ = request(
+                port, path, method="POST", form={"note": "changed", "csrfmiddlewaretoken": "a" * 32},
+                extra_headers={"Cookie": f"sessionid={staff}; csrftoken=" + "a" * 32},
+            )
+            assert status == 403
+    event.refresh_from_db()
+    assert event.note == "Added by hand & checked.\nSecond line."
+
+
+def compare_admin_page(port, path, client):
+    session = client.cookies["sessionid"].value
+    csrf = client.cookies["csrftoken"].value
+    status, headers, body = request(
+        port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+    )
+    token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+    mask = token[1][:32].decode() if token else csrf
+    with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+        reference = client.get(path)
+    assert status == reference.status_code, (path, status, reference.status_code)
+    if status == 302:
+        assert headers["Location"] == reference["Location"], path
+    else:
+        assert_html_bytes(body, reference.content)
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_administration_manages_accounts_groups_and_audit_with_board_exclusion():
     from django.contrib.auth.hashers import check_password
     from django.contrib.auth.models import Permission
@@ -4497,7 +4653,8 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
         assert request(port, "/admin", cookie=staff)[1]["Location"] == "/admin/"
         assert request(port, "/admin/unknown/", cookie=staff)[0] == 404
         assert request(port, "/404/")[0] == 404 and request(port, "/500/")[0] == 500
-        assert request(port, "/admin/tab/team/", cookie=staff)[1]["Location"] == "/view_teams/"
+        status, _, team_list = request(port, "/admin/tab/team/", cookie=staff)
+        assert status == 200 and b"Select team to change" in team_list and b"Admin Team 1" in team_list
         status, _, page = request(port, "/admin/tab/auditevent/?q=Fixture", cookie=staff)
         assert status == 200 and b"Fixture audit record" in page, page
         assert b"fixture evidence" in request(port, record, cookie=staff)[2]

@@ -1,31 +1,30 @@
 use axum::{
     Extension, Form, Router,
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Path, Query, RawQuery, State},
     http::{HeaderMap, StatusCode},
     response::Response,
     routing::get,
 };
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use chrono::NaiveDateTime;
 use minijinja::{Value, context};
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access, admin_html, legacy_html, legacy_session::Actor, login, private,
-    registration_form::Fields, round_audit, staff_pairing::lock_round, unavailable,
+    App, access,
+    admin_changelist::{self, PER_PAGE, SCORES},
+    admin_html,
+    admin_html::{admin_change_message, django_datetime, preserved_filters, scripts},
+    legacy_html,
+    legacy_session::Actor,
+    login, private,
+    registration_form::Fields,
+    round_audit,
+    staff_pairing::lock_round,
+    unavailable,
 };
 
-const ADMIN_MEDIA: &[&str] = &[
-    "vendor/jquery/jquery.min.js",
-    "jquery.init.js",
-    "core.js",
-    "admin/RelatedObjectLookups.js",
-    "actions.js",
-    "urlify.js",
-    "prepopulate.js",
-    "vendor/xregexp/xregexp.min.js",
-];
 const STATISTICS: &str = "/admin/tab/roundstats/";
 
 pub fn routes() -> Router<App> {
@@ -49,160 +48,21 @@ pub fn routes() -> Router<App> {
 #[derive(Default, Deserialize)]
 struct ScoreList {
     p: Option<u32>,
-    all: Option<String>,
 }
-
-const PER_PAGE: u32 = 100;
 
 fn score_opts() -> Value {
-    context! {
-        app_label => "tab",
-        model_name => "roundstats",
-        verbose_name => "round stats",
-        verbose_name_plural => "round stats",
-        app_config => context! { verbose_name => "MIT Tab" },
-    }
-}
-
-fn scripts() -> String {
-    ADMIN_MEDIA
-        .iter()
-        .map(|script| format!("<script src=\"/static/admin/js/{script}\"></script>"))
-        .collect::<Vec<_>>()
-        .join("\n")
+    SCORES.opts()
 }
 
 async fn scores(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
-    Query(query): Query<ScoreList>,
+    RawQuery(query): RawQuery,
 ) -> Response {
-    let shell = match admin_html::Shell::load(&app, actor, &headers, STATISTICS).await {
-        Ok(shell) => shell,
-        Err(response) => return *response,
-    };
-    let result = async {
-        let mut db = app.db.begin().await?;
-        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM tab_roundstats")
-            .fetch_one(&mut *db).await?;
-        let count = u32::try_from(total).unwrap_or(u32::MAX);
-        let page = query.p.unwrap_or(1).max(1);
-        let pages = count.div_ceil(PER_PAGE).max(1);
-        if page > pages {
-            return Ok(access::found(format!("{STATISTICS}?e=1")));
-        }
-        let show_all = query.all.is_some() && count <= 200;
-        let limit = if show_all { count } else { PER_PAGE };
-        let offset = if show_all { 0 } else { (page - 1) * PER_PAGE };
-        let rows = sqlx::query_as::<_, (i32, String)>(
-            "SELECT s.id, CONCAT('Results for ', d.name, ' in round ', r.round_number)
-             FROM tab_roundstats s JOIN tab_debater d ON s.debater_id = d.id
-             JOIN tab_round r ON s.round_id = r.id ORDER BY s.id DESC LIMIT ? OFFSET ?",
-        ).bind(limit).bind(offset).fetch_all(&mut *db).await?;
-        db.commit().await?;
-        let mut filters = url::form_urlencoded::Serializer::new(String::new());
-        if let Some(page) = query.p {
-            filters.append_pair("p", &page.to_string());
-        }
-        if let Some(all) = query.all {
-            filters.append_pair("all", &all);
-        }
-        let filters = filters.finish();
-        let filter_suffix = preserved_filters(&filters);
-        let results = rows.iter().map(|(id, label)| [
-            format!(r#"<td class="action-checkbox"><input type="checkbox" name="_selected_action" value="{id}" class="action-select"></td>"#),
-            format!(r#"<th class="field-__str__"><a href="{STATISTICS}{id}/change/{}">{}</a></th>"#, legacy_html::escape(&filter_suffix), legacy_html::escape(label)),
-        ]).collect::<Vec<_>>();
-        let initial = r#"<select name="action" required>
-  <option value="" selected>---------</option>
-
-  <option value="delete_selected">Delete selected round stats</option>
-
-</select>"#;
-        let opts = score_opts();
-        let page_range = paginator_links(page, pages);
-        let context = context! {
-            title => "Select round stats to change",
-            opts => &opts,
-            cl => context! {
-                opts => &opts,
-                show_admin_actions => !rows.is_empty(),
-                result_count => count,
-                result_list => &rows,
-            },
-            app_url => "/admin/tab/",
-            model_url => STATISTICS,
-            filter_suffix,
-            module_name => "round stats",
-            has_add_permission => true,
-            actions_on_top => true,
-            action_form => true,
-            action_fields => [
-                context! { label => "Action:", widget => initial },
-                context! { widget => r#"<input type="hidden" name="select_across" value="0" class="select-across">"# },
-            ],
-            actions_selection_counter => true,
-            selection_note => format!("0 of {} selected", rows.len()),
-            selection_note_all => format!("All {count} selected"),
-            search_form => "\n\n",
-            media => context! { js => scripts() },
-            result_headers => [
-                context! { class_attrib => r#" class="action-checkbox-column""#, text => r#"<input type="checkbox" id="action-toggle">"# },
-                context! { class_attrib => r#" class="column-__str__""#, text => "Round stats" },
-            ],
-            results,
-            pagination_required => !show_all && pages > 1,
-            page_range,
-            show_all_url => (!show_all && pages > 1 && count <= 200).then_some("?all="),
-        };
-        Ok::<_, sqlx::Error>(shell.render("admin/change_list.html", context, &headers))
-    }.await;
-    result.unwrap_or_else(|_| unavailable())
-}
-
-fn preserved_filters(query: &str) -> String {
-    if query.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "?{}",
-            url::form_urlencoded::Serializer::new(String::new())
-                .append_pair("_changelist_filters", query)
-                .finish()
-        )
-    }
-}
-
-fn paginator_links(page: u32, pages: u32) -> Vec<String> {
-    let mut links = Vec::new();
-    let mut previous = 0;
-    let numbers = if pages <= 10 {
-        (1..=pages).collect()
-    } else {
-        (1..=2)
-            .chain(page.saturating_sub(3).max(1)..=page.saturating_add(3).min(pages))
-            .chain(pages - 1..=pages)
-            .collect::<std::collections::BTreeSet<_>>()
-    };
-    for number in numbers {
-        if number > previous + 1 {
-            links.push("… ".into());
-        }
-        links.push(if number == page {
-            format!(r#"<span class="this-page">{number}</span> "#)
-        } else {
-            let href = format!("?p={number}");
-            let end = if number == pages {
-                r#" class="end""#
-            } else {
-                ""
-            };
-            format!(r#"<a href="{href}"{end}>{number}</a> "#)
-        });
-        previous = number;
-    }
-    links
+    admin_changelist::get(&app, actor, &headers, "tab", SCORES.name, query)
+        .await
+        .unwrap_or_else(unavailable)
 }
 
 #[derive(Serialize)]
@@ -356,6 +216,7 @@ async fn score_form(
         };
         let popup = query._popup.is_some();
         let add = id.is_none();
+        let filter_suffix = preserved_filters(query._changelist_filters.as_deref().unwrap_or(""));
         let page = context! {
             title => if add { "Add round stats" } else { "Change round stats" },
             original => &subtitle,
@@ -370,7 +231,8 @@ async fn score_form(
             app_url => "/admin/tab/",
             model_url => STATISTICS,
             object_url,
-            filter_suffix => preserved_filters(query._changelist_filters.as_deref().unwrap_or("")),
+            form_url => &filter_suffix,
+            filter_suffix,
             adminform => vec![context! { classes => "", lines => fields }],
             show_delete_link => !popup && !add,
             show_save => true,
@@ -761,60 +623,6 @@ async fn score_history(
     }
     .await;
     result.unwrap_or_else(|_| unavailable())
-}
-
-fn django_datetime(time: NaiveDateTime) -> String {
-    let month = [
-        "Jan.", "Feb.", "March", "April", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.",
-        "Dec.",
-    ][time.month0() as usize];
-    let clock = match (time.hour(), time.minute()) {
-        (0, 0) => "midnight".into(),
-        (12, 0) => "noon".into(),
-        (hour, minute) => {
-            let suffix = if hour < 12 { "a.m." } else { "p.m." };
-            let hour = (hour + 11) % 12 + 1;
-            if minute == 0 {
-                format!("{hour} {suffix}")
-            } else {
-                format!("{hour}:{minute:02} {suffix}")
-            }
-        }
-    };
-    format!("{month} {}, {}, {clock}", time.day(), time.year())
-}
-
-fn admin_change_message(message: &str) -> String {
-    let Ok(entries) = serde_json::from_str::<Vec<serde_json::Value>>(message) else {
-        return message.into();
-    };
-    let messages = entries
-        .iter()
-        .filter_map(|entry| {
-            if entry.get("added").is_some() {
-                return Some("Added.".into());
-            }
-            if entry.get("deleted").is_some() {
-                return Some("Deleted.".into());
-            }
-            let fields: Vec<_> = entry["changed"]["fields"]
-                .as_array()?
-                .iter()
-                .filter_map(serde_json::Value::as_str)
-                .collect();
-            let (last, rest) = fields.split_last()?;
-            if rest.is_empty() {
-                Some(format!("Changed {last}."))
-            } else {
-                Some(format!("Changed {} and {last}.", rest.join(", ")))
-            }
-        })
-        .collect::<Vec<_>>();
-    if messages.is_empty() {
-        "No fields changed.".into()
-    } else {
-        messages.join(" ")
-    }
 }
 
 async fn log_score(
