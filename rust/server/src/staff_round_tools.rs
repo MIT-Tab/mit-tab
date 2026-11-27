@@ -18,6 +18,7 @@ use crate::{
     App, access,
     board_snapshot::{self, Pairings, Snapshot},
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     login, private, public_rankings,
     registration_form::Fields,
@@ -209,21 +210,24 @@ async fn enter_checkin(
 }
 
 async fn rounds(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    let Ok(settings) = Settings::load(&mut db, &["tot_rounds", "cur_round"]).await else {
-        return unavailable();
-    };
-    let total = settings.integer("tot_rounds", 5).clamp(0, 50);
-    html::render(
-        "round_stats.html",
-        context! {
-            title => "Preliminary Rounds", nav => Navigation::new(actor, true),
-            rounds => (1..=total).collect::<Vec<_>>(), current => settings.integer("cur_round", 1) - 1, index => true,
-        },
-        StatusCode::OK,
-    )
+    const PAGE: &str = "/pairings/view_rounds/";
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let settings = Settings::load(&mut db, &["tot_rounds"]).await?;
+        let item_list: Vec<_> = (1..=settings.integer("tot_rounds", 0))
+            .map(|number| (number, format!("Round {number}"), 0, ""))
+            .collect();
+        let shell = legacy_html::shell(&mut db, actor, PAGE).await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(legacy_html::render(
+            "common/list_data.html",
+            shell,
+            context! { item_type => "round", item_list },
+            StatusCode::OK,
+        ))
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 async fn export_inround(State(app): State<App>) -> Response {

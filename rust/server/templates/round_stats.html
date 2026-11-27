@@ -7,9 +7,6 @@
 {% block content %}
 <div class="col-12">
   <h1 class="h3">{{ title }}</h1>
-  {% if index %}
-    <ul>{% for round in rounds %}<li>{% if round <= current %}<a href="/round/{{ round }}/">Round {{ round }}</a>{% else %}Round {{ round }} · Unpaired{% endif %}</li>{% endfor %}</ul>
-  {% else %}
     {% if overall %}
     <div class="table-responsive"><table class="table table-striped">
       <caption>Preliminary rounds</caption>
@@ -25,6 +22,5 @@
     </table></div>
     {% endif %}
     {% if not overall and not out %}<p>Statistics will appear after results are entered.</p>{% endif %}
-  {% endif %}
 </div>
 {% endblock %}

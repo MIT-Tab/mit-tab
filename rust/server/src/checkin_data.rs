@@ -147,8 +147,8 @@ pub async fn latest(
 pub async fn history(
     db: &mut MySqlConnection,
     entity: Entity,
-    page: u32,
-) -> Result<(Vec<Change>, u32), sqlx::Error> {
+    requested: i64,
+) -> Result<(Vec<Change>, u32, u32), sqlx::Error> {
     let count = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM tab_bulkcheckinchange WHERE entity_type = ?",
     )
@@ -156,7 +156,10 @@ pub async fn history(
     .fetch_one(&mut *db)
     .await?;
     let pages = (count as u64).div_ceil(25).max(1).min(u64::from(u32::MAX)) as u32;
-    let page = page.clamp(1, pages);
+    let page = match u32::try_from(requested) {
+        Ok(page) if (1..=pages).contains(&page) => page,
+        _ => pages,
+    };
     let rows = sqlx::query_as::<_, ChangeRow>(
         "SELECT id, token, checked, CAST(cells AS CHAR), undone, created_at
            FROM tab_bulkcheckinchange WHERE entity_type = ? ORDER BY id DESC LIMIT 25 OFFSET ?",
@@ -167,6 +170,7 @@ pub async fn history(
     .await?;
     Ok((
         rows.into_iter().map(convert).collect::<Result<_, _>>()?,
+        page,
         pages,
     ))
 }
@@ -326,7 +330,7 @@ pub async fn apply(
 #[derive(Serialize)]
 pub struct Restore {
     pub head: String,
-    pub before: String,
+    pub before: NaiveDateTime,
     pub edits: usize,
     pub check_in: usize,
     pub check_out: usize,
@@ -394,10 +398,7 @@ pub async fn restore(
     }
     Ok(Restore {
         head: printable(&head.token),
-        before: earliest
-            .created
-            .format("%b %d, %Y at %H:%M UTC")
-            .to_string(),
+        before: earliest.created,
         edits: changes.len(),
         check_in: check_in.len(),
         check_out: check_out.len(),

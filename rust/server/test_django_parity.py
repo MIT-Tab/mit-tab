@@ -138,7 +138,7 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
 def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
-        for bundle in ("main", "publicDisplay", "publicHome")
+        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -2145,6 +2145,101 @@ def test_native_settings_write_only_declared_fields_and_honor_discretionary_scra
 
 
 @pytest.mark.django_db(transaction=True)
+def test_staff_round_list_matches_django_bytes(html_assets):
+    path = "/pairings/view_rounds/"
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    session = legacy_tab_session("round-list-parity")
+    client = Client()
+    client.cookies["sessionid"] = session
+    with rust_server(overrides=html_assets) as port:
+        for rounds in (0, 5):
+            TabSettings.set("tot_rounds", rounds)
+            status, _, body = request(port, path, cookie=session)
+            reference = client.get(path)
+            assert status == reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_batch_checkin_and_history_match_django_bytes(html_assets):
+    from mittab.apps.tab.models import BulkCheckInChange
+
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 3)
+    TabSettings.set("theme_color", "#A24260")
+    TabSettings.set("motions_enabled", 0)
+    TabSettings.set("debaters_public", 1)
+    primary = School.objects.create(name="Example & School")
+    secondary = School.objects.create(name="Another School")
+    team = Team.objects.create(name="Zebra", school=primary, seed=Team.UNSEEDED, checked_in=True)
+    Team.objects.create(name="Albatross", school=secondary, seed=Team.UNSEEDED, checked_in=False)
+    team.debaters.add(Debater.objects.create(name="Z. Sample", novice_status=0), Debater.objects.create(name="A. O'Example", novice_status=0))
+    judge = Judge.objects.create(name="Judge <Tag>", rank=4, wing_only=True, request_wing=True, no_wings=True)
+    judge.schools.add(primary, secondary)
+    Judge.objects.create(name="Unaffiliated judge", rank=3)
+    CheckIn.objects.create(judge=judge, round_number=1)
+    RoomCheckIn.objects.create(room=Room.objects.create(name="Example Room", rank=1), round_number=3)
+    JudgeExpectedCheckIn.objects.create(judge=judge, round_number=0)
+    JudgeExpectedCheckIn.objects.create(judge=judge, round_number=2)
+
+    for index in range(26):
+        BulkCheckInChange.objects.create(
+            entity_type="judge_expected", cells=[[judge.id, 0], [judge.id, 2]],
+            checked=True, undone=index < 25,
+        )
+    current = BulkCheckInChange.objects.latest("id")
+    # Include an exact second, a fractional second, and a September date.
+    BulkCheckInChange.objects.filter(pk=current.pk).update(
+        created_at=datetime(2025, 9, 7, 8, 15, 5, 123456, tzinfo=timezone.get_default_timezone()),
+    )
+    BulkCheckInChange.objects.filter(undone=True).update(
+        created_at=datetime(2025, 1, 5, 16, 14, 3, tzinfo=timezone.get_default_timezone()),
+    )
+    page = "/batch_checkin/"
+    history = f"{page}?history=judge_expected"
+    csrf = "a" * 32
+    clients = []
+    for superuser in (True, False):
+        user = get_user_model().objects.create_user(
+            username=f"checkin-html-{superuser}", is_superuser=superuser, is_staff=True,
+        )
+        if not superuser:
+            user.groups.add(Group.objects.create(name="MIT-TAB: Check-in helper"))
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = csrf
+        clients.append(client)
+
+    paths = [
+        page, f"{page}?history=room", history, f"{history}&page=2", f"{history}&page=invalid",
+        f"{history}&page=0", f"{history}&before={current.token}", f"{history}&before=missing",
+    ]
+
+    def compare(port, path, client):
+        cookie = client.cookies["sessionid"].value
+        status, _, body = request(
+            port, path, extra_headers={"Cookie": f"sessionid={cookie}; csrftoken={csrf}"},
+        )
+        token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+        mask = token[1][:32].decode() if token else csrf
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+            reference = client.get(path)
+        assert status == reference.status_code, (path, status)
+        assert_html_bytes(body, reference.content)
+
+    with rust_server(overrides=html_assets) as port:
+        for client in clients:
+            for path in paths:
+                compare(port, path, client)
+        TabSettings.set("debaters_public", 0)
+        compare(port, page, clients[0])
+        TabSettings.set("tot_rounds", 0)
+        compare(port, page, clients[0])
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_batch_checkin_and_history_restore_keep_durable_cells_and_role_boundaries():
     from mittab.apps.tab.models import BulkCheckInChange
 
@@ -2200,7 +2295,7 @@ def test_native_batch_checkin_and_history_restore_keep_durable_cells_and_role_bo
         assert post(port, helper_cookie, csrf, action="undo", change_id=token)[0] == 409
         preview_url = f"{page_url}?history=team&before={token}"
         preview = request(port, preview_url, cookie=helper_cookie)[2]
-        assert b"Reverse 2 edits" in preview and b"Set 1 to Checked Out." in preview
+        assert b"Reverse 2 edits" in preview and b"Set 1 status to Checked Out." in preview
         assert post(port, helper_cookie, csrf, action="restore", change_id=token, head=token)[0] == 409
         assert list(Team.objects.values_list("checked_in", flat=True)) == [False, True]
 
@@ -2218,6 +2313,17 @@ def test_native_batch_checkin_and_history_restore_keep_durable_cells_and_role_bo
         assert b"Undo last change (1 changed)" in request(port, page_url, cookie=helper_cookie)[2]
         restore = post(port, helper_cookie, csrf, action="restore", change_id=token, head=latest["id"])
         assert restore[1]["Location"] == f"{page_url}#team"
+        notice = load_cookies(restore[1])["mittab_checkins_restored"]
+        assert notice["httponly"]
+        status, headers, body = request(
+            port, page_url, extra_headers={
+                "Cookie": f"sessionid={helper_cookie}; csrftoken={csrf}; {notice.key}={notice.value}",
+            },
+        )
+        assert status == 200 and b"Reversed 2 check-in edits." in body
+        assert b'class="alert alert-success"' in body
+        assert load_cookies(headers)[notice.key]["max-age"] == "0"
+        assert b"Reversed 2 check-in edits." not in request(port, page_url, cookie=helper_cookie)[2]
         assert list(Team.objects.values_list("checked_in", flat=True)) == [False, False]
         assert BulkCheckInChange.objects.filter(entity_type="team", undone=True).count() == 2
         assert b"Reversed" in request(port, f"{page_url}?history=team", cookie=helper_cookie)[2]

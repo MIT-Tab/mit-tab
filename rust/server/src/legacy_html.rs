@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{Html, Response},
 };
+use chrono::{NaiveDateTime, Timelike};
 use minijinja::{Environment, UndefinedBehavior, Value, context};
 use serde::Serialize;
 use sqlx::MySqlConnection;
@@ -62,6 +63,28 @@ pub fn environment() -> Environment<'static> {
 static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     let mut env = environment();
     env.add_function("legacy_bundle", html::legacy_bundle);
+    env.add_filter("django_default", |value: Value, fallback: Value| {
+        if value.is_true() { value } else { fallback }
+    });
+    env.add_filter("django_pluralize", |value: i64, suffix: Option<String>| {
+        if value == 1 {
+            String::new()
+        } else {
+            suffix.unwrap_or_else(|| "s".into())
+        }
+    });
+    env.add_filter("django_yesno", |value: Value, labels: String| {
+        let mut choices = labels.split(',');
+        let yes = choices.next().unwrap_or_default();
+        let no = choices.next().unwrap_or_default();
+        if value.is_true() {
+            yes.into()
+        } else {
+            String::from(no)
+        }
+    });
+    env.add_filter("django_date", django_date);
+    env.add_filter("django_length", |value: Value| value.len().unwrap_or(0));
     env.add_function("legacy_active", |path: String, target: Value| {
         if target.as_str() == Some(path.as_str()) {
             "active"
@@ -113,6 +136,26 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "public/public_team_results.html",
             include_str!("../../../mittab/templates/public/public_team_results.html"),
+        ),
+        (
+            "batch_check_in/check_in.html",
+            include_str!("../../../mittab/templates/batch_check_in/check_in.html"),
+        ),
+        (
+            "batch_check_in/_checkin_pane.html",
+            include_str!("../../../mittab/templates/batch_check_in/_checkin_pane.html"),
+        ),
+        (
+            "batch_check_in/history.html",
+            include_str!("../../../mittab/templates/batch_check_in/history.html"),
+        ),
+        (
+            "common/list_data.html",
+            include_str!("../../../mittab/templates/common/list_data.html"),
+        ),
+        (
+            "common/_quick_search.html",
+            include_str!("../../../mittab/templates/common/_quick_search.html"),
         ),
         (
             "pairing/judge_dropdown.html",
@@ -182,6 +225,41 @@ pub(crate) fn escape(value: &str) -> String {
         .replace('\'', "&#x27;")
 }
 
+fn tag_words(tag: &str) -> Vec<&str> {
+    let mut words = Vec::new();
+    let mut start = None;
+    let mut quote = None;
+    let mut escaped = false;
+    for (index, character) in tag.char_indices() {
+        match quote {
+            Some(end) => {
+                if escaped {
+                    escaped = false;
+                } else if character == '\\' {
+                    escaped = true;
+                } else if character == end {
+                    quote = None;
+                }
+            }
+            None if character.is_whitespace() => {
+                if let Some(begin) = start.take() {
+                    words.push(&tag[begin..index]);
+                }
+            }
+            None => {
+                start.get_or_insert(index);
+                if matches!(character, '\'' | '"') {
+                    quote = Some(character);
+                }
+            }
+        }
+    }
+    if let Some(begin) = start {
+        words.push(&tag[begin..]);
+    }
+    words
+}
+
 fn translate(source: &str) -> String {
     let mut output = String::new();
     let mut rest = source;
@@ -189,7 +267,7 @@ fn translate(source: &str) -> String {
         output.push_str(before);
         let (raw, after) = tail.split_once("%}").expect("closed template tag");
         rest = after;
-        let words: Vec<_> = raw.split_whitespace().collect();
+        let words = tag_words(raw);
         let argument = |text: &str| text.trim_matches(['\'', '"']).to_owned();
         match words.as_slice() {
             ["load", ..]
@@ -247,6 +325,19 @@ fn translate(source: &str) -> String {
                     "{{% with compact_staff=true %}}{{% include {template} %}}{{% endwith %}}"
                 ));
             }
+            ["include", template, "with", fields @ ..] => {
+                let fields = fields.join(", ");
+                output.push_str(&format!(
+                    "{{% with {fields} %}}{{% include {template} %}}{{% endwith %}}"
+                ));
+            }
+            ["with", fields @ ..] if fields.len() > 1 && fields.iter().all(|field| field.contains('=')) => {
+                output.push_str(&format!("{{% with {} %}}", fields.join(", ")));
+            }
+            ["quick_search"] => output.push_str("{% include 'common/_quick_search.html' %}"),
+            ["for", "filter_group", "in", "filters"] => output.push_str(
+                "{% for filter_group in filters %}{% set filter_group_index = loop.index %}",
+            ),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["render_field", field, ..] => output.push_str(&format!(
                 "{{% with field=widgets.{field}.field, checkbox=widgets.{field}.checkbox, widget_html=widgets.{field}.input|safe %}}{{% include \"ui/field.html\" %}}{{% endwith %}}"
@@ -259,7 +350,10 @@ fn translate(source: &str) -> String {
         }
     }
     output.push_str(rest);
-    output
+    let translated = output
+        .replace("|lookup:forloop.counter0", "[loop.index0]")
+        .replace("undo.cells|length", "undo.cells|django_length")
+        .replace("{{ row.school }}", "{{ row.school.name }}")
         .replace("{{ message }}", "{{ message.text }}")
         .replace("|with_return_to", "")
         .replace(
@@ -279,8 +373,67 @@ fn translate(source: &str) -> String {
         .replace("|floatformat:2", "")
         .replace(" is not None", " is not none")
         .replace("section.rows.0.", "section.rows[0].")
+        .replace("forloop.parent.counter", "filter_group_index")
+        .replace("forloop.counter0|divisibleby:2", "loop.index0 % 2 == 0")
         .replace("forloop.counter", "loop.index")
+        .replace("item.0", "item[0]")
+        .replace("item.1", "item[1]")
+        .replace("item.2", "item[2]")
+        .replace("item.3", "item[3]")
+        .replace("item.4", "item[4]")
         .replace("forloop.last", "loop.last")
+        .replace("|pluralize ", "|django_pluralize ");
+    ["default", "date", "yesno", "pluralize"]
+        .into_iter()
+        .fold(translated, translate_filter_arguments)
+}
+
+fn translate_filter_arguments(source: String, filter: &str) -> String {
+    let marker = format!("|{filter}:");
+    let mut rest = source.as_str();
+    let mut output = String::with_capacity(rest.len());
+    while let Some((before, argument)) = rest.split_once(&marker) {
+        output.push_str(before);
+        let length = match argument.as_bytes().first() {
+            Some(quote @ (b'\'' | b'"')) => argument[1..]
+                .bytes()
+                .position(|byte| byte == *quote)
+                .map_or(0, |index| index + 2),
+            _ => argument.bytes().take_while(u8::is_ascii_digit).count(),
+        };
+        if length == 0 {
+            output.push_str(&marker);
+            rest = argument;
+            continue;
+        }
+        let (value, after) = argument.split_at(length);
+        output.push_str(&format!("|django_{filter}({value})"));
+        rest = after;
+    }
+    output.push_str(rest);
+    output
+}
+
+fn django_date(value: String, format: String) -> String {
+    let Ok(time) = value.parse::<NaiveDateTime>() else {
+        return String::new();
+    };
+    match format.as_str() {
+        "c" => time.and_utc().to_rfc3339_opts(
+            if time.nanosecond() == 0 {
+                chrono::SecondsFormat::Secs
+            } else {
+                chrono::SecondsFormat::Micros
+            },
+            false,
+        ),
+        "M j, Y, g:i:s a T" => format!(
+            "{} {}. UTC",
+            time.format("%b %-d, %Y, %-I:%M:%S"),
+            if time.hour() < 12 { "a.m" } else { "p.m" }
+        ),
+        _ => String::new(),
+    }
 }
 
 #[derive(Serialize)]
