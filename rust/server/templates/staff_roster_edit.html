@@ -8,6 +8,7 @@
   {% if error %}<p class="alert alert-danger" role="alert">{{ error }}</p>{% endif %}
   <form method="post" class="mb-4">
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% if checkin_fields %}<input type="hidden" name="mittab_checkins_present" value="1">{% endif %}
     <div class="row">
       {% for field in fields %}
       {% if field.control == "checkbox" %}

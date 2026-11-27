@@ -1,14 +1,14 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use axum::{
     Extension, Router,
     body::Bytes,
     extract::{MatchedPath, Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, Uri},
     response::Response,
     routing::get,
 };
-use minijinja::context;
+use minijinja::{Value as TemplateValue, context};
 use serde::Serialize;
 use serde_json::Value;
 use sqlx::{AssertSqlSafe, MySqlConnection};
@@ -16,24 +16,25 @@ use sqlx::{AssertSqlSafe, MySqlConnection};
 use crate::{
     App, access,
     html::{self, Navigation},
-    legacy_session::Actor,
+    legacy_html,
+    legacy_session::{self, Actor, SessionError},
     login, private,
     registration_form::Fields,
     settings::Settings,
+    staff_pairing::lock_round,
+    staff_rankings, staff_roles,
     staff_roster_data::{self as data, Edit, Error, Kind},
     unavailable,
 };
 
 pub fn routes() -> Router<App> {
     let mut router = Router::new();
-    for kind in ["team", "judge", "room"] {
-        router = router.route(&format!("/{kind}/{{id}}"), get(roster_redirect));
-    }
     for kind in Kind::ALL {
         let name = kind.model();
         router = router
             .route(&format!("/view_{name}s/"), get(list))
             .route(&format!("/enter_{name}/"), get(enter).post(create))
+            .route(&format!("/{name}/{{id}}"), get(roster_redirect))
             .route(&format!("/{name}/{{id}}/"), get(view).post(update))
             .route(
                 &format!("/{name}/{{id}}/delete/"),
@@ -43,11 +44,13 @@ pub fn routes() -> Router<App> {
     router
 }
 
-async fn roster_redirect(path: MatchedPath, Path(id): Path<i32>) -> Response {
-    let Some(kind) = Kind::parse(path.as_str()) else {
-        return missing();
-    };
-    access::found(format!("/{}/{id}/", kind.model()))
+async fn roster_redirect(uri: Uri, Path(_id): Path<i32>) -> Response {
+    let mut location = format!("{}/", uri.path());
+    if let Some(query) = uri.query() {
+        location.push('?');
+        location.push_str(query);
+    }
+    access::found(location)
 }
 
 fn is_tab(actor: Actor) -> bool {
@@ -73,6 +76,52 @@ pub fn toolbar() -> Vec<(String, String)> {
         .collect()
 }
 
+pub async fn dashboard(app: &App, actor: Actor) -> Response {
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let school_rows = sqlx::query_as::<_, (i32, String, bool)>(
+            "SELECT id, name, apda_id IS NULL OR apda_id = -1 FROM tab_school ORDER BY name",
+        )
+        .fetch_all(&mut *db)
+        .await?;
+        let debater_rows = sqlx::query_as::<_, (i32, String, bool)>(
+            "SELECT id, name, apda_id IS NULL OR apda_id = -1 FROM tab_debater ORDER BY name",
+        )
+        .fetch_all(&mut *db)
+        .await?;
+        let judge_list = sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_judge ORDER BY name")
+            .fetch_all(&mut *db)
+            .await?;
+        let team_list = sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_team ORDER BY name, id")
+            .fetch_all(&mut *db)
+            .await?;
+        let room_list = sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_room ORDER BY name")
+            .fetch_all(&mut *db)
+            .await?;
+        let shell = legacy_html::shell(&mut db, actor, "/").await?;
+        db.commit().await?;
+        let schools_missing_apda_ids: Vec<_> = school_rows.iter().filter_map(|(id, _, missing)| missing.then_some(*id)).collect();
+        let debaters_missing_apda_ids: Vec<_> = debater_rows.iter().filter_map(|(id, _, missing)| missing.then_some(*id)).collect();
+        let school_list: Vec<_> = school_rows.into_iter().map(|(id, name, _)| (id, name)).collect();
+        let debater_list: Vec<_> = debater_rows.into_iter().map(|(id, name, _)| (id, name)).collect();
+        Ok::<_, sqlx::Error>(legacy_html::render(
+            "common/index.html",
+            shell,
+            context! {
+                number_schools => school_list.len(), school_list,
+                number_judges => judge_list.len(), judge_list,
+                number_teams => team_list.len(), team_list,
+                number_debaters => debater_list.len(), debater_list,
+                number_rooms => room_list.len(), room_list,
+                schools_missing_apda_count => schools_missing_apda_ids.len(), schools_missing_apda_ids,
+                debaters_missing_apda_count => debaters_missing_apda_ids.len(), debaters_missing_apda_ids,
+            },
+            StatusCode::OK,
+        ))
+    }.await;
+    result.unwrap_or_else(|_| unavailable())
+}
+
 pub async fn list(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
@@ -88,35 +137,183 @@ pub async fn list(
 }
 
 async fn listing(app: &App, kind: Kind, actor: Actor) -> Result<Response, sqlx::Error> {
-    let (table, key) = (kind.table(), kind.model());
-    let subject = kind.singular();
-    let statement = match kind {
-        Kind::School => "SELECT s.id, s.name, COALESCE(CAST(s.apda_id AS CHAR), '') FROM tab_school s ORDER BY s.name, s.id",
-        Kind::Room => "SELECT r.id, r.name, CAST(r.`rank` AS CHAR) FROM tab_room r ORDER BY r.name, r.id",
-        Kind::Debater => "SELECT d.id, d.name, COALESCE(s.name, '') FROM tab_debater d LEFT JOIN tab_school s ON s.id = d.school_id ORDER BY d.name, d.id",
-        Kind::Judge =>
-            "SELECT j.id, j.name, COALESCE(GROUP_CONCAT(s.name ORDER BY s.name SEPARATOR ', '), '')
-             FROM tab_judge j LEFT JOIN tab_judge_schools js ON js.judge_id = j.id LEFT JOIN tab_school s ON s.id = js.school_id
-             GROUP BY j.id ORDER BY j.name, j.id",
-        Kind::Team => "SELECT t.id, t.name, s.name FROM tab_team t JOIN tab_school s ON s.id = t.school_id ORDER BY t.name, t.id",
+    let mut db = app.db.begin().await?;
+    let item_type = kind.model();
+    let path = format!("/view_{item_type}s/");
+    let shell = legacy_html::shell(&mut db, actor, &path).await?;
+    let checkins = shell
+        .get_attr("can_checkins")
+        .is_ok_and(|value| value.is_true());
+    let mut filters = Vec::new();
+    let mut symbol_text = Vec::new();
+    let item_list: Vec<TemplateValue> = match kind {
+        Kind::School => {
+            sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_school ORDER BY name")
+                .fetch_all(&mut *db)
+                .await?
+                .into_iter()
+                .map(|(id, name)| TemplateValue::from_serialize((id, name, 0, "")))
+                .collect()
+        }
+        Kind::Room => {
+            filters.push(vec![
+                (128, "Room has rank of 0"),
+                (256, "Room has rank > 0"),
+            ]);
+            symbol_text.push(("*", "Room has rank of 0"));
+            sqlx::query_as::<_, (i32, String, bool)>(
+                "SELECT id, name, `rank` = 0 FROM tab_room ORDER BY name",
+            )
+            .fetch_all(&mut *db)
+            .await?
+            .into_iter()
+            .map(|(id, name, zero_rank)| {
+                let (flag, symbol) = if zero_rank { (128, "*") } else { (256, "") };
+                TemplateValue::from_serialize((id, name, flag, symbol))
+            })
+            .collect()
+        }
+        Kind::Debater => {
+            let mut groups = ranking_badges(&mut db, false).await?;
+            sqlx::query_as::<_, (i32, String)>("SELECT id, name FROM tab_debater ORDER BY name")
+                .fetch_all(&mut *db)
+                .await?
+                .into_iter()
+                .map(|(id, name)| {
+                    TemplateValue::from_serialize((
+                        id,
+                        name,
+                        0,
+                        "",
+                        groups.remove(&id).unwrap_or_default(),
+                    ))
+                })
+                .collect()
+        }
+        Kind::Team => {
+            if checkins {
+                filters.push(vec![(1, "Team Checked In"), (2, "Team NOT Checked In")]);
+                symbol_text.push(("*", "Team NOT Checked In"));
+            }
+            let mut groups = ranking_badges(&mut db, true).await?;
+            sqlx::query_as::<_, (i32, String, bool)>(
+                "SELECT id, name, checked_in FROM tab_team ORDER BY id",
+            )
+            .fetch_all(&mut *db)
+            .await?
+            .into_iter()
+            .map(|(id, name, checked_in)| {
+                let (flag, symbol) = match (checkins, checked_in) {
+                    (true, true) => (1, ""),
+                    (true, false) => (2, "*"),
+                    (false, _) => (0, ""),
+                };
+                TemplateValue::from_serialize((
+                    id,
+                    name,
+                    flag,
+                    symbol,
+                    groups.remove(&id).unwrap_or_default(),
+                ))
+            })
+            .collect()
+        }
+        Kind::Judge => {
+            if checkins {
+                filters.push(vec![
+                    (4, "Judge Checked In, Current Round"),
+                    (8, "Judge NOT Checked In, Current Round"),
+                    (512, "Judge Checked In, Next Round"),
+                    (1024, "Judge NOT Checked In, Next Round"),
+                ]);
+            }
+            filters.push(vec![
+                (16, "Low Ranked Judge"),
+                (32, "Mid Ranked Judge"),
+                (64, "High Ranked Judge"),
+            ]);
+            judge_list(&mut db, checkins).await?
+        }
     };
-    let rows = sqlx::query_as::<_, (i32, String, String)>(statement)
-        .fetch_all(&app.db)
-        .await?;
-    let column = match kind {
-        Kind::School => "APDA ID",
-        Kind::Room => "Rank",
-        Kind::Judge => "Affiliations",
-        Kind::Team | Kind::Debater => "School",
-    };
-    Ok(html::render(
-        "staff_roster_list.html",
+    db.commit().await?;
+    Ok(legacy_html::render(
+        "common/list_data.html",
+        shell,
         context! {
-            title => format!("{subject}s"), subject, key, table, rows, column, toolbar => toolbar(),
-            nav => Navigation::new(actor, true), admin => is_tab(actor),
+            title => format!("Viewing All {}s", kind.singular()), item_type, item_list, filters, symbol_text,
         },
         StatusCode::OK,
     ))
+}
+
+async fn ranking_badges(
+    db: &mut MySqlConnection,
+    teams: bool,
+) -> Result<BTreeMap<i32, Vec<String>>, sqlx::Error> {
+    let mut groups = BTreeMap::<_, Vec<_>>::new();
+    for (_, name, id) in staff_rankings::group_memberships(db, teams).await? {
+        groups.entry(id).or_default().push(name);
+    }
+    Ok(groups)
+}
+
+async fn judge_list(
+    db: &mut MySqlConnection,
+    checkins: bool,
+) -> Result<Vec<TemplateValue>, sqlx::Error> {
+    let mut checked_in = HashSet::new();
+    let mut next = 1;
+    if checkins {
+        next = Settings::load(db, &["cur_round"])
+            .await?
+            .integer("cur_round", 1);
+        checked_in.extend(
+            sqlx::query_as::<_, (i32, i32)>(
+                "SELECT judge_id, round_number FROM tab_checkin WHERE round_number IN (?, ?)",
+            )
+            .bind(next.saturating_sub(1))
+            .bind(next)
+            .fetch_all(&mut *db)
+            .await?,
+        );
+    }
+    let judges = sqlx::query_as::<_, (i32, String, Option<String>, String, i32, bool, bool, bool)>(
+        "SELECT id, name, ballot_code, CAST(`rank` AS CHAR),
+            CASE WHEN `rank` < 3 THEN 16 WHEN `rank` < 5 THEN 32 ELSE 64 END,
+            wing_only, request_wing, no_wings FROM tab_judge ORDER BY `rank` DESC, name",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(judges
+        .into_iter()
+        .map(
+            |(id, name, code, rank, mut flags, wing_only, request_wing, no_wings)| {
+                if checkins {
+                    flags |= if checked_in.contains(&(id, next.saturating_sub(1))) {
+                        4
+                    } else {
+                        8
+                    };
+                    flags |= if checked_in.contains(&(id, next)) {
+                        512
+                    } else {
+                        1024
+                    };
+                }
+                let code = format!("({})", code.as_deref().unwrap_or("None"));
+                TemplateValue::from_serialize((
+                    id,
+                    name,
+                    flags,
+                    code,
+                    rank,
+                    wing_only,
+                    request_wing,
+                    no_wings,
+                ))
+            },
+        )
+        .collect())
 }
 
 pub async fn enter(
@@ -209,25 +406,75 @@ async fn edit(
     if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    match data::save(
-        &app.db,
+    match save_edit(app, headers, kind, id, user, &fields).await {
+        Ok(response) => response,
+        Err(Error::Missing) => missing(),
+        Err(_) => unavailable(),
+    }
+}
+
+async fn save_edit(
+    app: &App,
+    headers: &HeaderMap,
+    kind: Kind,
+    id: Option<i32>,
+    user: i32,
+    fields: &Fields,
+) -> Result<Response, Error> {
+    let Some(session) = legacy_session::cookie(headers, "sessionid") else {
+        return Ok(access::access_denied());
+    };
+    let mut db = app.db.begin().await?;
+    lock_round(&mut db).await?;
+    // Refresh authorization after waiting for the tournament write lock.
+    let current =
+        match legacy_session::actor_on(&mut db, session, app.django_secret.as_deref()).await {
+            Ok(
+                actor @ Actor::User {
+                    id, board: false, ..
+                },
+            ) if id == user => actor,
+            Err(SessionError::Database) => return Err(Error::Database),
+            _ => return Ok(access::access_denied()),
+        };
+    let checkins = match current {
+        Actor::User {
+            superuser: true, ..
+        } => true,
+        Actor::User { staff: true, .. } => {
+            let Some(preset) = staff_roles::preset_on(&mut *db, user)
+                .await?
+                .filter(|preset| preset.data_entry())
+            else {
+                return Ok(access::access_denied());
+            };
+            preset.checkins()
+        }
+        _ if access::legacy_entry_user(&mut *db, user).await? => false,
+        _ => return Ok(access::access_denied()),
+    };
+    let result = data::save_on(
+        &mut db,
         kind,
         Edit {
             id,
             user,
-            checkins: is_tab(actor),
+            checkins: checkins && fields.flag("mittab_checkins_present"),
             public_log: true,
-            fields: &fields,
+            fields,
         },
     )
-    .await
-    {
-        Ok(id) => access::found(format!("/{}/{id}/", kind.model())),
-        Err(Error::Missing) => missing(),
-        Err(Error::Invalid(error)) => {
-            show(app, actor, headers, Some(kind), id, Some((&fields, error))).await
+    .await;
+    match result {
+        Ok(id) => {
+            db.commit().await?;
+            Ok(access::found(format!("/{}/{id}/", kind.model())))
         }
-        Err(Error::Database) => unavailable(),
+        Err(Error::Invalid(error)) => {
+            db.rollback().await?;
+            Ok(show(app, current, headers, Some(kind), id, Some((fields, error))).await)
+        }
+        Err(error) => Err(error),
     }
 }
 
@@ -316,10 +563,18 @@ async fn edit_page(
     posted: Option<(&Fields, &str)>,
 ) -> Result<Response, Error> {
     let mut db = app.db.acquire().await?;
-    let values = current(&mut db, kind, id, is_tab(actor)).await?;
-    let mut fields = form_fields(&mut db, kind, &values, id, is_tab(actor)).await?;
+    let checkins = staff_roles::can_check_in(&mut *db, actor).await?;
+    let values = current(&mut db, kind, id, checkins).await?;
+    let mut fields = form_fields(&mut db, kind, &values, id, checkins).await?;
+    let checkin_fields = checkins
+        && (kind == Kind::Team || id.is_some() && matches!(kind, Kind::Judge | Kind::Room));
     if let Some((posted, _)) = posted {
         for field in &mut fields {
+            if (field.name == "checked_in" || field.name.starts_with("checkin_"))
+                && !posted.flag("mittab_checkins_present")
+            {
+                continue;
+            }
             field.values = posted.all(&field.name).to_vec();
             field.value = posted.get(&field.name).into();
             field.checked = posted.flag(&field.name);
@@ -345,7 +600,8 @@ async fn edit_page(
     Ok(html::render(
         "staff_roster_edit.html",
         context! {
-            title, key, id, fields, links, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error, admin => is_tab(actor),
+            title, key, id, fields, links, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
+            checkin_fields, admin => is_tab(actor),
         },
         if error.is_some() {
             StatusCode::UNPROCESSABLE_ENTITY

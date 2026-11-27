@@ -1,5 +1,7 @@
 use sqlx::MySqlPool;
 
+use crate::legacy_session::Actor;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Preset {
     Scratches,
@@ -29,6 +31,26 @@ impl Preset {
 
 pub async fn preset(db: &MySqlPool, user: i32) -> Result<Option<Preset>, sqlx::Error> {
     preset_on(db, user).await
+}
+
+pub async fn can_check_in<'db>(
+    db: impl sqlx::MySqlExecutor<'db>,
+    actor: Actor,
+) -> Result<bool, sqlx::Error> {
+    match actor {
+        Actor::User {
+            board: false,
+            superuser: true,
+            ..
+        } => Ok(true),
+        Actor::User {
+            id,
+            board: false,
+            staff: true,
+            ..
+        } => Ok(preset_on(db, id).await?.is_some_and(Preset::checkins)),
+        _ => Ok(false),
+    }
 }
 
 pub async fn preset_on<'db>(

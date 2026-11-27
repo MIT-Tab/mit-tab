@@ -342,6 +342,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/list_data.html"),
         ),
         (
+            "common/index.html",
+            include_str!("../../../mittab/templates/common/index.html"),
+        ),
+        (
+            "common/_index_list.html",
+            include_str!("../../../mittab/templates/common/_index_list.html"),
+        ),
+        (
             "common/_quick_search.html",
             include_str!("../../../mittab/templates/common/_quick_search.html"),
         ),
@@ -600,9 +608,6 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str(&format!("{{% with {} %}}", fields.join(", ")));
             }
             ["quick_search"] => output.push_str("{% include 'common/_quick_search.html' %}"),
-            ["for", "filter_group", "in", "filters"] => output.push_str(
-                "{% for filter_group in filters %}{% set filter_group_index = loop.index %}",
-            ),
             ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
@@ -644,7 +649,8 @@ fn translate(name: &str, source: &str) -> String {
         .replace("|floatformat:2", "")
         .replace(" is not None", " is not none")
         .replace("section.rows.0.", "section.rows[0].")
-        .replace("forloop.parent.counter", "filter_group_index")
+        // Django renders this unresolved lookup as the empty filter group.
+        .replace("{{forloop.parent.counter}}", "")
         .replace("forloop.counter0|divisibleby:2", "loop.index0 % 2 == 0")
         .replace("forloop.counter", "loop.index")
         .replace("forloop.first", "loop.first")
@@ -905,8 +911,8 @@ pub async fn shell(
         public_pages => pages,
         motions_enabled_flag => motions,
         is_apda_board_user => board,
-        can_add_scratches => superuser || matches!(preset, Some(Preset::Scratches | Preset::ScratchRead | Preset::Assistant)),
-        can_view_scratches => superuser || matches!(preset, Some(Preset::ScratchRead | Preset::Assistant)),
+        can_add_scratches => superuser || matches!(preset, Some(Preset::Scratches | Preset::ScratchRead)),
+        can_view_scratches => superuser || matches!(preset, Some(Preset::ScratchRead)),
         can_checkins => superuser || preset.is_some_and(Preset::checkins),
         can_data_entry => superuser || preset.is_some_and(Preset::data_entry),
     })

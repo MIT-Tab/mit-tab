@@ -182,7 +182,7 @@ async fn destination(app: &App, account: &Account, next: &str) -> Result<String,
     if !account.staff
         && !account.superuser
         && !account.board
-        && access::legacy_entry_user(app, account.id).await?
+        && access::legacy_entry_user(&app.db, account.id).await?
     {
         return Ok("/pairings/status/".into());
     }

@@ -267,14 +267,6 @@ pub struct Edit<'a> {
     pub fields: &'a Fields,
 }
 
-pub async fn save(pool: &MySqlPool, kind: Kind, edit: Edit<'_>) -> Result<i32, Error> {
-    let mut tx = pool.begin().await?;
-    lock_round(&mut tx).await?;
-    let id = save_on(&mut tx, kind, edit).await?;
-    tx.commit().await?;
-    Ok(id)
-}
-
 pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Result<i32, Error> {
     let new_name = valid_name(kind, edit.fields)?;
     let original = if let Some(id) = edit.id {

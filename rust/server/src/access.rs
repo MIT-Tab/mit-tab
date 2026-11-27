@@ -149,7 +149,7 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
         Actor::User { staff: true, .. } => return access_denied(),
         Actor::User { id, .. } => {
             let allowed = if entry_ballot_route(&request) {
-                match legacy_entry_user(&app, id).await {
+                match legacy_entry_user(&app.db, id).await {
                     Ok(true) => Ok(true),
                     Ok(false) => has_settings_permission(&app, id).await,
                     Err(error) => Err(error),
@@ -168,13 +168,17 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
     next.run(request).await
 }
 
-pub async fn legacy_entry_user(app: &App, user: i32) -> Result<bool, sqlx::Error> {
+pub async fn legacy_entry_user<'db>(
+    db: impl sqlx::MySqlExecutor<'db>,
+    user: i32,
+) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM auth_user WHERE id = ? AND username = 'entry'
+        "SELECT EXISTS(SELECT 1 FROM auth_user WHERE id = ?
+         AND CAST(username AS BINARY) = CAST('entry' AS BINARY)
          AND is_active = TRUE AND is_staff = FALSE AND is_superuser = FALSE)",
     )
     .bind(user)
-    .fetch_one(&app.db)
+    .fetch_one(db)
     .await
 }
 
@@ -203,7 +207,8 @@ fn entry_roster_route(request: &Request) -> bool {
     {
         Some(
             "/view_teams/" | "/view_debaters/" | "/view_schools/" | "/view_judges/"
-            | "/view_rooms/" | "/team/{id}" | "/judge/{id}" | "/room/{id}",
+            | "/view_rooms/" | "/team/{id}" | "/judge/{id}" | "/room/{id}" | "/debater/{id}"
+            | "/school/{id}",
         ) => matches!(request.method(), &Method::GET | &Method::HEAD),
         Some(
             "/enter_team/" | "/team/{id}/" | "/enter_debater/" | "/debater/{id}/"
@@ -545,7 +550,7 @@ pub async fn data_entry(State(app): State<App>, mut request: Request, next: Next
             Err(_) => return unavailable(),
         },
         Actor::User { id, .. } if entry_roster_route(&request) => {
-            match legacy_entry_user(&app, id).await {
+            match legacy_entry_user(&app.db, id).await {
                 Ok(true) => {}
                 Ok(false) => return access_denied(),
                 Err(_) => return unavailable(),

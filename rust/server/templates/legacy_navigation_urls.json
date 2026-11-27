@@ -33,6 +33,8 @@
   "unpublish_all_motions": "/motions/unpublish-all/",
   "public_motions": "/public/motions/",
   "manage_roster_log": "/setup/public-change-log/",
+  "manage_ranking_groups": "/manage-ranking-groups",
+  "manage_room_tags": "/manage-room-tags",
   "manual_backup": "/pairing/backup/",
   "manual_backup_without_scratches": "",
   "outround_assign_judges": "/outround_pairing/assign_judges/",

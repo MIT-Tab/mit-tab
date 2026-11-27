@@ -11,7 +11,8 @@ use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access, legacy_html, legacy_session::Actor, public_cache, settings::Settings, unavailable,
+    App, access, legacy_html, legacy_session::Actor, public_cache, settings::Settings,
+    staff_roster, unavailable,
 };
 
 const SETTINGS: &[&str] = &[
@@ -436,20 +437,20 @@ pub async fn index(State(app): State<App>, Extension(actor): Extension<Actor>) -
         Actor::User {
             superuser: true, ..
         } => match access::wizard_complete(&app).await {
-            Ok(true) => access::found("/pairings/status/"),
+            Ok(true) => staff_roster::dashboard(&app, actor).await,
             Ok(false) => access::found("/setup/start-tournament/"),
             Err(_) => unavailable(),
         },
         Actor::User {
             id, staff: true, ..
         } => match crate::staff_roles::preset(&app.db, id).await {
-            Ok(Some(preset)) if preset.data_entry() => access::found("/view_teams/"),
+            Ok(Some(preset)) if preset.data_entry() => staff_roster::dashboard(&app, actor).await,
             Ok(Some(preset)) => access::found(preset.landing()),
             Ok(None) => access::access_denied(),
             Err(_) => unavailable(),
         },
-        Actor::User { id, .. } => match access::legacy_entry_user(&app, id).await {
-            Ok(true) => access::found("/pairings/status/"),
+        Actor::User { id, .. } => match access::legacy_entry_user(&app.db, id).await {
+            Ok(true) => staff_roster::dashboard(&app, actor).await,
             Ok(false) => access::found("/public/"),
             Err(_) => unavailable(),
         },

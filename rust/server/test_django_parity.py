@@ -35,7 +35,7 @@ from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConf
 
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeCodeEmailLog, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
-    NoShow, PublicDisplaySetting, PublicRosterChange, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
+    NoShow, PublicDisplaySetting, PublicRosterChange, RankingGroup, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
     WrittenRFDEmailLog,
 )
 
@@ -1786,7 +1786,8 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
             assert debate.victor == Round.UNKNOWN and debate.result_entered_at is None
             assert not debate.roundstats_set.exists()
 
-        assert request(port, "/", cookie=entry)[1]["Location"] == "/pairings/status/"
+        status, _, body = request(port, "/", cookie=entry)
+        assert status == 200 and b'id="team-list-btn-add"' in body
         assert request(port, "/view_teams/", cookie=entry)[0] == 200
         assert request(port, "/enter_school/", cookie=entry)[0] == 200
         assert post("/enter_school/", {"name": "Volunteer School"}, session=entry)[0] == 302
@@ -2232,7 +2233,7 @@ def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
         assert InfoLink.objects.get(title="Facebook").url == ready["facebook_url"]
         assert TournamentStaffRole.objects.get().title == "Room Coordinator"
         assert b"Robin Coordinator" in request(port, "/public/")[2]
-        assert request(port, "/", cookie=tab)[1]["Location"] == "/pairings/status/"
+        assert request(port, "/", cookie=tab)[0] == 200
 
         status, _, page = request(port, todo, extra_headers=jar)
         assert status == 200 and b"Configure Core Settings" in page
@@ -3931,15 +3932,121 @@ def test_staff_email_management_skips_unreachable_portals_and_malformed_addresse
 
 
 @pytest.mark.django_db(transaction=True)
+def test_staff_roster_lists_match_django_html(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 4)
+    users = get_user_model().objects
+    admin = users.create_superuser(username="staff-roster-parity")
+    board = users.create_superuser(username="staff-roster-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    entry = users.create_user(username="entry")
+    assistant = users.create_user(username="staff-roster-assistant", is_staff=True)
+    assistant.groups.add(Group.objects.create(name="MIT-TAB: Tab assistant"))
+    helper = users.create_user(username="staff-roster-helper", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    scratch_helper = users.create_user(username="staff-roster-scratches", is_staff=True)
+    scratch_helper.groups.add(Group.objects.create(name="MIT-TAB: Create and view scratches"))
+    checkin_helper = users.create_user(username="staff-roster-checkins", is_staff=True)
+    checkin_helper.groups.add(Group.objects.create(name="MIT-TAB: Check-in helper"))
+
+    def client_for(user):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        return client
+
+    clients = {user.username: client_for(user) for user in (admin, entry, assistant, helper)}
+    with rust_server(overrides=html_assets) as port:
+        for name, client in clients.items():
+            with subtests.test(user=name, path="/", roster="empty"):
+                compare_admin_page(port, "/", client)
+                status, _, body = request(port, "/", cookie=client.cookies["sessionid"].value)
+                assert status == 200
+                for kind in ("school", "team", "debater", "judge", "room"):
+                    assert f'href="/enter_{kind}/"'.encode() in body
+                    assert f'href="/view_{kind}s/"'.encode() in body
+
+    school = School.objects.create(name="Z School & Society")
+    School.objects.create(name="A School", apda_id=1123)
+    team = Team.objects.create(name="Z Team <Exhibition>", school=school, seed=0, checked_in=False)
+    second_team = Team.objects.create(name="A Team", school=school, seed=0, checked_in=True)
+    debater = Debater.objects.create(name="Z Debater & Partner", novice_status=0)
+    Debater.objects.create(name="A Debater", novice_status=1)
+    for name in ("Z Award", "A Award <Division>"):
+        group = RankingGroup.objects.create(name=name)
+        group.teams.add(team)
+        group.debaters.add(debater)
+    judge = Judge.objects.create(name="Z Judge", rank="2.99", wing_only=True, ballot_code="fixture7")
+    other_judge = Judge.objects.create(name="A Judge", rank="3.00", request_wing=True)
+    high_judge = Judge.objects.create(name="B Judge", rank="5.00", no_wings=True)
+    Judge.objects.filter(pk=high_judge.pk).update(ballot_code=None)
+    CheckIn.objects.create(judge=judge, round_number=1)
+    CheckIn.objects.create(judge=other_judge, round_number=2)
+    CheckIn.objects.create(judge=high_judge, round_number=3)
+    room = Room.objects.create(name="Z Room <Reserved>", rank=0)
+    Room.objects.create(name="A Room", rank="3.25")
+    Outround.objects.create(num_teams=2, type_of_round=0, gov_team=team, opp_team=second_team)
+    items = {"school": school, "team": team, "debater": debater, "judge": judge, "room": room}
+
+    with rust_server(overrides=html_assets) as port:
+        for name, client in clients.items():
+            with subtests.test(user=name, path="/", roster="populated"):
+                compare_admin_page(port, "/", client)
+            for kind, item in items.items():
+                path = f"/view_{kind}s/"
+                link = f"/{kind}/{item.pk}"
+                with subtests.test(user=name, path=path):
+                    compare_admin_page(port, path, client)
+                    session = client.cookies["sessionid"].value
+                    status, response, _ = request(port, link, cookie=session)
+                    assert status == 302 and response["Location"] == link + "/"
+                    assert request(port, link + "/", cookie=session)[0] == 200
+
+        session = clients[admin.username].cookies["sessionid"].value
+        status, response, _ = request(port, f"/school/00{school.pk}?next=%2F", cookie=session)
+        assert status == 302 and response["Location"] == f"/school/00{school.pk}/?next=%2F"
+
+        # MySQL's username collation can treat spelling variants as the built-in account.
+        users.filter(pk=entry.pk).update(username="former-entry")
+        lookalike = users.create_user(username="Entry")
+        for user in (board, scratch_helper, checkin_helper, lookalike):
+            session = client_for(user).cookies["sessionid"].value
+            for kind, item in items.items():
+                for path in (f"/view_{kind}s/", f"/{kind}/{item.pk}"):
+                    with subtests.test(user=user.username, path=path):
+                        status, response, body = request(port, path, cookie=session)
+                        assert status == 302 and response["Location"] == "/403/"
+                        assert b"fixture7" not in body and b"<ul" not in body
+
+        session = clients[helper.username].cookies["sessionid"].value
+        protected_paths = ("/view_teams/", "/view_judges/")
+        original = [request(port, path, cookie=session)[2] for path in protected_paths]
+        Team.objects.filter(pk=team.pk).update(checked_in=True)
+        CheckIn.objects.filter(judge=judge).update(round_number=2)
+        assert [request(port, path, cookie=session)[2] for path in protected_paths] == original
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_staff_roster_edits_and_data_entry_scope():
+    from time import monotonic, sleep
+
     tab = legacy_tab_session("native-roster-tab")
     board = legacy_tab_session("native-roster-board")
     get_user_model().objects.get(username="native-roster-board").groups.add(Group.objects.create(name="APDA Board"))
     helper = get_user_model().objects.create_user(username="native-roster-helper", is_staff=True)
     helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    assistant_user = get_user_model().objects.create_user(username="native-roster-assistant", is_staff=True)
+    assistant_user.groups.add(Group.objects.create(name="MIT-TAB: Tab assistant"))
     django = Client()
     django.force_login(helper)
     helper = django.cookies["sessionid"].value
+    django = Client()
+    django.force_login(assistant_user)
+    assistant = django.cookies["sessionid"].value
+    assistant_group = assistant_user.groups.get()
+    helper_group = Group.objects.get(name="MIT-TAB: Data entry helper")
+    checkin_intent = ("mittab_checkins_present", "1")
     TabSettings.set("cur_round", 1)
     TabSettings.set("tot_rounds", 2)
     tag = RoomTag.objects.create(tag="Accessible", priority="1.00")
@@ -3953,6 +4060,25 @@ def test_native_staff_roster_edits_and_data_entry_scope():
             return request(port, path, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
                            form=[("csrfmiddlewaretoken", token), *values])
 
+        def submit_during_role_change(path, values, session, change_role):
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                with transaction.atomic():
+                    TabSettings.objects.select_for_update().get(key="cur_round")
+                    pending = executor.submit(post, path, values, session)
+                    deadline = monotonic() + 3
+                    while monotonic() < deadline:
+                        with connection.cursor() as cursor:
+                            cursor.execute("SHOW FULL PROCESSLIST")
+                            waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                          and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                          for row in cursor.fetchall())
+                        if waiting:
+                            break
+                        sleep(0.025)
+                    assert waiting, "The roster save did not reach the transaction lock"
+                    change_role()
+                return pending.result(timeout=6)
+
         fields = {"name": "Roster School", "apda_id": 445}
         assert post("/enter_school/", fields.items(), token="bad")[0] == 403
         assert post("/enter_school/", fields.items(), session=board)[0] == 403
@@ -3961,7 +4087,7 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         school = School.objects.get(name="Roster School")
         assert school.apda_id == 445
         assert post("/enter_school/", fields.items())[0] == 422
-        assert request(port, "/", cookie=helper)[1]["Location"] == "/view_teams/"
+        assert request(port, "/", cookie=helper)[0] == 200
         assert request(port, "/view_schools/", cookie=helper)[0] == 200
         assert request(port, "/registration/manage/", cookie=helper)[1]["Location"] == "/403/"
 
@@ -3980,9 +4106,18 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         assert set(team.debaters.values_list("id", flat=True)) == {first.id, second.id}
         assert post(team_path, [(key, "Different Team" if key == "name" else value) for key, value in team_fields], session=helper)[0] == 422
         path = f"/team/{team.id}/"
-        assert b'name="checked_in"' not in request(port, path, cookie=helper)[2]
+        helper_form = request(port, path, cookie=helper)[2]
+        assert b'name="checked_in"' not in helper_form and b'name="mittab_checkins_present"' not in helper_form
         assert b'name="checked_in"' in request(port, path, cookie=tab)[2]
+        assistant_form = request(port, path, cookie=assistant)[2]
+        assert b'name="checked_in"' in assistant_form and b'name="mittab_checkins_present"' in assistant_form
         assert post(path, team_fields, session=helper)[0] == 302
+        team.refresh_from_db()
+        assert team.checked_in
+        assert post(path, [*team_fields, checkin_intent], session=assistant)[0] == 302
+        team.refresh_from_db()
+        assert not team.checked_in
+        assert post(path, [*team_fields, checkin_intent, ("checked_in", "on")], session=assistant)[0] == 302
         team.refresh_from_db()
         assert team.checked_in
         assert post(f"/debater/{second.id}/delete/", [], session=helper)[0] == 422
@@ -3997,23 +4132,52 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         assert judge_obj.request_wing and judge_obj.schools.get() == school
         assert judge_obj.ballot_code and judge_obj.required_room_tags.get() == tag
         judge_path = f"/judge/{judge_obj.id}/"
-        assert post(judge_path, [*judge, ("checkin_0", "on")])[0] == 302
+        assert post(judge_path, [*judge, checkin_intent, ("checkin_0", "on")])[0] == 302
         assert CheckIn.objects.filter(judge=judge_obj, round_number=1).exists()
-        assert post(judge_path, [*judge, ("checkin_1", "on")], session=helper)[0] == 302
+        assert post(judge_path, [*judge, checkin_intent, ("checkin_1", "on")], session=helper)[0] == 302
         assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [1]
+        assert b'name="checkin_1"' in request(port, judge_path, cookie=assistant)[2]
+        assert post(judge_path, [*judge, checkin_intent, ("checkin_1", "on")], session=assistant)[0] == 302
+        assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [2]
 
         room = [("name", "Roster Room"), ("rank", "4.25"), ("tags", tag.id)]
         assert post("/enter_room/", room)[0] == 302
         room_obj = Room.objects.get(name="Roster Room")
         assert room_obj.tags.get() == tag and room_obj.rank == Decimal("4.25")
         room_path = f"/room/{room_obj.id}/"
-        assert post(room_path, [*room, ("checkin_-1", "on")])[0] == 302
+        assert post(room_path, [*room, checkin_intent, ("checkin_-1", "on")])[0] == 302
         assert RoomCheckIn.objects.filter(room=room_obj, round_number=0).exists()
         opponent = Team.objects.create(name="Roster Opponent", school=school, seed=0)
         Round.objects.create(round_number=2, gov_team=team, opp_team=opponent, room=room_obj, victor=Round.GOV)
         assert post(f"{room_path}delete/", [])[0] == 422
         assert request(port, "/view_judges/", cookie=board)[1]["Location"] == "/403/"
         assert b"Roster Judge" in request(port, "/view_judges/", cookie=tab)[2]
+
+        demoted = submit_during_role_change(path, [*team_fields, checkin_intent], assistant,
+                                            lambda: assistant_user.groups.set([helper_group]))
+        assert demoted[1]["Location"] == path
+        team.refresh_from_db()
+        assert team.checked_in
+        assert b'name="checked_in"' not in request(port, path, cookie=assistant)[2]
+        promoted = submit_during_role_change(path, team_fields, assistant,
+                                             lambda: assistant_user.groups.set([assistant_group]))
+        assert promoted[1]["Location"] == path
+        team.refresh_from_db()
+        assert team.checked_in
+
+        demoted_tab = legacy_tab_session("native-roster-demoted")
+        demoted_user = get_user_model().objects.get(username="native-roster-demoted")
+
+        def remove_superuser():
+            demoted_user.groups.set([helper_group])
+            get_user_model().objects.filter(pk=demoted_user.pk).update(is_superuser=False)
+
+        invalid = [*judge, checkin_intent, ("rank", "invalid")]
+        status, _, page = submit_during_role_change(judge_path, invalid, demoted_tab, remove_superuser)
+        assert status == 422
+        assert b'name="checkin_1"' not in page and b'name="mittab_checkins_present"' not in page
+        assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [2]
+
         assert request(port, f"/judge/{judge_obj.id}/delete/", cookie=tab)[0] == 200
         assert Judge.objects.filter(pk=judge_obj.pk).exists()
         assert post(f"/judge/{judge_obj.id}/delete/", [])[0] == 302

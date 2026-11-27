@@ -172,21 +172,25 @@ async fn speaker_rows(
         .collect())
 }
 
-async fn groups(
+pub async fn group_memberships(
     db: &mut MySqlConnection,
     team: bool,
-) -> Result<Vec<(String, HashSet<i32>)>, sqlx::Error> {
+) -> Result<Vec<(i32, String, i32)>, sqlx::Error> {
     let query = if team {
         "SELECT g.id, g.name, m.team_id FROM tab_rankinggroup g JOIN tab_rankinggroup_teams m ON m.rankinggroup_id = g.id ORDER BY g.name, g.id"
     } else {
         "SELECT g.id, g.name, m.debater_id FROM tab_rankinggroup g JOIN tab_rankinggroup_debaters m ON m.rankinggroup_id = g.id ORDER BY g.name, g.id"
     };
+    sqlx::query_as(query).fetch_all(db).await
+}
+
+async fn groups(
+    db: &mut MySqlConnection,
+    team: bool,
+) -> Result<Vec<(String, HashSet<i32>)>, sqlx::Error> {
     let mut groups: Vec<(String, HashSet<i32>)> = Vec::new();
     let mut last = None;
-    for (id, name, member) in sqlx::query_as::<_, (i32, String, i32)>(query)
-        .fetch_all(db)
-        .await?
-    {
+    for (id, name, member) in group_memberships(db, team).await? {
         if last != Some(id) {
             groups.push((format!("{name} Rankings"), HashSet::new()));
             last = Some(id);
