@@ -19,7 +19,7 @@ use crate::{
     App,
     access::{self, PortalAccessError},
     board_outrounds, board_snapshot, legacy_html,
-    legacy_session::{self, Actor},
+    legacy_session::Actor,
     private,
     public_cache::{self, Page},
     settings::Settings,
@@ -395,10 +395,7 @@ async fn current_actor(
     headers: &HeaderMap,
     path: &str,
 ) -> Result<Actor, PortalAccessError> {
-    let session = legacy_session::cookie(headers, "sessionid").ok_or(PortalAccessError::Denied)?;
-    let current = legacy_session::actor_on(db, session, app.django_secret.as_deref())
-        .await
-        .map_err(PortalAccessError::Session)?;
+    let current = access::refreshed_user(db, app, original, headers).await?;
     let Actor::User {
         id,
         board,
@@ -408,15 +405,9 @@ async fn current_actor(
     else {
         return Err(PortalAccessError::Denied);
     };
-    if !matches!(original, Actor::User { id: original_id, .. } if original_id == id) {
-        return Err(PortalAccessError::Denied);
-    }
     if board {
-        return match access::board_access_open_on(db).await {
-            Ok(true) => Ok(current),
-            Ok(false) => Err(PortalAccessError::Board),
-            Err(_) => Err(PortalAccessError::Database),
-        };
+        access::require_open_board(db, current).await?;
+        return Ok(current);
     }
     if path.starts_with("/apda-board/") {
         return Err(PortalAccessError::Denied);

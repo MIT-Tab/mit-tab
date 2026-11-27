@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use axum::{
     Extension, Form,
     extract::{Path, Query, State, rejection::FormRejection},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, Uri},
     response::Response,
 };
 use chrono::NaiveDateTime;
@@ -13,9 +13,10 @@ use serde_json::json;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    board_snapshot::{self, Histories, History, Pairings, Snapshot},
+    App, access, board_outrounds,
+    board_snapshot::{self, Pairings},
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     login, private, unavailable,
 };
@@ -118,108 +119,112 @@ pub async fn home(
     result.unwrap_or_else(|_| unavailable())
 }
 
-#[derive(Deserialize)]
-pub struct InroundFilter {
-    manual: Option<String>,
-}
-
-#[derive(Serialize)]
-struct Display<'a> {
-    id: i32,
-    data: &'a Snapshot,
-    outcome: &'static str,
-    history: Option<&'a Vec<History>>,
-}
-
-fn display<'a>(id: i32, snapshot: &'a Snapshot, history: &'a Histories) -> Display<'a> {
-    Display {
-        id,
-        data: snapshot,
-        outcome: board_snapshot::outcome(snapshot.victor.unwrap_or(0)),
-        history: history.retained.get(&id),
-    }
-}
-
 pub async fn inrounds(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
-    Query(filter): Query<InroundFilter>,
+    headers: HeaderMap,
+    uri: Uri,
 ) -> Response {
-    inround_page(&app, actor, None, filter).await
+    inround_page(&app, actor, &headers, &uri, None).await
 }
 
 pub async fn inround(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    uri: Uri,
     Path(round): Path<i32>,
-    Query(filter): Query<InroundFilter>,
 ) -> Response {
-    inround_page(&app, actor, Some(round), filter).await
+    inround_page(&app, actor, &headers, &uri, Some(round)).await
 }
 
 async fn inround_page(
     app: &App,
     actor: Actor,
+    headers: &HeaderMap,
+    uri: &Uri,
     selected: Option<i32>,
-    filter: InroundFilter,
 ) -> Response {
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let actor = match access::refreshed_user(&mut db, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(app, headers).await;
+        }
+    };
+    if let Err(error) = access::require_open_board(&mut db, actor).await {
+        drop(db);
+        return error.response(app, headers).await;
+    }
     let result = async {
-        let mut db = app.db.begin().await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
+        if selected.is_some_and(|round| round < 0) {
+            db.commit().await?;
+            return Ok(legacy_html::render(
+                "common/404.html",
+                shell,
+                context! {},
+                StatusCode::NOT_FOUND,
+            ));
+        }
         let history = board_snapshot::histories(&mut db, "round").await?;
-        let manual = filter.manual.as_deref() == Some("1");
-        let numbers = if manual {
-            let mut numbers: Vec<_> = sqlx::query_as::<_, (i32, i32)>(
-                "SELECT id, round_number FROM tab_round ORDER BY round_number, id",
-            )
-            .fetch_all(&mut *db)
-            .await?
+        let manual_only = url::form_urlencoded::parse(uri.query().unwrap_or_default().as_bytes())
+            .filter_map(|(key, value)| (key == "manual").then_some(value))
+            .last()
+            .is_some_and(|value| value == "1");
+        let live = sqlx::query_as::<_, (i32, i32)>(
+            "SELECT id, round_number FROM tab_round ORDER BY round_number, id",
+        )
+        .fetch_all(&mut *db)
+        .await?;
+        let live_ids: HashSet<_> = live.iter().map(|&(id, _)| id).collect();
+        let mut round_numbers: Vec<_> = live
             .into_iter()
-            .filter_map(|(id, number)| history.retained.contains_key(&id).then_some(number))
+            .filter_map(|(id, number)| {
+                (!manual_only || history.retained.contains_key(&id)).then_some(number)
+            })
             .collect();
-            numbers.extend(
+        if manual_only {
+            round_numbers.extend(
                 history
                     .removed
-                    .values()
-                    .filter_map(|snapshot| snapshot.round_number),
+                    .iter()
+                    .filter_map(|(_, snapshot)| snapshot.round_number),
             );
-            numbers.sort_unstable();
-            numbers.dedup();
-            numbers
-        } else {
-            sqlx::query_scalar::<_, i32>(
-                "SELECT DISTINCT round_number FROM tab_round ORDER BY round_number",
-            )
-            .fetch_all(&mut *db)
-            .await?
-        };
-        let selected = selected
-            .filter(|round| !manual || numbers.contains(round))
-            .or_else(|| numbers.last().copied());
-        let rows = if let Some(round) = selected {
+            round_numbers.sort_unstable();
+        }
+        round_numbers.dedup();
+        let round_number = selected
+            .filter(|round| !manual_only || round_numbers.contains(round))
+            .or_else(|| round_numbers.last().copied());
+        let rows = if let Some(round) = round_number {
             board_snapshot::capture(&mut db, Pairings::Inround(round)).await?
         } else {
             Default::default()
         };
         db.commit().await?;
-        let removed: Vec<_> = history
+        let deleted: Vec<_> = history
             .removed
             .iter()
             .filter(|(id, snapshot)| {
-                selected.is_some() && snapshot.round_number == selected && !rows.contains_key(id)
+                round_number.is_some()
+                    && snapshot.round_number == round_number
+                    && !live_ids.contains(id)
             })
-            .map(|(&id, snapshot)| display(id, snapshot, &history))
+            .map(|(id, snapshot)| board_outrounds::deleted_pairing(*id, snapshot, &history))
             .collect();
-        let rows: Vec<_> = rows
+        let pairings: Vec<_> = rows
             .iter()
-            .filter(|(id, _)| !manual || history.retained.contains_key(id))
-            .map(|(&id, snapshot)| display(id, snapshot, &history))
+            .filter(|(id, _)| !manual_only || history.retained.contains_key(id))
+            .map(|(&id, snapshot)| board_outrounds::pairing(id, snapshot, &history))
             .collect();
-        Ok::<_, sqlx::Error>(html::render(
-            "board_inrounds.html",
-            context! {
-                title => "Inrounds", round => selected, rows, removed, numbers, manual,
-                nav => Navigation::new(actor, true),
-            },
+        Ok::<_, sqlx::Error>(legacy_html::render(
+            "apda_board/inrounds.html",
+            shell,
+            context! { pairings, deleted, round_number, round_numbers, manual_only },
             StatusCode::OK,
         ))
     }

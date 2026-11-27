@@ -65,9 +65,26 @@ pub(super) fn pairing(
     snapshot: &Snapshot,
     history: &board_snapshot::Histories,
 ) -> minijinja::Value {
+    pairing_view(id, snapshot, history, true)
+}
+
+pub(super) fn deleted_pairing(
+    id: i32,
+    snapshot: &Snapshot,
+    history: &board_snapshot::Histories,
+) -> minijinja::Value {
+    pairing_view(id, snapshot, history, false)
+}
+
+fn pairing_view(
+    id: i32,
+    snapshot: &Snapshot,
+    history: &board_snapshot::Histories,
+    annotate: bool,
+) -> minijinja::Value {
     let events = history.retained.get(&id);
     let mut positions = Vec::new();
-    if let Some(events) = events {
+    if annotate && let Some(events) = events {
         for (field, side) in [("government", "gov"), ("opposition", "opp")] {
             if events
                 .iter()
@@ -77,7 +94,7 @@ pub(super) fn pairing(
             }
         }
     }
-    let manual_judge_names = history.manual_judge_names(id);
+    let manual_judge_names = annotate.then(|| history.manual_judge_names(id)).flatten();
     let history: Vec<_> = events.into_iter().flatten().map(|event| {
         let mut changes: Vec<_> = event.changes.iter().map(|change| {
             let field = match change.field {
@@ -97,13 +114,15 @@ pub(super) fn pairing(
                     ("victor", "Opposition") => "OPP",
                     ("victor", "Government by forfeit") => "GOV via Forfeit",
                     ("victor", "Opposition by forfeit") => "OPP via Forfeit",
+                    ("victor", "Both lose") => "ALL DROP",
+                    ("victor", "Both win") => "ALL WIN",
                     (_, other) => other,
                 };
                 value.to_owned()
             };
             (field, context! {field, before => text(&change.before), after => text(&change.after)})
         }).collect();
-        if changes.iter().all(|(_, detail)| detail.get_attr("before").is_ok_and(|before| before.is_true())) {
+        if event.structured {
             changes.sort_by_key(|(field, _)| *field);
         }
         let changes: Vec<_> = changes.into_iter().map(|(_, detail)| detail).collect();
@@ -146,7 +165,7 @@ pub async fn list(
                 .map(|(size, pairings)| context! {size, pairings}).collect();
             let deleted: Vec<_> = history.removed.iter().filter(|(round, snapshot)| {
                 snapshot.division == Some(id) && !snapshots.contains_key(round)
-            }).map(|(&round, snapshot)| pairing(round, snapshot, &history)).collect();
+            }).map(|(round, snapshot)| deleted_pairing(*round, snapshot, &history)).collect();
             let teams: Vec<_> = teams.iter().filter(|team| team.division == id).map(|team| context! {
                 team_id => team.team, team__name => &team.name, seed => team.original,
             }).collect();

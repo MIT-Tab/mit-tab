@@ -561,6 +561,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/apda_board/outrounds.html"),
         ),
         (
+            "apda_board/inrounds.html",
+            include_str!("../../../mittab/templates/apda_board/inrounds.html"),
+        ),
+        (
             "apda_board/_pairing.html",
             include_str!("../../../mittab/templates/apda_board/_pairing.html"),
         ),
@@ -777,6 +781,9 @@ fn translate(name: &str, source: &str) -> String {
             ["static", "'css/tab-cards-print.css'"] => output.push_str("/static/css/tab-cards-print.css"),
             ["url", "'board_inrounds'", "number"] => {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
+            }
+            ["url", "'board_inrounds'", "round_number"] => {
+                output.push_str("/apda-board/inrounds/{{ round_number }}/");
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
             ["url", "'export_roster'", "kind", "extension"] => {

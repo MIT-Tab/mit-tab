@@ -385,6 +385,39 @@ impl PortalAccessError {
     }
 }
 
+pub(super) async fn refreshed_user(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, PortalAccessError> {
+    let Actor::User { id, .. } = original else {
+        return Err(PortalAccessError::Denied);
+    };
+    let key = cookie(headers, "sessionid").ok_or(PortalAccessError::Denied)?;
+    let current = legacy_session::actor_on(db, key, app.django_secret.as_deref())
+        .await
+        .map_err(PortalAccessError::Session)?;
+    match current {
+        Actor::User { id: current_id, .. } if id == current_id => Ok(current),
+        _ => Err(PortalAccessError::Denied),
+    }
+}
+
+pub(super) async fn require_open_board(
+    db: &mut MySqlConnection,
+    actor: Actor,
+) -> Result<(), PortalAccessError> {
+    if !matches!(actor, Actor::User { board: true, .. }) {
+        return Err(PortalAccessError::Denied);
+    }
+    match board_access_open_on(db).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(PortalAccessError::Board),
+        Err(_) => Err(PortalAccessError::Database),
+    }
+}
+
 pub async fn code_portal_actor(
     db: &mut MySqlConnection,
     app: &App,

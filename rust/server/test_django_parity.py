@@ -2457,9 +2457,9 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
             return re.sub(rb'name="csrfmiddlewaretoken" value="[A-Za-z0-9]{64}"', b'name="csrfmiddlewaretoken"', body)
 
         before = {path: page_without_csrf(path) for path in paths}
-        assert b"(chair)" in before[inrounds] and b"New Chair" in before[inrounds]
+        assert b"(chair)" in before[inrounds] and b"new chair" in before[inrounds]
         assert b"manual edits" in before[outrounds]
-        assert b"New Chair" in request(port, f"{inrounds}?manual=1", extra_headers=jar)[2]
+        assert b"new chair" in request(port, f"{inrounds}?manual=1", extra_headers=jar)[2]
         for body in before.values():
             assert b"protected" not in body and b"private reason fixture" not in body
             assert b"Synthetic-Board" not in body
@@ -3553,6 +3553,113 @@ def test_tab_card_pages_match_django(html_assets, subtests):
         Outround.objects.create(num_teams=4, type_of_round=Outround.NOVICE, gov_team=zeta, opp_team=beta)
         TabSettings.set("nov_teams_visible", 4)
         assert request(port, public)[0] == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_board_inround_audit_matches_django(html_assets, subtests):
+    from mittab.apps.tab.board_audit import pairing_snapshot
+
+    staff = legacy_tab_session("inround-audit-reference-staff")
+    board = legacy_tab_session("inround-audit-reference-board")
+    actor = get_user_model().objects.get(username="inround-audit-reference-board")
+    actor.groups.create(name="APDA Board")
+    TabSettings.set("tot_rounds", 4)
+    TabSettings.set("cur_round", 5)
+    school = School.objects.create(name="Audit Fixture School")
+    north, south, east, west = [Team.objects.create(name=name, school=school, seed=0)
+                                for name in ("North & East", "South", "East <Team>", "West")]
+    first_room = Room.objects.create(name="Library 1", rank=4)
+    second_room = Room.objects.create(name="Library 2", rank=4)
+    historical_room = Room.objects.create(name="Archived Annex", rank=2)
+    chair = Judge.objects.create(name="Alba Chair", rank=7)
+    old_chair = Judge.objects.create(name="Cora Former Chair", rank=9)
+    Outround.objects.create(num_teams=4, gov_team=north, opp_team=south)
+    path = "/apda-board/inrounds/"
+    client = Client()
+    client.cookies["sessionid"] = board
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(url):
+            status, headers, body = request(port, url, cookie=board)
+            reference = client.get(url)
+            assert status == reference.status_code == 200
+            assert headers["Cache-Control"] == "private, no-store"
+            assert_html_bytes(body, reference.content)
+            return body
+
+        assert b"No pairings available." in compare(path)
+        assert b"No manual edits." in compare(path + "?manual=1")
+        live = Round.objects.create(round_number=1, gov_team=north, opp_team=south, chair=chair,
+                                    room=first_room, victor=Round.GOV)
+        live.judges.add(old_chair, chair)
+        untouched = Round.objects.create(round_number=1, gov_team=east, opp_team=west, room=second_room)
+        AuditEvent.record(live, AuditEvent.MANUAL_CHAIR_CHANGE, actor,
+                          changes={"old_chair": old_chair.name, "new_chair": chair.name,
+                                   "rank": "protected judge rank fixture"}, note="protected audit note fixture")
+        early = Round.objects.create(round_number=2, gov_team=north, opp_team=east, room=first_room,
+                                     victor=Round.GOV, chair=old_chair)
+        later = Round.objects.create(round_number=2, gov_team=south, opp_team=west,
+                                     room=second_room, victor=Round.ALL_DROP)
+        early.judges.add(old_chair)
+        speaker = Debater.objects.create(name="History <Speaker>", novice_status=Debater.VARSITY)
+        RoundStats.objects.create(round=early, debater=speaker, speaks=26, ranks=1, debater_role="pm")
+        score_snapshot = pairing_snapshot(early)
+
+        def record_deletion(pairing, snapshot):
+            AuditEvent.record(pairing, AuditEvent.EDIT, actor, changes={"public": {
+                "source": "admin deletion", "before": snapshot, "after": None,
+            }}, note="private deletion note fixture")
+
+        record_deletion(later, pairing_snapshot(later))
+        record_deletion(early, score_snapshot)
+        record_deletion(early, {**score_snapshot, "room": {"id": historical_room.id, "name": historical_room.name}})
+        record_deletion(untouched, {**pairing_snapshot(untouched), "round_number": 2,
+                                   "room": {"id": 91, "name": "Fixture ID still live"}})
+        early.delete()
+        later.delete()
+        moved = Round.objects.create(round_number=4, gov_team=north, opp_team=west)
+        before = {**pairing_snapshot(moved), "round_number": 3}
+        AuditEvent.record(moved, AuditEvent.EDIT, actor, changes={"public": {
+            "source": "admin correction", "before": before, "after": pairing_snapshot(moved),
+        }})
+        valid_room = {"id": first_room.id, "name": first_room.name, "note": "protected room fixture"}
+        AuditEvent.record(moved, AuditEvent.EDIT, actor, changes={"public": {
+            "source": "staff room correction",
+            "before": {"room": None, "judges": [{"id": 2, "name": {"rank": "protected nested fixture"}}]},
+            "after": {"room": valid_room, "judges": [], "scratches": ["protected scratch fixture"]},
+        }})
+        Round.objects.create(round_number=5, gov_team=east, opp_team=south, victor=Round.OPP)
+
+        cases = (path, path + "1/", path + "2/", path + "4/", path + "9/", path + "?manual=1",
+                 path + "1/?manual=1", path + "2/?manual=1", path + "5/?manual=1",
+                 path + "1/?manual=0&manual=1")
+        bodies = {}
+        for url in cases:
+            with subtests.test(url=url):
+                bodies[url] = compare(url)
+        current, deleted, historical = bodies[path + "1/"], bodies[path + "2/"], bodies[path + "?manual=1"]
+        assert b'class="btn-sm btn-light manual-pairing-edit">Alba Chair' in current
+        assert b'class="btn-sm btn-light">Cora Former Chair' in current
+        assert deleted.count(b'class="card bg-light pairing-card mb-3"') == 3
+        assert deleted.index(b"South") < deleted.index(b"North &amp; East")
+        assert b"Fixture ID still live" not in deleted
+        assert b"History &lt;Speaker&gt; (PM): 26.0000 speaks, 1.0000 rank" in deleted
+        assert b"victor: ALL DROP" in deleted and b"round number: 3" in historical
+        assert b"room: Unassigned" in historical and b"Library 1" in historical
+        assert all(b"protected" not in body and b"private deletion note" not in body for body in bodies.values())
+
+        Scratch.objects.create(team=north, judge=chair, scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(pk=chair.pk).update(rank=10, wing_only=True, request_wing=True, no_wings=True,
+                                                 ballot_code="Fixture-Inround-Key")
+        assert {url: request(port, url, cookie=board)[2] for url in cases} == bodies
+        AuditEvent.record(live, AuditEvent.JUDGES_PAIRED, actor)
+        reset = compare(path + "1/")
+        assert b"new chair: Alba Chair" in reset and b"manual-pairing-edit" not in reset
+        assert request(port, path, method="HEAD", cookie=board)[0] == 200
+        assert request(port, path, cookie=staff)[0] == 403
+        assert request(port, path, method="POST", cookie=board)[1]["Location"] == "/403/"
+        Outround.objects.all().delete()
+        assert request(port, path, cookie=board)[0] == 403
 
 
 def multipart_request(port, path, *, fields, file, cookie, file_field="file"):
