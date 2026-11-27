@@ -47,6 +47,7 @@
   "start_tournament": "/setup/start-tournament/",
   "tab_login": "/public/login/",
   "tournament_todo": "/setup/tournament-todo/",
+  "tournament_todo_toggle": "/setup/tournament-todo/toggle/",
   "upload_data": "/import_data/",
   "upload_backup": "/upload_backup/",
   "view_backups": "/pairing/view_backups/",

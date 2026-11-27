@@ -6,7 +6,7 @@ use std::{
 use axum::{
     Extension, Form, Json,
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, Uri},
     response::Response,
 };
 use chrono::Utc;
@@ -16,8 +16,7 @@ use serde_json::json;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
+    App, access, legacy_html,
     legacy_session::Actor,
     login, private, publication,
     settings::{SettingValue, Settings, put},
@@ -78,13 +77,13 @@ fn url(name: &str) -> &'static str {
 
 #[derive(Serialize)]
 struct StepState<'a> {
-    field: String,
+    slug: &'a str,
     title: &'a str,
     description: &'a str,
-    optional: Option<&'a str>,
+    optional_label: Option<&'a str>,
     url: &'static str,
     checked: bool,
-    auto: bool,
+    auto_completed: bool,
 }
 
 #[derive(Serialize)]
@@ -94,7 +93,7 @@ struct Section<'a> {
     steps: Vec<StepState<'a>>,
     completed: usize,
     total: usize,
-    progress: usize,
+    progress_percent: usize,
 }
 
 fn group<'a>(
@@ -112,26 +111,26 @@ fn group<'a>(
                 .as_deref()
                 .is_some_and(|rule| auto.contains(rule));
             StepState {
-                field: format!("step_{}", step.slug),
+                slug: &step.slug,
                 title: &step.title,
                 description: &step.description,
-                optional: step.optional_label.as_deref(),
+                optional_label: step.optional_label.as_deref(),
                 url: url(&step.url_name),
                 checked: automatic || settings.flag(&format!("todo_{}", step.slug), false),
-                auto: automatic,
+                auto_completed: automatic,
             }
         })
         .collect();
     let completed = steps.iter().filter(|step| step.checked).count();
     let total = steps.len();
-    let progress = (100 * completed).checked_div(total).unwrap_or(0);
+    let progress_percent = (100 * completed).checked_div(total).unwrap_or(0);
     Section {
         phase,
         title,
         steps,
         completed,
         total,
-        progress,
+        progress_percent,
     }
 }
 
@@ -231,7 +230,7 @@ async fn states(
     );
     let event = group(
         "day_of",
-        "Day of Tournament",
+        "Day Of Tournament",
         &CONFIG.day_of_steps,
         auto,
         &settings,
@@ -273,6 +272,7 @@ async fn save_preference(
 pub async fn page(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
+    uri: Uri,
     headers: HeaderMap,
 ) -> Response {
     let Some(user) = user(actor) else {
@@ -284,14 +284,41 @@ pub async fn page(
         let hide = hide_preference(&mut db, user).await?;
         let auto = automatic(&mut db).await?;
         let sections = states(&mut db, &auto).await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
         db.commit().await?;
-        let Ok(csrf) = html::page_csrf(&headers) else { return Ok(unavailable()); };
-        let response = html::render("checklist.html", context! {
-            title => "Tournament Checklist", sections, hide, csrf, nav => Navigation::new(actor, true),
-        }, StatusCode::OK);
-        Ok::<_, sqlx::Error>(html::form_response(response, &headers, &csrf))
-    }.await;
+        let Ok(csrf) = login::TemplateCsrf::new(&headers) else {
+            return Ok(unavailable());
+        };
+        let mut response = legacy_html::render(
+            "tab/tournament_todo.html",
+            shell,
+            context! {
+                sections, hide_tournament_todo => hide, csrf_input => csrf.input(),
+                return_path => return_path(&uri),
+            },
+            StatusCode::OK,
+        );
+        csrf.set_cookie(&mut response, &headers);
+        Ok::<_, sqlx::Error>(response)
+    }
+    .await;
     result.unwrap_or_else(|_| unavailable())
+}
+
+fn return_path(uri: &Uri) -> String {
+    if let Some(query) = uri.query() {
+        let params: HashMap<_, _> = url::form_urlencoded::parse(query.as_bytes()).collect();
+        for name in ["return_to", "next"] {
+            if let Some(value) = params.get(name)
+                && !login::local_next(value).is_empty()
+            {
+                return value.to_string();
+            }
+        }
+    }
+    uri.path_and_query()
+        .map_or(CHECKLIST, |value| value.as_str())
+        .to_string()
 }
 
 pub async fn save(
@@ -377,12 +404,12 @@ pub async fn toggle(
         put(&mut db, &format!("todo_{}", step.slug), SettingValue::Number(i32::from(checked))).await?;
         let sections = states(&mut db, &auto).await?;
         db.commit().await?;
-        let section = sections.iter().find(|section| section.steps.iter().any(|step| step.field == field))
+        let section = sections.iter().find(|section| section.steps.iter().any(|state| state.slug == step.slug))
             .expect("configured checklist section");
         Ok::<_, sqlx::Error>(private(Json(json!({
             "ok": true, "field": field, "checked": checked, "auto_completed": auto_complete,
             "phase": section.phase, "section_completed": section.completed, "section_total": section.total,
-            "section_progress_percent": section.progress,
+            "section_progress_percent": section.progress_percent,
         }))))
     }.await;
     result.unwrap_or_else(|_| unavailable())

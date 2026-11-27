@@ -282,6 +282,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/tab/start_tournament.html"),
         ),
         (
+            "tab/tournament_todo.html",
+            include_str!("../../../mittab/templates/tab/tournament_todo.html"),
+        ),
+        (
+            "tab/settings_form.html",
+            include_str!("../../../mittab/templates/tab/settings_form.html"),
+        ),
+        (
             "tab/_custom_staff_role_form.html",
             include_str!("../../../mittab/templates/tab/_custom_staff_role_form.html"),
         ),
@@ -479,6 +487,7 @@ fn translate(name: &str, source: &str) -> String {
         .replace("forloop.parent.counter", "filter_group_index")
         .replace("forloop.counter0|divisibleby:2", "loop.index0 % 2 == 0")
         .replace("forloop.counter", "loop.index")
+        .replace("forloop.first", "loop.first")
         .replace("item.0", "item[0]")
         .replace("item.1", "item[1]")
         .replace("item.2", "item[2]")
@@ -486,13 +495,14 @@ fn translate(name: &str, source: &str) -> String {
         .replace("item.4", "item[4]")
         .replace("forloop.last", "loop.last")
         .replace("|pluralize ", "|django_pluralize ");
-    let translated = if matches!(
-        name,
-        "tab/start_tournament.html" | "tab/_custom_staff_role_form.html"
-    ) {
-        setup_widgets(translated)
-    } else {
-        translated
+    let translated = match name {
+        "tab/start_tournament.html" | "tab/_custom_staff_role_form.html" => {
+            setup_widgets(translated)
+        }
+        "tab/settings_form.html" => translated
+            .replace("{{ field }}", "{{ field.html|safe }}")
+            .replace("{{ field.errors }}", "{{ field.errors|safe }}"),
+        _ => translated,
     };
     ["default", "date", "yesno", "pluralize"]
         .into_iter()

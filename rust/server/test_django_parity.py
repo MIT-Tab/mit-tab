@@ -138,7 +138,7 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
 def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
-        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart")
+        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart", "tournamentTodo")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -2072,7 +2072,7 @@ def test_native_wizard_and_checklist_unlock_staff_on_valid_basics():
 
         status, _, page = request(port, todo, extra_headers=jar)
         assert status == 200 and b"Configure Core Settings" in page
-        assert b"Day of Tournament" in page and b"Speaker Results Auto-Published" in page
+        assert b"Day Of Tournament" in page and b"Speaker Results Auto-Published" in page
         assert re.search(rb'id="step_set_tournament_name"[^>]* checked[^>]* disabled', page)
         assert post(toggle, {"field": "step_unrecognized", "checked": "true"})[0] == 400
         activity = post(toggle, {"field": "step_add_tab_user_accounts", "checked": "true"})
@@ -2191,7 +2191,75 @@ def test_tournament_basics_matches_django_form_markup(html_assets, subtests):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_settings_write_only_declared_fields_and_honor_discretionary_scratch_lock():
+def test_checklist_matches_django_html_and_autosave_behavior(html_assets, subtests):
+    from mittab.apps.tab.models import UserTournamentSetupPreference
+
+    staff = legacy_tab_session("checklist-html")
+    colleague = legacy_tab_session("checklist-colleague")
+    path = "/setup/tournament-todo/"
+    toggle = f"{path}toggle/"
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 5)
+    TabSettings.set("tournament_name", "New Tournament")
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    cookie = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    def compare(port, target=path):
+        status, _, body = request(port, target, extra_headers=cookie)
+        assert status == 200
+        for cache in ("default", "filesystem"):
+            caches[cache].clear()
+        token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1]
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[:32].decode()):
+            reference = client.get(target)
+        assert reference.status_code == 200
+        assert_html_bytes(body, reference.content)
+        return body
+
+    def autosave(port, field, checked):
+        form = {"field": field, "checked": checked, "csrfmiddlewaretoken": csrf}
+        status, _, payload = request(port, toggle, method="POST", extra_headers=cookie, form=form)
+        for cache in ("default", "filesystem"):
+            caches[cache].clear()
+        reference = client.post(toggle, form)
+        assert status == reference.status_code == 200
+        assert json.loads(payload) == reference.json()
+        return reference.json()
+
+    with rust_server(overrides=html_assets) as port:
+        with subtests.test(page="new tournament"):
+            body = compare(port, path + "?return_to=%2Fsettings_form&next=%2Fpublic%2F")
+            assert b'data-autosave-url="/setup/tournament-todo/toggle/"' in body
+            assert b'name="return_to" value="/settings_form"' in body
+            assert b'data-completed="0"' in body
+        with subtests.test(page="manual and automatic progress"):
+            TabSettings.set("tournament_name", "Founders & Alumni")
+            room = Room.objects.create(name="Access room", rank=1)
+            tag = RoomTag.objects.create(tag="Accessible", priority=1)
+            room.tags.add(tag)
+            activity = autosave(port, "step_add_tab_user_accounts", "1")
+            assert activity["section_completed"] == 3 and activity["section_progress_percent"] == 42
+            automatic = autosave(port, "step_set_tournament_name", "0")
+            assert automatic["checked"] and automatic["auto_completed"]
+            body = compare(port)
+            assert b'aria-label="About Add Accessible Room Tags"' in body
+            assert b'data-completed="3"' in body
+        with subtests.test(page="persistent personal preference"):
+            assert autosave(port, "hide_tournament_todo", "true")["checked"]
+            body = compare(port)
+            assert re.search(rb'id="hide_tournament_todo"[^>]*checked', body)
+            peer = request(port, path, cookie=colleague)[2]
+            assert not re.search(rb'id="hide_tournament_todo"[^>]*checked', peer)
+            assert b'data-completed="3"' in peer
+            assert UserTournamentSetupPreference.objects.get(user__username="checklist-html").hide_tournament_todo
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_settings_write_only_declared_fields_and_honor_discretionary_scratch_lock(html_assets):
     from mittab.apps.tab.views.views import get_settings_from_yaml
 
     tab = legacy_tab_session("settings-staff")
@@ -2217,21 +2285,42 @@ def test_native_settings_write_only_declared_fields_and_honor_discretionary_scra
     data["setting_tot_rounds"] = "7"
     data["setting_written_rfd_deadline"] = "2099-11-10T20:15"
 
-    with rust_server() as port:
+    with rust_server(overrides=html_assets) as port:
         status, headers, page = request(port, path, cookie=tab)
         assert status == 200
         assert b"Tab Settings" in page and b"Speaker Points" in page
-        assert re.search(rb'id="setting_judges_public"[^>]* disabled', page)
+        assert re.search(rb'id="id_setting_judges_public"[^>]*disabled', page)
         csrf = load_cookies(headers)["csrftoken"].value
         jar = {"Cookie": f"sessionid={tab}; csrftoken={csrf}"}
+        client = Client()
+        client.cookies["sessionid"] = tab
+        client.cookies["csrftoken"] = csrf
+
+        def compare(body, form=None):
+            caches["default"].clear()
+            caches["filesystem"].clear()
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)[1][:32]
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask.decode()):
+                reference = client.get(path) if form is None else client.post(path, form)
+            assert reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+
+        compare(page)
 
         def post(path, form):
             return request(port, path, method="POST", extra_headers=jar,
                            form={"csrfmiddlewaretoken": csrf, **form})
 
-        assert post(path, {**data, "setting_min_byes": "-1"})[0] == 422
+        invalid = {**data, "setting_min_byes": "-1", "setting_written_rfd_deadline": "not-a-date",
+                   "setting_outround_pairing_mode": "unexpected & invalid"}
+        status, _, body = post(path, invalid)
+        assert status == 422
+        compare(body, invalid)
         assert TabSettings.get("tot_rounds", use_cache=False) == 5
-        assert post(path, {**data, "setting_cur_round": "10"})[1]["Location"] == path
+        all_categories = [category["id"] for category in categories]
+        visited = ",".join([*all_categories, "unknown"])
+        assert post(path, {**data, "setting_cur_round": "10", "visited_categories": visited})[1]["Location"] == path
+        assert TabSettings.get("settings_tabs_seen", use_cache=False) == ",".join(sorted(all_categories))
         assert TabSettings.get("tot_rounds", use_cache=False) == 7
         assert TabSettings.get("cur_round", use_cache=False) == 1
         assert TabSettings.get("judges_public", use_cache=False) == 1
@@ -2240,6 +2329,13 @@ def test_native_settings_write_only_declared_fields_and_honor_discretionary_scra
         registration.save(update_fields=["disc_scratches_open"])
         assert post(path, data)[0] == 302
         assert TabSettings.get("judges_public", use_cache=False) == 0
+        compare(request(port, path, extra_headers=jar)[2])
+        TabSettings.objects.filter(key="teams_public").update(value=None, value_string="1")
+        without_roster_flag = {key: value for key, value in data.items() if key != "setting_teams_public"}
+        assert post(path, without_roster_flag)[0] == 302
+        assert TabSettings.get("teams_public", use_cache=False) == "1"
+        assert post(path, {**without_roster_flag, "setting_teams_public": "0"})[0] == 302
+        assert TabSettings.get("teams_public", use_cache=False) == 0
         viewed = f"{path}/viewed/"
         assert post(viewed, {"category": "invalid"})[0] == 400
         for category in categories:

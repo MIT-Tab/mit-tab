@@ -68,8 +68,17 @@ impl Settings {
             Some(Value::Missing) | None => default,
         }
     }
+
+    pub fn value(&self, name: &str) -> Option<SettingValue<'_>> {
+        match self.0.get(name) {
+            Some(Value::Integer(value)) => Some(SettingValue::Number(*value)),
+            Some(Value::Text(value)) => Some(SettingValue::Text(value)),
+            Some(Value::Missing) | None => None,
+        }
+    }
 }
 
+#[derive(PartialEq, Eq)]
 pub enum SettingValue<'a> {
     Number(i32),
     Text(&'a str),
