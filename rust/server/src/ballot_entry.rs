@@ -7,7 +7,7 @@ use axum::{
     response::Response,
 };
 use chrono::{FixedOffset, NaiveDateTime, Utc};
-use minijinja::context;
+use minijinja::{Value, context};
 use mittab_tabulation::ballot_entry::{Ballot, ROLE_NAMES, ROLES, Score, SpeakPolicy, score_panel};
 use serde::Serialize;
 use sqlx::{MySqlConnection, Row};
@@ -15,10 +15,12 @@ use sqlx::{MySqlConnection, Row};
 use crate::{
     App, access,
     html::{self, Navigation},
+    legacy_html::escape,
     legacy_session::Actor,
     login, private, round_audit,
     settings::Settings,
     staff_pairing::{ChangeError, lock_round},
+    staff_roster_fields::{input, select},
     unavailable,
 };
 
@@ -31,6 +33,12 @@ pub const FORM_SETTINGS: &[&str] = &[
     "motions_enabled",
 ];
 
+pub const SPEAK_WARNING_SETTINGS: &[&str] = &[
+    "warn_judges_about_speaks",
+    "low_speak_warning_threshold",
+    "high_speak_warning_threshold",
+];
+
 pub const OUTCOMES: [(i32, &str); 6] = [
     (1, "Government"),
     (2, "Opposition"),
@@ -40,7 +48,18 @@ pub const OUTCOMES: [(i32, &str); 6] = [
     (6, "Both win"),
 ];
 
+pub(super) const DJANGO_OUTCOMES: [&str; 7] = [
+    "UNKNOWN",
+    "GOV",
+    "OPP",
+    "GOV via Forfeit",
+    "OPP via Forfeit",
+    "ALL DROP",
+    "ALL WIN",
+];
+
 pub type Submitted = HashMap<String, String>;
+const MAX_SCORE_TEXT_LEN: usize = 64;
 
 #[derive(Serialize)]
 struct Team {
@@ -172,6 +191,419 @@ pub async fn load(db: &mut MySqlConnection, id: i32) -> Result<Option<Debate>, s
         teams,
         scores,
     }))
+}
+
+#[derive(Default)]
+pub struct JudgeErrors {
+    fields: HashMap<String, String>,
+}
+
+fn django_choices(options: &[&str], start: i32) -> Vec<(String, String)> {
+    (start..)
+        .zip(options)
+        .map(|(index, text)| (index.to_string(), (*text).to_owned()))
+        .collect()
+}
+
+fn judge_choices(debate: &Debate, side: usize) -> Vec<(String, String)> {
+    std::iter::once(("-1".into(), "---".into()))
+        .chain(
+            debate.teams[side]
+                .speakers
+                .iter()
+                .map(|speaker| (speaker.id.to_string(), speaker.name.clone())),
+        )
+        .collect()
+}
+
+fn judge_score_step(settings: &Settings) -> (&'static str, &'static str) {
+    match policy(settings).step {
+        5_000 => ("0.5", "Speaks must be in half-point increments"),
+        1_000 => ("0.1", "Speaks may have at most 1 decimal digit"),
+        100 => ("0.01", "Speaks may have at most 2 decimal digits"),
+        _ => ("1", "Speaks must be whole numbers"),
+    }
+}
+
+fn judge_choice(raw: &str, options: &[(String, String)]) -> Result<i32, String> {
+    if raw.is_empty() {
+        return Err("This field is required.".into());
+    }
+    if !options.iter().any(|(choice, _)| choice == raw) {
+        return Err(format!(
+            "Select a valid choice. {raw} is not one of the available choices."
+        ));
+    }
+    Ok(raw.parse().expect("numeric ballot choice"))
+}
+
+fn judge_speaks(raw: &str, settings: &Settings) -> Result<i32, String> {
+    if raw.len() > MAX_SCORE_TEXT_LEN {
+        return Err("Enter a valid speaker score.".into());
+    }
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Err("This field is required.".into());
+    }
+    if raw.rsplit_once(['e', 'E']).is_some_and(|(_, exponent)| {
+        exponent
+            .parse::<i64>()
+            .is_ok_and(|value| !(-999..=999).contains(&value))
+    }) {
+        return Err("Enter a valid speaker score.".into());
+    }
+    let parsed: bigdecimal::BigDecimal = raw.parse().map_err(|_| "Enter a number.")?;
+    let policy = policy(settings);
+    // Compare using Decimal before converting to the database's fixed precision.
+    let whole_limit = |limit| bigdecimal::BigDecimal::new(limit, 4);
+    if parsed < whole_limit(policy.minimum.into()) || parsed > whole_limit(policy.maximum.into()) {
+        return Err(format!(
+            "{parsed} is an entirely invalid speaker score, try again."
+        ));
+    }
+    let (integer, scale) = parsed.as_bigint_and_exponent();
+    let digits = integer.to_string();
+    if digits == "0" {
+        return Ok(0);
+    }
+    let significant = digits.trim_end_matches('0');
+    let shift = 4_i64
+        .saturating_sub(scale)
+        .saturating_add((digits.len() - significant.len()) as i64);
+    let invalid_step = || judge_score_step(settings).1.to_owned();
+    let factor = u32::try_from(shift)
+        .ok()
+        .and_then(|shift| 10_i32.checked_pow(shift))
+        .ok_or_else(invalid_step)?;
+    let units = significant
+        .parse::<i32>()
+        .ok()
+        .and_then(|n| n.checked_mul(factor))
+        .ok_or_else(invalid_step)?;
+    if units % policy.step != 0 {
+        return Err(invalid_step());
+    }
+    Ok(units)
+}
+
+pub fn judge_ballot(
+    debate: &Debate,
+    settings: &Settings,
+    min: i32,
+    max: i32,
+    code: &str,
+    submitted: &Submitted,
+) -> Result<WriteBallot, JudgeErrors> {
+    let field = |name: &str| submitted.get(name).map_or("", String::as_str);
+    let mut errors = JudgeErrors::default();
+    let mut parse = |name: &str, result: Result<i32, String>| {
+        result.unwrap_or_else(|error| {
+            errors.fields.insert(name.into(), error);
+            0
+        })
+    };
+    let winner = parse(
+        "winner",
+        judge_choice(field("winner"), &django_choices(&DJANGO_OUTCOMES, 0)),
+    );
+    let ranks = django_choices(&["1", "2", "3", "4"], 1);
+    let teams = [judge_choices(debate, 0), judge_choices(debate, 1)];
+    let scores = std::array::from_fn(|index| {
+        let role = ROLES[index];
+        let debater = format!("{role}_debater");
+        let speaks = format!("{role}_speaks");
+        let rank = format!("{role}_ranks");
+        Score {
+            debater: parse(&debater, judge_choice(field(&debater), &teams[index / 2])),
+            speaks: parse(&speaks, judge_speaks(field(&speaks), settings)),
+            rank: parse(&rank, judge_choice(field(&rank), &ranks)),
+        }
+    });
+    let entered = field("ballot_code").trim();
+    let length = entered.chars().count();
+    let code_error = if entered.is_empty() {
+        Some("This field is required.".into())
+    } else if length > 30 {
+        Some(format!(
+            "Ensure this value has at most 30 characters (it has {length})."
+        ))
+    } else if entered.contains('\0') {
+        Some("Null characters are not allowed.".into())
+    } else {
+        None
+    };
+    if let Some(message) = code_error {
+        errors.fields.insert("ballot_code".into(), message);
+    }
+    if rfd_access(settings, debate.number).allowed && field("rfd").contains('\0') {
+        errors
+            .fields
+            .insert("rfd".into(), "Null characters are not allowed.".into());
+    }
+    if !errors.fields.is_empty() {
+        return Err(errors);
+    }
+
+    let mut order = [0, 1, 2, 3];
+    order.sort_by_key(|&index| scores[index].rank);
+    if order.map(|index| scores[index].rank) != [1, 2, 3, 4] {
+        for role in ROLES {
+            errors
+                .fields
+                .insert(format!("{role}_ranks"), "Ranks must be different".into());
+        }
+    }
+    for pair in order.windows(2) {
+        if scores[pair[0]].speaks < scores[pair[1]].speaks {
+            let role = ROLES[pair[1]];
+            errors.fields.insert(
+                format!("{role}_speaks"),
+                "These speaks are too high for the rank".into(),
+            );
+        }
+    }
+    for (role, score) in ROLES.into_iter().zip(scores) {
+        if score.debater == -1 {
+            errors.fields.insert(
+                format!("{role}_debater"),
+                "You need to pick a debater".into(),
+            );
+        }
+    }
+    if winner == 0 {
+        errors
+            .fields
+            .insert("winner".into(), "Someone has to win!".into());
+    }
+    if !errors.fields.is_empty() {
+        return Err(errors);
+    }
+
+    let eligible = debate.teams.each_ref().map(|team| {
+        team.speakers
+            .iter()
+            .map(|speaker| speaker.id)
+            .collect::<Vec<_>>()
+    });
+    let ballot = Ballot { winner, scores };
+    if let Err(message) = ballot.validate(policy(settings), [&eligible[0], &eligible[1]]) {
+        // Outcome, roster, increments, and rank order were already checked above.
+        errors
+            .fields
+            .insert("winner".into(), "Low Point Win!!".into());
+        debug_assert_eq!(
+            message,
+            "The selected winner received fewer speaker points or lower ranks."
+        );
+        return Err(errors);
+    }
+
+    if !entered.eq_ignore_ascii_case(code) {
+        errors.fields.insert(
+            "ballot_code".into(),
+            "Incorrect judge code. Enter again.".into(),
+        );
+    }
+    if !matches!(winner, 1 | 2) {
+        errors.fields.insert(
+            "winner".into(),
+            "Go to tab to submit a result other than a win or loss.".into(),
+        );
+    }
+    let bounds = min.saturating_mul(10_000)..=max.saturating_mul(10_000);
+    for (role, score) in ROLES.into_iter().zip(scores) {
+        if !bounds.contains(&score.speaks) {
+            errors.fields.insert(
+                format!("{role}_speaks"),
+                "Speaks must be justified to tab.".into(),
+            );
+        }
+    }
+    if !errors.fields.is_empty() {
+        return Err(errors);
+    }
+    Ok(scored_ballot(&ballot))
+}
+
+fn judge_rfd_field(access: RfdAccess, value: &str, error: Option<&String>) -> Value {
+    let help_text = if access.open {
+        format!(
+            "Optional. You may submit the ballot without an RFD and edit this text later until {}.",
+            access.deadline
+        )
+    } else if access.deadline.is_empty() {
+        "Tab has not configured the written RFD deadline yet.".into()
+    } else {
+        format!("The written RFD deadline was {}.", access.deadline)
+    };
+    let label_tag =
+        Value::from_safe_string(r#"<label for="id_rfd">Reason for decision:</label>"#.into());
+    let help_id = "id_rfd_helptext";
+    let error_id = error.map(|_| "id_rfd_error");
+    let class = if error.is_some() {
+        "form-control form-control is-invalid"
+    } else {
+        "form-control form-control"
+    };
+    let readonly = if access.open {
+        ""
+    } else {
+        r#" readonly="readonly""#
+    };
+    let invalid = if error.is_some() {
+        r#" aria-invalid="true""#
+    } else {
+        ""
+    };
+    let description = if error.is_some() {
+        "id_rfd_helptext id_rfd_error"
+    } else {
+        help_id
+    };
+    let input = format!(
+        r#"<textarea name="rfd" cols="40" rows="6" class="{class}"{readonly}{invalid} aria-describedby="{description}" id="id_rfd">
+{}</textarea>"#,
+        escape(value),
+    );
+    let errors: Vec<_> = error.into_iter().collect();
+    context! { label_tag, input, help_id, help_text, error_id, errors }
+}
+
+pub fn judge_context(
+    debate: &Debate,
+    settings: &Settings,
+    warnings: &Settings,
+    code: &str,
+    action: &str,
+    return_path: &str,
+    invalid: Option<(&Submitted, &JudgeErrors)>,
+) -> Value {
+    let field = |name: &str, initial: &str| {
+        invalid.map_or_else(
+            || initial.to_owned(),
+            |(submitted, _)| submitted.get(name).cloned().unwrap_or_default(),
+        )
+    };
+    let error = |name: &str| invalid.and_then(|(_, errors)| errors.fields.get(name));
+    let winner = if debate.winner == 0 {
+        String::new()
+    } else {
+        debate.winner.to_string()
+    };
+    let mut form = HashMap::from([
+        (
+            "winner".into(),
+            select(
+                "winner",
+                "Which team won the round?",
+                &django_choices(&DJANGO_OUTCOMES, 0),
+                &field("winner", &winner),
+                false,
+                false,
+                error("winner").cloned(),
+            ),
+        ),
+        (
+            "ballot_code".into(),
+            input(
+                "ballot_code",
+                "Judge code:",
+                "text",
+                &field("ballot_code", code),
+                r#" maxlength="30" minlength="0""#,
+                true,
+                error("ballot_code").cloned(),
+            ),
+        ),
+    ]);
+    let ranks = django_choices(&["1", "2", "3", "4"], 1);
+    let teams = [judge_choices(debate, 0), judge_choices(debate, 1)];
+    let step = format!(r#" step="{}""#, judge_score_step(settings).0);
+    for (index, (role, label)) in ROLES.into_iter().zip(ROLE_NAMES).enumerate() {
+        let name = format!("{role}_debater");
+        form.insert(
+            name.clone(),
+            select(
+                &name,
+                &format!("Who was {label}?"),
+                &teams[index / 2],
+                &field(&name, ""),
+                false,
+                false,
+                error(&name).cloned(),
+            ),
+        );
+        let name = format!("{role}_speaks");
+        let value = field(&name, "");
+        form.insert(
+            name.clone(),
+            input(
+                &name,
+                &format!("{label} Speaks:"),
+                "number",
+                if value.len() <= MAX_SCORE_TEXT_LEN {
+                    &value
+                } else {
+                    ""
+                },
+                &step,
+                true,
+                error(&name).cloned(),
+            ),
+        );
+        let name = format!("{role}_ranks");
+        form.insert(
+            name.clone(),
+            select(
+                &name,
+                &format!("{label} Rank:"),
+                &ranks,
+                &field(&name, ""),
+                false,
+                false,
+                error(&name).cloned(),
+            ),
+        );
+    }
+    let rfd = rfd_access(settings, debate.number);
+    if rfd.allowed {
+        form.insert(
+            "rfd".into(),
+            judge_rfd_field(rfd, &field("rfd", &debate.rfd), error("rfd")),
+        );
+    }
+    let hidden = format!(
+        r#"<input type="hidden" name="round_instance" value="{}" id="id_round_instance">"#,
+        debate.id
+    );
+    form.insert("hidden_fields".into(), Value::from_serialize([hidden]));
+    if let Some((_, errors)) = invalid {
+        form.insert(
+            "errors".into(),
+            Value::from_serialize(vec![true; errors.fields.len()]),
+        );
+    }
+    let [gov, opp] = debate.teams.each_ref().map(|team| team.name.as_str());
+    let title = format!(
+        "Entering Ballot for Round {} between {gov} and {opp}",
+        debate.number
+    );
+    let portal_url = format!("/public/e-ballots/{code}/");
+    let previous_ballots_url = format!("{portal_url}previous/");
+    let warn_judges_about_speaks = match warnings.value("warn_judges_about_speaks") {
+        Some(crate::settings::SettingValue::Number(value)) => value.to_string(),
+        Some(crate::settings::SettingValue::Text(value)) if value.eq_ignore_ascii_case("false") => {
+            "false".into()
+        }
+        _ => "true".into(),
+    };
+    context! {
+        title, form, ballot_code => code, action, return_path, portal_url, previous_ballots_url,
+        gov_team => context! { display => gov }, opp_team => context! { display => opp },
+        warn_judges_about_speaks,
+        low_speak_warning_threshold => warnings.integer("low_speak_warning_threshold", 25),
+        high_speak_warning_threshold => warnings.integer("high_speak_warning_threshold", 34),
+    }
 }
 
 pub async fn single_page(
@@ -517,8 +949,11 @@ pub fn extract(
                 .collect(),
         ));
     }
-    let ballot = &ballots[0];
-    Ok(WriteBallot::Scores(
+    Ok(scored_ballot(&ballots[0]))
+}
+
+fn scored_ballot(ballot: &Ballot) -> WriteBallot {
+    WriteBallot::Scores(
         ballot.winner,
         ballot
             .scores
@@ -533,7 +968,7 @@ pub fn extract(
                 )
             })
             .collect(),
-    ))
+    )
 }
 
 pub fn decimal(raw: &str) -> Option<i32> {

@@ -1991,13 +1991,12 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         assert not debate.roundstats_set.exists()
         status, _, page = request(port, chair_current)
         assert status == 200 and b"Portal Speaker 0" in page
-        assert b"Government by forfeit" not in page
+        assert b"GOV via Forfeit" in page and b'enctype="multipart/form-data"' in page
         assert request(port, wing_current)[0] == 403
         assert post(wing_current, {**data, "ballot_code": wing_code})[0] == 403
         assert post(chair_current, data, origin="https://example.invalid")[0] == 403
-        for invalid in (
-            {"round_instance": debate.id + 1}, {"winner": 3}, {"pm_speaks": 36}, {"ballot_code": wing_code},
-        ):
+        assert post(chair_current, {**data, "round_instance": debate.id + 1})[0] == 409
+        for invalid in ({"winner": 3}, {"pm_speaks": 36}, {"ballot_code": wing_code}):
             assert post(chair_current, {**data, **invalid})[0] == 422
             assert not debate.roundstats_set.exists()
 
@@ -2007,10 +2006,11 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         debate.refresh_from_db()
         assert debate.victor == Round.GOV and debate.rfd == "First reason"
         assert debate.roundstats_set.count() == 4
-        assert request(port, chair_current)[1]["Location"] == chair_submitted
-        status, _, page = request(port, chair_submitted)
-        assert status == 200 and b"First reason" in page
-        assert b"Disclose speaker points" in page and b"Ranks are closed" in page
+        for url in (chair_current, chair_submitted):
+            status, _, page = request(port, url)
+            assert status == 200 and b"First reason" in page
+            assert b"open speaks but closed ranks" in page
+            assert f'action="{chair_specific}"'.encode() in page
         assert request(port, wing_specific)[0] == 200
         assert request(port, other_specific)[1]["Location"] == f"{path}{other_code}/previous/"
         assert post(wing_specific, {"rfd": "Forbidden change"})[0] == 403
@@ -2036,6 +2036,145 @@ def test_native_judge_portal_availability_current_previous_and_reason_edits():
         assert post(chair_specific, {"rfd": "Late edit"})[0] == 403
         debate.refresh_from_db()
         assert debate.rfd == "Updated reason"
+
+        TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
+        future = Round.objects.create(round_number=2, gov_team=teams[0], opp_team=teams[1], chair=chair)
+        future.judges.add(chair)
+        TabSettings.set("cur_round", 3)
+        status, _, stale = post(chair_current, {**data, "rfd": "An earlier draft"})
+        assert status == 409 and b"An earlier draft" not in stale
+        assert b'name="pm_speaks" value=' not in request(port, chair_current)[2]
+        assert not future.roundstats_set.exists()
+        future.refresh_from_db()
+        assert not future.rfd
+        TabSettings.set("cur_round", 2)
+        Round.objects.filter(pk=future.pk).update(victor=Round.GOV, rfd="Next debate's reason")
+        RoundStats.objects.create(round=future, debater=speakers[0], speaks=31, ranks=1, debater_role="pm")
+        future_url = f"{chair_submitted}{future.id}/"
+        assert request(port, future_url)[1]["Location"] == chair_previous
+        assert post(future_url, {"rfd": "Too early"})[1]["Location"] == chair_previous
+        assert b"Next debate" not in request(port, chair_previous)[2]
+        TabSettings.set("cur_round", 3)
+        assert b"Next debate" in request(port, chair_submitted)[2]
+        assert post(chair_submitted, {"rfd": "Stale roundless edit"})[0] == 409
+        assert post(chair_specific, {"rfd": "Earlier debate only"})[1]["Location"] == chair_specific
+        debate.refresh_from_db()
+        future.refresh_from_db()
+        assert debate.rfd == "Earlier debate only"
+        assert future.rfd == "Next debate's reason"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_judge_ballot_entry_and_submitted_html_matches_django(html_assets):
+    chair_code = "Fixture-Ballot-632"
+    wing_code = "Fixture-Panel-633"
+    chair = Judge.objects.create(name="Fixture Chair", rank=5, ballot_code=chair_code)
+    wing = Judge.objects.create(name="Fixture Wing", rank=5, ballot_code=wing_code)
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("pairing_released", 1)
+    TabSettings.set("decimal_speaks", 3)
+    TabSettings.set("open_speaks", 1)
+    TabSettings.set("open_ranks", 2)
+    school = School.objects.create(name="Fixture School")
+    gov = Team.objects.create(name="Gov & <Blue>", school=school, seed=Team.UNSEEDED)
+    opp = Team.objects.create(name="Opp 'Gold' / Two", school=school, seed=Team.UNSEEDED)
+    speakers = [
+        Debater.objects.create(name=f"{name} <&>", novice_status=Debater.VARSITY)
+        for name in ("Zulu", "Alpha", "Ruby", "Emerald")
+    ]
+    gov.debaters.add(*speakers[:2])
+    opp.debaters.add(*speakers[2:])
+    debate = Round.objects.create(round_number=2, gov_team=gov, opp_team=opp, chair=chair)
+    debate.judges.add(chair, wing)
+    route = f"/public/e-ballots/{chair_code}/"
+    current = route + "current/"
+    submitted = route + "submitted/"
+    explicit = f"{submitted}{debate.id}/"
+    wing_ballot = f"/public/e-ballots/{wing_code}/submitted/{debate.id}/"
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["csrftoken"] = csrf
+    cookies = {"Cookie": f"csrftoken={csrf}"}
+    fields = {"round_instance": debate.id, "winner": 1, "ballot_code": chair_code, "rfd": "Ballot <&> reason"}
+    for i, (role, speaker) in enumerate(zip(("pm", "mg", "lo", "mo"), speakers)):
+        fields.update({f"{role}_debater": speaker.id, f"{role}_speaks": 31 - i, f"{role}_ranks": i + 1})
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(path, values=None, alias=False):
+            if values is None:
+                status, headers, body = request(port, path, extra_headers=cookies)
+            else:
+                status, headers, body = request(port, path, method="POST", extra_headers=cookies,
+                                                form={"csrfmiddlewaretoken": csrf, **values})
+            assert status == (200 if values is None else 422)
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            with patch("django.middleware.csrf._get_new_csrf_string",
+                       return_value=mask[1][:32].decode() if mask else csrf):
+                reference = client.get(path) if values is None else client.post(path, values)
+            assert reference.status_code == 200
+            expected = reference.content
+            if alias:
+                expected = expected.replace(b'<form method="post" action="">',
+                                            f'<form method="post" action="{explicit}">'.encode())
+            assert headers["Cache-Control"] == "private, no-store"
+            assert headers["Referrer-Policy"] == "same-origin"
+            assert_html_bytes(body, expected)
+            return body
+
+        compare(current)
+        TabSettings.set("written_rfd_first_round", 2)
+        compare(current)
+        TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
+        compare(current)
+        TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
+        TabSettings.set("warn_judges_about_speaks", 0)
+        TabSettings.set("low_speak_warning_threshold", 24)
+        TabSettings.set("high_speak_warning_threshold", 33)
+        compare(current)
+        for invalid in (
+            {"winner": ""}, {"winner": 0}, {"winner": 2}, {"winner": 3},
+            {"pm_debater": -1}, {"pm_debater": "<&>"}, {"pm_speaks": "not a number"},
+            {"pm_speaks": "51"}, {"pm_speaks": "31.001"}, {"pm_speaks": "36"},
+            {"pm_ranks": "2", "mg_speaks": "32"}, {"ballot_code": "No-Such-Judge-633"},
+            {"ballot_code": "", "pm_speaks": "", "lo_ranks": ""},
+        ):
+            compare(current, {**fields, **invalid})
+        for oversized in ("9" * 256, "1e9999"):
+            status, _, body = request(
+                port, current, method="POST", extra_headers=cookies,
+                form={"csrfmiddlewaretoken": csrf, **fields, "pm_speaks": oversized},
+            )
+            assert status == 422 and b"Enter a valid speaker score." in body
+            if len(oversized) > 64:
+                assert oversized.encode() not in body
+        assert not debate.roundstats_set.exists()
+
+        # Submit the same encoding a browser uses, including an exact Decimal exponent.
+        multipart_fields = {"csrfmiddlewaretoken": csrf, **fields, "pm_speaks": "3.1e1"}
+        multipart = "".join(
+            f'--fixture\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+            for name, value in multipart_fields.items()
+        ) + "--fixture--\r\n"
+        status, headers, _ = request(
+            port, current, method="POST", raw_body=multipart.encode(),
+            extra_headers={**cookies, "Content-Type": "multipart/form-data; boundary=fixture"},
+        )
+        assert status == 302 and headers["Location"] == submitted
+        assert list(debate.roundstats_set.order_by("-speaks").values_list("speaks", flat=True)) == [31, 30, 29, 28]
+        debate.refresh_from_db()
+        assert debate.rfd == fields["rfd"]
+        compare(explicit)
+        compare(current, alias=True)
+        compare(submitted, alias=True)
+        compare(wing_ballot)
+        debate.roundstats_set.filter(debater_role="mo").delete()
+        RoundStats.objects.create(round=debate, debater=speakers[1], speaks=31.25,
+                                  ranks=Decimal("2.5000"), debater_role="pm")
+        compare(explicit)
+        TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
+        compare(explicit)
+        TabSettings.set("written_rfd_deadline", "")
+        compare(explicit)
 
 
 @pytest.mark.django_db(transaction=True)

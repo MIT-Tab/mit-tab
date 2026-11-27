@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use axum::{
     Extension, Form,
-    extract::{Path, State},
+    extract::{Path, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, Uri, header},
     response::Response,
 };
@@ -13,14 +13,14 @@ use sqlx::MySqlConnection;
 
 use crate::{
     App, access,
-    ballot_entry::{self, Submitted, WriteBallot},
-    html::{self, Navigation},
+    ballot_entry::{self, Submitted},
     legacy_html,
     legacy_session::Actor,
     login::{self, TemplateCsrf},
     private,
     settings::Settings,
     staff_pairing::{lock_round, lock_round_if_configured},
+    staff_roster::{form_return_path, submitted_fields},
     staff_roster_notice::{self, Portal},
     unavailable,
 };
@@ -409,19 +409,28 @@ pub async fn current(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     Path(code): Path<String>,
 ) -> Response {
-    current_response(&app, actor, &headers, &code, None).await
+    let return_path = form_return_path(&uri, &headers, None);
+    current_response(&app, actor, &headers, &code, &return_path, None).await
 }
 
 pub async fn submit(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
-    headers: HeaderMap,
     Path(code): Path<String>,
-    Form(form): Form<Submitted>,
+    request: Request,
 ) -> Response {
-    current_response(&app, actor, &headers, &code, Some(form)).await
+    let headers = request.headers().clone();
+    let uri = request.uri().clone();
+    let fields = match submitted_fields(&app, request).await {
+        Ok(fields) => fields,
+        Err(error) => return *error,
+    };
+    let return_path = form_return_path(&uri, &headers, Some(&fields));
+    let form = fields.into_last_values().collect();
+    current_response(&app, actor, &headers, &code, &return_path, Some(form)).await
 }
 
 async fn current_response(
@@ -429,6 +438,7 @@ async fn current_response(
     actor: Actor,
     headers: &HeaderMap,
     code: &str,
+    return_path: &str,
     form: Option<Submitted>,
 ) -> Response {
     if let Some(form) = &form
@@ -458,7 +468,7 @@ async fn current_response(
         let [(id, _, chair, submitted)] = assignments.as_slice() else {
             return Ok(access::found(target(code, "")));
         };
-        if *submitted {
+        if *submitted && (form.is_some() || *chair != Some(judge_id)) {
             return Ok(access::found(target(code, "submitted/")));
         }
         if *chair != Some(judge_id) {
@@ -467,65 +477,76 @@ async fn current_response(
                 "Only the assigned chair can submit this ballot.",
             )));
         }
+        if *submitted {
+            let Some(ballot) = submitted_ballot(&mut db, judge_id, number, Some(*id)).await? else {
+                return Ok(access::found(target(code, "previous/")));
+            };
+            let path = target(code, "current/");
+            let view = FrozenView {
+                code,
+                path: &path,
+                actor,
+                judge: judge_id,
+                explicit: false,
+            };
+            return Ok(frozen_page(app, &mut db, headers, &view, &ballot, &options).await?);
+        }
+        if let Some(form) = &form
+            && form.get("round_instance").and_then(|value| value.trim().parse::<i32>().ok()) != Some(*id)
+        {
+            return Ok(private((
+                StatusCode::CONFLICT,
+                "This ballot belongs to a different debate. Reopen the current ballot from the Judge Portal.",
+            )));
+        }
         let settings = Settings::load(&mut db, ballot_entry::FORM_SETTINGS).await?;
         let Some(debate) = ballot_entry::load(&mut db, *id).await? else {
             return Ok(access::found(target(code, "")));
         };
-        let Some(form) = form else {
-            return Ok(ballot_entry::page(
-                actor,
-                headers,
+        let validation = form.as_ref().map(|form| {
+            ballot_entry::judge_ballot(
                 &debate,
                 &settings,
-                None,
-                None,
-                Some(code),
-            ));
-        };
-        let invalid = |message| {
-            ballot_entry::page(
-                actor,
-                headers,
-                &debate,
-                &settings,
-                None,
-                Some((&form, message)),
-                Some(code),
+                options.integer("min_eballot_speak", 15),
+                options.integer("max_eballot_speak", 35),
+                code,
+                form,
             )
-        };
-        let entered = form.get("ballot_code").map_or("", |value| value.trim());
-        if !entered.eq_ignore_ascii_case(code) {
-            return Ok(invalid("Enter the judge code provided by tab."));
-        }
-        let ballot = match ballot_entry::extract(&debate, &settings, &form, None) {
-            Ok(WriteBallot::Scores(winner @ (1 | 2), scores)) => {
-                WriteBallot::Scores(winner, scores)
+        });
+        let ballot = match (form.as_ref(), validation) {
+            (Some(_), Some(Ok(ballot))) => ballot,
+            (form, validation) => {
+                let errors = validation.and_then(Result::err);
+                let path = target(code, "current/");
+                let warnings =
+                    Settings::load(&mut db, ballot_entry::SPEAK_WARNING_SETTINGS).await?;
+                let shell = legacy_html::shell(&mut db, actor, &path).await?;
+                let context = ballot_entry::judge_context(
+                    &debate,
+                    &settings,
+                    &warnings,
+                    code,
+                    &path,
+                    return_path,
+                    form.zip(errors.as_ref()),
+                );
+                let mut response = form_page(
+                    app,
+                    headers,
+                    &path,
+                    "ballots/round_entry.html",
+                    shell,
+                    context,
+                );
+                if errors.is_some() && response.status().is_success() {
+                    *response.status_mut() = StatusCode::UNPROCESSABLE_ENTITY;
+                }
+                return Ok(response);
             }
-            Ok(_) => {
-                return Ok(invalid(
-                    "See tab to submit a result other than a win or loss.",
-                ));
-            }
-            Err(error) => return Ok(invalid(error)),
         };
-        let minimum = options
-            .integer("min_eballot_speak", 15)
-            .saturating_mul(10_000);
-        let maximum = options
-            .integer("max_eballot_speak", 35)
-            .saturating_mul(10_000);
-        if ROLES.iter().any(|role| {
-            form.get(&format!("{role}_speaks"))
-                .and_then(|value| ballot_entry::decimal(value))
-                .is_none_or(|speaks| !(minimum..=maximum).contains(&speaks))
-        }) {
-            return Ok(invalid(
-                "See tab to justify speaker points outside the e-ballot range.",
-            ));
-        }
         ballot_entry::save(&mut db, &debate, ballot).await?;
         if ballot_entry::rfd_access(&settings, number).open
-            && let Some(rfd) = form.get("rfd")
+            && let Some(rfd) = form.as_ref().and_then(|data| data.get("rfd"))
         {
             save_reason(&mut db, *id, rfd).await?;
         }
@@ -625,13 +646,6 @@ pub async fn previous(
     portal_response(&app, &headers, result).await
 }
 
-fn outcome(victor: i32) -> &'static str {
-    ballot_entry::OUTCOMES
-        .iter()
-        .find(|&&(code, _)| code == victor)
-        .map_or("Pending", |&(_, label)| label)
-}
-
 pub async fn submitted(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
@@ -675,7 +689,187 @@ struct FrozenScore {
     role: &'static str,
     name: String,
     speaks: String,
-    ranks: i32,
+    ranks: String,
+}
+
+struct SubmittedBallot {
+    id: i32,
+    number: i32,
+    chair: Option<i32>,
+    victor: i32,
+    gov: String,
+    opp: String,
+    rfd: String,
+}
+
+async fn submitted_ballot(
+    db: &mut MySqlConnection,
+    judge: i32,
+    current: i32,
+    requested: Option<i32>,
+) -> Result<Option<SubmittedBallot>, sqlx::Error> {
+    type Row = (i32, i32, Option<i32>, i32, String, String, String);
+    let ballot = sqlx::query_as::<_, Row>(
+        "SELECT r.id, r.round_number, r.chair_id, r.victor, g.name, o.name, r.rfd
+         FROM tab_round r JOIN tab_round_judges j ON j.round_id = r.id
+         JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
+         WHERE j.judge_id = ? AND r.round_number <= ?
+           AND ((? IS NULL AND r.round_number = ?) OR r.id = ?)
+           AND EXISTS(SELECT 1 FROM tab_roundstats s WHERE s.round_id = r.id)
+         ORDER BY r.id LIMIT 1",
+    )
+    .bind(judge)
+    .bind(current)
+    .bind(requested)
+    .bind(current)
+    .bind(requested)
+    .fetch_optional(db)
+    .await?;
+    Ok(ballot.map(
+        |(id, number, chair, victor, gov, opp, rfd)| SubmittedBallot {
+            id,
+            number,
+            chair,
+            victor,
+            gov,
+            opp,
+            rfd,
+        },
+    ))
+}
+
+fn disclosure_message(speaks: i32, ranks: i32) -> Option<&'static str> {
+    match (speaks, ranks) {
+        (0, 0) => None,
+        (1, 0) => Some(
+            "This tournament is open speaks. You are required to disclose speaks to debaters if they opt-in to hearing them.",
+        ),
+        (_, 0) => {
+            Some("This tournament is closed speaks. You should not tell debaters their speaks.")
+        }
+        (0, 1) => Some(
+            "This tournament is open ranks. You are required to disclose ranks to debaters if they opt-in to hearing them.",
+        ),
+        (0, _) => {
+            Some("This tournament is closed ranks. You should not tell debaters their ranks.")
+        }
+        (1, 1) => Some(
+            "This tournament is open speaks and open ranks. You are required to disclose both speaks and ranks to debaters if they opt-in to hearing them.",
+        ),
+        (1, 2) => Some(
+            "This tournament is open speaks but closed ranks. You are required to disclose speaks to debaters if they opt-in, but you should not tell debaters their ranks.",
+        ),
+        (2, 1) => Some(
+            "This tournament is closed speaks but open ranks. You should not tell speaks to debaters, but are required to disclose ranks if debaters opt-in to hearing them.",
+        ),
+        (_, _) => Some(
+            "This tournament is closed speaks and closed ranks. You should not tell debaters their speaks or ranks.",
+        ),
+    }
+}
+
+struct FrozenView<'a> {
+    code: &'a str,
+    path: &'a str,
+    actor: Actor,
+    judge: i32,
+    explicit: bool,
+}
+
+async fn frozen_page(
+    app: &App,
+    db: &mut MySqlConnection,
+    headers: &HeaderMap,
+    view: &FrozenView<'_>,
+    ballot: &SubmittedBallot,
+    options: &Settings,
+) -> Result<Response, sqlx::Error> {
+    let settings = Settings::load(db, ballot_entry::FORM_SETTINGS).await?;
+    let allowed = ballot_entry::rfd_access(&settings, ballot.number);
+    let editable = allowed.open && ballot.chair == Some(view.judge);
+    let shell = legacy_html::shell(db, view.actor, view.path).await?;
+    let mut stats: std::collections::HashMap<_, _> =
+        sqlx::query_as::<_, (String, String, String, String)>(
+            "SELECT s.debater_role, d.name, CAST(s.speaks AS CHAR), CAST(s.ranks AS CHAR)
+         FROM tab_roundstats s JOIN tab_debater d ON d.id = s.debater_id
+         WHERE s.round_id = ? AND s.debater_role IN ('pm','mg','lo','mo') ORDER BY s.id",
+        )
+        .bind(ballot.id)
+        .fetch_all(db)
+        .await?
+        .into_iter()
+        .map(|(role, name, speaks, ranks)| (role, (name, speaks, ranks)))
+        .collect();
+    let scores = ROLES.map(|role| stats.remove(role));
+    let rows: Vec<_> = ROLE_NAMES
+        .into_iter()
+        .zip(scores)
+        .map(|(role, score)| {
+            let (name, speaks, ranks) = score.map_or_else(
+                || ("—".into(), "—".into(), "—".into()),
+                |(name, speaks, ranks)| {
+                    let rounded = ranks
+                        .parse::<f64>()
+                        .expect("stored decimal rank")
+                        .round_ties_even() as i32;
+                    (name, speaks, rounded.to_string())
+                },
+            );
+            FrozenScore {
+                role,
+                name,
+                speaks,
+                ranks,
+            }
+        })
+        .collect();
+    let winner_display = usize::try_from(ballot.victor)
+        .ok()
+        .and_then(|index| ballot_entry::DJANGO_OUTCOMES.get(index))
+        .copied()
+        .unwrap_or("Unknown");
+    let rfd_action = if view.explicit {
+        String::new()
+    } else {
+        target(view.code, &format!("submitted/{}/", ballot.id))
+    };
+    let page = context! {
+        portal_url => target(view.code, ""),
+        previous_ballots_url => target(view.code, "previous/"),
+        ballot_code => view.code,
+        gov_team => context! { display => &ballot.gov },
+        opp_team => context! { display => &ballot.opp },
+        gov_debaters => &rows[..2],
+        opp_debaters => &rows[2..],
+        winner_display,
+        disclosure_message => disclosure_message(options.integer("open_speaks", 0), options.integer("open_ranks", 0)),
+        rfd_text => &ballot.rfd,
+        rfd_enabled => allowed.allowed,
+        rfd_editable => editable,
+        rfd_deadline_configured => !allowed.deadline.is_empty(),
+        rfd_deadline_display => allowed.deadline,
+        rfd_action,
+    };
+    if editable {
+        Ok(form_page(
+            app,
+            headers,
+            view.path,
+            "ballots/ballot_submitted.html",
+            shell,
+            page,
+        ))
+    } else {
+        Ok(staff_roster_notice::render_portal(
+            app,
+            headers,
+            Portal::Judge,
+            view.path,
+            "ballots/ballot_submitted.html",
+            shell,
+            page,
+        ))
+    }
 }
 
 async fn frozen(
@@ -692,7 +886,7 @@ async fn frozen(
         return csrf_error();
     }
     if !valid_code(code) {
-        return access::found(SEARCH);
+        return missing_judge(app, headers);
     }
     let result: PortalResult = async {
         let mut db = app.db.begin().await?;
@@ -702,55 +896,52 @@ async fn frozen(
         let row = judge(&mut db, code, form.is_some()).await?;
         let actor = access::code_portal_actor(&mut db, app, actor, headers).await?;
         let Some((judge_id, _)) = row else {
-            return Ok(access::found(SEARCH));
+            return Ok(missing_judge(app, headers));
         };
+        if form.is_some() && requested.is_none() {
+            return Ok(private((
+                StatusCode::CONFLICT,
+                "Reopen the submitted ballot before editing its written RFD.",
+            )));
+        }
         let options = Settings::load(&mut db, PORTAL_SETTINGS).await?;
         let current = options.integer("cur_round", 1).saturating_sub(1);
-        let Some((id, number, chair, victor, gov, opp, rfd)) =
-            sqlx::query_as::<_, (i32, i32, Option<i32>, i32, String, String, String)>(
-                "SELECT r.id, r.round_number, r.chair_id, r.victor, g.name, o.name, r.rfd
-                 FROM tab_round r JOIN tab_round_judges j ON j.round_id = r.id
-                 JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
-                 WHERE j.judge_id = ? AND ((? IS NULL AND r.round_number = ?) OR r.id = ?)
-                   AND EXISTS(SELECT 1 FROM tab_roundstats s WHERE s.round_id = r.id)
-                 ORDER BY r.id LIMIT 1",
-            ).bind(judge_id).bind(requested).bind(current).bind(requested).fetch_optional(&mut *db).await?
-        else {
+        let Some(ballot) = submitted_ballot(&mut db, judge_id, current, requested).await? else {
             return Ok(access::found(target(code, "previous/")));
         };
-        let settings = Settings::load(&mut db, ballot_entry::FORM_SETTINGS).await?;
-        let allowed = ballot_entry::rfd_access(&settings, number);
-        let editable = allowed.open && chair == Some(judge_id);
+        let suffix = requested.map_or_else(|| "submitted/".into(), |id| format!("submitted/{id}/"));
+        let path = target(code, &suffix);
         if let Some(form) = form {
+            let settings = Settings::load(&mut db, ballot_entry::FORM_SETTINGS).await?;
+            let editable = ballot_entry::rfd_access(&settings, ballot.number).open
+                && ballot.chair == Some(judge_id);
             if !editable || !form.contains_key("rfd") {
-                return Ok(private((StatusCode::FORBIDDEN, "Written reasons cannot be edited for this ballot.")));
+                return Ok(private((
+                    StatusCode::FORBIDDEN,
+                    "Written reasons cannot be edited for this ballot.",
+                )));
             }
-            save_reason(&mut db, id, &form["rfd"]).await?;
+            save_reason(&mut db, ballot.id, &form["rfd"]).await?;
             db.commit().await?;
-            let suffix = requested.map_or_else(|| "submitted/".into(), |id| format!("submitted/{id}/"));
-            return Ok(access::found(target(code, &suffix)));
+            return Ok(staff_roster_notice::portal_redirect(
+                app,
+                headers,
+                Portal::Judge,
+                &path,
+                "Written RFD saved.",
+                false,
+            ));
         }
-        let mut scores: Vec<_> = sqlx::query_as::<_, (String, String, String, i32)>(
-            "SELECT s.debater_role, d.name, CAST(s.speaks AS CHAR), CAST(ROUND(s.ranks, 0) AS SIGNED)
-             FROM tab_roundstats s JOIN tab_debater d ON d.id = s.debater_id WHERE s.round_id = ?
-             AND s.debater_role IN ('pm','mg','lo','mo') ORDER BY s.id",
-        ).bind(id).fetch_all(&mut *db).await?.into_iter().map(|(role, name, speaks, ranks)| {
-            let position = ROLES.iter().position(|&code| code == role).unwrap_or(0);
-            (position, FrozenScore { role: ROLE_NAMES[position], name, speaks, ranks })
-        }).collect();
-        scores.sort_by_key(|(position, _)| *position);
-        let scores: Vec<_> = scores.into_iter().map(|(_, score)| score).collect();
-        db.commit().await?;
-        let Ok(csrf) = html::page_csrf(headers) else { return Ok(unavailable()); };
-        let response = html::render("judge_submitted.html", context! {
-            title => format!("Round {number} Ballot Submitted"),
-            code, gov, opp, rfd, editable, scores, csrf, outcome => outcome(victor),
-            rfd_enabled => allowed.allowed, deadline => allowed.deadline,
-            open_speaks => options.integer("open_speaks", 0), open_ranks => options.integer("open_ranks", 0),
-            nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        }, StatusCode::OK);
-        Ok(html::form_response(response, headers, &csrf))
-    }.await;
+        let view = FrozenView {
+            actor,
+            code,
+            path: &path,
+            judge: judge_id,
+            explicit: requested.is_some(),
+        };
+        Ok(frozen_page(app, &mut db, headers, &view, &ballot, &options).await?)
+    }
+    .await;
     portal_response(app, headers, result).await
 }
 

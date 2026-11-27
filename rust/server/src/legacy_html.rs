@@ -296,6 +296,18 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/ballots/previous_ballots.html"),
         ),
         (
+            "ballots/ballot_submitted.html",
+            include_str!("../../../mittab/templates/ballots/ballot_submitted.html"),
+        ),
+        (
+            "ballots/round_entry.html",
+            include_str!("../../../mittab/templates/ballots/round_entry.html"),
+        ),
+        (
+            "ballots/_form.html",
+            include_str!("../../../mittab/templates/ballots/_form.html"),
+        ),
+        (
             "emails/judge_ballot_code.html",
             include_str!("../../../mittab/templates/emails/judge_ballot_code.html"),
         ),
@@ -740,6 +752,7 @@ fn translate(name: &str, source: &str) -> String {
             }
             ["quick_search"] => output.push_str("{% include 'common/_quick_search.html' %}"),
             ["outround_form", "form"] => output.push_str("{% include 'outrounds/_form.html' %}"),
+            ["round_form", "form", "gov_team", "opp_team"] => output.push_str("{% include 'ballots/_form.html' %}"),
             ["csrf_token"] => output.push_str("{{ csrf_input|safe }}"),
             ["widthratio", "num_rounds", "1", "72"] => output.push_str("{{ table_width }}"),
             ["render_form", "form"] => output.push_str("{% include 'ui/form.html' %}"),
@@ -756,6 +769,9 @@ fn translate(name: &str, source: &str) -> String {
             ["render_field", "field"] if name == "ui/form.html" => output.push_str(
                 "{% with checkbox=field.checkbox, choices=field.choices, widget_html=field.input|safe, help_id=field.help_id, error_id=field.error_id %}{% include 'ui/field.html' %}{% endwith %}",
             ),
+            ["render_field", field] if name == "ballots/_form.html" => output.push_str(&format!(
+                "{{% with field={field}, widget_html={field}.input|safe, help_id={field}.help_id, error_id={field}.error_id %}}{{% include 'ui/field.html' %}}{{% endwith %}}"
+            )),
             ["render_field", field, ..] => {
                 let field = field.strip_prefix("form.").unwrap_or(field);
                 output.push_str(&format!(
@@ -887,6 +903,12 @@ fn translate(name: &str, source: &str) -> String {
             .replace("row.round.gov_team.display", "row.government")
             .replace("row.round.opp_team.display", "row.opposition")
             .replace("{% if row.winner %}{{ row.winner.display }}{% else %}{{ row.round.get_victor_display }}{% endif %}", "{{ row.outcome }}"),
+        "ballots/_form.html" => translated
+            .replace("form.errors|django_pluralize", "form.errors|length|django_pluralize")
+            .replace("{{ hidden }}", "{{ hidden|safe }}"),
+        "ballots/ballot_submitted.html" => translated
+            .replace("<form method=\"post\" action=\"\">", "<form method=\"post\" action=\"{{ rfd_action }}\">")
+            .replace("|default:\"No written RFD has been entered.\"", "|django_default(\"No written RFD has been entered.\")"),
         "registration/team_portal.html" => translated
             .replace("team.debaters.all", "team.debaters")
             .replace("r.opponent.debaters.all", "r.opponent.debaters")

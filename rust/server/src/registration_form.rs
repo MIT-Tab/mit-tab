@@ -51,6 +51,12 @@ impl Fields {
         self.0.get(key).map(Vec::as_slice).unwrap_or_default()
     }
 
+    pub(super) fn into_last_values(self) -> impl Iterator<Item = (String, String)> {
+        self.0
+            .into_iter()
+            .filter_map(|(name, mut values)| values.pop().map(|value| (name, value)))
+    }
+
     pub fn flag(&self, key: &str) -> bool {
         matches!(
             self.get(key).to_ascii_lowercase().as_str(),
