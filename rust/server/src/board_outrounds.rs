@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use axum::{
     Extension, Form,
@@ -292,11 +292,21 @@ async fn recompute(
         .map(|entry| (entry.team, entry.original))
         .collect();
     let mut new = originals.clone();
-    for (_, stage) in by_stage(snapshots, division).into_iter().rev() {
+    let mut active = originals.keys().copied().collect::<BTreeSet<_>>();
+    let generation = entries
+        .iter()
+        .map(|entry| entry.id)
+        .min()
+        .unwrap_or_default();
+    let mut replay = crate::elimination_seeds::Replay::load(db, division, generation).await?;
+    for (size, stage) in by_stage(snapshots, division).into_iter().rev() {
+        replay
+            .apply_stage(db, size, &stage, &active, &originals, &mut new)
+            .await?;
         for pairing in stage {
             if let Some((winner, loser)) = winner_loser(pairing)
-                && new.contains_key(&winner)
-                && new.contains_key(&loser)
+                && active.contains(&winner)
+                && active.remove(&loser)
             {
                 new.insert(winner, new[&winner].min(new[&loser]));
                 new.insert(loser, originals[&loser]);
@@ -690,8 +700,12 @@ async fn correction(app: &App, actor: Actor, id: i32, form: Correction) -> Resul
         "board correction",
     )
     .await?;
-    let entries = seeds(&mut db).await?;
-    recompute(&mut db, user, &after, division, entries).await?;
+    if (form.action == "result" && winner_loser(row) != winner_loser(&after[&id]))
+        || (form.action == "team" && teams(row) != teams(&after[&id]))
+    {
+        let entries = seeds(&mut db).await?;
+        recompute(&mut db, user, &after, division, entries).await?;
+    }
     let settings = Settings::load(&mut db, publication::VISIBILITY_KEYS).await?;
     publication::refresh_placements(&mut db, &settings).await?;
     db.commit().await?;

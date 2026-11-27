@@ -183,6 +183,52 @@ pub async fn allowed_permission(
     }
 }
 
+pub async fn administration(State(app): State<App>, mut request: Request, next: Next) -> Response {
+    match admin_actor(&app, request.headers(), request.uri().path()).await {
+        Ok(actor) => {
+            request.extensions_mut().insert(actor);
+            next.run(request).await
+        }
+        Err(response) => *response,
+    }
+}
+
+pub async fn admin_actor(
+    app: &App,
+    headers: &axum::http::HeaderMap,
+    path: &str,
+) -> Result<Actor, Box<Response>> {
+    let Ok(actor) = actor(&app.db, headers, app.django_secret.as_deref()).await else {
+        return Err(Box::new(unavailable()));
+    };
+    let denied = match actor {
+        Actor::Anonymous => {
+            let path = if path == "/admin/login/" {
+                "/admin/"
+            } else {
+                path
+            };
+            found(format!("/public/login/?next={path}"))
+        }
+        Actor::User { board: true, .. } => match board_access_open(app).await {
+            Ok(true) => access_denied(),
+            Ok(false) => board_closed(),
+            Err(_) => unavailable(),
+        },
+        Actor::User {
+            staff: true,
+            superuser: true,
+            ..
+        } => match wizard_complete(app).await {
+            Ok(true) => return Ok(actor),
+            Ok(false) => found("/setup/start-tournament/"),
+            Err(_) => unavailable(),
+        },
+        _ => access_denied(),
+    };
+    Err(Box::new(denied))
+}
+
 pub async fn roster_log(State(app): State<App>, mut request: Request, next: Next) -> Response {
     let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
         return unavailable();

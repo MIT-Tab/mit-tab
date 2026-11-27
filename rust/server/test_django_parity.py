@@ -64,6 +64,7 @@ def rust_server(session_key_configured=True, overrides=None):
         "AWS_MAILMANAGER_ADDRESS_LIST": "",
         "MITTAB_PUBLIC_URL": "",
         "MITTAB_SES_ENDPOINT": "",
+        "SENTRY_DSN": "",
         "MYSQL_DATABASE": db["NAME"],
         "MYSQL_HOST": db["HOST"] or "127.0.0.1",
         "MYSQL_PORT": db["PORT"] or "3306",
@@ -82,6 +83,9 @@ def rust_server(session_key_configured=True, overrides=None):
         finally:
             process.terminate()
             process.wait(timeout=10)
+            diagnostics = process.stderr.read()
+            if diagnostics:
+                print(diagnostics)
 
 
 def request(port, path, *, method="GET", cookie=None, forwarded_proto=None, form=None,
@@ -381,7 +385,7 @@ def test_superuser_setup_gate_precedes_api_reads():
             assert request(port, path)[0] == 200
 
 
-def rust_command(command, database, *, tab_password=None):
+def rust_command(command, database, *, tab_password=None, overrides=None, args=()):
     db = connection.settings_dict
     assert db["HOST"] in ("localhost", "127.0.0.1", "::1", "")
     assert database.startswith("test_")
@@ -396,9 +400,11 @@ def rust_command(command, database, *, tab_password=None):
         "TAB_PASSWORD": tab_password or "",
         "ENTRY_PASSWORD": "synthetic-test-entry",
         "BOARD_PASSWORD": "synthetic-test-board",
+        "TOURNAMENT_NAME": "",
+        **(overrides or {}),
     }
     return subprocess.run(
-        [binary, command], env=environment, capture_output=True, text=True, timeout=30,
+        [binary, command, *args], env=environment, capture_output=True, text=True, timeout=30,
         check=False,
     )
 
@@ -3245,10 +3251,13 @@ def test_native_staff_standard_break_panels_publication_and_next_stage(tmp_path)
 
 
 @pytest.mark.django_db(transaction=True)
-def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path):
+@pytest.mark.parametrize("imported", (False, True))
+def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imported):
     from mittab.apps.tab.models import OutroundChallenge
 
     tab = legacy_tab_session("challenge-staff")
+    board = legacy_tab_session("challenge-board")
+    get_user_model().objects.get(username="challenge-board").groups.add(Group.objects.create(name="APDA Board"))
     for key, value in {
         "cur_round": 2, "tot_rounds": 1, "var_teams_to_break": 4, "nov_teams_to_break": 0,
         "outround_pairing_mode": 2, "var_panel_size": 1,
@@ -3293,6 +3302,42 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path):
         assert BreakingTeam.objects.get(team_id=c).effective_seed == 4
         assert TabSettings.get(f"challenge_once_applied_0_{min(seed.id for seed in seeds)}", use_cache=False) == 1
         assert post(path, action)[0] == 422
+        if imported:
+            TabSettings.objects.filter(key__startswith="rust_seed_").delete()
+        judge = Judge.objects.create(name="Challenge protected judge", rank=9, wing_only=True)
+        matching = list(Outround.objects.order_by("id"))
+        for row in matching:
+            row.judges.add(judge)
+            Outround.objects.filter(id=row.id).update(chair=judge)
+        assigned = {row.id: list(row.judges.values_list("id", flat=True)) for row in matching}
+
+        def board_post(url, form):
+            return request(port, url, method="POST",
+                           extra_headers={"Cookie": f"sessionid={board}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **form})
+
+        for row, winning_team in ((next(row for row in matching if c in (row.gov_team_id, row.opp_team_id)), c),
+                                  (next(row for row in matching if b in (row.gov_team_id, row.opp_team_id)), b)):
+            target = f"/apda-board/outround/{row.id}/"
+            def revision():
+                body = request(port, "/apda-board/outrounds/", cookie=board)[2].decode()
+                return re.search(rf'action="{target}"[^>]*>\s*<input[^>]*>\s*<input type="hidden" name="revision" value="([^"]+)"', body)[1]
+
+            assert board_post(target, {"action": "choice", "choice": 1, "revision": revision()})[0] == 302
+            result = board_post(target, {"action": "result", "victor": 1 if winning_team == row.gov_team_id else 2,
+                                         "revision": revision()})
+            assert result[0] == 302, result
+        assert BreakingTeam.objects.get(team_id=c).effective_seed == 1
+        assert BreakingTeam.objects.get(team_id=b).effective_seed == 2
+        paired = board_post("/apda-board/outrounds/pair/", {"division": 0})
+        assert paired[0] == 302, paired
+        final = Outround.objects.get(num_teams=2)
+        assert {final.gov_team_id, final.opp_team_id} == {b, c}
+        assert not final.judges.exists() and final.chair_id is None
+        for row in matching:
+            row.refresh_from_db()
+            assert row.chair_id == judge.id
+            assert list(row.judges.values_list("id", flat=True)) == assigned[row.id]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -3676,3 +3721,273 @@ def test_native_staff_rankings_and_report_match_reference():
             assert row["name"] in cells and f'{row["mean"]:.2f} ' in cells and f'#{row["mean_rank"]}' in cells
             assert f'{row["generosity"]:.2f} ' in cells and f'#{row["generosity_rank"]}' in cells
         assert f'data-judge-id="{highlighted.id}"'.encode() not in request(port, judges_url, cookie=staff)[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_new_tournament_requires_confirmation_and_saves_previous_data(tmp_path):
+    from mittab.apps.registration.models import Registration
+
+    staff = legacy_tab_session("reset-staff")
+    board = legacy_tab_session("reset-board")
+    get_user_model().objects.get(username="reset-board").groups.add(Group.objects.create(name="APDA Board"))
+    for key, value in {"cur_round": 2, "tot_rounds": 1, "tournament_name": "Before Reset",
+                       "teams_public": 1, "judges_public": 1}.items():
+        TabSettings.set(key, value)
+    school = School.objects.create(name="Reset School")
+    registration = Registration.objects.create(school=school, email="reset@example.invalid")
+    teams = [Team.objects.create(name=f"Reset Team {i}", school=school, seed=0, registration=registration)
+             for i in (1, 2)]
+    Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    config = RegistrationConfig.get_or_create_active()
+    config.allow_new_registrations = True
+    config.save()
+    PublicRosterChange.objects.create(list_kind="teams", message="Before reset public history")
+    confirm = "/pairing/confirm_start_tourny/"
+    reset = "/pairing/start_tourny/"
+    assert rust_command("migrate", connection.settings_dict["NAME"]).returncode == 0
+    with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
+        status, headers, body = request(port, confirm, cookie=staff)
+        assert status == 200 and b"Before Reset" in body, body
+        assert request(port, reset, cookie=staff)[0] == 200
+        assert request(port, confirm, cookie=board)[1]["Location"] == "/403/"
+        assert Team.objects.count() == 2 and not list(tmp_path.iterdir())
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(fields, session=staff):
+            return request(port, reset, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        action = {"revision": "initial", "confirm": "on"}
+        assert post(action, board)[1]["Location"] == "/403/"
+        assert post({"revision": "initial"})[0] == 422
+        assert post({**action, "revision": "stale"})[0] == 409
+        result = post(action)
+        assert result[0] == 302 and result[1]["Location"] == "/setup/start-tournament/", result
+        assert not Team.objects.exists() and not Round.objects.exists()
+        assert not Registration.objects.exists() and not PublicRosterChange.objects.exists()
+        assert get_user_model().objects.filter(username="reset-staff").exists()
+        assert TabSettings.get("cur_round", use_cache=False) == 1
+        assert TabSettings.get("tournament_name", use_cache=False) == "New Tournament"
+        assert not RegistrationConfig.get_active().allow_new_registrations
+        before, = tmp_path.glob("Before New Tournament*.dump.sql")
+        assert b"Before reset public history" in before.read_bytes()
+        assert b"Reset Team" in before.read_bytes()
+        assert request(port, "/setup/start-tournament/", cookie=staff)[0] == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_simulation_is_dev_only_and_adds_supported_ironman_ballots():
+    staff = legacy_tab_session("simulation-staff")
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 2)
+    school = School.objects.create(name="Simulation School")
+    teams = [Team.objects.create(name=f"Simulation Team {i}", school=school, seed=0) for i in (1, 2)]
+    for i, count in enumerate((1, 2)):
+        for j in range(count):
+            teams[i].debaters.add(Debater.objects.create(name=f"Simulated Speaker {i}-{j}", novice_status=0))
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1])
+    future = Round.objects.create(round_number=2, gov_team=teams[1], opp_team=teams[0])
+    url = "/pairings/simulate_rounds/"
+    for scope, expected in (("production", 422), ("development", 302)):
+        with rust_server(overrides={"MITTAB_ENV": scope}) as port:
+            status, headers, _ = request(port, url, cookie=staff)
+            assert status == 200
+            assert not RoundStats.objects.exists()
+            csrf = load_cookies(headers)["csrftoken"].value
+            result = request(port, url, method="POST",
+                             extra_headers={"Cookie": f"sessionid={staff}; csrftoken={csrf}"},
+                             form={"csrfmiddlewaretoken": csrf})
+            assert result[0] == expected, result
+    debate.refresh_from_db()
+    future.refresh_from_db()
+    assert debate.victor in (Round.GOV, Round.OPP) and future.victor == Round.NONE
+    stats = {row.debater_role: row for row in RoundStats.objects.filter(round=debate)}
+    assert set(stats) == {"pm", "mg", "lo", "mo"}
+    assert stats["pm"].debater_id == stats["mg"].debater_id
+    assert stats["lo"].debater_id != stats["mo"].debater_id
+    assert sorted(row.ranks for row in stats.values()) == [1, 2, 3, 4]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_test_deployment_seeds_fixture_without_overwriting_credentials():
+    from django.contrib.auth.hashers import check_password
+    from uuid import uuid4
+
+    existing = connection.settings_dict["NAME"]
+    database = f"{existing[:43]}_fixture_{uuid4().hex[:8]}"
+    with connection.cursor() as cursor:
+        cursor.execute(f"CREATE DATABASE `{database}` CHARACTER SET utf8mb4")
+    try:
+        result = rust_command("init", database, tab_password="fixture-auth-password",
+                              overrides={"TOURNAMENT_NAME": "synthetic-test"})
+        assert result.returncode == 0, result.stderr
+        with connection.cursor() as cursor:
+            for table, count in (("tab_school", 43), ("tab_team", 157), ("tab_judge", 130),
+                                 ("tab_scratch", 697), ("tab_roomcheckin", 700)):
+                cursor.execute(f"SELECT COUNT(*) FROM `{database}`.`{table}`")
+                assert cursor.fetchone()[0] == count
+            cursor.execute(f"SELECT password FROM `{database}`.auth_user WHERE username = 'tab'")
+            assert check_password("fixture-auth-password", cursor.fetchone()[0])
+        assert rust_command("init", database).returncode == 0
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP DATABASE `{database}`")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_administration_manages_accounts_groups_and_audit_with_board_exclusion():
+    from django.contrib.auth.hashers import check_password
+    from django.contrib.auth.models import Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    staff = legacy_tab_session("native-admin")
+    board = legacy_tab_session("native-admin-board")
+    user_model = get_user_model()
+    board_group = Group.objects.create(name="APDA Board")
+    user_model.objects.get(username="native-admin-board").groups.add(board_group)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Admin School")
+    teams = [Team.objects.create(name=f"Admin Team {i}", school=school, seed=0) for i in (1, 2)]
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], victor=Round.GOV)
+    audit = AuditEvent.objects.create(content_type=ContentType.objects.get_for_model(Round), object_id=debate.id,
+                                      object_repr="Fixture audit record", event_type="updated",
+                                      changes={"field": "fixture evidence"}, note="Staff audit entry")
+    assert rust_command("migrate", connection.settings_dict["NAME"]).returncode == 0
+    permission = Permission.objects.get(codename="change_publicrosterchange")
+    users = "/admin/auth/user/"
+    groups = "/admin/auth/group/"
+    record = f"/admin/tab/auditevent/{audit.id}/change/"
+    with rust_server() as port:
+        for path in ("/admin/", users, groups, record, "/admin/unknown/"):
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        assert request(port, "/admin/")[1]["Location"] == "/public/login/?next=/admin/"
+        assert request(port, "/admin/unknown/", cookie=staff)[0] == 404
+        assert request(port, "/404/")[0] == 404 and request(port, "/500/")[0] == 500
+        assert request(port, "/admin/tab/team/", cookie=staff)[1]["Location"] == "/view_teams/"
+        status, _, page = request(port, "/admin/tab/auditevent/?q=Fixture", cookie=staff)
+        assert status == 200 and b"Fixture audit record" in page, page
+        assert b"fixture evidence" in request(port, record, cookie=staff)[2]
+        status, headers, page = request(port, f"{groups}add/", cookie=staff)
+        assert status == 200 and b"Can change public roster change" in page, page
+        csrf = load_cookies(headers)["csrftoken"].value
+
+        def post(path, fields, session=staff):
+            return request(port, path, method="POST",
+                           extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+                           form={"csrfmiddlewaretoken": csrf, **fields})
+
+        assert post(f"{groups}add/", {"name": "Fixture Group", "permissions": permission.id})[0] == 302
+        group = Group.objects.get(name="Fixture Group")
+        assert set(group.permissions.all()) == {permission}
+        entry = {"username": "fixture-user", "active": "on", "staff": "on", "groups": group.id,
+                 "first_name": "Fixture", "email": "fixture-account@example.invalid",
+                 "password": "fixture-user-password", "confirmation": "fixture-user-password"}
+        assert post(f"{users}add/", {**entry, "groups": 99999999})[0] == 422
+        assert not user_model.objects.filter(username="fixture-user").exists()
+        assert post(f"{users}add/", entry, board)[1]["Location"] == "/403/"
+        response = post(f"{users}add/", entry)
+        assert response[0] == 302 and response[1]["Location"] == users, response
+        user = user_model.objects.get(username="fixture-user")
+        assert check_password(entry["password"], user.password)
+        assert list(user.groups.all()) == [group]
+        assert b"fixture-account@example.invalid" in request(port, users + "?q=fixture-user", cookie=staff)[2]
+        assert user.password.encode() not in request(port, f"{users}{user.id}/change/", cookie=staff)[2]
+        response = post(f"{users}{user.id}/password/", {"password": "changed-fixture-password",
+                                                       "confirmation": "changed-fixture-password"})
+        assert response[0] == 302, response
+        user.refresh_from_db()
+        assert check_password("changed-fixture-password", user.password)
+        assert post(f"{groups}{board_group.id}/delete/", {"confirm": "on"})[0] == 422
+        assert post(f"{users}{user.id}/delete/", {})[0] == 422
+        assert post(f"{users}{user.id}/delete/", {"confirm": "on"})[0] == 302
+        assert post(f"{groups}{group.id}/delete/", {"confirm": "on"})[0] == 302
+        assert not user_model.objects.filter(id=user.id).exists() and not Group.objects.filter(id=group.id).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_maintenance_cli_exports_csv_and_load_tests_local_ballots(tmp_path):
+    import csv
+
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("pairing_released", 1)
+    TabSettings.set("tot_rounds", 1)
+    schools = [School.objects.create(name=name) for name in ("CLI École", "CLI Hybrid")]
+    teams = [Team.objects.create(name=name, school=schools[0], hybrid_school=schools[1], seed=0)
+             for name in ("CLI, Team A", "CLI Team B")]
+    for i, team in enumerate(teams):
+        team.debaters.add(*[Debater.objects.create(name=f"CLI Speaker {i}-{j}", novice_status=i) for j in (0, 1)])
+    judge = Judge.objects.create(name="CLI Judge", rank=4, ballot_code="Local-Load")
+    debate = Round.objects.create(round_number=1, gov_team=teams[0], opp_team=teams[1], chair=judge)
+    debate.judges.add(judge)
+    database = connection.settings_dict["NAME"]
+    with rust_server() as port:
+        settings = {"MITTAB_ENV": "development"}
+        args = ("--host", f"127.0.0.1:{port}", "--connections", "2")
+        refused = rust_command("load-test", database, args=args, overrides={"MITTAB_ENV": "production"})
+        assert refused.returncode == 1 and "development" in refused.stderr
+        remote = rust_command("load-test", database, args=("--host", "example.invalid"), overrides=settings)
+        assert remote.returncode == 1 and "loopback" in remote.stderr
+        result = rust_command("load-test", database, args=args, overrides=settings)
+        assert result.returncode == 0 and "1 of 1" in result.stderr, result.stderr
+    debate.refresh_from_db()
+    assert debate.victor in (Round.GOV, Round.OPP) and debate.roundstats_set.count() == 4
+    result = rust_command("export-stats", database, args=("--root", str(tmp_path), "--team-file", "all.csv"))
+    assert result.returncode == 0, result.stderr
+    assert sorted(file.name for file in tmp_path.iterdir()) == ["all.csv", "debaters.csv", "nov-debaters.csv", "nov-teams.csv"]
+    with (tmp_path / "all.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 2 and all(row["School"] == "CLI École" and row["Hyrbid School"] == "CLI Hybrid" for row in rows)
+    assert rows[0]["Team Name"] == debate.winner.name
+    assert rows[0]["Wins"] == "1" and float(rows[0]["Speaks"]) > 0
+    with (tmp_path / "nov-debaters.csv").open(encoding="utf-8", newline="") as handle:
+        assert {row["Name"] for row in csv.DictReader(handle)} == {"CLI Speaker 1-0", "CLI Speaker 1-1"}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_sentry_reports_route_templates_without_sensitive_request_values():
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Event, Thread
+
+    staff = legacy_tab_session("telemetry-staff")
+    received = []
+    recorded = Event()
+
+    class Fixture(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+        def do_POST(self):
+            content = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            received.append(content)
+            if b'"type":"event"' in content:
+                recorded.set()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), Fixture) as collector:
+        thread = Thread(target=collector.serve_forever, daemon=True)
+        thread.start()
+        try:
+            env = {
+                "SENTRY_DSN": f"http://fixture-key@127.0.0.1:{collector.server_port}/1",
+                "SENTRY_ENVIRONMENT": "fixture",
+                "SENTRY_TRACES_SAMPLE_RATE": "1",
+                "BACKUP_STORAGE": "S3",
+                "BACKUP_BUCKET": "",
+            }
+            with rust_server(overrides=env) as port:
+                assert request(port, "/healthz")[0] == 200
+                assert request(port, "/backup/download/private-fixture-file/?code=private-fixture-query",
+                               cookie=staff)[0] == 503
+                assert recorded.wait(5)
+        finally:
+            collector.shutdown()
+            thread.join()
+    payload = b"\n".join(received)
+    assert b"/backup/download/{key}/" in payload
+    assert b"private-fixture-file" not in payload and b"private-fixture-query" not in payload
+    assert staff.encode() not in payload

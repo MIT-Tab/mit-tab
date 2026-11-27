@@ -581,6 +581,7 @@ async fn status_page(
         "staff_pairings.html",
         context! {
             title, round, current, csrf, pairings, byes, no_shows,
+            simulation_enabled => crate::tournament_maintenance::simulation_enabled(),
             next_round => current < settings.integer("tot_rounds", 5),
             released => settings.integer("pairing_released", 0) == 1,
             nav => Navigation::new(actor, settings.flag("motions_enabled", true)),

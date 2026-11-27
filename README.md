@@ -33,37 +33,45 @@ Want to contribute to MIT-Tab? Great! Check out **[CONTRIBUTING.md](CONTRIBUTING
 
 ### Quick Start for Developers
 
-```bash
-# Clone the repository
-git clone https://github.com/MIT-Tab/mit-tab.git
-cd mit-tab
+Install Rust using rustup, MySQL 8, and Node.js with npm. Create an empty development database and configure the connection before starting MIT-Tab.
 
-# Follow the setup guide for your platform in CONTRIBUTING.md
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-uv sync --all-groups
-npm install
+```bash
+npm ci
+export MYSQL_DATABASE=mittab_dev
+export MYSQL_HOST=127.0.0.1
+export MYSQL_USER=mittab_dev
+# Set MYSQL_PASSWORD and TAB_PASSWORD in your local environment.
+./bin/dev-server
 ```
+
+MIT-Tab opens at [http://127.0.0.1:8001](http://127.0.0.1:8001). Sign in as `tab` with the password you configured. Set `TOURNAMENT_NAME=local-test` before initialization to populate the development fixture.
 
 ### Technology Stack
 
-- **Backend**: Django (Python)
-- **Frontend**: JavaScript with Webpack
-- **Database**: MySQL
-- **Deployment**: Docker
-- **Python dependencies**: UV
+- **Backend** uses Rust, Axum, SQLx, and MiniJinja.
+- **Frontend** uses HTML, Sass, and JavaScript with Webpack.
+- **Storage** uses MySQL and local or S3-compatible database backups.
+- **Deployment** uses the repository’s multi-stage Dockerfile.
 
 ### Testing
 
-Tests require Chrome's headless driver in your `$PATH`. [Info here](http://chromedriver.chromium.org/getting-started)
+```bash
+cargo test --locked --workspace --all-targets --manifest-path rust/Cargo.toml
+cargo build --locked --manifest-path rust/Cargo.toml -p mittab-server
+uv sync --all-groups
+uv run --frozen pytest rust/server/test_django_parity.py
+npm run lint
+```
+
+The parity suite requires a disposable local MySQL test database and `mysqldump`. It checks the running Rust server and compares selected results with the Django reference. The reference browser suite also requires Chrome and ChromeDriver.
 
 ## Production Deployment
 
-Production deployment is managed through [benmusch/mittab-deploy](https://github.com/benmusch/mittab-deploy).
+The Docker image initializes an empty MySQL database or adopts an existing MIT-Tab schema, then starts `mittab-server`. Supply the existing `MYSQL_*` connection settings and set `TAB_PASSWORD` for new databases. For a remote database, supply a trusted CA as `MYSQL_CA_CERT` or provide a readable PEM file through `MYSQL_SSL_CA`. The startup script also supports the existing DigitalOcean managed-database certificate bootstrap. The Docker image listens on `PORT` (8000 by default) and serves `/healthz` for readiness checks.
 
-The production environment uses the Dockerfiles in this repository, and tournaments automatically pull code from the master branch.
+`MITTAB_DJANGO_SECRET_KEY` can validate existing Django sessions and staff invitation links during a cutover. Existing accounts and password hashes work after fresh sign-in. The AWS backup and email settings and the Black Rod settings retain their existing environment variable names. Set `SENTRY_DSN` to receive runtime events and traces.
 
-Legacy production setup documentation is available in the [`mittab/production_setup`](mittab/production_setup) directory.
+`mittab-server` implements `init`, `migrate`, `serve`, and `export-stats`. The `simulate-rounds` and loopback `load-test` commands run in development and test deployments.
 
 ## License
 

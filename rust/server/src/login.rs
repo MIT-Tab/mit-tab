@@ -216,7 +216,7 @@ pub fn set_cookie(
     response.headers_mut().append(header::SET_COOKIE, value);
 }
 
-fn local_next(value: &str) -> &str {
+pub fn local_next(value: &str) -> &str {
     if value.starts_with('/')
         && !value.starts_with("//")
         && !value.starts_with("/%2f")

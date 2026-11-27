@@ -1,53 +1,33 @@
-#!/usr/bin/env python
+#!/usr/bin/env bash
+set -euo pipefail
+set +x
 
-import os
-import signal
-import subprocess
-import sys
-import time
+cd "$(dirname "$0")/.."
+environment_file="${MITTAB_ENV_FILE:-.env}"
+if [[ -f "$environment_file" ]]; then
+  set -a
+  source "$environment_file"
+  set +a
+fi
+export MITTAB_ENV="${MITTAB_ENV:-development}"
+export MITTAB_RUST_LISTEN="${MITTAB_RUST_LISTEN:-127.0.0.1:8001}"
+export MITTAB_STATIC_ROOT="${MITTAB_STATIC_ROOT:-assets}"
 
-from dotenv import load_dotenv
+cargo build --locked --manifest-path rust/Cargo.toml -p mittab-server
+server="${CARGO_TARGET_DIR:-$PWD/rust/target}/debug/mittab-server"
+"$server" init
 
-load_dotenv()
+npm exec -- webpack --config webpack.config.js --mode development
+npm exec -- webpack --config webpack.config.js --mode development --watch &
+assets_pid=$!
+"$server" serve &
+server_pid=$!
 
-server_env = os.environ.copy()
-server_env["DEBUG"] = "1"
-server_env["MITTAB_DB_HOST"] = "127.0.0.1"
-
-webpack_env = os.environ.copy()
-webpack_env["NODE_ENV"] = "development"
-
-webpack_args = ["./node_modules/.bin/webpack", "--config", "webpack.config.js", "--watch"]
-server_args = ["python", "manage.py", "runserver", "0.0.0.0:8001"]
-
-webpack_proc = subprocess.Popen(webpack_args, stdout=sys.stdout, stderr=sys.stderr, env=webpack_env)
-server_proc = subprocess.Popen(server_args, stdout=sys.stdout, stderr=sys.stderr, env=server_env)
-procs = [webpack_proc, server_proc]
-
-def stop_procs():
-  for proc in procs:
-    if proc.poll() is None:
-      proc.terminate()
-  for proc in procs:
-    try:
-      proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-      proc.kill()
-      proc.wait()
-
-def on_interrupt(*args):
-  stop_procs()
-  sys.exit(0)
-
-signal.signal(signal.SIGINT, on_interrupt)
-signal.signal(signal.SIGTERM, on_interrupt)
-
-while True:
-  return_codes = [proc.poll() for proc in procs]
-  failed_codes = [code for code in return_codes if code not in (None, 0)]
-  if failed_codes:
-    stop_procs()
-    sys.exit(failed_codes[0])
-  if all(code == 0 for code in return_codes):
-    sys.exit(0)
-  time.sleep(0.2)
+cleanup() {
+  kill "$assets_pid" "$server_pid" 2>/dev/null || true
+  wait "$assets_pid" "$server_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+wait "$server_pid"

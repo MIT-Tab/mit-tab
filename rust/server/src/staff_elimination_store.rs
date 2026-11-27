@@ -471,6 +471,14 @@ async fn create_stage(
     let pairs = if state.enabled {
         let draw =
             outrounds::challenge(&seeds, state.basis, &state.picks).map_err(challenge_error)?;
+        crate::elimination_seeds::save(
+            db,
+            stage.division,
+            stage.size,
+            state.generation,
+            Some(&draw.seeds),
+        )
+        .await?;
         for entry in &state.entries {
             let effective = draw.seeds[&entry.team];
             update_seed(db, user, entry, effective).await?;
@@ -485,6 +493,8 @@ async fn create_stage(
         }
         draw.pairings
     } else {
+        crate::elimination_seeds::save(db, stage.division, stage.size, state.generation, None)
+            .await?;
         outrounds::standard(&seeds, stage.size as usize).map_err(challenge_error)?
     };
     if pairs.is_empty() {

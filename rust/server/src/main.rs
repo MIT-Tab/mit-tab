@@ -1,4 +1,6 @@
 mod access;
+mod admin_accounts;
+mod administration;
 mod aws_http;
 mod backup_dump;
 mod backup_objects;
@@ -17,6 +19,8 @@ mod checkin_data;
 mod checklist;
 mod codes;
 mod config;
+mod dev_fixture;
+mod elimination_seeds;
 mod email;
 mod email_admin;
 mod entity_store;
@@ -30,6 +34,7 @@ mod legacy_archive;
 mod legacy_session;
 mod live_results;
 mod login;
+mod maintenance_cli;
 mod motions;
 mod native_session;
 mod passwords;
@@ -76,7 +81,9 @@ mod staff_rounds;
 mod staff_scratches;
 mod tab_cards;
 mod team_portal;
+mod telemetry;
 mod tournament_data;
+mod tournament_maintenance;
 mod tournament_setup;
 
 use std::{process::ExitCode, sync::Arc};
@@ -111,17 +118,35 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> Result<(), &'static str> {
-    let command = std::env::args().nth(1).unwrap_or_else(|| "serve".into());
-    if !matches!(command.as_str(), "serve" | "migrate" | "init") {
-        return Err("Usage: mittab-server [serve|migrate|init]");
+    let mut args = std::env::args().skip(1);
+    let command = args.next().unwrap_or_else(|| "serve".into());
+    if !matches!(
+        command.as_str(),
+        "serve" | "migrate" | "init" | "simulate-rounds" | "export-stats" | "load-test"
+    ) {
+        return Err(
+            "Usage: mittab-server [serve|migrate|init|simulate-rounds|export-stats|load-test]",
+        );
     }
     let config = Config::from_env()?;
     let db = config.connect().await?;
+    if command == "export-stats" {
+        return maintenance_cli::export_stats(&db, &args.collect::<Vec<_>>()).await;
+    }
+    if command == "load-test" {
+        return maintenance_cli::load_test(&db, &args.collect::<Vec<_>>()).await;
+    }
+    if command == "simulate-rounds" {
+        let count = tournament_maintenance::simulate(&db).await?;
+        eprintln!("Saved simulated results for {count} debates.");
+        return Ok(());
+    }
     if command != "serve" {
         schema::prepare(&db, command == "init").await?;
         eprintln!("MIT-Tab database is ready");
         return Ok(());
     }
+    let _telemetry = telemetry::init();
     let listener = TcpListener::bind(config.listen)
         .await
         .map_err(|_| "Could not bind the MIT-Tab HTTP listener")?;
@@ -137,15 +162,40 @@ async fn run() -> Result<(), &'static str> {
             .map_err(|_| "Could not determine listen address")?
     );
     axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
+        .with_graceful_shutdown(shutdown())
         .await
         .map_err(|_| "The MIT-Tab HTTP server stopped unexpectedly")
 }
 
+async fn shutdown() {
+    #[cfg(unix)]
+    if let Ok(mut terminate) =
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+    {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = terminate.recv() => {}
+        }
+        return;
+    }
+    let _ = tokio::signal::ctrl_c().await;
+}
+
+async fn health(axum::extract::State(app): axum::extract::State<App>) -> Response {
+    if sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&app.db)
+        .await
+        .is_ok()
+    {
+        private((StatusCode::OK, "OK"))
+    } else {
+        unavailable()
+    }
+}
+
 fn router(app: App) -> Router {
     Router::new()
+        .route("/healthz", get(health))
         .route("/api/debater-counts", get(public_api::counts))
         .route("/api/new-debater-data", get(public_api::new_debaters))
         .route("/api/new-schools", get(public_api::new_schools))
@@ -340,6 +390,7 @@ fn router(app: App) -> Router {
                 .route("/archive/download/", get(legacy_archive::download))
                 .merge(roster_groups::routes())
                 .merge(staff_rankings::routes())
+                .merge(tournament_maintenance::routes())
                 .route("/judges/speaker-points/", get(judge_report::page))
                 .route("/pairings/status/", get(staff_pairing::status))
                 .route("/round/{round}/", get(staff_pairing::previous))
@@ -494,6 +545,14 @@ fn router(app: App) -> Router {
                 access::roster_log,
             )),
         )
+        .merge(
+            administration::routes().route_layer(axum::middleware::from_fn_with_state(
+                app.clone(),
+                access::administration,
+            )),
+        )
+        .route("/404/", get(administration::not_found))
+        .route("/500/", get(administration::internal_error))
         .route("/theme.css", get(homepage_admin::theme))
         .route("/public/login/", get(login::page).post(login::sign_in))
         .route(
@@ -507,6 +566,8 @@ fn router(app: App) -> Router {
                 std::env::var_os("MITTAB_STATIC_ROOT").unwrap_or_else(|| "staticfiles".into()),
             ),
         )
+        .fallback(administration::fallback)
+        .layer(axum::middleware::from_fn(telemetry::request))
         .with_state(app)
 }
 

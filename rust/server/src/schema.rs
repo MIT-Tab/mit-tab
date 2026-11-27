@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use sqlx::{MySql, MySqlConnection, MySqlPool, QueryBuilder};
+use sqlx::{MySqlConnection, MySqlPool};
 
 use crate::passwords;
 
@@ -124,12 +124,41 @@ async fn prepare_locked(db: &mut MySqlConnection, initialize: bool) -> Result<()
     install_public_logo(db).await?;
     install_staff_invite_token(db).await?;
     sqlx::query(
-        "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround'), ('tab', 'judge'), ('tab', 'breakingteam'), ('tab', 'team'), ('tab', 'scratch')
+        "INSERT INTO django_content_type (app_label, model) VALUES ('tab', 'round'), ('tab', 'outround'), ('tab', 'judge'), ('tab', 'breakingteam'), ('tab', 'team'), ('tab', 'scratch'), ('tab', 'tabsettings'), ('tab', 'publicrosterchange')
          ON DUPLICATE KEY UPDATE model = django_content_type.model",
     )
     .execute(&mut *db)
     .await
     .map_err(|_| "Could not prepare pairing audit types")?;
+    for (model, code, label) in [
+        (
+            "tabsettings",
+            "tab_settings.can_change",
+            "Can change tournament settings",
+        ),
+        (
+            "publicrosterchange",
+            "change_publicrosterchange",
+            "Can change public roster change",
+        ),
+        (
+            "publicrosterchange",
+            "delete_publicrosterchange",
+            "Can delete public roster change",
+        ),
+    ] {
+        sqlx::query(
+            "INSERT INTO auth_permission (name, content_type_id, codename)
+             SELECT ?, c.id, ? FROM django_content_type c WHERE c.app_label = 'tab' AND c.model = ?
+             ON DUPLICATE KEY UPDATE name = auth_permission.name",
+        )
+        .bind(label)
+        .bind(code)
+        .bind(model)
+        .execute(&mut *db)
+        .await
+        .map_err(|_| "Could not prepare tournament permissions")?;
+    }
     if initialize {
         initialize_tournament(db).await?;
     }
@@ -359,41 +388,51 @@ async fn initialize_tournament(db: &mut MySqlConnection) -> Result<(), &'static 
     .await
     .map_err(|_| "Could not configure the APDA Board account")?;
 
-    let defaults = [
-        ("tot_rounds", Some(5), None),
-        ("cur_round", Some(1), None),
-        ("lenient_late", Some(0), None),
-        ("tournament_name", None, Some("New Tournament")),
-        ("theme_color", None, Some("#00438A")),
-        ("start_tournament_wizard_completed", Some(0), None),
-        ("start_tournament_staff_invites_sent", Some(0), None),
-    ];
-    QueryBuilder::<MySql>::new("INSERT INTO tab_tabsettings (`key`, value, value_string) ")
-        .push_values(defaults, |mut row, (key, value, text)| {
-            row.push_bind(key).push_bind(value).push_bind(text);
-        })
-        .build()
-        .execute(&mut *tx)
+    tournament_defaults(&mut tx).await?;
+    if std::env::var("TOURNAMENT_NAME").is_ok_and(|name| name.ends_with("-test")) {
+        crate::dev_fixture::load(&mut tx).await?;
+    }
+    tx.commit()
         .await
-        .map_err(|_| "Could not create tournament settings")?;
+        .map_err(|_| "Could not finish tournament initialization")
+}
+
+pub async fn tournament_defaults(db: &mut MySqlConnection) -> Result<(), &'static str> {
+    use crate::settings::SettingValue;
+    let defaults = [
+        ("tot_rounds", SettingValue::Number(5)),
+        ("cur_round", SettingValue::Number(1)),
+        ("lenient_late", SettingValue::Number(0)),
+        ("tournament_name", SettingValue::Text("New Tournament")),
+        ("theme_color", SettingValue::Text("#00438A")),
+        ("start_tournament_wizard_completed", SettingValue::Number(0)),
+        (
+            "start_tournament_staff_invites_sent",
+            SettingValue::Number(0),
+        ),
+    ];
+    for (name, value) in defaults {
+        crate::settings::put(db, name, value)
+            .await
+            .map_err(|_| "Could not create tournament settings")?;
+    }
     sqlx::query(
         "
         INSERT INTO registration_registrationconfig (
             id, allow_new_registrations, allow_registration_edits, crash_housing_enabled,
             team_name_changes_allowed, disc_scratches_open, disc_scratch_quantity, updated_at
         ) VALUES (1, FALSE, TRUE, FALSE, FALSE, FALSE, 0, UTC_TIMESTAMP(6))
+        ON DUPLICATE KEY UPDATE allow_new_registrations = FALSE, updated_at = UTC_TIMESTAMP(6)
     ",
     )
-    .execute(&mut *tx)
+    .execute(&mut *db)
     .await
     .map_err(|_| "Could not initialize registration settings")?;
     sqlx::query("
         INSERT INTO registration_infotext (title, text, is_active, display_order, created_at, updated_at)
         VALUES ('GA', 'TBD', TRUE, 0, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
-    ").execute(&mut *tx).await.map_err(|_| "Could not initialize tournament information")?;
-    tx.commit()
-        .await
-        .map_err(|_| "Could not finish tournament initialization")
+    ").execute(&mut *db).await.map_err(|_| "Could not initialize tournament information")?;
+    Ok(())
 }
 
 fn password_or_random(name: &str) -> Result<String, &'static str> {

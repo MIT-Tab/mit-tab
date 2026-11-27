@@ -431,6 +431,34 @@ pub enum WriteBallot {
     Scores(i32, Vec<(usize, i32, String, i32)>),
 }
 
+pub fn simulate(
+    debate: &Debate,
+    random: &mut mittab_tabulation::legacy_random::LegacyRandom,
+) -> Result<WriteBallot, &'static str> {
+    let team = random.below(2);
+    let mut points = [0; 4];
+    for value in &mut points {
+        *value = random.below(20) + 15;
+    }
+    points.sort_unstable_by(|left, right| right.cmp(left));
+    let mut positions = Vec::new();
+    for (offset, side) in [team, 1 - team].into_iter().enumerate() {
+        let speakers = &debate.teams[side].speakers;
+        let Some(first) = speakers.first() else {
+            return Err("Every team needs at least one debater to simulate this round.");
+        };
+        let last = speakers.last().unwrap_or(first);
+        for (index, (speaker, role)) in [(first, side * 2 + 1), (last, side * 2)]
+            .into_iter()
+            .enumerate()
+        {
+            let rank = offset * 2 + index;
+            positions.push((role, speaker.id, points[rank].to_string(), rank as i32 + 1));
+        }
+    }
+    Ok(WriteBallot::Scores(team as i32 + 1, positions))
+}
+
 pub fn extract(
     debate: &Debate,
     settings: &Settings,
