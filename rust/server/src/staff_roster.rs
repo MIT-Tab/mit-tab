@@ -9,8 +9,6 @@ use axum::{
     routing::get,
 };
 use minijinja::{Value as TemplateValue, context};
-use serde::Serialize;
-use serde_json::Value;
 use sqlx::MySqlConnection;
 
 use crate::{
@@ -21,7 +19,7 @@ use crate::{
     login, private,
     registration_form::Fields,
     settings::Settings,
-    staff_debater,
+    staff_debater, staff_judge,
     staff_pairing::lock_round,
     staff_rankings, staff_roles, staff_room,
     staff_roster_data::{self as data, Edit, Error, Kind},
@@ -52,17 +50,6 @@ async fn roster_redirect(uri: Uri, Path(_id): Path<i32>) -> Response {
         location.push_str(query);
     }
     access::found(location)
-}
-
-fn is_tab(actor: Actor) -> bool {
-    matches!(
-        actor,
-        Actor::User {
-            board: false,
-            superuser: true,
-            ..
-        }
-    )
 }
 
 pub fn toolbar() -> Vec<(String, String)> {
@@ -520,8 +507,12 @@ async fn save_edit(
     } else {
         Ok(0)
     };
-    let result = match scratch_count {
-        Ok(count) => data::save_on(
+    let result = async {
+        let count = scratch_count?;
+        if let Some(id) = id.filter(|_| kind == Kind::Judge) {
+            staff_judge::verify_edit(app, &mut db, headers, id, fields).await?;
+        }
+        let saved = data::save_on(
             &mut db,
             kind,
             Edit {
@@ -532,10 +523,10 @@ async fn save_edit(
                 fields,
             },
         )
-        .await
-        .map(|saved| (saved, count)),
-        Err(error) => Err(error),
-    };
+        .await?;
+        Ok((saved, count))
+    }
+    .await;
     match result {
         Ok((saved, scratch_count)) => {
             db.commit().await?;
@@ -544,29 +535,25 @@ async fn save_edit(
                     "/team/{saved}/scratches/add/{scratch_count}"
                 )));
             }
-            if matches!(kind, Kind::School | Kind::Room | Kind::Debater | Kind::Team) {
-                let name = fields.get("name");
-                let (target, message) = if id.is_some() {
-                    // The Django room edit also uses "School" in its success message.
-                    let subject = if kind == Kind::Room {
-                        "School"
-                    } else {
-                        kind.singular()
-                    };
-                    (
-                        return_path,
-                        format!("{subject} {name} updated successfully"),
-                    )
+            let name = fields.get("name");
+            let (target, message) = if id.is_some() {
+                // The Django room edit uses "School" in its success message.
+                let subject = if kind == Kind::Room {
+                    "School"
                 } else {
-                    (
-                        "/",
-                        format!("{} {name} created successfully", kind.singular()),
-                    )
+                    kind.singular()
                 };
-                Ok(staff_roster_notice::saved(app, headers, target, &message))
+                (
+                    return_path,
+                    format!("{subject} {name} updated successfully"),
+                )
             } else {
-                Ok(access::found(format!("/{}/{saved}/", kind.model())))
-            }
+                (
+                    "/",
+                    format!("{} {name} created successfully", kind.singular()),
+                )
+            };
+            Ok(staff_roster_notice::saved(app, headers, target, &message))
         }
         Err(Error::Invalid(error)) => {
             db.rollback().await?;
@@ -631,266 +618,18 @@ async fn show(
     let Some(kind) = kind else {
         return missing();
     };
-    let legacy = match kind {
-        Kind::School => {
-            Some(staff_school::show(app, actor, headers, id, return_path, posted).await)
-        }
-        Kind::Room => Some(staff_room::show(app, actor, headers, id, return_path, posted).await),
-        Kind::Debater => {
-            Some(staff_debater::show(app, actor, headers, id, return_path, posted).await)
-        }
-        Kind::Team => Some(staff_team::show(app, actor, headers, id, return_path, posted).await),
-        _ => None,
+    let result = match kind {
+        Kind::School => staff_school::show(app, actor, headers, id, return_path, posted).await,
+        Kind::Room => staff_room::show(app, actor, headers, id, return_path, posted).await,
+        Kind::Debater => staff_debater::show(app, actor, headers, id, return_path, posted).await,
+        Kind::Team => staff_team::show(app, actor, headers, id, return_path, posted).await,
+        Kind::Judge => staff_judge::show(app, actor, headers, id, return_path, posted).await,
     };
-    if let Some(legacy) = legacy {
-        return match legacy {
-            Ok(response) => response,
-            Err(Error::Missing) => missing(),
-            Err(_) => unavailable(),
-        };
-    }
-    let Ok(csrf) = html::page_csrf(headers) else {
-        return unavailable();
-    };
-    match edit_judge_page(app, actor, &csrf, id, posted).await {
-        Ok(response) => html::form_response(response, headers, &csrf),
+    match result {
+        Ok(response) => response,
         Err(Error::Missing) => missing(),
         Err(_) => unavailable(),
     }
-}
-
-type Values = BTreeMap<String, Vec<String>>;
-type Choices = Vec<(String, String)>;
-
-#[derive(Serialize)]
-struct FormField {
-    name: String,
-    label: String,
-    control: &'static str,
-    values: Vec<String>,
-    value: String,
-    checked: bool,
-    choices: Choices,
-    required: bool,
-    maximum: Option<usize>,
-    step: Option<&'static str>,
-}
-
-impl FormField {
-    fn new(
-        values: &Values,
-        name: impl Into<String>,
-        label: impl Into<String>,
-        control: &'static str,
-    ) -> Self {
-        let name = name.into();
-        let values = values.get(&name).cloned().unwrap_or_default();
-        let value = values.last().cloned().unwrap_or_default();
-        let checked = ["1", "on", "true"].contains(&value.as_str());
-        Self {
-            name,
-            label: label.into(),
-            control,
-            values,
-            value,
-            checked,
-            choices: Vec::new(),
-            required: false,
-            maximum: None,
-            step: None,
-        }
-    }
-
-    fn choices(mut self, choices: Choices, required: bool) -> Self {
-        self.choices = choices;
-        self.required = required;
-        self
-    }
-
-    fn input(mut self, required: bool, maximum: usize) -> Self {
-        self.required = required;
-        self.maximum = Some(maximum);
-        self
-    }
-}
-
-async fn edit_judge_page(
-    app: &App,
-    actor: Actor,
-    csrf: &str,
-    id: Option<i32>,
-    posted: Option<(&Fields, &str)>,
-) -> Result<Response, Error> {
-    let mut db = app.db.acquire().await?;
-    let checkins = staff_roles::can_check_in(&mut *db, actor).await?;
-    let values = current_judge(&mut db, id, checkins).await?;
-    let mut fields = judge_fields(&mut db, &values, id, checkins).await?;
-    let checkin_fields = checkins && id.is_some();
-    if let Some((posted, _)) = posted {
-        for field in &mut fields {
-            if field.name.starts_with("checkin_") && !posted.flag("mittab_checkins_present") {
-                continue;
-            }
-            field.values = posted.all(&field.name).to_vec();
-            field.value = posted.get(&field.name).into();
-            field.checked = posted.flag(&field.name);
-        }
-    }
-    let title = values
-        .get("name")
-        .and_then(|name| name.first())
-        .map(|name| format!("Judge · {name}"))
-        .unwrap_or_else(|| "Create Judge".into());
-    let error = posted.map(|(_, error)| error);
-    Ok(html::render(
-        "staff_roster_edit.html",
-        context! {
-            title, key => "judge", id, fields, nav => Navigation::new(actor, true), toolbar => toolbar(), csrf, error,
-            checkin_fields, admin => is_tab(actor),
-        },
-        if error.is_some() {
-            StatusCode::UNPROCESSABLE_ENTITY
-        } else {
-            StatusCode::OK
-        },
-    ))
-}
-
-const BASE: &[(&str, &str)] = &[
-    ("needs_crash_housing", "Needs crash housing"),
-    ("requests_wgm_housing", "Requests WGM housing"),
-];
-const JUDGE_FLAGS: &[(&str, &str)] = &[
-    ("is_dino", "Dino"),
-    ("wing_only", "Wing only"),
-    ("request_wing", "Requests a wing"),
-    ("no_wings", "Requests no wings"),
-];
-
-async fn judge_fields(
-    db: &mut MySqlConnection,
-    values: &Values,
-    id: Option<i32>,
-    checkins: bool,
-) -> Result<Vec<FormField>, sqlx::Error> {
-    let field = |name, label, control| FormField::new(values, name, label, control);
-    let mut rank = field("rank", "Rank", "number");
-    rank.required = true;
-    rank.step = Some("0.01");
-    let mut output = vec![
-        field("name", "Name", "text").input(true, Kind::Judge.limit()),
-        rank,
-        field("email", "Email", "email").input(false, 254),
-    ];
-    for &(name, label) in BASE {
-        output.push(field(name, label, "checkbox"));
-    }
-    output.extend([
-        field("schools", "School affiliations", "multi").choices(
-            options(db, "SELECT id, name FROM tab_school ORDER BY name, id").await?, false,
-        ),
-        field("registration", "Registration", "select").choices(
-            options(db, "SELECT r.id, CONCAT(s.name, ' — ', r.email) FROM registration_registration r JOIN tab_school s ON r.school_id = s.id ORDER BY s.name, r.id").await?, false,
-        ),
-        field("ballot_code", "Ballot code", "text").input(false, 30),
-        field("reported_experience", "Reported years of experience", "number"),
-    ]);
-    for &(name, label) in JUDGE_FLAGS {
-        output.push(field(name, label, "checkbox"));
-    }
-    output.push(
-        field("required_room_tags", "Required room tags", "multi").choices(
-            options(db, "SELECT id, tag FROM tab_roomtag ORDER BY tag, id").await?,
-            false,
-        ),
-    );
-    if checkins && id.is_some() {
-        for round in data::checkin_rounds(db).await? {
-            let label = if round == 0 {
-                "Checked in for outrounds".into()
-            } else {
-                format!("Checked in for round {round}")
-            };
-            output.push(FormField::new(
-                values,
-                format!("checkin_{}", round - 1),
-                label,
-                "checkbox",
-            ));
-        }
-    }
-    Ok(output)
-}
-
-async fn options(
-    db: &mut MySqlConnection,
-    statement: &'static str,
-) -> Result<Choices, sqlx::Error> {
-    Ok(sqlx::query_as::<_, (i32, String)>(statement)
-        .fetch_all(db)
-        .await?
-        .into_iter()
-        .map(|(id, name)| (id.to_string(), name))
-        .collect())
-}
-
-async fn current_judge(
-    db: &mut MySqlConnection,
-    id: Option<i32>,
-    checkins: bool,
-) -> Result<Values, Error> {
-    let Some(id) = id else {
-        return Ok(Values::new());
-    };
-    let text: Option<String> = sqlx::query_scalar(
-        "SELECT CAST(JSON_OBJECT('name', name, 'rank', CAST(`rank` AS CHAR), 'email', email,
-            'registration', registration_id, 'ballot_code', ballot_code,
-            'reported_experience', reported_experience, 'wing_only', wing_only,
-            'is_dino', is_dino, 'request_wing', request_wing, 'no_wings', no_wings,
-            'needs_crash_housing', needs_crash_housing, 'requests_wgm_housing', requests_wgm_housing)
-         AS CHAR) FROM tab_judge WHERE id = ?",
-    ).bind(id).fetch_optional(&mut *db).await?;
-    let values = serde_json::from_str::<BTreeMap<String, Value>>(&text.ok_or(Error::Missing)?)
-        .map_err(|_| Error::Database)?;
-    let mut values: Values = values
-        .into_iter()
-        .filter_map(|(key, value)| match value {
-            Value::Null => None,
-            Value::String(value) => Some((key, vec![value])),
-            Value::Number(_) | Value::Bool(_) => Some((key, vec![value.to_string()])),
-            Value::Array(_) | Value::Object(_) => None,
-        })
-        .collect();
-    for (key, sql) in [
-        (
-            "required_room_tags",
-            "SELECT roomtag_id FROM tab_judge_required_room_tags WHERE judge_id = ?",
-        ),
-        (
-            "schools",
-            "SELECT school_id FROM tab_judge_schools WHERE judge_id = ?",
-        ),
-    ] {
-        let ids = sqlx::query_scalar::<_, i32>(sql)
-            .bind(id)
-            .fetch_all(&mut *db)
-            .await?;
-        values.insert(
-            key.into(),
-            ids.into_iter().map(|id| id.to_string()).collect(),
-        );
-    }
-    if checkins {
-        let rounds =
-            sqlx::query_scalar::<_, i32>("SELECT round_number FROM tab_checkin WHERE judge_id = ?")
-                .bind(id)
-                .fetch_all(&mut *db)
-                .await?;
-        for round in rounds {
-            values.insert(format!("checkin_{}", round - 1), vec!["1".into()]);
-        }
-    }
-    Ok(values)
 }
 
 pub async fn confirm_delete(
@@ -980,7 +719,7 @@ async fn delete_entry(
     match data::delete_on(&mut db, kind, id).await {
         Ok(()) => {
             db.commit().await?;
-            if matches!(kind, Kind::Debater | Kind::Team) {
+            if matches!(kind, Kind::Debater | Kind::Team | Kind::Judge) {
                 Ok(staff_roster_notice::saved(
                     app,
                     headers,

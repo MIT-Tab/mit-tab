@@ -6,11 +6,14 @@ use sqlx::{AssertSqlSafe, FromRow, MySqlConnection, QueryBuilder, Row, mysql::My
 
 use crate::{
     codes::{self, Credential},
-    entity_store, judge_portal,
-    registration_form::{Fields, integer_input, length, valid_email},
+    entity_store,
+    registration_form::{Fields, integer_input, length},
     roster_log,
     settings::Settings,
-    staff_roster_fields::{checkbox_value, email_errors, rank_input},
+    staff_roster_fields::{
+        WING_CONFLICT, checkbox_value, email_errors, judge_code_errors, judge_experience,
+        rank_input,
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,44 +151,12 @@ async fn foreign(
     Ok(Some(id))
 }
 
-fn decimal<'a>(fields: &'a Fields, key: &str) -> Result<&'a str, Error> {
-    let input = fields.get(key);
-    let digits = input.strip_prefix(['-', '+']).unwrap_or(input);
-    let (whole, fraction) = digits.split_once('.').unwrap_or((digits, ""));
-    let valid = !digits.is_empty()
-        && (whole.len() + fraction.len() > 0)
-        && whole.trim_start_matches('0').len() <= 2
-        && fraction.len() <= 2
-        && whole
-            .bytes()
-            .chain(fraction.bytes())
-            .all(|digit| digit.is_ascii_digit());
-    if !valid {
-        return Err(Error::Invalid(
-            "Enter a rank with up to two digits before and after the decimal point.",
-        ));
-    }
-    Ok(input)
-}
-
 fn enum_value(fields: &Fields, key: &str, max: i32, default: i32) -> Result<i32, Error> {
     let value = integer(fields, key)?.unwrap_or(default);
     if (0..=max).contains(&value) {
         Ok(value)
     } else {
         Err(Error::Invalid("Choose a valid option."))
-    }
-}
-
-fn optional_email(fields: &Fields) -> Result<Option<&str>, Error> {
-    let email = fields.get("email");
-    if email.is_empty() {
-        return Ok(None);
-    }
-    if valid_email(email) {
-        Ok(Some(email))
-    } else {
-        Err(Error::Invalid("Enter a valid email address."))
     }
 }
 
@@ -270,31 +241,32 @@ pub struct Edit<'a> {
 
 pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Result<i32, Error> {
     let new_name = valid_name(kind, edit.fields)?;
-    let original = if let Some(id) = edit.id {
-        Some(name(db, kind, id).await?.ok_or(Error::Missing)?)
-    } else {
-        None
-    };
-    let mut team_audit = None;
-    let id = match kind {
-        Kind::School => save_school(db, &edit, new_name).await?,
-        Kind::Room => save_room(db, &edit, new_name).await?,
-        Kind::Debater => save_debater(db, &edit, new_name).await?,
-        Kind::Judge => save_judge(db, &edit, new_name).await?,
+    if let Some(id) = edit.id
+        && name(db, kind, id).await?.is_none()
+    {
+        return Err(Error::Missing);
+    }
+    let (id, changes) = match kind {
+        Kind::School => (save_school(db, &edit, new_name).await?, None),
+        Kind::Room => (save_room(db, &edit, new_name).await?, None),
+        Kind::Debater => (save_debater(db, &edit, new_name).await?, None),
+        Kind::Judge => {
+            let (id, changes) = save_judge(db, &edit, new_name).await?;
+            (id, Some(changes))
+        }
         Kind::Team => {
-            let (id, changes) = save_team(db, &edit, new_name).await?;
-            team_audit = Some(changes);
-            id
+            let (id, fields) = save_team(db, &edit, new_name).await?;
+            (
+                id,
+                Some(if edit.id.is_some() {
+                    json!({ "fields": fields })
+                } else {
+                    json!({})
+                }),
+            )
         }
     };
-    if matches!(kind, Kind::Team | Kind::Judge) {
-        let changes = match (team_audit, original.as_deref()) {
-            (Some(fields), Some(_)) => json!({ "fields": fields }),
-            (None, Some(previous)) if previous != new_name => {
-                json!({"fields": ["name"], "name": {"before": previous, "after": new_name}})
-            }
-            _ => json!({}),
-        };
+    if let Some(changes) = changes {
         audit(
             db,
             kind,
@@ -305,18 +277,6 @@ pub async fn save_on(db: &mut MySqlConnection, kind: Kind, edit: Edit<'_>) -> Re
             changes,
         )
         .await?;
-        if kind == Kind::Judge && edit.public_log && roster_log::enabled(db).await? {
-            let message = match original {
-                None => Some(format!("Added {} “{new_name}”.", kind.model())),
-                Some(old) if old != new_name => {
-                    Some(format!("Renamed {} “{old}” to “{new_name}”.", kind.model()))
-                }
-                _ => None,
-            };
-            if let Some(message) = message {
-                roster_log::record(db, "judges", &message, false).await?;
-            }
-        }
     }
     Ok(id)
 }
@@ -384,11 +344,11 @@ async fn save_room(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Res
     };
     set_links(db, "tab_room_tags", "room_id", "roomtag_id", id, tags).await?;
     if edit.checkins && edit.id.is_some() {
-        let snapshot = room_checkins(db, id, true).await?;
+        let snapshot = checkin_snapshot(db, Kind::Room, id, true).await?;
         if snapshot.revision != edit.fields.get("mittab_room_checkin_revision") {
             return Err(Error::Invalid(ROOM_CHECKIN_CONFLICT));
         }
-        checkins(db, edit.fields, "tab_roomcheckin", "room_id", id).await?;
+        apply_checkins(db, Kind::Room, id, edit.fields, &snapshot).await?;
     }
     Ok(id)
 }
@@ -437,47 +397,155 @@ async fn save_debater(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> 
     Ok(result.last_insert_id() as i32)
 }
 
-async fn save_judge(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Result<i32, Error> {
+pub const JUDGE_FLAGS: [&str; 6] = [
+    "needs_crash_housing",
+    "requests_wgm_housing",
+    "is_dino",
+    "wing_only",
+    "request_wing",
+    "no_wings",
+];
+
+pub struct JudgeRow {
+    pub name: String,
+    pub rank: String,
+    pub experience: Option<i32>,
+    pub flags: [bool; 6],
+    pub email: Option<String>,
+    pub registration: Option<i32>,
+    pub code: Option<String>,
+    pub creator: String,
+    pub created: Option<NaiveDateTime>,
+}
+
+impl FromRow<'_, MySqlRow> for JudgeRow {
+    fn from_row(row: &MySqlRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            name: row.try_get("name")?,
+            rank: row.try_get("display_rank")?,
+            experience: row
+                .try_get::<Option<i64>, _>("reported_experience")?
+                .map(|years| years as i32),
+            flags: [
+                row.try_get("needs_crash_housing")?,
+                row.try_get("requests_wgm_housing")?,
+                row.try_get("is_dino")?,
+                row.try_get("wing_only")?,
+                row.try_get("request_wing")?,
+                row.try_get("no_wings")?,
+            ],
+            email: row.try_get("email")?,
+            registration: row.try_get("registration_id")?,
+            code: row.try_get("ballot_code")?,
+            creator: row.try_get("creator")?,
+            created: row.try_get("created_at")?,
+        })
+    }
+}
+
+impl JudgeRow {
+    pub async fn load(db: &mut MySqlConnection, id: i32, locked: bool) -> Result<Self, Error> {
+        let lock = if locked { " FOR UPDATE" } else { "" };
+        let query = format!(
+            "SELECT j.name, CAST(j.`rank` AS CHAR) AS display_rank, CAST(j.reported_experience AS SIGNED) AS reported_experience,
+                    j.needs_crash_housing, j.requests_wgm_housing, j.is_dino, j.wing_only,
+                    j.request_wing, j.no_wings, j.email, j.registration_id, j.ballot_code,
+                    COALESCE((SELECT username FROM auth_user WHERE id = j.created_by_id), 'Unknown') AS creator,
+                    j.created_at FROM tab_judge j WHERE j.id = ?{lock}",
+        );
+        sqlx::query_as(AssertSqlSafe(query))
+            .bind(id)
+            .fetch_optional(db)
+            .await?
+            .ok_or(Error::Missing)
+    }
+}
+
+pub async fn judge_links(
+    db: &mut MySqlConnection,
+    id: i32,
+    locked: bool,
+) -> Result<(BTreeSet<i32>, BTreeSet<i32>), sqlx::Error> {
+    let lock = if locked { " FOR UPDATE" } else { "" };
+    let schools = sqlx::query_scalar(AssertSqlSafe(format!(
+        "SELECT school_id FROM tab_judge_schools WHERE judge_id = ?{lock}"
+    )))
+    .bind(id)
+    .fetch_all(&mut *db)
+    .await?
+    .into_iter()
+    .collect();
+    let tags = sqlx::query_scalar(AssertSqlSafe(format!(
+        "SELECT roomtag_id FROM tab_judge_required_room_tags WHERE judge_id = ?{lock}"
+    )))
+    .bind(id)
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .collect();
+    Ok((schools, tags))
+}
+
+async fn save_judge(
+    db: &mut MySqlConnection,
+    edit: &Edit<'_>,
+    name: &str,
+) -> Result<(i32, serde_json::Value), Error> {
     let fields = edit.fields;
-    let rank = decimal(fields, "rank")?;
-    let email = optional_email(fields)?;
-    let experience = integer(fields, "reported_experience")?;
-    if experience.is_some_and(|experience| !(0..=10).contains(&experience)) {
-        return Err(Error::Invalid(
-            "Reported years of experience must be between 0 and 10.",
-        ));
+    let rank = rank_input(fields.get("rank")).map_err(Error::Invalid)?;
+    let email = fields.get("email");
+    if !email_errors(email).is_empty() {
+        return Err(Error::Invalid("Enter a valid email address."));
+    }
+    let email = (!email.is_empty()).then_some(email);
+    let experience = judge_experience(fields.get("reported_experience")).map_err(Error::Invalid)?;
+    let registration = fields.get("registration");
+    if !registration.is_empty() && registration.parse::<i32>().is_err() {
+        return Err(Error::Invalid("Choose a valid registration."));
     }
     let registration = foreign(db, fields, "registration", "registration_registration").await?;
-    let code = fields.get("ballot_code");
-    let code = if code.is_empty() {
-        let old: Option<String> =
-            sqlx::query_scalar("SELECT ballot_code FROM tab_judge WHERE id = ?")
-                .bind(edit.id)
-                .fetch_optional(&mut *db)
-                .await?
-                .flatten();
-        match old {
-            Some(old) if !old.is_empty() => old,
-            _ => codes::unique(db, Credential::Judge).await?,
+    let submitted_code = fields.get("ballot_code");
+    if !judge_code_errors(submitted_code).is_empty() {
+        return Err(Error::Invalid("Enter a valid judge ballot code."));
+    }
+    let [crash, wgm, dino, wing_only, request_wing, no_wings] =
+        JUDGE_FLAGS.map(|name| checkbox_value(fields, name));
+    if request_wing && no_wings {
+        return Err(Error::Invalid(WING_CONFLICT));
+    }
+    for name in ["schools", "required_room_tags"] {
+        if fields.all(name).iter().any(|value| value.trim().is_empty()) {
+            return Err(Error::Invalid("Choose a valid roster entry."));
         }
-    } else if judge_portal::valid_code(code) {
-        code.into()
-    } else {
-        return Err(Error::Invalid(
-            "Enter a valid judge ballot code of at most 30 characters.",
-        ));
-    };
+    }
     let schools = ids(fields, "schools")?;
     let tags = ids(fields, "required_room_tags")?;
     require_existing(db, "tab_school", schools.iter().copied()).await?;
     require_existing(db, "tab_roomtag", tags.iter().copied()).await?;
-    let request_wing = fields.flag("request_wing");
-    let no_wings = fields.flag("no_wings");
-    if request_wing && no_wings {
-        return Err(Error::Invalid(
-            "A judge cannot both request a wing and request no wings.",
-        ));
-    }
+    let before = if let Some(id) = edit.id {
+        Some(JudgeRow::load(db, id, true).await?)
+    } else {
+        None
+    };
+    let (previous_schools, previous_tags) = if let Some(id) = edit.id {
+        judge_links(db, id, true).await?
+    } else {
+        Default::default()
+    };
+    let snapshot = if let Some(id) = edit.id.filter(|_| edit.checkins) {
+        let snapshot = checkin_snapshot(db, Kind::Judge, id, true).await?;
+        if snapshot.revision != fields.get("mittab_judge_checkin_revision") {
+            return Err(Error::Invalid(JUDGE_CHECKIN_CONFLICT));
+        }
+        Some(snapshot)
+    } else {
+        None
+    };
+    let code = if submitted_code.is_empty() {
+        codes::unique(db, Credential::Judge).await?
+    } else {
+        submitted_code.into()
+    };
     let assignments = "name = ?, `rank` = ?, email = ?, reported_experience = ?, registration_id = ?, ballot_code = ?,
        is_dino = ?, wing_only = ?, request_wing = ?, no_wings = ?, needs_crash_housing = ?, requests_wgm_housing = ?";
     let statement = if edit.id.is_some() {
@@ -489,43 +557,130 @@ async fn save_judge(db: &mut MySqlConnection, edit: &Edit<'_>, name: &str) -> Re
     };
     let result = sqlx::query(AssertSqlSafe(statement))
         .bind(name)
-        .bind(rank)
+        .bind(&rank)
         .bind(email)
         .bind(experience)
         .bind(registration)
         .bind(code)
-        .bind(fields.flag("is_dino"))
-        .bind(fields.flag("wing_only"))
+        .bind(dino)
+        .bind(wing_only)
         .bind(request_wing)
         .bind(no_wings)
-        .bind(fields.flag("needs_crash_housing"))
-        .bind(fields.flag("requests_wgm_housing"))
+        .bind(crash)
+        .bind(wgm)
         .bind(edit.id.unwrap_or(edit.user))
         .execute(&mut *db)
         .await?;
     let id = edit.id.unwrap_or(result.last_insert_id() as i32);
-    set_links(
-        db,
-        "tab_judge_schools",
-        "judge_id",
-        "school_id",
-        id,
-        schools,
-    )
-    .await?;
-    set_links(
-        db,
-        "tab_judge_required_room_tags",
-        "judge_id",
-        "roomtag_id",
-        id,
-        tags,
-    )
-    .await?;
-    if edit.checkins && edit.id.is_some() {
-        checkins(db, fields, "tab_checkin", "judge_id", id).await?;
+    if edit.public_log && roster_log::enabled(db).await? {
+        if let Some(before) = &before {
+            if before.name != name {
+                roster_log::record(
+                    db,
+                    "judges",
+                    &format!("Changed name for “{name}”: {} → {name}.", before.name),
+                    false,
+                )
+                .await?;
+            }
+        } else {
+            roster_log::record(db, "judges", &format!("Added judge “{name}”."), false).await?;
+        }
+        for (verb, prep, ids) in [
+            ("Removed", "from", previous_schools.difference(&schools)),
+            ("Added", "for", schools.difference(&previous_schools)),
+        ] {
+            for &school in ids {
+                let school = self::name(db, Kind::School, school)
+                    .await?
+                    .ok_or(Error::Missing)?;
+                roster_log::record(
+                    db,
+                    "judges",
+                    &format!("{verb} affiliation “{school}” {prep} judge “{name}”."),
+                    false,
+                )
+                .await?;
+            }
+        }
     }
-    Ok(id)
+    let changes = if let Some(before) = before {
+        let [
+            old_crash,
+            old_wgm,
+            old_dino,
+            old_wing_only,
+            old_request_wing,
+            old_no_wings,
+        ] = before.flags;
+        let mut changed: Vec<String> = [
+            ("name", before.name != name),
+            ("rank", before.rank != rank),
+            ("reported_experience", before.experience != experience),
+            ("needs_crash_housing", old_crash != crash),
+            ("requests_wgm_housing", old_wgm != wgm),
+            ("schools", previous_schools != schools),
+            (
+                "email",
+                before.email.as_deref().unwrap_or_default() != email.unwrap_or_default(),
+            ),
+            ("registration", before.registration != registration),
+            (
+                "ballot_code",
+                before.code.as_deref().unwrap_or_default() != submitted_code,
+            ),
+            ("is_dino", old_dino != dino),
+            ("wing_only", old_wing_only != wing_only),
+            ("request_wing", old_request_wing != request_wing),
+            ("no_wings", old_no_wings != no_wings),
+            ("required_room_tags", previous_tags != tags),
+        ]
+        .into_iter()
+        .filter(|(_, changed)| *changed)
+        .map(|(name, _)| name.into())
+        .collect();
+        if let Some(snapshot) = &snapshot {
+            for round in snapshot.rounds.clone() {
+                let key = format!("checkin_{}", round - 1);
+                if checkbox_value(fields, &key) != snapshot.checked.contains(&round) {
+                    changed.push(key);
+                }
+            }
+        }
+        let mut changes = json!({ "fields": changed });
+        if old_dino != dino {
+            changes["is_dino"] = json!({ "before": old_dino, "after": dino });
+        }
+        changes
+    } else {
+        json!({})
+    };
+    if previous_schools != schools {
+        set_links(
+            db,
+            "tab_judge_schools",
+            "judge_id",
+            "school_id",
+            id,
+            schools,
+        )
+        .await?;
+    }
+    if previous_tags != tags {
+        set_links(
+            db,
+            "tab_judge_required_room_tags",
+            "judge_id",
+            "roomtag_id",
+            id,
+            tags,
+        )
+        .await?;
+    }
+    if let Some(snapshot) = &snapshot {
+        apply_checkins(db, Kind::Judge, id, fields, snapshot).await?;
+    }
+    Ok((id, changes))
 }
 
 pub struct TeamRow {
@@ -831,79 +986,94 @@ async fn change_team_links(
     Ok(())
 }
 
-async fn checkins(
-    db: &mut MySqlConnection,
-    fields: &Fields,
-    table: &'static str,
-    column: &'static str,
-    id: i32,
-) -> Result<(), sqlx::Error> {
-    for round in checkin_rounds(db).await? {
-        if fields.flag(&format!("checkin_{}", round - 1)) {
-            let query = format!(
-                "INSERT INTO {table} ({column}, round_number) VALUES (?, ?)
-              ON DUPLICATE KEY UPDATE round_number = round_number"
-            );
-            sqlx::query(AssertSqlSafe(query))
-                .bind(id)
-                .bind(round)
-                .execute(&mut *db)
-                .await?;
-        } else {
-            let query = format!("DELETE FROM {table} WHERE {column} = ? AND round_number = ?");
-            sqlx::query(AssertSqlSafe(query))
-                .bind(id)
-                .bind(round)
-                .execute(&mut *db)
-                .await?;
+impl Kind {
+    fn checkin_table(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Room => ("tab_roomcheckin", "room_id"),
+            Self::Judge => ("tab_checkin", "judge_id"),
+            _ => unreachable!("check-ins by round are available for judges and rooms"),
         }
+    }
+}
+
+async fn apply_checkins(
+    db: &mut MySqlConnection,
+    kind: Kind,
+    id: i32,
+    fields: &Fields,
+    snapshot: &CheckinSnapshot,
+) -> Result<(), sqlx::Error> {
+    let (table, column) = kind.checkin_table();
+    for round in snapshot.rounds.clone() {
+        let key = format!("checkin_{}", round - 1);
+        let checked = if kind == Kind::Judge {
+            checkbox_value(fields, &key)
+        } else {
+            fields.flag(&key)
+        };
+        if checked == snapshot.checked.contains(&round) {
+            continue;
+        }
+        let query = if checked {
+            format!(
+                "INSERT INTO {table} ({column}, round_number) VALUES (?, ?)
+                     ON DUPLICATE KEY UPDATE round_number = round_number"
+            )
+        } else {
+            format!("DELETE FROM {table} WHERE {column} = ? AND round_number = ?")
+        };
+        sqlx::query(AssertSqlSafe(query))
+            .bind(id)
+            .bind(round)
+            .execute(&mut *db)
+            .await?;
     }
     Ok(())
 }
 
-pub async fn checkin_rounds(db: &mut MySqlConnection) -> Result<RangeInclusive<i32>, sqlx::Error> {
-    let settings = Settings::load(db, &["tot_rounds"]).await?;
-    Ok(0..=settings.integer("tot_rounds", 6).clamp(0, 50))
-}
-
 pub const ROOM_CHECKIN_CONFLICT: &str =
     "Room check-ins changed. Review the current check-ins before saving again.";
+pub const JUDGE_CHECKIN_CONFLICT: &str =
+    "Judge check-ins changed. Review the current check-ins before saving again.";
 
-pub struct RoomCheckins {
+pub struct CheckinSnapshot {
     pub rounds: RangeInclusive<i32>,
     pub checked: Vec<i32>,
     pub revision: String,
 }
 
-pub async fn room_checkins(
+pub async fn checkin_snapshot(
     db: &mut MySqlConnection,
-    room: i32,
+    kind: Kind,
+    id: i32,
     locked: bool,
-) -> Result<RoomCheckins, sqlx::Error> {
+) -> Result<CheckinSnapshot, sqlx::Error> {
     use ring::digest::{Context, SHA256};
-    let rounds = checkin_rounds(db).await?;
-    let query = if locked {
-        "SELECT round_number FROM tab_roomcheckin WHERE room_id = ? AND round_number BETWEEN 0 AND ? ORDER BY round_number FOR UPDATE"
-    } else {
-        "SELECT round_number FROM tab_roomcheckin WHERE room_id = ? AND round_number BETWEEN 0 AND ? ORDER BY round_number"
-    };
-    let checked = sqlx::query_scalar::<_, i32>(query)
-        .bind(room)
+    let settings = Settings::load(db, &["tot_rounds"]).await?;
+    let rounds = 0..=settings.integer("tot_rounds", 6).clamp(0, 50);
+    let (table, column) = kind.checkin_table();
+    let lock = if locked { " FOR UPDATE" } else { "" };
+    let query = format!(
+        "SELECT round_number FROM {table} WHERE {column} = ? AND round_number BETWEEN 0 AND ?
+         ORDER BY round_number{lock}"
+    );
+    let checked = sqlx::query_scalar::<_, i32>(AssertSqlSafe(query))
+        .bind(id)
         .bind(*rounds.end())
         .fetch_all(db)
         .await?;
     let mut stamp = Context::new(&SHA256);
-    stamp.update(b"room check-ins v1\0");
-    stamp.update(&room.to_be_bytes());
+    stamp.update(kind.model().as_bytes());
+    stamp.update(b" check-ins v1\0");
+    stamp.update(&id.to_be_bytes());
     stamp.update(&rounds.end().to_be_bytes());
     for round in &checked {
         stamp.update(&round.to_be_bytes());
     }
-    let revision = hex::encode(stamp.finish());
-    Ok(RoomCheckins {
+    Ok(CheckinSnapshot {
         rounds,
         checked,
-        revision,
+        revision: hex::encode(stamp.finish()),
     })
 }
 

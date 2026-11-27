@@ -1,10 +1,15 @@
-use std::{fmt::Write, num::IntErrorKind};
+use std::{collections::BTreeSet, fmt::Write, num::IntErrorKind};
+
+use chrono::NaiveDateTime;
+use serde_json::Value as JsonValue;
 
 use minijinja::{Value, context};
 use sqlx::{AssertSqlSafe, MySqlConnection};
 
 use crate::{
+    admin_html::django_datetime,
     admin_model_data::valid_email,
+    judge_portal::code_format,
     legacy_html::escape,
     registration_form::{Fields, integer_input},
     staff_roster_data::Kind,
@@ -180,12 +185,62 @@ pub fn checkbox_value(fields: &Fields, name: &str) -> bool {
 }
 
 pub fn checkbox(name: &str, label: &str, value: bool) -> Value {
+    checkbox_with_help(name, label, value, None)
+}
+
+pub fn checkbox_with_help(name: &str, label: &str, value: bool, help_text: Option<&str>) -> Value {
     let id = format!("id_{name}");
     let checked = if value { " checked" } else { "" };
+    let help_id = help_text.map(|_| format!("{id}_helptext"));
+    let described_by = help_id
+        .as_ref()
+        .map_or_else(String::new, |id| format!(r#" aria-describedby="{id}""#));
     let input = format!(
-        r#"<input type="checkbox" name="{name}" class="form-check-input" id="{id}"{checked}>"#
+        r#"<input type="checkbox" name="{name}" class="form-check-input"{described_by} id="{id}"{checked}>"#
     );
-    widget(&id, label, input, Vec::new(), true)
+    let field = widget(&id, label, input, Vec::new(), true);
+    context! { help_id, help_text, ..field }
+}
+
+pub const WING_CONFLICT: &str = "A judge cannot both request a wing and request no wings.";
+
+pub fn judge_code_errors(value: &str) -> Vec<String> {
+    let length = value.chars().count();
+    let mut errors = Vec::new();
+    if length > 255 {
+        errors.push(format!(
+            "Ensure this value has at most 255 characters (it has {length})."
+        ));
+    }
+    if value.contains('\0') {
+        errors.push("Null characters are not allowed.".into());
+    }
+    if !errors.is_empty() || value.is_empty() {
+        return errors;
+    }
+    if length > 30 {
+        errors.push(format!(
+            "Ensure this value has at most 30 characters (it has {length})."
+        ));
+    }
+    if !code_format(value) {
+        errors.push("Ballot code must be legacy alphanumeric text or a hyphenated word-word code with an optional alphanumeric token.".into());
+    }
+    errors
+}
+
+pub fn judge_experience(value: &str) -> Result<Option<i32>, &'static str> {
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let number = integer_input(value).map_err(|_| "Enter a whole number.")?;
+    if number < 0 {
+        Err("Ensure this value is greater than or equal to 0.")
+    } else if number > 10 {
+        Err("Ensure this value is less than or equal to 10.")
+    } else {
+        Ok(Some(number))
+    }
 }
 
 pub fn rank_input(value: &str) -> Result<String, &'static str> {
@@ -233,4 +288,87 @@ pub fn rank_input(value: &str) -> Result<String, &'static str> {
     let cents = digits.parse::<i32>().map_err(|_| INVALID)? * 10_i32.pow((exponent + 2) as u32);
     let sign = if value.starts_with('-') { "-" } else { "" };
     Ok(format!("{sign}{}.{:02}", cents / 100, cents % 100))
+}
+
+pub const MEDIA: &str = concat!(
+    "<link href=\"/static/admin/css/widgets.css\" media=\"all\" rel=\"stylesheet\">\n",
+    "<script src=\"/admin/jsi18n\"></script>",
+);
+
+pub type Choices = Vec<(String, String)>;
+
+pub async fn options(
+    db: &mut MySqlConnection,
+    query: &'static str,
+) -> Result<Choices, sqlx::Error> {
+    Ok(sqlx::query_as::<_, (i32, String)>(query)
+        .fetch_all(db)
+        .await?
+        .into_iter()
+        .map(|(id, label)| (id.to_string(), label))
+        .collect())
+}
+
+pub const REQUIRED: &str = "This field is required.";
+pub const INVALID_CHOICE: &str =
+    "Select a valid choice. That choice is not one of the available choices.";
+pub fn reference_options(choices: &Choices, value: &str, required: bool) -> Option<String> {
+    if value.is_empty() {
+        required.then(|| REQUIRED.into())
+    } else {
+        let id = value.trim().parse::<i32>().ok().map(|id| id.to_string());
+        (!choices
+            .iter()
+            .any(|(id_string, _)| Some(id_string) == id.as_ref()))
+        .then(|| INVALID_CHOICE.into())
+    }
+}
+
+pub fn multi_error(choices: &Choices, values: &[String]) -> Option<String> {
+    let existing: BTreeSet<_> = choices.iter().map(|(id, _)| id.as_str()).collect();
+    values.iter().find_map(|value| {
+        let Ok(id) = value.trim().parse::<i32>() else {
+            return Some(format!("“{value}” is not a valid value."));
+        };
+        (!existing.contains(id.to_string().as_str()))
+            .then(|| format!("Select a valid choice. {value} is not one of the available choices."))
+    })
+}
+
+pub async fn audit_history(
+    db: &mut MySqlConnection,
+    kind: Kind,
+    id: i32,
+) -> Result<Vec<Value>, sqlx::Error> {
+    let rows = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            NaiveDateTime,
+            String,
+            String,
+        ),
+    >(
+        "SELECT e.event_type, COALESCE(u.username, 'Unknown'), e.created_at, e.note, CAST(e.changes AS CHAR)
+         FROM tab_auditevent e JOIN django_content_type c ON e.content_type_id = c.id
+         LEFT JOIN auth_user u ON e.user_id = u.id
+         WHERE c.app_label = 'tab' AND c.model = ? AND e.object_id = ?
+         ORDER BY e.created_at DESC, e.id DESC",
+    )
+    .bind(kind.model())
+    .bind(id)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(event, user, date, note, changes)| {
+            let label = crate::admin_records::event_label(&event);
+            let label = if label == "-" { &event } else { label };
+            context! {
+                    label, user_display => user, created_at => django_datetime(date), note,
+                    changes => serde_json::from_str::<JsonValue>(&changes).unwrap_or_default(),
+            }
+        })
+        .collect())
 }

@@ -4,9 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::Response,
 };
-use chrono::NaiveDateTime;
 use minijinja::{Value, context};
-use serde_json::Value as JsonValue;
 use sqlx::MySqlConnection;
 
 use crate::{
@@ -20,19 +18,15 @@ use crate::{
     registration_form::{Fields, integer_input},
     settings::Settings,
     staff_roster_data::{self as roster, Error, Kind, TEAM_CHECKIN_CONFLICT, TeamRow},
-    staff_roster_fields::{checkbox, checkbox_value, input, multi_select, name_error, select},
+    staff_roster_fields::{
+        Choices, INVALID_CHOICE, MEDIA, REQUIRED, audit_history, checkbox, checkbox_value, input,
+        multi_error, multi_select, name_error, options, reference_options, select,
+    },
     staff_roster_notice,
     staff_scratches::MAX_BATCH,
     tournament_data::TournamentData,
     unavailable,
 };
-
-const MEDIA: &str = concat!(
-    "<link href=\"/static/admin/css/widgets.css\" media=\"all\" rel=\"stylesheet\">\n",
-    "<script src=\"/admin/jsi18n\"></script>",
-);
-
-type Choices = Vec<(String, String)>;
 
 struct Options {
     schools: Choices,
@@ -69,18 +63,6 @@ fn choices(labels: impl IntoIterator<Item = &'static str>) -> Choices {
         .collect()
 }
 
-async fn options(db: &mut MySqlConnection, query: &'static str) -> Result<Choices, sqlx::Error> {
-    Ok(sqlx::query_as::<_, (i32, String)>(query)
-        .fetch_all(db)
-        .await?
-        .into_iter()
-        .map(|(id, label)| (id.to_string(), label))
-        .collect())
-}
-
-const REQUIRED: &str = "This field is required.";
-const INVALID_CHOICE: &str =
-    "Select a valid choice. That choice is not one of the available choices.";
 const ALREADY_ASSIGNED: &str = concat!(
     "A debater cannot already be on a different team!\n",
     "                    Consider editing the debaters' existing team,\n",
@@ -152,29 +134,6 @@ async fn identities(
         .into_iter()
         .map(|(id, name)| Identity { id, name })
         .collect())
-}
-
-fn reference_options(choices: &Choices, value: &str, required: bool) -> Option<String> {
-    if value.is_empty() {
-        required.then(|| REQUIRED.into())
-    } else {
-        let id = value.trim().parse::<i32>().ok().map(|id| id.to_string());
-        (!choices
-            .iter()
-            .any(|(id_string, _)| Some(id_string) == id.as_ref()))
-        .then(|| INVALID_CHOICE.into())
-    }
-}
-
-fn multi_error(choices: &Choices, values: &[String]) -> Option<String> {
-    let existing: BTreeSet<_> = choices.iter().map(|(id, _)| id.as_str()).collect();
-    values.iter().find_map(|value| {
-        let Ok(id) = value.trim().parse::<i32>() else {
-            return Some(format!("“{value}” is not a valid value."));
-        };
-        (!existing.contains(id.to_string().as_str()))
-            .then(|| format!("Select a valid choice. {value} is not one of the available choices."))
-    })
 }
 
 async fn field_errors(
@@ -474,7 +433,7 @@ pub async fn show(
                     name: name.clone(),
                 })
         };
-        audit_events = history(&mut db, id).await?;
+        audit_events = audit_history(&mut db, Kind::Team, id).await?;
         initial_fields = initial(
             Some(&team),
             &members,
@@ -522,37 +481,4 @@ pub async fn show(
     );
     csrf.set_cookie(&mut response, headers);
     Ok(response)
-}
-
-async fn history(db: &mut MySqlConnection, id: i32) -> Result<Vec<Value>, sqlx::Error> {
-    let rows = sqlx::query_as::<
-        _,
-        (
-            String,
-            String,
-            NaiveDateTime,
-            String,
-            String,
-        ),
-    >(
-        "SELECT e.event_type, COALESCE(u.username, 'Unknown'), e.created_at, e.note, CAST(e.changes AS CHAR)
-         FROM tab_auditevent e JOIN django_content_type c ON e.content_type_id = c.id
-         LEFT JOIN auth_user u ON e.user_id = u.id
-         WHERE c.app_label = 'tab' AND c.model = 'team' AND e.object_id = ?
-         ORDER BY e.created_at DESC, e.id DESC",
-    )
-    .bind(id)
-    .fetch_all(db)
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|(event, user, date, note, changes)| {
-            let label = crate::admin_records::event_label(&event);
-            let label = if label == "-" { &event } else { label };
-            context! {
-                    label, user_display => user, created_at => django_datetime(date), note,
-                    changes => serde_json::from_str::<JsonValue>(&changes).unwrap_or_default(),
-            }
-        })
-        .collect())
 }

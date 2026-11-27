@@ -4638,6 +4638,160 @@ def test_team_roster_forms_stats_and_history_match_django(html_assets, subtests)
         assert not Scratch.objects.filter(team=scratch_team).exists()
 
 
+@pytest.mark.django_db(transaction=True)
+def test_judge_roster_forms_and_history_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 4)
+    TabSettings.set("tot_rounds", 3)
+    TabSettings.set("written_rfd_first_round", -1)
+    school = School.objects.create(name="Z & University")
+    other = School.objects.create(name="A <College>")
+    registration = Registration.objects.create(school=school, email="staff-judge@example.org")
+    Registration.objects.create(school=other, email="other@example.org")
+    users = get_user_model().objects
+    admin = users.create_superuser(username="judge-form-admin")
+    board = users.create_superuser(username="judge-form-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    entry = users.create_user(username="entry")
+
+    def staff(username, group):
+        user = users.create_user(username=username, is_staff=True)
+        user.groups.add(Group.objects.create(name=group))
+        return user
+
+    helper = staff("judge-form-helper", "MIT-TAB: Data entry helper")
+    assistant = staff("judge-form-assistant", "MIT-TAB: Tab assistant")
+    scratch = staff("judge-form-scratch", "MIT-TAB: Create and view scratches")
+    clients = {}
+    for user in (admin, helper, assistant, entry, board, scratch):
+        client = Client()
+        client.force_login(user)
+        client.cookies["csrftoken"] = "a" * 32
+        clients[user.username] = client
+
+    judge = Judge.objects.create(name="Judge <One>", rank="5.25", reported_experience=7,
+                                 email="judge@example.org", registration=registration,
+                                 ballot_code="Synthetic-Judge-01", request_wing=True,
+                                 needs_crash_housing=True, created_by=admin)
+    empty = Judge.objects.create(name="Judge Without History", rank="0.00", ballot_code="Synthetic-Judge-02")
+    judge.schools.add(school, other)
+    tag = RoomTag.objects.create(tag="Z projector & screen", priority="1.00")
+    RoomTag.objects.create(tag="A microphone", priority="2.00")
+    judge.required_room_tags.add(tag)
+    for round_number in (0, 2, 8):
+        CheckIn.objects.create(judge=judge, round_number=round_number)
+    team = Team.objects.create(name="Fixture <Gov>", school=school, seed=0)
+    opponent = Team.objects.create(name="Fixture & Opp", school=other, seed=0)
+    room = Room.objects.create(name="Fixture & Room", rank=3)
+    second = Round.objects.create(round_number=2, gov_team=team, opp_team=opponent, room=room, chair=judge)
+    first = Round.objects.create(round_number=1, gov_team=opponent, opp_team=team)
+    without_panel = Round.objects.create(round_number=3, gov_team=team, opp_team=opponent, chair=judge)
+    Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY, gov_team=team, opp_team=opponent)
+    for paired in (second, first):
+        paired.judges.add(judge)
+    AuditEvent.record(judge, AuditEvent.EDIT, admin, changes={"fields": ["rank", "request_wing"]},
+                      note="Original & <Edited>")
+    create, detail = "/enter_judge/", f"/judge/{judge.id}/"
+    valid = {"name": judge.name, "rank": "5.25", "reported_experience": "7", "registration": registration.id,
+             "email": judge.email, "ballot_code": judge.ballot_code, "schools": [school.id, other.id],
+             "required_room_tags": [tag.id], "needs_crash_housing": "on", "request_wing": "on"}
+    with rust_server(overrides=html_assets) as port:
+        for user in (admin, assistant, helper, entry):
+            for path in (create, detail, f"/judge/{empty.id}/"):
+                with subtests.test(user=user.username, path=path):
+                    compare_admin_page(port, path, clients[user.username],
+                                       judge_checkins=path != create and user in (admin, assistant))
+        invalid = (
+            (create, {"name": "", "rank": "100", "reported_experience": "11", "email": "not-email",
+                      "registration": "999999", "ballot_code": "x_" * 20, "schools": ["999999"],
+                      "required_room_tags": ["bad"], "request_wing": "on", "no_wings": "on"}),
+            (create, {**valid, "rank": "4.111", "reported_experience": "-1"}),
+            (detail, {**valid, "name": "Attempted & Judge", "rank": "nonnumeric", "ballot_code": empty.ballot_code}),
+        )
+        for path, fields in invalid:
+            with subtests.test(path=path, fields=fields):
+                compare_admin_page(port, path, clients[admin.username], {**fields, "return_to": path},
+                                   judge_checkins=path == detail)
+
+        def request_as(user, path=detail, fields=None, *, notice=None, stable=False):
+            session = clients[user.username].cookies["sessionid"].value
+            csrf = "a" * (43 if stable else 32)
+            headers = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            if notice:
+                headers["Cookie"] += f"; mittab_roster_notice={notice}"
+            form = {**fields, "csrfmiddlewaretoken": csrf} if fields is not None else None
+            return request(port, path, method="POST" if form is not None else "GET", extra_headers=headers, form=form)
+
+        for user in (board, scratch):
+            for path in (create, detail):
+                for payload in (None, valid):
+                    assert request_as(user, path, payload)[1]["Location"] == "/403/"
+        administrator = request_as(admin)[2]
+        assert f"/round/{second.id}/result/".encode() in administrator
+        assert f"/round/{without_panel.id}/result/".encode() not in administrator
+        restricted = request_as(helper, stable=True)[2]
+        assert b"Rounds Judged" not in restricted and b'name="checkin_' not in restricted
+        assert b"Scratches for" not in restricted
+        snapshot = judge_checkin_proof(administrator)
+        payload = {**valid, "mittab_checkins_present": "1", "mittab_judge_checkin_revision": snapshot,
+                   "mittab_judge_edit_revision": judge_edit_proof(request_as(assistant)[2]),
+                   "checkin_-1": "on", "checkin_1": "on", "checkin_2": "on"}
+        CheckIn.objects.create(judge=judge, round_number=1)
+        without_panel.judges.add(judge)
+        Scratch.objects.create(judge=judge, team=team, scratch_type=Scratch.TEAM_SCRATCH)
+        assert request_as(helper, stable=True)[2] == restricted
+        before = set(judge.checkin_set.values_list("round_number", flat=True))
+        stale = request_as(assistant, fields={**payload, "name": "Unsaved Judge"})
+        assert stale[0] == 409 and b"Judge check-ins changed." in stale[2]
+        assert judge_checkin_proof(stale[2]) != snapshot
+        assert not Judge.objects.filter(name="Unsaved Judge").exists()
+        assert request_as(helper, fields=payload)[0] == 409
+        assert request_as(helper, fields={**payload, "mittab_judge_edit_revision": judge_edit_proof(restricted)})[0] == 302
+        assert set(judge.checkin_set.values_list("round_number", flat=True)) == before
+
+        RegistrationConfig.objects.update(allow_new_registrations=False)
+        PublicRosterLogState.objects.update_or_create(
+            pk=1, defaults={"first_published_at": timezone.now(), "started_at": timezone.now()},
+        )
+        PublicRosterChange.objects.all().delete()
+        school_path = f"/school/{school.id}/"
+        result = request_as(assistant, fields={**payload, "name": "Judge & Updated", "rank": "4.75e0",
+                                               "reported_experience": "8.0", "ballot_code": "", "is_dino": "on",
+                                               "schools": [school.id], "return_to": school_path,
+                                               "mittab_judge_checkin_revision": judge_checkin_proof(stale[2])})
+        assert result[0] == 302 and result[1]["Location"] == school_path
+        judge.refresh_from_db()
+        assert judge.created_by_id == admin.id and judge.ballot_code != valid["ballot_code"] and judge.ballot_code
+        assert judge.is_dino and judge.rank == Decimal("4.75") and judge.reported_experience == 8
+        assert set(judge.checkin_set.values_list("round_number", flat=True)) == {0, 2, 3, 8}
+        assert judge.audit_events.first().changes == {
+            "fields": ["name", "rank", "reported_experience", "schools", "ballot_code", "is_dino", "checkin_0", "checkin_2"],
+            "is_dino": {"before": False, "after": True},
+        }
+        assert list(PublicRosterChange.objects.order_by("id").values_list("message", "involves_debaters")) == [
+            ("Changed name for “Judge & Updated”: Judge <One> → Judge & Updated.", False),
+            ("Removed affiliation “A <College>” from judge “Judge & Updated”.", False),
+        ]
+        notice = load_cookies(result[1])["mittab_roster_notice"].value
+        assert b"Judge Judge &amp; Updated updated successfully" in request_as(assistant, school_path, notice=notice)[2]
+        assert b"updated successfully" not in request_as(helper, school_path, notice=notice)[2]
+        old_form = request_as(assistant, fields={**payload, "name": "Stale Attempt"})
+        assert old_form[0] == 409 and b"Judge details changed." in old_form[2]
+        assert valid["ballot_code"].encode() not in old_form[2]
+        assert b"Stale Attempt" not in old_form[2]
+        judge.refresh_from_db()
+        assert judge.is_dino and judge.ballot_code != valid["ballot_code"] and judge.name == "Judge & Updated"
+        assert judge.ballot_code not in json.dumps(list(judge.audit_events.values_list("changes", flat=True)))
+        compare_admin_page(port, detail, clients[admin.username], judge_checkins=True)
+        compare_admin_page(port, detail, clients[helper.username])
+
+        result = request_as(helper, create, {"name": "New & Judge", "rank": "3", "email": "person@[127.0.0.1]"})
+        assert result[0] == 302 and result[1]["Location"] == "/"
+        created = Judge.objects.get(name="New & Judge")
+        assert created.email == "person@[127.0.0.1]" and created.ballot_code and created.created_by_id == helper.id
+        assert not created.checkin_set.exists()
+
+
 def roster_request_waiting_for_lock(submit, change_role):
     from time import monotonic, sleep
 
@@ -4689,6 +4843,9 @@ def test_native_staff_roster_edits_and_data_entry_scope():
         csrf = load_cookies(headers)["csrftoken"].value
 
         def post(path, values, session=tab, token=csrf):
+            if re.fullmatch(r"/judge/\d+/", path):
+                page = request(port, path, cookie=session)[2]
+                values = [*values, ("mittab_judge_edit_revision", judge_edit_proof(page))]
             return request(port, path, method="POST", extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
                            form=[("csrfmiddlewaretoken", token), *values])
 
@@ -4744,19 +4901,25 @@ def test_native_staff_roster_edits_and_data_entry_scope():
 
         judge = [("name", "Roster Judge"), ("rank", "5.50"), ("schools", school.id),
                  ("required_room_tags", tag.id), ("email", "judge@example.test"), ("reported_experience", 6)]
-        assert post("/enter_judge/", [*judge, ("request_wing", "on"), ("no_wings", "on")])[0] == 422
+        assert b"A judge cannot both request a wing and request no wings." in post(
+            "/enter_judge/", [*judge, ("request_wing", "on"), ("no_wings", "on")],
+        )[2]
         assert post("/enter_judge/", [*judge, ("request_wing", "on")])[0] == 302
         judge_obj = Judge.objects.get(name="Roster Judge")
         assert judge_obj.rank == Decimal("5.50")
         assert judge_obj.request_wing and judge_obj.schools.get() == school
         assert judge_obj.ballot_code and judge_obj.required_room_tags.get() == tag
         judge_path = f"/judge/{judge_obj.id}/"
-        assert post(judge_path, [*judge, checkin_intent, ("checkin_0", "on")])[0] == 302
+        judge_proof = judge_checkin_proof(request(port, judge_path, cookie=tab)[2])
+        assert post(judge_path, [*judge, checkin_intent, ("checkin_0", "on"),
+                                 ("mittab_judge_checkin_revision", judge_proof)])[0] == 302
         assert CheckIn.objects.filter(judge=judge_obj, round_number=1).exists()
         assert post(judge_path, [*judge, checkin_intent, ("checkin_1", "on")], session=helper)[0] == 302
         assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [1]
         assert b'name="checkin_1"' in request(port, judge_path, cookie=assistant)[2]
-        assert post(judge_path, [*judge, checkin_intent, ("checkin_1", "on")], session=assistant)[0] == 302
+        judge_proof = judge_checkin_proof(request(port, judge_path, cookie=assistant)[2])
+        assert post(judge_path, [*judge, checkin_intent, ("checkin_1", "on"),
+                                 ("mittab_judge_checkin_revision", judge_proof)], session=assistant)[0] == 302
         assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [2]
 
         room = [("name", "Roster Room"), ("rank", "4.25"), ("tags", tag.id)]
@@ -4808,7 +4971,7 @@ def test_native_staff_roster_edits_and_data_entry_scope():
 
         invalid = [*judge, checkin_intent, ("rank", "invalid")]
         status, _, page = submit_during_role_change(judge_path, invalid, demoted_tab, remove_superuser)
-        assert status == 422
+        assert status == 200
         assert b'name="checkin_1"' not in page and b'name="mittab_checkins_present"' not in page
         assert list(CheckIn.objects.filter(judge=judge_obj).values_list("round_number", flat=True)) == [2]
 
@@ -7197,10 +7360,19 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
                        registration_revision=False, configuration_revision=False, list_revision=False,
                        content_revision=False, motion_revision=False, staff_motion_revision=False,
-                       email_log_revision=False, challenge_revision=False, roster_checkins=False, team_checkins=False):
+                       email_log_revision=False, challenge_revision=False, roster_checkins=False, team_checkins=False,
+                       judge_checkins=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    judge_editor = re.fullmatch(r"/judge/\d+/", path) is not None
+    if judge_editor and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_judge_edit_revision"] = judge_edit_proof(previous)
+        if judge_checkins:
+            form["mittab_checkins_present"] = "1"
+            form["mittab_judge_checkin_revision"] = judge_checkin_proof(previous)
     if staff_motion_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -7295,7 +7467,7 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_list_revision" value="[a-f0-9]{64}" id="id_mittab_list_revision">', b"", body,
             )
             assert metadata == 1
-        if roster_checkins or team_checkins:
+        if roster_checkins or team_checkins or judge_checkins:
             proof = b'<input type="hidden" name="mittab_checkins_present" value="1">'
             assert body.count(proof) == 1
             body = body.replace(proof, b"")
@@ -7305,7 +7477,21 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
         if team_checkins:
             body, removed = re.subn(rb'<input type="hidden" name="mittab_team_checkin_initial" value="[01]">', b"", body)
             assert removed == (0 if path == "/enter_team/" else 1)
+        if judge_checkins:
+            body, removed = re.subn(rb'<input type="hidden" name="mittab_judge_checkin_revision" value="[a-f0-9]{64}">', b"", body)
+            assert removed == 1
+        if judge_editor:
+            body, removed = re.subn(rb'<input type="hidden" name="mittab_judge_edit_revision" value="[a-f0-9]{64}">', b"", body)
+            assert removed == 1
         assert_html_bytes(body, reference.content)
+
+
+def judge_checkin_proof(body):
+    return re.search(rb'name="mittab_judge_checkin_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def judge_edit_proof(body):
+    return re.search(rb'name="mittab_judge_edit_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def room_checkin_proof(body):

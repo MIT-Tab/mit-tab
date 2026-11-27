@@ -44,7 +44,11 @@ pub async fn protect_response(mut response: Response) -> Response {
 }
 
 pub fn valid_code(code: &str) -> bool {
-    if code.is_empty() || code.len() > 30 {
+    code.len() <= 30 && code_format(code)
+}
+
+pub fn code_format(code: &str) -> bool {
+    if code.is_empty() {
         return false;
     }
     let mut segments = code.split('-');

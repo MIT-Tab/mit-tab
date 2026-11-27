@@ -88,6 +88,7 @@ mod staff_elimination_assign;
 mod staff_elimination_page;
 mod staff_elimination_store;
 mod staff_invites;
+mod staff_judge;
 mod staff_pairing;
 mod staff_rankings;
 mod staff_roles;

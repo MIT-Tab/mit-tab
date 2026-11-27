@@ -366,6 +366,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/tab/team_detail.html"),
         ),
         (
+            "tab/judge_detail.html",
+            include_str!("../../../mittab/templates/tab/judge_detail.html"),
+        ),
+        (
             "common/_audit_trail.html",
             include_str!("../../../mittab/templates/common/_audit_trail.html"),
         ),
@@ -646,9 +650,11 @@ fn translate(name: &str, source: &str) -> String {
             ["render_form", "form", "files_last=True"] => output.push_str(
                 concat!(
                     "{% with files_last=true %}{% include 'ui/form.html' %}{% endwith %}",
-                    "{% if room_checkin_revision or team_checkins %}<input type=\"hidden\" name=\"mittab_checkins_present\" value=\"1\">{% endif %}",
+                    "{% if room_checkin_revision or team_checkins or judge_checkin_revision %}<input type=\"hidden\" name=\"mittab_checkins_present\" value=\"1\">{% endif %}",
                     "{% if room_checkin_revision %}<input type=\"hidden\" name=\"mittab_room_checkin_revision\" value=\"{{ room_checkin_revision }}\">{% endif %}",
                     "{% if team_checkin_initial %}<input type=\"hidden\" name=\"mittab_team_checkin_initial\" value=\"{{ team_checkin_initial }}\">{% endif %}",
+                    "{% if judge_checkin_revision %}<input type=\"hidden\" name=\"mittab_judge_checkin_revision\" value=\"{{ judge_checkin_revision }}\">{% endif %}",
+                    "{% if judge_edit_revision %}<input type=\"hidden\" name=\"mittab_judge_edit_revision\" value=\"{{ judge_edit_revision }}\">{% endif %}",
                 ),
             ),
             ["render_field", "field"] if name == "ui/form.html" => output.push_str(

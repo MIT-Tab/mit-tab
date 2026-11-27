@@ -365,8 +365,10 @@ def view_judge(request, judge_id):
             instance=judge,
             allow_checkins=user_has_staff_capability(request.user, CAP_CHECKINS),
         )
-        judging_rounds = list(Round.objects.filter(judges=judge).select_related(
-            "gov_team", "opp_team", "room"))
+        if request.user.is_superuser:
+            judging_rounds = Round.objects.filter(judges=judge).select_related(
+                "gov_team", "opp_team", "room"
+            ).order_by("id")
     base_url = f"/judge/{judge_id}/"
     scratch_url = f"{base_url}scratches/view/"
     links = []

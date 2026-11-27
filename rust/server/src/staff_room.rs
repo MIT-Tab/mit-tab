@@ -14,7 +14,7 @@ use crate::{
     login::TemplateCsrf,
     registration_form::Fields,
     staff_roles,
-    staff_roster_data::{self, Error, Kind, ROOM_CHECKIN_CONFLICT, RoomCheckins},
+    staff_roster_data::{self, CheckinSnapshot, Error, Kind, ROOM_CHECKIN_CONFLICT},
     staff_roster_fields::{checkbox, input, multi_select, name_error, rank_input},
     staff_roster_notice, unavailable,
 };
@@ -51,12 +51,13 @@ pub async fn show(
     let room_checkin_revision = if let Some(room) = id
         && staff_roles::can_check_in(&mut *db, actor).await?
     {
-        let snapshot = staff_roster_data::room_checkins(&mut db, room, false).await?;
+        let snapshot =
+            staff_roster_data::checkin_snapshot(&mut db, Kind::Room, room, false).await?;
         let submitted = posted.map(|(fields, _)| fields).filter(|fields| {
             fields.flag("mittab_checkins_present")
                 && fields.get("mittab_room_checkin_revision") == snapshot.revision
         });
-        visible_fields.extend(checkin_fields(&snapshot, submitted));
+        visible_fields.extend(checkin_fields(&snapshot, submitted, Fields::flag));
         Some(snapshot.revision)
     } else {
         None
@@ -176,7 +177,11 @@ async fn form_fields(
     ])
 }
 
-fn checkin_fields(snapshot: &RoomCheckins, posted: Option<&Fields>) -> impl Iterator<Item = Value> {
+pub(super) fn checkin_fields<'a>(
+    snapshot: &'a CheckinSnapshot,
+    posted: Option<&'a Fields>,
+    selected_value: fn(&Fields, &str) -> bool,
+) -> impl Iterator<Item = Value> + 'a {
     snapshot.rounds.clone().map(move |round| {
         let field = format!("checkin_{}", round - 1);
         let label = if round == 0 {
@@ -186,7 +191,7 @@ fn checkin_fields(snapshot: &RoomCheckins, posted: Option<&Fields>) -> impl Iter
         };
         let selected = posted.map_or_else(
             || snapshot.checked.contains(&round),
-            |fields| fields.flag(&field),
+            |fields| selected_value(fields, &field),
         );
         checkbox(&field, &label, selected)
     })
