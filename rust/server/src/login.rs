@@ -5,13 +5,13 @@ use axum::{
     response::Response,
 };
 use minijinja::context;
+use ring::rand::{SecureRandom, SystemRandom};
 use serde::Deserialize;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
-    legacy_session::{Actor, cookie},
+    App, access, legacy_html,
+    legacy_session::{self, Actor, SessionError, cookie},
     native_session, passwords, private, unavailable,
 };
 
@@ -41,8 +41,12 @@ struct Account {
     board: bool,
 }
 
-pub async fn page(Query(destination): Query<Continue>, headers: HeaderMap) -> Response {
-    render(&destination.next, false, secure_request(&headers))
+pub async fn page(
+    State(app): State<App>,
+    Query(destination): Query<Continue>,
+    headers: HeaderMap,
+) -> Response {
+    render(&app, &headers, &destination.next, false).await
 }
 
 pub async fn sign_in(
@@ -59,13 +63,13 @@ pub async fn sign_in(
     let username: String = form.username.trim().nfkc().collect();
     let account = match verified_account(&app, &username, form.password).await {
         Ok(Some(account)) => account,
-        Ok(None) => return render(next, true, secure),
+        Ok(None) => return render(&app, &headers, next, true).await,
         Err(_) => return unavailable(),
     };
     if account.board {
         match access::board_access_open(&app).await {
             Ok(true) => {}
-            Ok(false) => return render(next, true, secure),
+            Ok(false) => return render(&app, &headers, next, true).await,
             Err(_) => return unavailable(),
         }
     }
@@ -93,7 +97,7 @@ pub async fn sign_in(
         secure,
         true,
     );
-    if let Ok(csrf) = passwords::random_secret() {
+    if let Ok(csrf) = new_csrf_code() {
         set_cookie(&mut response, "csrftoken", &csrf, 31_449_600, secure, false);
     }
     response
@@ -192,20 +196,119 @@ async fn destination(app: &App, account: &Account, next: &str) -> Result<String,
     Ok(if hide { "/" } else { "/setup/tournament-todo/" }.into())
 }
 
-fn render(next: &str, invalid: bool, secure: bool) -> Response {
-    let Ok(csrf) = passwords::random_secret() else {
+const DJANGO_CSRF_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const DJANGO_CSRF_LENGTH: usize = 32;
+
+pub fn new_csrf_code() -> Result<String, &'static str> {
+    let random = SystemRandom::new();
+    let mut code = String::with_capacity(DJANGO_CSRF_LENGTH);
+    let mut bytes = [0; 48];
+    while code.len() < DJANGO_CSRF_LENGTH {
+        random
+            .fill(&mut bytes)
+            .map_err(|_| "CSRF generation failed")?;
+        for byte in bytes.into_iter().filter(|&byte| byte < 248) {
+            code.push(DJANGO_CSRF_CHARS[usize::from(byte) % DJANGO_CSRF_CHARS.len()].into());
+            if code.len() == DJANGO_CSRF_LENGTH {
+                break;
+            }
+        }
+    }
+    Ok(code)
+}
+
+fn django_csrf_code(value: &str) -> bool {
+    value.len() == DJANGO_CSRF_LENGTH && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+}
+
+fn csrf_index(byte: u8) -> usize {
+    DJANGO_CSRF_CHARS
+        .iter()
+        .position(|&candidate| byte == candidate)
+        .expect("validated CSRF character")
+}
+
+fn mask_csrf(secret: &str, mask: &str) -> String {
+    let mut token = mask.to_owned();
+    token.extend(secret.bytes().zip(mask.bytes()).map(|(secret, mask)| {
+        let index = (csrf_index(secret) + csrf_index(mask)) % DJANGO_CSRF_CHARS.len();
+        char::from(DJANGO_CSRF_CHARS[index])
+    }));
+    token
+}
+
+async fn render(app: &App, headers: &HeaderMap, next: &str, invalid: bool) -> Response {
+    let actor = match legacy_session::actor(&app.db, headers, app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(SessionError::Reauthenticate) => Actor::Anonymous,
+        Err(SessionError::Database) => return unavailable(),
+    };
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let mut response = html::render(
-        "staff_login.html",
+    let shell = async {
+        let mut db = app.db.begin().await?;
+        let shell = legacy_html::shell(&mut db, actor, "/public/login/").await?;
+        db.commit().await?;
+        Ok::<_, sqlx::Error>(shell)
+    }
+    .await;
+    let Ok(shell) = shell else {
+        return unavailable();
+    };
+    let mut response = legacy_html::render(
+        "public/staff_login.html",
+        shell,
         context! {
-            title => "Staff Login", nav => Navigation::new(Actor::Anonymous, false),
-            csrf => &csrf, next => local_next(next), invalid,
+            csrf_input => csrf.input(),
+            next => local_next(next),
+            form => context! { errors => invalid },
         },
         StatusCode::OK,
     );
-    set_cookie(&mut response, "csrftoken", &csrf, 31_449_600, secure, false);
+    csrf.set_cookie(&mut response, headers);
     response
+}
+
+pub struct TemplateCsrf {
+    secret: String,
+    token: String,
+}
+
+impl TemplateCsrf {
+    pub fn new(headers: &HeaderMap) -> Result<Self, &'static str> {
+        let secret = match cookie(headers, "csrftoken").filter(|value| valid_csrf_token(value)) {
+            Some(value) => value.to_owned(),
+            None => new_csrf_code()?,
+        };
+        // Existing Rust forms carry the same 43-character value as their cookie.
+        let token = if django_csrf_code(&secret) {
+            mask_csrf(&secret, &new_csrf_code()?)
+        } else {
+            secret.clone()
+        };
+        Ok(Self { secret, token })
+    }
+
+    pub fn input(&self) -> String {
+        format!(
+            "<input type=\"hidden\" name=\"csrfmiddlewaretoken\" value=\"{}\">",
+            self.token
+        )
+    }
+
+    pub fn set_cookie(&self, response: &mut Response, headers: &HeaderMap) {
+        if cookie(headers, "csrftoken") != Some(self.secret.as_str()) {
+            set_cookie(
+                response,
+                "csrftoken",
+                &self.secret,
+                31_449_600,
+                secure_request(headers),
+                false,
+            );
+        }
+    }
 }
 
 pub fn set_cookie(
@@ -248,15 +351,26 @@ pub fn secure_request(headers: &HeaderMap) -> bool {
 
 pub fn valid_csrf(headers: &HeaderMap, submitted: &str) -> bool {
     same_origin(headers, secure_request(headers))
-        && cookie(headers, "csrftoken")
-            .is_some_and(|value| valid_csrf_token(value) && value == submitted)
+        && cookie(headers, "csrftoken").is_some_and(|value| {
+            if valid_csrf_token(value) && value == submitted {
+                return true;
+            }
+            let Some((mask, encoded)) = submitted.split_at_checked(DJANGO_CSRF_LENGTH) else {
+                return false;
+            };
+            django_csrf_code(value)
+                && django_csrf_code(mask)
+                && django_csrf_code(encoded)
+                && mask_csrf(value, mask) == submitted
+        })
 }
 
 pub fn valid_csrf_token(value: &str) -> bool {
-    value.len() == 43
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    django_csrf_code(value)
+        || (value.len() == 43
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_'))
 }
 
 pub fn csrf_error() -> Response {

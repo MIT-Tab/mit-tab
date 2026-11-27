@@ -28,6 +28,13 @@ impl Preset {
 }
 
 pub async fn preset(db: &MySqlPool, user: i32) -> Result<Option<Preset>, sqlx::Error> {
+    preset_on(db, user).await
+}
+
+pub async fn preset_on<'db>(
+    db: impl sqlx::MySqlExecutor<'db>,
+    user: i32,
+) -> Result<Option<Preset>, sqlx::Error> {
     let role = sqlx::query_scalar::<_, String>(
         "SELECT g.name FROM auth_group g
          JOIN auth_user_groups m ON m.group_id = g.id WHERE m.user_id = ?

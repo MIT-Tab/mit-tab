@@ -187,7 +187,7 @@ fn entry_roster_route(request: &Request) -> bool {
     {
         Some(
             "/view_teams/" | "/view_debaters/" | "/view_schools/" | "/view_judges/"
-            | "/view_rooms/",
+            | "/view_rooms/" | "/team/{id}",
         ) => matches!(request.method(), &Method::GET | &Method::HEAD),
         Some(
             "/enter_team/" | "/team/{id}/" | "/enter_debater/" | "/debater/{id}/"

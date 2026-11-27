@@ -63,6 +63,17 @@ pub async fn theme(State(app): State<App>) -> Response {
     let color = branding(&app)
         .await
         .map_or_else(|_| DEFAULT_THEME.into(), |(_, color)| color);
+    private((
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
+        format!(":root {{ {} }}", theme_variables(&color)),
+    ))
+}
+
+pub fn theme_variables(candidate: &str) -> String {
+    let color = theme_color(candidate);
     let channel = |from, to| u32::from_str_radix(&color[from..to], 16).unwrap_or_default();
     let (red, green, blue) = (channel(1, 3), channel(3, 5), channel(5, 7));
     let (text, text_rgb) = if red * 299 + green * 587 + blue * 114 >= 128_000 {
@@ -70,15 +81,9 @@ pub async fn theme(State(app): State<App>) -> Response {
     } else {
         ("#ffffff", "255, 255, 255")
     };
-    private((
-        [
-            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
-            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
-        ],
-        format!(
-            ":root {{ --theme-color: {color}; --theme-color-rgb: {red}, {green}, {blue}; --theme-on-color: {text}; --theme-on-color-rgb: {text_rgb}; }}"
-        ),
-    ))
+    format!(
+        "--theme-color: {color}; --theme-color-rgb: {red}, {green}, {blue}; --theme-on-color: {text}; --theme-on-color-rgb: {text_rgb};"
+    )
 }
 
 pub async fn page(

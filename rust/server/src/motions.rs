@@ -12,6 +12,7 @@ use sqlx::{MySql, MySqlExecutor, QueryBuilder};
 use crate::{
     App, access,
     html::{self, Navigation},
+    legacy_html,
     legacy_session::{Actor, cookie},
     login,
     public_cache::{self, Page},
@@ -201,7 +202,7 @@ pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) 
         if !settings.flag("motions_enabled", false) {
             return Ok(access::found(PUBLIC_ERROR));
         }
-        let mut rows = list(db, true).await?;
+        let mut rows = list(&mut *db, true).await?;
         rows.sort_by_key(|motion| std::cmp::Reverse(motion.round.sort_key()));
         let has_motions = !rows.is_empty();
         let [mut varsity, mut novice, mut preliminary] = [Vec::new(), Vec::new(), Vec::new()];
@@ -215,17 +216,15 @@ pub async fn public(State(app): State<App>, Extension(actor): Extension<Actor>) 
             }
         }
         let tournament = settings.string("tournament_name", "New Tournament");
-        Ok(html::render(
-            "motions.html",
+        let shell = legacy_html::shell(db, actor, "/public/motions/").await?;
+        Ok(legacy_html::render(
+            "public/motions.html",
+            shell,
             context! {
-                title => format!("Motions - {tournament}"),
-                nav => Navigation::new(actor, true),
-                has_motions,
-                groups => [
-                    ("Varsity Elimination Rounds", varsity),
-                    ("Novice Elimination Rounds", novice),
-                    ("Preliminary Rounds", preliminary),
-                ],
+                tournament, has_motions,
+                varsity_outrounds => varsity,
+                novice_outrounds => novice,
+                inround_motions => preliminary,
             },
             StatusCode::OK,
         ))
@@ -505,15 +504,16 @@ pub async fn back_to_manage() -> Response {
 }
 
 pub async fn public_error(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
-    public_cache::render(&app, actor, Page::AccessError, async |_| Ok(html::render(
-        "error.html",
-        context! {
-            nav => Navigation::new(actor, false), title => "Page Not Public",
-            banner => "This page is not public", heading => "This page is not public.",
-            detail => "Access to this information is limited by the tournament settings. Check back later or contact the tournament staff if you believe this is an error.",
-        },
-        StatusCode::OK,
-    ))).await
+    public_cache::render(&app, actor, Page::AccessError, async |db| {
+        let shell = legacy_html::shell(db, actor, PUBLIC_ERROR).await?;
+        Ok(legacy_html::render(
+            "public/access_error.html",
+            shell,
+            context! {},
+            StatusCode::OK,
+        ))
+    })
+    .await
 }
 
 pub async fn forbidden(Extension(actor): Extension<Actor>) -> Response {

@@ -11,12 +11,7 @@ use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
-    legacy_session::Actor,
-    public_cache,
-    settings::Settings,
-    unavailable,
+    App, access, legacy_html, legacy_session::Actor, public_cache, settings::Settings, unavailable,
 };
 
 const SETTINGS: &[&str] = &[
@@ -209,17 +204,16 @@ async fn page(
         }
     }
     let (info_links, info_texts, tournament_staff) = resources(db, &settings).await?;
-    let mut nav = Navigation::new(actor, motions_public);
-    nav.teams_public = teams_public;
-    nav.judges_public = judges_public;
-    let tournament_name = settings.string("tournament_name", "New Tournament");
-    let logo = database_logo_href(db).await.or(legacy_logo);
+    let tournament = settings.string("tournament_name", "New Tournament");
+    let logo = database_logo_href(&mut *db).await.or(legacy_logo);
     let public_tiles_odd = (quick_links.len() + usize::from(show_registration_lead)) % 2 == 1;
-    Ok(html::render(
-        "home.html",
+    let shell = legacy_html::shell(db, actor, "/public/").await?;
+    Ok(legacy_html::render(
+        "public/home.html",
+        shell,
         context! {
-            title => &tournament_name, tournament_name => &tournament_name,
-            nav, logo, quick_links, show_registration_lead, public_tiles_odd,
+            tournament, tournament_logo => logo, quick_links, show_registration_lead, public_tiles_odd,
+            registration_url => "/registration/",
             info_links, info_texts, tournament_staff,
         },
         StatusCode::OK,

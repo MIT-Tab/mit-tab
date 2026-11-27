@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 use axum::{
     Extension, Router,
@@ -8,7 +8,7 @@ use axum::{
     response::Response,
     routing::get,
 };
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset, Utc};
 use chrono_tz::America::New_York;
 use minijinja::context;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ use crate::{
     backup_restore::{self, RestoreError},
     backups::{BackupError, MAX_BACKUP_BYTES, SUFFIX, valid_key},
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     login, private,
     registration_form::Fields,
@@ -49,6 +50,7 @@ pub fn routes() -> Router<App> {
                 .layer(DefaultBodyLimit::max(MAX_BACKUP_BYTES + 256 * 1024)),
         )
         .route("/backup/{key}/", get(detail))
+        .route("/backup/{key}", get(detail))
         .route("/backup/download/{key}/", get(download))
         .route("/backup/restore/{key}/", get(restore_page).post(restore))
 }
@@ -64,7 +66,8 @@ struct Backup {
     name: String,
     category: &'static str,
     round: String,
-    seconds: i64,
+    key: String,
+    legacy_time: String,
     time: String,
     scratches: &'static str,
 }
@@ -79,15 +82,14 @@ impl Backup {
             metadata.next(),
             metadata.next(),
         );
-        let seconds = time
-            .and_then(|time| time.parse::<i64>().ok())
-            .unwrap_or_default();
+        let seconds = time.and_then(|time| time.parse::<i64>().ok());
         let category = kind
             .and_then(|kind| kind.parse::<usize>().ok())
             .and_then(|kind| TYPES.get(kind).copied())
             .unwrap_or("Unknown");
-        let time = DateTime::from_timestamp(seconds, 0)
-            .filter(|_| seconds > 0)
+        let time = seconds
+            .filter(|&time| time > 0)
+            .and_then(|time| DateTime::from_timestamp(time, 0))
             .map(|stamp| {
                 stamp
                     .with_timezone(&New_York)
@@ -104,12 +106,32 @@ impl Backup {
             name: name.unwrap_or(&key).into(),
             category,
             round: round.unwrap_or_default().into(),
-            seconds,
+            legacy_time: legacy_time(seconds),
             time,
             scratches,
             url_key: url_component(&key),
+            key: if key.contains(['?', '#', '%']) {
+                url_component(&key)
+            } else {
+                key
+            },
         }
     }
+}
+
+fn legacy_time(seconds: Option<i64>) -> String {
+    let east = FixedOffset::west_opt(5 * 3600).expect("fixed EST offset");
+    let Some(stamp) = seconds.and_then(|time| DateTime::from_timestamp(time, 0)) else {
+        return "Unknown".into();
+    };
+    let stamp = stamp.with_timezone(&east);
+    let today = Utc::now().with_timezone(&east).date_naive();
+    let format = match (today - stamp.date_naive()).num_days() {
+        0 => "Today at %I:%M %p",
+        1 => "Yesterday at %I:%M %p",
+        _ => "%b %d at %I:%M %p",
+    };
+    stamp.format(format).to_string()
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -139,7 +161,7 @@ async fn show_list(
     options: &ListOptions,
     error: Option<&str>,
 ) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
+    let Ok(csrf) = login::TemplateCsrf::new(headers) else {
         return unavailable();
     };
     let keys = match app.backups.list().await {
@@ -147,8 +169,12 @@ async fn show_list(
         Err(issue) => return backup_error(issue),
     };
     let mut items: Vec<_> = keys.into_iter().map(Backup::new).collect();
-    items.sort_by_key(|entry| Reverse(entry.seconds));
-    let categories: BTreeSet<_> = items.iter().map(|entry| entry.category).collect();
+    items.sort_by(|first, second| first.round.cmp(&second.round));
+    let categories: BTreeSet<_> = items
+        .iter()
+        .map(|entry| entry.category)
+        .filter(|category| *category != "Unknown")
+        .collect();
     let mut rounds: Vec<_> = items
         .iter()
         .map(|entry| entry.round.clone())
@@ -166,11 +192,37 @@ async fn show_list(
             && (options.round.is_empty() || entry.round == options.round)
             && (options.scratches.is_empty() || entry.scratches == options.scratches)
     });
-    let response = html::render(
-        "backup_list.html",
+    let Ok(mut db) = app.db.acquire().await else {
+        return unavailable();
+    };
+    let Ok(shell) = legacy_html::shell(&mut db, actor, LIST).await else {
+        return unavailable();
+    };
+    let messages = if let Some(text) = error {
+        vec![context! { text, tags => "error", level => 40 }]
+    } else if options.saved == Some(1) {
+        vec![context! { text => "Backup saved.", tags => "success", level => 25 }]
+    } else {
+        Vec::new()
+    };
+    let mut response = legacy_html::render(
+        "tab/backup_list.html",
+        shell,
         context! {
-            title => "Backups", nav => Navigation::new(actor, true), items, csrf, saved => options.saved == Some(1), error,
-            options, categories, rounds,
+            title => "Backup List",
+            csrf_input => csrf.input(),
+            widgets => backup_widgets(),
+            headers => ["Name", "Type", "Round", "Timestamp", "Scratches"],
+            filters => [
+                context! { id => "type", label => "Type", options => categories },
+                context! { id => "round", label => "Round", options => rounds },
+                context! { id => "scratches", label => "Scratches", options => ["No", "Unknown", "Yes"] },
+            ],
+            backups => items.iter().map(|item| (
+                &item.key, &item.name, item.category, &item.round, &item.legacy_time, item.scratches,
+            )).collect::<Vec<_>>(),
+            messages,
+            DEFAULT_MESSAGE_LEVELS => context! { ERROR => 40 },
         },
         if error.is_some() {
             StatusCode::UNPROCESSABLE_ENTITY
@@ -178,7 +230,30 @@ async fn show_list(
             StatusCode::OK
         },
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, headers);
+    response
+}
+
+fn backup_widgets() -> minijinja::Value {
+    context! {
+        create_form => context! {
+            backup_name => context! {
+                field => context! {label_tag => minijinja::Value::from_safe_string(r#"<label for="id_backup_name">Backup name:</label>"#.into())},
+                input => r#"<input type="text" name="backup_name" placeholder="Enter backup name" pattern="[^_]*" maxlength="255" class="form-control form-control-sm" required id="id_backup_name">"#,
+            },
+            include_scratches => context! {
+                checkbox => true,
+                field => context! {label_tag => minijinja::Value::from_safe_string(r#"<label for="id_include_scratches">Include scratches:</label>"#.into())},
+                input => r#"<input type="checkbox" name="include_scratches" class="form-check-input" id="id_include_scratches" checked>"#,
+            },
+        },
+        upload_form => context! {
+            file => context! {
+                field => context! {label_tag => minijinja::Value::from_safe_string(r#"<label for="id_file">Your Backup File:</label>"#.into())},
+                input => r#"<input type="file" name="file" class="form-control-file form-control-sm" required id="id_file">"#,
+            },
+        },
+    }
 }
 
 async fn back() -> Response {
@@ -202,13 +277,13 @@ async fn create(
         return login::csrf_error();
     }
     let name = fields.get("backup_name");
-    if name.is_empty() || !valid_key(name) || name.len() > 160 {
+    if !valid_key(name) || name.contains('_') {
         return show_list(
             &app,
             actor,
             &headers,
             &ListOptions::default(),
-            Some("Enter a backup name with up to 160 bytes and no path separators."),
+            Some("Enter a backup name without underscores or path separators."),
         )
         .await;
     }
@@ -221,6 +296,16 @@ async fn create(
         .await
     {
         Ok(_) => access::found(format!("{LIST}?saved=1")),
+        Err(BackupError::InvalidName) => {
+            show_list(
+                &app,
+                actor,
+                &headers,
+                &ListOptions::default(),
+                Some("The backup name is too long for storage."),
+            )
+            .await
+        }
         Err(issue) => backup_error(issue),
     }
 }

@@ -237,6 +237,7 @@ jobs:
             cargo test --locked --workspace --all-targets --manifest-path "$manifest"
             DJANGO_SETTINGS_MODULE=mittab.settings uv run --frozen python -m rust.tabulation.compare_with_django
             cargo build --locked --manifest-path "$manifest" -p mittab-server
+            ./node_modules/.bin/webpack --config webpack.config.js --mode production
             MITTAB_FAKE_WEBPACK_LOADER=1 uv run --frozen pytest rust/server/test_django_parity.py
   docs:
     docker:
@@ -283,8 +284,18 @@ jobs:
             test -n "$static_dockerfile" && test -n "$static_dir"
             docker build -t mittab-static:test -f "$static_dockerfile" .
             docker run --rm -e STATIC_DIR="$static_dir" mittab-static:test sh -ec '
-              test -f "$STATIC_DIR/img/favicon.ico"
-              test -f "$STATIC_DIR/webpack_bundles/main.css"'
+              cd "$STATIC_DIR"
+              test -f img/favicon.ico
+              test -f webpack_bundles/main.css
+              test -f admin/css/base.css
+              test -f admin/js/jquery.init.js
+              find . -type f -exec sha256sum {} + | LC_ALL=C sort
+            ' > static-assets.sha256
+            docker run --rm mittab:test sh -ec '
+              cd staticfiles
+              find . -type f -exec sha256sum {} + | LC_ALL=C sort
+            ' > runtime-assets.sha256
+            diff -u static-assets.sha256 runtime-assets.sha256
       - run:
           name: Start the Rust runtime with a new MySQL database
           command: |

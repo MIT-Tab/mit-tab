@@ -68,6 +68,7 @@ const LINKS: &[AdminSection] = &[
 
 pub fn routes() -> Router<App> {
     Router::new()
+        .route("/admin", get(login))
         .route("/admin/", get(index))
         .route("/admin/login/", get(login))
         .route("/admin/{application}/{model}/", get(model))

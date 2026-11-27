@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
+from difflib import unified_diff
 from hashlib import sha256
 from html import unescape
 from html.parser import HTMLParser
@@ -15,6 +16,8 @@ import random
 import re
 from pathlib import Path
 import subprocess
+import sys
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 import pytest
@@ -22,15 +25,17 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import caches
+from django.core.management import call_command
 from django.db import connection, transaction
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
+from webpack_loader import utils as webpack_utils
 
 from mittab.apps.registration.models import InfoLink, InfoText, RegistrationConfig
 
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
-    NoShow, PublicRosterChange, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
+    NoShow, PublicDisplaySetting, PublicRosterChange, Room, RoomCheckIn, RoomTag, School, Scratch, TabSettings, Team,
 )
 
 from mittab.libs import assign_judges, tab_logic
@@ -127,6 +132,246 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
     yield
     caches["default"].clear()
     caches["filesystem"].clear()
+
+
+@pytest.fixture
+def html_assets(tmp_path, monkeypatch):
+    chunks = {
+        bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
+        for bundle in ("main", "publicDisplay", "publicHome")
+    }
+    assets = {
+        name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
+        for chunk in chunks.values()
+        for name in chunk
+    }
+    manifest = tmp_path / "webpack-stats.json"
+    manifest.write_text(json.dumps(dict(status="done", assets=assets, chunks=chunks)))
+    webpack = {
+        **webpack_utils.load_config("DEFAULT"),
+        "STATS_FILE": manifest,
+        "CACHE": False,
+        "LOADER_CLASS": "webpack_loader.loaders.WebpackLoader",
+    }
+    monkeypatch.setattr(webpack_utils, "load_config", lambda _: webpack)
+    webpack_utils.get_loader.cache_clear()
+    yield {"MITTAB_WEBPACK_STATS": str(manifest)}
+    webpack_utils.get_loader.cache_clear()
+
+
+def assert_html_bytes(actual, expected):
+    if actual != expected:
+        diff = unified_diff(
+            expected.decode().splitlines(keepends=True),
+            actual.decode().splitlines(keepends=True),
+            fromfile="Django",
+            tofile="Rust",
+            n=2,
+        )
+        pytest.fail("".join(diff), pytrace=False)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_public_html_matches_django_bytes(html_assets):
+    TabSettings.set("motions_enabled", 1)
+    TabSettings.set("theme_color", "#F0C020")
+    TabSettings.set("tournament_name", "Tournament 'A' & B / C")
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    Motion.objects.create(
+        round_number=1, info_slide="A < B & \"C\" / X\r\nZ",
+        motion_text="This house prefers O’Connor's / example.\nSecond line.",
+        is_published=True,
+    )
+    Motion.objects.create(round_number=2, motion_text="Private motion", is_published=False)
+    InfoLink.objects.create(title="Example & resources", url="https://example.com/resources?a=x&b=y")
+    InfoText.objects.create(title="Tournament notes", text="Bring A & B")
+    TabSettings.set("tournament_director", "Alex Example\nPat Example")
+    caches["public"].clear()
+    user = get_user_model().objects.create_superuser(username="byte-parity")
+
+    with rust_server(overrides=html_assets) as port:
+        for authenticated in (False, True):
+            client = Client()
+            if authenticated:
+                client.force_login(user)
+            session = client.cookies.get("sessionid")
+            for path in ("/public/", "/public/access-error/", "/public/motions/"):
+                response = client.get(path)
+                status, _, body = request(port, path, cookie=session.value if session else None)
+                assert status == response.status_code == 200
+                assert_html_bytes(body, response.content)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_login_html_matches_django_bytes(html_assets):
+    path = "/public/login/?next=%2Fpublic%2F%3Fa%3D1%26b%3D2"
+    with rust_server(overrides=html_assets) as port:
+        status, headers, body = request(port, path)
+    jar = SimpleCookie(headers["Set-Cookie"])
+    token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]+)"', body)[1].decode()
+    assert len(token) == 64
+    client = Client()
+    client.cookies["csrftoken"] = jar["csrftoken"].value
+    with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[:32]):
+        response = client.get(path)
+    assert status == response.status_code == 200
+    assert_html_bytes(body, response.content)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("include_speaks", [False, True])
+def test_public_rankings_html_matches_django_bytes(html_assets, include_speaks):
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 2)
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    school = School.objects.create(name="Example School")
+    first = Team.objects.create(name="Alpha & Beta", school=school, seed=Team.UNSEEDED)
+    second = Team.objects.create(name="O’Connor's", school=school, seed=Team.UNSEEDED)
+    debater = Debater.objects.create(name="One < Two", novice_status=0)
+    first.debaters.add(debater)
+    debate = Round.objects.create(round_number=1, gov_team=first, opp_team=second, victor=Round.GOV)
+    RoundStats.objects.create(round=debate, debater=debater, speaks=Decimal("31.7450"), ranks=1)
+    for slug, label in (("team", "Team"), ("varsity", "Varsity Speakers"), ("novice", "Novice Speakers")):
+        PublicDisplaySetting.objects.create(
+            slug=slug, label=label, display_type=PublicDisplaySetting.RANKING,
+            is_enabled=True, include_speaks=include_speaks, round_number=1, max_visible=20,
+        )
+    PublicDisplaySetting.objects.create(
+        slug="ballot_round_1", label="Round 1", display_type=PublicDisplaySetting.BALLOT,
+        is_enabled=True, include_speaks=include_speaks, include_ranks=True, round_number=1,
+    )
+    user = get_user_model().objects.create_superuser(username="rankings-parity")
+    caches["public"].clear()
+    with rust_server(overrides=html_assets) as port:
+        for authenticated in (False, True):
+            client = Client()
+            if authenticated:
+                client.force_login(user)
+            session = client.cookies.get("sessionid")
+            for path in ("/public/team-rankings/", "/public/speaker-rankings/", "/public/ballots/"):
+                response = client.get(path)
+                status, _, body = request(port, path, cookie=session.value if session else None)
+                assert status == response.status_code == 200
+                assert_html_bytes(body, response.content)
+
+        status, headers, _ = request(port, f"/team/{first.id}", cookie=session.value)
+        assert status == 302 and headers["Location"] == f"/team/{first.id}/"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_backup_listing_html_matches_django_bytes(html_assets, tmp_path):
+    from mittab.libs.backup import get_metadata
+
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    user = get_user_model().objects.create_superuser(username="backup-list-parity")
+    client = Client()
+    client.force_login(user)
+    session = client.cookies["sessionid"].value
+    key = "Example & copy_0_2_1700000000_0"
+    (tmp_path / f"{key}.dump.sql").touch()
+    overrides = {**html_assets, "BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}
+    path = "/pairing/view_backups/"
+    with rust_server(overrides=overrides) as port:
+        status, headers, body = request(port, path, cookie=session)
+    assert status == 200
+    jar = SimpleCookie(headers["Set-Cookie"])
+    token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]+)"', body)[1].decode()
+    client.cookies["csrftoken"] = jar["csrftoken"].value
+    with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[:32]), \
+         patch("mittab.libs.backup.list_backups", return_value=[get_metadata(key)]):
+        response = client.get(path)
+    assert response.status_code == 200
+    assert_html_bytes(body, response.content)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    "screen",
+    [
+        pytest.param(
+            "pairings",
+            marks=pytest.mark.xfail(
+                strict=True, raises=pytest.fail.Exception, reason="Pairing control still has a different template",
+            ),
+        ),
+        pytest.param(
+            "score repair",
+            marks=pytest.mark.xfail(
+                strict=True, raises=pytest.fail.Exception, reason="Score editor still has a different template",
+            ),
+        ),
+    ],
+)
+def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    school = School.objects.create(name="Example Debate Club")
+    first = Team.objects.create(name="North Debate", school=school, seed=Team.UNSEEDED)
+    second = Team.objects.create(name="South Debate", school=school, seed=Team.UNSEEDED)
+    speaker = Debater.objects.create(name="Example Speaker", novice_status=0)
+    first.debaters.add(speaker)
+    debate = Round.objects.create(round_number=1, gov_team=first, opp_team=second, victor=Round.GOV)
+    score = RoundStats.objects.create(round=debate, debater=speaker, speaks=Decimal("29.25"), ranks=1)
+    user = get_user_model().objects.create_superuser(username="staff-screenshot-parity")
+    client = Client()
+    client.force_login(user)
+    session = client.cookies["sessionid"].value
+    csrf = "a" * 32
+    client.cookies["csrftoken"] = csrf
+    path = "/pairings/status/" if screen == "pairings" else f"/admin/tab/roundstats/{score.id}/change/"
+    with rust_server(overrides=html_assets) as port:
+        status, _, body = request(
+            port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+        )
+    token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]+)"', body)
+    mask = token[1][:32].decode() if token and len(token[1]) == 64 else csrf
+    with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+        response = client.get(path)
+    assert status == response.status_code == 200
+    assert_html_bytes(body, response.content)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rust_serves_the_django_static_bytes(tmp_path):
+    root = Path(__file__).resolve().parents[2]
+    before, after = tmp_path / "django", tmp_path / "rust"
+    with override_settings(STATIC_ROOT=before):
+        call_command("collectstatic", interactive=False, verbosity=0)
+    subprocess.run(
+        [sys.executable, root / "bin" / "collect-static.py", root / "assets", after],
+        check=True, capture_output=True,
+    )
+    paths = {path.relative_to(before) for path in before.rglob("*") if path.is_file()}
+    assert paths == {path.relative_to(after) for path in after.rglob("*") if path.is_file()}
+    assert Path("admin/js/jquery.init.js") in paths
+    assert Path("admin/css/base.css") in paths
+    assert Path("webpack_bundles/main.css") in paths
+    manifest = json.loads((root / "webpack-stats.json").read_text())
+    scripts = {
+        Path("webpack_bundles") / name
+        for chunk in manifest["chunks"].values()
+        for name in chunk
+        if name.endswith(".js")
+    }
+    assert scripts and scripts <= paths
+    with rust_server(overrides={"MITTAB_STATIC_ROOT": str(after)}) as port:
+        for path in sorted(paths):
+            expected = (before / path).read_bytes()
+            assert (after / path).read_bytes() == expected, path
+            if path.suffix in {".css", ".js"}:
+                status, _, body = request(port, f"/static/{path.as_posix()}")
+                assert status == 200 and body == expected, path
+
+        path = "/dynamic-media/jsi18n/"
+        TabSettings.set("start_tournament_wizard_completed", 1)
+        user = get_user_model().objects.create_superuser(username="catalog-parity")
+        client = Client()
+        client.force_login(user)
+        reference = client.get(path)
+        status, headers, body = request(port, path, cookie=client.cookies["sessionid"].value)
+        assert status == reference.status_code == 200
+        assert headers["Content-Type"] == reference["Content-Type"]
+        assert body == reference.content
 
 
 @pytest.mark.django_db(transaction=True)
@@ -542,7 +787,10 @@ def sign_in(port, username, password, *, next_path="", origin=None, csrf_valid=T
         request_headers["Origin"] = origin
     form = {
         "username": username, "password": password, "next": next_path,
-        "csrfmiddlewaretoken": cookie if csrf_valid else "invalid-test-token",
+        "csrfmiddlewaretoken": (
+            re.search(rb'name="csrfmiddlewaretoken" value="([^"]+)"', body)[1].decode()
+            if csrf_valid else "invalid-test-token"
+        ),
     }
     return request(port, "/public/login/", method="POST", form=form,
                    extra_headers=request_headers)
@@ -1937,7 +2185,7 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
         assert b"Ranking Speaker 0" in vars_page and b"Ranking Speaker 1" not in vars_page
         round_page = request(port, ballots)[2]
         assert b"Ranking Speaker 0" in round_page and b"Ranking Speaker 1" in round_page
-        assert b"31.7500" not in round_page and b"Ranks" in round_page
+        assert b"31.75" not in round_page and b"R 1.00" in round_page
         assert b"Private Example" not in round_page and b"Round 2</h3>" not in round_page
         for path in paths:
             anonymous = request(port, path)
@@ -1949,8 +2197,8 @@ def test_native_public_rankings_control_bounds_rounds_and_scores_for_board_and_a
                      "varsity_include_speaks": "on"})[0] == 302
         assert b"31.75" in request(port, standings)[2]
         assert b"35.00" not in request(port, standings)[2]
-        assert b"31.7500" in request(port, ballots)[2]
-        assert b"Unadjusted speaks" in request(port, speakers_page)[2]
+        assert b"31.75" in request(port, ballots)[2]
+        assert b'colspan="2">Unadjusted</th>' in request(port, speakers_page)[2]
 
         RoundStats.objects.filter(round=first, debater=people[0]).update(speaks=Decimal("32.25"))
         assert b"32.25" in request(port, standings)[2]
@@ -3470,7 +3718,7 @@ def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
     creation = "/pairing/backup/"
     with rust_server(overrides={"BACKUP_PREFIX": str(tmp_path), "BACKUP_STORAGE": ""}) as port:
         status, headers, body = request(port, listing, cookie=staff)
-        assert status == 200 and b"No backups yet." in body, body
+        assert status == 200 and b"No backups found" in body, body
         csrf = load_cookies(headers)["csrftoken"].value
         cookie = f"sessionid={staff}; csrftoken={csrf}"
 
@@ -3478,8 +3726,24 @@ def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
             return request(port, path, method="POST", extra_headers={"Cookie": cookie},
                            form={"csrfmiddlewaretoken": csrf, **fields})
 
+        # A template GET in a second tab must leave an open form's old Rust token usable.
+        old_csrf = "A" * 43
+        old_cookie = {"Cookie": f"sessionid={staff}; csrftoken={old_csrf}"}
+        status, old_headers, page = request(port, listing, extra_headers=old_cookie)
+        assert status == 200 and b'value="' + old_csrf.encode() + b'"' in page
+        assert not old_headers.get("Set-Cookie")
+        assert request(port, creation, method="POST", extra_headers=old_cookie,
+                       form={"csrfmiddlewaretoken": old_csrf, "backup_name": "Legacy CSRF"})[0] == 302
+        legacy_backup, = tmp_path.glob("Legacy CSRF*.dump.sql")
+        legacy_backup.unlink()
+
         assert request(port, creation, cookie=staff)[0] == 302
         assert not list(tmp_path.iterdir())
+        assert post(creation, {"backup_name": "é" * 127})[0] == 422
+        assert not list(tmp_path.iterdir())
+        assert post(creation, {"backup_name": "é" * 90})[0] == 302
+        long_backup, = tmp_path.glob("é*.dump.sql")
+        long_backup.unlink()
         assert request(port, creation, method="POST", cookie=staff, form={"backup_name": "CSRF"})[0] == 403
         assert post(creation, {"backup_name": "Round + example"})[0] == 302
         clean, = tmp_path.glob("Round + example*.dump.sql")
@@ -3489,12 +3753,13 @@ def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
         key = quote(clean.name.removesuffix(".dump.sql"), safe="")
         download = f"/backup/download/{key}/"
         restore = f"/backup/restore/{key}/"
-        assert key.encode() in request(port, listing, cookie=staff)[2]
+        assert clean.name.removesuffix(".dump.sql").encode() in request(port, listing, cookie=staff)[2]
+        assert request(port, f"/backup/{key}", cookie=staff)[0] == 200
         status, headers, body = request(port, download, cookie=staff)
         assert status == 200 and body == data
         assert headers["Content-Type"] == "application/sql"
         assert key in headers["Content-Disposition"]
-        for path in (listing, download, restore, "/upload_backup/"):
+        for path in (listing, f"/backup/{key}", download, restore, "/upload_backup/"):
             assert request(port, path, cookie=board)[1]["Location"] == "/403/"
 
         assert post(creation, {"backup_name": "Full", "include_scratches": "on"})[0] == 302
@@ -3634,7 +3899,7 @@ def test_native_signed_s3_backups_page_through_objects():
         "AWS_SECRET_ACCESS_KEY": "fixture-secret", "BACKUP_S3_REGION": "fixture-1",
     }) as port:
         status, headers, body = request(port, listing, cookie=staff)
-        assert status == 200 and b"No backups yet." in body, body
+        assert status == 200 and b"No backups found" in body, body
         csrf = load_cookies(headers)["csrftoken"].value
         for name in ("First & backup", "Second backup"):
             result = request(port, "/pairing/backup/", method="POST",
@@ -4006,9 +4271,10 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
     groups = "/admin/auth/group/"
     record = f"/admin/tab/auditevent/{audit.id}/change/"
     with rust_server() as port:
-        for path in ("/admin/", users, groups, record, "/admin/unknown/"):
+        for path in ("/admin", "/admin/", users, groups, record, "/admin/unknown/"):
             assert request(port, path, cookie=board)[1]["Location"] == "/403/"
         assert request(port, "/admin/")[1]["Location"] == "/public/login/?next=/admin/"
+        assert request(port, "/admin", cookie=staff)[1]["Location"] == "/admin/"
         assert request(port, "/admin/unknown/", cookie=staff)[0] == 404
         assert request(port, "/404/")[0] == 404 and request(port, "/500/")[0] == 500
         assert request(port, "/admin/tab/team/", cookie=staff)[1]["Location"] == "/view_teams/"
@@ -4192,7 +4458,7 @@ def test_native_diagnostics_gate_and_javascript_catalog():
         with rust_server(overrides={"SILK_ENABLED": "1", "MITTAB_ENV": environment}) as port:
             path = "/dynamic-media/jsi18n/?ignored=private-fixture-query"
             status, headers, script = request(port, path)
-            assert status == 200 and headers["Content-Type"] == "application/javascript; charset=utf-8"
+            assert status == 200 and headers["Content-Type"] == 'text/javascript; charset="utf-8"'
             assert b"django.ngettext" in script
             assert request(port, "/silk/", cookie=board)[1]["Location"] == "/403/"
             status, _, body = request(port, "/silk/", cookie=staff)

@@ -100,7 +100,7 @@ impl Page {
                 ("tab_tournamentstaffrole", "id, title, names, sort_order"),
                 ("mittab_public_logo", "id, updated_at"),
             ],
-            Self::AccessError => &[],
+            Self::AccessError => &[SETTINGS, DISPLAY, ROUNDS, OUTROUNDS],
             Self::Teams => &[SETTINGS, TEAMS, MEMBERS, DEBATERS, SCHOOLS, ROSTER_LOG],
             Self::Judges => &[
                 SETTINGS,
@@ -127,7 +127,9 @@ impl Page {
                 SETTINGS, DISPLAY, TEAMS, MEMBERS, DEBATERS, ROUNDS, OUTROUNDS, BYES, NO_SHOWS,
                 SCORES,
             ],
-            Self::Ballots => &[SETTINGS, DISPLAY, TEAMS, MEMBERS, DEBATERS, ROUNDS, SCORES],
+            Self::Ballots => &[
+                SETTINGS, DISPLAY, TEAMS, MEMBERS, DEBATERS, ROUNDS, OUTROUNDS, SCORES,
+            ],
             Self::Outrounds(_) => &[
                 SETTINGS,
                 TEAMS,
@@ -142,6 +144,9 @@ impl Page {
             ],
             Self::Motions => &[
                 SETTINGS,
+                DISPLAY,
+                ROUNDS,
+                OUTROUNDS,
                 (
                     "tab_motion",
                     "id, round_number, outround_type, num_teams, info_slide, motion_text, is_published",
@@ -216,6 +221,18 @@ impl Page {
         }
     }
 
+    fn has_role_navigation(self) -> bool {
+        matches!(
+            self,
+            Self::Home
+                | Self::AccessError
+                | Self::Motions
+                | Self::TeamRankings
+                | Self::SpeakerRankings
+                | Self::Ballots
+        )
+    }
+
     fn is_public_html(self) -> bool {
         !matches!(
             self,
@@ -239,9 +256,6 @@ impl Page {
     }
 
     async fn version(self, db: &mut MySqlConnection) -> Result<Vec<u8>, sqlx::Error> {
-        if matches!(self, Self::AccessError) {
-            return Ok(Vec::new());
-        }
         // Each input contributes a fixed-width digest. Including primary keys
         // keeps distinct rows distinct even when all their display values match.
         let mut query = QueryBuilder::<MySql>::new("SELECT CONCAT(");
@@ -429,6 +443,7 @@ async fn render_response(
         .cache_public_pages
         .then(|| Audience::for_actor(actor))
         .flatten()
+        .filter(|audience| !page.has_role_navigation() || *audience != Audience::SignedIn)
         .map(|audience| Key {
             page,
             audience,

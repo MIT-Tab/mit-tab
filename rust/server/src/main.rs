@@ -33,6 +33,7 @@ mod judge_assignment;
 mod judge_portal;
 mod judge_report;
 mod legacy_archive;
+mod legacy_html;
 mod legacy_session;
 mod live_results;
 mod login;

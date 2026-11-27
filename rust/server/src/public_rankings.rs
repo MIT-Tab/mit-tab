@@ -18,6 +18,7 @@ use sqlx::MySqlConnection;
 use crate::{
     App, access,
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     login, private,
     public_cache::{self, Page},
@@ -168,9 +169,15 @@ pub async fn update(
 }
 
 #[derive(Serialize)]
+struct RankedTeam {
+    id: i64,
+    display_backend: String,
+}
+
+#[derive(Serialize)]
 struct TeamRanking {
     place: usize,
-    name: String,
+    team: RankedTeam,
     debaters: String,
     wins: i32,
     speaks: Option<String>,
@@ -184,11 +191,23 @@ pub fn policy(settings: &Settings) -> ScoringPolicy {
     }
 }
 
-fn score_pair(score: Score, speaks: Stat, ranks: Stat) -> (String, String) {
-    (
-        format!("{:.2}", score.get(speaks)),
-        format!("{:.2}", score.get(ranks)),
-    )
+fn django_hundredths(value: f64) -> String {
+    let digits = value.abs().to_string();
+    let (whole, fraction) = digits.split_once('.').unwrap_or((&digits, ""));
+    let Ok(mut whole) = whole.parse::<u64>() else {
+        return format!("{value:.2}");
+    };
+    let mut fraction = fraction.bytes().map(|digit| u64::from(digit - b'0'));
+    let mut cents = fraction.next().unwrap_or(0) * 10 + fraction.next().unwrap_or(0);
+    cents += u64::from(fraction.next().is_some_and(|digit| digit >= 5));
+    whole += cents / 100;
+    cents %= 100;
+    let sign = if value < 0.0 && (whole != 0 || cents != 0) {
+        "-"
+    } else {
+        ""
+    };
+    format!("{sign}{whole}.{cents:02}")
 }
 
 pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
@@ -198,16 +217,8 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
         if !config.visible {
             return Ok(access::found(PUBLIC_ERROR));
         }
-        let settings = Settings::load(
-            db,
-            &[
-                "cur_round",
-                "lenient_late",
-                "debaters_public",
-                "motions_enabled",
-            ],
-        )
-        .await?;
+        let settings =
+            Settings::load(db, &["cur_round", "lenient_late", "debaters_public"]).await?;
         let tournament = TournamentData::load(db).await?;
         let mut metadata: HashMap<_, (String, Vec<String>)> = HashMap::new();
         for (id, team, debater) in sqlx::query_as::<_, (i32, String, Option<String>)>(
@@ -241,14 +252,20 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
             .into_iter()
             .filter_map(|standing| {
                 let (name, debaters) = metadata.remove(&standing.id)?;
-                let (speaks, ranks) = score_pair(standing.score, Stat::Speaks, Stat::Ranks);
                 Some(TeamRanking {
                     place: 0,
-                    name,
+                    team: RankedTeam {
+                        id: standing.id,
+                        display_backend: name,
+                    },
                     debaters: debaters.join(", "),
                     wins: standing.score.get(Stat::Wins) as i32,
-                    speaks: config.speaks.then_some(speaks),
-                    ranks: config.speaks.then_some(ranks),
+                    speaks: config
+                        .speaks
+                        .then(|| django_hundredths(standing.score.get(Stat::Speaks))),
+                    ranks: config
+                        .speaks
+                        .then(|| django_hundredths(standing.score.get(Stat::Ranks))),
                 })
             })
             .collect();
@@ -268,11 +285,14 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
             }
         }
         rows.truncate(config.maximum as usize);
-        Ok::<_, sqlx::Error>(html::render(
-            "public_team_rankings.html",
+        let shell = legacy_html::shell(db, actor, "/public/team-rankings/").await?;
+        Ok(legacy_html::render(
+            "public/public_team_results.html",
+            shell,
             context! {
-                title => "Team Rankings", rows, show_scores => config.speaks,
-                nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
+                title => "Team Rankings",
+                public_team_rows => rows,
+                show_scores => config.speaks,
             },
             StatusCode::OK,
         ))
@@ -281,21 +301,13 @@ pub async fn teams(State(app): State<App>, Extension(actor): Extension<Actor>) -
 }
 
 #[derive(Serialize)]
-struct SpeakerRanking {
-    place: usize,
-    name: String,
-    team: Option<String>,
-    columns: Vec<(&'static str, String, String)>,
+struct SpeakerColumn {
+    label: &'static str,
+    speaks: String,
+    ranks: String,
 }
 
-#[derive(Serialize)]
-struct SpeakerSection {
-    name: String,
-    show_scores: bool,
-    rows: Vec<SpeakerRanking>,
-}
-
-fn speaker_columns(score: Score, adjusted: bool) -> Vec<(&'static str, String, String)> {
+fn speaker_columns(score: Score, adjusted: bool) -> Vec<SpeakerColumn> {
     let mut groups = [
         ("Unadjusted", Stat::Speaks, Stat::Ranks),
         (
@@ -309,9 +321,10 @@ fn speaker_columns(score: Score, adjusted: bool) -> Vec<(&'static str, String, S
     }
     groups
         .into_iter()
-        .map(|(group, speaks, ranks)| {
-            let (speaks, ranks) = score_pair(score, speaks, ranks);
-            (group, speaks, ranks)
+        .map(|(label, speaks, ranks)| SpeakerColumn {
+            label,
+            speaks: django_hundredths(score.get(speaks)),
+            ranks: django_hundredths(score.get(ranks)),
         })
         .collect()
 }
@@ -319,45 +332,87 @@ fn speaker_columns(score: Score, adjusted: bool) -> Vec<(&'static str, String, S
 pub async fn speaker_page(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     public_cache::render(&app, actor, Page::SpeakerRankings, async |db| {
         let display = configured(db, 0).await?;
-        if !display[1..].iter().any(|config| config.visible) { return Ok(access::found(PUBLIC_ERROR)); }
-        let mut keys = speakers::SETTINGS.to_vec();
-        keys.push("motions_enabled");
-        let settings = Settings::load(db, &keys).await?;
+        if !display[1..].iter().any(|config| config.visible) {
+            return Ok(access::found(PUBLIC_ERROR));
+        }
+        let settings = Settings::load(db, speakers::SETTINGS).await?;
         let ordered = speakers::ordered_speaker_rows(db, &settings).await?;
         let names: HashMap<_, _> = sqlx::query_as::<_, (i32, String, Option<String>)>(
             "SELECT d.id, d.name, t.name FROM tab_debater d LEFT JOIN tab_team t
              ON t.id = (SELECT MIN(m.team_id) FROM tab_team_debaters m WHERE m.debater_id = d.id)",
-        ).fetch_all(&mut *db).await?.into_iter().map(|(id, name, team)| (id, (name, team))).collect();
+        )
+        .fetch_all(&mut *db)
+        .await?
+        .into_iter()
+        .map(|(id, name, team)| (id, (name, team)))
+        .collect();
         let adjusted = settings.flag("speaker_rankings_use_single_adjusted", false);
-        let sections: Vec<_> = display[1..].iter().enumerate().filter(|(_, config)| config.visible)
-            .map(|(index, config)| SpeakerSection {
-                name: config.label.clone(),
-                show_scores: config.speaks,
-                rows: ordered.iter().filter(|row| row.debater.novice_status == index as i32).take(config.maximum as usize)
-                    .enumerate().map(|(index, row)| {
-                    let (name, team) = &names[&row.debater.id];
-                    SpeakerRanking { place: index + 1, name: name.clone(), team: team.clone(),
-                        columns: if config.speaks { speaker_columns(row.score, adjusted) } else { Vec::new() } }
-                }).collect(),
-            }).collect();
-        Ok::<_, sqlx::Error>(html::render("public_speaker_rankings.html", context! {
-            title => "Speaker Rankings", sections, nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        }, StatusCode::OK))
-    }).await
+        let sections: Vec<_> = display[1..]
+            .iter()
+            .enumerate()
+            .map(|(division, config)| {
+                let rows = ordered
+                    .iter()
+                    .filter(|row| row.debater.novice_status == division as i32)
+                    .take(config.maximum as usize)
+                    .enumerate()
+                    .map(|(index, row)| {
+                        let (name, team) = &names[&row.debater.id];
+                        let score_columns = if config.speaks {
+                            speaker_columns(row.score, adjusted)
+                        } else {
+                            Vec::new()
+                        };
+                        context! {
+                            place => index + 1,
+                            debater => context! { display => name },
+                            team => context! { display_backend => team },
+                            score_columns,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let empty_message = if division == 0 {
+                    "No varsity speakers are available yet."
+                } else {
+                    "No novice speakers are available yet."
+                };
+                context! {
+                    title => &config.label,
+                    show => config.visible,
+                    show_scores => config.speaks,
+                    rows, empty_message,
+                }
+            })
+            .collect();
+        let shell = legacy_html::shell(db, actor, "/public/speaker-rankings/").await?;
+        Ok(legacy_html::render(
+            "public/public_speaker_rankings.html",
+            shell,
+            context! { speaker_sections => sections },
+            StatusCode::OK,
+        ))
+    })
+    .await
 }
 
 #[derive(Serialize)]
 struct PublicBallot {
-    gov: String,
-    opp: String,
-    result: &'static str,
-    winner: String,
-    speakers: Vec<BallotSpeaker>,
+    round_number: u32,
+    winner_name: String,
+    winner_side: &'static str,
+    sides: [BallotSide; 2],
+}
+
+#[derive(Serialize)]
+struct BallotSide {
+    label: &'static str,
+    team_name: String,
+    is_winner: bool,
+    debaters: Vec<BallotSpeaker>,
 }
 
 #[derive(Serialize)]
 struct BallotSpeaker {
-    side: &'static str,
     name: String,
     speaks: Option<String>,
     ranks: Option<String>,
@@ -365,10 +420,10 @@ struct BallotSpeaker {
 
 #[derive(Serialize)]
 struct RoundBallots {
-    number: u32,
-    speaks: bool,
-    ranks: bool,
-    rows: Vec<PublicBallot>,
+    round_number: u32,
+    include_speaks: bool,
+    include_ranks: bool,
+    ballots: Vec<PublicBallot>,
 }
 
 async fn ballots_for(
@@ -382,7 +437,7 @@ async fn ballots_for(
          WHERE r.round_number = ? AND r.victor IN (1,2,3,4) AND g.ranking_public AND o.ranking_public
          ORDER BY g.name, o.name, r.id",
     ).bind(number).fetch_all(&mut *db).await?;
-    let mut scores: HashMap<i32, Vec<BallotSpeaker>> = HashMap::new();
+    let mut scores: HashMap<(i32, bool), Vec<BallotSpeaker>> = HashMap::new();
     type Row = (i32, bool, String, Option<String>, Option<String>);
     for (id, govt, name, speaks, ranks) in sqlx::query_as::<_, Row>(
         "SELECT r.id, m.team_id = r.gov_team_id, d.name,
@@ -394,44 +449,70 @@ async fn ballots_for(
          WHERE r.round_number = ? AND r.victor IN (1,2,3,4) AND g.ranking_public AND o.ranking_public
          ORDER BY r.id, m.team_id = r.gov_team_id DESC, d.name, d.id",
     ).bind(config.speaks).bind(config.ranks).bind(number).fetch_all(db).await? {
-        scores.entry(id).or_default().push(BallotSpeaker { side: if govt { "Gov" } else { "Opp" }, name, speaks, ranks });
+        let format_score = |score: Option<String>| {
+            score.and_then(|value| value.parse::<f64>().ok()).map(django_hundredths)
+        };
+        scores.entry((id, govt)).or_default().push(BallotSpeaker {
+            name,
+            speaks: format_score(speaks),
+            ranks: format_score(ranks),
+        });
     }
-    let rows = rows
+    let ballots = rows
         .into_iter()
         .map(|(id, _, gov, _, opp, victor)| {
-            let winner = if victor % 2 == 1 {
-                gov.clone()
-            } else {
-                opp.clone()
-            };
+            let gov_wins = victor % 2 == 1;
             PublicBallot {
-                gov,
-                opp,
-                result: crate::board_snapshot::outcome(victor),
-                winner,
-                speakers: scores.remove(&id).unwrap_or_default(),
+                round_number: number,
+                winner_name: if gov_wins { gov.clone() } else { opp.clone() },
+                winner_side: if gov_wins { "Gov" } else { "Opp" },
+                sides: [
+                    BallotSide {
+                        label: "Gov",
+                        team_name: gov,
+                        is_winner: gov_wins,
+                        debaters: scores.remove(&(id, true)).unwrap_or_default(),
+                    },
+                    BallotSide {
+                        label: "Opp",
+                        team_name: opp,
+                        is_winner: !gov_wins,
+                        debaters: scores.remove(&(id, false)).unwrap_or_default(),
+                    },
+                ],
             }
         })
         .collect();
     Ok(RoundBallots {
-        number,
-        speaks: config.speaks,
-        ranks: config.ranks,
-        rows,
+        round_number: number,
+        include_speaks: config.speaks,
+        include_ranks: config.ranks,
+        ballots,
     })
 }
 
 pub async fn ballots(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     public_cache::render(&app, actor, Page::Ballots, async |db| {
-        let settings = Settings::load(db, &["tot_rounds", "motions_enabled"]).await?;
+        let settings = Settings::load(db, &["tot_rounds"]).await?;
         let display = configured(db, settings.integer("tot_rounds", 0)).await?;
         let mut rounds = Vec::new();
-        for config in display.iter().rev().filter(|config| config.kind == "ballot" && config.visible) {
+        for config in display
+            .iter()
+            .rev()
+            .filter(|config| config.kind == "ballot" && config.visible)
+        {
             rounds.push(ballots_for(db, config).await?);
         }
-        if rounds.is_empty() { return Ok(access::found(PUBLIC_ERROR)); }
-        Ok::<_, sqlx::Error>(html::render("public_ballots.html", context! {
-            title => "Public Ballots", rounds, nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        }, StatusCode::OK))
-    }).await
+        if rounds.is_empty() {
+            return Ok(access::found(PUBLIC_ERROR));
+        }
+        let shell = legacy_html::shell(db, actor, "/public/ballots/").await?;
+        Ok(legacy_html::render(
+            "public/public_ballots.html",
+            shell,
+            context! { round_results => rounds },
+            StatusCode::OK,
+        ))
+    })
+    .await
 }

@@ -17,7 +17,7 @@ excelerate = "0.14.0"
 flate2 = "1.1.5"
 hex = "0.4.3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
-minijinja = "2.12"
+minijinja = { version = "2.12", features = ["loader"] }
 quick-xml = { version = "0.42", features = ["serialize"] }
 ring = "0.17.14"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }

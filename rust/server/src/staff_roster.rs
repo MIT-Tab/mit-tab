@@ -25,7 +25,7 @@ use crate::{
 };
 
 pub fn routes() -> Router<App> {
-    let mut router = Router::new();
+    let mut router = Router::new().route("/team/{id}", get(team_redirect));
     for kind in Kind::ALL {
         let name = kind.model();
         router = router
@@ -38,6 +38,10 @@ pub fn routes() -> Router<App> {
             );
     }
     router
+}
+
+async fn team_redirect(Path(id): Path<i32>) -> Response {
+    access::found(format!("/team/{id}/"))
 }
 
 fn is_tab(actor: Actor) -> bool {

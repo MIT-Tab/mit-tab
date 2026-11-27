@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     legacy_session::{Actor, cookie},
-    login, passwords, private, unavailable,
+    login, private, unavailable,
 };
 
 static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
@@ -60,16 +60,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/diagnostics.html"),
         ),
         ("base.html", include_str!("../templates/base.html")),
-        ("home.html", include_str!("../templates/home.html")),
-        (
-            "home_resources.html",
-            include_str!("../templates/home_resources.html"),
-        ),
-        (
-            "staff_login.html",
-            include_str!("../templates/staff_login.html"),
-        ),
-        ("motions.html", include_str!("../templates/motions.html")),
         ("pairings.html", include_str!("../templates/pairings.html")),
         (
             "missing_ballots.html",
@@ -181,18 +171,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "ranking_control.html",
             include_str!("../templates/ranking_control.html"),
-        ),
-        (
-            "public_team_rankings.html",
-            include_str!("../templates/public_team_rankings.html"),
-        ),
-        (
-            "public_speaker_rankings.html",
-            include_str!("../templates/public_speaker_rankings.html"),
-        ),
-        (
-            "public_ballots.html",
-            include_str!("../templates/public_ballots.html"),
         ),
         (
             "public_outrounds.html",
@@ -311,10 +289,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/elimination_forum.html"),
         ),
         (
-            "backup_list.html",
-            include_str!("../templates/backup_list.html"),
-        ),
-        (
             "backup_detail.html",
             include_str!("../templates/backup_detail.html"),
         ),
@@ -348,12 +322,31 @@ struct Asset {
 }
 
 fn webpack_files(bundle: String) -> Value {
+    Value::from_serialize(bundle_assets(bundle))
+}
+
+pub fn legacy_bundle(bundle: String) -> Value {
+    let tags = bundle_assets(bundle)
+        .into_iter()
+        .map(|asset| {
+            if asset.stylesheet {
+                format!("<link href=\"{}\" rel=\"stylesheet\"/>", asset.href)
+            } else {
+                format!("<script src=\"{}\"></script>", asset.href)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Value::from_safe_string(tags)
+}
+
+fn bundle_assets(bundle: String) -> Vec<Asset> {
     let files = WEBPACK
         .chunks
         .get(&bundle)
         .cloned()
         .unwrap_or_else(|| vec![format!("{bundle}.css")]);
-    let assets: Vec<_> = files
+    files
         .into_iter()
         .filter(|name| {
             name.bytes()
@@ -364,8 +357,7 @@ fn webpack_files(bundle: String) -> Value {
             stylesheet: name.ends_with(".css"),
             href: format!("/static/webpack_bundles/{name}"),
         })
-        .collect();
-    Value::from_serialize(assets)
+        .collect()
 }
 
 #[derive(Serialize)]
@@ -411,7 +403,7 @@ pub fn render(template: &str, context: Value, status: StatusCode) -> Response {
 pub fn page_csrf(headers: &HeaderMap) -> Result<String, &'static str> {
     match cookie(headers, "csrftoken").filter(|value| login::valid_csrf_token(value)) {
         Some(token) => Ok(token.into()),
-        None => passwords::random_secret(),
+        None => login::new_csrf_code(),
     }
 }
 

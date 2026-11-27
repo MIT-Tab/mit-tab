@@ -11,23 +11,44 @@ if [[ -f "$environment_file" ]]; then
 fi
 export MITTAB_ENV="${MITTAB_ENV:-development}"
 export MITTAB_RUST_LISTEN="${MITTAB_RUST_LISTEN:-127.0.0.1:8001}"
-export MITTAB_STATIC_ROOT="${MITTAB_STATIC_ROOT:-assets}"
+static_overlay=
+assets_pid=
+server_pid=
+
+cleanup() {
+  if [[ -n "$assets_pid" ]]; then
+    kill "$assets_pid" 2>/dev/null || true
+    wait "$assets_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$server_pid" ]]; then
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$static_overlay" ]]; then
+    rm -r -- "$static_overlay"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 cargo build --locked --manifest-path rust/Cargo.toml -p mittab-server
 server="${CARGO_TARGET_DIR:-$PWD/rust/target}/debug/mittab-server"
 "$server" init
 
 npm exec -- webpack --config webpack.config.js --mode development
+if [[ -z "${MITTAB_STATIC_ROOT:-}" ]]; then
+  admin_static="$(uv run --frozen python -c 'from pathlib import Path; from django.contrib import admin; print(Path(admin.__file__).parent / "static" / "admin")')"
+  static_overlay="$(mktemp -d "${TMPDIR:-/tmp}/mittab-static.XXXXXXXX")"
+  for path in "$PWD"/assets/*; do
+    ln -s "$path" "$static_overlay/"
+  done
+  ln -s "$admin_static" "$static_overlay/admin"
+  export MITTAB_STATIC_ROOT="$static_overlay"
+fi
 npm exec -- webpack --config webpack.config.js --mode development --watch &
 assets_pid=$!
 "$server" serve &
 server_pid=$!
 
-cleanup() {
-  kill "$assets_pid" "$server_pid" 2>/dev/null || true
-  wait "$assets_pid" "$server_pid" 2>/dev/null || true
-}
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 wait "$server_pid"
