@@ -52,18 +52,6 @@ async fn roster_redirect(uri: Uri, Path(_id): Path<i32>) -> Response {
     access::found(location)
 }
 
-pub fn toolbar() -> Vec<(String, String)> {
-    Kind::ALL
-        .into_iter()
-        .map(|kind| {
-            (
-                format!("/view_{}s/", kind.model()),
-                format!("{}s", kind.singular()),
-            )
-        })
-        .collect()
-}
-
 pub async fn dashboard(app: &App, actor: Actor, headers: &HeaderMap) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;

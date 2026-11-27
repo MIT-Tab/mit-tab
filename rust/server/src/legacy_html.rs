@@ -469,6 +469,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/common/_form.html"),
         ),
         (
+            "common/data_upload.html",
+            include_str!("../../../mittab/templates/common/data_upload.html"),
+        ),
+        (
+            "common/_upload_error.html",
+            include_str!("../../../mittab/templates/common/_upload_error.html"),
+        ),
+        (
             "tab/school_detail.html",
             include_str!("../../../mittab/templates/tab/school_detail.html"),
         ),
@@ -747,6 +755,12 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
+            ["url", "'export_roster'", "kind", "extension"] => {
+                output.push_str("/export_data/{{ kind }}.{{ extension }}");
+            }
+            ["url", "'export_roster'", "'scratches'", "extension"] => {
+                output.push_str("/export_data/scratches.{{ extension }}");
+            }
             ["url", "'view_team'", "row.team.id"] => output.push_str("/team/{{ row.team.id }}/"),
             ["url", "'judge_portal'", "ballot_code"] => output.push_str("{{ portal_url }}"),
             ["url", "'enter_e_ballot'", "ballot_code"] => output.push_str("{{ current_ballot_url }}"),
@@ -978,6 +992,7 @@ fn translate(name: &str, source: &str) -> String {
             "event.changes.fields|join:\", \"",
             "event.changes.fields|join(\", \")",
         ),
+        "common/data_upload.html" => translated.replace("kind|capfirst", "kind|capitalize"),
         "common/data_entry_multiple.html" => translated
             .replace("event.changes.fields|join:\", \" ", "event.changes.fields|join(\", \") ")
             .replace(

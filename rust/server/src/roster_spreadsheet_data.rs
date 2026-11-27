@@ -1,8 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use sqlx::{Acquire, MySqlConnection, MySqlPool};
+use axum::http::HeaderMap;
+use sqlx::{Acquire, MySqlConnection};
 
 use crate::{
+    App,
+    access::{self, PortalAccessError},
+    legacy_session::Actor,
     registration_form::{Fields, length},
     roster_spreadsheet_layout::{self as layout, Roster},
     settings::Settings,
@@ -132,18 +136,33 @@ async fn rounds(db: &mut MySqlConnection) -> Result<usize, sqlx::Error> {
 }
 
 pub async fn import(
-    pool: &MySqlPool,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
     kind: Roster,
     format: Format,
     input: Vec<u8>,
-    user: i32,
-) -> Result<usize, Vec<String>> {
-    let raw = tokio::task::spawn_blocking(move || spreadsheets::read(format, &input))
+) -> Result<(), ImportError> {
+    let raw = tokio::task::spawn_blocking(move || spreadsheets::read_roster(format, &input))
         .await
         .map_err(|_| vec!["Unable to read the spreadsheet.".into()])?
-        .map_err(|error| vec![error.into()])?;
-    let mut tx = pool.begin().await.map_err(|_| database())?;
+        .map_err(|error| vec![error])?;
+    let mut tx = app.db.begin().await.map_err(|_| database())?;
     lock_round(&mut tx).await.map_err(|_| database())?;
+    let current = access::data_entry_actor(&mut tx, app, original, headers)
+        .await
+        .map_err(ImportError::Access)?;
+    let Actor::User {
+        id: user,
+        superuser,
+        ..
+    } = current
+    else {
+        return Err(ImportError::Access(PortalAccessError::Denied));
+    };
+    if kind == Roster::Scratches && !superuser {
+        return Err(ImportError::Access(PortalAccessError::Denied));
+    }
     let rounds = if kind == Roster::Judges {
         rounds(&mut tx).await.map_err(|_| database())?
     } else {
@@ -151,7 +170,6 @@ pub async fn import(
     };
     let decoded = layout::configure(kind, raw, rounds).map_err(|error| vec![error])?;
     let mut errors = Vec::new();
-    let len = decoded.rows.len();
     for (number, row) in decoded.rows {
         let mut position = tx.begin().await.map_err(|_| database())?;
         match import_row(
@@ -167,13 +185,19 @@ pub async fn import(
             Ok(()) => position.commit().await.map_err(|_| database())?,
             Err(error) => {
                 position.rollback().await.map_err(|_| database())?;
-                let error = match error {
-                    Error::Invalid(error) => error,
-                    Error::Missing => "A referenced roster entry was removed.",
-                    Error::Database => "The row could not be saved.",
+                let details = match error {
+                    RowError::Validation(details) => details,
+                    RowError::Save(Error::Invalid(error)) => vec![error.into()],
+                    RowError::Save(Error::Missing) => vec!["A referenced roster entry was removed.".into()],
+                    RowError::Save(Error::Database) => vec!["A value conflicts with an existing record or exceeds a database limit. Check the names and column values.".into()],
                 };
-                errors.push(format!("Row {number}: {error}"));
-                if errors.len() == 100 {
+                errors.extend(
+                    details
+                        .into_iter()
+                        .map(|message| format!("Row {number}: {message}")),
+                );
+                if errors.len() >= 100 {
+                    errors.truncate(100);
                     break;
                 }
             }
@@ -181,10 +205,44 @@ pub async fn import(
     }
     if !errors.is_empty() {
         tx.rollback().await.map_err(|_| database())?;
-        return Err(errors);
+        return Err(errors.into());
     }
     tx.commit().await.map_err(|_| database())?;
-    Ok(len)
+    Ok(())
+}
+
+pub(super) enum ImportError {
+    Access(PortalAccessError),
+    Validation(Vec<String>),
+}
+
+impl From<Vec<String>> for ImportError {
+    fn from(errors: Vec<String>) -> Self {
+        Self::Validation(errors)
+    }
+}
+
+enum RowError {
+    Validation(Vec<String>),
+    Save(Error),
+}
+
+impl From<Error> for RowError {
+    fn from(error: Error) -> Self {
+        Self::Save(error)
+    }
+}
+
+impl From<sqlx::Error> for RowError {
+    fn from(error: sqlx::Error) -> Self {
+        Self::Save(error.into())
+    }
+}
+
+fn value_error(value: &str, column: &str, error: &str) -> RowError {
+    RowError::Validation(vec![format!(
+        "Value \"{value}\" in column \"{column}\": {error}"
+    )])
 }
 
 fn database() -> Vec<String> {
@@ -198,15 +256,15 @@ async fn import_row(
     user: i32,
     rounds: usize,
     named: bool,
-) -> Result<(), Error> {
+) -> Result<(), RowError> {
     match kind {
         Roster::Teams => import_team(db, row, user).await,
         Roster::Judges => import_judge(db, row, user, rounds, named).await,
         Roster::Rooms => {
             let mut fields = Fields::default();
             fields.push("name", &row[0]);
-            let rank =
-                layout::finite(&row[1]).ok_or(Error::Invalid("Rank must be a finite number."))?;
+            let rank = layout::finite(&row[1])
+                .ok_or_else(|| value_error(&row[1], "Rank", "expected a finite number."))?;
             fields.push("rank", rank.to_string());
             create(db, Kind::Room, &fields, user).await?;
             Ok(())
@@ -257,11 +315,19 @@ async fn school(db: &mut MySqlConnection, name: &str) -> Result<i32, Error> {
     )
 }
 
-async fn import_team(db: &mut MySqlConnection, row: &[String], user: i32) -> Result<(), Error> {
+async fn import_team(db: &mut MySqlConnection, row: &[String], user: i32) -> Result<(), RowError> {
     let school_id = school(db, &row[1]).await?;
-    let seed = layout::seed(&row[3]).ok_or(Error::Invalid(
-        "Seed must be full, half, free, or unseeded.",
-    ))?;
+    let seed = layout::seed(&row[3])
+        .ok_or_else(|| value_error(&row[3], "Seed", "expected full, half, free, or unseeded."))?;
+    for base in [4, 8] {
+        if layout::novice(&row[base + 1]).is_none() {
+            return Err(value_error(
+                &row[base + 1],
+                Roster::Teams.headers()[base + 1],
+                "expected novice, varsity, or a blank cell.",
+            ));
+        }
+    }
     let mut draft = Fields::default();
     draft.push("name", &row[0]);
     draft.push("school", school_id);
@@ -292,9 +358,14 @@ async fn import_judge(
     user: i32,
     rounds: usize,
     named: bool,
-) -> Result<(), Error> {
-    let rank =
-        layout::finite(&row[2]).ok_or(Error::Invalid("Calibration must be a finite number."))?;
+) -> Result<(), RowError> {
+    if row[0].is_empty() {
+        return Err(RowError::Validation(vec![
+            "Column \"Judge name\": enter a non-empty judge name.".into(),
+        ]));
+    }
+    let rank = layout::finite(&row[2])
+        .ok_or_else(|| value_error(&row[2], "Calibration", "expected a finite number."))?;
     let split = if rounds > 0
         && row.len() >= 3 + rounds
         && (named
@@ -308,8 +379,21 @@ async fn import_judge(
     };
     let affiliated = &row[3..split];
     if affiliated.iter().all(|field| field.is_empty()) {
-        return Err(Error::Invalid("Each judge must have at least one school."));
+        return Err(RowError::Validation(vec!["Column \"School\": each judge must have at least one school. Add a \"School 1\" column and fill in the judge's school.".into()]));
     }
+    let expected_rounds = row[split..]
+        .iter()
+        .enumerate()
+        .map(|(index, flag)| {
+            layout::expected(flag).ok_or_else(|| {
+                value_error(
+                    flag,
+                    &format!("Round {} expected", index + 1),
+                    "use yes, no, or a blank cell.",
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut draft = Fields::default();
     draft.push("name", &row[0]);
     draft.push("email", &row[1]);
@@ -318,10 +402,7 @@ async fn import_judge(
         draft.push("schools", school(db, name).await?);
     }
     let judge = create(db, Kind::Judge, &draft, user).await?;
-    for (index, flag) in row[split..].iter().enumerate() {
-        let available = layout::expected(flag).ok_or(Error::Invalid(
-            "Use yes, no, or a blank cell for expected availability.",
-        ))?;
+    for (index, available) in expected_rounds.into_iter().enumerate() {
         if available {
             sqlx::query(
                 "INSERT INTO tab_judgeexpectedcheckin (judge_id, round_number) VALUES (?, ?)",
@@ -335,19 +416,33 @@ async fn import_judge(
     Ok(())
 }
 
-async fn import_scratch(db: &mut MySqlConnection, row: &[String], user: i32) -> Result<(), Error> {
-    let kind =
-        layout::scratch(&row[2]).ok_or(Error::Invalid("Scratch type must be team or tab."))?;
-    let team: i32 = sqlx::query_scalar("SELECT id FROM tab_team WHERE name = ?")
+async fn import_scratch(
+    db: &mut MySqlConnection,
+    row: &[String],
+    user: i32,
+) -> Result<(), RowError> {
+    let kind = layout::scratch(&row[2]);
+    let team: Option<i32> = sqlx::query_scalar("SELECT id FROM tab_team WHERE name = ?")
         .bind(&row[0])
         .fetch_optional(&mut *db)
-        .await?
-        .ok_or(Error::Invalid("The team does not exist."))?;
-    let judge: i32 = sqlx::query_scalar("SELECT id FROM tab_judge WHERE name = ?")
+        .await?;
+    let judge: Option<i32> = sqlx::query_scalar("SELECT id FROM tab_judge WHERE name = ?")
         .bind(&row[1])
         .fetch_optional(&mut *db)
-        .await?
-        .ok_or(Error::Invalid("The judge does not exist."))?;
+        .await?;
+    let (Some(team), Some(judge), Some(kind)) = (team, judge, kind) else {
+        let mut errors = Vec::new();
+        if team.is_none() {
+            errors.push(format!("Team '{}' does not exist", row[0]));
+        }
+        if judge.is_none() {
+            errors.push(format!("Judge '{}' does not exist", row[1]));
+        }
+        if kind.is_none() {
+            errors.push(format!("'{}' is not a valid scratch type", row[2]));
+        }
+        return Err(RowError::Validation(errors));
+    };
     let record = sqlx::query(
         "INSERT INTO tab_scratch (team_id, judge_id, scratch_type, created_by_id, created_at)
          VALUES (?, ?, ?, ?, UTC_TIMESTAMP(6))",

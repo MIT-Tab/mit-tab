@@ -6158,7 +6158,10 @@ def test_native_scratch_roles_keep_submission_blind_and_board_excluded():
 
 @pytest.mark.django_db(transaction=True)
 def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
+    from io import BytesIO
     from django.core.files.uploadedfile import SimpleUploadedFile
+    from openpyxl import load_workbook
+    from xlrd import open_workbook
     from mittab.libs.spreadsheets import read_rows, spreadsheet_response
 
     tab = legacy_tab_session("sheet-tab")
@@ -6196,7 +6199,7 @@ def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
         mixed = upload("team_file", "xlsx", team_header,
                        [*teams, ("Debater Four", "Rollback School", "Conflicting Team", "invalid",
                                  "Debater Three", "Varsity", "", "", "")], session=entry)
-        assert mixed[0] == 422 and b"Row 3" in mixed[2], mixed
+        assert mixed[0] == 200 and b"Row 3" in mixed[2], mixed
         assert not Team.objects.exists() and not School.objects.exists() and not Debater.objects.exists()
         uploaded = upload("team_file", "xlsx", team_header, teams, session=entry)
         assert uploaded[0] == 302, uploaded
@@ -6214,23 +6217,40 @@ def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
         assert list(JudgeExpectedCheckIn.objects.filter(judge=judge).values_list("round_number", flat=True)) == [2]
 
         rooms = upload("room_file", "csv", ["Room name", "Rank"], [("Test Room", "3.5"), ("Invalid Room", "bad")])
-        assert rooms[0] == 422 and b"Row 3" in rooms[2]
+        assert rooms[0] == 200 and b"Row 3" in rooms[2]
         assert not Room.objects.exists()
         rooms = upload("room_file", "csv", ["Room name", "Rank"], [("Test Room", "3.5")])
         assert rooms[0] == 302 and Room.objects.get().rank == Decimal("3.50")
 
         scratch_args = ("scratch_file", "csv", ["Judge name", "Scratch type", "Team name"],
                         [(judge.name, "tab", team.name)])
-        assert upload(*scratch_args, session=entry)[0] == 422
+        rejected = upload(*scratch_args, session=entry)
+        assert rejected[0] == 200 and b"Choose at least one spreadsheet to import." in rejected[2]
         assert not Scratch.objects.exists()
         assert upload(*scratch_args)[0] == 302 and Scratch.objects.get().scratch_type == Scratch.TAB_SCRATCH
-        assert request(port, "/export_data/scratches.csv", cookie=entry)[1]["Location"] == "/403/"
+        assert request(port, "/export_data/scratches.csv", cookie=entry)[0] == 403
+        assert request(port, "/export_data/teams.csv", cookie=board)[0] == 403
+        reference = Client()
+        reference.cookies["sessionid"] = tab
         for kind in ("teams", "judges", "rooms", "scratches"):
             for fmt in ("csv", "xls", "xlsx"):
                 filename = f"{kind}.{fmt}"
                 status, headers, data = request(port, f"/export_data/{filename}", cookie=tab)
                 assert status == 200 and filename in headers["content-disposition"]
+                original = reference.get(f"/export_data/{filename}")
+                assert original.status_code == 200
+                assert original["Content-Disposition"] == headers["Content-Disposition"]
+                assert original["Content-Type"] == headers["Content-Type"]
+                if fmt == "csv":
+                    assert original.content == data
+                elif fmt == "xlsx":
+                    workbook_file = load_workbook(BytesIO(data), read_only=True)
+                    assert workbook_file.sheetnames == ["Sheet"]
+                    workbook_file.close()
+                else:
+                    assert open_workbook(file_contents=data).sheet_names() == ["Data"]
                 values = read_rows(SimpleUploadedFile(filename, data))
+                assert values == read_rows(SimpleUploadedFile(filename, original.content))
                 assert len(values) == 2
                 _, exported = values[1]
                 if kind == "teams":
@@ -6239,6 +6259,116 @@ def test_native_roster_spreadsheets_roundtrip_and_atomically_reject_bad_rows():
                     assert exported[-2:] == ["", "yes"]
                 if kind == "scratches":
                     assert exported == [team.name, judge.name, "tab"]
+
+        status, _, denial = roster_request_waiting_for_lock(
+            lambda: upload("room_file", "csv", ["Room name", "Rank"], [("Queued Room", "3.5")], session=entry),
+            lambda: helper.groups.add(Group.objects.get(name="APDA Board")),
+        )
+        assert status == 403 and b"Queued Room" not in denial
+        assert not Room.objects.filter(name="Queued Room").exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_roster_upload_pages_match_django(html_assets):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    tab = legacy_tab_session("roster-upload-reference")
+    helper = get_user_model().objects.create_user(username="roster-upload-helper", is_staff=True)
+    helper.groups.add(Group.objects.create(name="MIT-TAB: Data entry helper"))
+    other_client = Client()
+    other_client.force_login(helper)
+    entry = other_client.cookies["sessionid"].value
+    csrf = "a" * 32
+    path = "/import_data/"
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("tot_rounds", 2)
+
+    def client_for(session_id):
+        client = Client()
+        client.cookies["sessionid"] = session_id
+        client.cookies["csrftoken"] = csrf
+        return client
+
+    def cookies(session_id):
+        return {"Cookie": f"sessionid={session_id}; csrftoken={csrf}"}
+
+    def post(port, session_id, files, target=path):
+        boundary = "mittab-roster-browser-123"
+        data = bytearray()
+        for key, value in (("csrfmiddlewaretoken", "invalid-earlier-token"),
+                           ("return_to", target), ("csrfmiddlewaretoken", csrf)):
+            data.extend((f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n'
+                         f'\r\n{value}\r\n').encode())
+        for key, (name, data_bytes) in files.items():
+            data.extend((f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"; filename="{name}"\r\n'
+                         'Content-Type: application/octet-stream\r\n\r\n').encode())
+            data.extend(data_bytes)
+            data.extend(b"\r\n")
+        data.extend(f"--{boundary}--\r\n".encode())
+        return request(port, path, method="POST", extra_headers={
+            **cookies(session_id), "Content-Type": f"multipart/form-data; boundary={boundary}",
+        }, raw_body=bytes(data))
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(session_id=tab, files=None, committed_room=None):
+            if files is None:
+                status, _, body = request(port, path, extra_headers=cookies(session_id))
+            else:
+                status, _, body = post(port, session_id, files)
+            assert status == 200
+            if committed_room:
+                assert Room.objects.filter(name=committed_room).count() == 1
+                Room.objects.get(name=committed_room).delete()
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            client = client_for(session_id)
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask[1][:32].decode()):
+                reference = client.get(path) if files is None else client.post(path, {
+                    "return_to": path, **{key: SimpleUploadedFile(*file) for key, file in files.items()},
+                })
+            assert reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+            if committed_room:
+                assert Room.objects.filter(name=committed_room).count() == 1
+                Room.objects.get(name=committed_room).delete()
+            return body
+
+        assert b"Scratch Data File" in compare()
+        assert b"Scratch Data File" not in compare(entry)
+        compare(files={})
+        compare(files={"room_file": ("empty.csv", b"")})
+        compare(files={"room_file": ("rooms.csv", b'Room name,Rank\r\n\r\nInvalid room,bad\r\n')})
+        compare(files={"room_file": ("rooms.csv", b'Room name,Rank\r\nInvalid room,"3.5')})
+        compare(files={"room_file": ("rooms.csv", b'Room name,Rank\r\n"Room\r\nAnnotation",bad\r\n')})
+        compare(files={"room_file": ("binary.csv", b"Room name,Rank\r\nInvalid\x00room,1\r\n")})
+        compare(files={"room_file": ("invalid-utf8.csv", b"Room name,Rank\r\nRoom \xff,1\r\n")})
+        compare(files={"scratch_file": ("scratches.csv", b"Team name,Judge name,Scratch type\r\nUnlisted,Unknown,nonsense\r\n")})
+        compare(files={"judge_file": ("judges.csv", b"Judge name,Calibration\r\nUnaffiliated,2\r\n")})
+        compare(files={"judge_file": ("invalid.xlsx", b"corrupt"),
+                       "room_file": ("rooms.csv", b"Room name,Rank\r\nMixed Room,2\r\n")},
+                committed_room="Mixed Room")
+        compare(files={"judge_file": ("unsupported.txt", b"corrupt"),
+                       "room_file": ("rooms.csv", b"Room name,Rank\r\nMixed Room,2\r\n")},
+                committed_room="Mixed Room")
+        compare(files={"judge_file": ("empty.csv", b""),
+                       "room_file": ("rooms.csv", b"Room name,Rank\r\nMixed Room,2\r\n")})
+        assert not Room.objects.filter(name="Mixed Room").exists()
+        assert not Room.objects.exists() and not Judge.objects.exists() and not Scratch.objects.exists()
+
+        too_wide = post(port, tab, {"room_file": ("too-wide.csv", b"Room name,Rank\r\nExample,1" + b"," * 255)})
+        assert too_wide[0] == 200 and b"The spreadsheet exceeds the row or column limit." in too_wide[2]
+        for filename, status in (("rooms.CSV", 400), ("rooms", 404), ("rooms.csv", 200)):
+            assert request(port, f"/export_data/{filename}", extra_headers=cookies(tab))[0] == status
+        assert request(port, "/export_data/rooms.csv", method="HEAD", extra_headers=cookies(tab))[0] == 405
+
+        files = {"room_file": ("rooms.csv", b"Room name,Rank\r\nValid Browser Room,2\r\n")}
+        returned = post(port, tab, files, target=path + "?fixture=1")
+        assert returned[0] == 302 and returned[1]["Location"] == path + "?fixture=1"
+        notice = load_cookies(returned[1])["mittab_roster_notice"].value
+        cookie = cookies(tab)["Cookie"] + f"; mittab_roster_notice={notice}"
+        response = request(port, returned[1]["Location"], extra_headers={"Cookie": cookie})
+        assert b"Data imported successfully" in response[2]
+        assert load_cookies(response[1])["mittab_roster_notice"]["max-age"] == "0"
+        assert Room.objects.get(name="Valid Browser Room").rank == 2
 
 
 @pytest.mark.django_db(transaction=True)

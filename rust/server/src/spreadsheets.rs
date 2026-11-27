@@ -41,10 +41,132 @@ impl Format {
 }
 
 pub type Rows = Vec<(usize, Vec<String>)>;
+const MAX_ROWS: usize = 100_000;
+const MAX_COLUMNS: usize = 256;
+const LIMIT: &str = "The spreadsheet exceeds the row or column limit.";
+const UNREADABLE: &str =
+    "Could not read the spreadsheet. Open it in a spreadsheet editor and save it again.";
+pub(super) const MAX_CELLS: usize = 2_000_000;
+const MAX_DECODED_TEXT: usize = 32 * 1024 * 1024;
+
+pub(super) fn read_roster(format: Format, input: &[u8]) -> Result<Rows, String> {
+    let damaged = || {
+        format!(
+            "Could not read .{} file. It may be damaged, empty, password-protected, or saved with the wrong extension. Open it in a spreadsheet editor and save it again.",
+            format.suffix()
+        )
+    };
+    let rows = if format == Format::Csv {
+        let text = std::str::from_utf8(input)
+            .map_err(|_| "Could not decode CSV. Save the file as UTF-8 CSV.")?;
+        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+        if text.contains('\0') {
+            return Err("CSV contains binary data; save it as UTF-8 CSV.".into());
+        }
+        let numbers = csv_record_numbers(text).map_err(|error| match error {
+            UNREADABLE => damaged(),
+            _ => error.into(),
+        })?;
+        let mut csv = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .flexible(true)
+            .from_reader(text.as_bytes());
+        let mut rows = Rows::new();
+        let mut numbers = numbers.into_iter();
+        for record in csv.records() {
+            let record = record.map_err(|_| damaged())?;
+            let number = numbers.next().ok_or_else(damaged)?;
+            if record.iter().any(|value| !value.trim().is_empty()) {
+                rows.push((
+                    number,
+                    record.iter().map(|value| value.trim().into()).collect(),
+                ));
+            }
+        }
+        if numbers.next().is_some() {
+            return Err(damaged());
+        }
+        rows
+    } else {
+        read(format, input).map_err(|error| match error {
+            UNREADABLE | "The spreadsheet has no sheets." => damaged(),
+            "The spreadsheet is empty." => {
+                "The spreadsheet is empty. Add a header and at least one data row.".into()
+            }
+            _ => error.into(),
+        })?
+    };
+    if rows.is_empty() {
+        return Err("The spreadsheet is empty. Add a header and at least one data row.".into());
+    }
+    Ok(rows)
+}
+
+fn csv_record_numbers(text: &str) -> Result<Vec<usize>, &'static str> {
+    // Validate the quoting and count Python-style logical records before the CSV reader allocates cells.
+    // The reader skips blank records, but Django counts them when naming an error's row.
+    #[derive(Clone, Copy, PartialEq)]
+    enum Field {
+        Start,
+        Plain,
+        Quoted,
+        Closed,
+    }
+    let mut state = Field::Start;
+    let mut numbers = Vec::new();
+    let mut number = 1;
+    let mut columns = 1;
+    let mut cells = 0;
+    let mut has_data = false;
+    let mut bytes = text.bytes().peekable();
+    let mut record = |number, columns| {
+        cells += columns;
+        if numbers.len() == MAX_ROWS || cells > MAX_CELLS {
+            return Err(LIMIT);
+        }
+        numbers.push(number);
+        Ok(())
+    };
+    while let Some(byte) = bytes.next() {
+        if state != Field::Quoted && matches!(byte, b'\r' | b'\n') {
+            if byte == b'\r' && bytes.peek() == Some(&b'\n') {
+                bytes.next();
+            }
+            if has_data {
+                record(number, columns)?;
+            }
+            state = Field::Start;
+            number += 1;
+            columns = 1;
+            has_data = false;
+            continue;
+        }
+        has_data = true;
+        state = match (state, byte) {
+            (Field::Start | Field::Closed, b'"') => Field::Quoted,
+            (Field::Quoted, b'"') => Field::Closed,
+            (Field::Quoted, _) => Field::Quoted,
+            (_, b',') => {
+                columns += 1;
+                if columns > MAX_COLUMNS {
+                    return Err(LIMIT);
+                }
+                Field::Start
+            }
+            (Field::Closed, _) => return Err(UNREADABLE),
+            _ => Field::Plain,
+        };
+    }
+    if state == Field::Quoted {
+        return Err(UNREADABLE);
+    }
+    if has_data {
+        record(number, columns)?;
+    }
+    Ok(numbers)
+}
 
 pub fn read(format: Format, input: &[u8]) -> Result<Rows, &'static str> {
-    const UNREADABLE: &str =
-        "Could not read the spreadsheet. Open it in a spreadsheet editor and save it again.";
     let rows: Rows = match format {
         Format::Csv => {
             let text = std::str::from_utf8(input)
@@ -79,21 +201,35 @@ pub fn read(format: Format, input: &[u8]) -> Result<Rows, &'static str> {
             .map_err(|_| UNREADABLE)?;
             let sheet = file.sheet(0).ok_or("The spreadsheet has no sheets.")?;
             let mut cells = BTreeMap::<usize, Vec<String>>::new();
+            let mut cell_count = 0;
+            let mut text_bytes = 0;
             for (address, cell) in sheet.iter() {
+                text_bytes += source_text_bytes(&cell.value);
+                if text_bytes > MAX_DECODED_TEXT {
+                    return Err("The spreadsheet contains too much cell text.");
+                }
                 let value = text(&cell.value);
                 if value.trim().is_empty() {
                     continue;
                 }
                 let row = address.row.one_based() as usize;
                 let column = address.col.index() as usize;
-                if column >= 256 || row > 100_000 {
-                    return Err("The spreadsheet exceeds the row or column limit.");
+                if column >= MAX_COLUMNS || row > MAX_ROWS {
+                    return Err(LIMIT);
                 }
                 let entry = cells.entry(row).or_default();
                 if entry.len() <= column {
+                    cell_count += column + 1 - entry.len();
+                    if cell_count > MAX_CELLS {
+                        return Err(LIMIT);
+                    }
                     entry.resize(column + 1, String::new());
                 }
-                entry[column] = value.trim().into();
+                entry[column] = if value.trim().len() == value.len() {
+                    value
+                } else {
+                    value.trim().into()
+                };
             }
             cells.into_iter().collect()
         }
@@ -109,6 +245,18 @@ pub fn read(format: Format, input: &[u8]) -> Result<Rows, &'static str> {
         return Err("The spreadsheet exceeds the row or column limit.");
     }
     Ok(rows)
+}
+
+fn source_text_bytes(value: &CellValue) -> usize {
+    match value {
+        CellValue::Text(value) => value.len(),
+        CellValue::RichText(runs) => runs.iter().map(|run| run.text.len()).sum(),
+        CellValue::Formula {
+            cached: Some(result),
+            ..
+        } => source_text_bytes(result),
+        _ => 0,
+    }
 }
 
 fn text(value: &CellValue) -> String {
@@ -137,6 +285,29 @@ pub fn write(
     rows: &[Vec<String>],
     byte_order_mark: bool,
 ) -> Result<Vec<u8>, &'static str> {
+    write_sheet(format, headers, rows, byte_order_mark, "Data")
+}
+
+pub(super) fn write_roster(
+    format: Format,
+    headers: &[&str],
+    rows: &[Vec<String>],
+) -> Result<Vec<u8>, &'static str> {
+    let sheet = if format == Format::Xlsx {
+        "Sheet"
+    } else {
+        "Data"
+    };
+    write_sheet(format, headers, rows, true, sheet)
+}
+
+fn write_sheet(
+    format: Format,
+    headers: &[&str],
+    rows: &[Vec<String>],
+    byte_order_mark: bool,
+    sheet_name: &str,
+) -> Result<Vec<u8>, &'static str> {
     const ERROR: &str = "Could not write the spreadsheet. Check the cell text and file size.";
     if format == Format::Csv {
         let mut data = if byte_order_mark {
@@ -157,7 +328,7 @@ pub fn write(
         return Ok(data);
     }
     let mut workbook = Spreadsheet::empty();
-    let mut sheet = Worksheet::new("Data").map_err(|_| ERROR)?;
+    let mut sheet = Worksheet::new(sheet_name).map_err(|_| ERROR)?;
     for (column, header) in headers.iter().enumerate() {
         sheet
             .set_at(1, column as u32 + 1, *header)

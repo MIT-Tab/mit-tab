@@ -430,6 +430,30 @@ pub(super) async fn settings_actor(
     }
 }
 
+pub(super) async fn data_entry_actor(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, PortalAccessError> {
+    let actor = code_portal_actor(db, app, original, headers).await?;
+    match actor {
+        Actor::User {
+            superuser: true, ..
+        } => Ok(actor),
+        Actor::User {
+            id, staff: true, ..
+        } if crate::staff_roles::preset_on(db, id)
+            .await
+            .map_err(|_| PortalAccessError::Database)?
+            .is_some_and(crate::staff_roles::Preset::data_entry) =>
+        {
+            Ok(actor)
+        }
+        _ => Err(PortalAccessError::Denied),
+    }
+}
+
 pub async fn wizard_complete(app: &App) -> Result<bool, sqlx::Error> {
     let mut db = app.db.acquire().await?;
     let settings = Settings::load(&mut db, &["start_tournament_wizard_completed"]).await?;

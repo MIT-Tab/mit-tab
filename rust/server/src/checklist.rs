@@ -21,6 +21,7 @@ use crate::{
     login, private, publication,
     settings::{SettingValue, Settings, put},
     staff_pairing::lock_round,
+    staff_roster_notice,
     tournament_setup::{CHECKLIST, truthy},
     unavailable,
 };
@@ -289,7 +290,10 @@ pub async fn page(
         let Ok(csrf) = login::TemplateCsrf::new(&headers) else {
             return Ok(unavailable());
         };
-        let mut response = legacy_html::render(
+        let mut response = staff_roster_notice::render(
+            &app,
+            &headers,
+            uri.path(),
             "tab/tournament_todo.html",
             shell,
             context! {

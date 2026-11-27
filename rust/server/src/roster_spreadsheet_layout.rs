@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::spreadsheets::{Rows, normalized_header};
+use crate::spreadsheets::{MAX_CELLS, Rows, normalized_header};
+
+const SCRATCH_COLUMNS: &str = "Use one row per scratch with columns \"Team name\", \"Judge name\", and \"Scratch type\" (team or tab).";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Roster {
@@ -32,15 +34,6 @@ impl Roster {
             Self::Judges => "judge_file",
             Self::Rooms => "room_file",
             Self::Scratches => "scratch_file",
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Teams => "Teams",
-            Self::Judges => "Judges",
-            Self::Rooms => "Rooms",
-            Self::Scratches => "Scratches",
         }
     }
 
@@ -232,7 +225,7 @@ fn judge_extras(
         if let Some(number) = named_round(&normalized_header(&headers[index])) {
             if !(1..=count).contains(&number) {
                 return Err(format!(
-                    "Column “{}” exceeds the configured total of {count} rounds.",
+                    "Column \"{}\" exceeds the configured total of {count} rounds.",
                     headers[index]
                 ));
             }
@@ -299,7 +292,9 @@ pub fn configure(roster: Roster, mut rows: Rows, round_count: usize) -> Result<L
                 })
             })
         {
-            return Err("This looks like a scratch form response sheet. Use one row per scratch with Team name, Judge name, and Scratch type.".into());
+            return Err(format!(
+                "This looks like a scratch form response sheet. {SCRATCH_COLUMNS}"
+            ));
         }
     }
     let default = |rows: &Rows| {
@@ -317,13 +312,13 @@ pub fn configure(roster: Roster, mut rows: Rows, round_count: usize) -> Result<L
             .map(|(_, row)| row.len())
             .max()
             .unwrap_or_default();
-        return Ok(project(
+        return project(
             rows,
             width,
             sequential(),
             (width..extra).map(Some).collect(),
             false,
-        ));
+        );
     }
 
     let aliases = roster.aliases();
@@ -333,7 +328,7 @@ pub fn configure(roster: Roster, mut rows: Rows, round_count: usize) -> Result<L
             && mapping.insert(target, index).is_some()
         {
             return Err(format!(
-                "Duplicate column “{}” in header row.",
+                "Duplicate column \"{}\" in header row.",
                 roster.headers()[target]
             ));
         }
@@ -364,7 +359,7 @@ pub fn configure(roster: Roster, mut rows: Rows, round_count: usize) -> Result<L
         } else {
             (width..first.len()).map(Some).collect()
         };
-        return Ok(project(rows, width, sequential(), extras, has_header));
+        return project(rows, width, sequential(), extras, has_header);
     }
     if !has_header {
         mapping.clear();
@@ -415,20 +410,29 @@ pub fn configure(roster: Roster, mut rows: Rows, round_count: usize) -> Result<L
                         >= width - 1
             })
         {
-            return Ok(project(
+            return project(
                 rows,
                 width,
                 sequential(),
                 (width..first.len()).map(Some).collect(),
                 false,
-            ));
+            );
         }
-        return Err(format!(
-            "Could not identify these columns: {}. Use the default order or the named headers from an export.",
-            missing.join(", ")
-        ));
+        let names = missing
+            .into_iter()
+            .map(|label| format!("\"{label}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut error = format!(
+            "Couldn't find an unambiguous column for {names}. Use the default column order or add the named headers from an export."
+        );
+        if roster == Roster::Scratches {
+            error.push_str(" For scratches, ");
+            error.push_str(&SCRATCH_COLUMNS.replacen("Use", "use", 1));
+        }
+        return Err(error);
     }
-    Ok(project(rows, width, mapping, extras, has_header))
+    project(rows, width, mapping, extras, has_header)
 }
 
 fn project(
@@ -437,11 +441,14 @@ fn project(
     mapping: BTreeMap<usize, usize>,
     extras: Vec<Option<usize>>,
     named_headers: bool,
-) -> Layout {
+) -> Result<Layout, String> {
     let columns: Vec<_> = (0..width)
         .map(|target| mapping.get(&target).copied())
         .chain(extras)
         .collect();
+    if rows.len().saturating_mul(columns.len()) > MAX_CELLS {
+        return Err("The spreadsheet exceeds the row or column limit.".into());
+    }
     let rows = rows
         .into_iter()
         .map(|(number, row)| {
@@ -454,10 +461,10 @@ fn project(
             )
         })
         .collect();
-    Layout {
+    Ok(Layout {
         rows,
         named_headers,
-    }
+    })
 }
 
 #[cfg(test)]
