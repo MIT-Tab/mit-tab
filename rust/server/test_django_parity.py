@@ -145,7 +145,7 @@ def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
         for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart",
-                       "tournamentTodo", "emailManagement")
+                       "tournamentTodo", "emailManagement", "registrationStyles")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -3190,13 +3190,14 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
     room = Room.objects.create(name="Previously assigned room", rank=4)
     tab_scratch = Scratch.objects.create(team=team, judge=hidden, scratch_type=Scratch.TAB_SCRATCH)
     board = legacy_tab_session("team-portal-board")
-    get_user_model().objects.get(username="team-portal-board").groups.add(Group.objects.create(name="APDA Board"))
+    board_group = Group.objects.create(name="APDA Board")
+    get_user_model().objects.get(username="team-portal-board").groups.add(board_group)
     search = "/team_portal/"
     path = f"{search}{code}/"
 
     with rust_server() as port:
         status, headers, body = request(port, search)
-        assert status == 200 and b"Team code" in body
+        assert status == 200 and b"Team access code" in body
         assert headers["Referrer-Policy"] == "same-origin"
         csrf = load_cookies(headers)["csrftoken"].value
 
@@ -3206,31 +3207,78 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
                            extra_headers={"Cookie": f"csrftoken={csrf}{session}"})
 
         assert post(search, {"team_code": code.lower()})[1]["Location"] == path
-        assert post(search, {"team_code": "unknown"})[0] == 422
+        for submitted, message in (
+            ("unknown", b"We couldn&#x27;t find a team for that code. Double-check and try again."),
+            ("", b"Please enter the team code provided by tab."),
+        ):
+            status, headers, _ = post(search, {"team_code": submitted})
+            assert status == 302 and headers["Location"] == search
+            notice = load_cookies(headers)["mittab_team_portal_notice"].value
+            status, headers, body = request(port, search, extra_headers={
+                "Cookie": f"csrftoken={csrf}; mittab_team_portal_notice={notice}",
+            })
+            assert status == 200 and message in body and b"alert-danger" in body
+            assert load_cookies(headers)["mittab_team_portal_notice"]["max-age"] == "0"
         assert request(port, f"{search}unknown/")[0] == 404
         status, _, body = request(port, path)
         assert status == 200 and b"Team Portal Debater" in body
-        assert b"Half seed" in body and b"Available to scratch" in body
+        assert b"Half Seed seed" in body and b"Available to scratch" in body
         assert b"Tab blocked judge" not in body
         assert request(port, path, cookie=board)[0] == 403
 
         name = {"action": "update_name", "name": "Renamed Team"}
         assert post(path, name, token="invalid")[0] == 403
-        assert post(path, {**name, "name": opposite.name})[0] == 422
-        assert post(path, name)[1]["Location"] == path
+        assert b"A team with this name already exists." in post(path, {**name, "name": opposite.name})[2]
+        assert b"Null characters are not allowed." in post(path, {**name, "name": "Invalid\x00Name"})[2]
+        status, headers, _ = post(path, name)
+        assert status == 302 and headers["Location"] == path
+        notice = load_cookies(headers)["mittab_team_portal_notice"].value
+        assert code not in notice
+        valid_cookie = f"csrftoken={csrf}; mittab_team_portal_notice={notice}"
+        assert b"Team name updated." in request(port, path, extra_headers={"Cookie": valid_cookie})[2]
+        assert b"Team name updated." not in request(port, search, extra_headers={"Cookie": valid_cookie})[2]
+        assert b"Team name updated." not in request(port, path, extra_headers={
+            "Cookie": f"csrftoken={'b' * 32}; mittab_team_portal_notice={notice}",
+        })[2]
         old_coin = team.tiebreaker
         team.refresh_from_db()
         assert team.name == "Renamed Team" and team.tiebreaker == old_coin
         fields = {"action": "update_scratches", "scratch_0": allowed.id}
-        assert post(path, {**fields, "scratch_1": allowed.id})[0] == 422
-        assert post(path, {**fields, "scratch_1": hidden.id})[0] == 422
+        response = post(path, {**fields, "scratch_1": allowed.id})
+        assert response[0] == 200 and b"data-ui-dialog-autostart" in response[2]
+        assert b"Select each judge at most once." in response[2]
+        for invalid in (hidden.id, f"0{allowed.id}"):
+            assert b"Select a valid choice." in post(path, {**fields, "scratch_1": invalid})[2]
         assert not Scratch.objects.filter(team=team, scratch_type=Scratch.TEAM_SCRATCH).exists()
         assert post(path, fields)[1]["Location"] == path
         assert Scratch.objects.filter(team=team, judge=allowed, scratch_type=Scratch.TEAM_SCRATCH).exists()
         assert Scratch.objects.filter(pk=tab_scratch.id).exists()
+        from time import monotonic, sleep
+
+        pending_actor = legacy_tab_session("team-portal-pending")
+        pending_user = get_user_model().objects.get(username="team-portal-pending")
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = executor.submit(post, path, {"action": "update_scratches"}, session=pending_actor)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The portal update did not reach the tournament lock"
+                pending_user.groups.add(board_group)
+            queued = pending.result(timeout=6)
+            assert queued[0] == 403 and b"Renamed Team" not in queued[2]
+        assert Scratch.objects.filter(team=team, judge=allowed, scratch_type=Scratch.TEAM_SCRATCH).exists()
         TabSettings.set("judges_public", 0)
         assert b"Available to scratch" not in request(port, path)[2]
-        assert post(path, fields)[0] == 422
+        assert post(path, fields)[0] == 200
         TabSettings.set("judges_public", 1)
         TabSettings.set("cur_round", 3)
         first = Round.objects.create(round_number=1, gov_team=team, opp_team=opposite, room=room)
@@ -3241,8 +3289,8 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
         assert b"Previous Pairings" in body and b"Previously assigned chair" in body
         assert b"Previously assigned room" in body and b"Opponent Team" in body
         assert b"Save Scratches" not in body and b"Save Team Name" not in body
-        assert post(path, {**name, "name": "Late Change"})[0] == 422
-        assert post(path, {"action": "update_scratches"})[0] == 422
+        assert b"auto-disabled once round 1 has been paired" in post(path, {**name, "name": "Late Change"})[2]
+        assert b"Save Scratches" not in post(path, {"action": "update_scratches"})[2]
         for guarded in (path, search):
             assert request(port, guarded, cookie=board)[1]["Location"] == "/403/"
             assert post(guarded, name, session=board)[1]["Location"] == "/403/"
@@ -3251,6 +3299,73 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
         assert set(Scratch.objects.filter(team=team).values_list("judge", flat=True)) == {allowed.id, hidden.id}
     options.refresh_from_db()
     assert options.disc_scratch_quantity == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_team_portal_html_matches_django(html_assets, subtests):
+    search, path = "/team_portal/", "/team_portal/Fixture-Team-Portal/"
+    TabSettings.set("cur_round", 1)
+    TabSettings.set("judges_public", 1)
+    options, _ = RegistrationConfig.objects.update_or_create(id=1, defaults={
+        "team_name_changes_allowed": True, "disc_scratches_open": True, "disc_scratch_quantity": 2,
+    })
+    school = School.objects.create(name="École & Partners")
+    team = Team.objects.create(name="Team <Fixture>", school=school, seed=Team.HALF_SEED, team_code="Fixture-Team-Portal")
+    opponent = Team.objects.create(name="Opponent & Team", school=school, seed=Team.UNSEEDED, team_code="Fixture-Other-Portal")
+    team.debaters.add(Debater.objects.create(name="Open & Speaker", novice_status=0, school=school))
+    opponent.debaters.add(
+        Debater.objects.create(name="Élite & Speaker", novice_status=1),
+        Debater.objects.create(name="Other <Speaker>", novice_status=0),
+    )
+    chair = Judge.objects.create(name="Chair & Judge", rank=3)
+    wing = Judge.objects.create(name="Wing <Judge>", rank=3)
+    blocked = Judge.objects.create(name="Private Tab Scratch", rank=4)
+    Scratch.objects.create(team=team, judge=blocked, scratch_type=Scratch.TAB_SCRATCH)
+    Scratch.objects.create(team=team, judge=wing, scratch_type=Scratch.TEAM_SCRATCH)
+    room = Room.objects.create(name="Room & Hall", rank=2)
+    client = Client()
+    client.cookies["csrftoken"] = "a" * 32
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(url, form=None):
+            status, headers, body = request(port, url, method="POST" if form is not None else "GET",
+                                            extra_headers={"Cookie": "csrftoken=" + "a" * 32}, form=form)
+            token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            mask = token[1][:32].decode() if token else "a" * 32
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
+                reference = client.post(url, form) if form is not None else client.get(url)
+            assert status == reference.status_code
+            assert headers["Cache-Control"] == "private, no-store"
+            assert headers["Referrer-Policy"] == "same-origin"
+            assert_html_bytes(body, reference.content)
+            assert b"Private Tab Scratch" not in body
+
+        for url in (search, path, "/team_portal/unknown/", "/team_portal/fixture-team-portal/"):
+            with subtests.test(url=url):
+                compare(url)
+        for form in (
+            {"action": "update_name", "name": opponent.name},
+            {"action": "update_name", "name": ""},
+            {"action": "update_name", "name": "<" * 36},
+            {"action": "update_scratches", "scratch_0": str(chair.id), "scratch_1": str(chair.id)},
+            {"action": "update_scratches", "scratch_0": str(wing.id), "scratch_1": "0" + str(chair.id)},
+            {"action": "unknown"},
+        ):
+            with subtests.test(form=form):
+                compare(path, {**form, "csrfmiddlewaretoken": "a" * 32})
+        options.disc_scratch_quantity = 0
+        options.save()
+        compare(path)
+        TabSettings.set("judges_public", 0)
+        compare(path)
+        TabSettings.set("cur_round", 4)
+        played = Round.objects.create(round_number=1, gov_team=team, opp_team=opponent, room=room, chair=chair)
+        played.judges.add(chair, wing)
+        panel_without_chair = Round.objects.create(round_number=2, gov_team=opponent, opp_team=team)
+        panel_without_chair.judges.add(wing)
+        Round.objects.create(round_number=3, gov_team=team, opp_team=opponent)
+        compare(path)
+        compare(path, {"action": "update_name", "name": "Closed name change", "csrfmiddlewaretoken": "a" * 32})
 
 
 @contextmanager

@@ -26,6 +26,7 @@
   "index": "/",
   "invite_staff": "/staff/invite/",
   "judge_speaker_points": "/judges/speaker-points/",
+  "team_portal_search": "/team_portal/",
   "logout": "/accounts/logout/",
   "manage_motions": "/motions/",
   "add_motion": "/motions/add/",

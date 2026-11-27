@@ -276,6 +276,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/emails/team_portal.html"),
         ),
         (
+            "registration/team_portal.html",
+            include_str!("../../../mittab/templates/registration/team_portal.html"),
+        ),
+        (
+            "registration/team_portal_search.html",
+            include_str!("../../../mittab/templates/registration/team_portal_search.html"),
+        ),
+        (
             "emails/judge_ballot_code.html",
             include_str!("../../../mittab/templates/emails/judge_ballot_code.html"),
         ),
@@ -860,6 +868,13 @@ fn translate(name: &str, source: &str) -> String {
             .replace("team.3", "team[3]")
             .replace("team.4", "team[4]"),
         "tab/_rank_debaters_table.html" => translated.replace("debaters.0.", "debaters[0]."),
+        "registration/team_portal.html" => translated
+            .replace("team.debaters.all", "team.debaters")
+            .replace("r.opponent.debaters.all", "r.opponent.debaters")
+            .replace("judge != r.chair", "judge.id != r.chair.id")
+            .replace("{{ name_form.name }}", "{{ name_form.name.input|safe }}")
+            .replace("for field in scratch_form", "for field in scratch_form.fields")
+            .replace("{{ field }}", "{{ field.input|safe }}"),
         "pairing/manage_room_tags.html" => translated.replace("tag.tag", "tag.name"),
         "pairing/manage_ranking_groups.html" => translated
             .replace("group.teams.count", "group.team_count")

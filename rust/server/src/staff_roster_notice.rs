@@ -11,29 +11,65 @@ use serde::Serialize;
 use crate::{App, access, legacy_html, legacy_session::cookie, login};
 
 const COOKIE: &str = "mittab_roster_notice";
+const TEAM_COOKIE: &str = "mittab_team_portal_notice";
 const LIFETIME: u32 = 60;
 const ERROR_PREFIX: &str = "error.";
 
 pub fn saved(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
-    redirect(app, headers, target, text, "")
+    redirect(app, headers, target, text, "", COOKIE)
 }
 
 pub fn failed(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Response {
-    redirect(app, headers, target, text, ERROR_PREFIX)
+    redirect(app, headers, target, text, ERROR_PREFIX, COOKIE)
 }
 
-fn redirect(app: &App, headers: &HeaderMap, target: &str, text: &str, prefix: &str) -> Response {
+pub fn team_redirect(
+    app: &App,
+    headers: &HeaderMap,
+    target: &str,
+    text: &str,
+    error: bool,
+) -> Response {
+    redirect(
+        app,
+        headers,
+        target,
+        text,
+        if error { ERROR_PREFIX } else { "" },
+        TEAM_COOKIE,
+    )
+}
+
+fn identity<'a>(headers: &'a HeaderMap, channel: &str) -> Option<&'a str> {
+    if channel == TEAM_COOKIE {
+        cookie(headers, "csrftoken").filter(|value| login::valid_csrf_token(value))
+    } else {
+        cookie(headers, "sessionid")
+    }
+}
+
+fn redirect(
+    app: &App,
+    headers: &HeaderMap,
+    target: &str,
+    text: &str,
+    prefix: &str,
+    channel: &str,
+) -> Response {
     let mut response = access::found(target);
-    if let Some(session) = cookie(headers, "sessionid") {
+    if let Some(session) = identity(headers, channel) {
         let message = URL_SAFE_NO_PAD.encode(text);
         let expires = Utc::now().timestamp() + i64::from(LIFETIME);
         let body = format!("{expires}.{prefix}{message}");
         let path = target.split(['?', '#']).next().unwrap_or("/");
-        let signature = hmac::sign(&app.admin_notice_key, &signed_data(session, path, &body));
+        let signature = hmac::sign(
+            &app.admin_notice_key,
+            &signed_data(channel, session, path, &body),
+        );
         let encoded = URL_SAFE_NO_PAD.encode(signature.as_ref());
         login::set_cookie(
             &mut response,
-            COOKIE,
+            channel,
             &format!("{body}.{encoded}"),
             LIFETIME,
             login::secure_request(headers),
@@ -43,8 +79,13 @@ fn redirect(app: &App, headers: &HeaderMap, target: &str, text: &str, prefix: &s
     response
 }
 
-fn signed_data(session: &str, path: &str, body: &str) -> Vec<u8> {
-    format!("mit-tab staff roster notice v1\0{session}\0{path}\0{body}").into_bytes()
+fn signed_data(channel: &str, session: &str, path: &str, body: &str) -> Vec<u8> {
+    let purpose = if channel == TEAM_COOKIE {
+        "team portal"
+    } else {
+        "staff roster"
+    };
+    format!("mit-tab {purpose} notice v1\0{session}\0{path}\0{body}").into_bytes()
 }
 
 #[derive(Serialize)]
@@ -54,12 +95,16 @@ pub struct Notice {
 }
 
 pub fn message(app: &App, headers: &HeaderMap, path: &str) -> Option<Notice> {
-    let session = cookie(headers, "sessionid")?;
-    let (body, signature) = cookie(headers, COOKIE)?.rsplit_once('.')?;
+    read(app, headers, path, COOKIE)
+}
+
+fn read(app: &App, headers: &HeaderMap, path: &str, channel: &str) -> Option<Notice> {
+    let session = identity(headers, channel)?;
+    let (body, signature) = cookie(headers, channel)?.rsplit_once('.')?;
     let signature = URL_SAFE_NO_PAD.decode(signature).ok()?;
     hmac::verify(
         &app.admin_notice_key,
-        &signed_data(session, path, body),
+        &signed_data(channel, session, path, body),
         &signature,
     )
     .ok()?;
@@ -85,7 +130,31 @@ pub fn render(
     page: Value,
     status: StatusCode,
 ) -> Response {
-    let Some(Notice { text, error }) = message(app, headers, path) else {
+    let notice = message(app, headers, path).map(|notice| (COOKIE, notice));
+    render_notice(headers, template, shell, page, status, notice)
+}
+
+pub fn render_team(
+    app: &App,
+    headers: &HeaderMap,
+    path: &str,
+    template: &str,
+    shell: Value,
+    page: Value,
+) -> Response {
+    let notice = read(app, headers, path, TEAM_COOKIE).map(|notice| (TEAM_COOKIE, notice));
+    render_notice(headers, template, shell, page, StatusCode::OK, notice)
+}
+
+fn render_notice(
+    headers: &HeaderMap,
+    template: &str,
+    shell: Value,
+    page: Value,
+    status: StatusCode,
+    notice: Option<(&str, Notice)>,
+) -> Response {
+    let Some((channel, Notice { text, error })) = notice else {
         return legacy_html::render(template, shell, page, status);
     };
     let existing = page.get_attr("messages").unwrap_or_default();
@@ -101,15 +170,19 @@ pub fn render(
     messages.push(context! { text, tags, level });
     let mut response = legacy_html::render(template, shell, context! { messages, ..page }, status);
     if !response.status().is_server_error() {
-        clear(&mut response, headers);
+        clear_channel(&mut response, headers, channel);
     }
     response
 }
 
 pub fn clear(response: &mut Response, headers: &HeaderMap) {
+    clear_channel(response, headers, COOKIE);
+}
+
+fn clear_channel(response: &mut Response, headers: &HeaderMap, channel: &str) {
     login::set_cookie(
         response,
-        COOKIE,
+        channel,
         "",
         0,
         login::secure_request(headers),

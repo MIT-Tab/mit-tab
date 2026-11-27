@@ -3,26 +3,27 @@ use std::collections::{BTreeSet, HashMap};
 use axum::{
     Extension, Form,
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, Uri},
     response::Response,
 };
-use minijinja::context;
+use minijinja::{Value, context};
 use serde::Serialize;
 use sqlx::MySqlConnection;
 
 use crate::{
     App, access,
     ballot_entry::Submitted,
-    html::{self, Navigation},
-    legacy_session::Actor,
-    login, private,
+    legacy_html,
+    legacy_session::{self, Actor, SessionError},
+    login::{self, TemplateCsrf},
     settings::Settings,
-    staff_pairing::lock_round,
-    unavailable,
+    staff_pairing::lock_round_if_configured,
+    staff_roster_fields::{self, Choices},
+    staff_roster_notice, unavailable,
 };
 
 const SEARCH: &str = "/team_portal/";
-const SETTINGS: &[&str] = &["cur_round", "judges_public", "motions_enabled"];
+const SETTINGS: &[&str] = &["cur_round", "judges_public"];
 
 struct Access {
     name: bool,
@@ -45,21 +46,21 @@ async fn config(db: &mut MySqlConnection) -> Result<Access, sqlx::Error> {
     })
 }
 
-#[derive(Serialize)]
 struct Team {
     id: i32,
     name: String,
     code: String,
     school: String,
-    seed: &'static str,
+    seed: i32,
 }
 
-fn seed_name(seed: i32) -> &'static str {
+fn seed_name(seed: i32) -> String {
     match seed {
-        3 => "Full seed",
-        2 => "Half seed",
-        1 => "Free seed",
-        _ => "Unseeded",
+        3 => "Full Seed".into(),
+        2 => "Half Seed".into(),
+        1 => "Free Seed".into(),
+        0 => "Unseeded".into(),
+        _ => seed.to_string(),
     }
 }
 
@@ -88,38 +89,61 @@ async fn find(
             .bind(code)
             .fetch_optional(db)
             .await?
+            .filter(|(_, _, stored, _, _)| valid_code(stored) && stored.eq_ignore_ascii_case(code))
             .map(|(id, name, code, school, seed)| Team {
                 id,
                 name,
                 code,
                 school,
-                seed: seed_name(seed),
+                seed,
             }),
     )
 }
 
-fn search_page(actor: Actor, headers: &HeaderMap, invalid: bool) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
+fn render(
+    app: &App,
+    headers: &HeaderMap,
+    path: &str,
+    template: &str,
+    shell: Value,
+    page: Value,
+) -> Response {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let response = html::render(
-        "code_lookup.html",
-        context! {
-            title => "Team Portal", label => "Team code", field => "team_code", button => "Open Team Portal",
-            csrf, message => invalid.then_some("No team was found for that code."),
-            has_error => invalid, nav => Navigation::new(actor, true),
-        },
-        if invalid {
-            StatusCode::UNPROCESSABLE_ENTITY
-        } else {
-            StatusCode::OK
-        },
+    let mut response = staff_roster_notice::render_team(
+        app,
+        headers,
+        path,
+        template,
+        shell,
+        context! { csrf_input => csrf.input(), ..page },
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, headers);
+    response
 }
 
-pub async fn search(Extension(actor): Extension<Actor>, headers: HeaderMap) -> Response {
-    search_page(actor, &headers, false)
+pub async fn search(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+) -> Response {
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let actor = authorized_actor(&mut db, &app, actor, &headers).await?;
+        let shell = legacy_html::shell(&mut db, actor, SEARCH).await?;
+        db.commit().await?;
+        Ok(render(
+            &app,
+            &headers,
+            SEARCH,
+            "registration/team_portal_search.html",
+            shell,
+            context! {},
+        ))
+    }
+    .await;
+    portal_result(&app, &headers, result).await
 }
 
 pub async fn lookup(
@@ -129,20 +153,28 @@ pub async fn lookup(
     Form(fields): Form<Submitted>,
 ) -> Response {
     if !valid_csrf(&headers, &fields) {
-        return csrf_error();
+        return login::csrf_error();
     }
     let code = fields.get("team_code").map_or("", |code| code.trim());
-    if !valid_code(code) {
-        return search_page(actor, &headers, true);
+    let result = async {
+        let mut db = app.db.acquire().await?;
+        authorized_actor(&mut db, &app, actor, &headers).await?;
+        if valid_code(code)
+            && let Some(team) = find(&mut db, code, false).await?
+        {
+            return Ok(access::found(target(&team.code)));
+        }
+        let message = if code.is_empty() {
+            "Please enter the team code provided by tab."
+        } else {
+            "We couldn't find a team for that code. Double-check and try again."
+        };
+        Ok(staff_roster_notice::team_redirect(
+            &app, &headers, SEARCH, message, true,
+        ))
     }
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    match find(&mut db, code, false).await {
-        Ok(Some(team)) if valid_code(&team.code) => access::found(target(&team.code)),
-        Ok(_) => search_page(actor, &headers, true),
-        Err(_) => unavailable(),
-    }
+    .await;
+    portal_result(&app, &headers, result).await
 }
 
 fn target(code: &str) -> String {
@@ -156,15 +188,9 @@ fn valid_csrf(headers: &HeaderMap, fields: &Submitted) -> bool {
     )
 }
 
-fn csrf_error() -> Response {
-    private((StatusCode::FORBIDDEN, "CSRF verification failed."))
-}
-
 #[derive(Serialize)]
-struct Member {
+struct Named {
     name: String,
-    school: Option<String>,
-    novice: bool,
 }
 
 #[derive(Serialize)]
@@ -175,13 +201,18 @@ struct Judge {
 
 #[derive(Serialize)]
 struct Pairing {
-    round: i32,
-    opponent: String,
-    members: String,
+    round_number: i32,
+    opponent: Opponent,
     side: &'static str,
-    room: Option<String>,
-    chair: Option<String>,
-    wings: Vec<String>,
+    room: Option<Named>,
+    chair: Option<Judge>,
+    judges: Vec<Judge>,
+}
+
+#[derive(Serialize)]
+struct Opponent {
+    name: String,
+    debaters: Vec<Named>,
 }
 
 async fn recent(
@@ -193,10 +224,10 @@ async fn recent(
         return Ok(Vec::new());
     }
     let mut panels = HashMap::<_, Vec<_>>::new();
-    for (id, wing) in sqlx::query_as::<_, (i32, String)>(
-        "SELECT r.id, j.name FROM tab_round r JOIN tab_round_judges x ON x.round_id = r.id
+    for (round_id, id, name) in sqlx::query_as::<_, (i32, i32, String)>(
+        "SELECT r.id, j.id, j.name FROM tab_round r JOIN tab_round_judges x ON x.round_id = r.id
          JOIN tab_judge j ON j.id = x.judge_id WHERE r.round_number <= ?
-         AND ? IN (r.gov_team_id, r.opp_team_id) AND (r.chair_id IS NULL OR j.id <> r.chair_id)
+         AND ? IN (r.gov_team_id, r.opp_team_id)
          ORDER BY j.name, j.id",
     )
     .bind(through)
@@ -204,30 +235,46 @@ async fn recent(
     .fetch_all(&mut *db)
     .await?
     {
-        panels.entry(id).or_default().push(wing);
+        panels.entry(round_id).or_default().push(Judge { id, name });
+    }
+    let mut debaters = HashMap::<_, Vec<_>>::new();
+    for (round_id, name) in sqlx::query_as::<_, (i32, String)>(
+        "SELECT r.id, d.name FROM tab_round r
+         JOIN tab_team_debaters x ON x.team_id = IF(r.gov_team_id = ?, r.opp_team_id, r.gov_team_id)
+         JOIN tab_debater d ON d.id = x.debater_id
+         WHERE r.round_number <= ? AND ? IN (r.gov_team_id, r.opp_team_id)
+         ORDER BY d.name, d.id",
+    )
+    .bind(team)
+    .bind(through)
+    .bind(team)
+    .fetch_all(&mut *db)
+    .await?
+    {
+        debaters.entry(round_id).or_default().push(Named { name });
     }
     type Row = (
         i32,
         i32,
         String,
-        String,
         bool,
         Option<String>,
+        Option<i32>,
         Option<String>,
     );
     Ok(sqlx::query_as::<_, Row>(
-        "SELECT r.id, r.round_number, o.name, COALESCE((
-           SELECT GROUP_CONCAT(d.name ORDER BY d.name SEPARATOR ', ') FROM tab_team_debaters x
-           JOIN tab_debater d ON d.id = x.debater_id WHERE x.team_id = o.id
-         ), ''), r.gov_team_id = ?, m.name, j.name
+        "SELECT r.id, r.round_number, o.name, r.gov_team_id = ?, m.name, j.id, j.name
          FROM tab_round r JOIN tab_team o ON o.id = IF(r.gov_team_id = ?, r.opp_team_id, r.gov_team_id)
          LEFT JOIN tab_room m ON m.id = r.room_id LEFT JOIN tab_judge j ON j.id = r.chair_id
          WHERE r.round_number <= ? AND ? IN (r.gov_team_id, r.opp_team_id)
          ORDER BY r.round_number, r.id",
     ).bind(team).bind(team).bind(through).bind(team).fetch_all(db).await?.into_iter().map(
-        |(id, round, opponent, members, govt, room, chair)| Pairing {
-            round, opponent, members, side: if govt { "Gov" } else { "Opp" },
-            room, chair, wings: panels.remove(&id).unwrap_or_default(),
+        |(id, round_number, name, govt, room, chair_id, chair)| Pairing {
+            round_number, opponent: Opponent { name, debaters: debaters.remove(&id).unwrap_or_default() },
+            side: if govt { "Gov" } else { "Opp" },
+            room: room.map(|name| Named { name }),
+            chair: chair_id.zip(chair).map(|(id, name)| Judge { id, name }),
+            judges: panels.remove(&id).unwrap_or_default(),
         }
     ).collect())
 }
@@ -236,77 +283,230 @@ pub async fn page(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     Path(code): Path<String>,
 ) -> Response {
-    view(&app, actor, &headers, &code, None).await
+    view(&app, actor, &headers, uri.path(), &code, None).await
+}
+
+enum Feedback {
+    Name(String),
+    Scratch(ScratchSelection),
+    Closed,
+    Unknown,
+}
+
+struct ScratchSelection {
+    wanted: BTreeSet<i32>,
+    errors: Vec<Option<String>>,
+    repeated: bool,
+}
+
+impl ScratchSelection {
+    fn valid(&self) -> bool {
+        !self.repeated && self.errors.iter().all(Option::is_none)
+    }
+}
+
+fn scratch_selection(quantity: u16, options: &Choices, fields: &Submitted) -> ScratchSelection {
+    let allowed: BTreeSet<_> = options.iter().map(|(id, _)| id.as_str()).collect();
+    let mut wanted = BTreeSet::new();
+    let mut repeated = false;
+    let errors = (0..quantity)
+        .map(|index| {
+            let raw = fields
+                .get(&format!("scratch_{index}"))
+                .map_or("", String::as_str);
+            if raw.is_empty() {
+                return None;
+            }
+            if !allowed.contains(raw) {
+                return Some(format!(
+                    "Select a valid choice. {raw} is not one of the available choices."
+                ));
+            }
+            let id = raw.parse().expect("judge option ID");
+            repeated |= !wanted.insert(id);
+            None
+        })
+        .collect();
+    ScratchSelection {
+        wanted,
+        errors,
+        repeated,
+    }
+}
+
+async fn scratch_options(db: &mut MySqlConnection, team: i32) -> Result<Choices, sqlx::Error> {
+    let options = sqlx::query_as::<_, (i32, String)>(
+        "SELECT j.id, j.name FROM tab_judge j WHERE NOT EXISTS(
+            SELECT 1 FROM tab_scratch s WHERE s.judge_id = j.id AND s.team_id = ? AND s.scratch_type = 1
+         ) ORDER BY j.name, j.id",
+    ).bind(team).fetch_all(db).await?;
+    Ok(std::iter::once((String::new(), "No scratch".into()))
+        .chain(options.into_iter().map(|(id, name)| (id.to_string(), name)))
+        .collect())
+}
+
+fn name_form(team: &Team, posted: Option<(&Submitted, &Feedback)>) -> Value {
+    let entered = posted.filter(|(fields, _)| {
+        fields
+            .get("action")
+            .is_some_and(|action| action == "update_name")
+    });
+    let name = entered.map_or(team.name.as_str(), |(fields, _)| {
+        fields.get("name").map_or("", String::as_str)
+    });
+    let errors = entered.and_then(|(_, feedback)| match feedback {
+        Feedback::Name(error) => Some(error.as_str()),
+        _ => None,
+    });
+    let widget = staff_roster_fields::input(
+        "name",
+        "Team name",
+        "text",
+        name,
+        r#" maxlength="35""#,
+        true,
+        None,
+    );
+    context! {
+        name => context! {
+            id_for_label => "id_name",
+            input => widget.get_attr("input").unwrap_or_default(),
+            errors => errors.into_iter().collect::<Vec<_>>(),
+        },
+    }
+}
+
+fn scratch_form(
+    quantity: u16,
+    options: &Choices,
+    current: &[Judge],
+    posted: Option<(&Submitted, &Feedback)>,
+) -> Value {
+    let entered = posted.filter(|(fields, _)| {
+        fields
+            .get("action")
+            .is_some_and(|action| action == "update_scratches")
+    });
+    let invalid = entered.and_then(|(_, feedback)| match feedback {
+        Feedback::Scratch(selection) => Some(selection),
+        _ => None,
+    });
+    let fields: Vec<_> = (0..usize::from(quantity))
+        .map(|index| {
+            let field = format!("scratch_{index}");
+            let selected = if let Some((fields, _)) = entered {
+                fields.get(&field).cloned().unwrap_or_default()
+            } else {
+                current
+                    .get(index)
+                    .map(|judge| judge.id.to_string())
+                    .unwrap_or_default()
+            };
+            let widget =
+                staff_roster_fields::select(&field, "", options, &selected, false, false, None);
+            let error = invalid.and_then(|selection| selection.errors.get(index)?.as_deref());
+            context! {
+                id_for_label => format!("id_{field}"),
+                label => format!("Scratch {}", index + 1),
+                input => widget.get_attr("input").unwrap_or_default(),
+                errors => error.into_iter().collect::<Vec<_>>(),
+            }
+        })
+        .collect();
+    let non_field_errors: Vec<_> = invalid
+        .is_some_and(|selection| selection.repeated)
+        .then_some("Select each judge at most once.")
+        .into_iter()
+        .collect();
+    context! { fields, non_field_errors, errors => invalid.is_some() }
 }
 
 async fn view(
     app: &App,
     actor: Actor,
     headers: &HeaderMap,
+    path: &str,
     code: &str,
-    error: Option<&'static str>,
+    posted: Option<(&Submitted, &Feedback)>,
 ) -> Response {
-    if !valid_code(code) {
-        return not_found();
-    }
     let result = async {
         let mut db = app.db.begin().await?;
-        let Some(team) = find(&mut db, code, false).await? else { return Ok(not_found()); };
+        let actor = authorized_actor(&mut db, app, actor, headers).await?;
+        let shell = legacy_html::shell(&mut db, actor, path).await?;
+        let team = if valid_code(code) { find(&mut db, code, false).await? } else { None };
+        let Some(team) = team else {
+            return Ok(legacy_html::render("common/404.html", shell, context! {}, StatusCode::NOT_FOUND));
+        };
         let settings = Settings::load(&mut db, SETTINGS).await?;
         let config = config(&mut db).await?;
         let cur = settings.integer("cur_round", 1);
         let locked = cur > 1;
         let judges_public = settings.flag("judges_public", false);
         let disc_open = config.scratches && judges_public;
-        let can_scratch = disc_open && config.slots > 0 && !locked;
-        let can_name = config.name && !locked;
         let people: Vec<_> = sqlx::query_as::<_, (String, Option<String>, i32)>(
             "SELECT d.name, s.name, d.novice_status FROM tab_team_debaters x
              JOIN tab_debater d ON d.id = x.debater_id LEFT JOIN tab_school s ON s.id = d.school_id
              WHERE x.team_id = ? ORDER BY d.name, d.id",
         ).bind(team.id).fetch_all(&mut *db).await?.into_iter().map(
-            |(name, school, status)| Member { name, school, novice: status == 1 }
+            |(name, school, status)| context! {
+                name,
+                school => school.map(|name| Named { name }),
+                get_novice_status_display => match status {
+                    0 => "Varsity".into(),
+                    1 => "Novice".into(),
+                    _ => status.to_string(),
+                },
+            }
         ).collect();
-        let current = if judges_public {
+        let current: Vec<_> = if judges_public {
             sqlx::query_as::<_, (i32, String)>(
                 "SELECT j.id, j.name FROM tab_scratch x JOIN tab_judge j ON j.id = x.judge_id
                  WHERE x.team_id = ? AND x.scratch_type = 0 ORDER BY j.name, j.id",
-            ).bind(team.id).fetch_all(&mut *db).await?
+            ).bind(team.id).fetch_all(&mut *db).await?.into_iter()
+                .map(|(id, name)| Judge { id, name }).collect()
         } else { Vec::new() };
-        let eligible = if can_scratch {
-            sqlx::query_as::<_, (i32, String)>(
-                "SELECT j.id, j.name FROM tab_judge j WHERE NOT EXISTS(
-                    SELECT 1 FROM tab_scratch s WHERE s.judge_id = j.id AND s.team_id = ? AND s.scratch_type = 1
-                 ) ORDER BY j.name, j.id",
-            ).bind(team.id).fetch_all(&mut *db).await?
-        } else { Vec::new() };
-        let judges: Vec<_> = eligible.into_iter().map(|(id, name)| Judge { id, name }).collect();
-        let scratch_slots: Vec<_> = if can_scratch {
-            (0..usize::from(config.slots)).map(|index| current.get(index).map(|(id, _)| *id)).collect()
-        } else { Vec::new() };
+        let scratch_form = if disc_open && config.slots > 0 && !locked {
+            let options = scratch_options(&mut db, team.id).await?;
+            Some(scratch_form(config.slots, &options, &current, posted))
+        } else { None };
         let history = recent(&mut db, team.id, cur.saturating_sub(2)).await?;
         db.commit().await?;
-        let Ok(csrf) = html::page_csrf(headers) else { return Ok(unavailable()); };
-        let response = html::render("team_portal.html", context! {
-            title => "Team Portal", team, people, current, eligible => judges, scratch_slots, history, csrf,
-            can_name, can_scratch, disc_open, judges_public, locked, message => error, has_error => error.is_some(),
-            nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        }, if error.is_some() { StatusCode::UNPROCESSABLE_ENTITY } else { StatusCode::OK });
-        Ok::<_, sqlx::Error>(html::form_response(response, headers, &csrf))
+        let messages = posted.filter(|(_, feedback)| matches!(feedback, Feedback::Unknown))
+            .map(|_| [context! { text => "Unknown team portal action.", tags => "error", level => 40 }]);
+        Ok(render(app, headers, path, "registration/team_portal.html", shell, context! {
+            team => context! {
+                name => &team.name,
+                school => context! { name => &team.school },
+                get_seed_display => seed_name(team.seed),
+                debaters => people,
+            },
+            config => context! {
+                team_name_changes_allowed => config.name,
+                disc_scratch_quantity => config.slots,
+            },
+            name_form => name_form(&team, posted),
+            scratch_form,
+            disc_scratches_open => disc_open,
+            judge_list_is_public => judges_public,
+            scratches => current.into_iter().map(|judge| context! { judge }).collect::<Vec<_>>(),
+            edits_locked_by_pairings => locked,
+            team_round_history => history,
+            messages,
+        }))
     }.await;
-    result.unwrap_or_else(|_| unavailable())
-}
-
-fn not_found() -> Response {
-    private((StatusCode::NOT_FOUND, "Team code not found."))
+    portal_result(app, headers, result).await
 }
 
 enum UpdateError {
     Storage,
     NotFound,
-    Invalid(&'static str),
+    Form(Feedback),
+    Board,
+    Session(SessionError),
+    Denied,
 }
 
 impl From<sqlx::Error> for UpdateError {
@@ -315,120 +515,178 @@ impl From<sqlx::Error> for UpdateError {
     }
 }
 
+async fn authorized_actor(
+    db: &mut MySqlConnection,
+    app: &App,
+    original: Actor,
+    headers: &HeaderMap,
+) -> Result<Actor, UpdateError> {
+    let Some(key) = legacy_session::cookie(headers, "sessionid") else {
+        return Ok(Actor::Anonymous);
+    };
+    let current = legacy_session::actor_on(db, key, app.django_secret.as_deref())
+        .await
+        .map_err(UpdateError::Session)?;
+    match (original, current) {
+        (_, Actor::User { board: true, .. }) => Err(UpdateError::Board),
+        (Actor::Anonymous, _) => Ok(current),
+        (Actor::User { id, .. }, Actor::User { id: current_id, .. }) if id == current_id => {
+            Ok(current)
+        }
+        _ => Err(UpdateError::Denied),
+    }
+}
+
+async fn portal_result(
+    app: &App,
+    headers: &HeaderMap,
+    result: Result<Response, UpdateError>,
+) -> Response {
+    match result {
+        Ok(response) => response,
+        Err(UpdateError::Board) => access::board_restricted(app, headers).await,
+        Err(UpdateError::Denied) => access::access_denied(),
+        Err(UpdateError::Session(error)) => error.response(),
+        Err(_) => unavailable(),
+    }
+}
+
 pub async fn update(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
+    uri: Uri,
     Path(code): Path<String>,
     Form(fields): Form<Submitted>,
 ) -> Response {
     if !valid_csrf(&headers, &fields) {
-        return csrf_error();
+        return login::csrf_error();
     }
     if !valid_code(&code) {
-        return not_found();
+        return view(&app, actor, &headers, uri.path(), &code, None).await;
     }
-    match save(&app, &code, &fields).await {
-        Ok(code) => access::found(target(&code)),
-        Err(UpdateError::Storage) => unavailable(),
-        Err(UpdateError::NotFound) => not_found(),
-        Err(UpdateError::Invalid(error)) => view(&app, actor, &headers, &code, Some(error)).await,
+    match save(&app, actor, &headers, &code, &fields).await {
+        Ok((code, message)) => {
+            staff_roster_notice::team_redirect(&app, &headers, &target(&code), message, false)
+        }
+        Err(UpdateError::NotFound) => view(&app, actor, &headers, uri.path(), &code, None).await,
+        Err(UpdateError::Form(feedback)) => {
+            view(
+                &app,
+                actor,
+                &headers,
+                uri.path(),
+                &code,
+                Some((&fields, &feedback)),
+            )
+            .await
+        }
+        Err(error) => portal_result(&app, &headers, Err(error)).await,
     }
 }
 
-async fn save(app: &App, code: &str, fields: &Submitted) -> Result<String, UpdateError> {
+async fn save(
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
+    code: &str,
+    fields: &Submitted,
+) -> Result<(String, &'static str), UpdateError> {
     let mut db = app.db.begin().await?;
-    lock_round(&mut db).await?;
+    lock_round_if_configured(&mut db).await?;
     sqlx::query("SELECT id FROM registration_registrationconfig WHERE id = 1 FOR UPDATE")
         .fetch_optional(&mut *db)
         .await?;
-    let team = find(&mut db, code, true)
-        .await?
-        .ok_or(UpdateError::NotFound)?;
+    let team = find(&mut db, code, true).await?;
+    authorized_actor(&mut db, app, actor, headers).await?;
+    let team = team.ok_or(UpdateError::NotFound)?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
-    if settings.integer("cur_round", 1) > 1 {
-        return Err(UpdateError::Invalid(
-            "Edits close once Round 1 is paired. Contact tab for changes.",
-        ));
-    }
+    let locked = settings.integer("cur_round", 1) > 1;
     let config = config(&mut db).await?;
-    match fields.get("action").map(String::as_str) {
+    let message = match fields.get("action").map(String::as_str) {
         Some("update_name") => {
-            if !config.name {
-                return Err(UpdateError::Invalid(
-                    "Team name changes are currently disabled.",
-                ));
+            if locked || !config.name {
+                return Err(UpdateError::Form(Feedback::Closed));
             }
-            let name = fields.get("name").map_or("", |name| name.trim());
-            if name.is_empty() || name.chars().count() > 35 {
-                return Err(UpdateError::Invalid(
-                    "Enter a team name of at most 35 characters.",
-                ));
-            }
-            let exists = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM tab_team WHERE name = ? AND id <> ?)",
+            save_name(
+                &mut db,
+                &team,
+                fields.get("name").map_or("", String::as_str),
             )
-            .bind(name)
-            .bind(team.id)
-            .fetch_one(&mut *db)
             .await?;
-            if exists {
-                return Err(UpdateError::Invalid(
-                    "A team with this name already exists.",
-                ));
-            }
-            sqlx::query("UPDATE tab_team SET name = ? WHERE id = ?")
-                .bind(name)
-                .bind(team.id)
-                .execute(&mut *db)
-                .await?;
+            "Team name updated."
         }
         Some("update_scratches") => {
-            if !config.scratches || config.slots == 0 || !settings.flag("judges_public", false) {
-                return Err(UpdateError::Invalid(
-                    "Discretionary scratches are currently closed.",
-                ));
+            if locked
+                || !config.scratches
+                || config.slots == 0
+                || !settings.flag("judges_public", false)
+            {
+                return Err(UpdateError::Form(Feedback::Closed));
             }
-            replace_scratches(&mut db, team.id, config.slots, fields).await?;
+            let options = scratch_options(&mut db, team.id).await?;
+            let selection = scratch_selection(config.slots, &options, fields);
+            if !selection.valid() {
+                return Err(UpdateError::Form(Feedback::Scratch(selection)));
+            }
+            replace_scratches(&mut db, team.id, selection.wanted).await?;
+            "Disc scratches updated."
         }
-        _ => return Err(UpdateError::Invalid("Choose a team portal action.")),
-    }
+        _ => return Err(UpdateError::Form(Feedback::Unknown)),
+    };
     db.commit().await?;
-    Ok(team.code)
+    Ok((team.code, message))
+}
+
+async fn save_name(
+    db: &mut MySqlConnection,
+    team: &Team,
+    entered: &str,
+) -> Result<(), UpdateError> {
+    let name = entered.trim();
+    let invalid = |error| UpdateError::Form(Feedback::Name(error));
+    let length = name.chars().count();
+    if name.is_empty() {
+        return Err(invalid("This field is required.".into()));
+    }
+    if length > 35 {
+        return Err(invalid(format!(
+            "Ensure this value has at most 35 characters (it has {length})."
+        )));
+    }
+    if name.contains('\0') {
+        return Err(invalid("Null characters are not allowed.".into()));
+    }
+    let duplicate = "A team with this name already exists.";
+    let exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM tab_team WHERE name = ? AND id <> ?)",
+    )
+    .bind(name)
+    .bind(team.id)
+    .fetch_one(&mut *db)
+    .await?;
+    if exists {
+        return Err(invalid(duplicate.into()));
+    }
+    match sqlx::query("UPDATE tab_team SET name = ? WHERE id = ?")
+        .bind(name)
+        .bind(team.id)
+        .execute(db)
+        .await
+    {
+        Err(sqlx::Error::Database(error)) if error.is_unique_violation() => {
+            Err(invalid(duplicate.into()))
+        }
+        Err(error) => Err(error.into()),
+        Ok(_) => Ok(()),
+    }
 }
 
 async fn replace_scratches(
     db: &mut MySqlConnection,
     id: i32,
-    limit: u16,
-    fields: &Submitted,
+    wanted: BTreeSet<i32>,
 ) -> Result<(), UpdateError> {
-    let mut wanted = BTreeSet::new();
-    const INVALID: UpdateError =
-        UpdateError::Invalid("One or more selected judges cannot be scratched.");
-    for index in 0..limit {
-        let Some(value) = fields
-            .get(&format!("scratch_{index}"))
-            .filter(|value| !value.is_empty())
-        else {
-            continue;
-        };
-        let judge = value
-            .parse::<i32>()
-            .ok()
-            .filter(|&id| id > 0)
-            .ok_or(INVALID)?;
-        if !wanted.insert(judge) {
-            return Err(UpdateError::Invalid("Select each judge at most once."));
-        }
-        let eligible = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM tab_judge j WHERE j.id = ? AND NOT EXISTS(
-                SELECT 1 FROM tab_scratch s WHERE s.judge_id = j.id AND s.team_id = ? AND s.scratch_type = 1))",
-        ).bind(judge).bind(id).fetch_one(&mut *db).await?;
-        if !eligible {
-            return Err(INVALID);
-        }
-    }
     let existing: BTreeSet<_> = sqlx::query_scalar::<_, i32>(
         "SELECT judge_id FROM tab_scratch WHERE team_id = ? AND scratch_type = 0 FOR UPDATE",
     )
