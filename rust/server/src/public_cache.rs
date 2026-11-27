@@ -457,6 +457,9 @@ async fn render_response(
     }
 
     let mut db = app.db.begin().await?;
+    if page == Page::LiveResults {
+        crate::staff_pairing::lock_round_if_configured(&mut db).await?;
+    }
     let version = if cache_key.is_some() {
         page.version(&mut db).await.ok()
     } else {

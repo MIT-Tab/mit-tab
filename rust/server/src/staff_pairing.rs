@@ -402,10 +402,18 @@ async fn apply(app: &App, user: i32, requested: i32, trigger: Trigger) -> Result
 }
 
 pub async fn lock_round(db: &mut MySqlConnection) -> Result<i32, sqlx::Error> {
-    sqlx::query_scalar::<_, i32>(
+    lock_round_if_configured(db)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
+}
+
+pub async fn lock_round_if_configured(
+    db: &mut MySqlConnection,
+) -> Result<Option<i32>, sqlx::Error> {
+    sqlx::query_scalar(
         "SELECT id FROM tab_tabsettings WHERE `key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE",
     )
-    .fetch_one(db)
+    .fetch_optional(db)
     .await
 }
 
@@ -487,12 +495,14 @@ struct Pairing {
     room: Option<String>,
     judges: Vec<Judge>,
     victor: i32,
+    edits: crate::board_snapshot::StaffEdits,
 }
 
 #[derive(Serialize)]
 struct Judge {
     name: String,
     chair: bool,
+    manual: bool,
 }
 
 pub async fn status(
@@ -531,10 +541,12 @@ async fn status_page(
     if selected.is_some() && !(1..=current).contains(&round) {
         return Ok(private((StatusCode::NOT_FOUND, "Round not found.")));
     }
+    let mut history = crate::board_snapshot::histories(&mut db, "round").await?;
     let mut judges: HashMap<i32, Vec<Judge>> = HashMap::new();
-    for (pairing, name, chair) in sqlx::query_as::<_, (i32, String, bool)>(
-        "SELECT r.id, j.name, COALESCE(r.chair_id = j.id, FALSE) FROM tab_round r
+    for (pairing, name, chair, manual) in sqlx::query_as::<_, (i32, String, bool, bool)>(
+        "SELECT r.id, j.name, COALESCE(r.chair_id = j.id, FALSE), manual.id IS NOT NULL FROM tab_round r
          JOIN tab_round_judges x ON x.round_id = r.id JOIN tab_judge j ON j.id = x.judge_id
+         LEFT JOIN tab_manualjudgeassignment manual ON manual.round_id = r.id AND manual.judge_id = j.id
          WHERE r.round_number = ? ORDER BY COALESCE(r.chair_id = j.id, FALSE) DESC, j.name, j.id",
     )
     .bind(round)
@@ -544,7 +556,7 @@ async fn status_page(
         judges
             .entry(pairing)
             .or_default()
-            .push(Judge { name, chair });
+            .push(Judge { name, chair, manual });
     }
     let pairings: Vec<_> = sqlx::query_as::<_, (i32, String, String, Option<String>, i32)>(
         "SELECT r.id, g.name, o.name, m.name, r.victor FROM tab_round r
@@ -562,6 +574,7 @@ async fn status_page(
         room,
         judges: judges.remove(&id).unwrap_or_default(),
         victor,
+        edits: history.take_staff_edits(id),
     })
     .collect();
     let byes = sqlx::query_scalar::<_, String>(

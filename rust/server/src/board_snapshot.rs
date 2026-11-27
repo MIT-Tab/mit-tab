@@ -198,6 +198,32 @@ pub struct Change {
 pub struct Histories {
     pub retained: HashMap<i32, Vec<History>>,
     pub removed: BTreeMap<i32, Snapshot>,
+    current_judges: HashMap<i32, std::collections::BTreeSet<String>>,
+}
+
+#[derive(Serialize)]
+pub struct StaffEdits {
+    pub gov: bool,
+    pub opp: bool,
+    pub judges: std::collections::BTreeSet<String>,
+    pub history: Vec<History>,
+}
+
+impl Histories {
+    pub fn take_staff_edits(&mut self, id: i32) -> StaffEdits {
+        let history = self.retained.remove(&id).unwrap_or_default();
+        let changed = |field| {
+            history
+                .iter()
+                .any(|event| event.changes.iter().any(|change| change.field == field))
+        };
+        StaffEdits {
+            gov: changed("government"),
+            opp: changed("opposition"),
+            judges: self.current_judges.remove(&id).unwrap_or_default(),
+            history,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -226,6 +252,7 @@ pub async fn histories(
 ) -> Result<Histories, sqlx::Error> {
     let mut retained = HashMap::<_, Vec<_>>::new();
     let mut removed = BTreeMap::new();
+    let mut current_judges: HashMap<i32, std::collections::BTreeSet<String>> = HashMap::new();
     type Event = (
         i32,
         String,
@@ -237,8 +264,9 @@ pub async fn histories(
         Option<String>,
         Option<String>,
         Option<String>,
+        bool,
     );
-    for (id, kind, actor, time, public, assigned, removed_judge, chair, new_chair, old_chair) in
+    for (id, kind, actor, time, public, assigned, removed_judge, chair, new_chair, old_chair, current) in
         sqlx::query_as::<_, Event>(
             "SELECT CAST(a.object_id AS SIGNED), a.event_type, COALESCE(u.username, 'Unknown'), a.created_at,
              CASE WHEN JSON_TYPE(JSON_EXTRACT(a.changes, '$.public')) = 'OBJECT'
@@ -252,7 +280,10 @@ pub async fn histories(
              CASE WHEN JSON_TYPE(JSON_EXTRACT(a.changes, '$.new_chair')) = 'STRING'
                 THEN JSON_UNQUOTE(JSON_EXTRACT(a.changes, '$.new_chair')) END,
              CASE WHEN JSON_TYPE(JSON_EXTRACT(a.changes, '$.old_chair')) = 'STRING'
-                THEN JSON_UNQUOTE(JSON_EXTRACT(a.changes, '$.old_chair')) END
+                THEN JSON_UNQUOTE(JSON_EXTRACT(a.changes, '$.old_chair')) END,
+             NOT EXISTS(SELECT 1 FROM tab_auditevent reset
+                WHERE reset.content_type_id = a.content_type_id AND reset.object_id = a.object_id
+                AND reset.event_type = 'judges_paired' AND reset.id > a.id)
              FROM tab_auditevent a JOIN django_content_type t ON t.id = a.content_type_id
              LEFT JOIN auth_user u ON u.id = a.user_id
              WHERE t.app_label = 'tab' AND t.model = ?
@@ -278,6 +309,18 @@ pub async fn histories(
                 "manual_chair_change" => vec![("chair", chair), ("new chair", new_chair), ("old chair", old_chair)],
                 _ => Vec::new(),
             };
+            if current {
+                let judges = current_judges.entry(id).or_default();
+                for (field, name) in &entries {
+                    if let Some(name) = name {
+                        if *field == "removed judge" {
+                            judges.remove(name);
+                        } else {
+                            judges.insert(name.clone());
+                        }
+                    }
+                }
+            }
             entries.into_iter().filter_map(|(field, value)| value.map(|after| Change {
                 field, before: String::new(), after,
             })).collect()
@@ -288,7 +331,11 @@ pub async fn histories(
             });
         }
     }
-    Ok(Histories { retained, removed })
+    Ok(Histories {
+        retained,
+        removed,
+        current_judges,
+    })
 }
 
 fn compare(before: Option<&Snapshot>, after: Option<&Snapshot>) -> Vec<Change> {

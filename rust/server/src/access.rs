@@ -16,8 +16,9 @@ use crate::{
 };
 
 pub async fn public_api(State(app): State<App>, request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     match actor {
         Actor::User { board: true, .. } => {
@@ -62,8 +63,9 @@ pub async fn public_tournament(
     mut request: Request,
     next: Next,
 ) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     if matches!(actor, Actor::User { board: true, .. }) {
         let Ok(open) = board_access_open(&app).await else {
@@ -101,8 +103,9 @@ pub async fn public_tournament(
 }
 
 pub async fn staff_settings(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     match actor {
         Actor::Anonymous => {
@@ -128,14 +131,74 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
             superuser: true, ..
         } => {}
         Actor::User { staff: true, .. } => return access_denied(),
-        Actor::User { id, .. } => match has_settings_permission(&app, id).await {
-            Ok(true) => {}
-            Ok(false) => return access_denied(),
-            Err(_) => return unavailable(),
-        },
+        Actor::User { id, .. } => {
+            let allowed = if entry_ballot_route(&request) {
+                match legacy_entry_user(&app, id).await {
+                    Ok(true) => Ok(true),
+                    Ok(false) => has_settings_permission(&app, id).await,
+                    Err(error) => Err(error),
+                }
+            } else {
+                has_settings_permission(&app, id).await
+            };
+            match allowed {
+                Ok(true) => {}
+                Ok(false) => return access_denied(),
+                Err(_) => return unavailable(),
+            }
+        }
     }
     request.extensions_mut().insert(actor);
     next.run(request).await
+}
+
+pub async fn legacy_entry_user(app: &App, user: i32) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM auth_user WHERE id = ? AND username = 'entry'
+         AND is_active = TRUE AND is_staff = FALSE AND is_superuser = FALSE)",
+    )
+    .bind(user)
+    .fetch_one(&app.db)
+    .await
+}
+
+fn entry_ballot_route(request: &Request) -> bool {
+    match request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+    {
+        Some("/pairings/status/" | "/round/{round}/") => {
+            matches!(request.method(), &Method::GET | &Method::HEAD)
+        }
+        Some("/round/{round}/result/" | "/round/{round}/result/{count}/") => matches!(
+            request.method(),
+            &Method::GET | &Method::HEAD | &Method::POST
+        ),
+        _ => false,
+    }
+}
+
+fn entry_roster_route(request: &Request) -> bool {
+    match request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(MatchedPath::as_str)
+    {
+        Some(
+            "/view_teams/" | "/view_debaters/" | "/view_schools/" | "/view_judges/"
+            | "/view_rooms/",
+        ) => matches!(request.method(), &Method::GET | &Method::HEAD),
+        Some(
+            "/enter_team/" | "/team/{id}/" | "/enter_debater/" | "/debater/{id}/"
+            | "/enter_school/" | "/school/{id}/" | "/enter_judge/" | "/judge/{id}/"
+            | "/enter_room/" | "/room/{id}/",
+        ) => matches!(
+            request.method(),
+            &Method::GET | &Method::HEAD | &Method::POST
+        ),
+        _ => false,
+    }
 }
 
 async fn has_settings_permission(app: &App, user: i32) -> Result<bool, sqlx::Error> {
@@ -199,9 +262,9 @@ pub async fn admin_actor(
     headers: &axum::http::HeaderMap,
     path: &str,
 ) -> Result<Actor, Box<Response>> {
-    let Ok(actor) = actor(&app.db, headers, app.django_secret.as_deref()).await else {
-        return Err(Box::new(unavailable()));
-    };
+    let actor = actor(&app.db, headers, app.django_secret.as_deref())
+        .await
+        .map_err(|error| Box::new(error.response()))?;
     let denied = match actor {
         Actor::Anonymous => {
             let path = if path == "/admin/login/" {
@@ -231,8 +294,9 @@ pub async fn admin_actor(
 }
 
 pub async fn roster_log(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     match actor {
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
@@ -304,24 +368,22 @@ pub async fn board_access_open_on(db: &mut MySqlConnection) -> Result<bool, sqlx
             None => value,
         })
         .filter(|&rounds| rounds > 0);
-    let Some(final_round) = total_rounds else {
-        return Ok(false);
-    };
     const MILESTONE: &str = "
         SELECT EXISTS(SELECT 1 FROM tab_outround)
            OR (COUNT(*) > 0 AND COUNT(CASE WHEN victor <> 0 THEN 1 END) * 5 >= COUNT(*) * 4)
         FROM tab_round WHERE round_number = ?
     ";
     let open = sqlx::query_scalar::<_, i64>(MILESTONE)
-        .bind(final_round)
+        .bind(total_rounds)
         .fetch_one(db)
         .await?;
     Ok(open != 0)
 }
 
 pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     if !matches!(actor, Actor::User { board: true, .. }) {
         return private((StatusCode::FORBIDDEN, "Board access is unavailable."));
@@ -373,8 +435,9 @@ pub async fn board(State(app): State<App>, mut request: Request, next: Next) -> 
 }
 
 pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     match actor {
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
@@ -412,8 +475,9 @@ pub async fn checkins(State(app): State<App>, mut request: Request, next: Next) 
 
 /// The router that uses this middleware contains only roster data entry routes.
 pub async fn data_entry(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     match actor {
         Actor::Anonymous => return found(format!("/public/login/?next={}", request.uri().path())),
@@ -436,6 +500,13 @@ pub async fn data_entry(State(app): State<App>, mut request: Request, next: Next
             Ok(_) => return access_denied(),
             Err(_) => return unavailable(),
         },
+        Actor::User { id, .. } if entry_roster_route(&request) => {
+            match legacy_entry_user(&app, id).await {
+                Ok(true) => {}
+                Ok(false) => return access_denied(),
+                Err(_) => return unavailable(),
+            }
+        }
         Actor::User { .. } => return access_denied(),
     }
     request.extensions_mut().insert(actor);
@@ -455,13 +526,15 @@ pub async fn staff_or_board(State(app): State<App>, mut request: Request, next: 
                     | "/team/card/{id}/"
                     | "/team/card/{id}/pretty/"
                     | "/archive/black_rod_bundle/"
+                    | "/forum_post"
             )
         )
     {
         return access_denied();
     }
-    let Ok(actor) = actor(&app.db, request.headers(), app.django_secret.as_deref()).await else {
-        return unavailable();
+    let actor = match actor(&app.db, request.headers(), app.django_secret.as_deref()).await {
+        Ok(actor) => actor,
+        Err(error) => return error.response(),
     };
     if matches!(actor, Actor::User { board: true, .. }) {
         match board_access_open(&app).await {

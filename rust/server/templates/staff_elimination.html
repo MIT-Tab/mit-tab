@@ -51,18 +51,19 @@
       <tbody>
       {% for round in section.debates %}
         <tr>
-          <td>{{ round.data.gov_team.name }}{% if round.data.sidelock %} · Side locked{% endif %}</td>
-          <td>{{ round.data.opp_team.name }}</td>
-          <td>{% for judge in round.data.judges %}{{ judge.name }}{% if judge.id == round.data.chair %} (chair){% endif %}{% if not loop.last %}, {% endif %}{% else %}Unassigned{% endfor %}</td>
+          <td{% if round.edits.gov %} class="manual-team"{% endif %}><span class="team-link">{{ round.data.gov_team.name }}</span>{% if round.data.sidelock %} · Side locked{% endif %}</td>
+          <td{% if round.edits.opp %} class="manual-team"{% endif %}><span class="team-link">{{ round.data.opp_team.name }}</span></td>
+          <td>{% for judge in round.data.judges %}<span{% if judge.name in round.edits.judges %} class="manual-pairing-edit"{% endif %}>{{ judge.name }}{% if judge.id == round.data.chair %} (chair){% endif %}</span>{% if not loop.last %}, {% endif %}{% else %}Unassigned{% endfor %}</td>
           <td>{{ round.data.room.name or "Unassigned" }}</td>
           <td>{{ ["Pending", "Government", "Opposition", "Government by forfeit", "Opposition by forfeit"][round.data.victor] or "Pending" }}</td>
-          <td><a href="/outround/{{ round.id }}/result/">Ballot</a> · <a href="/outround/{{ round.id }}/edit/">Assignments</a>
+          <td><a href="/outround/{{ round.id }}/result/">Ballot</a> · <a href="/outround/{{ round.id }}/edit/">Assignments</a>{% if nav.tab %} · <a href="/admin/tab/outround/{{ round.id }}/delete/">Delete Pairing</a>{% endif %}
             <form method="post" action="/outround_choice/{{ round.id }}">
               <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}"><input type="hidden" name="redirect" value="on">
               <button class="btn btn-link btn-sm p-0" type="submit">{{ ["No team choice", "Government choice", "Opposition choice"][round.data.choice] or "Team choice" }}</button>
             </form>
           </td>
         </tr>
+        {% if round.edits.history %}<tr><td colspan="6">{% set row = round.edits %}{% include "board_history.html" %}</td></tr>{% endif %}
       {% endfor %}
       </tbody>
     </table></div>

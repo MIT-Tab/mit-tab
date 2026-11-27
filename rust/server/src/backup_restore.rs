@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use sqlx::{AssertSqlSafe, Connection, MySqlConnection};
 
@@ -70,25 +70,24 @@ async fn apply(db: &mut MySqlConnection, dump: backup_dump::Dump<'_>) -> Result<
     .execute(&mut *db)
     .await?;
 
-    let delete_always = [
-        "django_session",
-        "mittab_rust_session",
-        "mittab_staff_invite_token",
-        "tab_bulkcheckinchange",
-        "mittab_registration_private_email",
-    ];
-    let mut clear: BTreeSet<_> = dump
-        .tables
-        .into_iter()
-        .filter(|&table| !schema::temporary_backup_table(table))
-        .chain(delete_always)
-        .filter(|table| existing.contains(*table))
+    // Tables introduced after an older archive start empty. The active
+    // schema history and explicitly omitted scratches stay local.
+    let clear: BTreeSet<&str> = existing
+        .iter()
+        .map(String::as_str)
+        .filter(|&table| {
+            schema::backup_table(table)
+                && (!schema::temporary_backup_table(table)
+                    || matches!(
+                        table,
+                        "django_session"
+                            | "mittab_rust_session"
+                            | "mittab_staff_invite_token"
+                            | "tab_bulkcheckinchange"
+                    ))
+                && (table != "tab_scratch" || original_scratches.is_none())
+        })
         .collect();
-    // Legacy backups never contained an uploaded Rust logo. Leaving a later
-    // logo attached to restored branding would cross tournament boundaries.
-    if existing.contains("mittab_public_logo") {
-        clear.insert("mittab_public_logo");
-    }
     for table in &clear {
         sqlx::query(AssertSqlSafe(format!("DELETE FROM `{table}`")))
             .execute(&mut *db)
@@ -125,7 +124,7 @@ async fn apply(db: &mut MySqlConnection, dump: backup_dump::Dump<'_>) -> Result<
             "This scratch-free backup has a different roster. Restore a backup that includes scratches.",
         ));
     }
-    validate_foreign_keys(db, &existing).await?;
+    validate_foreign_keys(db, &clear).await?;
     sqlx::query("SET SESSION FOREIGN_KEY_CHECKS = 1")
         .execute(db)
         .await?;
@@ -142,43 +141,55 @@ async fn scratches(db: &mut MySqlConnection) -> Result<Vec<Scratch>, sqlx::Error
     ).fetch_all(db).await
 }
 
-fn name(value: &str) -> bool {
-    !value.is_empty()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+fn identifier(value: &str) -> String {
+    format!("`{}`", value.replace('`', "``"))
 }
 
 async fn validate_foreign_keys(
     db: &mut MySqlConnection,
-    existing: &BTreeSet<String>,
+    changed: &BTreeSet<&str>,
 ) -> Result<(), RestoreError> {
-    let pairs = sqlx::query_as::<_, (String, String, String, String)>(
-        "SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+    let rows = sqlx::query_as::<_, (String, String, String, String, String)>(
+        "SELECT TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
          FROM information_schema.KEY_COLUMN_USAGE
          WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_SCHEMA = DATABASE()
-         AND REFERENCED_TABLE_NAME IS NOT NULL",
+         AND REFERENCED_TABLE_NAME IS NOT NULL
+         ORDER BY TABLE_NAME, CONSTRAINT_NAME, ORDINAL_POSITION",
     )
     .fetch_all(&mut *db)
     .await?;
-    for (table, column, reference, referred) in pairs {
-        if !existing.contains(&table)
-            || !schema::backup_table(&table)
-            || !existing.contains(&reference)
-            || !schema::backup_table(&reference)
-        {
-            continue;
+    let mut constraints: BTreeMap<_, Vec<_>> = BTreeMap::new();
+    for (table, constraint, column, reference, referred) in rows {
+        if changed.contains(table.as_str()) || changed.contains(reference.as_str()) {
+            constraints
+                .entry((table, constraint, reference))
+                .or_default()
+                .push((column, referred));
         }
-        if [&table, &column, &reference, &referred]
-            .into_iter()
-            .any(|value| !name(value))
-        {
-            return Err(RestoreError::Database);
-        }
+    }
+    for ((table, _, reference), columns) in constraints {
+        let join = columns
+            .iter()
+            .map(|(child, parent)| {
+                format!(
+                    "child.{} = parent.{}",
+                    identifier(child),
+                    identifier(parent)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        let present = columns
+            .iter()
+            .map(|(child, _)| format!("child.{} IS NOT NULL", identifier(child)))
+            .collect::<Vec<_>>()
+            .join(" AND ");
         let statement = format!(
-            "SELECT EXISTS(SELECT 1 FROM `{table}` child LEFT JOIN `{reference}` parent
-                           ON parent.`{referred}` = child.`{column}`
-                           WHERE child.`{column}` IS NOT NULL AND parent.`{referred}` IS NULL)"
+            "SELECT EXISTS(SELECT 1 FROM {} child LEFT JOIN {} parent ON {join}
+                           WHERE {present} AND parent.{} IS NULL)",
+            identifier(&table),
+            identifier(&reference),
+            identifier(&columns[0].1),
         );
         let invalid: bool = sqlx::query_scalar(AssertSqlSafe(statement))
             .fetch_one(&mut *db)

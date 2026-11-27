@@ -36,7 +36,6 @@ pub fn routes() -> Router<App> {
         .route("/team/rank/", get(team_rankings))
         .route("/debater/ranking/", get(speaker_rankings))
         .route("/debater/rank/", get(speaker_rankings))
-        .route("/forum_post", get(forum))
 }
 
 #[derive(Serialize)]
@@ -234,7 +233,7 @@ async fn speaker_rankings(State(app): State<App>, Extension(actor): Extension<Ac
     }).await
 }
 
-async fn forum(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
+pub async fn forum(State(app): State<App>, Extension(actor): Extension<Actor>) -> Response {
     let result = async {
         let mut db = app.db.begin().await?;
         let settings = Settings::load(&mut db, SETTINGS).await?;

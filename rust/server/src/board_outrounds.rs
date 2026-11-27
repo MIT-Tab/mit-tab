@@ -338,6 +338,17 @@ async fn recompute(
     Ok(entries)
 }
 
+pub async fn recompute_staff_seeds(
+    db: &mut MySqlConnection,
+    user: i32,
+    snapshots: &BTreeMap<i32, Snapshot>,
+    division: i32,
+) -> Result<(), sqlx::Error> {
+    let entries = seeds(db).await?;
+    recompute(db, user, snapshots, division, entries).await?;
+    Ok(())
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PairForm {
@@ -659,17 +670,6 @@ async fn correction(app: &App, actor: Actor, id: i32, form: Correction) -> Resul
                 if known == 0 {
                     return Err(BoardError::Conflict("Choose a valid room."));
                 }
-                if winner == 0
-                    && before.iter().any(|(&peer, pairing)| {
-                        peer != id
-                            && pairing.victor == Some(0)
-                            && pairing.room.as_ref().is_some_and(|room| room.id == room_id)
-                    })
-                {
-                    return Err(BoardError::Conflict(
-                        "That room is already assigned to an undecided outround.",
-                    ));
-                }
             }
         }
         "choice" => {
@@ -683,6 +683,29 @@ async fn correction(app: &App, actor: Actor, id: i32, form: Correction) -> Resul
     sqlx::query("UPDATE tab_outround SET gov_team_id = ?, opp_team_id = ?, room_id = ?, victor = ?, choice = ? WHERE id = ?")
         .bind(gov).bind(opp).bind(room).bind(winner).bind(choice).bind(id).execute(&mut *db).await?;
     let after = board_snapshot::capture(&mut db, Pairings::Outround).await?;
+    for (&changed, previous) in peer_changes.iter().chain(std::iter::once((&id, row))) {
+        let corrected = &after[&changed];
+        let Some(room_id) = corrected.room.as_ref().map(|room| room.id) else {
+            continue;
+        };
+        let occupied_before = previous.victor == Some(0)
+            && previous
+                .room
+                .as_ref()
+                .is_some_and(|room| room.id == room_id);
+        if corrected.victor == Some(0)
+            && !occupied_before
+            && after.iter().any(|(&peer, pairing)| {
+                peer != changed
+                    && pairing.victor == Some(0)
+                    && pairing.room.as_ref().is_some_and(|room| room.id == room_id)
+            })
+        {
+            return Err(BoardError::Conflict(
+                "That room is already assigned to an undecided outround.",
+            ));
+        }
+    }
     let peer_after = after
         .iter()
         .filter(|(id, _)| peer_changes.contains_key(id))

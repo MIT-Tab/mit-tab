@@ -188,6 +188,7 @@ struct Select {
 struct Round<'a> {
     id: i32,
     data: &'a Snapshot,
+    edits: board_snapshot::StaffEdits,
 }
 
 #[derive(Serialize)]
@@ -227,6 +228,7 @@ async fn show_stage(
     let mut db = app.db.begin().await?;
     let settings = Settings::load(&mut db, store::SETTINGS).await?;
     let snapshots = board_snapshot::capture(&mut db, Pairings::Outround).await?;
+    let mut history = board_snapshot::histories(&mut db, "outround").await?;
     let mut options = BTreeSet::new();
     for (division, count) in store::break_sizes(&settings).into_iter().enumerate() {
         if let Some(mut size) = store::stage_size(count) {
@@ -264,7 +266,11 @@ async fn show_stage(
         let debates: Vec<_> = snapshots
             .iter()
             .filter(|(_, value)| stage.matches(value))
-            .map(|(&id, data)| Round { id, data })
+            .map(|(&id, data)| Round {
+                id,
+                data,
+                edits: history.take_staff_edits(id),
+            })
             .collect();
         let released =
             settings.integer(store::VISIBILITY[stage.division as usize], 256) <= stage.size;

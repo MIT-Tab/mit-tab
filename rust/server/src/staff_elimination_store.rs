@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use mittab_tabulation::outrounds::{self, Seed, SeedBasis};
 use serde::Serialize;
 use serde_json::json;
-use sqlx::{MySqlConnection, Row};
+use sqlx::MySqlConnection;
 
 use crate::{
     App,
@@ -596,7 +596,7 @@ pub async fn ballot(
     let mut db = app.db.begin().await?;
     lock_round(&mut db).await?;
     let before = board_snapshot::capture(&mut db, Pairings::Outround).await?;
-    let original = before.get(&id).ok_or(Error::Missing)?;
+    let original = before.get(&id).cloned().ok_or(Error::Missing)?;
     if !revision.is_empty() && revision != original.revision() {
         return Err(Error::Invalid(
             "This pairing changed. Reload it before saving.",
@@ -615,7 +615,7 @@ pub async fn ballot(
         .bind(id)
         .execute(&mut *db)
         .await?;
-    if let Some((old_winner, _)) = winner_loser(original)
+    if let Some((old_winner, _)) = winner_loser(&original)
         && old_winner != won
     {
         let other: bool = sqlx::query_scalar(
@@ -627,40 +627,29 @@ pub async fn ballot(
             ));
         }
     }
-    let current_entry = |team| {
-        sqlx::query("SELECT b.*, t.name FROM tab_breakingteam b JOIN tab_team t ON t.id = b.team_id WHERE b.team_id = ? AND b.type_of_team = ?")
-        .bind(team).bind(stage.division)
-    };
-    let winner = current_entry(won)
-        .fetch_optional(&mut *db)
-        .await?
-        .ok_or(Error::Invalid("The winning team has no break seed."))?;
-    let loser = current_entry(lost)
-        .fetch_optional(&mut *db)
-        .await?
-        .ok_or(Error::Invalid("The losing team has no break seed."))?;
-    let entry = |row: sqlx::mysql::MySqlRow| -> Result<Entry, sqlx::Error> {
-        Ok(Entry {
-            id: row.try_get("id")?,
-            team: row.try_get("team_id")?,
-            name: row.try_get("name")?,
-            seed: row.try_get("seed")?,
-            effective: row.try_get("effective_seed")?,
-        })
-    };
-    let (winner, loser) = (entry(winner)?, entry(loser)?);
-    if loser.effective < winner.effective {
-        update_seed(&mut db, user, &winner, loser.effective).await?;
-        update_seed(&mut db, user, &loser, loser.seed).await?;
+    let seeded: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT team_id) FROM tab_breakingteam
+         WHERE type_of_team = ? AND team_id IN (?, ?)",
+    )
+    .bind(stage.division)
+    .bind(won)
+    .bind(lost)
+    .fetch_one(&mut *db)
+    .await?;
+    if seeded != 2 {
+        return Err(Error::Invalid("Both teams must have a break seed."));
     }
     board_snapshot::audit_pairings(
         &mut db,
-        &BTreeMap::from([(id, original.clone())]),
-        &BTreeMap::from([(id, current)]),
+        &BTreeMap::from([(id, original)]),
+        &BTreeMap::from([(id, current.clone())]),
         user,
-        "staff elimination ballot",
+        "staff outround result",
     )
     .await?;
+    let mut after = before;
+    after.insert(id, current);
+    crate::board_outrounds::recompute_staff_seeds(&mut db, user, &after, stage.division).await?;
     let visibility = Settings::load(&mut db, &VISIBILITY).await?;
     publication::refresh_placements(&mut db, &visibility).await?;
     db.commit().await?;

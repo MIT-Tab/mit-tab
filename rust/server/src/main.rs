@@ -1,5 +1,6 @@
 mod access;
 mod admin_accounts;
+mod admin_repairs;
 mod administration;
 mod aws_http;
 mod backup_dump;
@@ -548,6 +549,7 @@ fn router(app: App) -> Router {
                 .route("/team/card/{id}/", get(tab_cards::single))
                 .route("/team/card/{id}/pretty/", get(tab_cards::single))
                 .route("/archive/black_rod_bundle/", get(tab_cards::bundle))
+                .route("/forum_post", get(staff_rankings::forum))
                 .route_layer(axum::middleware::from_fn_with_state(
                     app.clone(),
                     access::staff_or_board,

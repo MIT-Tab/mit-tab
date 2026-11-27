@@ -69,7 +69,7 @@ services:
   routes:
   - path: /
 static_sites:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.static
   github:
     branch: main
     repo: MIT-Tab/mit-tab

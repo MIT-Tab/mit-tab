@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="col-12 col-lg-7">
+  <h1>{{ title }}</h1>
+  <form method="post">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf }}">
+    {% if score %}
+    <div class="form-group"><label for="round_id">Round ID</label><input class="form-control" id="round_id" name="round_id" type="number" min="1" required value="{{ score.round_id }}"></div>
+    <div class="form-group"><label for="debater_id">Debater ID</label><input class="form-control" id="debater_id" name="debater_id" type="number" min="1" required value="{{ score.debater_id }}"></div>
+    <div class="form-group"><label for="role">Debater role</label><input class="form-control" id="role" name="role" maxlength="4" value="{{ score.role or '' }}"></div>
+    <div class="form-group"><label for="speaks">Speaks</label><input class="form-control" id="speaks" name="speaks" inputmode="decimal" required value="{{ score.speaks }}"></div>
+    <div class="form-group"><label for="ranks">Ranks</label><input class="form-control" id="ranks" name="ranks" inputmode="decimal" required value="{{ score.ranks }}"></div>
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-outline-danger" href="{{ delete_url }}">Delete</a>
+    {% else %}
+    <p>Delete <strong>{{ description }}</strong>?</p>
+    <button class="btn btn-danger" type="submit" name="confirm" value="on">Delete</button>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ cancel }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

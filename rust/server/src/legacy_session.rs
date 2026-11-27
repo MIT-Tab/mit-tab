@@ -1,6 +1,9 @@
 use std::io::Read;
 
-use axum::http::{HeaderMap, header};
+use axum::{
+    http::{HeaderMap, StatusCode, header},
+    response::Response,
+};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use flate2::read::ZlibDecoder;
 use ring::{digest, hmac};
@@ -24,8 +27,20 @@ pub enum Actor {
 }
 
 pub enum SessionError {
-    Unavailable,
+    Reauthenticate,
     Database,
+}
+
+impl SessionError {
+    pub fn response(self) -> Response {
+        match self {
+            Self::Reauthenticate => crate::private((
+                StatusCode::SEE_OTHER,
+                [(header::LOCATION, "/public/login/")],
+            )),
+            Self::Database => crate::unavailable(),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -64,12 +79,25 @@ pub async fn actor(
     else {
         return Ok(Actor::Anonymous);
     };
-    // Requests carrying valid database session keys must retain their access
-    // restrictions even while the server is running alongside Django.
-    let secret = secret.ok_or(SessionError::Unavailable)?;
-    let Some(session) = decode_session(&data, secret) else {
+    let (signed, tag) = data.rsplit_once(':').ok_or(SessionError::Reauthenticate)?;
+    let payload = decode_session_data(signed).ok_or(SessionError::Reauthenticate)?;
+    // Django also creates database sessions for anonymous visitors. Only
+    // explicit absence of authentication markers can take the anonymous path.
+    if !["_auth_user_id", "_auth_user_backend", "_auth_user_hash"]
+        .into_iter()
+        .any(|field| payload.contains_key(field))
+    {
         return Ok(Actor::Anonymous);
-    };
+    }
+    let secret = secret.ok_or(SessionError::Reauthenticate)?;
+    let tag = URL_SAFE_NO_PAD
+        .decode(tag)
+        .map_err(|_| SessionError::Reauthenticate)?;
+    if !verify(SIGNER_SALT, signed, secret, &tag) {
+        return Err(SessionError::Reauthenticate);
+    }
+    let session: Session = serde_json::from_value(serde_json::Value::Object(payload))
+        .map_err(|_| SessionError::Reauthenticate)?;
     let Ok(user_id) = session.user_id.parse::<i32>() else {
         return Ok(Actor::Anonymous);
     };
@@ -126,13 +154,8 @@ pub fn is_legacy_key(key: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
 }
 
-fn decode_session(encoded: &str, secret: &str) -> Option<Session> {
-    if encoded.len() > MAX_SESSION_BYTES {
-        return None;
-    }
-    let (signed, tag) = encoded.rsplit_once(':')?;
-    let tag = URL_SAFE_NO_PAD.decode(tag).ok()?;
-    if !verify(SIGNER_SALT, signed, secret, &tag) {
+fn decode_session_data(signed: &str) -> Option<serde_json::Map<String, serde_json::Value>> {
+    if signed.len() > MAX_SESSION_BYTES {
         return None;
     }
     let (payload, timestamp) = signed.rsplit_once(':')?;

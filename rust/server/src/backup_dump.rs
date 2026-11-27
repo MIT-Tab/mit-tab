@@ -19,7 +19,14 @@ pub const INVALID: &str = "This file is not a supported MIT-Tab MySQL dump.";
 pub fn parse(bytes: &[u8]) -> Result<Dump<'_>, &'static str> {
     let text = std::str::from_utf8(bytes).map_err(|_| INVALID)?;
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    if text.is_empty() || text.contains('\0') {
+    if text.contains('\0')
+        || !text
+            .lines()
+            .rev()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .is_some_and(|line| line.starts_with("-- Dump completed on "))
+    {
         return Err(INVALID);
     }
     let mut dump = Dump {
@@ -47,7 +54,19 @@ pub fn parse(bytes: &[u8]) -> Result<Dump<'_>, &'static str> {
             _ => {}
         }
     }
-    for required in ["tab_tabsettings", "tab_team", "tab_judge", "tab_round"] {
+    for required in [
+        "auth_user",
+        "auth_user_groups",
+        "tab_tabsettings",
+        "tab_school",
+        "tab_team",
+        "tab_debater",
+        "tab_team_debaters",
+        "tab_judge",
+        "tab_room",
+        "tab_round",
+        "tab_outround",
+    ] {
         if !dump.tables.contains(required) {
             return Err(INVALID);
         }
@@ -339,20 +358,29 @@ mod tests {
     const SCHEMA: &str = r#"
       /*!80000 SET @@GLOBAL.SYSTEM_VARIABLE = 1 */;
       DROP TABLE IF EXISTS tab_tabsettings;
+      CREATE TABLE auth_user (`id` INT);
+      CREATE TABLE auth_user_groups (`id` INT);
       CREATE TABLE tab_tabsettings (`id` INT);
+      CREATE TABLE tab_school (`id` INT);
+      CREATE TABLE tab_debater (`id` INT);
+      CREATE TABLE tab_team_debaters (`id` INT);
+      CREATE TABLE tab_room (`id` INT);
+      CREATE TABLE tab_outround (`id` INT);
       CREATE TABLE tab_team (`id` INT);
       CREATE TABLE tab_judge (`id` INT);
       CREATE TABLE tab_round (`id` INT);
       CREATE TABLE third_party_table (`id` INT);
     "#;
 
+    const FOOTER: &str = "\n-- Dump completed on 2026-01-01 00:00:00\n";
+
     #[test]
     fn reads_literals_without_replaying_mysql_controls() {
         let document = format!(
-            "{SCHEMA}INSERT INTO `tab_tabsettings` (`id`, `value_string`) VALUES (1,'semicolon; retained'),(2,'two ''quotes''');"
+            "{SCHEMA}INSERT INTO `tab_tabsettings` (`id`, `value_string`) VALUES (1,'semicolon; retained'),(2,'two ''quotes''');{FOOTER}"
         );
         let dump = parse(document.as_bytes()).unwrap();
-        assert_eq!(dump.tables.len(), 4);
+        assert_eq!(dump.tables.len(), 11);
         assert_eq!(dump.inserts.len(), 1);
         assert!(dump.inserts[0].sql.contains("semicolon; retained"));
     }
@@ -368,10 +396,16 @@ mod tests {
             "INSERT INTO tab_team (id) VALUES (1 /* comment */);",
         ] {
             assert!(
-                parse(format!("{SCHEMA}{suffix}").as_bytes()).is_err(),
+                parse(format!("{SCHEMA}{suffix}{FOOTER}").as_bytes()).is_err(),
                 "{suffix}"
             );
         }
-        assert!(parse(b"INSERT INTO tab_team (id) VALUES (1);").is_err());
+        assert!(parse(SCHEMA.as_bytes()).is_err());
+        let no_members = SCHEMA
+            .lines()
+            .filter(|line| !line.contains("tab_team_debaters"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(parse(format!("{no_members}{FOOTER}").as_bytes()).is_err());
     }
 }

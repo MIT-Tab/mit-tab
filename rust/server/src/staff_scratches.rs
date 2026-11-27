@@ -80,11 +80,12 @@ pub fn routes() -> Router<App> {
 }
 
 pub async fn middleware(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let Ok(actor) =
-        legacy_session::actor(&app.db, request.headers(), app.django_secret.as_deref()).await
-    else {
-        return unavailable();
-    };
+    let actor =
+        match legacy_session::actor(&app.db, request.headers(), app.django_secret.as_deref()).await
+        {
+            Ok(actor) => actor,
+            Err(error) => return error.response(),
+        };
     let scope = match actor {
         Actor::Anonymous => {
             return access::found(format!("/public/login/?next={}", request.uri().path()));

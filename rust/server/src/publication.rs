@@ -8,6 +8,8 @@ use crate::settings::Settings;
 pub const VISIBILITY_KEYS: &[&str] = &["var_teams_visible", "nov_teams_visible"];
 pub type PublishedPlacements = [BTreeMap<i32, i32>; 2];
 
+// Callers take the tournament round lock before the first consistent read in
+// their transaction. A stage lock alone cannot make an older snapshot current.
 pub async fn refresh_placements(
     db: &mut MySqlConnection,
     settings: &Settings,

@@ -54,6 +54,7 @@ const LINKS: &[AdminSection] = &[
             ("Scratches", "/scratches/view/"),
             ("Check-In", "/batch_checkin/"),
             ("Preliminary Pairings", "/pairings/view_rounds/"),
+            ("Round Statistics", "/admin/tab/roundstats/"),
             ("Elimination Pairings", "/outround_pairing"),
             (
                 "Manual Judge Assignments",
@@ -72,6 +73,7 @@ pub fn routes() -> Router<App> {
         .route("/admin/{application}/{model}/", get(model))
         .route("/admin/{application}/{model}/{id}/change/", get(change))
         .merge(admin_accounts::routes())
+        .merge(crate::admin_repairs::routes())
 }
 
 async fn index(Extension(actor): Extension<Actor>) -> Response {

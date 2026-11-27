@@ -105,6 +105,7 @@ async fn respond(app: &App, headers: HeaderMap, include_import: bool) -> Respons
     }
     let result = async {
         let mut db = app.db.begin().await?;
+        crate::staff_pairing::lock_round_if_configured(&mut db).await?;
         let value = payload(&mut db, &source, true).await?;
         db.commit().await?;
         Ok::<_, sqlx::Error>(private(Json(value)))

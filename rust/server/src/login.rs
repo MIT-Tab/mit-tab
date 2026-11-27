@@ -175,6 +175,13 @@ async fn destination(app: &App, account: &Account, next: &str) -> Result<String,
     if !next.is_empty() {
         return Ok(next.into());
     }
+    if !account.staff
+        && !account.superuser
+        && !account.board
+        && access::legacy_entry_user(app, account.id).await?
+    {
+        return Ok("/pairings/status/".into());
+    }
     let hide = sqlx::query_scalar::<_, bool>(
         "SELECT hide_tournament_todo FROM tab_usertournamentsetuppreference WHERE user_id = ?",
     )

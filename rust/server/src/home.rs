@@ -453,6 +453,10 @@ pub async fn index(State(app): State<App>, Extension(actor): Extension<Actor>) -
             Ok(None) => access::access_denied(),
             Err(_) => unavailable(),
         },
-        Actor::User { .. } => access::found("/public/"),
+        Actor::User { id, .. } => match access::legacy_entry_user(&app, id).await {
+            Ok(true) => access::found("/pairings/status/"),
+            Ok(false) => access::found("/public/"),
+            Err(_) => unavailable(),
+        },
     }
 }

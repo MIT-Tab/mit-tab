@@ -1,6 +1,6 @@
 """Compare the Rust HTTP server with Django over a shared disposable test DB."""
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -213,11 +213,19 @@ def test_missing_session_signing_key_does_not_remove_staff_restrictions():
     with rust_server() as port:
         for path in API_PATHS:
             assert request(port, path, cookie=cookie)[0] == client.get(path).status_code == 302
+    visitor = Client().session
+    visitor["_return_to"] = "/public/pairings/"
+    visitor.save()
     with rust_server(session_key_configured=False) as port:
-        status, _, body = request(port, COUNTS, cookie=cookie)
-        assert status == 503
-        assert body == b"Unable to complete this request."
+        assert request(port, "/public/", cookie=visitor.session_key)[0] == 200
+        status, headers, _ = request(port, COUNTS, cookie=cookie)
+        assert status == 303 and headers["Location"] == "/public/login/"
+        assert headers["Cache-Control"] == "private, no-store"
+        assert request(port, headers["Location"], cookie=cookie)[0] == 200
         assert request(port, COUNTS)[0] == 200
+    with rust_server(overrides={"MITTAB_DJANGO_SECRET_KEY": "wrong-fixture-key"}) as port:
+        status, headers, _ = request(port, COUNTS, cookie=cookie)
+        assert status == 303 and headers["Location"] == "/public/login/"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -333,6 +341,35 @@ def test_speaker_awards_match_legacy_scoring_and_publication_gates():
         outround.delete()
         check(port, 200)
 
+
+
+
+@pytest.mark.django_db(transaction=True)
+def test_live_publication_reads_after_concurrent_result_correction():
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    TabSettings.set("var_teams_visible", 2)
+    school = School.objects.create(name="Publication fixture")
+    first, second = [Team.objects.create(name=name, school=school, seed=0)
+                     for name in ("Original winner", "Corrected winner")]
+    final = Outround.objects.create(gov_team=first, opp_team=second, num_teams=2,
+                                    type_of_round=0, victor=Outround.GOV)
+    with rust_server() as port, ThreadPoolExecutor(max_workers=1) as pool:
+        assert request(port, LIVE)[0] == 200
+        with transaction.atomic():
+            TabSettings.objects.select_for_update().get(key="cur_round")
+            Outround.objects.filter(pk=final.pk).update(victor=Outround.OPP)
+            # A public refresh must not establish its source snapshot until
+            # the tournament mutation holding the round lock has committed.
+            pending = pool.submit(request, port, LIVE)
+            with pytest.raises(FutureTimeout):
+                pending.result(timeout=0.8)
+        status, _, body = pending.result()
+        assert status == 200
+        winner, = (row["team"]["tournament_id"] for row in json.loads(body)["team_results"]
+                   if row["division"] == "varsity" and row["place"] == 1)
+        assert winner == second.id
+        assert PublishedTeamPlacement.objects.get(team=second, stage__num_teams=2).place == 1
 
 
 def compare_live(port, client, *, completed, expected_placement_count=None):
@@ -591,6 +628,9 @@ def test_native_board_login_opens_on_outcomes_and_retains_board_restrictions():
             assert headers["Location"] == "/403/"
         Round.objects.filter(pk=rounds[3].pk).update(victor=Round.UNKNOWN)
         assert request(port, LIVE, cookie=session)[0] == 403
+        TabSettings.objects.filter(key="tot_rounds").delete()
+        Outround.objects.create(gov_team=teams[0], opp_team=teams[1], num_teams=2, type_of_round=0)
+        assert request(port, LIVE, cookie=session)[1]["Location"] == "/403/"
         assert request(port, "/admin/logout/", cookie=session)[1]["Location"] == "/"
 
 
@@ -1161,6 +1201,10 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
     from mittab.apps.tab.forms import ResultEntryForm, score_panel
 
     tab = legacy_tab_session("native-ballots")
+    volunteer = get_user_model().objects.create_user(username="entry", password="fixture-entry")
+    client = Client()
+    client.force_login(volunteer)
+    entry = client.cookies["sessionid"].value
     board = legacy_tab_session("ballots-board")
     get_user_model().objects.get(username="ballots-board").groups.add(Group.objects.create(name="APDA Board"))
     TabSettings.set("cur_round", 2)
@@ -1218,7 +1262,15 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
             assert debate.victor == Round.UNKNOWN and debate.result_entered_at is None
             assert not debate.roundstats_set.exists()
 
-        assert post(single, {**first, "rfd": " Synthetic note "})[1]["Location"] == "/pairings/status/"
+        assert request(port, "/", cookie=entry)[1]["Location"] == "/pairings/status/"
+        assert request(port, "/view_teams/", cookie=entry)[0] == 200
+        assert request(port, "/enter_school/", cookie=entry)[0] == 200
+        assert post("/enter_school/", {"name": "Volunteer School"}, session=entry)[0] == 302
+        assert School.objects.filter(name="Volunteer School").exists()
+        for denied in ("/settings_form", "/pairing/view_backups/", f"/team/{teams[0].id}/delete/"):
+            assert request(port, denied, cookie=entry)[1]["Location"] == "/403/"
+        assert request(port, single, cookie=entry)[0] == 200
+        assert post(single, {**first, "rfd": " Synthetic note "}, session=entry)[1]["Location"] == "/pairings/status/"
         debate.refresh_from_db()
         assert debate.victor == Round.GOV and debate.result_entered_at
         entered = debate.result_entered_at
@@ -1260,6 +1312,18 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
                 role: (debater.id, Decimal(f"{speaks:.4f}"), ranks)
                 for debater, role, speaks, ranks in expected
             }
+
+        # The reference assigns distinct ranks before its tie-group pass.
+        tied = [(Round.GOV, (30, 30, 28, 27), ranks) for ranks in ((1, 2, 3, 4), (2, 1, 3, 4))]
+        grouped = {Round.GOV: [list(zip(speakers, roles, speaks, ranks)) for _, speaks, ranks in tied]}
+        expected, _ = score_panel(grouped, discard_minority=False)
+        tied_fields = {}
+        for i, (winner, speaks, ranks) in enumerate(tied, 1):
+            tied_fields.update(ballot(winner, speaks, ranks, f"{i}-"))
+        assert post(f"{single}2/", tied_fields)[0] == 302
+        assert dict(debate.roundstats_set.values_list("debater_role", "ranks")) == {
+            role: rank for _, role, _, rank in expected
+        }
 
         TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
         assert post(single, {"rfd": "Too late"})[0] == 422
@@ -1519,6 +1583,9 @@ def test_native_board_bracket_operations_allow_only_team_room_and_result_fields(
         final = Outround.objects.get(num_teams=2)
         assert {final.gov_team_id, final.opp_team_id} == {replacement, original}
         assert final.chair_id is None and not final.judges.exists()
+        assert correction(final.id, {"action": "room", "room": rooms[2].id})[0] == 302
+        assert correction(first.id, {"action": "result", "victor": 0})[0] == 409
+        assert Outround.objects.get(id=first.id).victor == Outround.GOV
         for matchup in (first, second):
             matchup.refresh_from_db()
             assert matchup.chair_id == judges[0].id
@@ -3103,6 +3170,14 @@ def test_native_manual_pairing_corrections_are_transactional_and_staff_only():
         assert post(f"/pairings/assign_team/{debate.id}/gov/{gov.id}/")[0] == 422
         assert post(commands[5])[0] == 200
         assert not NoShow.objects.filter(no_show_team=spare).exists()
+        current = request(port, "/round/1/", cookie=tab)[2]
+        assert b'class="manual-team"' in current and b'class="manual-pairing-edit"' in current
+        assert b"Manual edits" in current
+        ManualJudgeAssignment.objects.filter(round=debate).delete()
+        AuditEvent.record(debate, "judges_paired", None)
+        after_reset = request(port, "/round/1/", cookie=tab)[2]
+        assert b'class="manual-team"' in after_reset and b'class="manual-pairing-edit"' not in after_reset
+        assert b"Manual edits" in after_reset
 
         for command in commands[6:]:
             assert post(command)[0] == 200
@@ -3333,6 +3408,18 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
             row.judges.add(judge)
             Outround.objects.filter(id=row.id).update(chair=judge)
         assigned = {row.id: list(row.judges.values_list("id", flat=True)) for row in matching}
+        challenged_match = next(row for row in matching if c in (row.gov_team_id, row.opp_team_id))
+        ballot = f"/outround/{challenged_match.id}/result/"
+        for winning_team in (c, a, c):
+            code = Outround.GOV if winning_team == challenged_match.gov_team_id else Outround.OPP
+            assert post(ballot, {"winner": code, "round_instance": challenged_match.id})[0] == 302
+        assert BreakingTeam.objects.get(team_id=c).effective_seed == 1
+        assert b"Manual edits" in request(port, "/apda-board/outrounds/", cookie=board)[2]
+        preview = request(port, "/outround_pairing/0/4", cookie=tab)[2]
+        assert b"Manual edits" in preview
+        assert any(event.get("public", {}).get("source") == "staff outround result"
+                   for event in AuditEvent.objects.filter(object_id=challenged_match.id, content_type__model="outround")
+                   .values_list("changes", flat=True))
 
         def board_post(url, form):
             return request(port, url, method="POST",
@@ -3366,6 +3453,7 @@ def test_native_elimination_challenge_once_enforces_pool_and_seeds(tmp_path, imp
 @pytest.mark.django_db(transaction=True)
 def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
     from urllib.parse import quote
+    from mittab.apps.tab.models import PublishedOutroundStage
 
     staff = legacy_tab_session("backup-staff")
     board = legacy_tab_session("backup-board")
@@ -3416,7 +3504,9 @@ def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
         assert post(restore, {})[0] == 422
 
         bad = tmp_path / "Invalid_7_2_3_U.dump.sql"
-        bad.write_bytes(full.read_bytes() + b"\nINSERT INTO `tab_team` (`id`,`absent_column`) VALUES (10000,0);\n")
+        dump, footer = full.read_bytes().rsplit(b"-- Dump completed on ", 1)
+        bad.write_bytes(dump + b"INSERT INTO `tab_team` (`id`,`absent_column`) VALUES (10000,0);\n"
+                        + b"-- Dump completed on " + footer)
         Judge.objects.filter(id=judge.id).update(rank=9)
         response = post("/backup/restore/Invalid_7_2_3_U/", {"confirm": "on"})
         assert response[0] == 422 and b"incompatible with the installed" in response[2], response
@@ -3429,12 +3519,36 @@ def test_native_backup_restore_is_atomic_and_preserves_scratches(tmp_path):
         uploaded, = tmp_path.glob("example_7*.dump.sql")
         assert uploaded.read_bytes() == data
 
+        later = Team.objects.create(name="Added after backup", school=school, seed=0)
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE review_restore_extension (team_id INT, FOREIGN KEY (team_id) REFERENCES tab_team(id)) ENGINE=InnoDB")
+            cursor.execute("INSERT INTO review_restore_extension VALUES (%s)", [later.id])
+        try:
+            response = post(restore, {"confirm": "on"})
+            assert response[0] == 422 and b"reference to a missing tournament record" in response[2]
+            assert Team.objects.filter(pk=later.id).exists()
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("DROP TABLE review_restore_extension")
+
+        stage = PublishedOutroundStage.objects.create(type_of_round=0, num_teams=2)
+        PublishedTeamPlacement.objects.create(stage=stage, team=team, place=1)
+        # An older mysqldump has a valid footer, without the later placement tables.
+        before_publication = re.sub(
+            rb"(?ms)^-- Table structure for table `tab_published(?:teamplacement|outroundstage)`\r?\n"
+            rb".*?(?=^-- Table structure for table |^-- Dump completed on )", b"", data,
+        )
+        assert b"CREATE TABLE `tab_publishedoutroundstage`" not in before_publication
+        assert b"CREATE TABLE `tab_publishedteamplacement`" not in before_publication
+        clean.write_bytes(before_publication)
         response = post(restore, {"confirm": "on"})
         assert response[0] == 302 and response[1]["Location"] == "/public/login/", response
+        assert not PublishedTeamPlacement.objects.exists()
+        assert not PublishedOutroundStage.objects.exists()
         judge.refresh_from_db()
         assert judge.rank == 5
         assert Scratch.objects.filter(id=scratch.id, team_id=team.id, judge_id=judge.id).exists()
-        assert len(list(tmp_path.glob("Before Restoring Backup*.dump.sql"))) == 2
+        assert len(list(tmp_path.glob("Before Restoring Backup*.dump.sql"))) == 3
         assert request(port, listing, cookie=staff)[1]["Location"].startswith("/public/login/")
 
 
@@ -3715,7 +3829,7 @@ def test_native_staff_rankings_and_report_match_reference():
                                       ranks=i+1, debater_role=role)
     judges_url = "/judges/speaker-points/"
     with rust_server() as port:
-        for url in ("/team/ranking/", "/team/rank/", "/debater/ranking/", "/debater/rank/", "/forum_post", judges_url):
+        for url in ("/team/ranking/", "/team/rank/", "/debater/ranking/", "/debater/rank/", judges_url):
             assert request(port, url, cookie=board)[1]["Location"] == "/403/"
         status, _, team_ranks = request(port, "/team/rank/", cookie=staff)
         assert status == 200 and b"Regional Fixture Rankings" in team_ranks, team_ranks
@@ -3732,6 +3846,14 @@ def test_native_staff_rankings_and_report_match_reference():
         assert status == 200, preview
         for value in (b"Rank Judge 0", b"2 teams", b"2 novices", b"Novice Speaker Awards", b"Varsity Breaking Teams"):
             assert value in preview
+        status, headers, board_preview = request(port, "/forum_post", cookie=board)
+        assert status == 200 and headers["Cache-Control"] == "private, no-store"
+        assert b"Varsity Breaking Teams" in board_preview and b"Rank Judge 0" in board_preview
+        assert request(port, "/forum_post", method="HEAD", cookie=board)[0] == 200
+        assert request(port, "/forum_post", method="POST", cookie=board)[1]["Location"] == "/403/"
+        Scratch.objects.create(team=teams[0], judge=judges[1], scratch_type=Scratch.TAB_SCRATCH)
+        Judge.objects.filter(pk=judges[1].pk).update(rank=9, wing_only=True)
+        assert request(port, "/forum_post", cookie=board)[2] == board_preview
         highlighted = judges[2]
         status, headers, report = request(port, f"{judges_url}?minimum_rounds=1&judge={highlighted.id}", cookie=staff)
         assert status == 200 and headers["Cache-Control"] == "private, no-store"
@@ -3863,6 +3985,7 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
     from django.contrib.auth.hashers import check_password
     from django.contrib.auth.models import Permission
     from django.contrib.contenttypes.models import ContentType
+    from mittab.apps.tab.models import PublishedOutroundStage
 
     staff = legacy_tab_session("native-admin")
     board = legacy_tab_session("native-admin-board")
@@ -3927,6 +4050,44 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
         assert post(f"{users}{user.id}/delete/", {"confirm": "on"})[0] == 302
         assert post(f"{groups}{group.id}/delete/", {"confirm": "on"})[0] == 302
         assert not user_model.objects.filter(id=user.id).exists() and not Group.objects.filter(id=group.id).exists()
+
+        speaker = Debater.objects.create(name="Administrative Score", novice_status=0)
+        teams[0].debaters.add(speaker)
+        score = RoundStats.objects.create(round=debate, debater=speaker, speaks=25, ranks=1, debater_role="pm")
+        edit = f"/admin/tab/roundstats/{score.id}/change/"
+        delete = f"/admin/tab/round/{debate.id}/delete/"
+        final = Outround.objects.create(num_teams=2, type_of_round=0, gov_team=teams[0], opp_team=teams[1])
+        delete_final = f"/admin/tab/outround/{final.id}/delete/"
+        for path in (edit, delete, delete_final):
+            assert request(port, path, cookie=staff)[0] == 200
+            assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            assert post(path, {"confirm": "on"}, board)[1]["Location"] == "/403/"
+        fields = {"round_id": debate.id, "debater_id": speaker.id, "role": "pm", "speaks": "31.2575", "ranks": "1"}
+        assert post(edit, {**fields, "speaks": "101.0000"})[0] == 422
+        assert post(edit, fields)[0] == 302
+        assert RoundStats.objects.get(id=score.id).speaks == Decimal("31.2575")
+        assert AuditEvent.objects.filter(changes__public__source="admin scores", object_id=debate.id).exists()
+        assert post(delete, {})[0] == 422
+        assert post(delete, {"confirm": "on"})[0] == 302
+        assert not Round.objects.filter(id=debate.id).exists() and not RoundStats.objects.filter(id=score.id).exists()
+        assert post(delete_final, {"confirm": "on"})[0] == 302
+        assert not Outround.objects.filter(id=final.id).exists()
+        assert AuditEvent.objects.filter(changes__public__source="admin deletion", object_id=final.id,
+                                         content_type__model="outround").exists()
+
+        # Deleting an old, hidden semifinal leaves the other published semifinal intact.
+        TabSettings.set("var_teams_visible", 256)
+        extra = [Team.objects.create(name=f"Admin Semifinal Team {i}", school=school, seed=0)
+                 for i in (3, 4)]
+        semifinal = Outround.objects.create(num_teams=4, type_of_round=0, gov_team=teams[0], opp_team=teams[1])
+        Outround.objects.create(num_teams=4, type_of_round=0, gov_team=extra[0], opp_team=extra[1])
+        stage = PublishedOutroundStage.objects.create(type_of_round=0, num_teams=4)
+        for team, place in zip(teams + extra, (2, 3, 3, 2)):
+            PublishedTeamPlacement.objects.create(stage=stage, team=team, place=place)
+        assert post(f"/admin/tab/outround/{semifinal.id}/delete/", {"confirm": "on"})[0] == 302
+        assert dict(PublishedTeamPlacement.objects.filter(stage=stage).values_list("team_id", "place")) == {
+            extra[0].id: 3, extra[1].id: 2
+        }
 
 
 @pytest.mark.django_db(transaction=True)

@@ -280,6 +280,7 @@ pub async fn page(
     };
     let result = async {
         let mut db = app.db.begin().await?;
+        crate::staff_pairing::lock_round_if_configured(&mut db).await?;
         let hide = hide_preference(&mut db, user).await?;
         let auto = automatic(&mut db).await?;
         let sections = states(&mut db, &auto).await?;

@@ -131,7 +131,15 @@ impl Backups {
             }
             let path = self.prefix.join(format!("{key}{SUFFIX}"));
             match tokio::fs::hard_link(&temporary.0, path).await {
-                Ok(()) => return Ok(key),
+                Ok(()) => {
+                    tokio::fs::File::open(&self.prefix)
+                        .await
+                        .map_err(|_| BackupError::Storage)?
+                        .sync_all()
+                        .await
+                        .map_err(|_| BackupError::Storage)?;
+                    return Ok(key);
+                }
                 Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
                 Err(_) => return Err(BackupError::Storage),
             }

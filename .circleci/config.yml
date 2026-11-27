@@ -278,10 +278,13 @@ jobs:
           name: Build and test Dockerfile
           command: |
             docker build -t mittab:test -f Dockerfile .
-            docker build -t mittab-static:test -f Dockerfile.static .
-            docker run --rm mittab-static:test sh -c '
-              test -f /var/www/tab/staticfiles/img/favicon.ico &&
-              test -f /var/www/tab/assets/webpack_bundles/main.css'
+            static_dockerfile=$(awk '/^static_sites:/{site=1} site && /dockerfile_path:/{print $NF; exit}' .do/deploy.template.yaml)
+            static_dir=$(awk '/^static_sites:/{site=1} site && /output_dir:/{print $NF; exit}' .do/deploy.template.yaml)
+            test -n "$static_dockerfile" && test -n "$static_dir"
+            docker build -t mittab-static:test -f "$static_dockerfile" .
+            docker run --rm -e STATIC_DIR="$static_dir" mittab-static:test sh -ec '
+              test -f "$STATIC_DIR/img/favicon.ico"
+              test -f "$STATIC_DIR/webpack_bundles/main.css"'
       - run:
           name: Start the Rust runtime with a new MySQL database
           command: |

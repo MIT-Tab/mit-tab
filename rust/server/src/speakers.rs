@@ -77,6 +77,7 @@ pub async fn novice(State(app): State<App>) -> Response {
 
 async fn get_awards(app: &App, novices_only: bool) -> Result<Awards, sqlx::Error> {
     let mut db = app.db.begin().await?;
+    crate::staff_pairing::lock_round_if_configured(&mut db).await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let placements = publication::refresh_placements(&mut db, &settings).await?;
     let completed_at = publication::completion_time(&mut db, &settings).await?;
