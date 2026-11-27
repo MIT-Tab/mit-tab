@@ -10,7 +10,7 @@ use crate::{
 pub struct Choice {
     id: i32,
     name: String,
-    occupied: bool,
+    pub(crate) occupied: bool,
     badges: Vec<String>,
 }
 

@@ -386,31 +386,37 @@ async fn sides(
 }
 
 async fn alts(State(app): State<App>, path: MatchedPath, Path(id): Path<i32>) -> Response {
-    alternatives(&app, path.as_str(), id, None).await
+    alternatives(&app, path.as_str(), id, None, None).await
 }
 
 async fn alts_fixed(
     State(app): State<App>,
     path: MatchedPath,
-    Path((id, _)): Path<(i32, i32)>,
+    Path((id, current)): Path<(i32, i32)>,
 ) -> Response {
-    alternatives(&app, path.as_str(), id, None).await
+    alternatives(&app, path.as_str(), id, Some(current), None).await
 }
 
 async fn alts_teams(
     State(app): State<App>,
     path: MatchedPath,
-    Path((id, _, side)): Path<(i32, i32, String)>,
+    Path((id, current, side)): Path<(i32, i32, String)>,
 ) -> Response {
     let side = match side.as_str() {
         "gov" => true,
         "opp" => false,
         _ => return error_response(Error::Invalid("Choose a side.")),
     };
-    alternatives(&app, path.as_str(), id, Some(side)).await
+    alternatives(&app, path.as_str(), id, Some(current), Some(side)).await
 }
 
-async fn alternatives(app: &App, path: &str, id: i32, side: Option<bool>) -> Response {
+async fn alternatives(
+    app: &App,
+    path: &str,
+    id: i32,
+    current: Option<i32>,
+    side: Option<bool>,
+) -> Response {
     let Ok(mut db) = app.db.acquire().await else {
         return unavailable();
     };
@@ -420,6 +426,13 @@ async fn alternatives(app: &App, path: &str, id: i32, side: Option<bool>) -> Res
         Ok(None) => return error_response(Error::Missing),
         Err(_) => return unavailable(),
     };
+    if kind == Debate::Inround {
+        return match crate::pairing_dropdowns::render(&mut db, &detail, path, current, side).await {
+            Ok(response) => response,
+            Err(sqlx::Error::RowNotFound) => error_response(Error::Missing),
+            Err(_) => unavailable(),
+        };
+    }
     let options = if let Some(side) = side {
         choices::teams(&mut db, kind, &detail, side).await
     } else if path.contains("alternative_judges") {

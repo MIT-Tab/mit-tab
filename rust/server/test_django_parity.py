@@ -288,12 +288,15 @@ def test_backup_listing_html_matches_django_bytes(html_assets, tmp_path):
 @pytest.mark.parametrize(
     "screen",
     [
-        pytest.param(
-            "pairings",
-            marks=pytest.mark.xfail(
-                strict=True, raises=pytest.fail.Exception, reason="Pairing control still has a different template",
-            ),
-        ),
+        "pairings",
+        "pairings previous",
+        "pairings empty",
+        "pairings prepare",
+        "pairings prepare pending",
+        "pairings repair",
+        "pairings team choices",
+        "pairings room choices",
+        "pairings judge choices",
         "admin index",
         "admin app",
         "scores",
@@ -319,6 +322,47 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     user = get_user_model().objects.create_superuser(
         username="staff-screenshot-parity", first_name="Fixture & Staff",
     )
+    if screen.startswith("pairings") and screen != "pairings empty":
+        chair = Judge.objects.create(name="Chair & Example", rank=Decimal("6.25"), request_wing=True)
+        wing = Judge.objects.create(name="A Wing", rank=Decimal("4.35"), wing_only=True)
+        checked = Judge.objects.create(name="Checked in judge", rank=Decimal("5.00"))
+        Judge.objects.create(name="Absent judge", rank=Decimal("7.20"))
+        chair_room = Room.objects.create(name="Room & Example", rank=8)
+        Room.objects.create(name="Unused room", rank=3)
+        tag = RoomTag.objects.create(tag="Accessible", priority=1)
+        first.required_room_tags.add(tag)
+        debate.chair = chair
+        debate.room = chair_room
+        debate.save(update_fields=["chair", "room"])
+        debate.judges.add(chair, wing)
+        CheckIn.objects.create(judge=checked, round_number=1)
+        if "choices" in screen:
+            tagged_room = Room.objects.create(name="Accessible room", rank=7)
+            tagged_room.tags.add(tag)
+            RoomCheckIn.objects.create(room=tagged_room, round_number=1)
+        if screen == "pairings prepare pending":
+            debate.victor = Round.NONE
+            debate.save(update_fields=["victor"])
+            checked.schools.add(school)
+            CheckIn.objects.create(judge=checked, round_number=2)
+        from mittab.apps.tab.models import ManualJudgeAssignment
+        ManualJudgeAssignment.objects.update_or_create(round=debate, judge=wing, defaults={"created_by": user})
+        AuditEvent.record(debate, AuditEvent.MANUAL_JUDGE_ASSIGN, user, note="Assigned by hand")
+        AuditEvent.record(debate, AuditEvent.EDIT, user, changes={"public": {
+            "source": "staff team correction",
+            "before": {"gov_team": {"id": second.id, "name": second.name}},
+            "after": {"gov_team": {"id": first.id, "name": first.name}},
+        }})
+        spare = Team.objects.create(name="Spare team", school=school, seed=Team.UNSEEDED, checked_in=True)
+        if screen == "pairings previous":
+            TabSettings.set("cur_round", 3)
+            TabSettings.set("pairing_released", 1)
+            previous = Round.objects.create(round_number=2, gov_team=first, opp_team=spare)
+            previous.judges.add(chair)
+            Bye.objects.create(bye_team=spare, round_number=1)
+    elif screen == "pairings empty":
+        debate.delete()
+        TabSettings.set("cur_round", 1)
     if screen == "empty scores":
         score.delete()
     elif screen == "scores second page":
@@ -343,6 +387,14 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     client.cookies["csrftoken"] = csrf
     path = {
         "pairings": "/pairings/status/",
+        "pairings previous": "/round/1/",
+        "pairings empty": "/pairings/status/",
+        "pairings prepare": "/pairing/pair_round/",
+        "pairings prepare pending": "/pairing/pair_round/",
+        "pairings repair": "/pairing/re_pair_round/",
+        "pairings team choices": f"/round/{debate.id}/{first.id}/alternative_teams/gov/",
+        "pairings room choices": f"/round/{debate.id}/alternative_rooms/{getattr(debate, 'room_id', None)}/",
+        "pairings judge choices": f"/round/{debate.id}/alternative_judges/{getattr(debate, 'chair_id', None)}/",
         "admin index": "/admin/",
         "admin app": "/admin/tab/",
         "scores": "/admin/tab/roundstats/",
@@ -368,6 +420,9 @@ def test_staff_screenshot_html_matches_django_bytes(html_assets, screen):
     with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
         response = client.post(path, post_data) if post_data else client.get(path)
     assert status == response.status_code == 200
+    if screen.startswith("pairings"):
+        # The native form carries the displayed round to prevent stale-page writes.
+        body = re.sub(rb'<input type="hidden" name="round" value="\d+">', b'', body)
     assert_html_bytes(body, response.content)
 
 
@@ -1270,7 +1325,7 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch)
     with rust_server(overrides={"BACKUP_STORAGE": "", "BACKUP_PREFIX": str(backup_dir)}) as port:
         status, headers, body = request(port, pair_page, cookie=tab)
         assert status == 200
-        assert b"0 of 2" in body and b"disabled" in body
+        assert b"Need 2, have 0" in body and b"Not enough judges" in body
         csrf = load_cookies(headers)["csrftoken"].value
 
         def post(path, *, session=tab, round_number=1, token=csrf):
@@ -1311,7 +1366,8 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch)
         assert post(pair_page)[0] == 409
         assert post(pair_page, round_number=2)[0] == 409
         assert round_signature(2) == ([], [], [])
-        assert not b"Pairing Room 0" in request(port, status_page, cookie=tab)[2]
+        assert not Round.objects.filter(round_number=1, room__isnull=False).exists()
+        assert request(port, status_page, cookie=tab)[2].count(b"Assign Room") >= 2
 
         first, second = list(Round.objects.filter(round_number=1).order_by("id"))
         tag = RoomTag.objects.create(tag="Accessible Room", priority=Decimal("4.75"))
@@ -1331,7 +1387,13 @@ def test_native_pair_assign_publish_and_repair_are_atomic(tmp_path, monkeypatch)
 
         assert post(release_page)[0] == 302
         assert b"Pairing Room 1" in request(port, "/public/pairings/")[2]
-        assert post(release_page)[0] == 302
+        status, _, body = request(
+            port, release_page, method="POST",
+            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}",
+                           "X-CSRFToken": csrf, "X-Requested-With": "XMLHttpRequest"},
+            form={"round": 1},
+        )
+        assert status == 200 and json.loads(body) == {"pairing_released": False}
         assert b"Pairing Room 1" not in request(port, "/public/pairings/")[2]
 
         RoundStats.objects.create(round=first, debater=first.gov_team.debaters.first(),
@@ -1485,7 +1547,8 @@ def test_native_judge_assignment_matches_django_for_all_prelim_modes(tmp_path, m
 
         actual = signature()
         assert AuditEvent.objects.filter(event_type="judges_paired").count() == 12 * 4
-        assert b"<b>Assignment Judge" in request(port, "/pairings/status/", cookie=tab)[2]
+        page = request(port, "/pairings/status/", cookie=tab)[2]
+        assert re.search(rb'judge-toggle[^"]*\bchair"[^>]*>\s*Assignment Judge', page)
         Judge.objects.filter(pk__in=[judge.id for judge in judges]).update(wing_only=True)
         status, _, body = assign()
         assert status == 409 and b"eligible chair" in body
@@ -3468,13 +3531,15 @@ def test_native_manual_pairing_corrections_are_transactional_and_staff_only():
         assert post(commands[5])[0] == 200
         assert not NoShow.objects.filter(no_show_team=spare).exists()
         current = request(port, "/round/1/", cookie=tab)[2]
-        assert b'class="manual-team"' in current and b'class="manual-pairing-edit"' in current
-        assert b"Manual edits" in current
+        assert b'class="gov-team manual-team"' in current or b'class="opp-team manual-team"' in current
+        assert b'judge-assignment manual-lay' in current
+        assert b"manual edits" in current
         ManualJudgeAssignment.objects.filter(round=debate).delete()
         AuditEvent.record(debate, "judges_paired", None)
         after_reset = request(port, "/round/1/", cookie=tab)[2]
-        assert b'class="manual-team"' in after_reset and b'class="manual-pairing-edit"' not in after_reset
-        assert b"Manual edits" in after_reset
+        assert b'class="gov-team manual-team"' in after_reset or b'class="opp-team manual-team"' in after_reset
+        assert b'judge-assignment manual-lay' not in after_reset
+        assert b"manual edits" not in after_reset
 
         for command in commands[6:]:
             assert post(command)[0] == 200

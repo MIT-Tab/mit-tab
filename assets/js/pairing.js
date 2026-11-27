@@ -2,13 +2,22 @@ import $ from "jquery";
 
 import quickSearchInit from "./quickSearch";
 
+function pairingWrite(url, data) {
+  return {
+    url,
+    data,
+    type: "POST",
+    headers: { "X-CSRFToken": $("[name=csrfmiddlewaretoken]").first().val() },
+  };
+}
+
 function populateTabCards() {
   const roundNumber = $("#round-number").data("round-number");
   if (!roundNumber || !$(".tabcard").length) {
     return;
   }
   $.ajax({
-    url: `/round/${roundNumber}/stats`,
+    url: `/round/${roundNumber}/stats/`,
     success(result) {
       Object.entries(result).forEach(([teamId, stats]) => {
         const tabCardElement = $(`.tabcard[team-id=${teamId}]`);
@@ -21,7 +30,7 @@ function populateTabCards() {
         ].join(" / ");
         const debatersText = stats.debaters || "";
         tabCardElement.attr("title", "Wins / Speaks / Govs / Opps / Seed");
-        tabCardElement.attr("href", `/team/card/${teamId}`);
+        tabCardElement.attr("href", `/team/card/${teamId}/`);
         tabCardElement.empty();
         if (debatersText) {
           tabCardElement.append(document.createTextNode(debatersText));
@@ -38,14 +47,14 @@ function assignTeam(e) {
   const teamId = $(e.target).attr("team-id");
   const roundId = $(e.target).attr("round-id");
   const position = $(e.target).attr("position");
-  const url = `/pairings/assign_team/${roundId}/${position}/${teamId}`;
+  const url = `/pairings/assign_team/${roundId}/${position}/${teamId}/`;
   const alertMsg = `
     An error occured.
     Refresh the page and try to fix any inconsistencies you may notice.
   `;
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       if (result.success) {
         const $container = $(`.row[round-id=${roundId}] .${position}-team`);
@@ -93,7 +102,7 @@ function handleSwitchSides(event) {
   const alertMsg = "Unable to switch sides. Refresh and try again.";
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       if (result.success) {
         updateTeamSection(roundId, "gov", result.gov_team);
@@ -140,12 +149,17 @@ function assignRoom(e) {
   $button.addClass("disabled");
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
       $buttonWrapper.attr("room-id", result.room_id);
-      $button.html(`<i class="far fa-building"></i> ${result.room_name}`);
+      $button
+        .empty()
+        .append(
+          $("<i>").addClass("far fa-building"),
+          document.createTextNode(` ${result.room_name}`),
+        );
       $(`.room span[round-id=${roundId}] .room-toggle`).css(
         "background-color",
         result.room_color,
@@ -161,7 +175,7 @@ function populateAlternativeRooms() {
   const outround = $parent.attr("outround") === "true";
   const baseUrl = outround ? "/outround" : "/round";
   const query = outround ? window.location.search || "" : "";
-  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId || ""}${query}`;
+  const url = `${baseUrl}/${roundId}/alternative_rooms/${roomId ? `${roomId}/` : ""}${query}`;
 
   $.ajax({
     url,
@@ -179,7 +193,7 @@ function populateAlternativeTeams() {
   const teamId = $parent.attr("team-id");
   const roundId = $parent.attr("round-id");
   const position = $parent.attr("position");
-  const url = `/round/${roundId}/${teamId}/alternative_teams/${position}`;
+  const url = `/round/${roundId}/${teamId}/alternative_teams/${position}/`;
 
   $.ajax({
     url,
@@ -197,7 +211,7 @@ function assignJudge(e) {
   const roundId = $(e.target).attr("round-id");
   const judgeId = $(e.target).attr("judge-id");
   const curJudgeId = $(e.target).attr("current-judge-id");
-  const url = `/round/${roundId}/assign_judge/${judgeId}/${curJudgeId || ""}`;
+  const url = `/round/${roundId}/assign_judge/${judgeId}/${curJudgeId ? `${curJudgeId}/` : ""}`;
 
   let $buttonWrapper;
   if (curJudgeId) {
@@ -209,7 +223,7 @@ function assignJudge(e) {
   $button.addClass("disabled");
 
   $.ajax({
-    url,
+    ...pairingWrite(url),
     success(result) {
       $button.removeClass("disabled");
       $buttonWrapper.removeClass("unassigned");
@@ -218,7 +232,11 @@ function assignJudge(e) {
 
       const rank = result.judge_rank.toFixed(2);
       $button
-        .html(`${result.judge_name} <small>(${rank})</small>`)
+        .empty()
+        .append(
+          document.createTextNode(`${result.judge_name} `),
+          $("<small>").text(`(${rank})`),
+        )
         .attr("title", "Manually assigned judge");
       $(`.judges span[round-id=${roundId}] .judge-toggle`).removeClass("chair");
       $(`.judges span[round-id=${roundId}][judge-id=${result.chair_id}]
@@ -231,7 +249,7 @@ function populateAlternativeJudges() {
   const $parent = $(this).parent();
   const judgeId = $parent.attr("judge-id");
   const roundId = $parent.attr("round-id");
-  const url = `/round/${roundId}/alternative_judges/${judgeId || ""}`;
+  const url = `/round/${roundId}/alternative_judges/${judgeId ? `${judgeId}/` : ""}`;
 
   $.ajax({
     url,
@@ -267,7 +285,9 @@ function alertLink() {
 function togglePairingRelease(event) {
   event.preventDefault();
   $.ajax({
-    url: "/pairing/release",
+    ...pairingWrite("/pairing/release/", {
+      round: $("#round-number").data("round-number"),
+    }),
     success(result) {
       if (result.pairing_released) {
         $("#close-pairings-group").removeClass("d-none");
@@ -301,7 +321,7 @@ function handleJudgeRemoveClick(event) {
   }
 
   $.ajax({
-    url: `/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`,
+    ...pairingWrite(`/${endpointPrefix}/${roundId}/remove_judge/${judgeId}/`),
     dataType: "json",
     success: handleRemoveSuccess,
     error: handleRemoveError,
@@ -329,7 +349,7 @@ function handleChairClick(event) {
   }
 
   $.ajax({
-    url: `/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`,
+    ...pairingWrite(`/${endpointPrefix}/${roundId}/assign_chair/${judgeId}/`),
     dataType: "json",
     success: handleAssignSuccess,
     error: handleAssignError,

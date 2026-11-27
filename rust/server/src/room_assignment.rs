@@ -122,7 +122,7 @@ pub async fn plan(
         .collect())
 }
 
-fn seeded_key(gov: &Score, opp: &Score) -> (f64, f64, f64) {
+pub(crate) fn seeded_key(gov: &Score, opp: &Score) -> (f64, f64, f64) {
     let gov_speaks = gov.get(Stat::Speaks);
     let opp_speaks = opp.get(Stat::Speaks);
     (

@@ -1,4 +1,8 @@
 {
+  "break": "/break/",
+  "re_pair_round": "/pairing/re_pair_round/",
+  "quick_judge_checkin": "/pairings/quick_judge_checkin/",
+  "pretty_pair": "/public/pairings/",
   "add_scratch": "/enter_scratch/",
   "all_tab_cards": "/all_tab_cards/",
   "apda_board_home": "/apda-board/",

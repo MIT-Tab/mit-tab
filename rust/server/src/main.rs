@@ -42,6 +42,8 @@ mod login;
 mod maintenance_cli;
 mod motions;
 mod native_session;
+mod pairing_dropdowns;
+mod pairing_status;
 mod passwords;
 mod placements;
 mod public_api;
@@ -419,6 +421,10 @@ fn router(app: App) -> Router {
                 .route(
                     "/round/{round}/result/{count}/",
                     get(ballot_entry::panel_page).post(ballot_entry::panel),
+                )
+                .route(
+                    "/pairing/pair_round",
+                    get(|| async { access::found("/pairing/pair_round/") }),
                 )
                 .route(
                     "/pairing/pair_round/",

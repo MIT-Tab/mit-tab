@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use axum::{
-    Extension, Form,
+    Extension, Form, Json,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::Response,
@@ -11,14 +9,14 @@ use mittab_tabulation::{
     pairing::{PairingWeights, required_bye_count},
     prelim::Policy,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{MySqlConnection, QueryBuilder};
 
 use crate::{
     App, access,
     backups::Trigger,
     html::{self, Navigation},
-    judge_assignment,
+    judge_assignment, legacy_html,
     legacy_session::Actor,
     login, private, room_assignment, round_audit,
     settings::Settings,
@@ -73,7 +71,6 @@ impl From<sqlx::Error> for ChangeError {
     }
 }
 
-#[derive(Serialize)]
 struct Readiness {
     rooms: i64,
     judges: i64,
@@ -187,30 +184,131 @@ async fn preview(
     let mut db = app.db.begin().await?;
     let settings = Settings::load(&mut db, SETTINGS).await?;
     let round = target(&settings, repair)?;
-    let check = readiness(&mut db, &settings, round).await?;
-    let judges = sqlx::query_scalar::<_, String>(
-        "SELECT j.name FROM tab_judge j JOIN tab_checkin c ON c.judge_id = j.id
-         WHERE c.round_number = ? ORDER BY j.name, j.id",
-    )
-    .bind(round)
-    .fetch_all(&mut *db)
-    .await?;
-    db.commit().await?;
-    let csrf = html::page_csrf(headers).map_err(|_| ChangeError::Storage)?;
-    let title = if repair {
-        format!("Re-pair Round {round}")
+    let path = if repair {
+        "/pairing/re_pair_round/"
     } else {
-        format!("Pairing Round {round}")
+        "/pairing/pair_round/"
     };
-    let response = html::render(
-        "pair_prelim.html",
-        context! {
-            title, round, repair, check, judges, ready => check.issue().is_ok(), csrf,
-            nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        },
-        StatusCode::OK,
-    );
-    Ok(html::form_response(response, headers, &csrf))
+    let shell = legacy_html::shell(&mut db, actor, path).await?;
+    let csrf = login::TemplateCsrf::new(headers).map_err(|_| ChangeError::Storage)?;
+    let round_input = format!("<input type=\"hidden\" name=\"round\" value=\"{round}\">");
+    let (template, page) = if repair {
+        (
+            "pairing/confirm_re_pair.html",
+            context! {
+                round_number => round, csrf_input => csrf.input(), round_input,
+            },
+        )
+    } else {
+        let check = readiness(&mut db, &settings, round).await?;
+        let checks = [
+            (
+                format!(
+                    "Enough judges checked in for Round {round}? Need {}, have {}",
+                    check.needed, check.judges
+                ),
+                check.judges >= check.needed as i64,
+                "Judges are checked in".into(),
+                "Not enough judges".into(),
+            ),
+            (
+                format!(
+                    "Enough rooms available Round {round}? Need {}, have {}",
+                    check.needed, check.rooms
+                ),
+                check.rooms >= check.needed as i64,
+                "Rooms are checked in".into(),
+                "Not enough rooms".into(),
+            ),
+            (
+                format!("All Rounds properly entered for Round {}", round - 1),
+                check.previous_error.is_none(),
+                "All rounds look good".into(),
+                if check.previous_error.is_some() {
+                    previous_notice(&mut db, round - 1).await?
+                } else {
+                    String::new()
+                },
+            ),
+        ];
+        let check_status = checks.map(|(message, valid, yes, no)| {
+            (
+                message,
+                if valid { "Yes" } else { "No" },
+                if valid { yes } else { no },
+            )
+        });
+        let checked_in_judges = checked_in_judges(&mut db, round).await?;
+        (
+            "pairing/pair_round.html",
+            context! {
+                title => format!("Pairing Round {round}"),
+                check_status, checked_in_judges, csrf_input => csrf.input(), round_input,
+            },
+        )
+    };
+    db.commit().await?;
+    let mut response = legacy_html::render(template, shell, page, StatusCode::OK);
+    csrf.set_cookie(&mut response, headers);
+    Ok(response)
+}
+
+async fn checked_in_judges(
+    db: &mut MySqlConnection,
+    round: i32,
+) -> Result<Vec<minijinja::Value>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (i32, String, Option<String>)>(
+        "SELECT j.id, j.name, s.name FROM tab_judge j
+         LEFT JOIN tab_judge_schools x ON x.judge_id = j.id LEFT JOIN tab_school s ON s.id = x.school_id
+         WHERE EXISTS (SELECT 1 FROM tab_checkin c WHERE c.judge_id = j.id AND c.round_number = ?)
+         ORDER BY j.name, j.id, s.name, s.id",
+    ).bind(round).fetch_all(db).await?;
+    let mut judges: Vec<(i32, String, Vec<String>)> = Vec::new();
+    for (id, name, school) in rows {
+        if judges.last().is_none_or(|(previous, ..)| *previous != id) {
+            judges.push((id, name, Vec::new()));
+        }
+        if let Some(school) = school.filter(|school| !school.is_empty())
+            && let Some((_, _, schools)) = judges.last_mut()
+        {
+            schools.push(school);
+        }
+    }
+    Ok(judges
+        .into_iter()
+        .map(|(id, name, schools)| {
+            context! {
+                id, name, affiliations_display => schools.join(", "),
+            }
+        })
+        .collect())
+}
+
+async fn previous_notice(db: &mut MySqlConnection, round: i32) -> Result<String, sqlx::Error> {
+    type Row = (i32, String, bool, bool, String, bool, bool);
+    for (victor, government, gov_bye, gov_absent, opposition, opp_bye, opp_absent) in sqlx::query_as::<_, Row>(
+        "SELECT r.victor, g.name,
+            EXISTS(SELECT 1 FROM tab_bye b WHERE b.round_number = r.round_number AND b.bye_team_id = g.id),
+            EXISTS(SELECT 1 FROM tab_noshow n WHERE n.round_number = r.round_number AND n.no_show_team_id = g.id),
+            o.name,
+            EXISTS(SELECT 1 FROM tab_bye b WHERE b.round_number = r.round_number AND b.bye_team_id = o.id),
+            EXISTS(SELECT 1 FROM tab_noshow n WHERE n.round_number = r.round_number AND n.no_show_team_id = o.id)
+         FROM tab_round r JOIN tab_team g ON g.id = r.gov_team_id
+         JOIN tab_team o ON o.id = r.opp_team_id WHERE r.round_number = ? ORDER BY r.id",
+    ).bind(round).fetch_all(db).await? {
+        if victor == 0 {
+            return Ok("Not all rounds are entered. 'You have not entered all the results from the previous round.'".into());
+        }
+        for (name, bye, absent) in [(government, gov_bye, gov_absent), (opposition, opp_bye, opp_absent)] {
+            if bye {
+                return Ok(format!("You have a bye and results. {name} both had a bye and debated last round"));
+            }
+            if absent {
+                return Ok(format!("You have a noshow and results. {name} both debated and had a no show"));
+            }
+        }
+    }
+    Ok(String::new())
 }
 
 fn target(settings: &Settings, repair: bool) -> Result<i32, ChangeError> {
@@ -487,30 +585,12 @@ fn policy(settings: &Settings, round: i32) -> Policy {
     }
 }
 
-#[derive(Serialize)]
-struct Pairing {
-    id: i32,
-    government: String,
-    opposition: String,
-    room: Option<String>,
-    judges: Vec<Judge>,
-    victor: i32,
-    edits: crate::board_snapshot::StaffEdits,
-}
-
-#[derive(Serialize)]
-struct Judge {
-    name: String,
-    chair: bool,
-    manual: bool,
-}
-
 pub async fn status(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
-    match status_page(&app, actor, &headers, None).await {
+    match crate::pairing_status::render(&app, actor, &headers, None).await {
         Ok(response) => response,
         Err(issue) => error(actor, issue),
     }
@@ -522,86 +602,10 @@ pub async fn previous(
     headers: HeaderMap,
     Path(round): Path<i32>,
 ) -> Response {
-    match status_page(&app, actor, &headers, Some(round)).await {
+    match crate::pairing_status::render(&app, actor, &headers, Some(round)).await {
         Ok(response) => response,
         Err(issue) => error(actor, issue),
     }
-}
-
-async fn status_page(
-    app: &App,
-    actor: Actor,
-    headers: &HeaderMap,
-    selected: Option<i32>,
-) -> Result<Response, ChangeError> {
-    let mut db = app.db.begin().await?;
-    let settings = Settings::load(&mut db, SETTINGS).await?;
-    let current = settings.integer("cur_round", 1).saturating_sub(1);
-    let round = selected.unwrap_or(current);
-    if selected.is_some() && !(1..=current).contains(&round) {
-        return Ok(private((StatusCode::NOT_FOUND, "Round not found.")));
-    }
-    let mut history = crate::board_snapshot::histories(&mut db, "round").await?;
-    let mut judges: HashMap<i32, Vec<Judge>> = HashMap::new();
-    for (pairing, name, chair, manual) in sqlx::query_as::<_, (i32, String, bool, bool)>(
-        "SELECT r.id, j.name, COALESCE(r.chair_id = j.id, FALSE), manual.id IS NOT NULL FROM tab_round r
-         JOIN tab_round_judges x ON x.round_id = r.id JOIN tab_judge j ON j.id = x.judge_id
-         LEFT JOIN tab_manualjudgeassignment manual ON manual.round_id = r.id AND manual.judge_id = j.id
-         WHERE r.round_number = ? ORDER BY COALESCE(r.chair_id = j.id, FALSE) DESC, j.name, j.id",
-    )
-    .bind(round)
-    .fetch_all(&mut *db)
-    .await?
-    {
-        judges
-            .entry(pairing)
-            .or_default()
-            .push(Judge { name, chair, manual });
-    }
-    let pairings: Vec<_> = sqlx::query_as::<_, (i32, String, String, Option<String>, i32)>(
-        "SELECT r.id, g.name, o.name, m.name, r.victor FROM tab_round r
-         JOIN tab_team g ON g.id = r.gov_team_id JOIN tab_team o ON o.id = r.opp_team_id
-         LEFT JOIN tab_room m ON m.id = r.room_id WHERE r.round_number = ? ORDER BY r.id",
-    )
-    .bind(round)
-    .fetch_all(&mut *db)
-    .await?
-    .into_iter()
-    .map(|(id, government, opposition, room, victor)| Pairing {
-        id,
-        government,
-        opposition,
-        room,
-        judges: judges.remove(&id).unwrap_or_default(),
-        victor,
-        edits: history.take_staff_edits(id),
-    })
-    .collect();
-    let byes = sqlx::query_scalar::<_, String>(
-        "SELECT t.name FROM tab_bye b JOIN tab_team t ON t.id = b.bye_team_id WHERE b.round_number = ? ORDER BY b.id",
-    ).bind(round).fetch_all(&mut *db).await?;
-    let no_shows = sqlx::query_scalar::<_, String>(
-        "SELECT t.name FROM tab_noshow n JOIN tab_team t ON t.id = n.no_show_team_id WHERE n.round_number = ? ORDER BY n.id",
-    ).bind(round).fetch_all(&mut *db).await?;
-    db.commit().await?;
-    let csrf = html::page_csrf(headers).map_err(|_| ChangeError::Storage)?;
-    let title = if round > 0 {
-        format!("Round {round} Pairings")
-    } else {
-        "Preliminary Pairings".into()
-    };
-    let response = html::render(
-        "staff_pairings.html",
-        context! {
-            title, round, current, csrf, pairings, byes, no_shows,
-            simulation_enabled => crate::tournament_maintenance::simulation_enabled(),
-            next_round => current < settings.integer("tot_rounds", 5),
-            released => settings.integer("pairing_released", 0) == 1,
-            nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-        },
-        StatusCode::OK,
-    );
-    Ok(html::form_response(response, headers, &csrf))
 }
 
 pub async fn release(
@@ -610,7 +614,11 @@ pub async fn release(
     headers: HeaderMap,
     Form(form): Form<Action>,
 ) -> Response {
-    if !login::valid_csrf(&headers, &form.csrfmiddlewaretoken) {
+    let token = headers
+        .get("x-csrftoken")
+        .and_then(|token| token.to_str().ok())
+        .unwrap_or(&form.csrfmiddlewaretoken);
+    if !login::valid_csrf(&headers, token) {
         return private((StatusCode::FORBIDDEN, "CSRF verification failed."));
     }
     let result = async {
@@ -623,13 +631,21 @@ pub async fn release(
                 "The current round changed. Reload this page and try again.",
             ));
         }
-        write_release(&mut db, settings.integer("pairing_released", 0) != 1).await?;
+        let released = settings.integer("pairing_released", 0) != 1;
+        write_release(&mut db, released).await?;
         db.commit().await?;
-        Ok(())
+        Ok(released)
     }
     .await;
     match result {
-        Ok(()) => access::found(STATUS),
+        Ok(released)
+            if headers
+                .get("x-requested-with")
+                .is_some_and(|value| value == "XMLHttpRequest") =>
+        {
+            private(Json(serde_json::json!({ "pairing_released": released })))
+        }
+        Ok(_) => access::found(STATUS),
         Err(issue) => error(actor, issue),
     }
 }

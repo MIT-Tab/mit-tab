@@ -115,6 +115,46 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/public/public_team_results.html"),
         ),
         (
+            "pairing/judge_dropdown.html",
+            include_str!("../../../mittab/templates/pairing/judge_dropdown.html"),
+        ),
+        (
+            "pairing/room_dropdown.html",
+            include_str!("../../../mittab/templates/pairing/room_dropdown.html"),
+        ),
+        (
+            "pairing/team_dropdown.html",
+            include_str!("../../../mittab/templates/pairing/team_dropdown.html"),
+        ),
+        (
+            "pairing/pair_round.html",
+            include_str!("../../../mittab/templates/pairing/pair_round.html"),
+        ),
+        (
+            "pairing/confirm_re_pair.html",
+            include_str!("../../../mittab/templates/pairing/confirm_re_pair.html"),
+        ),
+        (
+            "pairing/pairing_control.html",
+            include_str!("../../../mittab/templates/pairing/pairing_control.html"),
+        ),
+        (
+            "pairing/_round_tabs.html",
+            include_str!("../../../mittab/templates/pairing/_round_tabs.html"),
+        ),
+        (
+            "pairing/_pairing_card.html",
+            include_str!("../../../mittab/templates/pairing/_pairing_card.html"),
+        ),
+        (
+            "pairing/_manual_history.html",
+            include_str!("../../../mittab/templates/pairing/_manual_history.html"),
+        ),
+        (
+            "common/_return_to_input.html",
+            include_str!("../../../mittab/templates/common/_return_to_input.html"),
+        ),
+        (
             "tab/backup_list.html",
             include_str!("../../../mittab/templates/tab/backup_list.html"),
         ),
@@ -163,6 +203,29 @@ fn translate(source: &str) -> String {
                 assert!(URLS.contains_key(&name), "unknown legacy URL {name}");
                 output.push_str(&format!("{{% set {variable} = urls.{name} %}}"));
             }
+            ["url", "'view_round'", "number"] => output.push_str("/round/{{ number }}/"),
+            ["url", "'board_inrounds'", "number"] => {
+                output.push_str("/apda-board/inrounds/{{ number }}/");
+            }
+            ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
+            ["return_to_input"] => output.push_str(
+                "{{ round_input|safe }}{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+            ),
+            ["return_to_input", "request.path"] => output.push_str(
+                "{{ round_input|safe }}{% with redirect_target=request.path %}{% include 'common/_return_to_input.html' %}{% endwith %}",
+            ),
+            ["is_manual_judge_assignment", "pairing.id", "judge.id", "as", "is_manual_assignment"] => {
+                output.push_str("{% set is_manual_assignment = judge.manual_label %}");
+            }
+            ["manual_judge_assignment_label", "pairing.id", "judge.id", "as", "manual_assignment_label"] => {
+                output.push_str("{% set manual_assignment_label = judge.manual_label %}");
+            }
+            ["judge_team_count", "judge", "pairing", "as", "rejudge_count"] => {
+                output.push_str("{% set rejudge_count = judge.rejudge_count %}");
+            }
+            ["manual_judge_audit_events", "pairing.id", "as", "manual_events"] => {
+                output.push_str("{% set manual_events = pairing.manual_events %}");
+            }
             ["url", name] => {
                 let name = argument(name);
                 assert!(URLS.contains_key(&name), "unknown legacy URL {name}");
@@ -199,6 +262,20 @@ fn translate(source: &str) -> String {
     output
         .replace("{{ message }}", "{{ message.text }}")
         .replace("|with_return_to", "")
+        .replace(
+            "challenge_context.automatic_pair.0.",
+            "challenge_context.automatic_pair[0].",
+        )
+        .replace(
+            "challenge_context.automatic_pair.1.",
+            "challenge_context.automatic_pair[1].",
+        )
+        .replace("pairing.judges.all", "pairing.judges")
+        .replace("pairing.chair == judge", "pairing.chair_id == judge.id")
+        .replace("if judge.rank > warning", "if judge.high_rank")
+        .replace("if judge.rank %}", "if judge.has_rank %}")
+        .replace("|default_if_none:''", "")
+        .replace("|date:'Y-m-d H:i:s T'", "")
         .replace("|floatformat:2", "")
         .replace(" is not None", " is not none")
         .replace("section.rows.0.", "section.rows[0].")
