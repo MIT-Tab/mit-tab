@@ -139,7 +139,8 @@ def isolate_tournament_settings(django_db_setup, django_db_blocker):
 def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
-        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart", "tournamentTodo")
+        for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart",
+                       "tournamentTodo", "emailManagement")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -3088,7 +3089,7 @@ def test_native_team_portal_locks_changes_at_first_pairing_and_protects_tab_scra
 
 
 @contextmanager
-def mock_registration_directory(deliveries=None):
+def mock_registration_directory(deliveries=None, rejected=()):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from threading import Thread
 
@@ -3111,6 +3112,9 @@ def mock_registration_directory(deliveries=None):
                     return
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
                 deliveries.append(body)
+                if any(address in rejected for address in body["Destination"]["ToAddresses"]):
+                    self.send_error(400)
+                    return
                 self.reply({"MessageId": "example"})
                 return
             if self.path != "/api/private/debater-emails/" or self.headers.get("Authorization") != "Bearer fixture":
@@ -3554,6 +3558,7 @@ def test_native_staff_invites_and_legacy_password_links_are_single_use():
 @pytest.mark.django_db(transaction=True)
 def test_native_email_management_writes_history_and_sends_written_decisions():
     from mittab.apps.tab.models import WrittenRFDEmailLog
+    from mittab.libs.email_views import build_written_rfd_email
 
     tab = legacy_tab_session("email-management-tab")
     board = legacy_tab_session("email-management-board")
@@ -3574,14 +3579,15 @@ def test_native_email_management_writes_history_and_sends_written_decisions():
     RoundStats.objects.create(round=debate, debater=first, speaks=Decimal("27"), ranks=1, debater_role="PM")
     Round.objects.filter(id=debate.id).update(rfd="Example <b>reason</b>")
     deliveries = []
-    with mock_registration_directory(deliveries) as fixture, rust_server(overrides={
+    rejected = set()
+    with mock_registration_directory(deliveries, rejected) as fixture, rust_server(overrides={
             "AWS_SES_ACCESS_KEY_ID": "fixture-access", "AWS_SES_SECRET_ACCESS_KEY": "fixture-secret",
             "MITTAB_SES_ENDPOINT": fixture, "EMAIL_FROM_ADDRESS": "tab@example.test",
             "MITTAB_PUBLIC_URL": "https://tournament.example.test",
     }) as port:
         path = "/email_management/"
         status, headers, body = request(port, path, cookie=tab)
-        assert status == 200 and b"Example Gov vs Example Opp" in body, (status, body)
+        assert status == 200 and b"Example Gov" in body and b"Example Opp" in body
         csrf = load_cookies(headers)["csrftoken"].value
         assert request(port, path, cookie=board)[0] == 403
         assert request(port, "/download_judge_codes/", cookie=board)[0] == 403
@@ -3596,13 +3602,175 @@ def test_native_email_management_writes_history_and_sends_written_decisions():
         assert post(board)[0] == 403
         assert post(tab, token="invalid")[0] == 403
         status, headers, _ = post(tab)
-        assert status == 302 and headers["Location"] == f"{path}?sent=1"
+        assert status == 302 and headers["Location"] == path
+        notice = load_cookies(headers)["mittab_email_notice"].value
+        assert b"Sent 1 written RFD email." in request(port, path,
+            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}; mittab_email_notice={notice}"})[2]
+        assert b"Sent 1 written RFD email." not in request(port, path, cookie=tab)[2]
         assert len(deliveries) == 1
         message = deliveries[0]["Content"]["Simple"]
-        assert "Example <b>reason</b>" in message["Body"]["Text"]["Data"]
-        assert "Example &lt;b&gt;reason&lt;/b&gt;" in message["Body"]["Html"]["Data"]
+        expected = build_written_rfd_email("speaker@example.test", "your tournament", debate,
+                                           gov.name, judge.name, "Example <b>reason</b>")
+        assert message["Subject"]["Data"] == expected.subject
+        assert message["Body"]["Text"]["Data"] == expected.text_body
+        assert message["Body"]["Html"]["Data"] == expected.html_body
         assert WrittenRFDEmailLog.objects.get().email.lower() == "speaker@example.test"
-        assert b"Delivery History" in request(port, path, cookie=tab)[2]
+        assert WrittenRFDEmailLog.objects.get().email_payload == expected.snapshot
+        assert b"Sent Email History" in request(port, path, cookie=tab)[2]
+
+        later = Round.objects.create(round_number=3, gov_team=opp, opp_team=gov, chair=judge, victor=Round.OPP)
+        RoundStats.objects.create(round=later, debater=second, speaks=27, ranks=1, debater_role="PM")
+        Round.objects.filter(id=later.id).update(rfd="Third round decision")
+        deliveries.clear()
+        status, headers, _ = request(port, path, method="POST",
+            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"}, form={
+                "csrfmiddlewaretoken": csrf, "email_action": "written_rfds",
+                "round_ids": [debate.id, later.id, debate.id],
+            })
+        assert status == 302 and headers["Location"] == path
+        assert sorted(request["Content"]["Simple"]["Subject"]["Data"] for request in deliveries) == [
+            "Round 2 decision for your tournament", "Round 3 decision for your tournament",
+        ]
+        assert list(WrittenRFDEmailLog.objects.order_by("id").values_list("round_id", flat=True)) == [
+            debate.id, debate.id, later.id,
+        ]
+
+        rejected.add("SPEAKER@example.test")
+        status, headers, _ = request(port, path, method="POST",
+            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}"}, form={
+                "csrfmiddlewaretoken": csrf, "email_action": "written_rfds", "round_ids": [later.id, debate.id],
+            })
+        assert status == 302 and headers["Location"] == path
+        notice = load_cookies(headers)["mittab_email_notice"].value
+        assert b"Unable to send written RFDs after sending 1 written RFD email" in request(port, path,
+            extra_headers={"Cookie": f"sessionid={tab}; csrftoken={csrf}; mittab_email_notice={notice}"})[2]
+        assert list(WrittenRFDEmailLog.objects.order_by("id").values_list("round_id", flat=True)) == [
+            debate.id, debate.id, later.id, debate.id,
+        ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_email_management_matches_django_bytes(html_assets, subtests):
+    from mittab.apps.registration.models import Registration, RegistrationConfirmationEmailLog, RegistrationLink
+    from mittab.apps.tab.models import StaffInviteEmailLog, TeamCodeEmailLog
+    from django.utils.html import escape as django_escape
+
+    session = legacy_tab_session("email-parity-staff")
+    board = legacy_tab_session("email-parity-board")
+    get_user_model().objects.get(username="email-parity-board").groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("tot_rounds", 2)
+    path = "/email_management/"
+    host = "tournament.example.test"
+    csrf = "a" * 32
+    cookies = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+    client = Client()
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+
+    def compare(port):
+        status, headers, actual = request(port, path, extra_headers=cookies)
+        assert status == 200, (status, actual[:160])
+        assert headers["Cache-Control"] == "private, no-store"
+        token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', actual)[1]
+        with patch("django.middleware.csrf._get_new_csrf_string", return_value=token[:32].decode()):
+            expected = client.get(path, secure=True, HTTP_HOST=host)
+        assert expected.status_code == 200
+        metadata = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; base-uri \'none\'; form-action \'none\'">'
+        assert_html_bytes(actual.replace(django_escape(metadata).encode(), b""), expected.content)
+        return actual
+
+    with override_settings(ALLOWED_HOSTS=[host]), rust_server(overrides={**html_assets,
+            "MITTAB_PUBLIC_URL": f"https://{host}"}) as port:
+        with subtests.test(state="empty"):
+            compare(port)
+        assert client.get(path, secure=True, HTTP_HOST=host).status_code == 200
+        TabSettings.set("tournament_name", "Sample & Open")
+        TabSettings.set("written_rfd_first_round", 2)
+        school = School.objects.create(name="Mail & Society")
+        registration = Registration.objects.create(school=school, email="school@example.org",
+                                                    dietary_requests="Apricots < peaches", housing_requests="None needed")
+        RegistrationLink.objects.create(title="Example form", url="https://forms.example.org/entry?a=1&b=2",
+                                        description="Bring an ID if possible.")
+        ready = Team.objects.create(name="A sample team", school=school, seed=2, registration=registration)
+        cooled = Team.objects.create(name="B sample team", school=school, seed=0)
+        duplicate = Team.objects.create(name="C sample team", school=school, seed=0)
+        missing = Team.objects.create(name="D sample team", school=school, seed=0)
+        first = Debater.objects.create(name="First D. <Speaker>", novice_status=0, school=school,
+                                      email="first@example.org", apda_id=120, qualified=True)
+        second = Debater.objects.create(name="Second D. & Speaker", novice_status=1, email="second@example.org")
+        repeated = Debater.objects.create(name="Repeated Contact", novice_status=1, email="FIRST@example.org")
+        ready.debaters.add(first, second)
+        cooled.debaters.add(second)
+        duplicate.debaters.add(repeated)
+        chair = Judge.objects.create(name="Example Chair", rank=5, reported_experience=5, email="chair@example.org",
+                                       registration=registration, ballot_code="fixture-judge-alpha")
+        chair.schools.add(school)
+        JudgeExpectedCheckIn.objects.create(judge=chair, round_number=0)
+        JudgeExpectedCheckIn.objects.create(judge=chair, round_number=2)
+        Judge.objects.create(name="Example Duplicate", rank=2, email="CHAIR@example.org", ballot_code="fixture-judge-other")
+        Judge.objects.create(name="Example No Contact", rank=2, ballot_code="fixture-judge-none")
+        invalid = Judge.objects.create(name="Example Invalid", rank=2, email="invalid@example.org")
+        Judge.objects.filter(pk=invalid.pk).update(ballot_code="invalid_fixture")
+        debate = Round.objects.create(round_number=2, gov_team=ready, opp_team=duplicate, chair=chair, victor=Round.GOV)
+        uncontactable = Round.objects.create(round_number=2, gov_team=missing, opp_team=missing, victor=Round.OPP)
+        RoundStats.objects.create(round=debate, debater=first, speaks=27, ranks=1, debater_role="PM")
+        RoundStats.objects.create(round=uncontactable, debater=first, speaks=26, ranks=2, debater_role="LO")
+        Round.objects.filter(pk=debate.id).update(rfd="Decision <text>\r\nSecond line & notes.")
+        for team, email in ((cooled, "other@example.org"), (ready, "first@example.org")):
+            TeamCodeEmailLog.objects.create(team=team, email=email, team_snapshot={"name": "Archived team"})
+        TeamCodeEmailLog.objects.filter(team=ready).update(sent_at=datetime.fromisoformat("2024-01-01T06:25:00+00:00"))
+        log_a = JudgeCodeEmailLog.objects.create(judge=chair, email="chair@example.org", source="registration",
+                                                  ballot_code="fixture-judge-alpha")
+        JudgeCodeEmailLog.objects.filter(pk=log_a.pk).update(sent_at=datetime.fromisoformat("2024-01-01T12:09:00+00:00"))
+        RegistrationConfirmationEmailLog.objects.create(registration=registration, email=registration.email)
+        RegistrationConfirmationEmailLog.objects.create(registration=registration, email=registration.email,
+            successful=False, error_message="Too many attempts & " * 11)
+        WrittenRFDEmailLog.objects.create(round=debate, email="first@example.org", email_payload={
+            "subject": "Recorded fixture", "to_address": "first@example.org", "html_body": "<p>Recorded &amp; safe</p>",
+        })
+        StaffInviteEmailLog.objects.create(username="synthetic-user", email="staff@example.org", successful=False,
+                                           error_message="Local fixtures only")
+        with subtests.test(state="populated"):
+            body = compare(port)
+            assert b'id="email-preview-frame"' in body and b'sandbox=""' in body
+            assert b"Preview recorded email" in body
+        denied = request(port, path, cookie=board)
+        assert denied[1]["Location"] == "/403/"
+        assert b"fixture-judge-alpha" not in denied[2] and b"first@example.org" not in denied[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_email_management_skips_unreachable_portals_and_malformed_addresses(html_assets):
+    from mittab.apps.registration.models import Registration, RegistrationConfirmationEmailLog
+    from mittab.apps.tab.models import TeamCodeEmailLog
+
+    staff = legacy_tab_session("email-invalid-fixture")
+    school = School.objects.create(name="Invalid Delivery Fixture School")
+    registration = Registration.objects.create(school=school, email="school@example.org")
+    Registration.objects.filter(pk=registration.pk).update(herokunator_code="unusable.code")
+    team = Team.objects.create(name="Team with an unreachable code", school=school, seed=0)
+    Team.objects.filter(pk=team.pk).update(team_code="unusable.team")
+    team.debaters.add(Debater.objects.create(name="Fixture Speaker", novice_status=0, email="speaker@example.org"))
+    judge = Judge.objects.create(name="Judge with a malformed address", rank=4, email="bad address")
+    Judge.objects.filter(pk=judge.pk).update(ballot_code=None)
+    csrf = "a" * 32
+    cookies = f"sessionid={staff}; csrftoken={csrf}"
+    path = "/email_management/"
+    with rust_server(overrides=html_assets) as port:
+        status, _, body = request(port, path, extra_headers={"Host": "lan.example.test", "Cookie": cookies})
+        assert status == 200 and b"Email Management" in body
+        assert b"Invalid team code" in body and b"Invalid email or code" in body and b"Invalid email" in body
+        for batch, field, id in (("team_codes", "team_ids", team.id),
+                                 ("registration_confirmations", "registration_ids", registration.id),
+                                 ("judge_codes", "judge_ids", judge.id)):
+            status, headers, _ = request(port, path, method="POST", extra_headers={"Cookie": cookies},
+                form={"csrfmiddlewaretoken": csrf, "email_action": batch, field: id})
+            assert status == 302 and headers["Location"] == path
+        judge.refresh_from_db()
+        assert judge.ballot_code is None
+        assert not TeamCodeEmailLog.objects.exists() and not JudgeCodeEmailLog.objects.exists()
+        assert not RegistrationConfirmationEmailLog.objects.exists()
 
 
 @pytest.mark.django_db(transaction=True)

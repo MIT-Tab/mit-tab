@@ -145,6 +145,25 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         }
     });
     env.add_filter("django_date", django_date);
+    env.add_filter("isolated_email_preview", isolated_email_preview);
+    env.add_filter("django_truncatechars", |value: String, limit: usize| {
+        use unicode_normalization::{UnicodeNormalization, char::canonical_combining_class};
+        let value: String = value.nfc().collect();
+        if value
+            .chars()
+            .filter(|&c| canonical_combining_class(c) == 0)
+            .count()
+            <= limit
+        {
+            return value;
+        }
+        let cutoff = value
+            .char_indices()
+            .filter(|&(_, c)| canonical_combining_class(c) == 0)
+            .nth(limit.saturating_sub(1))
+            .map_or(0, |(offset, _)| offset);
+        format!("{}…", &value[..cutoff])
+    });
     env.add_filter("django_length", |value: Value| value.len().unwrap_or(0));
     env.add_filter("escapejs", |value: String| {
         let mut escaped = String::with_capacity(value.len());
@@ -201,6 +220,38 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "common/403.html",
             include_str!("../../../mittab/templates/common/403.html"),
+        ),
+        (
+            "tab/email_management.html",
+            include_str!("../../../mittab/templates/tab/email_management.html"),
+        ),
+        (
+            "tab/_team_code_emails.html",
+            include_str!("../../../mittab/templates/tab/_team_code_emails.html"),
+        ),
+        (
+            "tab/_email_preview.html",
+            include_str!("../../../mittab/templates/tab/_email_preview.html"),
+        ),
+        (
+            "emails/base.html",
+            include_str!("../../../mittab/templates/emails/base.html"),
+        ),
+        (
+            "emails/team_portal.html",
+            include_str!("../../../mittab/templates/emails/team_portal.html"),
+        ),
+        (
+            "emails/judge_ballot_code.html",
+            include_str!("../../../mittab/templates/emails/judge_ballot_code.html"),
+        ),
+        (
+            "emails/registration_confirmation.html",
+            include_str!("../../../mittab/templates/emails/registration_confirmation.html"),
+        ),
+        (
+            "emails/written_rfd.html",
+            include_str!("../../../mittab/templates/emails/written_rfd.html"),
         ),
         (
             "public/home.html",
@@ -433,6 +484,7 @@ fn translate(name: &str, source: &str) -> String {
             | ["is_apda_board", ..]
             | ["tournament_logo_url", ..]
             | ["staff_can", ..] => {}
+            ["autoescape", "on"] | ["endautoescape"] => {}
             ["url", name, "as", variable] => {
                 let name = argument(name);
                 assert!(URLS.contains_key(&name), "unknown legacy URL {name}");
@@ -461,6 +513,10 @@ fn translate(name: &str, source: &str) -> String {
                 output.push_str("/apda-board/inrounds/{{ number }}/");
             }
             ["url", "'view_judge'", "judge.id"] => output.push_str("/judge/{{ judge.id }}/"),
+            ["url", "'view_team'", "row.team.id"] => output.push_str("/team/{{ row.team.id }}/"),
+            ["url", "'registration_portal_edit'", "row.registration.herokunator_code"] => {
+                output.push_str("{{ row.registration.url }}");
+            }
             ["url", "'edit_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/edit/"),
             ["url", "'toggle_motion_published'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/toggle-published/"),
             ["url", "'delete_motion'", "motion.pk"] => output.push_str("/motions/{{ motion.id }}/delete/"),
@@ -492,6 +548,9 @@ fn translate(name: &str, source: &str) -> String {
             }
             ["render_bundle", bundle] => {
                 output.push_str(&format!("{{{{ legacy_bundle({bundle}) }}}}"));
+            }
+            ["render_bundle", bundle, kind] => {
+                output.push_str(&format!("{{{{ legacy_bundle({bundle}, {kind}) }}}}"));
             }
             ["theme_css_variables"] => output.push_str("{{ theme_variables }}"),
             ["favicon_url"] => output.push_str("{{ urls.favicon }}"),
@@ -601,11 +660,26 @@ fn translate(name: &str, source: &str) -> String {
         "tab/settings_form.html" => translated
             .replace("{{ field }}", "{{ field.html|safe }}")
             .replace("{{ field.errors }}", "{{ field.errors|safe }}"),
+        "tab/_email_preview.html" => translated.replace(
+            "|default:email.to_address", "|django_default(email.to_address)",
+        ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),
         _ => translated,
     };
-    ["default", "date", "yesno", "pluralize"]
+    ["default", "date", "yesno", "pluralize", "truncatechars"]
         .into_iter()
         .fold(translated, translate_filter_arguments)
+}
+
+fn isolated_email_preview(html: String) -> String {
+    const POLICY: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'\">";
+    let source = html.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '\u{feff}');
+    let doctype_end = source
+        .get(..9)
+        .filter(|prefix| prefix.eq_ignore_ascii_case("<!doctype"))
+        .and_then(|_| source.find('>'))
+        .map_or(0, |offset| offset + 1);
+    let (doctype, rest) = source.split_at(doctype_end);
+    format!("{doctype}{POLICY}{rest}")
 }
 
 fn setup_widgets(source: String) -> String {
@@ -673,6 +747,12 @@ fn django_date(value: String, format: String) -> String {
         return String::new();
     };
     match format.as_str() {
+        "U" => time.and_utc().timestamp().to_string(),
+        "M j, g:i a" => format!(
+            "{} {}",
+            time.format("%b %-d, %-I:%M"),
+            if time.hour() < 12 { "a.m." } else { "p.m." }
+        ),
         "c" => time.and_utc().to_rfc3339_opts(
             if time.nanosecond() == 0 {
                 chrono::SecondsFormat::Secs
@@ -813,11 +893,12 @@ pub async fn forbidden(
     ))
 }
 
+pub fn render_fragment(template: &str, page: Value) -> Result<String, minijinja::Error> {
+    TEMPLATE_ENV.get_template(template)?.render(page)
+}
+
 pub fn render(template: &str, shell: Value, page: Value, status: StatusCode) -> Response {
-    let result = TEMPLATE_ENV
-        .get_template(template)
-        .and_then(|template| template.render(context! { ..shell, ..page }));
-    match result {
+    match render_fragment(template, context! { ..shell, ..page }) {
         Ok(page) => private((status, Html(page))),
         Err(error) => {
             eprintln!("Failed to render {template}: {}", error.kind());

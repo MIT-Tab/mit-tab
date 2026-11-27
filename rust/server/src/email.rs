@@ -24,6 +24,31 @@ pub struct Email {
 }
 
 impl Email {
+    pub fn templated(
+        to_address: String,
+        subject: String,
+        text_body: String,
+        template: &str,
+        preheader: &str,
+        fields: minijinja::Value,
+    ) -> Result<Self, sqlx::Error> {
+        let html = crate::legacy_html::render_fragment(
+            template,
+            minijinja::context! {
+                subject => &subject, preheader, sender_name => "MIT-TAB", ..fields,
+            },
+        )
+        .map_err(|error| sqlx::Error::Decode(error.into()))?;
+        Ok(Self {
+            to_address,
+            subject,
+            text_body,
+            html_body: Some(html.trim().to_owned()),
+            reply_to: None,
+            from_address: None,
+        })
+    }
+
     pub fn simple(to_address: String, subject: String, text_body: String) -> Self {
         let html_body = Some(format!(
             "<div style=\"white-space:pre-wrap;font-family:system-ui,sans-serif\">{}</div>",

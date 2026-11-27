@@ -35,6 +35,7 @@ mod diagnostics;
 mod elimination_seeds;
 mod email;
 mod email_admin;
+mod email_content;
 mod entity_store;
 mod home;
 mod homepage_admin;

@@ -63,7 +63,7 @@ fn seed_name(seed: i32) -> &'static str {
     }
 }
 
-fn valid_code(code: &str) -> bool {
+pub(crate) fn valid_code(code: &str) -> bool {
     !code.is_empty()
         && code.len() <= 255
         && code

@@ -1,12 +1,13 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use sqlx::{MySql, MySqlConnection, MySqlPool, pool::PoolConnection};
 
 use crate::{
     codes::{self, Credential},
     email::{self, Email, Mailer},
+    email_content::{self, Confirmations},
+    judge_portal,
     registration_form::valid_email,
-    registration_store,
     settings::Settings,
 };
 
@@ -145,26 +146,63 @@ pub async fn send_all(
     deliveries: Vec<Delivery>,
     source: &str,
 ) -> Result<bool, sqlx::Error> {
-    let mut all_sent = true;
+    Ok(send_report(db, mailer, deliveries, source).await?.failed == 0)
+}
+
+#[derive(Default)]
+pub struct SendReport {
+    pub sent: usize,
+    pub failed: usize,
+    pub last_error: &'static str,
+}
+
+pub async fn send_report(
+    db: &mut MySqlConnection,
+    mailer: Option<&'static Mailer>,
+    deliveries: Vec<Delivery>,
+    source: &str,
+) -> Result<SendReport, sqlx::Error> {
+    let mut report = SendReport::default();
     let mut batch = tokio::task::JoinSet::new();
-    let mut deliveries = deliveries.into_iter();
-    for _ in 0..4 {
-        if let Some(delivery) = deliveries.next() {
-            batch.spawn(deliver(mailer, delivery));
+    let mut queue = deliveries.into_iter().enumerate();
+    let mut active = HashMap::new();
+    let mut completed = BTreeMap::new();
+    let mut next_log = 0;
+    loop {
+        while batch.len() < 4 {
+            let Some((index, delivery)) = queue.next() else {
+                break;
+            };
+            let task = batch.spawn(deliver(mailer, delivery));
+            active.insert(task.id(), index);
+        }
+        let Some(joined) = batch.join_next_with_id().await else {
+            break;
+        };
+        let (task, outcome) = match joined {
+            Ok((task, outcome)) => (task, Some(outcome)),
+            Err(error) => (error.id(), None),
+        };
+        let index = active.remove(&task).expect("queued email task");
+        completed.insert(index, outcome);
+        // Delivery is concurrent. History keeps the original selection order.
+        while let Some(outcome) = completed.remove(&next_log) {
+            let result = if let Some((delivery, result)) = outcome {
+                delivery.record(db, result, source).await?;
+                result
+            } else {
+                Err(UNSENT)
+            };
+            if let Err(error) = result {
+                report.last_error = error;
+                report.failed += 1;
+            } else {
+                report.sent += 1;
+            }
+            next_log += 1;
         }
     }
-    while let Some(result) = batch.join_next().await {
-        if let Ok((delivery, result)) = result {
-            all_sent &= result.is_ok();
-            delivery.record(db, result, source).await?;
-        } else {
-            all_sent = false;
-        }
-        if let Some(delivery) = deliveries.next() {
-            batch.spawn(deliver(mailer, delivery));
-        }
-    }
-    Ok(all_sent)
+    Ok(report)
 }
 
 async fn deliver(
@@ -185,110 +223,139 @@ pub async fn confirmation(
     origin: &str,
     tournament: &str,
 ) -> Result<Option<Delivery>, sqlx::Error> {
-    let Some(entry) = registration_store::entry(db, id).await? else {
+    let entries = Confirmations::load(db, Some(id)).await?;
+    let Some(registration) = entries.registrations.first() else {
         return Ok(None);
     };
-    let code: String =
-        sqlx::query_scalar("SELECT herokunator_code FROM registration_registration WHERE id = ?")
-            .bind(id)
-            .fetch_one(&mut *db)
-            .await?;
-    let link = format!("{origin}/registration/{code}/");
-    let form = entry.form;
-    let links: Vec<(String, String, String)> = sqlx::query_as(
-        "SELECT title, url, description FROM registration_registrationlink WHERE is_active = TRUE ORDER BY display_order, created_at, id",
-    ).fetch_all(db).await?;
-    let mut body = format!(
-        "Hi {},\n\nYour registration for {tournament} has been received.\n\nRegistration code: {code}\nEdit your registration: {link}\n\nContact: {}\nDietary requests: {}\nHousing requests: {}\n",
-        form.school.name,
-        form.email,
-        present(&form.dietary_requests),
-        present(&form.housing_requests),
-    );
-    for (title, url, description) in links {
-        if url::Url::parse(&url).is_ok_and(|url| matches!(url.scheme(), "http" | "https")) {
-            body.push_str(&format!("\n{title}: {url} {description}"));
-        }
+    Ok(entries
+        .email(registration, origin, tournament)?
+        .filter(|email| valid_email(&email.to_address))
+        .map(|email| Delivery {
+            log: Log::Confirmation { id },
+            email,
+        }))
+}
+
+pub struct TeamMail {
+    pub id: i32,
+    pub name: String,
+    pub code: Option<String>,
+    pub recipients: Vec<String>,
+    debaters: Vec<String>,
+}
+
+impl TeamMail {
+    pub fn path(&self) -> Option<String> {
+        email_content::portal_path("team_portal", self.code.as_deref()?)
     }
-    body.push_str("\n\nTeams\n");
-    if form.teams.is_empty() {
-        body.push_str("None\n");
+
+    pub fn snapshot(&self, tournament: &str) -> serde_json::Value {
+        let mut debaters: Vec<_> = self.debaters.iter().collect();
+        debaters.sort();
+        let mut recipients: Vec<_> = self
+            .recipients
+            .iter()
+            .map(|email| email.to_lowercase())
+            .collect();
+        recipients.sort();
+        serde_json::json!({
+            "name": self.name, "team_code": self.code, "debaters": debaters,
+            "recipients": recipients, "tournament_name": tournament,
+        })
     }
-    for team in form.teams {
-        let seed = match team.seed {
-            1 => "Free seed",
-            2 => "Half seed",
-            3 => "Full seed",
-            _ => "Unseeded",
+
+    pub fn email(
+        &self,
+        address: &str,
+        origin: &str,
+        tournament: &str,
+    ) -> Result<Option<Email>, sqlx::Error> {
+        let Some(path) = self.path() else {
+            return Ok(None);
         };
-        body.push_str(&format!("- {} ({seed})\n", team.name));
-        for member in &team.members {
-            let class = if member.novice_status == 1 {
-                "Novice"
-            } else {
-                "Varsity"
-            };
-            let id = member
-                .apda_id
-                .filter(|&id| id > 0)
-                .map_or_else(|| "None".into(), |id| id.to_string());
-            let qualified = if member.qualified { "yes" } else { "no" };
-            body.push_str(&format!(
-                "  - {} ({}, {class}, APDA ID {id}, Qualified {qualified})\n",
-                member.name, member.school.name
-            ));
-        }
-    }
-    body.push_str("\nJudges\n");
-    if form.judges.is_empty() {
-        body.push_str("None\n");
-    }
-    for judge in form.judges {
-        let schools = judge
-            .schools
-            .into_iter()
-            .map(|school| school.name)
-            .collect::<Vec<_>>()
-            .join(", ");
-        body.push_str(&format!(
-            "- {} ({} years, {}, {})\n",
-            judge.name,
-            judge.experience,
-            schools,
-            availability(&judge.rounds)
-        ));
-    }
-    body.push_str("\nThanks,\nThe Tab Team");
-    Ok(Some(Delivery {
-        log: Log::Confirmation { id },
-        email: Email::simple(
-            form.email,
-            format!("Registration confirmed: {tournament}"),
-            body,
+        email_content::team(
+            address,
+            &self.name,
+            self.code.as_deref().unwrap_or_default(),
+            &self.debaters,
+            tournament,
+            &format!("{origin}{path}"),
         )
-        .with_link(&link, "Edit Registration"),
-    }))
-}
-
-fn present(value: &str) -> &str {
-    if value.is_empty() { "None" } else { value }
-}
-
-fn availability(rounds: &[i32]) -> String {
-    if rounds.is_empty() {
-        return "None selected".into();
+        .map(Some)
     }
-    rounds
-        .iter()
-        .map(|round| {
-            if *round == 0 {
-                "Outrounds".into()
-            } else {
-                format!("Round {round}")
+}
+
+pub async fn team_mail(db: &mut MySqlConnection) -> Result<Vec<TeamMail>, sqlx::Error> {
+    let mut members: BTreeMap<i32, Vec<(String, Option<String>)>> = BTreeMap::new();
+    for (id, name, email) in sqlx::query_as::<_, (i32, String, Option<String>)>(
+        "SELECT m.team_id, d.name, d.email FROM tab_debater d JOIN tab_team_debaters m ON m.debater_id = d.id
+         ORDER BY d.name, d.id",
+    ).fetch_all(&mut *db).await? {
+        members.entry(id).or_default().push((name, email));
+    }
+    let teams = sqlx::query_as::<_, (i32, String, Option<String>)>(
+        "SELECT id, name, team_code FROM tab_team ORDER BY name, id",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(teams
+        .into_iter()
+        .map(|(id, name, code)| {
+            let mut seen = BTreeSet::new();
+            let mut debaters = Vec::new();
+            let mut recipients = Vec::new();
+            for (debater, email) in members.remove(&id).unwrap_or_default() {
+                debaters.push(debater);
+                if let Some(address) = email
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|email| !email.is_empty())
+                    && seen.insert(address.to_lowercase())
+                {
+                    recipients.push(address.into());
+                }
+            }
+            TeamMail {
+                id,
+                name,
+                code,
+                recipients,
+                debaters,
             }
         })
-        .collect::<Vec<_>>()
-        .join(", ")
+        .collect())
+}
+
+pub async fn team_plan<'a>(
+    db: &mut MySqlConnection,
+    teams: impl IntoIterator<Item = &'a TeamMail>,
+) -> Result<BTreeMap<i32, Vec<&'a str>>, sqlx::Error> {
+    let recent = sqlx::query_as::<_, (i32, String)>(
+        "SELECT team_id, email FROM tab_teamcodeemaillog
+         WHERE successful AND sent_at >= UTC_TIMESTAMP(6) - INTERVAL 6 HOUR",
+    )
+    .fetch_all(db)
+    .await?;
+    let recent_teams: BTreeSet<_> = recent.iter().map(|&(id, _)| id).collect();
+    let mut addresses: BTreeSet<_> = recent
+        .into_iter()
+        .map(|(_, email)| email.to_lowercase())
+        .collect();
+    let mut plan = BTreeMap::new();
+    for team in teams {
+        if !recent_teams.contains(&team.id) && team.path().is_some() {
+            let recipients: Vec<_> = team
+                .recipients
+                .iter()
+                .map(String::as_str)
+                .filter(|email| valid_email(email) && addresses.insert(email.to_lowercase()))
+                .collect();
+            if !recipients.is_empty() {
+                plan.insert(team.id, recipients);
+            }
+        }
+    }
+    Ok(plan)
 }
 
 pub async fn team_deliveries(
@@ -297,75 +364,127 @@ pub async fn team_deliveries(
     origin: &str,
     tournament: &str,
 ) -> Result<Vec<Delivery>, sqlx::Error> {
-    let mut output = Vec::new();
-    let recent: Vec<(i32, String)> = sqlx::query_as(
-        "SELECT team_id, email FROM tab_teamcodeemaillog
-         WHERE successful = TRUE AND sent_at >= UTC_TIMESTAMP(6) - INTERVAL 6 HOUR",
-    )
-    .fetch_all(&mut *db)
-    .await?;
-    let previous_teams: BTreeSet<_> = recent.iter().map(|&(id, _)| id).collect();
-    let mut addresses: BTreeSet<_> = recent
-        .into_iter()
-        .map(|(_, address)| address.to_lowercase())
+    let teams = team_mail(db).await?;
+    let selected: BTreeSet<_> = ids.iter().copied().collect();
+    let teams: Vec<_> = teams
+        .iter()
+        .filter(|team| selected.contains(&team.id))
         .collect();
-    for &id in ids {
-        if previous_teams.contains(&id) {
-            continue;
-        }
-        let Some((name, code)) = sqlx::query_as::<_, (String, Option<String>)>(
-            "SELECT name, team_code FROM tab_team WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_optional(&mut *db)
-        .await?
-        else {
-            continue;
-        };
-        let Some(code) = code.filter(|code| valid_code(code)) else {
-            continue;
-        };
-        let members: Vec<(String, Option<String>)> = sqlx::query_as(
-            "SELECT d.name, d.email FROM tab_debater d JOIN tab_team_debaters m ON m.debater_id = d.id
-             WHERE m.team_id = ? ORDER BY d.name, d.id",
-        ).bind(id).fetch_all(&mut *db).await?;
-        let names: Vec<_> = members.iter().map(|(name, _)| name.as_str()).collect();
-        let recipients: BTreeMap<_, _> = members
-            .iter()
-            .filter_map(|(_, email)| {
-                let address = email.as_deref()?.trim();
-                valid_email(address).then(|| (address.to_lowercase(), address))
-            })
-            .collect();
-        let snapshot = serde_json::json!({
-            "name": name, "team_code": code, "debaters": names,
-            "recipients": recipients.keys().collect::<Vec<_>>(), "tournament_name": tournament,
-        })
-        .to_string();
-        let link = format!("{origin}/team_portal/{code}/");
-        let body = format!(
-            "Hello,\n\nYour team is registered for {tournament}. Use the team portal to manage your team name and discretionary judge scratches when they are open.\n\nTeam: {name}\nDebaters: {}\nTeam code: {code}\nTeam portal: {link}\n\nThanks,\nThe Tab Team",
-            names.join(", "),
-        );
-        for (key, address) in recipients {
-            if !addresses.insert(key) {
-                continue;
+    let plan = team_plan(db, teams.iter().copied()).await?;
+    let mut messages = Vec::new();
+    for team in teams {
+        if let Some(addresses) = plan.get(&team.id) {
+            let snapshot = team.snapshot(tournament).to_string();
+            for address in addresses {
+                if let Some(email) = team.email(address, origin, tournament)? {
+                    messages.push(Delivery {
+                        log: Log::Team {
+                            id: team.id,
+                            snapshot: snapshot.clone(),
+                        },
+                        email,
+                    });
+                }
             }
-            output.push(Delivery {
-                log: Log::Team {
-                    id,
-                    snapshot: snapshot.clone(),
-                },
-                email: Email::simple(
-                    address.into(),
-                    format!("Your team portal for {tournament}"),
-                    body.clone(),
-                )
-                .with_link(&link, "Open Team Portal"),
-            });
         }
     }
-    Ok(output)
+    Ok(messages)
+}
+
+pub struct JudgeMail {
+    pub id: i32,
+    pub name: String,
+    pub email: String,
+    pub code: Option<String>,
+    rounds: Vec<i32>,
+}
+
+impl JudgeMail {
+    pub fn preview(&self, origin: &str, tournament: &str) -> Result<Option<Email>, sqlx::Error> {
+        let Some(code) = self
+            .code
+            .as_deref()
+            .filter(|code| judge_portal::valid_code(code))
+        else {
+            return Ok(None);
+        };
+        if self.email.is_empty() {
+            return Ok(None);
+        }
+        email_content::judge(
+            &self.email,
+            &self.name,
+            code,
+            &self.rounds,
+            origin,
+            tournament,
+            false,
+        )
+        .map(Some)
+    }
+}
+
+pub async fn judge_mail(db: &mut MySqlConnection) -> Result<Vec<JudgeMail>, sqlx::Error> {
+    let mut rounds: BTreeMap<i32, Vec<i32>> = BTreeMap::new();
+    for (id, round) in sqlx::query_as::<_, (i32, i32)>(
+        "SELECT judge_id, round_number FROM tab_judgeexpectedcheckin ORDER BY round_number",
+    )
+    .fetch_all(&mut *db)
+    .await?
+    {
+        rounds.entry(id).or_default().push(round);
+    }
+    let rows = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>)>(
+        "SELECT id, name, email, ballot_code FROM tab_judge ORDER BY name, id",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, name, email, code)| JudgeMail {
+            id,
+            name,
+            code,
+            email: email.unwrap_or_default(),
+            rounds: rounds.remove(&id).unwrap_or_default(),
+        })
+        .collect())
+}
+
+pub async fn judge_plan<'a>(
+    db: &mut MySqlConnection,
+    judges: impl IntoIterator<Item = &'a JudgeMail>,
+) -> Result<BTreeMap<i32, &'static str>, sqlx::Error> {
+    let recent = sqlx::query_as::<_, (i32, String)>(
+        "SELECT judge_id, email FROM tab_judgecodeemaillog WHERE sent_at >= UTC_TIMESTAMP(6) - INTERVAL 6 HOUR",
+    ).fetch_all(db).await?;
+    let recent_judges: BTreeSet<_> = recent.iter().map(|&(id, _)| id).collect();
+    let mut addresses: BTreeSet<_> = recent
+        .into_iter()
+        .map(|(_, email)| email.to_lowercase())
+        .collect();
+    Ok(judges
+        .into_iter()
+        .map(|judge| {
+            let email = judge.email.trim();
+            let status = if email.is_empty() {
+                "Missing email"
+            } else if !valid_email(email) {
+                "Invalid email"
+            } else if judge
+                .code
+                .as_deref()
+                .is_some_and(|code| !code.is_empty() && !judge_portal::valid_code(code))
+            {
+                "Invalid code"
+            } else if recent_judges.contains(&judge.id) || !addresses.insert(email.to_lowercase()) {
+                "Recently emailed"
+            } else {
+                "Ready"
+            };
+            (judge.id, status)
+        })
+        .collect())
 }
 
 pub async fn judge_deliveries(
@@ -375,79 +494,63 @@ pub async fn judge_deliveries(
     tournament: &str,
     registration: bool,
 ) -> Result<Vec<Delivery>, sqlx::Error> {
-    let recent: Vec<(i32, String)> = sqlx::query_as(
-        "SELECT judge_id, email FROM tab_judgecodeemaillog WHERE sent_at >= UTC_TIMESTAMP(6) - INTERVAL 6 HOUR",
-    ).fetch_all(&mut *db).await?;
-    let previous_judges: BTreeSet<_> = recent.iter().map(|&(id, _)| id).collect();
-    let mut addresses: BTreeSet<_> = recent
-        .into_iter()
-        .map(|(_, address)| address.to_lowercase())
-        .collect();
-    let mut output = Vec::new();
-    for &id in ids {
-        if previous_judges.contains(&id) {
-            continue;
-        }
-        let Some((name, email, code)) =
-            sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
-                "SELECT name, email, ballot_code FROM tab_judge WHERE id = ?",
-            )
-            .bind(id)
-            .fetch_optional(&mut *db)
-            .await?
-        else {
-            continue;
-        };
-        let Some(address) = email.filter(|email| valid_email(email)) else {
-            continue;
-        };
-        let code = match code.filter(|code| !code.is_empty()) {
-            Some(code) if valid_code(&code) && code.len() <= 30 => code,
-            Some(_) => continue,
-            None => {
-                let code = codes::unique(db, Credential::Judge).await?;
-                sqlx::query("UPDATE tab_judge SET ballot_code = ? WHERE id = ? AND (ballot_code IS NULL OR ballot_code = '')")
-                    .bind(&code).bind(id).execute(&mut *db).await?;
-                sqlx::query_scalar("SELECT ballot_code FROM tab_judge WHERE id = ?")
-                    .bind(id)
-                    .fetch_one(&mut *db)
-                    .await?
-            }
-        };
-        if !addresses.insert(address.to_lowercase()) {
-            continue;
-        }
-        let link = format!("{origin}/public/e-ballots/{code}/");
-        let message = if registration {
-            let rounds: Vec<i32> = sqlx::query_scalar(
-                "SELECT round_number FROM tab_judgeexpectedcheckin WHERE judge_id = ? ORDER BY round_number",
-            ).bind(id).fetch_all(&mut *db).await?;
-            format!(
-                "Your judge registration for {tournament} has been received.\nAvailability: {}\n\n",
-                availability(&rounds)
-            )
-        } else {
-            String::new()
-        };
-        let message = format!(
-            "Hi {name},\n\n{message}Your ballot code is {code}.\nJudge portal: {link}\nJudge lookup: {origin}/public/e-ballots/\n\nThanks,\nThe Tab Team"
-        );
-        output.push(Delivery {
-            log: Log::Judge { id, code },
-            email: Email::simple(
-                address,
-                format!("Your judge ballot code for {tournament}"),
-                message,
-            )
-            .with_link(&link, "Open Judge Portal"),
-        });
-    }
-    Ok(output)
+    judge_delivery_plan(db, ids, origin, tournament, registration)
+        .await
+        .map(|(deliveries, _)| deliveries)
 }
 
-fn valid_code(code: &str) -> bool {
-    !code.is_empty()
-        && code
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+pub async fn judge_delivery_plan(
+    db: &mut MySqlConnection,
+    ids: &[i32],
+    origin: &str,
+    tournament: &str,
+    registration: bool,
+) -> Result<(Vec<Delivery>, usize), sqlx::Error> {
+    let judges = judge_mail(db).await?;
+    let selected: BTreeSet<_> = ids.iter().copied().collect();
+    let plan = judge_plan(
+        db,
+        judges
+            .iter()
+            .filter(|judge| !registration || selected.contains(&judge.id)),
+    )
+    .await?;
+    let skipped = plan.values().filter(|&&status| status != "Ready").count();
+    let mut judges: BTreeMap<_, _> = judges.into_iter().map(|judge| (judge.id, judge)).collect();
+    let mut output = Vec::new();
+    for id in ids.iter().filter(|&id| plan.get(id) == Some(&"Ready")) {
+        let Some(judge) = judges.remove(id) else {
+            continue;
+        };
+        let code = match judge.code.filter(|code| !code.is_empty()) {
+            Some(code) => code,
+            None => ensure_judge_code(db, judge.id).await?,
+        };
+        if judge_portal::valid_code(&code) {
+            let email = email_content::judge(
+                judge.email.trim(),
+                &judge.name,
+                &code,
+                &judge.rounds,
+                origin,
+                tournament,
+                registration,
+            )?;
+            output.push(Delivery {
+                log: Log::Judge { id: judge.id, code },
+                email,
+            });
+        }
+    }
+    Ok((output, skipped))
+}
+
+pub async fn ensure_judge_code(db: &mut MySqlConnection, id: i32) -> Result<String, sqlx::Error> {
+    let code = codes::unique(db, Credential::Judge).await?;
+    sqlx::query("UPDATE tab_judge SET ballot_code = ? WHERE id = ? AND (ballot_code IS NULL OR ballot_code = '')")
+        .bind(&code).bind(id).execute(&mut *db).await?;
+    sqlx::query_scalar("SELECT ballot_code FROM tab_judge WHERE id = ?")
+        .bind(id)
+        .fetch_one(db)
+        .await
 }

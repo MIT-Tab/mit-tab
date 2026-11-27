@@ -163,10 +163,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/staff_invite_confirm.html"),
         ),
         (
-            "email_admin.html",
-            include_str!("../templates/email_admin.html"),
-        ),
-        (
             "staff_roster_list.html",
             include_str!("../templates/staff_roster_list.html"),
         ),
@@ -251,9 +247,13 @@ fn webpack_files(bundle: String) -> Value {
     Value::from_serialize(bundle_assets(bundle))
 }
 
-pub fn legacy_bundle(bundle: String) -> Value {
+pub fn legacy_bundle(bundle: String, kind: Option<String>) -> Value {
     let tags = bundle_assets(bundle)
         .into_iter()
+        .filter(|asset| {
+            kind.as_deref()
+                .is_none_or(|kind| asset.stylesheet == (kind == "css"))
+        })
         .map(|asset| {
             if asset.stylesheet {
                 format!("<link href=\"{}\" rel=\"stylesheet\"/>", asset.href)
