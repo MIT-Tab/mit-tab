@@ -191,7 +191,7 @@ pub fn policy(settings: &Settings) -> ScoringPolicy {
     }
 }
 
-fn django_hundredths(value: f64) -> String {
+pub(super) fn django_hundredths(value: f64) -> String {
     let digits = value.abs().to_string();
     let (whole, fraction) = digits.split_once('.').unwrap_or((&digits, ""));
     let Ok(mut whole) = whole.parse::<u64>() else {

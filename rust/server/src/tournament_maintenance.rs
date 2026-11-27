@@ -16,10 +16,11 @@ use crate::{
     html::{self, Navigation},
     legacy_session::Actor,
     login, passwords, private,
+    public_cache::Page,
     registration_form::Fields,
     settings::{self, SettingValue, Settings},
     staff_pairing::lock_round,
-    unavailable,
+    staff_roster_notice, unavailable,
 };
 
 const CONFIRM: &str = "/pairing/confirm_start_tourny/";
@@ -258,10 +259,28 @@ pub async fn simulate(pool: &MySqlPool) -> Result<usize, &'static str> {
 
 #[derive(Deserialize)]
 struct Refresh {
+    key: Option<String>,
     next: Option<String>,
 }
 
-async fn cache_refresh(Query(params): Query<Refresh>) -> Response {
+async fn cache_refresh(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(params): Query<Refresh>,
+) -> Response {
+    let page = match params.key.as_deref() {
+        Some("team_rankings_private" | "team_rankings") => Some(Page::StaffTeamRankings),
+        Some("speaker_rankings") => Some(Page::StaffSpeakerRankings),
+        _ => None,
+    };
+    if let Some(page) = page {
+        app.public_cache.evict(page);
+    }
     let target = login::local_next(params.next.as_deref().unwrap_or_default());
-    access::found(if target.is_empty() { "/" } else { target })
+    staff_roster_notice::saved(
+        &app,
+        &headers,
+        if target.is_empty() { "/" } else { target },
+        "Refreshed!",
+    )
 }

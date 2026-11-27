@@ -368,18 +368,43 @@ enum Lookup {
 }
 
 #[derive(Default)]
-pub struct PublicCache(Mutex<HashMap<Key, Entry>>);
+struct CacheState {
+    entries: HashMap<Key, Entry>,
+    generations: HashMap<Page, u64>,
+}
+
+impl CacheState {
+    fn generation(&self, page: Page) -> u64 {
+        self.generations.get(&page).copied().unwrap_or_default()
+    }
+}
+
+#[derive(Default)]
+pub struct PublicCache(Mutex<CacheState>);
 
 impl PublicCache {
+    pub fn evict(&self, page: Page) {
+        if let Ok(mut cache) = self.0.lock() {
+            cache.entries.retain(|key, _| key.page != page);
+            *cache.generations.entry(page).or_default() += 1;
+        }
+    }
+
+    fn generation(&self, page: Page) -> Option<u64> {
+        self.0.lock().ok().map(|cache| cache.generation(page))
+    }
+
     fn has_entry(&self, key: &Key) -> bool {
-        self.0.lock().is_ok_and(|cache| cache.contains_key(key))
+        self.0
+            .lock()
+            .is_ok_and(|cache| cache.entries.contains_key(key))
     }
 
     fn get(&self, key: &Key, version: &[u8]) -> Lookup {
         let Ok(cache) = self.0.lock() else {
             return Lookup::Miss;
         };
-        let Some(entry) = cache.get(key) else {
+        let Some(entry) = cache.entries.get(key) else {
             return Lookup::Miss;
         };
         let now = Instant::now();
@@ -395,11 +420,15 @@ impl PublicCache {
         Lookup::Hit(response)
     }
 
-    fn insert(&self, key: Key, entry: Entry) {
+    fn insert(&self, key: Key, generation: u64, entry: Entry) {
         const MAX_ENTRIES: usize = 128;
         let Ok(mut cache) = self.0.lock() else {
             return;
         };
+        if cache.generation(key.page) != generation {
+            return;
+        }
+        let cache = &mut cache.entries;
         if cache.len() >= MAX_ENTRIES
             && !cache.contains_key(&key)
             && let Some(expiring) = cache
@@ -491,6 +520,10 @@ async fn render_response(
         }
     }
 
+    // Force Refresh must also invalidate an in-flight render using old data.
+    let generation = cache_key
+        .as_ref()
+        .and_then(|key| app.public_cache.generation(key.page));
     let mut db = app.db.begin().await?;
     if page == Page::LiveResults {
         crate::staff_pairing::lock_round_if_configured(&mut db).await?;
@@ -516,7 +549,7 @@ async fn render_response(
     let _refresh = refresh;
     let response = load(&mut db).await?;
     db.commit().await?;
-    let (Some(key), Some(version)) = (cache_key, version) else {
+    let (Some(key), Some(version), Some(generation)) = (cache_key, version, generation) else {
         return Ok(response);
     };
     let public_redirect = response.status() == StatusCode::FOUND
@@ -563,6 +596,7 @@ async fn render_response(
         };
     app.public_cache.insert(
         key,
+        generation,
         Entry {
             version,
             fresh_until,
@@ -581,6 +615,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn refreshing_staff_rankings_evicts_only_the_requested_fragment() {
+        let cache = PublicCache::default();
+        let key = |page, audience| Key {
+            page,
+            audience,
+            source: None,
+        };
+        let target = Page::StaffTeamRankings;
+        let kept = Page::StaffSpeakerRankings;
+        let now = Instant::now();
+        let entry = || Entry {
+            version: vec![1],
+            fresh_until: now + Duration::from_secs(60),
+            stale_until: now + Duration::from_secs(60),
+            refreshing: Arc::default(),
+            status: StatusCode::OK,
+            headers: HeaderMap::new(),
+            body: Bytes::from_static(b"rankings"),
+        };
+        for page in [target, kept, Page::TeamRankings] {
+            for audience in [Audience::Tab, Audience::SignedIn] {
+                cache.insert(key(page, audience), 0, entry());
+            }
+        }
+        let in_flight_generation = cache.generation(target).unwrap();
+        cache.evict(target);
+        cache.insert(key(target, Audience::Tab), in_flight_generation, entry());
+        for audience in [Audience::Tab, Audience::SignedIn] {
+            assert!(!cache.has_entry(&key(target, audience)));
+            assert!(cache.has_entry(&key(kept, audience)));
+            assert!(cache.has_entry(&key(Page::TeamRankings, audience)));
+        }
+        let new_generation = cache.generation(target).unwrap();
+        cache.insert(key(target, Audience::Tab), new_generation, entry());
+        assert!(cache.has_entry(&key(target, Audience::Tab)));
+    }
+
+    #[test]
     fn stale_entries_require_the_same_version_and_allow_only_one_refresh() {
         let cache = PublicCache::default();
         let key = Key {
@@ -591,6 +663,7 @@ mod tests {
         let now = Instant::now();
         cache.insert(
             key.clone(),
+            0,
             Entry {
                 version: vec![1],
                 fresh_until: now,

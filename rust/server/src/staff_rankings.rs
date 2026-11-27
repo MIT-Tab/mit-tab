@@ -7,17 +7,19 @@ use axum::{
     response::Response,
     routing::get,
 };
-use minijinja::context;
+use minijinja::{Value, context};
 use mittab_tabulation::{ballots::RoundFilter, rankings::Stat};
 use serde::Serialize;
 use sqlx::MySqlConnection;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     App,
     html::{self, Navigation},
+    legacy_html,
     legacy_session::Actor,
     public_cache::{self, Page},
-    public_rankings::policy,
+    public_rankings::{django_hundredths, policy},
     settings::Settings,
     speakers,
     staff_elimination::forum_results,
@@ -39,9 +41,9 @@ const SETTINGS: &[&str] = &[
 
 pub fn routes() -> Router<App> {
     Router::new()
-        .route("/team/ranking/", get(team_rankings))
+        .route("/team/ranking/", get(ranking_page))
         .route("/team/rank/", get(team_rankings))
-        .route("/debater/ranking/", get(speaker_rankings))
+        .route("/debater/ranking/", get(ranking_page))
         .route("/debater/rank/", get(speaker_rankings))
 }
 
@@ -134,8 +136,8 @@ async fn teams(
                 members: members.join(", "),
                 novice,
                 wins: standing.score.get(Stat::Wins) as i32,
-                speaks: format!("{:.2}", standing.score.get(Stat::Speaks)),
-                ranks: format!("{:.2}", standing.score.get(Stat::Ranks)),
+                speaks: django_hundredths(standing.score.get(Stat::Speaks)),
+                ranks: django_hundredths(standing.score.get(Stat::Ranks)),
                 tiebreaker: tiebreaker(standing.tiebreaker_with_next, index + 1 < count),
             }
         })
@@ -169,10 +171,10 @@ async fn speaker_rows(
                 team_id,
                 team: team.unwrap_or_default(),
                 novice: row.debater.novice_status == 1,
-                speaks: format!("{:.2}", row.score.get(Stat::Speaks)),
-                ranks: format!("{:.2}", row.score.get(Stat::Ranks)),
-                adjusted_speaks: format!("{:.2}", row.score.get(Stat::SingleAdjustedSpeaks)),
-                adjusted_ranks: format!("{:.2}", row.score.get(Stat::SingleAdjustedRanks)),
+                speaks: django_hundredths(row.score.get(Stat::Speaks)),
+                ranks: django_hundredths(row.score.get(Stat::Ranks)),
+                adjusted_speaks: django_hundredths(row.score.get(Stat::SingleAdjustedSpeaks)),
+                adjusted_ranks: django_hundredths(row.score.get(Stat::SingleAdjustedRanks)),
                 tiebreaker: tiebreaker(row.tiebreaker, index + 1 < count),
             }
         })
@@ -191,24 +193,78 @@ pub async fn group_memberships(
     sqlx::query_as(query).fetch_all(db).await
 }
 
-async fn groups(
-    db: &mut MySqlConnection,
-    team: bool,
-) -> Result<Vec<(String, HashSet<i32>)>, sqlx::Error> {
-    let mut groups: Vec<(String, HashSet<i32>)> = Vec::new();
+struct RankingGroup {
+    title: String,
+    anchor: String,
+    members: HashSet<i32>,
+}
+
+fn slugify(name: &str) -> String {
+    let mut slug = String::new();
+    let mut separator = false;
+    for ch in name.nfkd().filter(char::is_ascii) {
+        if ch == '-' || ch.is_ascii_whitespace() {
+            separator = true;
+        } else if ch == '_' || ch.is_ascii_alphanumeric() {
+            if separator && !slug.is_empty() {
+                slug.push('-');
+            }
+            separator = false;
+            slug.push(ch.to_ascii_lowercase());
+        }
+    }
+    slug.trim_matches(['-', '_']).into()
+}
+
+async fn groups(db: &mut MySqlConnection, team: bool) -> Result<Vec<RankingGroup>, sqlx::Error> {
+    let mut groups: Vec<RankingGroup> = Vec::new();
     let mut last = None;
+    let prefix = if team { "team" } else { "debater" };
     for (id, name, member) in group_memberships(db, team).await? {
         if last != Some(id) {
-            groups.push((format!("{name} Rankings"), HashSet::new()));
+            groups.push(RankingGroup {
+                title: format!("{name} Rankings"),
+                anchor: format!("{prefix}-ranking-group-{}", slugify(&name)),
+                members: HashSet::new(),
+            });
             last = Some(id);
         }
         groups
             .last_mut()
             .expect("matching ranking group")
-            .1
+            .members
             .insert(member);
     }
     Ok(groups)
+}
+
+async fn ranking_page(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    let result = async {
+        let mut db = app.db.begin().await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
+        db.commit().await?;
+        let (template, title) = if uri.path() == "/team/ranking/" {
+            ("tab/rank_teams.html", "Team Rankings")
+        } else {
+            ("tab/rank_debaters.html", "Debater Rankings")
+        };
+        Ok::<_, sqlx::Error>(staff_roster_notice::render(
+            &app,
+            &headers,
+            uri.path(),
+            template,
+            shell,
+            context! { title },
+            StatusCode::OK,
+        ))
+    }
+    .await;
+    result.unwrap_or_else(|_| unavailable())
 }
 
 async fn team_rankings(
@@ -235,25 +291,44 @@ async fn render_team_rankings(
 ) -> Result<Response, sqlx::Error> {
     let settings = Settings::load(db, SETTINGS).await?;
     let rankings = teams(db, &settings).await?;
-    let memberships = groups(db, true).await?;
-    let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
-    let groups: Vec<_> = memberships
-        .into_iter()
-        .map(|(title, members)| {
-            (
-                title,
-                rankings
-                    .iter()
-                    .filter(|row| members.contains(&(row.id as i32)))
-                    .collect::<Vec<_>>(),
-            )
+    let rows: Vec<_> = rankings
+        .iter()
+        .map(|row| {
+            Value::from_serialize((
+                context! { id => row.id, display_backend => &row.name },
+                row.wins,
+                &row.speaks,
+                &row.ranks,
+                row.tiebreaker,
+            ))
         })
         .collect();
-    Ok(html::render(
-        "staff_rankings.html",
+    let novice: Vec<_> = rankings
+        .iter()
+        .zip(&rows)
+        .filter(|(rank, _)| rank.novice)
+        .map(|(_, row)| row.clone())
+        .collect();
+    let team_ranking_groups: Vec<_> = groups(db, true)
+        .await?
+        .into_iter()
+        .filter_map(|group| {
+            let teams: Vec<_> = rankings
+                .iter()
+                .zip(&rows)
+                .filter(|(rank, _)| group.members.contains(&(rank.id as i32)))
+                .map(|(_, row)| row.clone())
+                .collect();
+            (!teams.is_empty())
+                .then(|| context! { title => group.title, anchor => group.anchor, teams })
+        })
+        .collect();
+    Ok(legacy_html::render(
+        "tab/rank_teams_component.html",
+        context! {},
         context! {
-            title => "Team Rankings", nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-            varsity => rankings, novice, groups, team => true, message,
+            user => context! { is_authenticated => actor != Actor::Anonymous },
+            varsity => rows, novice, team_ranking_groups, ranking_notice => message,
         },
         StatusCode::OK,
     ))
@@ -271,7 +346,7 @@ async fn speaker_rankings(
         Page::StaffSpeakerRankings,
         &headers,
         uri.path(),
-        async |db, message| render_speaker_rankings(db, actor, message).await,
+        async |db, message| render_speaker_rankings(db, message).await,
     )
     .await
 }
@@ -306,32 +381,45 @@ async fn rankings_response(
 
 async fn render_speaker_rankings(
     db: &mut MySqlConnection,
-    actor: Actor,
     message: Option<&str>,
 ) -> Result<Response, sqlx::Error> {
     let settings = Settings::load(db, SETTINGS).await?;
     let rankings = speaker_rows(db, &settings).await?;
-    let memberships = groups(db, false).await?;
-    let novice: Vec<_> = rankings.iter().filter(|row| row.novice).collect();
-    let groups: Vec<_> = memberships
+    let adjusted_first = settings.flag("speaker_rankings_use_single_adjusted", false);
+    let rows: Vec<_> = rankings.iter().map(|row| {
+        let unadjusted = context! { label => "Unadjusted", speaks => &row.speaks, ranks => &row.ranks };
+        let adjusted = context! { label => "Single adjusted", speaks => &row.adjusted_speaks, ranks => &row.adjusted_ranks };
+        let score_columns = if adjusted_first { [adjusted, unadjusted] } else { [unadjusted, adjusted] };
+        context! {
+            debater => context! { id => row.id, name => &row.name },
+            team => row.team_id.map(|id| context! { id, name => &row.team }),
+            score_columns, tiebreaker => row.tiebreaker,
+        }
+    }).collect();
+    let nov_debaters: Vec<_> = rankings
+        .iter()
+        .zip(&rows)
+        .filter(|(rank, _)| rank.novice)
+        .map(|(_, row)| row.clone())
+        .collect();
+    let debater_ranking_groups: Vec<_> = groups(db, false)
+        .await?
         .into_iter()
-        .map(|(title, members)| {
-            (
-                title,
-                rankings
-                    .iter()
-                    .filter(|row| members.contains(&row.id))
-                    .collect::<Vec<_>>(),
-            )
+        .filter_map(|group| {
+            let debaters: Vec<_> = rankings
+                .iter()
+                .zip(&rows)
+                .filter(|(rank, _)| group.members.contains(&rank.id))
+                .map(|(_, row)| row.clone())
+                .collect();
+            (!debaters.is_empty())
+                .then(|| context! { title => group.title, anchor => group.anchor, debaters })
         })
         .collect();
-    Ok(html::render(
-        "staff_rankings.html",
-        context! {
-            title => "Speaker Rankings", nav => Navigation::new(actor, settings.flag("motions_enabled", true)),
-            varsity => rankings, novice, groups, team => false, message,
-            adjusted_first => settings.flag("speaker_rankings_use_single_adjusted", false),
-        },
+    Ok(legacy_html::render(
+        "tab/rank_debaters_component.html",
+        context! {},
+        context! { debaters => rows, nov_debaters, debater_ranking_groups, ranking_notice => message },
         StatusCode::OK,
     ))
 }

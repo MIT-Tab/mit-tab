@@ -6188,6 +6188,95 @@ def test_native_roster_log_management_uses_fixed_est_permissions_and_privacy():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_staff_ranking_shells_and_fragments_match_django(html_assets, subtests):
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    user = get_user_model().objects.create_superuser(username="staff-rankings-parity")
+    board = legacy_tab_session("staff-rankings-parity-board")
+    get_user_model().objects.get(username="staff-rankings-parity-board").groups.add(Group.objects.create(name="APDA Board"))
+    client = Client()
+    client.force_login(user)
+    client.cookies["csrftoken"] = "a" * 32
+    session = client.cookies["sessionid"].value
+    team_page, team_fragment = "/team/ranking/", "/team/rank/"
+    speaker_page, speaker_fragment = "/debater/ranking/", "/debater/rank/"
+    paths = (team_page, team_fragment, speaker_page, speaker_fragment)
+
+    with rust_server(overrides=html_assets) as port:
+        for path in paths:
+            with subtests.test(state="empty", path=path):
+                compare_admin_page(port, path, client)
+        school = School.objects.create(name="Ranking & School")
+        team = Team.objects.create(name="Ranked <Team>", school=school, seed=0, ranking_public=False)
+        other = Team.objects.create(name="Opposition & Team", school=school, seed=0)
+        empty = Team.objects.create(name="Unassigned Team", school=school, seed=0)
+        speaker = Debater.objects.create(name="Speaker & One", novice_status=1)
+        counterpart = Debater.objects.create(name="Opposition <Speaker>", novice_status=0)
+        solo = Debater.objects.create(name="Independent Speaker", novice_status=1)
+        team.debaters.add(speaker)
+        other.debaters.add(counterpart)
+        played = Round.objects.create(round_number=1, gov_team=team, opp_team=other, victor=Round.GOV)
+        ballot = RoundStats.objects.create(round=played, debater=speaker, speaks=Decimal("27.1250"), ranks=Decimal("1.3750"))
+        RoundStats.objects.create(round=played, debater=counterpart, speaks=Decimal("26.9375"), ranks=Decimal("2.6250"))
+        group = RankingGroup.objects.create(name="Élite & Novice -- Crew_2")
+        group.teams.add(team, empty)
+        group.debaters.add(speaker, solo)
+        RankingGroup.objects.create(name="Empty <Group>")
+        cache_logic.clear_cache()
+        for path in paths:
+            with subtests.test(state="populated", path=path):
+                compare_admin_page(port, path, client)
+                response = request(port, path, cookie=session)
+                assert response[1]["Cache-Control"] == "private, no-store"
+                assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        team_body = request(port, team_fragment, cookie=session)[2]
+        speaker_body = request(port, speaker_fragment, cookie=session)[2]
+        assert b"27.13" in team_body and b"27.13" in speaker_body
+        assert b"Empty &lt;Group&gt;" not in team_body and b"Empty &lt;Group&gt;" not in speaker_body
+        assert b"#team-ranking-group-elite-novice-crew_2" in team_body
+        assert b"#debater-ranking-group-elite-novice-crew_2" in speaker_body
+        assert b'href="/team//"' in speaker_body
+        assert b"<html" not in team_body and b"<html" not in speaker_body
+        assert b'id="team_ranking"' in request(port, team_page, cookie=session)[2]
+        assert b'id="debater_ranking"' in request(port, speaker_page, cookie=session)[2]
+        assert b"Ranked &lt;Team&gt;" not in request(port, team_page, cookie=session)[2]
+
+        TabSettings.set("speaker_rankings_use_single_adjusted", 1)
+        compare_admin_page(port, speaker_fragment, client)
+        changed = request(port, speaker_fragment, cookie=session)[2]
+        assert changed.index(b">Single adjusted<") < changed.index(b">Unadjusted<")
+        group.teams.clear()
+        assert b"#team-ranking-group-elite-novice-crew_2" not in request(port, team_fragment, cookie=session)[2]
+        RoundStats.objects.filter(id=ballot.id).update(speaks="31.1250")
+        for path in (team_fragment, speaker_fragment):
+            latest = request(port, path, cookie=session)[2]
+            assert b"31.13" in latest and b"27.13" not in latest
+            assert request(port, path, cookie=session)[2] == latest
+        cache_logic.clear_cache()
+        compare_admin_page(port, team_fragment, client)
+        compare_admin_page(port, speaker_fragment, client)
+
+        for label, page, fragment in (
+            ("team_rankings_private", team_page, team_fragment),
+            ("speaker_rankings", speaker_page, speaker_fragment),
+        ):
+            refresh = f"/cache_refresh?key={label}&next={page}"
+            assert refresh.encode() in request(port, fragment, cookie=session)[2]
+            assert request(port, refresh, cookie=board)[1]["Location"] == "/403/"
+            compare_admin_page(port, refresh, client)
+            status, headers, _ = request(port, refresh, cookie=session)
+            assert status == 302 and headers["Location"] == page
+            notice = load_cookies(headers)["mittab_roster_notice"].value
+            assert b"Refreshed!" in request(port, page, extra_headers={
+                "Cookie": f"sessionid={session}; mittab_roster_notice={notice}",
+            })[2]
+            assert b"Refreshed!" not in request(port, fragment, cookie=session)[2]
+        invalid_next = "/cache_refresh?key=team_rankings_private&next=https://invalid.example/"
+        assert request(port, invalid_next, cookie=session)[1]["Location"] == "/"
+
+
+@pytest.mark.django_db(transaction=True)
 def test_native_staff_rankings_and_report_match_reference():
     from mittab.apps.tab.judge_speaker_points import judge_speaker_metrics
     from mittab.apps.tab.models import RankingGroup
@@ -6223,13 +6312,13 @@ def test_native_staff_rankings_and_report_match_reference():
         status, _, team_ranks = request(port, "/team/rank/", cookie=staff)
         assert status == 200 and b"Regional Fixture Rankings" in team_ranks, team_ranks
         expected_teams, _ = get_team_rankings(None)
-        locations = [team_ranks.index(f"/team/{row[0].id}/".encode()) for row in expected_teams]
+        locations = [team_ranks.index(f'href="/team/{row[0].id}"'.encode()) for row in expected_teams]
         assert locations == sorted(locations)
         status, _, speakers_result = request(port, "/debater/rank/", cookie=staff)
         assert status == 200 and b"Regional Fixture Rankings" in speakers_result, speakers_result
-        assert speakers_result.index(b"Single adjusted speaks") < speakers_result.index(b"Unadjusted speaks")
+        assert speakers_result.index(b">Single adjusted<") < speakers_result.index(b">Unadjusted<")
         expected_speakers, _ = get_speaker_rankings()
-        locations = [speakers_result.index(f"/debater/{row[0].id}/".encode()) for row in expected_speakers]
+        locations = [speakers_result.index(f'href="/debater/{row[0].id}"'.encode()) for row in expected_speakers]
         assert locations == sorted(locations)
         status, _, preview = request(port, "/forum_post", cookie=staff)
         assert status == 200, preview

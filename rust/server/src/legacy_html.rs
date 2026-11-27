@@ -123,6 +123,7 @@ pub fn environment() -> Environment<'static> {
 
 static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
     let mut env = environment();
+    env.add_global("urls", Value::from_serialize(&*URLS));
     env.add_function("legacy_bundle", html::legacy_bundle);
     env.add_filter("django_default", |value: Value, fallback: Value| {
         if value.is_true() { value } else { fallback }
@@ -372,6 +373,30 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "tab/judge_detail.html",
             include_str!("../../../mittab/templates/tab/judge_detail.html"),
+        ),
+        (
+            "tab/rank_teams.html",
+            include_str!("../../../mittab/templates/tab/rank_teams.html"),
+        ),
+        (
+            "tab/rank_debaters.html",
+            include_str!("../../../mittab/templates/tab/rank_debaters.html"),
+        ),
+        (
+            "tab/rank_teams_component.html",
+            include_str!("../../../mittab/templates/tab/rank_teams_component.html"),
+        ),
+        (
+            "tab/rank_debaters_component.html",
+            include_str!("../../../mittab/templates/tab/rank_debaters_component.html"),
+        ),
+        (
+            "tab/_rank_teams_table.html",
+            include_str!("../../../mittab/templates/tab/_rank_teams_table.html"),
+        ),
+        (
+            "tab/_rank_debaters_table.html",
+            include_str!("../../../mittab/templates/tab/_rank_debaters_table.html"),
         ),
         (
             "common/_audit_trail.html",
@@ -778,6 +803,22 @@ fn translate(name: &str, source: &str) -> String {
                 "{{ csrf_input|safe }}",
                 "{{ csrf_input|safe }}{% if scratch_error %}<div class=\"alert alert-danger\" role=\"alert\">{{ scratch_error }}</div>{% endif %}",
             ),
+        "tab/rank_teams_component.html" | "tab/rank_debaters_component.html" => {
+            // Direct fragment requests can also be a saved form's return target.
+            [
+                "{% if ranking_notice %}<div class=\"col-12\"><div class=\"alert alert-success\">{{ ranking_notice }}</div></div>{% endif %}",
+                &translated,
+            ].concat()
+        }
+        "tab/_rank_teams_table.html" => translated
+            .replace("|default_if_none:True", "|default(true)")
+            .replace("teams.0|length", "teams[0]|django_length")
+            .replace("team.0.", "team[0].")
+            .replace("team.1", "team[1]")
+            .replace("team.2", "team[2]")
+            .replace("team.3", "team[3]")
+            .replace("team.4", "team[4]"),
+        "tab/_rank_debaters_table.html" => translated.replace("debaters.0.", "debaters[0]."),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),
