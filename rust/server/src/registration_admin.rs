@@ -263,6 +263,96 @@ async fn update_settings(app: &App, fields: &Fields) -> Result<(), Error> {
     Ok(())
 }
 
+pub(super) fn valid_http_url(value: &str) -> bool {
+    let Some((scheme, rest)) = value.split_once("://") else {
+        return false;
+    };
+    if !(scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https"))
+        || value
+            .chars()
+            .any(|character| character.is_whitespace() || character.is_control())
+    {
+        return false;
+    }
+    let Some(authority) = rest.split(['/', '?', '#']).next() else {
+        return false;
+    };
+    if authority.contains('\\') || url::Url::parse(value).is_err() {
+        return false;
+    }
+    let host_port = if let Some((credentials, host_port)) = authority.split_once('@') {
+        let (user, password) = credentials.split_once(':').unwrap_or((credentials, ""));
+        if user.is_empty() || password.contains(':') {
+            return false;
+        }
+        host_port
+    } else {
+        authority
+    };
+    if host_port.contains('@') {
+        return false;
+    }
+    let (host, port) = if let Some(bracketed) = host_port.strip_prefix('[') {
+        let Some((ipv6, suffix)) = bracketed.split_once(']') else {
+            return false;
+        };
+        if ipv6.parse::<std::net::Ipv6Addr>().is_err() {
+            return false;
+        }
+        return suffix.is_empty() || suffix.strip_prefix(':').is_some_and(valid_url_port);
+    } else {
+        host_port
+            .split_once(':')
+            .map_or((host_port, None), |(host, port)| (host, Some(port)))
+    };
+    port.is_none_or(valid_url_port) && valid_url_host(host)
+}
+
+fn valid_url_port(port: &str) -> bool {
+    (1..=5).contains(&port.len()) && port.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn valid_url_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::Ipv4Addr>().is_ok() {
+        return true;
+    }
+    if host.chars().count() > 253 {
+        return false;
+    }
+    let host = host.strip_suffix('.').unwrap_or(host);
+    let Some((subdomains, tld)) = host.rsplit_once('.') else {
+        return false;
+    };
+    let label = |label: &str, valid_character: fn(char) -> bool| {
+        !label.is_empty()
+            && label.chars().count() <= 63
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label.chars().all(valid_character)
+    };
+    let top_level_valid = if tld
+        .get(..4)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("xn--"))
+    {
+        (5..=63).contains(&tld.len()) && tld[4..].bytes().all(|byte| byte.is_ascii_alphanumeric())
+    } else {
+        tld.chars().count() >= 2
+            && label(tld, |character| {
+                character.is_ascii_alphabetic()
+                    || ('\u{a1}'..='\u{ffff}').contains(&character)
+                    || character == '-'
+            })
+    };
+    top_level_valid
+        && subdomains.split('.').all(|value| {
+            label(value, |character| {
+                character.is_ascii_alphanumeric()
+                    || ('\u{a1}'..='\u{ffff}').contains(&character)
+                    || character == '-'
+            })
+        })
+}
+
 #[derive(Clone, Copy)]
 pub enum Resource {
     RegistrationLink,
@@ -441,7 +531,7 @@ async fn save_resource(
     } else {
         order.parse::<u32>().ok()
     };
-    let Some(order) = source.filter(|&order| order <= i32::MAX as u32) else {
+    let Some(order) = source else {
         return access::found(kind.next(false));
     };
     let content_ok = if kind.is_text() {

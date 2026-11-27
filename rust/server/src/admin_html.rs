@@ -275,7 +275,7 @@ fn translate(source: &str) -> String {
         .replace("{{ block.super }}", "{{ super() }}")
         .replace(
             "{% csrf_token %}{% block form_top %}",
-            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% if configuration_revision %}<input type="hidden" name="mittab_configuration_revision" value="{{ configuration_revision }}">{% endif %}{% block form_top %}"#,
+            r#"{% csrf_token %}{% if pairing_revision %}<input type="hidden" name="mittab_pairing_revision" value="{{ pairing_revision }}">{% endif %}{% if registration_revision %}<input type="hidden" name="mittab_registration_revision" value="{{ registration_revision }}">{% endif %}{% if registration_delete_revision %}<input type="hidden" name="mittab_registration_delete_revision" value="{{ registration_delete_revision }}">{% endif %}{% if resource_revision %}<input type="hidden" name="{{ resource_revision_name }}" value="{{ resource_revision }}">{% endif %}{% block form_top %}"#,
         )
         .replace(
             r#"<input type="hidden" name="post" value="yes">"#,
@@ -297,6 +297,8 @@ fn translate(source: &str) -> String {
         .replace("inline_admin_formset.has_change_permission|yesno:'inlinechangelink,inlineviewlink'", "('inlinechangelink' if inline_admin_formset.has_change_permission else 'inlineviewlink')")
         .replace("field.help_text|striptags", "field.help_text")
         .replace("{{ field.field.errors.as_ul }}", "{{ field.errors|safe }}")
+        .replace("{{ cl.formset.management_form }}", "{{ cl.formset.management_form|safe }}")
+        .replace("{{ cl.formset.non_form_errors }}", "{{ cl.formset.non_form_errors|default('')|safe }}")
         .replace("{{ inline_admin_formset.formset.management_form }}", "{{ inline_admin_formset.formset.management_form|safe }}")
         .replace("{{ inline_admin_formset.formset.non_form_errors }}", "{{ inline_admin_formset.formset.non_form_errors|safe }}")
         .replace("{{ inline_admin_form.form.non_field_errors }}", "{{ inline_admin_form.form.non_field_errors|safe }}")
@@ -847,6 +849,16 @@ async fn notice(
             )
         }
         (2, "password") if model.name == "user" => "Password changed successfully.".into(),
+        (2, list) if list.starts_with("list-") => {
+            let Ok(count) = list[5..].parse::<usize>() else {
+                return Ok(None);
+            };
+            if count == 1 {
+                format!("1 {singular} was changed successfully.")
+            } else {
+                format!("{count} {} were changed successfully.", model.plural)
+            }
+        }
         (3, "delete") => format!("The {singular} “{description}” was deleted successfully."),
         (3, bulk) if bulk.starts_with("bulk-") => {
             let Ok(count) = bulk[5..].parse::<usize>() else {

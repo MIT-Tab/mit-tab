@@ -32,6 +32,9 @@ pub const MANAGED: &[&str] = &[
     "registrationconfig",
     "registrationchangelog",
     "registrationconfirmationemaillog",
+    "infolink",
+    "infotext",
+    "registrationlink",
 ];
 
 pub struct Resource {
@@ -47,6 +50,7 @@ pub struct Field {
     pub kind: Kind,
     pub required: bool,
     pub initial: Option<&'static str>,
+    empty_value: Option<&'static str>,
     pub filter_label: Option<&'static str>,
     pub help_text: Option<&'static str>,
     pub related_widget: bool,
@@ -56,12 +60,14 @@ pub struct Field {
 #[derive(Clone, Copy)]
 pub enum Kind {
     Text(usize),
+    HttpUrl(usize),
     Textarea,
     Json,
     EasternDateTime,
     Email(usize),
     Integer,
     PositiveSmallInteger,
+    PositiveInteger,
     Experience,
     BallotCode,
     Decimal,
@@ -311,6 +317,7 @@ impl Field {
             kind,
             required: true,
             initial: None,
+            empty_value: None,
             filter_label: None,
             help_text: None,
             related_widget: true,
@@ -334,6 +341,13 @@ impl Field {
         Self {
             required: false,
             ..self
+        }
+    }
+
+    const fn blank_text(self) -> Self {
+        Self {
+            empty_value: Some(""),
+            ..self.optional()
         }
     }
 
@@ -384,6 +398,11 @@ const fn checkbox(name: &'static str, label: &'static str, initial: &'static str
         .optional()
         .initial(initial)
 }
+
+const INFO_TITLE: Field = Field::new("title", "Title", Kind::Text(80));
+pub(super) const INFO_ACTIVE: Field = checkbox("is_active", "Is active", "1");
+pub(super) const INFO_ORDER: Field =
+    Field::new("display_order", "Display order", Kind::PositiveInteger).initial("0");
 
 const APDA_ID: Field = Field::new("apda_id", "Apda id", Kind::Integer)
     .optional()
@@ -490,6 +509,29 @@ impl Resource {
             "registrationchangelog" => (&[], &[]),
             "registrationconfirmationemaillog" => (
                 const { &[Field::new("email_payload", "Email payload", Kind::Json).optional()] },
+                &[],
+            ),
+            "infotext" => (
+                const {
+                    &[
+                        INFO_TITLE,
+                        Field::new("text", "Text", Kind::Text(500)),
+                        INFO_ACTIVE,
+                        INFO_ORDER,
+                    ]
+                },
+                &[],
+            ),
+            "infolink" | "registrationlink" => (
+                const {
+                    &[
+                        INFO_TITLE,
+                        Field::new("url", "Url", Kind::HttpUrl(500)),
+                        Field::new("description", "Description", Kind::Text(160)).blank_text(),
+                        INFO_ACTIVE,
+                        INFO_ORDER,
+                    ]
+                },
                 &[],
             ),
             "bye" => (
@@ -845,6 +887,13 @@ impl Resource {
         self.list.model.name == "registrationconfig"
     }
 
+    pub fn public_information(&self) -> bool {
+        matches!(
+            self.list.model.name,
+            "infolink" | "infotext" | "registrationlink"
+        )
+    }
+
     pub fn pairing(&self) -> bool {
         matches!(self.list.model.name, "round" | "outround")
     }
@@ -894,7 +943,7 @@ impl Resource {
                 _ => format!("CAST(`{}` AS CHAR)", field.column),
             })
             .chain(
-                self.registration_config()
+                (self.registration_config() || self.public_information())
                     .then(|| "CAST(updated_at AS CHAR)".into()),
             )
             .collect::<Vec<_>>()
@@ -1021,7 +1070,7 @@ impl Resource {
                 columns.push("id = 1");
             }
         }
-        if self.registration() {
+        if self.registration() || self.public_information() {
             columns.push("updated_at = UTC_TIMESTAMP(6)");
             if id.is_none() {
                 columns.push("created_at = UTC_TIMESTAMP(6)");
@@ -1082,7 +1131,7 @@ pub struct Form {
     pub can_add: bool,
     pub non_field_error: Option<&'static str>,
     pub pairing_revision: Option<String>,
-    pub configuration_revision: Option<String>,
+    pub resource_revision: Option<(&'static str, String)>,
     pub inlines: Option<crate::admin_registration_inlines::Inlines>,
 }
 
@@ -1160,7 +1209,7 @@ impl Form {
             can_add: true,
             non_field_error: None,
             pairing_revision: None,
-            configuration_revision: None,
+            resource_revision: None,
             inlines: None,
         })
     }
@@ -1279,11 +1328,11 @@ impl BoundField {
             return if self.field.required {
                 invalid(&mut self.error, "This field is required.")
             } else {
-                None
+                self.field.empty_value.map(str::to_owned)
             };
         }
         match self.field.kind {
-            Kind::Text(max) | Kind::Email(max) => {
+            Kind::Text(max) | Kind::Email(max) | Kind::HttpUrl(max) => {
                 if matches!(self.field.kind, Kind::Email(_)) && !valid_email(raw) {
                     return invalid(&mut self.error, "Enter a valid email address.");
                 }
@@ -1296,6 +1345,11 @@ impl BoundField {
                 }
                 if raw.contains('\0') {
                     return invalid(&mut self.error, "Null characters are not allowed.");
+                }
+                if matches!(self.field.kind, Kind::HttpUrl(_))
+                    && !crate::registration_admin::valid_http_url(raw)
+                {
+                    return invalid(&mut self.error, "Enter a valid URL.");
                 }
                 Some(raw.into())
             }
@@ -1319,7 +1373,10 @@ impl BoundField {
                 Ok(date) => Some(date.format("%Y-%m-%d %H:%M:%S%.6f").to_string()),
                 Err(message) => invalid(&mut self.error, &message),
             },
-            Kind::Integer | Kind::Experience | Kind::PositiveSmallInteger => {
+            Kind::Integer
+            | Kind::Experience
+            | Kind::PositiveSmallInteger
+            | Kind::PositiveInteger => {
                 let integer = if let Some((number, fraction)) = raw.split_once('.')
                     && fraction.bytes().all(|digit| digit == b'0')
                 {
@@ -1331,7 +1388,7 @@ impl BoundField {
                     Ok(value)
                         if matches!(
                             self.field.kind,
-                            Kind::Experience | Kind::PositiveSmallInteger
+                            Kind::Experience | Kind::PositiveSmallInteger | Kind::PositiveInteger
                         ) && value < 0 =>
                     {
                         invalid(
@@ -1353,6 +1410,15 @@ impl BoundField {
                             &mut self.error,
                             "Ensure this value is less than or equal to 65535.",
                         )
+                    }
+                    Ok(value) if matches!(self.field.kind, Kind::PositiveInteger) => {
+                        match u32::try_from(value) {
+                            Ok(number) => Some(number.to_string()),
+                            Err(_) => invalid(
+                                &mut self.error,
+                                "Ensure this value is less than or equal to 4294967295.",
+                            ),
+                        }
                     }
                     Ok(value) if value < i128::from(i32::MIN) => invalid(
                         &mut self.error,

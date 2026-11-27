@@ -5,16 +5,21 @@ use axum::{
 use chrono::{NaiveDateTime, TimeZone};
 use chrono_tz::America::New_York;
 use minijinja::{Value, context};
-use sqlx::{MySql, QueryBuilder};
+use sqlx::{AssertSqlSafe, MySql, MySqlConnection, QueryBuilder};
 
 use crate::{
     App, access,
-    admin_changelist::{Page, Query, default_list, filter_ids},
+    admin_changelist::{DefaultList, Page, Query, default_list, filter_ids},
     admin_html::{self, Shell, django_datetime},
-    admin_records::{Column, choice_filter, headings, order_sql, search_terms},
+    admin_model_data::{BoundField, Field, INFO_ACTIVE, INFO_ORDER},
+    admin_model_forms::{AdminFormProof, error_list, render_widget},
+    admin_records::{Column, choice_filter, headings, order_sql, order_sql_with, search_terms},
     legacy_html::escape,
     legacy_session::Actor,
-    private, unavailable,
+    private,
+    registration_form::Fields,
+    staff_pairing::lock_round_if_configured,
+    unavailable,
 };
 
 const REGISTRATION: &[Column] = &[
@@ -99,6 +104,27 @@ const EMAILS: &[Column] = &[
     Column::new("email", "Email", "t.email", false),
     Column::new("successful", "Successful", "t.successful", false),
 ];
+const INFO_TITLE_COLUMN: Column = Column::new("title", "Title", "t.title", false);
+const INFO_ACTIVE_COLUMN: Column = Column::new("is_active", "Is active", "t.is_active", false);
+const INFO_ORDER_COLUMN: Column =
+    Column::new("display_order", "Display order", "t.display_order", false);
+const INFO_UPDATED_COLUMN: Column = Column::new("updated_at", "Updated at", "t.updated_at", true);
+const INFO_LINKS: &[Column] = &[
+    INFO_TITLE_COLUMN,
+    Column::new("url", "Url", "t.url", false),
+    INFO_ACTIVE_COLUMN,
+    INFO_ORDER_COLUMN,
+    INFO_UPDATED_COLUMN,
+];
+const INFO_TEXTS: &[Column] = &[
+    INFO_TITLE_COLUMN,
+    Column::new("text", "Text", "t.text", false),
+    INFO_ACTIVE_COLUMN,
+    INFO_ORDER_COLUMN,
+    INFO_UPDATED_COLUMN,
+];
+const LIST_REVISION: &str = "mittab_list_revision";
+
 const SUCCESS_FILTER: &str = "successful__exact";
 const REGISTRATION_LABEL: &str = "CONCAT(s.name, ' — ', r.email)";
 
@@ -108,6 +134,9 @@ pub(super) enum ListKind {
     Config,
     Changes,
     Emails,
+    InfoLink,
+    InfoText,
+    RegistrationLink,
 }
 
 impl ListKind {
@@ -117,6 +146,9 @@ impl ListKind {
             "registrationconfig" => Some(Self::Config),
             "registrationchangelog" => Some(Self::Changes),
             "registrationconfirmationemaillog" => Some(Self::Emails),
+            "infolink" => Some(Self::InfoLink),
+            "infotext" => Some(Self::InfoText),
+            "registrationlink" => Some(Self::RegistrationLink),
             _ => None,
         }
     }
@@ -127,6 +159,9 @@ impl ListKind {
             Self::Config => "registrationconfig",
             Self::Changes => "registrationchangelog",
             Self::Emails => "registrationconfirmationemaillog",
+            Self::InfoLink => "infolink",
+            Self::InfoText => "infotext",
+            Self::RegistrationLink => "registrationlink",
         }
     }
 
@@ -136,7 +171,16 @@ impl ListKind {
             Self::Config => CONFIG,
             Self::Changes => CHANGES,
             Self::Emails => EMAILS,
+            Self::InfoLink | Self::RegistrationLink => INFO_LINKS,
+            Self::InfoText => INFO_TEXTS,
         }
+    }
+
+    pub fn editable(self) -> bool {
+        matches!(
+            self,
+            Self::InfoLink | Self::InfoText | Self::RegistrationLink
+        )
     }
 
     pub fn ids(self, query: &Query) -> Option<Vec<i32>> {
@@ -163,6 +207,8 @@ impl ListKind {
                 "t.summary",
             ],
             Self::Emails => &["s.name", "t.email", "t.error_message"],
+            Self::InfoLink | Self::RegistrationLink => &["t.title", "t.url"],
+            Self::InfoText => &["t.title", "t.text"],
             Self::Config => return,
         };
         if matches!(self, Self::Emails)
@@ -196,6 +242,8 @@ impl ListKind {
         let Some(order) = query.get("o") else {
             return if matches!(self, Self::Changes | Self::Emails) {
                 vec![(0, false)]
+            } else if self.editable() {
+                vec![(3, true)]
             } else {
                 Vec::new()
             };
@@ -240,6 +288,7 @@ impl ListKind {
                 parse_db_date(value).map_or_else(|| "-".into(), django_datetime)
             }
             "successful"
+            | "is_active"
             | "allow_new_registrations"
             | "allow_registration_edits"
             | "crash_housing_enabled" => boolean_icon(value == "1"),
@@ -280,6 +329,7 @@ pub async fn list(
     headers: &HeaderMap,
     kind: ListKind,
     query: Query,
+    submission: Option<(&Fields, i32)>,
 ) -> Response {
     let config = default_list(kind.name()).expect("registration changelist");
     let model = &config.model;
@@ -298,11 +348,19 @@ pub async fn list(
         return access::found(format!("{path}?e=1"));
     };
     let popup = query.get("_popup").is_some();
+    let editable = kind.editable() && !popup;
+    if submission.is_some() && !editable {
+        return private((StatusCode::BAD_REQUEST, "This list is not editable."));
+    }
+    let target = query.request_url(&path);
     let offset = usize::from(!popup);
     let order = kind.order(&query, offset);
     let columns = kind.columns();
     let result = async {
         let mut db = app.db.begin().await?;
+        if submission.is_some() {
+            lock_round_if_configured(&mut db).await?;
+        }
         let mut all = QueryBuilder::new(format!("SELECT COUNT(*) FROM {}", config.table()));
         let full: i64 = all.build_query_scalar().fetch_one(&mut *db).await?;
         let from = format!(" FROM {} WHERE TRUE", config.source);
@@ -319,24 +377,55 @@ pub async fn list(
         ));
         filter_ids(&mut selection, &ids);
         kind.filter(&mut selection, &query);
-        selection.push(" ORDER BY ").push(order_sql(columns, &order))
+        let ordering = if kind.editable() {
+            if query.get("o").is_none() { config.ordering.into() } else { order_sql_with(columns, &order, config.ordering) }
+        } else { order_sql(columns, &order) };
+        selection.push(" ORDER BY ").push(ordering)
             .push(" LIMIT ").push_bind(limit).push(" OFFSET ").push_bind(start);
+        if submission.is_some() {
+            selection.push(" FOR UPDATE");
+        }
         let rows = selection.build_query_as::<(i32, String)>().fetch_all(&mut *db).await?;
+        let proof = editable.then(|| AdminFormProof::for_target(headers, "admin public information list edit", &target, &rows)).flatten();
+        let stale = submission.is_some_and(|(post, _)| {
+            proof.as_ref().is_none_or(|proof| !proof.verified(app, post.get(LIST_REVISION)))
+                || !matches_list(&rows, post)
+        });
+        let bound = submission.filter(|_| !stale);
+        let entries = list_rows(&rows)?;
+        let mut edits = editable.then(|| prepare_edits(&entries, bound.map(|(post, _)| post)));
+        if let Some((_, user)) = bound
+            && let Some(edits) = &mut edits
+            && !edits.iter().any(EditRow::has_errors)
+        {
+            let changed = save_list_edits(&mut db, &config, &entries, edits, user).await?;
+            db.commit().await?;
+            return Ok(match changed {
+                Some((log, count)) => admin_html::redirect_with_notice(app, headers, target, log, &format!("list-{count}")),
+                None => access::found(target),
+            });
+        }
         db.commit().await?;
         let suffix = escape(&query.suffix());
         let mut results = Vec::with_capacity(rows.len());
-        for (id, row) in &rows {
-            let values: Vec<Option<String>> = serde_json::from_str(row)
-                .map_err(|error| sqlx::Error::Decode(error.into()))?;
+        for (row_index, (id, values)) in entries.iter().enumerate() {
+            let edit = edits.as_ref().and_then(|rows| rows.get(row_index));
             let opener = if popup { format!(r#" data-popup-opener="{id}""#) } else { String::new() };
             let mut cells = Vec::new();
             if !popup {
                 cells.push(format!(r#"<td class="action-checkbox"><input type="checkbox" name="_selected_action" value="{id}" class="action-select"></td>"#));
             }
-            cells.extend(columns.iter().zip(&values).enumerate().map(|(index, (column, value))| {
+            cells.extend(columns.iter().zip(values).enumerate().map(|(index, (column, value))| {
                 let name = column.name;
                 let nowrap = if column.nowrap { " nowrap" } else { "" };
-                let value = kind.cell(column, value.as_deref());
+                let value = if let Some(edit) = edit && let Some(field) = edit.field(name) {
+                    let input = format!("form-{row_index}-{name}");
+                    let widget = render_widget(field, &input, false).expect("list uses only checkbox and integer widgets");
+                    let error = field.error.as_deref().map_or_else(String::new, |message| error_list(message, false));
+                    format!("{error}{widget}")
+                } else {
+                    kind.cell(column, value.as_deref())
+                };
                 if index == 0 {
                     format!(r#"<th class="field-{name}{nowrap}"><a href="{path}{id}/change/{suffix}"{opener}>{value}</a></th>"#)
                 } else {
@@ -388,15 +477,34 @@ pub async fn list(
 </select>"#, model.plural);
         let title = if popup { format!("Select {}", model.singular) } else { format!("Select {} to change", model.singular) };
         let can_add = match kind {
-            ListKind::Registration => true,
             ListKind::Config => full == 0,
             ListKind::Changes | ListKind::Emails => false,
+            _ => true,
         };
-        Ok::<_, sqlx::Error>(shell.render("admin/change_list.html", context! {
+        let formset = edits.as_ref().map(|edits| {
+            let mut management_form: String = [
+                ("TOTAL_FORMS", edits.len()),
+                ("INITIAL_FORMS", edits.len()),
+                ("MIN_NUM_FORMS", 0),
+                ("MAX_NUM_FORMS", 1000),
+            ].into_iter().map(|(field, value)| hidden(&format!("form-{field}"), &value.to_string())).collect();
+            if let Some(proof) = proof {
+                management_form.push_str(&hidden(LIST_REVISION, &proof.token(app)));
+            }
+            let errors = edits.iter().filter(|row| row.has_errors()).count() + usize::from(stale);
+            let non_form_errors = if stale {
+                r#"<ul class="errorlist nonform"><li>This list changed. Review the current rows before saving.</li></ul>"#
+            } else { "" };
+            context! { management_form, errors => errors > 0, total_error_count => errors, non_form_errors }
+        });
+        let result_hidden_fields = editable.then(|| entries.iter().enumerate().map(|(index, (id, _))| {
+            hidden(&format!("form-{index}-id"), &id.to_string())
+        }).collect::<Vec<_>>());
+        let mut response = shell.render("admin/change_list.html", context! {
             title, opts => &opts, is_popup => popup,
             cl => context! {
                 opts => &opts, show_admin_actions => full > 0,
-                result_count => count, result_list => &rows,
+                result_count => count, result_list => &rows, formset,
                 has_filters => !filters.is_empty(), filter_specs => filters,
                 has_active_filters => active_filter, clear_all_filters_qs => Query::encode(filter_params),
             },
@@ -412,11 +520,152 @@ pub async fn list(
             selection_note => format!("0 of {} selected", rows.len()),
             selection_note_all => format!("All {count} selected"),
             media => context! { js => admin_html::scripts() },
-            search_form, result_headers, num_sorted_fields => order.len(), results,
+            search_form, result_headers, num_sorted_fields => order.len(), results, result_hidden_fields,
             ..pager,
-        }, headers))
+        }, headers);
+        if stale && response.status() == StatusCode::OK {
+            *response.status_mut() = StatusCode::CONFLICT;
+        }
+        Ok::<_, sqlx::Error>(response)
     }.await;
     result.unwrap_or_else(|_| unavailable())
+}
+
+type ListRow = (i32, Vec<Option<String>>);
+
+fn list_rows(rows: &[(i32, String)]) -> Result<Vec<ListRow>, sqlx::Error> {
+    rows.iter()
+        .map(|(id, raw)| {
+            serde_json::from_str(raw)
+                .map(|row| (*id, row))
+                .map_err(|error| sqlx::Error::Decode(error.into()))
+        })
+        .collect()
+}
+
+fn hidden(name: &str, value: &str) -> String {
+    format!(
+        r#"<input type="hidden" name="{name}" value="{}" id="id_{name}">"#,
+        escape(value)
+    )
+}
+
+fn matches_list(rows: &[(i32, String)], post: &Fields) -> bool {
+    ["TOTAL_FORMS", "INITIAL_FORMS"]
+        .into_iter()
+        .all(|name| post.get(&format!("form-{name}")).parse::<usize>() == Ok(rows.len()))
+        && rows
+            .iter()
+            .enumerate()
+            .all(|(index, (id, _))| post.get(&format!("form-{index}-id")).parse::<i32>() == Ok(*id))
+}
+
+struct EditRow {
+    active: BoundField,
+    order: BoundField,
+    cleaned_order: Option<String>,
+}
+
+impl EditRow {
+    fn field(&self, name: &str) -> Option<&BoundField> {
+        match name {
+            "is_active" => Some(&self.active),
+            "display_order" => Some(&self.order),
+            _ => None,
+        }
+    }
+
+    fn has_errors(&self) -> bool {
+        self.order.error.is_some()
+    }
+}
+
+fn prepare_edits(entries: &[ListRow], post: Option<&Fields>) -> Vec<EditRow> {
+    let bound = |field: &'static Field, value| BoundField {
+        field,
+        value,
+        initial_json: None,
+        options: Vec::new(),
+        selected: Vec::new(),
+        error: None,
+    };
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, (_, values))| {
+            let mut active = values[2].clone();
+            let mut order = values[3].clone();
+            if let Some(post) = post {
+                active = Some(
+                    if post.flag(&format!("form-{index}-is_active")) {
+                        "1"
+                    } else {
+                        "0"
+                    }
+                    .into(),
+                );
+                order = post
+                    .all(&format!("form-{index}-display_order"))
+                    .last()
+                    .cloned();
+            }
+            let active = bound(&INFO_ACTIVE, active);
+            let mut order = bound(&INFO_ORDER, order);
+            let cleaned_order = post.and_then(|_| order.clean());
+            EditRow {
+                active,
+                order,
+                cleaned_order,
+            }
+        })
+        .collect()
+}
+
+async fn save_list_edits(
+    db: &mut MySqlConnection,
+    config: &DefaultList,
+    entries: &[ListRow],
+    edits: &[EditRow],
+    user: i32,
+) -> Result<Option<(u64, usize)>, sqlx::Error> {
+    let sql = format!(
+        "UPDATE {} SET is_active = ?, display_order = ?, updated_at = UTC_TIMESTAMP(6) WHERE id = ?",
+        config.table()
+    );
+    let mut last_log = None;
+    let mut count = 0;
+    for ((id, values), edit) in entries.iter().zip(edits) {
+        let mut changes = Vec::new();
+        if edit.active.value != values[2] {
+            changes.push(INFO_ACTIVE.label);
+        }
+        if edit.cleaned_order != values[3] {
+            changes.push(INFO_ORDER.label);
+        }
+        if changes.is_empty() {
+            continue;
+        }
+        sqlx::query(AssertSqlSafe(sql.as_str()))
+            .bind(edit.active.value.as_deref())
+            .bind(edit.cleaned_order.as_deref())
+            .bind(id)
+            .execute(&mut *db)
+            .await?;
+        last_log = Some(
+            admin_html::log_action(
+                db,
+                config.model.name,
+                user,
+                *id,
+                values[0].as_deref().unwrap_or_default(),
+                2,
+                serde_json::json!([{"changed": {"fields": changes}}]).to_string(),
+            )
+            .await?,
+        );
+        count += 1;
+    }
+    Ok(last_log.map(|id| (id, count)))
 }
 
 pub(super) async fn can_add(

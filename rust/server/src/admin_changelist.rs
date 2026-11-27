@@ -114,6 +114,18 @@ pub(super) fn default_list(name: &str) -> Option<DefaultList> {
             "CONCAT('Registration confirmation ', IF(t.successful, 'sent', 'failed'), ': ', t.email)",
             "t.sent_at DESC, t.id DESC",
         ),
+        "infolink" => (
+            "infolink", "info link", "info links", "registration_infolink t",
+            "t.title", "t.display_order, t.created_at, t.id DESC",
+        ),
+        "infotext" => (
+            "infotext", "info text", "info texts", "registration_infotext t",
+            "t.title", "t.display_order, t.created_at, t.id DESC",
+        ),
+        "registrationlink" => (
+            "registrationlink", "registration link", "registration links", "registration_registrationlink t",
+            "t.title", "t.display_order, t.created_at, t.id DESC",
+        ),
         "school" => (
             "school",
             "school",
@@ -310,6 +322,14 @@ impl Query {
         Self { raw, params, page }
     }
 
+    pub fn request_url(&self, path: &str) -> String {
+        if self.raw.is_empty() {
+            path.into()
+        } else {
+            format!("{path}?{}", self.raw)
+        }
+    }
+
     pub fn requested(&self) -> i64 {
         self.page
     }
@@ -440,7 +460,7 @@ pub async fn get(
     if application == "registration" {
         let kind = crate::admin_registration::ListKind::find(model)?;
         return Some(
-            crate::admin_registration::list(app, actor, headers, kind, Query::new(raw)).await,
+            crate::admin_registration::list(app, actor, headers, kind, Query::new(raw), None).await,
         );
     }
     if application != "tab" {

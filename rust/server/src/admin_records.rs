@@ -165,6 +165,14 @@ fn sort_order(kind: Record, query: &Query) -> Vec<(usize, bool)> {
 }
 
 pub(super) fn order_sql(columns: &[Column], order: &[(usize, bool)]) -> String {
+    order_sql_with(columns, order, "t.id DESC")
+}
+
+pub(super) fn order_sql_with(
+    columns: &[Column],
+    order: &[(usize, bool)],
+    fallback: &str,
+) -> String {
     let mut order: Vec<_> = order
         .iter()
         .map(|&(index, ascending)| {
@@ -175,7 +183,7 @@ pub(super) fn order_sql(columns: &[Column], order: &[(usize, bool)]) -> String {
             )
         })
         .collect();
-    order.push("t.id DESC".into());
+    order.push(fallback.into());
     order.join(", ")
 }
 

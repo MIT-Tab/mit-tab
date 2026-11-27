@@ -180,6 +180,13 @@ async fn entry(
     {
         return private((StatusCode::BAD_REQUEST, "Invalid related object field."));
     }
+    if matches!(screen, Screen::List)
+        && let Some(kind) = ListKind::find(model).filter(|kind| kind.editable())
+        && let Some(post) = post.as_ref().filter(|post| !post.all("_save").is_empty())
+    {
+        return admin_registration::list(&app, actor, &headers, kind, query, Some((post, user)))
+            .await;
+    }
     let shell = match Shell::load(&app, actor, &headers, uri.path()).await {
         Ok(shell) => shell,
         Err(response) => return *response,
@@ -237,18 +244,27 @@ async fn change(
     let stale_pairing = post
         .zip(pairing_revision.as_ref())
         .is_some_and(|(post, proof)| !proof.verified(app, post.get("mittab_pairing_revision")));
-    let configuration_revision = initial
-        .as_ref()
-        .filter(|_| resource.registration_config())
-        .and_then(|initial| {
-            AdminFormProof::for_session(&page, "admin registration configuration edit", initial)
-        });
-    let stale_configuration =
-        post.zip(configuration_revision.as_ref())
-            .is_some_and(|(post, proof)| {
-                !proof.verified(app, post.get("mittab_configuration_revision"))
+    let revision = if resource.registration_config() {
+        Some((
+            "mittab_configuration_revision",
+            "admin registration configuration edit",
+        ))
+    } else if resource.public_information() {
+        Some(("mittab_content_revision", "admin public information edit"))
+    } else {
+        None
+    };
+    let resource_revision =
+        initial
+            .as_ref()
+            .zip(revision)
+            .and_then(|(initial, (name, purpose))| {
+                AdminFormProof::for_session(&page, purpose, initial).map(|proof| (name, proof))
             });
-    let stale = stale_pairing || stale_configuration;
+    let stale_resource = post
+        .zip(resource_revision.as_ref())
+        .is_some_and(|(post, (name, proof))| !proof.verified(app, post.get(name)));
+    let stale = stale_pairing || stale_resource;
     let mut inlines = if resource.registration() {
         Some(Inlines::load(&mut db, id, post.is_some()).await?)
     } else {
@@ -286,7 +302,7 @@ async fn change(
     let bound = post.filter(|_| !stale && !stale_registration);
     let mut form = Form::load(resource, &mut db, initial.as_deref(), bound, &page.query).await?;
     form.pairing_revision = pairing_revision.map(|revision| revision.token(app));
-    form.configuration_revision = configuration_revision.map(|revision| revision.token(app));
+    form.resource_revision = resource_revision.map(|(name, proof)| (name, proof.token(app)));
     form.readonly =
         admin_registration::readonly_fields(&mut db, resource.list.model.name, id).await?;
     form.can_add = can_add;
@@ -298,8 +314,10 @@ async fn change(
     if stale || stale_registration {
         form.non_field_error = Some(if stale_registration {
             "This registration changed. Review the current values before saving."
-        } else if stale_configuration {
+        } else if stale_resource && resource.registration_config() {
             "This registration configuration changed. Review the current values before saving."
+        } else if stale_resource {
+            "This content changed. Review the current values before saving."
         } else {
             "This pairing changed. Review the current values before saving."
         });
@@ -717,7 +735,8 @@ fn render_form(
         object_url, form_url => &suffix, filter_suffix => &suffix,
         adminform => [context! { classes => "", lines => widgets }],
         pairing_revision => form.pairing_revision,
-        configuration_revision => form.configuration_revision,
+        resource_revision => form.resource_revision.as_ref().map(|(_, token)| token),
+        resource_revision_name => form.resource_revision.as_ref().map(|(name, _)| name),
         registration_revision => form.inlines.as_ref().and_then(|inlines| inlines.token.as_deref()),
         registration_delete_revision => form.inlines.as_ref().and_then(|inlines| inlines.removal_token.as_deref()),
         inline_admin_formsets,
@@ -820,7 +839,7 @@ pub(super) fn render_widget(
             format!(r#" value="{}""#, escape(value))
         });
     let widget = match field.kind {
-        Kind::Text(max) | Kind::Email(max) => {
+        Kind::Text(max) | Kind::Email(max) | Kind::HttpUrl(max) => {
             let input_type = if matches!(field.kind, Kind::Email(_)) {
                 "email"
             } else {
@@ -856,8 +875,11 @@ pub(super) fn render_widget(
         Kind::BallotCode => format!(
             r#"<input type="text" name="{name}"{value} class="vTextField" maxlength="255"{required} id="id_{name}">"#
         ),
-        Kind::Integer | Kind::Experience | Kind::PositiveSmallInteger => {
-            let min = if matches!(field.kind, Kind::Experience | Kind::PositiveSmallInteger) {
+        Kind::Integer | Kind::Experience | Kind::PositiveSmallInteger | Kind::PositiveInteger => {
+            let min = if matches!(
+                field.kind,
+                Kind::Experience | Kind::PositiveSmallInteger | Kind::PositiveInteger
+            ) {
                 r#" min="0""#
             } else {
                 ""
@@ -929,7 +951,14 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
     let errors = bound
         .error
         .as_deref()
-        .map(|message| error_list(message, false))
+        .map(|message| {
+            if matches!(field.kind, Kind::HttpUrl(_)) && message == "Enter a valid URL." {
+                // Django runs the URL validator for the model field and in TournamentLinkBase.clean().
+                r#"<ul class="errorlist"><li>Enter a valid URL.</li><li>Enter a valid URL.</li></ul>"#.into()
+            } else {
+                error_list(message, false)
+            }
+        })
         .unwrap_or_default();
     let suffix = if checkbox { "" } else { ":" };
     let help_text = field.help_text.or_else(|| {
@@ -1051,7 +1080,7 @@ struct DeletionSummary {
     objects: Vec<String>,
 }
 
-struct AdminFormProof(Vec<u8>);
+pub(super) struct AdminFormProof(Vec<u8>);
 
 impl AdminFormProof {
     fn deletion(
@@ -1076,19 +1105,27 @@ impl AdminFormProof {
     }
 
     fn for_session(page: &Page<'_>, purpose: &str, state: impl serde::Serialize) -> Option<Self> {
-        let session = cookie(page.headers, "sessionid")?;
-        let statement =
-            serde_json::to_vec(&(purpose, session, page.target.split('?').next(), state))
-                .expect("serializable admin confirmation");
+        Self::for_target(page.headers, purpose, page.target.split('?').next()?, state)
+    }
+
+    pub(super) fn for_target(
+        headers: &HeaderMap,
+        purpose: &str,
+        target: &str,
+        state: impl serde::Serialize,
+    ) -> Option<Self> {
+        let session = cookie(headers, "sessionid")?;
+        let statement = serde_json::to_vec(&(purpose, session, target, state))
+            .expect("serializable admin confirmation");
         Some(Self(statement))
     }
 
-    fn verified(&self, app: &App, posted: &str) -> bool {
+    pub(super) fn verified(&self, app: &App, posted: &str) -> bool {
         hex::decode(posted)
             .is_ok_and(|tag| hmac::verify(&app.admin_notice_key, &self.0, &tag).is_ok())
     }
 
-    fn token(&self, app: &App) -> String {
+    pub(super) fn token(&self, app: &App) -> String {
         hex::encode(hmac::sign(&app.admin_notice_key, &self.0).as_ref())
     }
 }

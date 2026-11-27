@@ -184,6 +184,7 @@ def test_public_html_matches_django_bytes(html_assets):
     )
     Motion.objects.create(round_number=2, motion_text="Private motion", is_published=False)
     InfoLink.objects.create(title="Example & resources", url="https://example.com/resources?a=x&b=y")
+    InfoLink.objects.create(title="Internationalized resources", url="https://bücher.de/verzeichnis")
     InfoText.objects.create(title="Tournament notes", text="Bring A & B")
     TabSettings.set("tournament_director", "Alex Example\nPat Example")
     caches["public"].clear()
@@ -6047,10 +6048,15 @@ def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
 
 
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False,
-                       registration_revision=False, configuration_revision=False):
+                       registration_revision=False, configuration_revision=False, list_revision=False,
+                       content_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
     form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
+    if list_revision and form is not None:
+        status, _, previous = request(port, path, cookie=session)
+        assert status == 200
+        form["mittab_list_revision"] = list_edit_proof(previous)
     if configuration_revision and form is not None:
         status, _, previous = request(port, path, cookie=session)
         assert status == 200
@@ -6095,7 +6101,25 @@ def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, p
                 rb'<input type="hidden" name="mittab_configuration_revision" value="[a-f0-9]{64}">', b"", body,
             )
             assert metadata == 1
+        if content_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_content_revision" value="[a-f0-9]{64}">', b"", body,
+            )
+            assert metadata == 1
+        if list_revision:
+            body, metadata = re.subn(
+                rb'<input type="hidden" name="mittab_list_revision" value="[a-f0-9]{64}" id="id_mittab_list_revision">', b"", body,
+            )
+            assert metadata == 1
         assert_html_bytes(body, reference.content)
+
+
+def content_edit_proof(body):
+    return re.search(rb'name="mittab_content_revision" value="([a-f0-9]{64})"', body)[1].decode()
+
+
+def list_edit_proof(body):
+    return re.search(rb'name="mittab_list_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
 def registration_config_proof(body):
@@ -6436,6 +6460,158 @@ def test_registration_admin_config_and_logs_match_django(html_assets, subtests):
                                  request(port, config_delete, cookie=session)[2])[1].decode()
         assert submit(port, config_delete, {"post": "yes", "mittab_delete_scope": config_scope})[0] == 302
         assert RegistrationConfig.get_active() is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_registration_and_public_information_admin_link_parity(html_assets, subtests):
+    from django.contrib.admin.models import LogEntry
+    from mittab.apps.registration.models import RegistrationLink
+
+    session = legacy_tab_session("registration-link-admin")
+    board = legacy_tab_session("registration-link-board")
+    get_user_model().objects.get(username="registration-link-board").groups.add(
+        Group.objects.create(name="APDA Board"),
+    )
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Public Info School")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Gov", "Opp")]
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    csrf = "a" * 32
+    client = Client()
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+
+    def submit(port, path, fields, sid=session):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": csrf},
+                       extra_headers={"Cookie": f"sessionid={sid}; csrftoken={csrf}"})
+
+    with rust_server(overrides=html_assets) as port:
+        for model in (InfoLink, InfoText, RegistrationLink):
+            with subtests.test(model=model._meta.model_name):
+                root = f"/admin/registration/{model._meta.model_name}/"
+                model.objects.all().delete()
+                compare_admin_page(port, root, client, list_revision=True)
+                compare_admin_page(port, root + "add/", client)
+                if model is InfoText:
+                    content = {"text": "Tournament notes <&>"}
+                    invalid = {"text": ""}
+                else:
+                    content = {"url": "https://example.org/page?one=1&two=2", "description": ""}
+                    invalid = {"url": "javascript:alert(1)"}
+                first = model.objects.create(title="Example & Information", display_order=0, **content)
+                other = model.objects.create(title="Other information", display_order=1, **content)
+
+                for suffix in ("", "?q=Example", "?o=-4", "?q=absent", "?_popup=1&_to_field=id"):
+                    compare_admin_page(port, root + suffix, client, list_revision="_popup" not in suffix)
+                for action in ("change", "history", "delete"):
+                    compare_admin_page(port, f"{root}{first.id}/{action}/", client, content_revision=action == "change")
+                assert request(port, root, cookie=board)[1]["Location"] == "/403/"
+
+                add_form = {"title": "New public information", "display_order": 8, **content, "is_active": "on"}
+                compare_admin_page(port, root + "add/", client, {**add_form, **invalid})
+                compare_admin_page(port, root + "add/", client, {**add_form, "display_order": -1})
+                assert submit(port, root + "add/", add_form)[0] == 302
+                added = model.objects.get(title=add_form["title"])
+                assert added.is_active and added.display_order == 8
+                added_path = f"{root}{added.id}/change/"
+
+                def submit_detail(path, fields):
+                    proof = content_edit_proof(request(port, path, cookie=session)[2])
+                    return submit(port, path, {**fields, "mittab_content_revision": proof})
+
+                assert submit_detail(added_path, {**add_form, "display_order": 4294967295})[0] == 302
+                added.refresh_from_db()
+                assert added.display_order == 4294967295
+                compare_admin_page(port, f"{root}{added.id}/history/", client)
+                if model is InfoText:
+                    staff_form = f"/registration/manage/info-text/{added.id}/"
+                else:
+                    kind = "info" if model is InfoLink else "registration"
+                    staff_form = f"/registration/manage/links/{kind}/{added.id}/"
+                staff_title = "Title changed from management"
+                status, headers, _ = submit(port, staff_form, {
+                    **add_form, "title": staff_title, "display_order": 4294967295,
+                })
+                assert status == 302 and headers["Location"].endswith("?saved=3")
+                added.refresh_from_db()
+                assert added.title == staff_title and added.display_order == 4294967295
+                add_form["title"] = staff_title
+                if model is not InfoText:
+                    assert submit_detail(added_path, {**add_form, "display_order": 4294967295})[0] == 302
+                    assert LogEntry.objects.filter(content_type__model=model._meta.model_name,
+                                                  object_id=str(added.id), action_flag=2).first().change_message == "[]"
+                    for bad_url in ("data:text/html,hi", "https:example.org", "https:///example.org",
+                                    "https://127.1", "https://example.123a", r"https://account\@example.org"):
+                        status, _, body = submit_detail(added_path, {**add_form, "url": bad_url})
+                        assert status == 200 and b"Enter a valid URL." in body
+                    added.refresh_from_db()
+                    assert added.url == content["url"]
+
+                only_first = root + "?" + urlencode({"q": '"Example &"'})
+                form = {
+                    "form-TOTAL_FORMS": 1, "form-INITIAL_FORMS": 1,
+                    "form-MIN_NUM_FORMS": 0, "form-MAX_NUM_FORMS": 1000,
+                    "form-0-id": first.id, "form-0-display_order": -1, "_save": "Save",
+                }
+                compare_admin_page(port, only_first, client, form, list_revision=True)
+                proof = list_edit_proof(request(port, only_first, cookie=session)[2])
+                form.update({"mittab_list_revision": proof, "form-0-display_order": 6})
+                assert submit(port, only_first, form, sid=board)[1]["Location"] == "/403/"
+                assert submit(port, only_first, {**form, "form-0-id": other.id})[0] == 409
+                assert model.objects.get(id=other.id).display_order == 1
+                model.objects.filter(id=first.id).update(title="Example & updated concurrently")
+                status, _, body = submit(port, only_first, form)
+                assert status == 409 and b"This list changed." in body
+                first.refresh_from_db()
+                assert first.is_active and first.display_order == 0
+
+                first_path = f"{root}{first.id}/change/"
+                old_detail = content_edit_proof(request(port, first_path, cookie=session)[2])
+                form["mittab_list_revision"] = list_edit_proof(request(port, only_first, cookie=session)[2])
+                status, headers, _ = submit(port, only_first, {**form, "form-0-title": "Forged title"})
+                assert status == 302 and headers["Location"] == only_first
+                notice = load_cookies(headers)["mittab_admin_notice"].value
+                cookies = {"Cookie": f"sessionid={session}; csrftoken={csrf}; mittab_admin_notice={notice}"}
+                body = request(port, only_first, extra_headers=cookies)[2]
+                assert f"1 {model._meta.verbose_name} was changed successfully.".encode() in body
+                first.refresh_from_db()
+                assert first.display_order == 6 and not first.is_active
+                assert first.title == "Example & updated concurrently"
+                assert submit(port, first_path, {
+                    **add_form, "mittab_content_revision": old_detail,
+                })[0] == 409
+                assert not model.objects.get(id=first.id).is_active
+                compare_admin_page(port, f"{root}{first.id}/history/", client)
+                assert LogEntry.objects.filter(content_type__model=model._meta.model_name,
+                                              object_id=str(first.id), action_flag=2).count() == 1
+
+                all_rows = {
+                    "form-TOTAL_FORMS": 3, "form-INITIAL_FORMS": 3,
+                    "form-MIN_NUM_FORMS": 0, "form-MAX_NUM_FORMS": 1000,
+                    "form-0-id": other.id, "form-0-display_order": 2, "form-0-is_active": "on",
+                    "form-1-id": first.id, "form-1-display_order": -1,
+                    "form-2-id": added.id, "form-2-display_order": 4294967295, "form-2-is_active": "on",
+                    "mittab_list_revision": list_edit_proof(request(port, root, cookie=session)[2]),
+                    "_save": "Save",
+                }
+                assert submit(port, root, all_rows)[0] == 200
+                assert model.objects.get(id=other.id).display_order == 1
+                status, headers, _ = submit(port, root, {**all_rows, "form-1-display_order": 7})
+                assert status == 302 and headers["Location"] == root
+                notice = load_cookies(headers)["mittab_admin_notice"].value
+                cookies = {"Cookie": f"sessionid={session}; csrftoken={csrf}; mittab_admin_notice={notice}"}
+                body = request(port, root, extra_headers=cookies)[2]
+                assert f"2 {model._meta.verbose_name_plural} were changed successfully.".encode() in body
+                assert model.objects.get(id=other.id).display_order == 2
+                assert model.objects.get(id=first.id).display_order == 7
+                assert model.objects.get(id=added.id).display_order == 4294967295
+
+                assert submit(port, f"{root}{first.id}/delete/", {"post": "yes"})[0] == 302
+                assert not model.objects.filter(id=first.id).exists()
+                assert model.objects.filter(id=other.id).exists()
+                if model is not InfoText:
+                    assert model.objects.get(id=added.id).url == content["url"]
 
 
 @pytest.mark.django_db(transaction=True)

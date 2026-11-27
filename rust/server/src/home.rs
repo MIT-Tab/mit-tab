@@ -289,11 +289,12 @@ async fn resources(
     .await?
     .into_iter()
     .filter(|(_, url, _)| {
-        url.parse::<axum::http::Uri>().is_ok_and(|uri| {
-            uri.authority()
-                .is_some_and(|authority| !authority.host().is_empty())
-                && matches!(uri.scheme_str(), Some("http" | "https" | "ftp" | "ftps"))
-        })
+        crate::registration_admin::valid_http_url(url)
+            || url.parse::<axum::http::Uri>().is_ok_and(|uri| {
+                uri.authority()
+                    .is_some_and(|authority| !authority.host().is_empty())
+                    && matches!(uri.scheme_str(), Some("ftp" | "ftps"))
+            })
     })
     .map(|(title, url, description)| InfoLink {
         title,
