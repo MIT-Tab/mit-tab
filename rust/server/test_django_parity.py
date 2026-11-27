@@ -1737,7 +1737,10 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
     client.force_login(volunteer)
     entry = client.cookies["sessionid"].value
     board = legacy_tab_session("ballots-board")
-    get_user_model().objects.get(username="ballots-board").groups.add(Group.objects.create(name="APDA Board"))
+    board_group = Group.objects.create(name="APDA Board")
+    get_user_model().objects.get(username="ballots-board").groups.add(board_group)
+    queued = legacy_tab_session("ballots-queued")
+    queued_user = get_user_model().objects.get(username="ballots-queued")
     TabSettings.set("cur_round", 2)
     TabSettings.set("tot_rounds", 1)
     TabSettings.set("decimal_speaks", 3)
@@ -1810,7 +1813,16 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
         assert not NoShow.objects.exists()
         scores = dict(debate.roundstats_set.values_list("debater_role", "speaks"))
         assert scores["pm"] == Decimal("30.2300")
-        assert post(single, {"rfd": "Edited reason"})[1]["Location"] == single
+        no_show = NoShow.objects.create(round_number=1, no_show_team=teams[0])
+        assert post(single, {"rfd": "Wrong debate", "round_instance": debate.id + 1})[0] == 422
+        status, saved_headers, _ = post(single, {"rfd": "Edited reason"})
+        assert status == 302 and saved_headers["Location"] == single
+        saved_notice = load_cookies(saved_headers)["mittab_roster_notice"].value
+        status, _, body = request(
+            port, single, extra_headers={"Cookie": f"sessionid={tab}; mittab_roster_notice={saved_notice}"},
+        )
+        assert status == 200 and b"Written RFD saved." in body
+        assert NoShow.objects.filter(pk=no_show.pk).exists()
         debate.refresh_from_db()
         assert debate.rfd == "Edited reason" and debate.result_entered_at == entered
         assert post(single, first, session=board)[1]["Location"] == "/403/"
@@ -1829,11 +1841,39 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
 
         prior_ids = list(debate.roundstats_set.order_by("id").values_list("id", flat=True))
         assert post(panel, {**fields, "2-pm_debater": speakers[1].id})[0] == 422
+        assert post(panel, {**fields, "2-round_instance": debate.id + 1})[0] == 422
         assert list(debate.roundstats_set.order_by("id").values_list("id", flat=True)) == prior_ids
+
+        # Wait specifically on the debate row and then assign the restricted role.
+        from time import monotonic, sleep
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                Round.objects.select_for_update().get(pk=debate.pk)
+                pending = executor.submit(post, panel, fields, session=queued)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "SELECT id FROM tab_round WHERE id" in row[7]
+                                      and "FOR UPDATE" in row[7] for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The staff ballot did not reach the debate lock"
+                queued_user.groups.add(board_group)
+            assert pending.result(timeout=6)[1]["Location"] == "/403/"
+        assert list(debate.roundstats_set.order_by("id").values_list("id", flat=True)) == prior_ids
+        assert NoShow.objects.filter(pk=no_show.pk).exists()
         for discard_minority in (False, True):
             expected, winner = score_panel(grouped, discard_minority)
-            data = {**fields, "discard_minority": "on"} if discard_minority else fields
-            assert post(panel, data)[0] == 302
+            data = {**fields, "return_to": single}
+            expected_return = single
+            if discard_minority:
+                data.update(discard_minority="on", return_to="https://example.invalid/")
+                expected_return = "/"
+            status, headers, _ = post(panel, data)
+            assert status == 302 and headers["Location"] == expected_return
             debate.refresh_from_db()
             assert debate.victor == winner and debate.result_entered_at == entered
             stored = dict(
@@ -1858,12 +1898,97 @@ def test_native_single_and_panel_ballots_preserve_existing_results_on_invalid_in
         }
 
         TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
-        assert post(single, {"rfd": "Too late"})[0] == 422
+        status, late_headers, _ = post(single, {"rfd": "Too late"})
+        assert status == 302 and late_headers["Location"] == single
+        late_notice = load_cookies(late_headers)["mittab_roster_notice"].value
+        _, _, page = request(
+            port, single, extra_headers={"Cookie": f"sessionid={tab}; mittab_roster_notice={late_notice}"},
+        )
+        assert b"Written RFDs cannot be edited for this ballot." in page
         debate.refresh_from_db()
         assert debate.rfd == "Edited reason"
         history = list(AuditEvent.objects.values_list("changes", flat=True))
         assert {event["public"]["source"] for event in history} == {"ballot entry", "panel ballot entry"}
         assert "Synthetic note" not in json.dumps(history) and "Edited reason" not in json.dumps(history)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_ballot_forms_match_django_bytes(html_assets):
+    staff = get_user_model().objects.create_superuser(username="ballot-parity-staff")
+    entry = get_user_model().objects.create_user(username="entry")
+    TabSettings.set("cur_round", 3)
+    TabSettings.set("decimal_speaks", 3)
+    school = School.objects.create(name="Fixture & College")
+    gov, opp = [
+        Team.objects.create(name=name, school=school, seed=Team.UNSEEDED)
+        for name in ("G & <Blue>", "O 'Gold'")
+    ]
+    speakers = [Debater.objects.create(name=f"Speaker {i} <&>", novice_status=Debater.VARSITY) for i in range(4)]
+    gov.debaters.add(*speakers[:2])
+    opp.debaters.add(*speakers[2:])
+    debate = Round.objects.create(round_number=2, gov_team=gov, opp_team=opp)
+    single = f"/round/{debate.id}/result/"
+    panel = f"{single}3/"
+    csrf = "a" * 32
+    roles = ("pm", "mg", "lo", "mo")
+
+    def ballot(prefix=""):
+        fields = {f"{prefix}round_instance": debate.id, f"{prefix}winner": Round.GOV}
+        for i, (role, speaker) in enumerate(zip(roles, speakers)):
+            fields.update({f"{prefix}{role}_debater": speaker.id, f"{prefix}{role}_speaks": 31-i,
+                           f"{prefix}{role}_ranks": i+1})
+        return fields
+
+    with rust_server(overrides=html_assets) as port:
+        def compare(path, values=None, *, user=staff):
+            client = Client()
+            client.force_login(user)
+            client.cookies["csrftoken"] = csrf
+            session = client.cookies["sessionid"].value
+            cookies = {"Cookie": f"sessionid={session}; csrftoken={csrf}"}
+            if values is None:
+                status, _, body = request(port, path, extra_headers=cookies)
+            else:
+                status, _, body = request(port, path, method="POST", extra_headers=cookies,
+                                          form={"csrfmiddlewaretoken": csrf, **values})
+            assert status == (200 if values is None else 422)
+            match = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            assert match
+            with patch("django.middleware.csrf._get_new_csrf_string", return_value=match[1][:32].decode()):
+                with transaction.atomic():
+                    reference = client.get(path) if values is None else client.post(path, values)
+                    # The reference may delete existing scores when rejecting an inconsistent panel.
+                    transaction.set_rollback(True)
+            assert reference.status_code == 200
+            assert_html_bytes(body, reference.content)
+
+        compare(single)
+        compare(panel)
+        compare(f"{single}1/", user=entry)
+        compare(single, {"rfd": "Unscored <&>"})
+        compare(single, {**ballot(), "pm_speaks": "not a number", "round_instance": "malformed"})
+        compare(single, {**ballot(), "winner": Round.UNKNOWN})
+        TabSettings.set("written_rfd_first_round", 2)
+        compare(single)
+        TabSettings.set("warn_judges_about_speaks", 0)
+        TabSettings.set("low_speak_warning_threshold", 24)
+        TabSettings.set("high_speak_warning_threshold", 33)
+        TabSettings.set("written_rfd_deadline", "2000-01-01T00:00")
+        Round.objects.filter(pk=debate.pk).update(victor=Round.GOV, rfd="Prior RFD <&>\nSecond line")
+        for i, (role, speaker) in enumerate(zip(roles, speakers)):
+            RoundStats.objects.create(round=debate, debater=speaker, speaks=Decimal("31.2500") - i,
+                                      ranks=Decimal("2.5000") if i == 1 else i + 1, debater_role=role)
+        compare(single)
+        compare(panel)
+        TabSettings.set("written_rfd_deadline", "2099-01-01T19:00")
+        compare(single, user=entry)
+        compare(single, {**ballot(), "winner": Round.OPP, "rfd": "A revised note"})
+        fields = {key: value for index in (1, 2, 3) for key, value in ballot(f"{index}-").items()}
+        compare(panel, {**fields, "2-pm_ranks": 2, "3-lo_speaks": "bad"})
+        snapshot = list(debate.roundstats_set.values_list("pk", "speaks", "ranks"))
+        compare(panel, {**fields, "2-pm_debater": speakers[1].id})
+        compare(f"{single}1/", ballot("1-"))
+        assert list(debate.roundstats_set.values_list("pk", "speaks", "ranks")) == snapshot
 
 
 @pytest.mark.django_db(transaction=True)

@@ -808,11 +808,7 @@ async fn frozen_page(
             let (name, speaks, ranks) = score.map_or_else(
                 || ("—".into(), "—".into(), "—".into()),
                 |(name, speaks, ranks)| {
-                    let rounded = ranks
-                        .parse::<f64>()
-                        .expect("stored decimal rank")
-                        .round_ties_even() as i32;
-                    (name, speaks, rounded.to_string())
+                    (name, speaks, ballot_entry::display_rank(&ranks).to_string())
                 },
             );
             FrozenScore {

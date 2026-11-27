@@ -304,6 +304,10 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/ballots/round_entry.html"),
         ),
         (
+            "ballots/round_entry_multiple.html",
+            include_str!("../../../mittab/templates/ballots/round_entry_multiple.html"),
+        ),
+        (
             "ballots/_form.html",
             include_str!("../../../mittab/templates/ballots/_form.html"),
         ),
