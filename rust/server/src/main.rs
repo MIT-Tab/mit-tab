@@ -2,6 +2,8 @@ mod access;
 mod admin_accounts;
 mod admin_changelist;
 mod admin_html;
+mod admin_model_data;
+mod admin_model_forms;
 mod admin_records;
 mod admin_repairs;
 mod admin_scores;
@@ -117,6 +119,7 @@ struct App {
     cache_shared_public_pages: bool,
     backups: Arc<backups::Backups>,
     django_secret: Option<Arc<str>>,
+    admin_notice_key: Arc<ring::hmac::Key>,
 }
 
 #[tokio::main]
@@ -174,6 +177,7 @@ async fn run() -> Result<(), &'static str> {
         cache_shared_public_pages: std::env::var("MITTAB_SHARED_PUBLIC_CACHE").as_deref()
             == Ok("1"),
         backups: Arc::new(config.backups),
+        admin_notice_key: Arc::new(admin_html::notice_key(config.django_secret.as_deref())?),
         django_secret: config.django_secret.map(Arc::from),
     });
     eprintln!(

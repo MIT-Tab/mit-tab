@@ -42,6 +42,7 @@ pub fn routes() -> Router<App> {
         .merge(admin_accounts::routes())
         .merge(crate::admin_repairs::routes())
         .merge(crate::admin_scores::routes())
+        .merge(crate::admin_model_forms::routes())
 }
 
 async fn index(

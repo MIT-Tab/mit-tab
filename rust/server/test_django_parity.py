@@ -4604,16 +4604,198 @@ def test_admin_assignment_and_audit_records_match_django_bytes(html_assets):
     assert event.note == "Added by hand & checked.\nSecond line."
 
 
-def compare_admin_page(port, path, client):
+@pytest.mark.django_db(transaction=True)
+def test_admin_editable_model_forms_match_django_and_save(html_assets, subtests):
+    from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
+    from mittab.apps.tab.models import PublicRosterLogState, PublishedOutroundStage, UserTournamentSetupPreference
+
+    staff = legacy_tab_session("admin-model-forms")
+    user = get_user_model().objects.get(username="admin-model-forms")
+    board = legacy_tab_session("admin-model-forms-board")
+    board_user = get_user_model().objects.get(username="admin-model-forms-board")
+    board_user.groups.add(Group.objects.create(name="APDA Board"))
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Admin & School")
+    gov = Team.objects.create(name="Wild & West", school=school, seed=0)
+    opp = Team.objects.create(name="Common Side", school=school, seed=0)
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+    judge = Judge.objects.create(name="Debate Judge", rank=5)
+    room = Room.objects.create(name="Auditorium", rank=3)
+    tag = RoomTag.objects.create(tag="Main <Hall>", priority=1.25)
+    room.tags.add(tag)
+    gov.required_room_tags.add(tag)
+    judge.required_room_tags.add(tag)
+    bye = Bye.objects.create(bye_team=gov, round_number=2)
+    noshow = NoShow.objects.create(no_show_team=opp, round_number=2)
+    judge_checkin = CheckIn.objects.create(judge=judge, round_number=1)
+    room_checkin = RoomCheckIn.objects.create(room=room, round_number=1)
+    breaking = BreakingTeam.objects.create(team=gov, seed=1, effective_seed=2, type_of_team=0)
+    preferences = UserTournamentSetupPreference.objects.create(user=user, hide_tournament_todo=True)
+    setting = TabSettings.set("test-admin-setting", "Fixture & value")
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = staff
+    client.cookies["csrftoken"] = csrf
+    csrf_headers = {"Cookie": f"sessionid={staff}; csrftoken={csrf}"}
+
+    def submit(port, path, submitted, headers=csrf_headers, token=csrf):
+        fields = [(key, item) for key, values in submitted.items()
+                  for item in (values if isinstance(values, list) else [values])]
+        return request(port, path, method="POST", form=[*fields, ("csrfmiddlewaretoken", token)], extra_headers=headers)
+
+    records = [
+        ("bye", bye), ("noshow", noshow), ("checkin", judge_checkin), ("roomcheckin", room_checkin),
+        ("breakingteam", breaking), ("usertournamentsetuppreference", preferences), ("roomtag", tag), ("tabsettings", setting),
+    ]
+    base = "/admin/tab/"
+    with rust_server(overrides=html_assets) as port:
+        for name, obj in records:
+            model = f"{base}{name}/"
+            for path in (f"{model}add/", f"{model}{obj.id}/change/", f"{model}{obj.id}/history/", f"{model}{obj.id}/delete/"):
+                with subtests.test(path=path):
+                    compare_admin_page(port, path, client)
+                    assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+            with subtests.test(bulk=model):
+                compare_admin_page(port, model, client, post={
+                    "action": "delete_selected", "_selected_action": obj.id, "index": 0,
+                })
+        forms = [
+            (f"{base}roomtag/add/?_to_field=id&_popup=1", None),
+            (f"{base}checkin/add/", {"judge": judge.id, "round_number": 1}),
+            (f"{base}roomcheckin/add/", {"room": 99_999_999, "round_number": "bad"}),
+            (f"{base}roomtag/add/", {"tag": "", "priority": "100.1"}),
+            (f"{base}roomtag/add/", {"tag": "Malformed sign", "priority": "-+1"}),
+            (f"{base}breakingteam/add/", {"team": gov.id, "seed": 1, "effective_seed": 4, "type_of_team": 1}),
+            (f"{base}tabsettings/{setting.id}/change/?_changelist_filters=p%3D1", None),
+        ]
+        for path, post in forms:
+            with subtests.test(path=path, post=post):
+                compare_admin_page(port, path, client, post=post)
+
+        assert submit(port, f"{base}roomtag/add/", {"tag": "Forbidden", "priority": "3.00"},
+                      headers={"Cookie": f"sessionid={board}; csrftoken={csrf}"})[1]["Location"] == "/403/"
+        assert submit(port, f"{base}roomtag/add/", {"tag": "Forbidden", "priority": "3.00"}, token="bad")[0] == 403
+        assert not RoomTag.objects.filter(tag__in=["Forbidden", "Malformed sign"]).exists()
+
+        saved = submit(port, f"{base}roomtag/add/", {"tag": "Reserved <Room>", "priority": "25e-2", "_continue": 1})
+        new_tag = RoomTag.objects.get(tag="Reserved <Room>")
+        assert new_tag.priority == Decimal("0.25")
+        change = f"{base}roomtag/{new_tag.id}/change/"
+        assert saved[0] == 302 and saved[1]["Location"] == change
+        notice = load_cookies(saved[1])["mittab_admin_notice"]
+        assert notice["httponly"]
+        cookie = csrf_headers["Cookie"] + f"; {notice.key}={notice.value}"
+        status, headers, html = request(port, change, extra_headers={"Cookie": cookie})
+        assert status == 200 and b"was added successfully. You may edit it again below." in html
+        assert b"Reserved &lt;Room&gt;" in html and load_cookies(headers)[notice.key]["max-age"] == "0"
+        assert b"was added successfully" not in request(port, change, extra_headers=csrf_headers)[2]
+        fresh_client = Client()
+        fresh_client.force_login(user)
+        fresh_session = fresh_client.cookies["sessionid"].value
+        foreign_cookie = f"sessionid={fresh_session}; csrftoken={csrf}; {notice.key}={notice.value}"
+        assert b"was added successfully" not in request(port, change, extra_headers={"Cookie": foreign_cookie})[2]
+        tampered = csrf_headers["Cookie"] + f"; {notice.key}={notice.value.replace('.continue.', '.another.')}"
+        assert b"was added successfully" not in request(port, change, extra_headers={"Cookie": tampered})[2]
+
+        assert submit(port, f"{base}bye/{bye.id}/change/", {
+            "bye_team": opp.id, "round_number": 3, "_addanother": 1,
+        })[1]["Location"] == f"{base}bye/add/"
+        bye.refresh_from_db()
+        assert (bye.bye_team_id, bye.round_number) == (opp.id, 3)
+
+        assert submit(port, f"{base}noshow/{noshow.id}/change/", {
+            "no_show_team": gov.id, "round_number": 3,
+        })[0] == 302
+        noshow.refresh_from_db()
+        assert (noshow.no_show_team_id, noshow.round_number) == (gov.id, 3)
+
+        assert submit(port, f"{base}checkin/{judge_checkin.id}/change/", {
+            "judge": judge.id, "round_number": 2,
+        })[0] == 302
+        judge_checkin.refresh_from_db()
+        assert judge_checkin.round_number == 2
+
+        assert submit(port, f"{base}roomcheckin/add/", {"room": room.id, "round_number": 2})[0] == 302
+        assert RoomCheckIn.objects.filter(room=room, round_number=2).exists()
+        assert submit(port, f"{base}breakingteam/{breaking.id}/change/", {
+            "team": gov.id, "seed": 2, "effective_seed": 3, "type_of_team": 1,
+        })[0] == 302
+        breaking.refresh_from_db()
+        assert (breaking.seed, breaking.effective_seed, breaking.type_of_team) == (2, 3, 1)
+
+        assert submit(port, f"{base}usertournamentsetuppreference/{preferences.id}/change/", {"user": user.id})[0] == 302
+        preferences.refresh_from_db()
+        assert not preferences.hide_tournament_todo
+
+        assert submit(port, f"{base}tabsettings/{setting.id}/change/", {
+            "key": setting.key, "value": -2, "value_string": "",
+        })[0] == 302
+        setting.refresh_from_db()
+        assert setting.value == -2 and setting.value_string is None
+
+        settings_url = f"{base}tabsettings/"
+        assert not PublicRosterLogState.objects.exists()
+        assert submit(port, f"{settings_url}add/", {"key": "teams_public", "value": 1})[0] == 302
+        first_publication = PublicRosterLogState.objects.get()
+        assert first_publication.started_at and first_publication.first_published_at
+        published_setting = TabSettings.objects.get(key="teams_public")
+        assert submit(port, f"{settings_url}{published_setting.id}/change/", {"key": "teams_public", "value": 0})[0] == 302
+        assert PublicRosterLogState.objects.get().first_published_at == first_publication.first_published_at
+
+        Outround.objects.create(num_teams=2, type_of_round=Outround.VARSITY, gov_team=gov, opp_team=opp, victor=Outround.GOV)
+        assert not PublishedOutroundStage.objects.exists()
+        assert submit(port, f"{settings_url}add/", {"key": "var_teams_visible", "value": 2})[0] == 302
+        stage = PublishedOutroundStage.objects.get(type_of_round=Outround.VARSITY, num_teams=2)
+        assert dict(PublishedTeamPlacement.objects.filter(stage=stage).values_list("team_id", "place")) == {gov.id: 1, opp.id: 2}
+        visibility = TabSettings.objects.get(key="var_teams_visible")
+        assert submit(port, f"{settings_url}{visibility.id}/change/", {"key": "archived-visibility", "value": 2})[0] == 302
+        assert not TabSettings.objects.filter(key="var_teams_visible").exists()
+        assert PublishedTeamPlacement.objects.filter(stage=stage).count() == 2
+
+        popup_status, _, popup = submit(port, f"{base}roomtag/add/", {
+            "tag": "Partner’s room", "priority": "4.00", "_popup": 1, "_to_field": "id",
+        })
+        assert popup_status == 200 and b"django-admin-popup-response-constants" in popup
+        assert b"Partner\\u2019s room" in popup
+
+        # Confirming a filtered bulk action affects only the records in that filter.
+        status, _, preview = submit(port, f"{base}roomtag/?id__exact={tag.id}", {
+            "action": "delete_selected", "select_across": 1, "index": 0,
+        })
+        assert status == 200 and b"delete-selected-confirmation" in preview
+        assert b"Reserved &lt;Room&gt;" not in preview
+        filtered_list = f"{base}roomtag/?id__exact={tag.id}"
+        deleted = submit(port, filtered_list, {
+            "action": "delete_selected", "post": "yes", "_selected_action": [tag.id, new_tag.id],
+        })
+        assert deleted[0] == 302 and deleted[1]["Location"] == filtered_list
+        deletion_notice = load_cookies(deleted[1])["mittab_admin_notice"]
+        with_notice = csrf_headers["Cookie"] + f"; {deletion_notice.key}={deletion_notice.value}"
+        assert b"Successfully deleted 1 room tag." in request(port, filtered_list, extra_headers={"Cookie": with_notice})[2]
+        forged = with_notice.replace(".bulk-1.", ".bulk-999.")
+        assert b"Successfully deleted" not in request(port, filtered_list, extra_headers={"Cookie": forged})[2]
+        assert not RoomTag.objects.filter(id=tag.id).exists()
+        assert RoomTag.objects.filter(id=new_tag.id).exists()
+        assert not room.tags.exists() and not gov.required_room_tags.exists() and not judge.required_room_tags.exists()
+        assert submit(port, f"{base}bye/{bye.id}/delete/", {"post": "yes"})[0] == 302
+        assert not Bye.objects.filter(id=bye.id).exists()
+        assert set(LogEntry.objects.filter(user=user).values_list("action_flag", flat=True)) == {ADDITION, CHANGE, DELETION}
+        compare_admin_page(port, f"{base}roomtag/{new_tag.id}/history/", client)
+
+
+def compare_admin_page(port, path, client, post=None):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
+    form = {**post, "csrfmiddlewaretoken": csrf} if post is not None else None
     status, headers, body = request(
         port, path, extra_headers={"Cookie": f"sessionid={session}; csrftoken={csrf}"},
+        method="POST" if form is not None else "GET", form=form,
     )
     token = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
     mask = token[1][:32].decode() if token else csrf
     with patch("django.middleware.csrf._get_new_csrf_string", return_value=mask):
-        reference = client.get(path)
+        reference = client.post(path, form) if form is not None else client.get(path)
     assert status == reference.status_code, (path, status, reference.status_code)
     if status == 302:
         assert headers["Location"] == reference["Location"], path

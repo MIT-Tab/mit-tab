@@ -40,14 +40,22 @@ impl Model {
     }
 }
 
-struct DefaultList {
-    model: Model,
-    source: &'static str,
-    label: &'static str,
-    ordering: &'static str,
+pub(super) struct DefaultList {
+    pub model: Model,
+    pub source: &'static str,
+    pub label: &'static str,
+    pub ordering: &'static str,
 }
 
-fn default_list(name: &str) -> Option<DefaultList> {
+impl DefaultList {
+    pub fn table(&self) -> &'static str {
+        self.source
+            .split_once(' ')
+            .map_or(self.source, |(table, _)| table)
+    }
+}
+
+pub(super) fn default_list(name: &str) -> Option<DefaultList> {
     let (name, singular, plural, source, label, ordering) = match name {
         "school" => (
             "school",
@@ -400,10 +408,7 @@ async fn default_page(
         let Some(ids) = query.record_ids(&[]) else {
             return Ok(access::found(format!("{path}?e=1")));
         };
-        let table = config
-            .source
-            .split_once(' ')
-            .map_or(config.source, |(table, _)| table);
+        let table = config.table();
         let mut total = QueryBuilder::new(format!("SELECT COUNT(*) FROM {table} t WHERE TRUE"));
         filter_ids(&mut total, &ids);
         let count = total

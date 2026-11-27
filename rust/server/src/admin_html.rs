@@ -4,14 +4,23 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{Html, Response},
 };
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{Datelike, NaiveDateTime, Timelike};
 use minijinja::{Environment, Value, context};
+use ring::{
+    hmac,
+    rand::{SecureRandom, SystemRandom},
+};
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlConnection;
 
 use crate::{
-    App, access, legacy_html, legacy_session::Actor, login::TemplateCsrf, private,
-    settings::Settings, unavailable,
+    App, access, legacy_html,
+    legacy_session::{Actor, cookie},
+    login::{self, TemplateCsrf},
+    private,
+    settings::Settings,
+    unavailable,
 };
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -50,6 +59,7 @@ pub struct Shell {
     pub applications: Vec<Application>,
     pub context: Value,
     csrf: TemplateCsrf,
+    clear_notice: bool,
 }
 
 impl Shell {
@@ -104,6 +114,15 @@ impl Shell {
                 model.add_url = None;
             }
         }
+        let notice_cookie = cookie(headers, ADMIN_NOTICE);
+        let messages = if let Some(value) = notice_cookie {
+            notice(&mut db, &app.admin_notice_key, headers, id, value)
+                .await
+                .map_err(|_| Box::new(unavailable()))?
+                .map(|text| [context! { text => Value::from_safe_string(text), tags => "success" }])
+        } else {
+            None
+        };
         let context = context! {
             available_apps => &applications,
             has_permission => true,
@@ -117,11 +136,13 @@ impl Shell {
                 has_usable_password,
             },
             csrf_input => csrf.input(),
+            messages,
         };
         Ok(Self {
             applications,
             context,
             csrf,
+            clear_notice: notice_cookie.is_some(),
         })
     }
 
@@ -135,6 +156,16 @@ impl Shell {
             }
         };
         self.csrf.set_cookie(&mut response, headers);
+        if self.clear_notice {
+            login::set_cookie(
+                &mut response,
+                ADMIN_NOTICE,
+                "",
+                0,
+                login::secure_request(headers),
+                true,
+            );
+        }
         response
     }
 }
@@ -212,6 +243,7 @@ fn templates(env: &mut Environment<'static>) {
         upstream!("submit_line.html"),
         upstream!("includes/fieldset.html"),
         upstream!("prepopulated_fields_js.html"),
+        upstream!("popup_response.html"),
         upstream!("widgets/related_widget_wrapper.html"),
         (
             "admin/base_site.html",
@@ -224,6 +256,10 @@ fn templates(env: &mut Environment<'static>) {
         (
             "admin/score_widget.html",
             include_str!("../templates/admin_score_widget.html"),
+        ),
+        (
+            "admin/model_select.html",
+            include_str!("../templates/admin_model_select.html"),
         ),
     ] {
         env.add_template_owned(name, translate(source))
@@ -258,7 +294,7 @@ fn translate(source: &str) -> String {
             "{% blocktranslate count counter=errors|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}",
             "{% if errors|length == 1 %}Please correct the error below.{% else %}Please correct the errors below.{% endif %}",
         )
-        .replace("{{ message|capfirst }}", "{{ message.text|capfirst }}")
+        .replace("{{ message|capfirst }}", "{{ message.text }}")
         .replace("{{ field.field }}", "{{ field.widget|safe }}")
         .replace("{{ field.label_tag }}", "{{ field.label_tag|safe }}")
         .replace("in fieldset %}", "in fieldset.lines %}")
@@ -555,4 +591,145 @@ pub fn capitalized(value: &str) -> String {
         Some(first) => format!("{}{}", first.to_uppercase(), letters.as_str()),
         None => value.into(),
     }
+}
+
+const ADMIN_NOTICE: &str = "mittab_admin_notice";
+
+pub async fn log_action(
+    db: &mut MySqlConnection,
+    model: &str,
+    user: i32,
+    id: i32,
+    description: &str,
+    flag: u8,
+    message: String,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "INSERT INTO django_admin_log (action_time, object_id, object_repr, action_flag,
+            change_message, content_type_id, user_id)
+         VALUES (UTC_TIMESTAMP(6), ?, ?, ?, ?,
+            (SELECT id FROM django_content_type WHERE app_label = 'tab' AND model = ?), ?)",
+    )
+    .bind(id.to_string())
+    .bind(description.chars().take(200).collect::<String>())
+    .bind(flag)
+    .bind(message)
+    .bind(model)
+    .bind(user)
+    .execute(db)
+    .await?;
+    Ok(result.last_insert_id())
+}
+
+pub fn notice_key(secret: Option<&str>) -> Result<hmac::Key, &'static str> {
+    if let Some(secret) = secret {
+        let key = hmac::Key::new(hmac::HMAC_SHA256, secret.as_bytes());
+        let derived = hmac::sign(&key, b"MIT-Tab Rust admin notices v1");
+        return Ok(hmac::Key::new(hmac::HMAC_SHA256, derived.as_ref()));
+    }
+    let mut seed = [0; 32];
+    SystemRandom::new()
+        .fill(&mut seed)
+        .map_err(|_| "Unable to initialize administration notices")?;
+    Ok(hmac::Key::new(hmac::HMAC_SHA256, &seed))
+}
+
+pub fn redirect_with_notice(
+    app: &App,
+    headers: &HeaderMap,
+    target: String,
+    log: u64,
+    contents: &str,
+) -> Response {
+    let mut response = access::found(target);
+    if let Some(session) = cookie(headers, "sessionid") {
+        let body = format!("{log}.{contents}");
+        let tag = hmac::sign(
+            &app.admin_notice_key,
+            format!("{session}:{body}").as_bytes(),
+        );
+        let encoded = URL_SAFE_NO_PAD.encode(tag.as_ref());
+        login::set_cookie(
+            &mut response,
+            ADMIN_NOTICE,
+            &format!("{body}.{encoded}"),
+            60,
+            login::secure_request(headers),
+            true,
+        );
+    }
+    response
+}
+
+async fn notice(
+    db: &mut MySqlConnection,
+    key: &hmac::Key,
+    headers: &HeaderMap,
+    user: i32,
+    raw: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let Some(session) = cookie(headers, "sessionid") else {
+        return Ok(None);
+    };
+    let Some((body, tag)) = raw.rsplit_once('.') else {
+        return Ok(None);
+    };
+    let Ok(tag) = URL_SAFE_NO_PAD.decode(tag) else {
+        return Ok(None);
+    };
+    if hmac::verify(key, format!("{session}:{body}").as_bytes(), &tag).is_err() {
+        return Ok(None);
+    }
+    let Some((log, action)) = body.split_once('.') else {
+        return Ok(None);
+    };
+    let Ok(log) = log.parse::<u64>() else {
+        return Ok(None);
+    };
+    let data = sqlx::query_as::<_, (String, String, String, u8)>(
+        "SELECT t.model, l.object_id, l.object_repr, l.action_flag
+         FROM django_admin_log l JOIN django_content_type t ON t.id = l.content_type_id
+         WHERE l.id = ? AND l.user_id = ? AND t.app_label = 'tab'
+           AND l.action_time > UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE",
+    )
+    .bind(log)
+    .bind(user)
+    .fetch_optional(db)
+    .await?;
+    let Some((model, id, description, flag)) = data else {
+        return Ok(None);
+    };
+    let Some(resource) = crate::admin_changelist::default_list(&model) else {
+        return Ok(None);
+    };
+    let model = resource.model;
+    let singular = model.singular;
+    let description = legacy_html::escape(&description);
+    let response = match (flag, action) {
+        (1 | 2, "save" | "continue" | "another") => {
+            let verb = if flag == 1 { "added" } else { "changed" };
+            let Ok(id) = id.parse::<i32>() else {
+                return Ok(None);
+            };
+            let extra = match action {
+                "continue" => " You may edit it again below.".into(),
+                "another" => format!(" You may add another {singular} below."),
+                _ => String::new(),
+            };
+            format!(
+                r#"The {singular} “<a href="{}{id}/change/">{description}</a>” was {verb} successfully.{extra}"#,
+                model.url()
+            )
+        }
+        (3, "delete") => format!("The {singular} “{description}” was deleted successfully."),
+        (3, bulk) if bulk.starts_with("bulk-") => {
+            let Ok(count) = bulk[5..].parse::<usize>() else {
+                return Ok(None);
+            };
+            let name = if count == 1 { singular } else { model.plural };
+            format!("Successfully deleted {count} {name}.")
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(response))
 }

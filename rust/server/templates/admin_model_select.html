@@ -1,0 +1,6 @@
+<select name="{{ name }}"{% if required %} required{% endif %} id="id_{{ name }}">
+{% if blank %}  <option value=""{% if not selected %} selected{% endif %}>---------</option>
+
+{% endif %}{% for id, label in options %}  <option value="{{ id }}"{% if id|string == selected %} selected{% endif %}>{{ label }}</option>
+
+{% endfor %}</select>
