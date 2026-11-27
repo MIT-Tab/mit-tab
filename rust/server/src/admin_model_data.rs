@@ -1328,6 +1328,17 @@ impl Form {
                     Kind::Json if field.value.is_none() => {
                         stored.or(field.field.initial).map(str::to_owned)
                     }
+                    Kind::Json
+                        if resource.email_log()
+                            && stored != Some("null")
+                            && field
+                                .value
+                                .as_deref()
+                                .is_some_and(|value| value.trim() == "null") =>
+                    {
+                        field.error = Some("Enter a JSON value other than null.".into());
+                        None
+                    }
                     _ => field.clean(),
                 }
             })
@@ -1440,12 +1451,10 @@ impl BoundField {
             };
         }
         if matches!(self.field.kind, Kind::Json) {
-            return match serde_json::from_str::<serde_json::Value>(raw) {
-                Ok(serde_json::Value::Null) => {
-                    invalid(&mut self.error, "Enter a JSON value other than null.")
-                }
-                Ok(_) => Some(raw.into()),
-                Err(_) => invalid(&mut self.error, "Enter a valid JSON."),
+            return if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
+                Some(raw.into())
+            } else {
+                invalid(&mut self.error, "Enter a valid JSON.")
             };
         }
         if raw.is_empty() {

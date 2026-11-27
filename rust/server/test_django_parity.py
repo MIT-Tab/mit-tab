@@ -7139,7 +7139,18 @@ def test_tab_email_log_admin_matches_django(html_assets, subtests):
 
             omitted = {key: value for key, value in form.items() if key != "email_payload"}
             assert submit(port, add, {**omitted, "email": "default@example.org"})[0] == 302
-            assert model.objects.get(email="default@example.org").email_payload == {}
+            legacy = model.objects.get(email="default@example.org")
+            assert legacy.email_payload == {}
+            with connection.cursor() as db:
+                db.execute(f"UPDATE {model._meta.db_table} SET email_payload = CAST('null' AS JSON) WHERE id = %s",
+                           [legacy.pk])
+            legacy_edit = f"{root}{legacy.id}/change/"
+            compare_admin_page(port, legacy_edit, client, email_log_revision=True)
+            legacy_proof = email_log_edit_proof(request(port, legacy_edit, cookie=staff)[2])
+            assert submit(port, legacy_edit, {**form, "email_payload": "null", "email": "older@example.org",
+                                              "mittab_email_log_revision": legacy_proof})[0] == 302
+            legacy.refresh_from_db()
+            assert legacy.email_payload is None and legacy.email == "older@example.org"
             direct_scope = motion_delete_proof(request(port, delete, cookie=staff)[2])
             assert submit(port, delete, {"post": "yes", "mittab_delete_scope": direct_scope})[0] == 302
             bulk = {**bulk, "_selected_action": [str(added.id)]}
