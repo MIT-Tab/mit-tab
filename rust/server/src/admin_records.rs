@@ -121,15 +121,20 @@ impl Record {
 }
 
 #[derive(Clone, Copy)]
-struct Column {
-    name: &'static str,
-    label: &'static str,
+pub(super) struct Column {
+    pub(crate) name: &'static str,
+    pub(crate) label: &'static str,
     sql: &'static str,
     nowrap: bool,
 }
 
 impl Column {
-    const fn new(name: &'static str, label: &'static str, sql: &'static str, nowrap: bool) -> Self {
+    pub(super) const fn new(
+        name: &'static str,
+        label: &'static str,
+        sql: &'static str,
+        nowrap: bool,
+    ) -> Self {
         Self {
             name,
             label,
@@ -152,7 +157,7 @@ fn sort_order(kind: Record, query: &Query) -> Vec<(usize, bool)> {
         .collect()
 }
 
-fn order_sql(columns: &[Column; 4], order: &[(usize, bool)]) -> String {
+pub(super) fn order_sql(columns: &[Column], order: &[(usize, bool)]) -> String {
     let mut order: Vec<_> = order
         .iter()
         .map(|&(index, ascending)| {
@@ -167,9 +172,15 @@ fn order_sql(columns: &[Column; 4], order: &[(usize, bool)]) -> String {
     order.join(", ")
 }
 
-fn headings(columns: &[Column; 4], order: &[(usize, bool)], query: &Query) -> Vec<Value> {
-    let encode =
-        |index: usize, ascending: bool| format!("{}{index}", if ascending { "" } else { "-" });
+pub(super) fn headings(
+    columns: &[Column],
+    order: &[(usize, bool)],
+    query: &Query,
+    offset: usize,
+) -> Vec<Value> {
+    let encode = |index: usize, ascending: bool| {
+        format!("{}{}", if ascending { "" } else { "-" }, index + offset)
+    };
     columns
         .iter()
         .enumerate()
@@ -210,7 +221,7 @@ fn headings(columns: &[Column; 4], order: &[(usize, bool)], query: &Query) -> Ve
         .collect()
 }
 
-fn content_label(application: &str, model: &str) -> String {
+pub(super) fn content_label(application: &str, model: &str) -> String {
     CONTENT_TYPES
         .get(&format!("{application}.{model}"))
         .map_or_else(|| model.into(), |name| format!("{application} | {name}"))
@@ -223,7 +234,7 @@ fn event_label(event: &str) -> &str {
         .map_or("-", |&(_, label)| label)
 }
 
-fn choice_filter(
+pub(super) fn choice_filter(
     query: &Query,
     field: &str,
     title: &str,
@@ -243,7 +254,7 @@ fn choice_filter(
     admin_html::render_fragment("admin/filter.html", context! { title, choices })
 }
 
-fn search_terms(text: &str) -> Vec<String> {
+pub(super) fn search_terms(text: &str) -> Vec<String> {
     let mut terms = Vec::new();
     let mut current = String::new();
     let mut quote = None;
@@ -448,7 +459,7 @@ pub async fn list(
             actions_on_top => true,
             search_form => search,
             media => context! { js => admin_html::scripts() },
-            result_headers => headings(&columns, &order, &query),
+            result_headers => headings(&columns, &order, &query, 0),
             num_sorted_fields => order.len(),
             results,
             ..pager,

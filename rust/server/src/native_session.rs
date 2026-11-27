@@ -1,5 +1,5 @@
 use ring::digest;
-use sqlx::MySqlPool;
+use sqlx::{MySqlConnection, MySqlPool};
 
 use crate::{
     legacy_session::{self, Actor},
@@ -19,10 +19,6 @@ pub fn is_native_key(token: &str) -> bool {
 }
 
 pub async fn create(db: &MySqlPool, user_id: i32, password: &str) -> Result<String, sqlx::Error> {
-    let token = format!(
-        "{PREFIX}{}",
-        passwords::random_secret().map_err(|message| sqlx::Error::Protocol(message.into()))?
-    );
     let mut tx = db.begin().await?;
     sqlx::query(
         "DELETE FROM mittab_rust_session WHERE expires_at <= UTC_TIMESTAMP(6)
@@ -30,16 +26,7 @@ pub async fn create(db: &MySqlPool, user_id: i32, password: &str) -> Result<Stri
     )
     .execute(&mut *tx)
     .await?;
-    sqlx::query(
-        "INSERT INTO mittab_rust_session (token_hash, user_id, password_hash, expires_at)
-         VALUES (?, ?, ?, DATE_ADD(UTC_TIMESTAMP(6), INTERVAL ? SECOND))",
-    )
-    .bind(hash(&token).as_ref())
-    .bind(user_id)
-    .bind(hash(password).as_ref())
-    .bind(MAX_AGE)
-    .execute(&mut *tx)
-    .await?;
+    let token = issue(&mut tx, user_id, password).await?;
     sqlx::query("UPDATE auth_user SET last_login = UTC_TIMESTAMP(6) WHERE id = ?")
         .bind(user_id)
         .execute(&mut *tx)
@@ -48,7 +35,29 @@ pub async fn create(db: &MySqlPool, user_id: i32, password: &str) -> Result<Stri
     Ok(token)
 }
 
-pub async fn actor(db: &MySqlPool, token: &str) -> Result<Actor, sqlx::Error> {
+pub(super) async fn issue(
+    db: &mut MySqlConnection,
+    user_id: i32,
+    password: &str,
+) -> Result<String, sqlx::Error> {
+    let token = format!(
+        "{PREFIX}{}",
+        passwords::random_secret().map_err(|message| sqlx::Error::Protocol(message.into()))?
+    );
+    sqlx::query(
+        "INSERT INTO mittab_rust_session (token_hash, user_id, password_hash, expires_at)
+         VALUES (?, ?, ?, DATE_ADD(UTC_TIMESTAMP(6), INTERVAL ? SECOND))",
+    )
+    .bind(hash(&token).as_ref())
+    .bind(user_id)
+    .bind(hash(password).as_ref())
+    .bind(MAX_AGE)
+    .execute(db)
+    .await?;
+    Ok(token)
+}
+
+pub async fn actor(db: &mut MySqlConnection, token: &str) -> Result<Actor, sqlx::Error> {
     let row = sqlx::query_as::<_, (i32, String, Vec<u8>, bool, bool, i64)>(
         "SELECT u.id, u.password, s.password_hash, u.is_staff, u.is_superuser,
                 EXISTS(SELECT 1 FROM auth_user_groups membership

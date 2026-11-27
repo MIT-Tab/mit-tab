@@ -228,6 +228,8 @@ fn templates(env: &mut Environment<'static>) {
         upstream!("nav_sidebar.html"),
         upstream!("color_theme_toggle.html"),
         upstream!("change_form.html"),
+        upstream!("auth/user/add_form.html"),
+        upstream!("auth/user/change_password.html"),
         upstream!("change_list.html"),
         upstream!("change_list_results.html"),
         upstream!("change_list_object_tools.html"),
@@ -286,6 +288,19 @@ fn translate(source: &str) -> String {
         .replace("pair.1", "pair[1]")
         .replace("|iriencode", "")
         .replace("{{ field.contents }}", "{{ field.contents|safe }}")
+        .replace("{{ original.get_username }}", "{{ original }}")
+        .replace("{% blocktranslate with username=original %}", "")
+        .replace("<strong>{{ username }}</strong>", "<strong>{{ original }}</strong>")
+        .replace(
+            "{% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}",
+            "{% if form.errors|length == 1 %}Please correct the error below.{% else %}Please correct the errors below.{% endif %}",
+        )
+        .replace("{{ form.password1 }}", "{{ form.password1.widget|safe }}")
+        .replace("{{ form.password2 }}", "{{ form.password2.widget|safe }}")
+        .replace("{{ form.password1.errors }}", "{{ form.password1.errors|safe }}")
+        .replace("{{ form.password2.errors }}", "{{ form.password2.errors|safe }}")
+        .replace("{{ form.password1.label_tag }}", "{{ form.password1.label_tag|safe }}")
+        .replace("{{ form.password2.label_tag }}", "{{ form.password2.label_tag|safe }}")
         .replace("LANGUAGE_CODE|default:\"en-us\"", "\"en-us\"")
         .replace("LANGUAGE_BIDI|yesno:'rtl,ltr,auto'", "\"ltr\"")
         .replace("request.path|urlencode", "request.path")
@@ -496,11 +511,23 @@ pub fn scripts() -> String {
 }
 
 pub fn filtered_select_scripts() -> String {
+    form_scripts(true, false)
+}
+
+pub fn account_editor_scripts() -> String {
+    form_scripts(true, true)
+}
+
+fn form_scripts(filtered_select: bool, dates: bool) -> String {
     ADMIN_MEDIA
         .iter()
         .flat_map(|&script| match script {
-            "admin/RelatedObjectLookups.js" => [Some(script), Some("SelectBox.js")],
-            "actions.js" => [Some(script), Some("SelectFilter2.js")],
+            "vendor/jquery/jquery.min.js" if dates => [Some(script), Some("calendar.js")],
+            "jquery.init.js" if dates => [Some(script), Some("admin/DateTimeShortcuts.js")],
+            "admin/RelatedObjectLookups.js" if filtered_select => {
+                [Some(script), Some("SelectBox.js")]
+            }
+            "actions.js" if filtered_select => [Some(script), Some("SelectFilter2.js")],
             _ => [Some(script), None],
         })
         .flatten()
@@ -630,12 +657,17 @@ pub async fn log_action(
         "INSERT INTO django_admin_log (action_time, object_id, object_repr, action_flag,
             change_message, content_type_id, user_id)
          VALUES (UTC_TIMESTAMP(6), ?, ?, ?, ?,
-            (SELECT id FROM django_content_type WHERE app_label = 'tab' AND model = ?), ?)",
+            (SELECT id FROM django_content_type WHERE app_label = ? AND model = ?), ?)",
     )
     .bind(id.to_string())
     .bind(description.chars().take(200).collect::<String>())
     .bind(flag)
     .bind(message)
+    .bind(if matches!(model, "user" | "group") {
+        "auth"
+    } else {
+        "tab"
+    })
     .bind(model)
     .bind(user)
     .execute(db)
@@ -663,8 +695,26 @@ pub fn redirect_with_notice(
     log: u64,
     contents: &str,
 ) -> Response {
+    redirect_with_notice_for_session(
+        app,
+        headers,
+        target,
+        log,
+        contents,
+        cookie(headers, "sessionid"),
+    )
+}
+
+pub fn redirect_with_notice_for_session(
+    app: &App,
+    headers: &HeaderMap,
+    target: String,
+    log: u64,
+    contents: &str,
+    session: Option<&str>,
+) -> Response {
     let mut response = access::found(target);
-    if let Some(session) = cookie(headers, "sessionid") {
+    if let Some(session) = session {
         let body = format!("{log}.{contents}");
         let tag = hmac::sign(
             &app.admin_notice_key,
@@ -708,23 +758,30 @@ async fn notice(
     let Ok(log) = log.parse::<u64>() else {
         return Ok(None);
     };
-    let data = sqlx::query_as::<_, (String, String, String, u8)>(
-        "SELECT t.model, l.object_id, l.object_repr, l.action_flag
+    let data = sqlx::query_as::<_, (String, String, String, String, u8)>(
+        "SELECT t.app_label, t.model, l.object_id, l.object_repr, l.action_flag
          FROM django_admin_log l JOIN django_content_type t ON t.id = l.content_type_id
-         WHERE l.id = ? AND l.user_id = ? AND t.app_label = 'tab'
+         WHERE l.id = ? AND l.user_id = ? AND t.app_label IN ('tab', 'auth')
            AND l.action_time > UTC_TIMESTAMP(6) - INTERVAL 1 MINUTE",
     )
     .bind(log)
     .bind(user)
     .fetch_optional(db)
     .await?;
-    let Some((model, id, description, flag)) = data else {
+    let Some((app, model, id, description, flag)) = data else {
         return Ok(None);
     };
-    let Some(resource) = crate::admin_changelist::default_list(&model) else {
-        return Ok(None);
+    let model = match (app.as_str(), model.as_str()) {
+        ("auth", "user") => crate::admin_auth_pages::USER,
+        ("auth", "group") => crate::admin_auth_pages::GROUP,
+        ("tab", model) => {
+            let Some(resource) = crate::admin_changelist::default_list(model) else {
+                return Ok(None);
+            };
+            resource.model
+        }
+        _ => return Ok(None),
     };
-    let model = resource.model;
     let singular = model.singular;
     let description = legacy_html::escape(&description);
     let response = match (flag, action) {
@@ -743,6 +800,7 @@ async fn notice(
                 model.url()
             )
         }
+        (2, "password") if model.name == "user" => "Password changed successfully.".into(),
         (3, "delete") => format!("The {singular} “{description}” was deleted successfully."),
         (3, bulk) if bulk.starts_with("bulk-") => {
             let Ok(count) = bulk[5..].parse::<usize>() else {

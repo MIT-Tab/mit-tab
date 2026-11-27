@@ -1227,7 +1227,7 @@ impl BoundField {
     }
 }
 
-fn valid_email(value: &str) -> bool {
+pub(super) fn valid_email(value: &str) -> bool {
     let Some((local, domain)) = value.rsplit_once('@') else {
         return false;
     };

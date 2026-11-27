@@ -26,16 +26,25 @@ pub const SCORES: Model = Model {
 
 impl Model {
     pub fn url(&self) -> String {
-        format!("/admin/tab/{}/", self.name)
+        format!("/admin/{}/{}/", self.application(), self.name)
+    }
+
+    pub fn application(&self) -> &'static str {
+        if matches!(self.name, "user" | "group") {
+            "auth"
+        } else {
+            "tab"
+        }
     }
 
     pub fn opts(&self) -> Value {
+        let app = self.application();
         context! {
-            app_label => "tab",
+            app_label => app,
             model_name => self.name,
             verbose_name => self.singular,
             verbose_name_plural => self.plural,
-            app_config => context! { verbose_name => "MIT Tab" },
+            app_config => context! { verbose_name => if app == "auth" { "Authentication and Authorization" } else { "MIT Tab" } },
         }
     }
 }
@@ -293,7 +302,7 @@ impl Query {
         admin_html::preserved_filters(&serializer.finish())
     }
 
-    fn add_suffix(&self) -> String {
+    pub(super) fn add_suffix(&self) -> String {
         let mut suffix = self.suffix();
         if self.get("_popup").is_some() {
             suffix.push_str("&_popup=1");

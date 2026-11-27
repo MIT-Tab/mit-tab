@@ -48,10 +48,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/administration.html"),
         ),
         (
-            "admin_accounts.html",
-            include_str!("../templates/admin_accounts.html"),
-        ),
-        (
             "diagnostics.html",
             include_str!("../templates/diagnostics.html"),
         ),

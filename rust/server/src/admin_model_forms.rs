@@ -758,7 +758,7 @@ fn field_line(bound: &BoundField) -> Result<Value, minijinja::Error> {
     })
 }
 
-fn popup_response(action: Option<&str>, id: i32, description: Option<&str>) -> Response {
+pub(super) fn popup_response(action: Option<&str>, id: i32, description: Option<&str>) -> Response {
     let quoted = |value: &str| {
         let mut json = String::new();
         for unit in serde_json::to_string(value)

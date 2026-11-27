@@ -8,7 +8,7 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use flate2::read::ZlibDecoder;
 use ring::{digest, hmac};
 use serde::Deserialize;
-use sqlx::MySqlPool;
+use sqlx::{MySqlConnection, MySqlPool};
 
 const AUTH_BACKEND: &str = "mittab.apps.tab.auth_backends.TabAuthenticationBackend";
 const SIGNER_SALT: &str = "django.contrib.sessions.SessionStoresigner";
@@ -61,6 +61,18 @@ pub async fn actor(
     let Some(key) = cookie(headers, "sessionid") else {
         return Ok(Actor::Anonymous);
     };
+    if !is_legacy_key(key) && !crate::native_session::is_native_key(key) {
+        return Ok(Actor::Anonymous);
+    }
+    let mut db = db.acquire().await.map_err(|_| SessionError::Database)?;
+    actor_on(&mut db, key, secret).await
+}
+
+pub(super) async fn actor_on(
+    db: &mut MySqlConnection,
+    key: &str,
+    secret: Option<&str>,
+) -> Result<Actor, SessionError> {
     if crate::native_session::is_native_key(key) {
         return crate::native_session::actor(db, key)
             .await
@@ -73,7 +85,7 @@ pub async fn actor(
         "SELECT session_data FROM django_session WHERE session_key = ? AND expire_date > UTC_TIMESTAMP(6)",
     )
     .bind(key)
-    .fetch_optional(db)
+    .fetch_optional(&mut *db)
     .await
     .map_err(|_| SessionError::Database)?
     else {

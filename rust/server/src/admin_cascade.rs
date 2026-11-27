@@ -8,6 +8,7 @@ use crate::{admin_changelist, admin_html, entity_store::delete_links, legacy_htm
 enum Model {
     Registered(&'static str),
     JudgeExpectedCheckIn,
+    LogEntry,
     Other {
         table: &'static str,
         class: &'static str,
@@ -51,6 +52,15 @@ impl Model {
                 label: "CONCAT('Judge ', j.name, ' is expected for round ', t.round_number)".into(),
                 singular: "judge expected check in",
                 plural: "judge expected check ins",
+                url: None,
+            },
+            Model::LogEntry => Description {
+                table: "django_admin_log",
+                source: "django_admin_log t".into(),
+                label: "CAST(JSON_ARRAY(t.action_flag, t.object_repr, t.change_message) AS CHAR)"
+                    .into(),
+                singular: "log entry",
+                plural: "log entries",
                 url: None,
             },
             Model::Other {
@@ -102,6 +112,56 @@ const MANUAL_ASSIGNMENT: Model = Model::other(
 
 fn children(table: &str) -> &'static [(Model, &'static str)] {
     match table {
+        "auth_user" => {
+            const {
+                &[
+                    (Model::LogEntry, "user_id"),
+                    (
+                        Model::other(
+                            "auth_user_groups",
+                            "User_groups",
+                            "user-group relationship",
+                            "user-group relationships",
+                        ),
+                        "user_id",
+                    ),
+                    (
+                        Model::other(
+                            "auth_user_user_permissions",
+                            "User_user_permissions",
+                            "user-permission relationship",
+                            "user-permission relationships",
+                        ),
+                        "user_id",
+                    ),
+                    (Registered("usertournamentsetuppreference"), "user_id"),
+                ]
+            }
+        }
+        "auth_group" => {
+            const {
+                &[
+                    (
+                        Model::other(
+                            "auth_group_permissions",
+                            "Group_permissions",
+                            "group-permission relationship",
+                            "group-permission relationships",
+                        ),
+                        "group_id",
+                    ),
+                    (
+                        Model::other(
+                            "auth_user_groups",
+                            "User_groups",
+                            "user-group relationship",
+                            "user-group relationships",
+                        ),
+                        "group_id",
+                    ),
+                ]
+            }
+        }
         "tab_team" => {
             const {
                 &[
@@ -275,6 +335,9 @@ impl Cascade {
             }
             let related_order = match (model.table, column) {
                 ("tab_team_debaters", "team_id") => Some("debater_id"),
+                ("auth_user_groups", "user_id") => Some("group_id"),
+                ("auth_user_user_permissions", "user_id")
+                | ("auth_group_permissions", "group_id") => Some("permission_id"),
                 ("tab_team_required_room_tags", "team_id")
                 | ("tab_room_tags", "room_id")
                 | ("tab_judge_required_room_tags", "judge_id") => Some("roomtag_id"),
@@ -320,6 +383,22 @@ impl Cascade {
                 let key = (model.table, id);
                 self.edges.entry((parent, owner)).or_default().push(key);
                 if recorded.ids.insert(id) {
+                    let label = if matches!(child, Model::LogEntry) {
+                        let (action, object, message): (u8, String, String) =
+                            serde_json::from_str(&label)
+                                .map_err(|error| sqlx::Error::Decode(error.into()))?;
+                        match action {
+                            1 => format!("Added “{object}”."),
+                            2 => format!(
+                                "Changed “{object}” — {}",
+                                admin_html::admin_change_message(&message)
+                            ),
+                            3 => format!("Deleted “{object}.”"),
+                            _ => format!("LogEntry Object ({id})"),
+                        }
+                    } else {
+                        label
+                    };
                     let label = escape(&label);
                     let item = if let Some(url) = &model.url {
                         format!("{title}: <a href=\"{url}{id}/change/\">{label}</a>")

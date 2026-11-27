@@ -5878,6 +5878,174 @@ def admin_edit_proof(body):
     return re.search(rb'name="mittab_pairing_revision" value="([a-f0-9]{64})"', body)[1].decode()
 
 
+@pytest.mark.django_db(transaction=True)
+def test_auth_admin_screens_and_mutations_match_django(html_assets, subtests):
+    from django.contrib.admin.models import CHANGE, LogEntry
+    from django.contrib.auth.hashers import check_password, make_password
+    from django.contrib.auth.models import Permission
+    from mittab.apps.tab.models import UserTournamentSetupPreference
+
+    session = legacy_tab_session("auth-parity-admin")
+    user_model = get_user_model()
+    admin = user_model.objects.get(username="auth-parity-admin")
+    board = legacy_tab_session("auth-parity-board")
+    board_user = user_model.objects.get(username="auth-parity-board")
+    board_group = Group.objects.create(name="Apda Board")
+    board_user.groups.add(board_group)
+    TabSettings.set("cur_round", 2)
+    TabSettings.set("tot_rounds", 1)
+    school = School.objects.create(name="Auth parity")
+    gov, opp = [Team.objects.create(name=name, school=school, seed=0) for name in ("Auth Gov", "Auth Opp")]
+    Round.objects.create(round_number=1, gov_team=gov, opp_team=opp, victor=Round.GOV)
+
+    chosen = Group.objects.create(name="Fixture & Group")
+    permission = Permission.objects.get(codename="view_debater")
+    chosen.permissions.add(permission)
+    password_hash = make_password("fixture-secret-for-test", salt="fixtureAccountSaltOnly", hasher="pbkdf2_sha256")
+    account = user_model.objects.create(username="fixture+person", first_name="A & Name", last_name="Display",
+                                         email="fixture@example.org", password=password_hash, is_staff=True,
+                                         last_login=timezone.now())
+    account.groups.add(chosen)
+    account.user_permissions.add(permission)
+    preference = UserTournamentSetupPreference.objects.create(user=account, hide_tournament_todo=True)
+    LogEntry.objects.log_action(user_id=account.id, content_type_id=permission.content_type_id,
+        object_id=gov.id, object_repr="Fixture & object", action_flag=CHANGE,
+        change_message=[{"changed": {"fields": ["Fixture"]}}])
+
+    client = Client()
+    csrf = "a" * 32
+    client.cookies["sessionid"] = session
+    client.cookies["csrftoken"] = csrf
+    users, groups = "/admin/auth/user/", "/admin/auth/group/"
+    edit_user, edit_group = f"{users}{account.id}/change/", f"{groups}{chosen.id}/change/"
+
+    def submit(port, path, fields, sid=session, token=csrf):
+        return request(port, path, method="POST", form={**fields, "csrfmiddlewaretoken": token},
+                       extra_headers={"Cookie": f"sessionid={sid}; csrftoken={csrf}"})
+
+    with rust_server(overrides=html_assets) as port:
+        for path in (
+            users, groups, users + "?is_staff__exact=1&q=Fixture",
+            users + "?o=-3.1", users + f"?groups__id__exact={chosen.id}",
+            groups + "?q=Fixture", groups + "?_to_field=id&_popup=1",
+            users + "add/", groups + "add/", edit_user, edit_group,
+            f"{users}{account.id}/password/", f"{users}{account.id}/history/", f"{groups}{chosen.id}/history/",
+            f"{users}{account.id}/delete/", f"{groups}{chosen.id}/delete/",
+        ):
+            with subtests.test(path=path):
+                compare_admin_page(port, path, client, deletion_scope=path.endswith("/delete/"))
+                assert request(port, path, cookie=board)[1]["Location"] == "/403/"
+        for path, fields in [
+            (users + "add/", {}),
+            (users + "add/", {"username": "invalid name", "password1": "fixture-one", "password2": "fixture-two"}),
+            (f"{users}{account.id}/password/", {"password1": "fixture-one", "password2": "fixture-two"}),
+            (groups + "add/", {"name": chosen.name}),
+        ]:
+            with subtests.test(path=path, fields=tuple(fields)):
+                compare_admin_page(port, path, client, post=fields)
+        for path, id in ((users, account.id), (groups, chosen.id)):
+            compare_admin_page(port, path, client, post={
+                "action": "delete_selected", "_selected_action": id, "index": 0,
+            }, deletion_scope=True)
+        assert password_hash.encode() not in request(port, edit_user, cookie=session)[2]
+        fields = {"username": "auth-new-fixture", "password1": "fixture-created-password", "password2": "fixture-created-password",
+                  "is_staff": "on", "is_superuser": "on", "groups": board_group.id}
+        assert submit(port, users + "add/", fields, sid=board)[1]["Location"] == "/403/"
+        assert submit(port, users + "add/", fields, token="invalid")[0] == 403
+        assert not user_model.objects.filter(username=fields["username"]).exists()
+        created = submit(port, users + "add/", fields)
+        fixture = user_model.objects.get(username=fields["username"])
+        fixture_url = f"{users}{fixture.id}/change/"
+        assert created[0] == 302 and created[1]["Location"] == fixture_url
+        assert fixture.is_active and not fixture.is_staff and not fixture.is_superuser and not fixture.groups.exists()
+        assert check_password(fields["password1"], fixture.password)
+        compare_admin_page(port, f"{users}{fixture.id}/history/", client)
+        updated = {"username": fixture.username, "first_name": "New first", "email": "updated@example.org",
+                   "is_active": "on", "is_staff": "on", "groups": chosen.id, "user_permissions": permission.id,
+                   "last_login_0": "2024-01-01", "last_login_1": "13:15:30",
+                   "date_joined_0": "2023-01-02", "date_joined_1": "14:16:30", "_continue": 1}
+        assert submit(port, fixture_url, updated)[1]["Location"] == fixture_url
+        fixture.refresh_from_db()
+        assert fixture.is_staff and not fixture.is_superuser
+        assert list(fixture.groups.all()) == [chosen]
+        assert list(fixture.user_permissions.all()) == [permission]
+        assert fixture.date_joined.date().isoformat() == "2023-01-02"
+        assert fixture.last_login.date().isoformat() == "2024-01-01"
+        compare_admin_page(port, fixture_url, client)
+        compare_admin_page(port, f"{users}{fixture.id}/history/", client)
+        assert submit(port, f"{users}{admin.id}/change/", {"username": admin.username, "is_active": "on"})[0] == 422
+
+        old_state = request(port, f"{groups}{chosen.id}/delete/", cookie=session)[2]
+        second_perm = Permission.objects.get(codename="view_room")
+        assert submit(port, edit_group, {"name": "Renamed & Group", "permissions": [permission.id, second_perm.id]})[0] == 302
+        assert submit(port, f"{groups}{chosen.id}/delete/", {
+            "post": "yes", "mittab_delete_scope": admin_delete_proof(old_state),
+        })[0] == 409
+        assert Group.objects.filter(id=chosen.id, name="Renamed & Group").exists()
+        assert submit(port, f"{groups}{board_group.id}/change/", {"name": "Different role"})[0] == 422
+        assert submit(port, f"{groups}{board_group.id}/delete/", {"post": "yes"})[0] == 422
+
+        group_filter = f"{groups}?id__exact={chosen.id}"
+        selection = {"action": "delete_selected", "_selected_action": [chosen.id, board_group.id], "index": 0}
+        status, _, response = submit(port, group_filter, selection)
+        assert status == 200
+        assert submit(port, group_filter, {**selection, "post": "yes",
+                                           "mittab_delete_scope": admin_delete_proof(response)})[0] == 302
+        assert not Group.objects.filter(id=chosen.id).exists()
+        assert Group.objects.filter(id=board_group.id).exists()
+        assert user_model.objects.filter(id=fixture.id).exists()
+
+        deletion = f"{users}{account.id}/delete/"
+        _, _, preview = request(port, deletion, cookie=session)
+        assert submit(port, deletion, {"confirm": "on"})[0] == 409
+        attribution = AuditEvent.objects.create(content_type=permission.content_type, object_id=gov.id,
+                                                object_repr="Fixture audit authorship", event_type="edit", user=account)
+        assert submit(port, deletion, {"post": "yes", "mittab_delete_scope": admin_delete_proof(preview)})[0] == 409
+        attribution.refresh_from_db()
+        assert attribution.user_id == account.id
+        _, _, preview = request(port, deletion, cookie=session)
+        assert submit(port, deletion, {
+            "post": "yes", "mittab_delete_scope": admin_delete_proof(preview),
+        })[0] == 302
+        assert not user_model.objects.filter(id=account.id).exists()
+        attribution.refresh_from_db()
+        assert attribution.user_id is None
+        assert not UserTournamentSetupPreference.objects.filter(id=preference.id).exists()
+        assert submit(port, f"{users}{admin.id}/delete/", {"post": "yes"})[0] == 422
+
+        changed = submit(port, f"{users}{admin.id}/password/", {"password1": "new-staff-password", "password2": "new-staff-password"})
+        assert changed[0] == 302
+        refreshed = load_cookies(changed[1])["sessionid"].value
+        assert refreshed != session and request(port, "/admin/", cookie=refreshed)[0] == 200
+        old_login = request(port, "/admin/", cookie=session)
+        assert old_login[0] != 200
+
+        # A request authenticated before a credential change must check it again after waiting.
+        from time import monotonic, sleep
+
+        replacement = make_password("newer-staff-password")
+        raced = {"password1": "stale-racing-password", "password2": "stale-racing-password"}
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                user_model.objects.select_for_update().get(id=admin.id)
+                pending = executor.submit(submit, port, f"{users}{admin.id}/password/", raced, refreshed)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "SELECT id FROM auth_user WHERE is_superuser = TRUE ORDER BY id FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The account mutation did not reach the transaction lock"
+                user_model.objects.filter(id=admin.id).update(password=replacement)
+            assert pending.result(timeout=6)[1]["Location"] == "/403/"
+        admin.refresh_from_db()
+        assert admin.password == replacement
+
+
 def compare_admin_page(port, path, client, post=None, *, deletion_scope=False, pairing_revision=False):
     session = client.cookies["sessionid"].value
     csrf = client.cookies["csrftoken"].value
@@ -5976,8 +6144,10 @@ def test_native_administration_manages_accounts_groups_and_audit_with_board_excl
         assert check_password("changed-fixture-password", user.password)
         assert post(f"{groups}{board_group.id}/delete/", {"confirm": "on"})[0] == 422
         assert post(f"{users}{user.id}/delete/", {})[0] == 422
-        assert post(f"{users}{user.id}/delete/", {"confirm": "on"})[0] == 302
-        assert post(f"{groups}{group.id}/delete/", {"confirm": "on"})[0] == 302
+        for deletion in (f"{users}{user.id}/delete/", f"{groups}{group.id}/delete/"):
+            status, _, preview = request(port, deletion, cookie=staff)
+            assert status == 200
+            assert post(deletion, {"post": "yes", "mittab_delete_scope": admin_delete_proof(preview)})[0] == 302
         assert not user_model.objects.filter(id=user.id).exists() and not Group.objects.filter(id=group.id).exists()
 
         speaker = Debater.objects.create(name="Administrative Score", novice_status=0)
