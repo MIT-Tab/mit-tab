@@ -1,13 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use axum::{http::HeaderMap, response::Response};
 use chrono::NaiveDateTime;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use sqlx::{MySqlConnection, MySqlPool, Row};
 
 use crate::{
+    App, access,
     codes::{self, Credential},
     entity_store::{self, Entity},
+    legacy_session::Actor,
     registration_form::{Judge, Member, Registration, SchoolField, Team, length},
     roster_log,
     settings::Settings,
@@ -74,6 +77,7 @@ impl School {
 
 pub struct Entry {
     pub form: Registration,
+    pub code: String,
     snapshot: Value,
 }
 
@@ -81,10 +85,16 @@ pub async fn existing_code(
     db: &mut MySqlConnection,
     code: &str,
 ) -> Result<Option<i32>, sqlx::Error> {
-    sqlx::query_scalar("SELECT id FROM registration_registration WHERE herokunator_code = ?")
-        .bind(code)
-        .fetch_optional(db)
-        .await
+    let record = sqlx::query_as::<_, (i32, String)>(
+        "SELECT id, herokunator_code FROM registration_registration WHERE herokunator_code = ?",
+    )
+    .bind(code)
+    .fetch_optional(db)
+    .await?;
+    Ok(record.and_then(|(id, stored)| {
+        (crate::registration_views::valid_code(&stored) && code.eq_ignore_ascii_case(&stored))
+            .then_some(id)
+    }))
 }
 
 async fn schools(db: &mut MySqlConnection) -> Result<BTreeMap<i32, School>, sqlx::Error> {
@@ -131,7 +141,7 @@ pub async fn entry(db: &mut MySqlConnection, id: i32) -> Result<Option<Entry>, s
          FROM tab_team_debaters td JOIN tab_team t ON t.id = td.team_id
          JOIN tab_debater d ON td.debater_id = d.id
          LEFT JOIN mittab_registration_private_email p ON p.debater_id = d.id
-         WHERE t.registration_id = ? ORDER BY td.team_id, d.id",
+         WHERE t.registration_id = ? ORDER BY td.team_id, d.name, d.id",
     ).bind(id).fetch_all(&mut *db).await?;
     for row in rows {
         let private: bool = row.try_get("private_email")?;
@@ -179,7 +189,7 @@ pub async fn entry(db: &mut MySqlConnection, id: i32) -> Result<Option<Entry>, s
             "debaters": member_snapshots}));
         let mut members = members.into_iter().map(|(member, _)| member);
         form.teams.push(Team { id: Some(team_id), name, seed, second_primary,
-            members: [members.next().unwrap_or_default(), members.next().unwrap_or_default()] });
+            members: [members.next().unwrap_or_default(), members.next().unwrap_or_default()], extra_member_names: members.map(|member| member.name).collect() });
     }
 
     let affiliation_rows: Vec<(i32, i32)> = sqlx::query_as(
@@ -221,6 +231,10 @@ pub async fn entry(db: &mut MySqlConnection, id: i32) -> Result<Option<Entry>, s
                 .try_get::<Option<String>, _>("email")?
                 .unwrap_or_default(),
             experience: reported_experience.unwrap_or(rank.clamp(0, 10) as u16),
+            experience_display: Some(match reported_experience {
+                Some(value) => value.to_string(),
+                None => row.try_get("calibration")?,
+            }),
             schools: judge_schools.iter().map(|school| school.field()).collect(),
             needs_crash_housing: row.try_get("needs_crash_housing")?,
             requests_wgm_housing: row.try_get("requests_wgm_housing")?,
@@ -232,17 +246,31 @@ pub async fn entry(db: &mut MySqlConnection, id: i32) -> Result<Option<Entry>, s
             "schools": judge_schools, "availability_rounds": judge.rounds}));
         form.judges.push(judge);
     }
-    let snapshot = json!({"id": id, "code": row.try_get::<String, _>("herokunator_code")?,
+    let code: String = row.try_get("herokunator_code")?;
+    let snapshot = json!({"id": id, "code": code,
         "school": school, "email": form.email,
         "dietary_requests": form.dietary_requests, "housing_requests": form.housing_requests,
         "teams": team_snapshots, "judges": judge_snapshots});
-    Ok(Some(Entry { form, snapshot }))
+    Ok(Some(Entry {
+        form,
+        code,
+        snapshot,
+    }))
+}
+
+pub fn revision(app: &App, form: &Registration) -> String {
+    // Only editable values belong to this revision. Private addresses were removed
+    // by entry(), and a server-only signature keeps the revision opaque.
+    let bytes = serde_json::to_vec(form).expect("registration form serializable");
+    let signature = ring::hmac::sign(&app.admin_notice_key, &bytes);
+    hex::encode(signature.as_ref())
 }
 
 #[derive(Debug)]
 pub enum Error {
     Invalid(&'static str),
     Closed,
+    Access(Box<Response>),
     NotFound,
     Database,
 }
@@ -616,16 +644,22 @@ async fn log_change(
 }
 
 pub async fn save(
-    pool: &MySqlPool,
+    app: &App,
+    actor: Actor,
+    headers: &HeaderMap,
     code: Option<&str>,
     input: &Registration,
     choices: &std::collections::HashMap<&str, &str>,
     emails: &BTreeMap<(i32, i32), String>,
 ) -> Result<(i32, String), Error> {
     input.validate().map_err(Error::Invalid)?;
-    let mut tx = pool.begin().await?;
+    let mut tx = app.db.begin().await?;
     lock_round(&mut tx).await?;
     lock_config(&mut tx).await?;
+    if let Err(error) = access::code_portal_actor(&mut tx, app, actor, headers).await {
+        tx.rollback().await?;
+        return Err(Error::Access(Box::new(error.response(app, headers).await)));
+    }
     let config = config(&mut tx).await?;
     if !if code.is_some() {
         config.can_edit
@@ -641,8 +675,7 @@ pub async fn save(
         None
     };
     if let Some(before) = &before
-        && !input.revision.is_empty()
-        && before.form.revision != input.revision
+        && revision(app, &before.form) != input.revision
     {
         return Err(Error::Invalid(
             "This registration changed. Reload it before submitting again.",
@@ -673,6 +706,46 @@ pub async fn save(
         ));
     }
 
+    let kept_teams: BTreeSet<_> = input.teams.iter().filter_map(|team| team.id).collect();
+    let kept_judges: BTreeSet<_> = input.judges.iter().filter_map(|judge| judge.id).collect();
+    let exact_rows =
+        |old: &BTreeMap<i32, &Value>, kept: &BTreeSet<i32>, deleted: &BTreeSet<i32>| {
+            kept.is_disjoint(deleted) && kept.union(deleted).copied().eq(old.keys().copied())
+        };
+    if !exact_rows(&old_teams, &kept_teams, &input.deleted_teams)
+        || !exact_rows(&old_judges, &kept_judges, &input.deleted_judges)
+    {
+        return Err(Error::Invalid(
+            "This registration form is missing existing rows. Reload it before submitting again.",
+        ));
+    }
+    if kept_teams
+        .iter()
+        .any(|id| items(old_teams[id], "debaters").len() > 2)
+    {
+        return Err(Error::Invalid(
+            "Contact tab to edit a team with more than two debaters.",
+        ));
+    }
+
+    if let Some(id) = before.as_ref().and_then(|entry| entry.form.id) {
+        let shared = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1
+              FROM tab_team t JOIN tab_team_debaters members ON members.team_id = t.id
+              JOIN tab_team_debaters roster ON roster.debater_id = members.debater_id
+              JOIN tab_team other ON other.id = roster.team_id
+              WHERE t.registration_id = ? AND NOT (other.registration_id <=> t.registration_id))",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if shared {
+            return Err(Error::Invalid(
+                "Tab must resolve a debater shared with another registration before this registration can be edited.",
+            ));
+        }
+    }
+
     let school = resolve_school(&mut tx, &input.school, choices).await?;
     let (registration, code) = if let Some(before) = &before {
         let id = before.form.id.ok_or(Error::NotFound)?;
@@ -694,7 +767,6 @@ pub async fn save(
     };
 
     let log = roster_log::enabled(&mut tx).await?;
-    let mut saved_teams = BTreeSet::new();
     for team in &input.teams {
         let [first, second] = &team.members;
         let first_school = resolve_school(&mut tx, &first.school, choices).await?;
@@ -726,13 +798,11 @@ pub async fn save(
             members[index] = save_debater(&mut tx, member, school, config.housing, email).await?;
         }
         set_team_members(&mut tx, id, members).await?;
-        saved_teams.insert(id);
     }
-    for id in old_teams.keys().filter(|id| !saved_teams.contains(*id)) {
+    for id in &input.deleted_teams {
         entity_store::delete_team(&mut tx, *id).await?;
     }
 
-    let mut saved_judges = BTreeSet::new();
     for judge in &input.judges {
         let id = save_judge(&mut tx, judge, registration, config.housing).await?;
         let mut affiliations = BTreeSet::new();
@@ -748,9 +818,8 @@ pub async fn save(
             .fetch_one(&mut *tx)
             .await?;
         set_judge_availability(&mut tx, id, &judge.rounds, &name, log, config.last_round).await?;
-        saved_judges.insert(id);
     }
-    for id in old_judges.keys().filter(|id| !saved_judges.contains(*id)) {
+    for id in &input.deleted_judges {
         entity_store::delete_judge(&mut tx, *id).await?;
     }
 

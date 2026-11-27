@@ -267,9 +267,10 @@ const renderDebaterList = ($select, entries = [], schoolValue = "") => {
     });
     insertAlphabetically($select, option);
   }
-  const restoredValue = $select.find(`option[value="${currentValue}"]`).length
-    ? currentValue
-    : "";
+  const hasCurrentValue = $select
+    .find("option")
+    .filter((_, option) => option.value === currentValue).length;
+  const restoredValue = hasCurrentValue ? currentValue : "";
   $select.val(restoredValue);
   $select.prop("disabled", false);
   // Restoring a selection must keep the saved/manual status, even when the
@@ -881,6 +882,8 @@ const initDraftAutosave = ($root, maxTeams) => {
     clearAllDrafts();
     return;
   }
+  // Edit links carry a registration code. Keep their form values in the tab.
+  if (formEl.elements.namedItem("revision")) return;
   // A re-rendered submission already carries the user's latest values.
   const draft = formEl.hasAttribute("data-registration-bound")
     ? null

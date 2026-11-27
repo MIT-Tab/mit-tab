@@ -89,14 +89,6 @@ static ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../templates/board_apda_id.html"),
         ),
         (
-            "code_lookup.html",
-            include_str!("../templates/code_lookup.html"),
-        ),
-        (
-            "registration.html",
-            include_str!("../templates/registration.html"),
-        ),
-        (
             "registration_admin.html",
             include_str!("../templates/registration_admin.html"),
         ),

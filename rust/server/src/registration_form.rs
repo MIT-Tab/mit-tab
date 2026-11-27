@@ -7,7 +7,7 @@ use serde::Serialize;
 use url::form_urlencoded;
 
 pub const MAX_TEAMS: usize = 200;
-const MAX_JUDGES: usize = 1_000;
+pub const MAX_JUDGES: usize = 1_000;
 
 pub fn integer_input(raw: &str) -> Result<i32, ParseIntError> {
     let whole = raw
@@ -92,6 +92,7 @@ pub struct Team {
     pub seed: i32,
     pub second_primary: bool,
     pub members: [Member; 2],
+    pub extra_member_names: Vec<String>,
 }
 
 #[derive(Default, Serialize)]
@@ -100,6 +101,7 @@ pub struct Judge {
     pub name: String,
     pub email: String,
     pub experience: u16,
+    pub experience_display: Option<String>,
     pub needs_crash_housing: bool,
     pub requests_wgm_housing: bool,
     pub schools: Vec<SchoolField>,
@@ -116,6 +118,8 @@ pub struct Registration {
     pub housing_requests: String,
     pub teams: Vec<Team>,
     pub judges: Vec<Judge>,
+    pub deleted_teams: BTreeSet<i32>,
+    pub deleted_judges: BTreeSet<i32>,
 }
 
 impl Registration {
@@ -131,6 +135,11 @@ impl Registration {
         for i in 0..count(fields, "teams-TOTAL_FORMS", MAX_TEAMS)? {
             let p = format!("teams-{i}-");
             if fields.flag(&format!("{p}DELETE")) {
+                if let Some(id) = number(fields.get(&format!("{p}team_id")))?
+                    && !registration.deleted_teams.insert(id)
+                {
+                    return None;
+                }
                 continue;
             }
             let member = |key: &str| {
@@ -141,7 +150,11 @@ impl Registration {
                 Some(Member {
                     id: number(read("id"))?,
                     name: read("name").into(),
-                    email: read("email").into(),
+                    email: if flag("use_private_email") && read("email").contains("***") {
+                        String::new()
+                    } else {
+                        read("email").into()
+                    },
                     use_private_email: flag("use_private_email"),
                     apda_id: number(read("apda_id"))?,
                     novice_status: number(read("novice_status"))?.unwrap_or_default(),
@@ -162,6 +175,7 @@ impl Registration {
                     _ => return None,
                 },
                 members: [member("debater_one")?, member("debater_two")?],
+                extra_member_names: Vec::new(),
             };
             if team.id.is_some()
                 || !team.name.is_empty()
@@ -178,17 +192,14 @@ impl Registration {
             let read = |field| fields.get(&format!("{p}{field}"));
             let flag = |field| fields.flag(&format!("{p}{field}"));
             if flag("DELETE") {
+                if let Some(id) = number(read("judge_id"))?
+                    && !registration.deleted_judges.insert(id)
+                {
+                    return None;
+                }
                 continue;
             }
             let id = number(read("judge_id"))?;
-            if id.is_none()
-                && ["name", "email", "experience"]
-                    .iter()
-                    .all(|field| read(field).is_empty())
-            {
-                continue;
-            }
-            let wgm = flag("requests_wgm_housing");
             let rounds = (0..=last_round)
                 .filter(|&round| {
                     if round == 0 {
@@ -197,7 +208,17 @@ impl Registration {
                         fields.flag(&format!("{p}availability_round_{round}"))
                     }
                 })
-                .collect();
+                .collect::<Vec<_>>();
+            if id.is_none()
+                && ["name", "email", "experience"]
+                    .iter()
+                    .all(|field| read(field).is_empty())
+                && rounds.is_empty()
+                && fields.all(&format!("{p}schools")).is_empty()
+            {
+                continue;
+            }
+            let wgm = flag("requests_wgm_housing");
             let schools = fields
                 .all(&format!("{p}schools"))
                 .iter()
@@ -210,7 +231,8 @@ impl Registration {
                 id,
                 name: read("name").into(),
                 email: read("email").into(),
-                experience: read("experience").parse().ok()?,
+                experience: integer_input(read("experience")).ok()?.try_into().ok()?,
+                experience_display: None,
                 needs_crash_housing: wgm || flag("needs_crash_housing"),
                 requests_wgm_housing: wgm,
                 schools,
@@ -218,6 +240,26 @@ impl Registration {
             });
         }
         Some(registration)
+    }
+
+    pub fn preserve_private_contacts(&mut self, stored: &Self) {
+        for member in self.teams.iter_mut().flat_map(|team| &mut team.members) {
+            if member.email.is_empty()
+                && member.id.is_some()
+                && stored
+                    .teams
+                    .iter()
+                    .flat_map(|team| &team.members)
+                    .any(|existing| {
+                        existing.use_private_email
+                            && existing.id == member.id
+                            && existing.apda_id == member.apda_id
+                            && existing.school.value == member.school.value
+                    })
+            {
+                member.use_private_email = true;
+            }
+        }
     }
 
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -232,6 +274,9 @@ impl Registration {
         }
         if self.teams.is_empty() && self.judges.is_empty() {
             return Err("Add at least one team or one judge");
+        }
+        if self.teams.iter().filter(|team| team.seed == 1).count() > 1 {
+            return Err("Select at most one free seed");
         }
         let mut teams = BTreeSet::new();
         let mut members = BTreeSet::new();
@@ -273,7 +318,7 @@ fn number(value: &str) -> Option<Option<i32>> {
     if value.is_empty() {
         Some(None)
     } else {
-        value.parse().ok().map(Some)
+        integer_input(value).ok().map(Some)
     }
 }
 

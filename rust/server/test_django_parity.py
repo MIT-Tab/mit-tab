@@ -31,7 +31,7 @@ from django.test import Client, override_settings
 from django.utils import timezone
 from webpack_loader import utils as webpack_utils
 
-from mittab.apps.registration.models import InfoLink, InfoText, Registration, RegistrationConfig
+from mittab.apps.registration.models import InfoLink, InfoText, Registration, RegistrationConfig, RegistrationLink
 
 from mittab.apps.tab.models import (
     AuditEvent, BreakingTeam, Bye, CheckIn, Debater, Judge, JudgeCodeEmailLog, JudgeExpectedCheckIn, Motion, Outround, PublishedTeamPlacement, Round, RoundStats,
@@ -145,7 +145,7 @@ def html_assets(tmp_path, monkeypatch):
     chunks = {
         bundle: [f"{bundle}.css", f"{bundle}-fixture.js"]
         for bundle in ("main", "publicDisplay", "publicHome", "batchCheckin", "bracket", "tournamentStart",
-                       "tournamentTodo", "emailManagement", "registrationStyles")
+                       "tournamentTodo", "emailManagement", "registrationStyles", "registrationPortal")
     }
     assets = {
         name: {"name": name, "publicPath": f"/static/webpack_bundles/{name}"}
@@ -3854,6 +3854,7 @@ def test_native_registration_create_edit_privacy_and_delete():
         "teams-0-debater_one_apda_id": "8101",
         "teams-0-debater_one_novice_status": "1",
         "teams-0-debater_one_use_private_email": "on",
+        "teams-0-debater_one_email": "hi***@example.test",
         "teams-0-debater_one_requests_wgm_housing": "on",
         "teams-0-debater_two_name": "Test Second",
         "teams-0-debater_two_email": "second@example.test",
@@ -3871,7 +3872,7 @@ def test_native_registration_create_edit_privacy_and_delete():
             "BLACK_ROD_PRIVATE_API_TOKEN": "fixture",
     }) as port:
         status, headers, body = request(port, path)
-        assert status == 200 and b"North Institute" in body and b"Add team" in body
+        assert status == 200 and b"North Institute" in body and b"Add Team" in body
         assert headers["referrer-policy"] == "same-origin"
         csrf = load_cookies(headers)["csrftoken"].value
 
@@ -3925,8 +3926,11 @@ def test_native_registration_create_edit_privacy_and_delete():
         assert registration.change_logs.get().action == "created"
         status, _, body = request(port, target)
         assert status == 200 and b"Join the Discord" in body and b"Hybrid Example" in body
-        assert b"Using the email on file" in body and b"hidden-fixture-address" not in body
+        assert b"data-registration-form" not in body and b"hidden-fixture-address" not in body
         assert first.email not in json.dumps(registration.change_logs.get().snapshot)
+        body = request(port, edit)[2]
+        assert re.search(rb'name="teams-0-debater_one_use_private_email" value="on"', body)
+        assert b"hidden-fixture-address" not in body
         revision = re.search(rb'name="revision" value="([^"]+)"', body).group(1).decode()
         assert post("/registration/edit/", [("registration_code", registration.herokunator_code)])[1]["Location"] == edit
 
@@ -3936,6 +3940,60 @@ def test_native_registration_create_edit_privacy_and_delete():
             "teams-0-debater_one_id": first.id, "teams-0-debater_two_id": second.id,
             "teams-0-debater_two_school": "apda:71", "judges-0-judge_id": judge.id, "judges-0-experience": 9,
         }
+        update["teams-0-debater_one_email"] = ""
+        update.pop("teams-0-debater_one_use_private_email")
+        without_revision = {key: value for key, value in update.items() if key != "revision"}
+        assert post(edit, without_revision.items())[0] == 422
+        omitted_judge = {**update, "judges-TOTAL_FORMS": "0"}
+        assert post(edit, omitted_judge.items())[0] == 422
+        assert registration.judges.filter(pk=judge.pk).exists()
+        added = Debater.objects.create(name="Third Fixture Speaker", novice_status=0, school=school)
+        team.debaters.add(added)
+        assert post(edit, update.items())[0] == 422
+        assert team.debaters.filter(pk=added.pk).exists()
+        expanded = {**update, "revision": re.search(
+            rb'name="revision" value="([^"]+)"', request(port, edit)[2],
+        ).group(1).decode()}
+        assert b"more than two debaters" in post(edit, expanded.items())[2]
+        assert team.debaters.filter(pk=added.pk).exists()
+        team.debaters.remove(added)
+        added.delete()
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=3)
+        assert post(edit, update.items())[0] == 422
+        assert JudgeExpectedCheckIn.objects.filter(judge=judge, round_number=3).exists()
+        assert Team.objects.get(id=team.id).name == "Hybrid Example"
+        body = request(port, edit)[2]
+        update["revision"] = re.search(rb'name="revision" value="([^"]+)"', body).group(1).decode()
+        external = Team.objects.create(name="Shared Fixture", school=school, seed=Team.UNSEEDED)
+        external.debaters.add(first)
+        assert post(edit, update.items())[0] == 422
+        external.debaters.remove(first)
+        external.delete()
+        queued = legacy_tab_session("queued-registration-editor")
+        queued_user = get_user_model().objects.get(username="queued-registration-editor")
+        board_group = Group.objects.get(name="APDA Board")
+        from time import monotonic, sleep
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with transaction.atomic():
+                TabSettings.objects.select_for_update().get(key="cur_round")
+                pending = executor.submit(post, edit, update.items(), session=queued)
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SHOW FULL PROCESSLIST")
+                        waiting = any(row[3] == connection.settings_dict["NAME"] and row[7]
+                                      and "`key` = 'cur_round' ORDER BY id LIMIT 1 FOR UPDATE" in row[7]
+                                      for row in cursor.fetchall())
+                    if waiting:
+                        break
+                    sleep(0.025)
+                assert waiting, "The registration edit did not reach the tournament lock"
+                queued_user.groups.add(board_group)
+            status, _, denied = pending.result(timeout=6)
+        assert status == 403 and registration.email.encode() not in denied
+        assert Team.objects.get(id=team.id).name == "Hybrid Example"
+        options.allow_new_registrations = False
+        options.save(update_fields=["allow_new_registrations"])
         coin = team.tiebreaker
         assert post(edit, update.items())[0] == 302
         assert post(edit, update.items())[0] == 422
@@ -3943,6 +4001,8 @@ def test_native_registration_create_edit_privacy_and_delete():
         judge.refresh_from_db()
         assert (team.name, team.tiebreaker, team.hybrid_school_id) == ("Renamed Hybrid", coin, secondary.id)
         assert (judge.rank, judge.wing_only, judge.reported_experience) == (Decimal("8.50"), True, 9)
+        first.refresh_from_db()
+        assert first.email == "hidden-fixture-address@example.test"
         assert registration.change_logs.filter(action="updated").exists()
         assert request(port, manage, cookie=tab)[0] == 200
         assert request(port, manage, cookie=board)[0] == 403
@@ -3957,6 +4017,80 @@ def test_native_registration_create_edit_privacy_and_delete():
         assert not Debater.objects.filter(id__in=(first.id, second.id)).exists()
         assert RegistrationChangeLog.objects.filter(action="deleted", registration_id=None).exists()
         assert request(port, edit)[0] == 404
+
+
+@pytest.mark.django_db(transaction=True)
+def test_registration_portal_template_matches_django(html_assets):
+    school = School.objects.create(name="North & East University")
+    other = School.objects.create(name="South <West> College")
+    TabSettings.set("tot_rounds", 2)
+    config = RegistrationConfig.get_or_create_active()
+    config.crash_housing_enabled = True
+    config.save(update_fields=["crash_housing_enabled"])
+    create = "/registration/"
+    lookup = "/registration/edit/"
+    client = Client()
+    csrf = "a" * 32
+    cookie = {"Cookie": f"csrftoken={csrf}"}
+    client.cookies["csrftoken"] = csrf
+
+    with patch("mittab.apps.registration.services.fetch_remote_schools", return_value=[]), rust_server(
+        overrides={**html_assets, "MITTAB_SCHOOL_DIRECTORY_URL": ""},
+    ) as port:
+        def compare(path, data=None):
+            if data is None:
+                status, _, body = request(port, path, extra_headers=cookie)
+            else:
+                status, _, body = request(port, path, method="POST", form={
+                    **data, "csrfmiddlewaretoken": csrf,
+                }, extra_headers=cookie)
+            assert status == (200 if data is None else 422)
+            mask = re.search(rb'name="csrfmiddlewaretoken" value="([A-Za-z0-9]{64})"', body)
+            with patch("django.middleware.csrf._get_new_csrf_string",
+                       return_value=mask[1][:32].decode() if mask else csrf):
+                reference = client.get(path) if data is None else client.post(path, data)
+            assert reference.status_code == 200
+            # Native edits bind the revision and explicitly mark deleted rows.
+            body = re.sub(rb'<input type="hidden" name="revision" value="[^"]+" id="id_revision">', b"", body)
+            body = re.sub(rb'<input type="hidden" name="((teams|judges)-[0-9]+-DELETE)" id="id_\1">', b"", body)
+            assert_html_bytes(body, reference.content)
+
+        compare(lookup)
+        compare(create)
+        fields = {
+            "school": f"pk:{school.id}", "email": "fixture@example.test",
+            "teams-TOTAL_FORMS": 1, "teams-INITIAL_FORMS": 0,
+            "judges-TOTAL_FORMS": 1, "judges-INITIAL_FORMS": 0,
+            "teams-0-name": "A <Team>", "teams-0-seed_choice": "2",
+            "judges-0-name": "A <Judge>", "judges-0-email": "bad",
+            "judges-0-experience": "broken", "judges-0-availability_round_2": "on",
+        }
+        compare(create, fields)
+        registration = Registration.objects.create(email="fixture@example.test", school=school,
+                                                   dietary_requests="Dinner & snacks")
+        team = Team.objects.create(name="Hybrid <Team>", school=school, hybrid_school=other,
+                                   seed=Team.FREE_SEED, registration=registration)
+        later = Debater.objects.create(name="Zulu", novice_status=1, school=other, email="z@example.test")
+        earlier = Debater.objects.create(name="Alpha", novice_status=0, school=school,
+                                         email="a@example.test", qualified=True)
+        team.debaters.add(later, earlier)
+        judge = Judge.objects.create(registration=registration, name="Judge & One", rank="4.50",
+                                     email="j@example.test", requests_wgm_housing=True)
+        judge.schools.add(school, other)
+        JudgeExpectedCheckIn.objects.create(judge=judge, round_number=2)
+        RegistrationLink.objects.create(title="Follow & share", url="https://example.test/follow", is_active=True)
+        RegistrationLink.objects.create(title="Hidden", url="https://example.test/hidden", is_active=False)
+        edit = f"/registration/{registration.herokunator_code}/"
+        compare(edit)
+        compare(edit + "?saved=1")
+
+        config.allow_new_registrations = False
+        config.allow_registration_edits = False
+        config.crash_housing_enabled = False
+        config.save(update_fields=["allow_new_registrations", "allow_registration_edits", "crash_housing_enabled"])
+        compare(lookup)
+        compare(create)
+        compare(edit)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -4136,6 +4270,9 @@ def test_native_registration_delivers_confirmation_and_codes_via_ses():
         fields["teams-0-debater_one_id"] = team.debaters.get(name="First Member").id
         fields["teams-0-debater_two_id"] = team.debaters.get(name="Second Member").id
         fields["judges-0-judge_id"] = judge.id
+        edit = f"/registration/{registration.herokunator_code}/"
+        page = request(port, edit, extra_headers=jar)[2]
+        fields["revision"] = re.search(rb'name="revision" value="([^"]+)"', page).group(1).decode()
         status, _, _ = request(port, f"/registration/{registration.herokunator_code}/",
                                method="POST", form=fields, extra_headers=jar)
         assert status == 302

@@ -7,29 +7,23 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::Response,
 };
-use minijinja::context;
+use minijinja::{Value as TemplateValue, context};
 use serde_json::{Value, json};
 
 use crate::{
-    App, access,
-    html::{self, Navigation},
+    App, access, legacy_html,
     legacy_session::Actor,
-    login, private, registration_directory as directory, registration_emails,
+    login::{self, TemplateCsrf},
+    private, registration_directory as directory, registration_emails,
     registration_form::{Fields, MAX_TEAMS, Registration},
+    registration_page,
     registration_store::{self as store, Error},
     school_directory::{self, SchoolChoice},
+    staff_roster_notice::{self, Portal as NoticePortal},
     unavailable,
 };
 
-pub async fn form_script() -> Response {
-    private((
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/javascript; charset=utf-8",
-        )],
-        include_str!("../templates/registration.js"),
-    ))
-}
+const LOOKUP: &str = "/registration/edit/";
 
 fn not_found() -> Response {
     private((StatusCode::NOT_FOUND, "Registration not found."))
@@ -43,11 +37,10 @@ pub(crate) fn valid_code(code: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
-async fn lookup_page(
-    app: &App,
-    actor: Actor,
-    headers: &HeaderMap,
-    message: Option<&str>,
+pub async fn search(
+    State(app): State<App>,
+    Extension(actor): Extension<Actor>,
+    headers: HeaderMap,
 ) -> Response {
     let Ok(mut db) = app.db.acquire().await else {
         return unavailable();
@@ -55,40 +48,26 @@ async fn lookup_page(
     let Ok(config) = store::config(&mut db).await else {
         return unavailable();
     };
-    let Ok(csrf) = html::page_csrf(headers) else {
+    let Ok(shell) = legacy_html::shell(&mut db, actor, LOOKUP).await else {
         return unavailable();
     };
-    let response = html::render(
-        "code_lookup.html",
-        context! {
-            title => "Edit Registration", label => "Registration code", field => "registration_code",
-            button => "Open Registration", csrf,
-            message => message.or((!config.can_edit).then_some("Registration editing is currently disabled.")),
-            has_error => message.is_some(), nav => Navigation::new(actor, true),
-        },
-        if message.is_some() {
-            StatusCode::UNPROCESSABLE_ENTITY
-        } else {
-            StatusCode::OK
-        },
+    let Ok(csrf) = TemplateCsrf::new(&headers) else {
+        return unavailable();
+    };
+    let mut response = staff_roster_notice::render_portal(
+        &app,
+        &headers,
+        NoticePortal::Registration,
+        LOOKUP,
+        "registration/code_lookup.html",
+        shell,
+        context! { csrf_input => csrf.input(), can_modify_registration => config.can_edit },
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, &headers);
+    response
 }
 
-pub async fn search(
-    State(app): State<App>,
-    Extension(actor): Extension<Actor>,
-    headers: HeaderMap,
-) -> Response {
-    lookup_page(&app, actor, &headers, None).await
-}
-
-pub async fn lookup(
-    State(app): State<App>,
-    Extension(actor): Extension<Actor>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
+pub async fn lookup(State(app): State<App>, headers: HeaderMap, body: Bytes) -> Response {
     let fields = Fields::parse(&body);
     if !login::valid_csrf(&headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
@@ -102,8 +81,10 @@ pub async fn lookup(
     let code = fields.get("registration_code");
     let problem = if !config.can_edit {
         "Registration editing is currently disabled."
-    } else if !valid_code(code) {
+    } else if code.is_empty() {
         "Please enter the registration code from your confirmation email."
+    } else if !valid_code(code) {
+        "We couldn't find a registration for that code. Double-check and try again."
     } else {
         match store::existing_code(&mut db, code).await {
             Ok(Some(_)) => return access::found(format!("/registration/{code}/")),
@@ -113,8 +94,14 @@ pub async fn lookup(
             Err(_) => return unavailable(),
         }
     };
-    drop(db);
-    lookup_page(&app, actor, &headers, Some(problem)).await
+    staff_roster_notice::portal_redirect(
+        &app,
+        &headers,
+        NoticePortal::Registration,
+        LOOKUP,
+        problem,
+        true,
+    )
 }
 
 pub async fn new_page(
@@ -122,7 +109,7 @@ pub async fn new_page(
     Extension(actor): Extension<Actor>,
     headers: HeaderMap,
 ) -> Response {
-    page(&app, actor, &headers, None, false, false).await
+    page(&app, actor, &headers, None, false, false, None).await
 }
 
 pub async fn edit_page(
@@ -141,6 +128,7 @@ pub async fn edit_page(
         query
             .get("email")
             .is_some_and(|result| result == "unavailable"),
+        None,
     )
     .await
 }
@@ -152,30 +140,48 @@ async fn page(
     code: Option<&str>,
     saved: bool,
     delivery_warning: bool,
+    invalid: Option<(&Fields, &str)>,
 ) -> Response {
-    let Ok(mut db) = app.db.acquire().await else {
+    let schools = if saved {
+        Vec::new()
+    } else {
+        let Ok(schools) = school_directory::choices(&app.db).await else {
+            return unavailable();
+        };
+        schools
+    };
+    let Ok(mut db) = app.db.begin().await else {
         return unavailable();
+    };
+    let actor = match access::code_portal_actor(&mut db, app, actor, headers).await {
+        Ok(actor) => actor,
+        Err(error) => {
+            drop(db);
+            return error.response(app, headers).await;
+        }
     };
     let Ok(config) = store::config(&mut db).await else {
         return unavailable();
     };
-    let registration = if let Some(code) = code {
-        if !valid_code(code) {
-            return not_found();
-        }
-        let id = match store::existing_code(&mut db, code).await {
-            Ok(Some(id)) => id,
-            Ok(None) => return not_found(),
-            Err(_) => return unavailable(),
-        };
-        match store::entry(&mut db, id).await {
-            Ok(Some(entry)) => entry.form,
-            Ok(None) => return not_found(),
-            Err(_) => return unavailable(),
-        }
-    } else {
-        Registration::default()
+    let path = registration_path(code);
+    let Ok(shell) = legacy_html::shell(&mut db, actor, &path).await else {
+        return unavailable();
     };
+    let (mut registration, persisted_code) = match load(&mut db, code).await {
+        Ok(entry) => entry,
+        Err(Error::NotFound) => {
+            return legacy_html::render(
+                "common/404.html",
+                shell,
+                context! {},
+                StatusCode::NOT_FOUND,
+            );
+        }
+        Err(_) => return unavailable(),
+    };
+    if registration.id.is_some() {
+        registration.revision = store::revision(app, &registration);
+    }
     let links = if saved {
         let Ok(links) = sqlx::query_as::<_, (String, String, String)>(
             "SELECT title, url, description FROM registration_registrationlink WHERE is_active = TRUE
@@ -192,24 +198,53 @@ async fn page(
     } else {
         Vec::new()
     };
-    drop(db);
-    let Ok(schools) = school_directory::choices(&app.db).await else {
+    if db.commit().await.is_err() {
         return unavailable();
-    };
+    }
+    let (posted, error) =
+        invalid.map_or((None, None), |(fields, error)| (Some(fields), Some(error)));
     render(
-        actor,
         headers,
+        shell,
         &registration,
         Portal {
             schools: &schools,
             config: &config,
-            code,
+            code: persisted_code.as_deref(),
             saved,
             delivery_warning,
-            error: None,
+            error,
             links,
+            posted,
         },
     )
+}
+
+fn registration_path(code: Option<&str>) -> String {
+    code.map_or_else(
+        || "/registration/".into(),
+        |code| format!("/registration/{code}/"),
+    )
+}
+
+async fn load(
+    db: &mut sqlx::MySqlConnection,
+    code: Option<&str>,
+) -> Result<(Registration, Option<String>), Error> {
+    let Some(code) = code else {
+        return Ok((Registration::default(), None));
+    };
+    if !valid_code(code) {
+        return Err(Error::NotFound);
+    }
+    let id = store::existing_code(db, code)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let entry = store::entry(db, id).await?.ok_or(Error::NotFound)?;
+    if !entry.code.eq_ignore_ascii_case(code) {
+        return Err(Error::NotFound);
+    }
+    Ok((entry.form, Some(entry.code)))
 }
 
 struct Portal<'a> {
@@ -220,44 +255,73 @@ struct Portal<'a> {
     delivery_warning: bool,
     error: Option<&'a str>,
     links: Vec<(String, String, String)>,
+    posted: Option<&'a Fields>,
 }
 
 fn render(
-    actor: Actor,
     headers: &HeaderMap,
+    shell: TemplateValue,
     registration: &Registration,
     view: Portal<'_>,
 ) -> Response {
-    let Ok(csrf) = html::page_csrf(headers) else {
+    let Ok(csrf) = TemplateCsrf::new(headers) else {
         return unavailable();
     };
-    let rounds: Vec<_> = (0..=view.config.last_round)
-        .map(|round| {
-            if round == 0 {
-                (0, "availability_outround".into(), "Outrounds".into())
-            } else {
-                (
-                    round,
-                    format!("availability_round_{round}"),
-                    format!("Round {round}"),
-                )
+    let (can_submit_registration, lock) = if view.code.is_some() {
+        (
+            view.config.can_edit,
+            "Registration updates are currently disabled.",
+        )
+    } else {
+        (
+            view.config.can_create,
+            "New registrations are currently closed.",
+        )
+    };
+    let forms = if view.saved {
+        TemplateValue::UNDEFINED
+    } else {
+        registration_page::context_for_forms(
+            registration,
+            view.schools,
+            view.config.last_round,
+            view.posted,
+            view.error,
+        )
+    };
+    let summary = view
+        .code
+        .map(|code| registration_page::summary(registration, code));
+    let revision = view
+        .posted
+        .map_or(registration.revision.as_str(), |fields| {
+            fields.get("revision")
+        });
+    let revision_input = registration_page::revision_input(view.code.is_some().then_some(revision));
+    let post_registration_links: Vec<_> = view
+        .links
+        .into_iter()
+        .map(|(title, url, description)| {
+            context! {
+                title, url, description,
             }
         })
         .collect();
-    let can_submit = if view.code.is_some() {
-        view.config.can_edit
-    } else {
-        view.config.can_create
-    };
-    let response = html::render(
-        "registration.html",
+    let messages = view.delivery_warning.then(|| {
+        [context! {
+            text => "Registration saved, but the confirmation email could not be sent.",
+            tags => "warning", level => 30,
+        }]
+    });
+    let mut response = legacy_html::render(
+        "registration/portal.html",
+        shell,
         context! {
-            title => "Tournament Registration", nav => Navigation::new(actor, true), csrf, registration,
-            config => view.config, schools => view.schools, rounds, code => view.code,
-            error => view.error, saved => view.saved, delivery_warning => view.delivery_warning, links => view.links, can_submit,
-            private_email_enabled => std::env::var("BLACK_ROD_PRIVATE_API_TOKEN").is_ok_and(|token| !token.is_empty()),
-            blank_team => crate::registration_form::Team::default(),
-            blank_judge => crate::registration_form::Judge::default(), max_teams => MAX_TEAMS,
+            csrf_input => csrf.input(), revision_input,
+            max_teams => MAX_TEAMS, can_submit_registration, registration_lock_message => (!can_submit_registration).then_some(lock),
+            config => context! { crash_housing_enabled => view.config.housing },
+            registration_saved => view.saved, summary, post_registration_links, messages,
+            ..forms
         },
         if view.error.is_some() {
             StatusCode::UNPROCESSABLE_ENTITY
@@ -265,7 +329,8 @@ fn render(
             StatusCode::OK
         },
     );
-    html::form_response(response, headers, &csrf)
+    csrf.set_cookie(&mut response, headers);
+    response
 }
 
 pub async fn create(
@@ -298,82 +363,73 @@ async fn submit(
     if !login::valid_csrf(headers, fields.get("csrfmiddlewaretoken")) {
         return login::csrf_error();
     }
-    let Ok(mut db) = app.db.acquire().await else {
-        return unavailable();
-    };
-    if let Some(code) = code {
-        if !valid_code(code) {
-            return not_found();
-        }
-        match store::existing_code(&mut db, code).await {
-            Ok(Some(_)) => {}
-            Ok(None) => return not_found(),
-            Err(_) => return unavailable(),
-        }
-    }
-    let Ok(config) = store::config(&mut db).await else {
-        return unavailable();
-    };
-    drop(db);
     let Ok(schools) = school_directory::choices(&app.db).await else {
         return unavailable();
     };
-    let parsed = Registration::from_form(&fields, config.last_round);
-    let mut registration = parsed.unwrap_or_else(|| Registration {
-        email: fields.get("email").into(),
-        school: crate::registration_form::SchoolField {
-            value: fields.get("school").into(),
-            name: fields.get("school_name").into(),
-        },
-        ..Registration::default()
-    });
-    // Preserve the revision even when validation fails.
-    registration.revision = fields.get("revision").into();
-    let error = if let Err(problem) = registration.validate() {
-        Error::Invalid(problem)
-    } else if (code.is_some() && !config.can_edit) || (code.is_none() && !config.can_create) {
-        Error::Closed
-    } else {
-        let private = resolve_private_emails(&registration).await;
-        match store::save(
-            &app.db,
-            code,
-            &registration,
-            &school_directory::by_code(&schools),
-            &private,
-        )
-        .await
-        {
-            Ok((id, code)) => {
-                let delivered =
-                    registration_emails::send(&app.db, id, crate::email::origin(headers)).await;
-                let notice = if delivered { "" } else { "&email=unavailable" };
-                return access::found(format!("/registration/{code}/?saved=1{notice}"));
+    let Ok(mut db) = app.db.begin().await else {
+        return unavailable();
+    };
+    let (stored, _) = match load(&mut db, code).await {
+        Ok(entry) => entry,
+        Err(Error::NotFound) => return not_found(),
+        Err(_) => return unavailable(),
+    };
+    let Ok(config) = store::config(&mut db).await else {
+        return unavailable();
+    };
+    if db.commit().await.is_err() {
+        return unavailable();
+    }
+    let error = if let Some(mut registration) = Registration::from_form(&fields, config.last_round)
+    {
+        registration.preserve_private_contacts(&stored);
+        if let Err(problem) = registration.validate() {
+            Error::Invalid(problem)
+        } else if (code.is_some() && !config.can_edit) || (code.is_none() && !config.can_create) {
+            Error::Closed
+        } else {
+            let private = resolve_private_emails(&registration).await;
+            match store::save(
+                app,
+                actor,
+                headers,
+                code,
+                &registration,
+                &school_directory::by_code(&schools),
+                &private,
+            )
+            .await
+            {
+                Ok((id, code)) => {
+                    let delivered =
+                        registration_emails::send(&app.db, id, crate::email::origin(headers)).await;
+                    let notice = if delivered { "" } else { "&email=unavailable" };
+                    return access::found(format!("/registration/{code}/?saved=1{notice}"));
+                }
+                Err(error) => error,
             }
-            Err(error) => error,
         }
+    } else {
+        Error::Invalid("Check the registration form and try again.")
     };
     let error = match error {
         Error::Invalid(message) => message,
         Error::Closed if code.is_some() => "Registration updates are currently disabled.",
         Error::Closed => "New registrations are currently closed.",
         Error::NotFound => return not_found(),
+        Error::Access(response) => return *response,
         Error::Database => return unavailable(),
     };
-    render(
+    page(
+        app,
         actor,
         headers,
-        &registration,
-        Portal {
-            schools: &schools,
-            config: &config,
-            code,
-            saved: false,
-            delivery_warning: false,
-            error: Some(error),
-            links: Vec::new(),
-        },
+        code,
+        false,
+        false,
+        Some((&fields, error)),
     )
+    .await
 }
 
 async fn resolve_private_emails(registration: &Registration) -> BTreeMap<(i32, i32), String> {

@@ -12,6 +12,7 @@ use crate::{App, access, legacy_html, legacy_session::cookie, login};
 
 const COOKIE: &str = "mittab_roster_notice";
 const TEAM_COOKIE: &str = "mittab_team_portal_notice";
+const REGISTRATION_COOKIE: &str = "mittab_registration_notice";
 const JUDGE_COOKIE: &str = "mittab_judge_portal_notice";
 const LIFETIME: u32 = 60;
 const ERROR_PREFIX: &str = "error.";
@@ -44,6 +45,7 @@ pub fn failed(app: &App, headers: &HeaderMap, target: &str, text: &str) -> Respo
 pub enum Portal {
     Team,
     Judge,
+    Registration,
 }
 
 impl Portal {
@@ -51,6 +53,7 @@ impl Portal {
         match self {
             Self::Team => TEAM_COOKIE,
             Self::Judge => JUDGE_COOKIE,
+            Self::Registration => REGISTRATION_COOKIE,
         }
     }
 }
@@ -123,6 +126,7 @@ fn signed_data(channel: &str, session: &str, path: &str, body: &str) -> Vec<u8> 
     let purpose = match channel {
         TEAM_COOKIE => "team portal",
         JUDGE_COOKIE => "judge portal",
+        REGISTRATION_COOKIE => "registration",
         _ => "staff roster",
     };
     format!("mit-tab {purpose} notice v1\0{session}\0{path}\0{body}").into_bytes()

@@ -65,6 +65,7 @@ mod registration_admin;
 mod registration_directory;
 mod registration_emails;
 mod registration_form;
+mod registration_page;
 mod registration_store;
 mod registration_views;
 mod room_assignment;
@@ -301,10 +302,6 @@ fn router(app: App) -> Router {
                 .route(
                     "/registration/{code}/",
                     get(registration_views::edit_page).post(registration_views::edit),
-                )
-                .route(
-                    "/registration/form.js",
-                    get(registration_views::form_script),
                 )
                 .route(
                     "/registration/api/debaters/{school}/",

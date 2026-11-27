@@ -289,6 +289,30 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("../../../mittab/templates/emails/team_portal.html"),
         ),
         (
+            "registration/portal.html",
+            include_str!("../../../mittab/templates/registration/portal.html"),
+        ),
+        (
+            "registration/code_lookup.html",
+            include_str!("../../../mittab/templates/registration/code_lookup.html"),
+        ),
+        (
+            "registration/_team_form.html",
+            include_str!("../../../mittab/templates/registration/_team_form.html"),
+        ),
+        (
+            "registration/_judge_form.html",
+            include_str!("../../../mittab/templates/registration/_judge_form.html"),
+        ),
+        (
+            "registration/_debater_card.html",
+            include_str!("../../../mittab/templates/registration/_debater_card.html"),
+        ),
+        (
+            "registration/_input_group.html",
+            include_str!("../../../mittab/templates/registration/_input_group.html"),
+        ),
+        (
             "registration/team_portal.html",
             include_str!("../../../mittab/templates/registration/team_portal.html"),
         ),
@@ -707,6 +731,9 @@ fn translate(name: &str, source: &str) -> String {
             ["url", "'view_team'", "row.team.id"] => output.push_str("/team/{{ row.team.id }}/"),
             ["url", "'judge_portal'", "ballot_code"] => output.push_str("{{ portal_url }}"),
             ["url", "'enter_e_ballot'", "ballot_code"] => output.push_str("{{ current_ballot_url }}"),
+            ["url", "'registration_portal_edit'", "summary.herokunator_code"] => {
+                output.push_str("/registration/{{ summary.herokunator_code }}/");
+            }
             ["url", "'registration_portal_edit'", "row.registration.herokunator_code"] => {
                 output.push_str("{{ row.registration.url }}");
             }
@@ -940,6 +967,39 @@ fn translate(name: &str, source: &str) -> String {
         "ballots/ballot_submitted.html" => translated
             .replace("<form method=\"post\" action=\"\">", "<form method=\"post\" action=\"{{ rfd_action }}\">")
             .replace("|default:\"No written RFD has been entered.\"", "|django_default(\"No written RFD has been entered.\")"),
+        "registration/portal.html" => translated
+            .replace("{{ csrf_input|safe }}", "{{ csrf_input|safe }}{{ revision_input|safe }}")
+            .replace("summary.teams.all", "summary.teams")
+            .replace("summary.judges.all", "summary.judges")
+            .replace("team.debaters.all", "team.debaters")
+            .replace("management_form }}", "management_form|safe }}"),
+        "registration/_team_form.html" => translated
+            .replace("{{ hidden }}", "{{ hidden|safe }}")
+            .replace("{{ form.team_school_source }}", "{{ form.team_school_source.input }}")
+            .replace("{{ form.seed_choice }}", "{{ form.seed_choice.input }}")
+            .replace("class=\"registration-subform\"", "class=\"registration-subform{% if form.deleted %} d-none{% endif %}\""),
+        "registration/_judge_form.html" => translated
+            .replace("{{ hidden }}", "{{ hidden|safe }}")
+            .replace("{{ form.needs_crash_housing }}", "{{ form.needs_crash_housing.input }}")
+            .replace("{{ form.requests_wgm_housing }}", "{{ form.requests_wgm_housing.input }}")
+            .replace("{{ form.schools }}", "{{ form.schools.input }}")
+            .replace("{{ availability.field }}", "{{ availability.field.input }}")
+            .replace("class=\"registration-subform\"", "class=\"registration-subform{% if form.deleted %} d-none{% endif %}\""),
+        "registration/_input_group.html" => translated
+            .replace("margin|default:''", "margin|default('')")
+            .replace("{{ field }}", "{{ field.input }}"),
+        "registration/_debater_card.html" => {
+            let mut translated = translated
+                .replace("prefix|add:", "prefix ~ ")
+                .replace("{{ housing_field }}", "{{ housing_field.input }}")
+                .replace("{{ wgm_field }}", "{{ wgm_field.input }}");
+            for key in ["name", "email", "school", "novice", "housing", "wgm"] {
+                translated = translated.replace(
+                    &format!("form|get_field:{key}_key"), &format!("form[{key}_key]"),
+                );
+            }
+            translated
+        }
         "registration/team_portal.html" => translated
             .replace("team.debaters.all", "team.debaters")
             .replace("r.opponent.debaters.all", "r.opponent.debaters")
