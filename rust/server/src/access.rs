@@ -147,6 +147,8 @@ pub async fn staff_settings(State(app): State<App>, mut request: Request, next: 
             superuser: true, ..
         } => {}
         Actor::User { staff: true, .. } => return access_denied(),
+        // The report renders its own 403 for authenticated non-staff accounts.
+        Actor::User { .. } if request.uri().path() == "/judges/speaker-points/" => {}
         Actor::User { id, .. } => {
             let allowed = if entry_ballot_route(&request) {
                 match legacy_entry_user(&app.db, id).await {

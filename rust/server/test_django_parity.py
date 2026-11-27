@@ -6336,14 +6336,94 @@ def test_native_staff_rankings_and_report_match_reference():
         status, headers, report = request(port, f"{judges_url}?minimum_rounds=1&judge={highlighted.id}", cookie=staff)
         assert status == 200 and headers["Cache-Control"] == "private, no-store"
         report = report.decode()
-        assert report.count('aria-label="Scatter plot') == 2
+        assert report.count('aria-label="Mean speaks versus generosity by judge.') == 2
         for row in judge_speaker_metrics(1):
-            attributes, cells = re.search(rf'<tr data-judge-id="{row["id"]}"([^>]*)>(.*?)</tr>',
-                                          report, re.DOTALL).groups()
+            attributes, cells = re.search(
+                rf'<tr([^>]*)>\s*<th scope="row">{re.escape(row["name"])}</th>(.*?)</tr>',
+                report, re.DOTALL,
+            ).groups()
             assert ("speaker-points-highlight" in attributes) == (row["id"] == highlighted.id)
-            assert row["name"] in cells and f'{row["mean"]:.2f} ' in cells and f'#{row["mean_rank"]}' in cells
-            assert f'{row["generosity"]:.2f} ' in cells and f'#{row["generosity_rank"]}' in cells
-        assert f'data-judge-id="{highlighted.id}"'.encode() not in request(port, judges_url, cookie=staff)[2]
+            assert f'{row["mean"]:.2f}' in cells and f'#{row["mean_rank"]}' in cells
+            assert f'{row["generosity"]:.2f}' in cells and f'#{row["generosity_rank"]}' in cells
+        assert highlighted.name.encode() not in request(port, judges_url, cookie=staff)[2]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_judge_speaker_points_match_django(html_assets, subtests):
+    path = "/judges/speaker-points/"
+    TabSettings.set("start_tournament_wizard_completed", 1)
+    TabSettings.set("tournament_name", "Judge & Speaker Exhibition")
+    TabSettings.set("tot_rounds", 1)
+    admin = get_user_model().objects.create_superuser(username="speaker-points-admin")
+    board = get_user_model().objects.create_superuser(username="speaker-points-board")
+    board.groups.add(Group.objects.create(name="APDA Board"))
+    staff = get_user_model().objects.create_user(username="speaker-points-staff", is_staff=True)
+    entrant = get_user_model().objects.create_user(username="speaker-points-entrant")
+    client = Client()
+    client.force_login(admin)
+    client.cookies["csrftoken"] = "a" * 32
+    session = client.cookies["sessionid"].value
+    school = School.objects.create(name="Speaker Points & School")
+    gov = Team.objects.create(name="Speaker Points Government", school=school, seed=0)
+    opp = Team.objects.create(name="Speaker Points Opposition", school=school, seed=0)
+    speakers = [Debater.objects.create(name=f"Judge Report Speaker {i}", novice_status=0) for i in range(6)]
+    names = ["ß Judge <Chair>", "St Judge", "María de los Prados Cortéz VI", *[f"Panelist {i}" for i in range(12)]]
+    panel = [Judge.objects.create(name=name, rank=3) for name in names]
+    recurring = Judge.objects.create(name="Recurring Thirds", rank=3)
+    comparator = Judge.objects.create(name="Comparison Judge", rank=3)
+    single = Judge.objects.create(name="One Scored Debate", rank=3)
+
+    def ballot(number, judges, scores, victor=Round.GOV):
+        played = Round.objects.create(round_number=number, gov_team=gov, opp_team=opp, victor=victor)
+        played.judges.add(*judges)
+        RoundStats.objects.bulk_create([
+            RoundStats(round=played, debater=speakers[index], speaks=Decimal(score), ranks=1)
+            for index, score in scores
+        ])
+
+    with rust_server(overrides=html_assets) as port:
+        for query in ("", "?minimum_rounds=", "?minimum_rounds=0", "?minimum_rounds=x%3C",
+                      "?minimum_rounds=1.00", "?minimum_rounds=1%20.0", "?minimum_rounds=1_2",
+                      "?minimum_rounds=%D9%A3", "?minimum_rounds=" + "1" * 32):
+            with subtests.test(state="empty", query=query):
+                compare_admin_page(port, path + query, client)
+        ballot(1, [single], [(5, "31")])
+        compare_admin_page(port, path + "?minimum_rounds=1", client)
+        ballot(2, panel, [(0, "27.00"), (1, "26.02")])
+        ballot(3, [recurring], [(2, "25.00"), (3, "25.00"), (4, "25.0250")])
+        for number in range(4, 7):
+            last = number == 6
+            ballot(number, [comparator], [
+                (0, "25.02" if last else "25.00"),
+                (1, "28.01" if last else "28.00"),
+                *[(index, "25.01" if last else "25.00") for index in range(2, 5)],
+            ])
+        ballot(7, [single], [(5, "50.00")], victor=Round.ALL_WIN)
+        selected = f"?minimum_rounds=1&judge={panel[0].id}&judge={panel[2].id}&judge=0{panel[1].id}"
+        for query in (selected, "?minimum_rounds=99&minimum_rounds=1", "?minimum_rounds=invalid", ""):
+            with subtests.test(state="populated", query=query):
+                compare_admin_page(port, path + query, client)
+        status, headers, html = request(port, path + selected, cookie=session)
+        assert status == 200 and headers["Cache-Control"] == "private, no-store"
+        assert html.count(b'class="table table-sm speaker-points-table"') == 2
+        assert html.count(b'class="speaker-points-dot speaker-points-highlight"') == 4
+        assert b'value="' + str(panel[1].id).encode() + b'" selected' not in html
+        assert b"Generosity 0.00" in html and b"Generosity 0.01" in html
+        status, headers, body = request(port, path + selected, cookie=session, method="HEAD")
+        assert status == 200 and headers["Cache-Control"] == "private, no-store" and body == b""
+        assert request(port, path, cookie=session, method="POST")[0] == 405
+        assert request(port, path)[1]["Location"] == f"/public/login/?next={path}"
+        for denied in (board, staff):
+            client.force_login(denied)
+            compare_admin_page(port, path, client)
+            denied_session = client.cookies["sessionid"].value
+            response = request(port, path + selected, cookie=denied_session)
+            assert response[0] == 302 and response[1]["Location"] == "/403/"
+            assert b"speaker-points-dot" not in response[2]
+        client.force_login(entrant)
+        compare_admin_page(port, path + selected, client)
+        entrant_session = client.cookies["sessionid"].value
+        assert request(port, path, cookie=entrant_session)[0] == 403
 
 
 @pytest.mark.django_db(transaction=True)

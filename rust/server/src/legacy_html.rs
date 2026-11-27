@@ -84,6 +84,30 @@ static URLS: LazyLock<BTreeMap<String, String>> = LazyLock::new(|| {
         .expect("valid legacy navigation URLs")
 });
 
+// Match Python's Unicode casefold, including multi-character folds and final sigma.
+static CASEFOLD: LazyLock<BTreeMap<char, &str>> = LazyLock::new(|| {
+    include_str!("casefold.tsv")
+        .lines()
+        .skip(1)
+        .map(|line| {
+            let (key, value) = line.split_once('\t').expect("casefold mapping row");
+            (key.chars().next().expect("casefold mapping key"), value)
+        })
+        .collect()
+});
+
+pub(crate) fn casefold(name: &str) -> String {
+    let mut folded = String::with_capacity(name.len());
+    for ch in name.chars() {
+        if let Some(replacement) = CASEFOLD.get(&ch) {
+            folded.push_str(replacement);
+        } else {
+            folded.push(ch);
+        }
+    }
+    folded
+}
+
 pub fn environment() -> Environment<'static> {
     let mut env = Environment::new();
     env.set_keep_trailing_newline(true);
@@ -377,6 +401,14 @@ static TEMPLATE_ENV: LazyLock<Environment<'static>> = LazyLock::new(|| {
         (
             "tab/rank_teams.html",
             include_str!("../../../mittab/templates/tab/rank_teams.html"),
+        ),
+        (
+            "tab/judge_speaker_points.html",
+            include_str!("../../../mittab/templates/tab/judge_speaker_points.html"),
+        ),
+        (
+            "tab/_speaker_points_chart.html",
+            include_str!("../../../mittab/templates/tab/_speaker_points_chart.html"),
         ),
         (
             "tab/rank_debaters.html",
@@ -819,6 +851,17 @@ fn translate(name: &str, source: &str) -> String {
             .replace("team.3", "team[3]")
             .replace("team.4", "team[4]"),
         "tab/_rank_debaters_table.html" => translated.replace("debaters.0.", "debaters[0]."),
+        "tab/judge_speaker_points.html" => translated
+            .replace("{{ filters.minimum_rounds }}", "{{ filters.minimum_rounds.html|safe }}")
+            .replace("metrics|django_pluralize", "metrics|length|django_pluralize")
+            .replace("minimum_rounds|django_pluralize", "('' if minimum_rounds == '1' else 's')")
+            .replace("row.mean }}", "row.mean_text }}")
+            .replace("row.generosity }}", "row.generosity_text }}")
+            .replace("|unlocalize", ""),
+        "tab/_speaker_points_chart.html" => translated
+            .replace("point.mean }}", "point.mean_text }}")
+            .replace("point.generosity }}", "point.generosity_text }}")
+            .replace("|unlocalize", ""),
         "tab/_email_preview.html" => translated.replace(
             "|default:email.to_address", "|django_default(email.to_address)",
         ).replace("{{ email.html_body }}", "{{ email.html_body|isolated_email_preview }}"),

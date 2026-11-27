@@ -1,5 +1,3 @@
-use std::{collections::BTreeMap, sync::LazyLock};
-
 use axum::{
     Extension, Router,
     body::Bytes,
@@ -310,34 +308,11 @@ impl ChoicesByKind {
     }
 }
 
-// CPython casefold for the pinned Django runtime. Unlike lowercase/collation,
-// this preserves the same option order for expanding folds and final sigma.
-static CASEFOLD: LazyLock<BTreeMap<char, &str>> = LazyLock::new(|| {
-    include_str!("casefold.tsv")
-        .lines()
-        .skip(1)
-        .map(|line| {
-            let (key, value) = line.split_once('\t').expect("casefold mapping row");
-            (key.chars().next().expect("casefold mapping key"), value)
-        })
-        .collect()
-});
-
 async fn names(db: &mut MySqlConnection, query: &'static str) -> Result<Choices, sqlx::Error> {
     let mut rows = sqlx::query_as::<_, (i32, String)>(query)
         .fetch_all(db)
         .await?;
-    rows.sort_by_cached_key(|(id, name)| {
-        let mut folded = String::with_capacity(name.len());
-        for ch in name.chars() {
-            if let Some(replacement) = CASEFOLD.get(&ch) {
-                folded.push_str(replacement);
-            } else {
-                folded.push(ch);
-            }
-        }
-        (folded, *id)
-    });
+    rows.sort_by_cached_key(|(id, name)| (legacy_html::casefold(name), *id));
     Ok(rows
         .into_iter()
         .map(|(id, name)| (id.to_string(), name))

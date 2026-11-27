@@ -10,6 +10,7 @@ axum = { version = "0.8.8", default-features = false, features = ["form", "http1
 aws-credential-types = "1"
 aws-sigv4 = { version = "1", default-features = false, features = ["sign-http", "http1"] }
 base64 = "0.22.1"
+bigdecimal = "0.4.11"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 chrono-tz = "0.10.4"
 csv = "1.4.0"

@@ -1,30 +1,32 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    num::NonZeroU64,
+};
 
 use axum::{
     Extension,
     extract::{RawQuery, State},
-    http::StatusCode,
+    http::{StatusCode, Uri},
     response::Response,
 };
-use minijinja::context;
-use serde::Serialize;
+use bigdecimal::{BigDecimal, RoundingMode, ToPrimitive};
+use minijinja::{Value, context};
+use serde::{Serialize, Serializer};
 use sqlx::MySqlConnection;
 
 use crate::{
-    App,
-    html::{self, Navigation},
-    legacy_session::Actor,
-    private,
-    registration_form::Fields,
+    App, legacy_html, legacy_session::Actor, registration_form::Fields, settings::Settings,
     unavailable,
 };
 
 const DEFAULT_MINIMUM: usize = 3;
+const REPORT: &str = "tab/judge_speaker_points.html";
 
 pub async fn page(
     State(app): State<App>,
     Extension(actor): Extension<Actor>,
     RawQuery(query): RawQuery,
+    uri: Uri,
 ) -> Response {
     if !matches!(
         actor,
@@ -34,37 +36,98 @@ pub async fn page(
             ..
         }
     ) {
-        return private((
-            StatusCode::FORBIDDEN,
-            "You cannot view judge speaker points.",
-        ));
+        let Ok(mut db) = app.db.acquire().await else {
+            return unavailable();
+        };
+        return legacy_html::forbidden(&mut db, actor, uri.path())
+            .await
+            .unwrap_or_else(|_| unavailable());
     }
     let filter = Fields::parse(query.as_deref().unwrap_or_default().as_bytes());
-    let entered = filter.get("minimum_rounds");
-    let minimum = entered.parse::<usize>().ok().filter(|&value| value >= 1);
-    let invalid = !entered.is_empty() && minimum.is_none();
-    let minimum = minimum.unwrap_or(DEFAULT_MINIMUM);
-    let highlights: BTreeSet<_> = filter
-        .all("judge")
-        .iter()
-        .filter_map(|value| value.parse().ok())
-        .collect();
+    let entered = filter.all("minimum_rounds").last();
+    let minimum = entered.and_then(|value| minimum_rounds(value));
+    let invalid = entered.is_some() && minimum.is_none();
+    let minimum = minimum.unwrap_or_else(|| DEFAULT_MINIMUM.to_string());
+    let widget = number_input(entered.map_or(&minimum, String::as_str));
+    let highlights: BTreeSet<_> = filter.all("judge").iter().map(String::as_str).collect();
     let result = async {
         let mut db = app.db.begin().await?;
-        let judges = metrics(&mut db, minimum, &highlights).await?;
+        let shell = legacy_html::shell(&mut db, actor, uri.path()).await?;
+        let tournament = Settings::load(&mut db, &["tournament_name"])
+            .await?
+            .string("tournament_name", "New Tournament");
+        let threshold = minimum.parse().unwrap_or(usize::MAX);
+        let judges = metrics(&mut db, threshold, &highlights).await?;
         db.commit().await?;
         let mut alphabetic: Vec<_> = judges.iter().collect();
-        alphabetic.sort_by_cached_key(|judge| (judge.name.to_lowercase(), judge.id));
+        alphabetic.sort_by_cached_key(|judge| legacy_html::casefold(&judge.name));
         let midpoint = judges.len().div_ceil(2);
         let panels = if judges.len() > 16 { vec![&judges[..midpoint], &judges[midpoint..]] } else { vec![judges.as_slice()] };
-        let chart = plot(&judges, 760);
-        let narrow = plot(&judges, 360);
-        Ok::<_, sqlx::Error>(html::render("judge_report.html", context! {
-            title => "Judge Speaker Points", nav => Navigation::new(actor, true), panels, minimum,
-            alphabetic, chart, narrow, invalid,
+        Ok::<_, sqlx::Error>(legacy_html::render(REPORT, shell, context! {
+            metrics => &judges,
+            tournament,
+            judges => alphabetic,
+            panels,
+            minimum_rounds => minimum,
+            filters => context! {
+                minimum_rounds => context! { id_for_label => "id_minimum_rounds", html => widget },
+                errors => invalid,
+            },
+            plot => plot(&judges, 760),
+            mobile_plot => plot(&judges, 360),
         }, StatusCode::OK))
     }.await;
     result.unwrap_or_else(|_| unavailable())
+}
+
+fn minimum_rounds(entered: &str) -> Option<String> {
+    let entered = entered.trim();
+    let whole = entered
+        .rsplit_once('.')
+        .filter(|(_, decimal)| decimal.bytes().all(|byte| byte == b'0'))
+        .map_or(entered, |(whole, _)| whole.trim_end());
+    let whole = whole.strip_prefix('+').unwrap_or(whole);
+    let mut digits = String::new();
+    for part in whole.split('_') {
+        if part.is_empty() {
+            return None;
+        }
+        for ch in part.chars() {
+            digits.push(decimal_digit(ch)?);
+        }
+    }
+    // CPython limits a decimal integer conversion to 4,300 digits.
+    let value = digits.trim_start_matches('0');
+    (!value.is_empty() && digits.len() <= 4300).then(|| value.into())
+}
+
+fn decimal_digit(ch: char) -> Option<char> {
+    // The starting code points of each Unicode 13 decimal digit set in CPython 3.10.
+    const ZEROES: &[u32] = &[
+        0x30, 0x660, 0x6f0, 0x7c0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66,
+        0xde6, 0xe50, 0xed0, 0xf20, 0x1040, 0x1090, 0x17e0, 0x1810, 0x1946, 0x19d0, 0x1a80, 0x1a90,
+        0x1b50, 0x1bb0, 0x1c40, 0x1c50, 0xa620, 0xa8d0, 0xa900, 0xa9d0, 0xa9f0, 0xaa50, 0xabf0,
+        0xff10, 0x104a0, 0x10d30, 0x11066, 0x110f0, 0x11136, 0x111d0, 0x112f0, 0x11450, 0x114d0,
+        0x11650, 0x116c0, 0x11730, 0x118e0, 0x11950, 0x11c50, 0x11d50, 0x11da0, 0x16a60, 0x16b50,
+        0x1d7ce, 0x1d7d8, 0x1d7e2, 0x1d7ec, 0x1d7f6, 0x1e140, 0x1e2f0, 0x1e950, 0x1fbf0,
+    ];
+    let code = u32::from(ch);
+    let index = ZEROES
+        .partition_point(|&zero| zero <= code)
+        .checked_sub(1)?;
+    let distance = code - ZEROES[index];
+    (distance < 10).then(|| char::from(b'0' + distance as u8))
+}
+
+fn number_input(value: &str) -> Value {
+    let value_attr = if value.is_empty() {
+        String::new()
+    } else {
+        format!(" value=\"{}\"", legacy_html::escape(value))
+    };
+    Value::from_safe_string(format!(
+        "<input type=\"number\" name=\"minimum_rounds\"{value_attr} class=\"form-control\" min=\"1\" required id=\"id_minimum_rounds\">"
+    ))
 }
 
 #[derive(Default)]
@@ -83,7 +146,21 @@ impl Total {
 #[derive(Default)]
 struct Debate {
     raw: Total,
-    gaps: Vec<f64>,
+    gap_total: BigDecimal,
+    gap_count: usize,
+}
+
+fn django_decimal(value: BigDecimal) -> BigDecimal {
+    value.with_precision_round(NonZeroU64::new(28).unwrap(), RoundingMode::HalfEven)
+}
+
+fn mean_hundredths(total: BigDecimal, count: usize) -> i64 {
+    let mean = django_decimal(total / BigDecimal::from(count as u64));
+    mean.with_scale_round(2, RoundingMode::HalfEven)
+        .into_bigint_and_scale()
+        .0
+        .to_i64()
+        .expect("hundredths of a bounded ballot score")
 }
 
 #[derive(Serialize)]
@@ -103,7 +180,7 @@ struct Judge {
 async fn metrics(
     db: &mut MySqlConnection,
     minimum: usize,
-    highlights: &BTreeSet<i32>,
+    highlights: &BTreeSet<&str>,
 ) -> Result<Vec<Judge>, sqlx::Error> {
     let scores = sqlx::query_as::<_, (i32, i32, i64)>(
         "SELECT s.round_id, s.debater_id, CAST(s.speaks * 10000 AS SIGNED)
@@ -122,12 +199,15 @@ async fn metrics(
         let here = &within[&(round, debater)];
         let count = all.count - here.count;
         if count != 0 {
-            let other = (all.points - here.points) as f64 / count as f64;
-            debates
-                .entry(round)
-                .or_default()
-                .gaps
-                .push(speaks as f64 - other);
+            // Python Decimal rounds division and subtraction at 28 significant
+            // digits. statistics.mean then adds those rounded gaps exactly.
+            let other = django_decimal(
+                BigDecimal::new((all.points - here.points).into(), 4)
+                    / BigDecimal::from(count as u64),
+            );
+            let debate = debates.get_mut(&round).expect("recorded debate");
+            debate.gap_total += django_decimal(BigDecimal::new(speaks.into(), 4) - other);
+            debate.gap_count += 1;
         }
     }
 
@@ -151,11 +231,11 @@ async fn metrics(
         }
         let points: i64 = rounds.iter().map(|debate| debate.raw.points).sum();
         let scores: usize = rounds.iter().map(|debate| debate.raw.count).sum();
-        let gaps: usize = rounds.iter().map(|debate| debate.gaps.len()).sum();
-        let mean = (points as f64 / (100.0 * scores as f64)).round_ties_even() as i64;
+        let gaps: usize = rounds.iter().map(|debate| debate.gap_count).sum();
+        let mean = mean_hundredths(BigDecimal::new(points.into(), 4), scores);
         let generosity = (gaps != 0).then(|| {
-            let difference: f64 = rounds.iter().flat_map(|debate| &debate.gaps).sum();
-            (difference / (100.0 * gaps as f64)).round_ties_even() as i64
+            let difference = rounds.iter().map(|debate| &debate.gap_total).sum();
+            mean_hundredths(difference, gaps)
         });
         rows.push(Judge {
             id,
@@ -166,14 +246,11 @@ async fn metrics(
             mean_rank: 0,
             generosity_rank: 0,
             mean_text: format!("{:.2}", mean as f64 / 100.0),
-            generosity_text: generosity.map(|points| {
-                let sign = if points > 0 { "+" } else { "" };
-                format!("{sign}{:.2}", points as f64 / 100.0)
-            }),
-            highlight: highlights.contains(&id),
+            generosity_text: generosity.map(|points| format!("{:.2}", points as f64 / 100.0)),
+            highlight: highlights.contains(id.to_string().as_str()),
         });
     }
-    rows.sort_by_cached_key(|row| (-row.mean, row.name.to_lowercase(), row.id));
+    rows.sort_by_cached_key(|row| (-row.mean, legacy_html::casefold(&row.name), row.id));
     let mut means = HashMap::new();
     for (index, row) in rows.iter_mut().enumerate() {
         row.mean_rank = *means.entry(row.mean).or_insert(index + 1);
@@ -190,9 +267,9 @@ async fn metrics(
     Ok(rows)
 }
 
-const LEFT: f64 = 54.0;
+const LEFT: u32 = 56;
 const TOP: f64 = 18.0;
-const BOTTOM: f64 = 238.0;
+const BOTTOM: f64 = 248.0;
 
 struct Axis {
     start: f64,
@@ -204,6 +281,7 @@ struct Axis {
 
 #[derive(Serialize)]
 struct Tick {
+    #[serde(serialize_with = "svg_coordinate")]
     position: f64,
     text: String,
     zero: bool,
@@ -211,11 +289,14 @@ struct Tick {
 
 impl Axis {
     fn from_range(minimum: i64, maximum: i64, start: f64, end: f64) -> Self {
-        let margin = ((maximum - minimum) as f64 * 0.1).max(4.0);
-        let low = minimum as f64 - margin;
-        let high = maximum as f64 + margin;
+        let low = minimum as f64 / 100.0;
+        let high = maximum as f64 / 100.0;
+        let margin = ((high - low) * 0.1).max(0.04);
+        let low = low - margin;
+        let high = high + margin;
         let ideal = (high - low) / 4.0;
-        let unit = 10_f64.powf(ideal.log10().floor());
+        let power = ideal.log10().floor() as i32;
+        let unit = format!("1e{power}").parse::<f64>().expect("axis unit");
         let step = [1.0, 2.0, 5.0, 10.0]
             .into_iter()
             .map(|factor| factor * unit)
@@ -232,14 +313,15 @@ impl Axis {
 
     fn coordinate(&self, value: f64) -> f64 {
         let fraction = (value / self.step - self.low as f64) / (self.high - self.low) as f64;
-        ((self.start + fraction * (self.end - self.start)) * 10.0).round() / 10.0
+        let position = self.start + fraction * (self.end - self.start);
+        format!("{position:.1}").parse().expect("axis coordinate")
     }
 
     fn ticks(&self) -> Vec<Tick> {
         (self.low..=self.high)
             .map(|tick| {
                 let value = tick as f64 * self.step;
-                let label = format!("{:.2}", value / 100.0);
+                let label = format!("{value:.2}");
                 Tick {
                     position: self.coordinate(value),
                     text: label.trim_end_matches('0').trim_end_matches('.').into(),
@@ -250,30 +332,39 @@ impl Axis {
     }
 }
 
-#[derive(Serialize)]
+fn svg_coordinate<S: Serializer>(coordinate: &f64, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&format!("{coordinate:?}"))
+}
+
+#[derive(Clone, Copy, Serialize)]
 struct Point<'a> {
+    #[serde(serialize_with = "svg_coordinate")]
     x: f64,
+    #[serde(serialize_with = "svg_coordinate")]
     y: f64,
+    #[serde(flatten)]
     judge: &'a Judge,
 }
 
 #[derive(Serialize)]
 struct Chart<'a> {
     width: u32,
-    right: f64,
-    midpoint: f64,
+    right: u32,
+    field_width: u32,
+    x_label: u32,
     points: Vec<Point<'a>>,
-    labels: Vec<Label>,
+    labels: Vec<Label<'a>>,
     x_ticks: Vec<Tick>,
     y_ticks: Vec<Tick>,
 }
 
 #[derive(Serialize)]
-struct Label {
+struct Label<'a> {
+    #[serde(serialize_with = "svg_coordinate")]
     x: f64,
+    #[serde(serialize_with = "svg_coordinate")]
     y: f64,
-    origin_x: f64,
-    origin_y: f64,
+    point: Point<'a>,
     anchor: &'static str,
     text: String,
 }
@@ -287,10 +378,12 @@ impl Bounds {
     }
 }
 
-fn labels(points: &[Point<'_>], outliers: &BTreeSet<i32>, right: f64) -> Vec<Label> {
+fn labels<'a>(points: &[Point<'a>], outliers: &BTreeSet<i32>, right: u32) -> Vec<Label<'a>> {
+    let left_edge = f64::from(LEFT);
+    let right = f64::from(right);
     let mut occupied: Vec<_> = points
         .iter()
-        .map(|point| Bounds(point.x - 6.0, point.y - 6.0, point.x + 6.0, point.y + 6.0))
+        .map(|point| Bounds(point.x - 7.0, point.y - 7.0, point.x + 7.0, point.y + 7.0))
         .collect();
     let mut candidates: Vec<_> = points
         .iter()
@@ -304,8 +397,8 @@ fn labels(points: &[Point<'_>], outliers: &BTreeSet<i32>, right: f64) -> Vec<Lab
             text.pop();
             text.push('…');
         }
-        let width = 7.5 * text.chars().count() as f64 + 4.0;
-        let side = if point.x < (LEFT + right) / 2.0 {
+        let width = 8.0 * text.chars().count() as f64 + 6.0;
+        let side = if point.x < (left_edge + right) / 2.0 {
             1.0
         } else {
             -1.0
@@ -320,8 +413,8 @@ fn labels(points: &[Point<'_>], outliers: &BTreeSet<i32>, right: f64) -> Vec<Lab
             let x = point.x + dx;
             let y = point.y + dy;
             let left = if dx.is_sign_positive() { x } else { x - width };
-            let candidate = Bounds(left, y - 8.0, left + width, y + 8.0);
-            if candidate.0 >= LEFT
+            let candidate = Bounds(left, y - 9.0, left + width, y + 9.0);
+            if candidate.0 >= left_edge
                 && candidate.1 >= TOP
                 && candidate.2 <= right
                 && candidate.3 <= BOTTOM
@@ -331,8 +424,7 @@ fn labels(points: &[Point<'_>], outliers: &BTreeSet<i32>, right: f64) -> Vec<Lab
                 labels.push(Label {
                     x,
                     y,
-                    origin_x: point.x,
-                    origin_y: point.y,
+                    point: *point,
                     anchor: if dx.is_sign_positive() {
                         "start"
                     } else {
@@ -352,12 +444,12 @@ fn plot(rows: &[Judge], width: u32) -> Option<Chart<'_>> {
         .iter()
         .filter_map(|row| row.generosity.map(|gap| (row, gap)))
         .collect();
-    let right = f64::from(width) - 18.0;
+    let right = width - 18;
     let x = Axis::from_range(
         comparable.last()?.0.mean,
         comparable.first()?.0.mean,
-        LEFT,
-        right,
+        f64::from(LEFT),
+        f64::from(right),
     );
     let y = Axis::from_range(
         comparable.iter().map(|(_, gap)| *gap).min()?.min(0),
@@ -380,8 +472,8 @@ fn plot(rows: &[Judge], width: u32) -> Option<Chart<'_>> {
     let mut points: Vec<_> = comparable
         .into_iter()
         .map(|(judge, gap)| Point {
-            x: x.coordinate(judge.mean as f64),
-            y: y.coordinate(gap as f64),
+            x: x.coordinate(judge.mean as f64 / 100.0),
+            y: y.coordinate(gap as f64 / 100.0),
             judge,
         })
         .collect();
@@ -389,7 +481,8 @@ fn plot(rows: &[Judge], width: u32) -> Option<Chart<'_>> {
     Some(Chart {
         width,
         right,
-        midpoint: (LEFT + right) / 2.0,
+        field_width: right - LEFT,
+        x_label: (LEFT + right) / 2,
         labels: labels(&points, &outliers, right),
         points,
         x_ticks: x.ticks(),
